@@ -117,6 +117,8 @@
   /* avatars: hue comes from the student id (avatarHue), saturation/lightness from the theme */
   --cc-avatar-s: 55%;
   --cc-avatar-l: 38%;
+  /* Small avatars have small initials (not "large text"), so they need 4.5:1 against white: darker. */
+  --cc-avatar-l-small: 28%;
   --cc-avatar-text: var(--p-white);
   /* decorations + mascot (theme-specific, always subtle) */
   --cc-deco-1: var(--p-sky-300);
@@ -729,6 +731,7 @@ a {
 }
 .cc-avatar--sm {
   --cc-avatar-size: 2.25rem;
+  --cc-avatar-l: var(--cc-avatar-l-small);
 }
 .cc-avatar--lg {
   --cc-avatar-size: 4.5rem;
@@ -1613,4 +1616,111 @@ a {
 .cc-class-switcher__live svg {
   width: 0.9em;
   height: 0.9em;
+}
+
+/* ------------------------------------------------------------------ S7: Secret Students, Daily Assistant */
+.cc-secret__chosen {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.cc-secret__count {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 0;
+}
+.cc-reveal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+}
+.cc-reveal__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--cc-radius);
+  border: 2px solid var(--cc-border);
+  background: var(--cc-surface);
+  box-shadow: var(--cc-shadow);
+  animation: cc-fade-in 400ms ease-out 1 both;
+}
+.cc-reveal__name {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.cc-reveal__outcome {
+  min-height: var(--cc-touch);
+  padding: 0.5rem 1rem;
+  border-radius: var(--cc-radius-sm);
+  border: 2px solid var(--cc-border-strong);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+.cc-reveal__outcome[aria-checked='true'] {
+  border-width: 3px;
+  border-color: var(--cc-success);
+  background: var(--cc-success-soft);
+}
+.cc-reveal__outcome:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-reveal__outcome svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.cc-reveal__celebration {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 800;
+  color: var(--cc-success);
+}
+.cc-reveal__absent {
+  color: var(--cc-text-muted);
+}
+.cc-assistant__name {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.cc-assistant__jobs {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  display: grid;
+  gap: 0.25rem;
+}
+.cc-assistant__week {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.cc-assistant__day {
+  min-width: 10rem;
+  font-weight: 700;
+}
+@media print {
+  .cc-noprint,
+  .cc-topbar,
+  .cc-tablist {
+    display: none !important;
+  }
+  .cc-print-sheet {
+    color: var(--cc-text);
+    background: var(--cc-surface);
+  }
+  .cc-print-sheet table {
+    width: 100%;
+  }
 }

@@ -17,7 +17,9 @@ import { setDisplay, useDisplay } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useOutboxStatus } from '../lib/outbox-client.ts';
 import { useMe } from '../lib/session.ts';
+import '../modules/assistant/AssistantPanel.tsx';
 import '../modules/counters/CounterPanel.tsx';
+import '../modules/secret/SecretPanel.tsx';
 import { classLabel, LessonDashboard } from '../modules/lessons/Dashboard.tsx';
 import { EndLessonFlow, LessonSummaryView, type EndDraft } from '../modules/lessons/EndLesson.tsx';
 import { serverNow, useActiveLessons, useLessonState, useServerOffset } from '../modules/lessons/lessonClient.ts';
@@ -63,6 +65,10 @@ const COMMAND_TEXT: Record<string, MessageKey> = {
   'counter.tap': 'command.counter.tap',
   'counter.void': 'command.counter.void',
   'counter.resetLessonBar': 'command.counter.reset',
+  'secret.draw': 'command.secret.draw',
+  'secret.redraw': 'command.secret.redraw',
+  'secret.reveal': 'command.secret.reveal',
+  'secret.recordOutcome': 'command.secret.outcome',
 };
 
 /**

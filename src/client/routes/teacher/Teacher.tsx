@@ -11,7 +11,7 @@ import { freshMe, ME_KEY, signOut, useMe, type Me } from '../../lib/session.ts';
 import { Button, BigButton } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
-import { IconBoard, IconCalendar, IconList, IconPlus, IconSettings, IconUser, IconUsers } from '../../ui/icons.tsx';
+import { IconBoard, IconCalendar, IconFlag, IconList, IconPlus, IconSettings, IconUser, IconUsers } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
 import { SensitiveGate } from '../Lock.tsx';
@@ -46,6 +46,8 @@ export function TeacherLayout() {
               <Link to="/teacher/attendance">{t('teacher.attendance')}</Link>
               <Link to="/teacher/routines">{t('teacher.routines')}</Link>
               <Link to="/teacher/counters">{t('teacher.counters')}</Link>
+              <Link to="/teacher/assistant">{t('teacher.assistant')}</Link>
+              <Link to="/teacher/secret">{t('teacher.secret')}</Link>
             </div>
           </nav>
           <Outlet />
@@ -102,6 +104,14 @@ export function TeacherMenu() {
         <Link to="/teacher/counters" className="cc-menu-tile">
           <IconPlus />
           {t('teacher.counters')}
+        </Link>
+        <Link to="/teacher/assistant" className="cc-menu-tile">
+          <IconCalendar />
+          {t('teacher.assistant')}
+        </Link>
+        <Link to="/teacher/secret" className="cc-menu-tile">
+          <IconFlag />
+          {t('teacher.secret')}
         </Link>
       </div>
       <div className="cc-row">

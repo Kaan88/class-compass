@@ -42,6 +42,9 @@ test('start a lesson with 19 students, resume after refresh, switch classes, off
     await expect(start.locator('.cc-att-item')).toHaveCount(19);
     await expect(start.getByTestId('attendance-counts')).toHaveText('19 Present');
     await start.getByRole('button', { name: 'Next', exact: true }).click();
+    // Daily Assistant step (S7, AST-1): who helps today, then the routine.
+    await expect(start.getByText(/assistant/i).first()).toBeVisible();
+    await start.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(start.getByRole('radio').first()).toBeVisible();
     await start.getByRole('button', { name: 'Begin lesson' }).click();
 

@@ -61,7 +61,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Routine templates (built-in default RTN-1, own templates with add/remove/reorder/rename stages, per-class default), snapshot at lesson start, stepper with current stage; server-timed classroom timer with one soft tone — D-047, D-048
 - [x] End Lesson: step registry (core reflection step; module steps plug in later), works with every optional module off; lesson summary — D-051
 - [x] Dashboard: live local date/day in the class timezone, collapsible student grid with attendance chips, module slot registry (only enabled modules that contribute a slot are shown) — D-052
-- [~] Dashboard slots for assistant (DSH-3), Secret Students (DSH-6), groups/homework (DSH-8) and the assistant start step are not built yet: the registries exist and nothing is registered, so they are omitted (S7–S8). The main counter slot (DSH-5) is registered by S6
+- [~] Dashboard slots for groups/homework (DSH-8) are not built yet (S8). The counter slot (DSH-5) is registered by S6; the assistant (DSH-3), Secret Students (DSH-6) slots and the assistant start step by S7
 - [~] ATT-1 "shown alongside homework": attendance is stored separately; the homework view and the cross-test (`it.todo`) come with S8
 - [x] Tests: new vs resumed, start replay, switching with queued ops (WRONG_LESSON / LESSON_ENDED), ETag 304, shared attendance + audit actor, exception precedence, template edits vs snapshot, end with all modules off, Istanbul midnight boundary, overnight auto-abandon; e2e: 19-student start on 1920×1080 touch, refresh resume, class switch and back, offline attendance tap synced once (`e2e/lessons.spec.ts`)
 - [x] Review fixes (D-053…D-056): start-screen attendance applied on the resume path and guarded against overwriting a colleague's newer record (`expected` + `othersPresent`, warning toast for kept entries); Start/End Lesson drafts kept per class and keyed by class/lesson; finished timer restarts on Start (server + device) and its tone never replays after reload/remount; teacher attendance page shows times in the class timezone; classroom summary limited to held contexts with older reflection notes withheld; teacher-area exception edits need the context still assigned (tests: second start with attendance, stale start screen vs colleague, finished-timer restart, ended assignment, summary note next day; e2e: End Lesson drafts per class)
@@ -79,10 +79,14 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [ ] Undo for a class reset (a confirmation dialog guards it for now; not covered by e2e); threshold sound; per-attended-lesson rates in reports (S11)
 
 ## S7 Secret Students, assistant, End Lesson
-- [ ] Sealed draw, reveal, outcomes, silent absent replacement, history
-- [ ] Weekly assistant plan, swaps, planned vs actual, responsibilities
-- [ ] End Lesson assembled from enabled module steps
-- [ ] Tests: pre-reveal leak scan, fairness, schedule stability, absence carry-forward
+- [x] Sealed draw (count setting 1–10, default 2), confirmed redraw, reveal and outcomes (goal met / still practising, note, celebration) at End Lesson, silent absent replacement with an identical attendance response, shortfall reasons for small classes, unrevealed rounds of abandoned lessons closed and never shown, teacher-area settings and history — SEC-1..7, D-007, D-010, D-062, D-064
+- [x] Fair rotation: fewest counted selections, then longest ago, then a seeded order; redraw and absent withdrawals do not count, abandoned selections do (property test) — SEC-2, D-062
+- [x] Daily Assistant: one per class+subject and day, deterministic weekly plan in Turkish collation, generated once and stable after announcing, re-plan only future unchanged days with confirmation, swaps, overrides, absence carry-forward, planned vs actual, missed turns, editable EN+TR responsibilities (four defaults), school days — AST-1..6, D-063, D-065
+- [x] Dashboard panels for the assistant (with the classroom-safe week) and Secret Students (counts only, mascot), Start Lesson assistant step — DSH-3, DSH-6, D-066
+- [x] End Lesson assembled from enabled module steps: Secret Students reveal → assistant thank-you → reflection — LES-3, D-067
+- [x] Teacher-area weekly schedule page with a print view, responsibilities editor and history; Secret Students settings and history
+- [x] Tests: differential pre-reveal leak scan over every GET (responses + ETags) plus logs/audit/command results, secrecy boundary grep, fairness properties, schedule determinism and stability, absence carry-forward, archived year read-only; e2e: draw, refresh, no chosen name in the panel or any secret-related response before the reveal, reveal and outcomes, weekly plan and announce, axe on the panels, the reveal and the assistant page (`e2e/secret-assistant.spec.ts`)
+- [ ] Not yet: mobile-viewport check of the new teacher pages and an axe pass of the Secret Students teacher page (the panels, the reveal and the assistant page are axe-checked; small avatars were darkened for 4.5:1 contrast); the print view is CSS only, with no print e2e; fairness and outcome reports over the kept history come with S11
 
 ## S8 Grouping & homework
 - [ ] Solver, 5 default arrangements, subject levels, pair constraints, unsatisfied report
