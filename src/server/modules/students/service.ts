@@ -92,11 +92,16 @@ function currentAndScheduledEnrolments(deps: Deps, studentId: string): LiveEnrol
  * (D-021). Turkish-sorted (UX-5, D-009).
  */
 export function rosterRows(deps: Deps, cls: ClassRow): Array<{ student: StudentRow; enrolment: EnrolmentRow }> {
-  const rows = deps.db
+  return rosterRowsOn(deps.db, cls.id, todayFor(deps, cls));
+}
+
+/** Active students enrolled in the class on local day `date` (attendance for past days, S5). */
+export function rosterRowsOn(db: Db, classId: string, date: string): Array<{ student: StudentRow; enrolment: EnrolmentRow }> {
+  const rows = db
     .select({ student: students, enrolment: enrolments })
     .from(enrolments)
     .innerJoin(students, eq(students.id, enrolments.studentId))
-    .where(and(eq(enrolments.classId, cls.id), enrolmentActiveOn(todayFor(deps, cls)), isNull(students.deactivatedAt)))
+    .where(and(eq(enrolments.classId, classId), enrolmentActiveOn(date), isNull(students.deactivatedAt)))
     .all();
   return sortByName(rows, (r) => r.student.fullName);
 }

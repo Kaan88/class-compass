@@ -25,3 +25,8 @@ export function schoolYearFor(ms: number, tz: string): SchoolYearSpan {
   const start = m >= 7 ? y : y - 1;
   return { name: `${start}–${start + 1}`, startsOn: `${start}-09-01`, endsOn: `${start + 1}-06-30` };
 }
+
+/** Day of the week (0 = Sunday … 6 = Saturday) of a local 'YYYY-MM-DD' date. */
+export function weekdayOf(date: string): number {
+  return new Date(`${date}T12:00:00Z`).getUTCDay();
+}

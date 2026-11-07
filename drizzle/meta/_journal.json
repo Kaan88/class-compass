@@ -15,6 +15,13 @@
       "when": 1794055601716,
       "tag": "0001_s2_school_students",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794060623512,
+      "tag": "0002_s5_lessons_attendance",
+      "breakpoints": true
     }
   ]
 }

@@ -271,4 +271,108 @@ export const studentSubjectLevels = sqliteTable(
   (t) => [primaryKey({ columns: [t.studentId, t.subjectId] })],
 );
 
+// ---------------------------------------------------------------- lessons & routines (S5)
+export type StageJson = { id: string; name: LocalizedText };
+export type TimerJson = { durationMs: number; startedAt: number | null; remainingMs: number; running: boolean };
+export type ReflectionJson = { rating: number | null; note: string | null };
+
+/**
+ * Routine templates (RTN-2). Owned by one teacher; `contextId` null = usable in all of the
+ * teacher's classes. The built-in default routine (RTN-1) is code, not a row (DEFAULT_ROUTINE_ID).
+ */
+export const routineTemplates = sqliteTable(
+  'routine_templates',
+  {
+    id: text('id').primaryKey(),
+    teacherId: text('teacher_id').notNull().references(() => users.id),
+    contextId: text('context_id').references(() => teachingContexts.id),
+    name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    stagesJson: text('stages_json', { mode: 'json' }).$type<StageJson[]>().notNull(),
+    archivedAt: integer('archived_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('routine_templates_teacher_idx').on(t.teacherId)],
+);
+
+/** Per-context lesson settings: the routine a new lesson starts with by default (RTN-2, CFG-3). */
+export const contextLessonSettings = sqliteTable('context_lesson_settings', {
+  contextId: text('context_id').primaryKey().references(() => teachingContexts.id),
+  /** A routine_templates id or DEFAULT_ROUTINE_ID. */
+  defaultTemplateId: text('default_template_id').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+  updatedBy: text('updated_by'),
+});
+
+/**
+ * Lessons (LES-1..4). At most one ACTIVE lesson per teaching context (DB-enforced). The routine is
+ * snapshotted at start, so template edits never change a running lesson. `version` increases on
+ * every lesson-state change (ETag for polling). Name snapshots keep history readable (DAT-6).
+ */
+export const lessons = sqliteTable(
+  'lessons',
+  {
+    id: text('id').primaryKey(), // = opId of the 'lesson.start' command
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    teacherId: text('teacher_id').notNull().references(() => users.id),
+    classId: text('class_id').notNull().references(() => classes.id),
+    status: text('status', { enum: ['active', 'ended', 'abandoned'] }).notNull(),
+    startedAt: integer('started_at').notNull(),
+    endedAt: integer('ended_at'),
+    localDate: text('local_date').notNull(), // class timezone, at start
+    routineTemplateId: text('routine_template_id'),
+    routineNameJson: text('routine_name_json', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    routineSnapshotJson: text('routine_snapshot_json', { mode: 'json' }).$type<StageJson[]>().notNull(),
+    stageIndex: integer('stage_index').notNull().default(0),
+    timerJson: text('timer_json', { mode: 'json' }).$type<TimerJson>().notNull(),
+    reflectionJson: text('reflection_json', { mode: 'json' }).$type<ReflectionJson>(),
+    version: integer('version').notNull().default(1),
+    classNameSnapshot: text('class_name_snapshot').notNull(),
+    subjectNameSnapshot: text('subject_name_snapshot', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('lessons_one_active_uq').on(t.contextId).where(sql`status = 'active'`),
+    index('lessons_context_idx').on(t.contextId, t.startedAt),
+    index('lessons_class_date_idx').on(t.classId, t.localDate),
+  ],
+);
+
+// ---------------------------------------------------------------- attendance (S5)
+export const ATTENDANCE_STATUS_VALUES = ['present', 'absent', 'late', 'excused'] as const;
+
+/**
+ * Daily attendance (ACC-8, ATT-2): one row per student and local date, SHARED by every teacher of
+ * the class. Every change is audited with its actor (ACC-9). Independent of homework (ATT-1).
+ */
+export const attendanceDaily = sqliteTable(
+  'attendance_daily',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    classId: text('class_id').notNull().references(() => classes.id),
+    localDate: text('local_date').notNull(),
+    status: text('status', { enum: ATTENDANCE_STATUS_VALUES }).notNull(),
+    note: text('note'),
+    recordedBy: text('recorded_by').notNull().references(() => users.id),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('attendance_daily_student_date_uq').on(t.studentId, t.localDate), index('attendance_daily_class_date_idx').on(t.classId, t.localDate)],
+);
+
+/** Lesson-specific exceptions (ATT-2): override the daily status for one lesson only. */
+export const attendanceLessonExceptions = sqliteTable(
+  'attendance_lesson_exceptions',
+  {
+    lessonId: text('lesson_id').notNull().references(() => lessons.id),
+    studentId: text('student_id').notNull().references(() => students.id),
+    status: text('status', { enum: ATTENDANCE_STATUS_VALUES }).notNull(),
+    note: text('note'),
+    recordedBy: text('recorded_by').notNull().references(() => users.id),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.lessonId, t.studentId] })],
+);
+
 export const _sqlHelper = sql; // re-export for raw fragments in repos
