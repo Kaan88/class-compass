@@ -18,7 +18,7 @@ import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
-import { attendanceStamp, lessonAttendanceCounts, rosterWithAttendance, setDailyCore } from '../attendance/service.ts';
+import { attendanceStamp, dailyFor, lessonAttendanceCounts, markAllPresentCore, rosterWithAttendance, setDailyCore } from '../attendance/service.ts';
 import { assertModuleEnabled, isModuleEnabled } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, effectiveTimezone, getClass, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { endStepsFor, type LessonRow } from './endSteps.ts';
@@ -162,10 +162,20 @@ export function summaryOf(db: Db, l: LessonRow): LessonSummary {
   };
 }
 
+/**
+ * Classroom-access summary (shown right after End Lesson). Only for lessons of a context the teacher
+ * still teaches, and the private reflection note only for a lesson of the class's current local day:
+ * older notes are teacher-area data and must not be readable from a locked classroom device (PIN-1,
+ * PIN-8).
+ */
 export function lessonSummary(ctx: RequestContext, lessonId: string): LessonSummary {
   const l = ctx.db.select().from(lessons).where(eq(lessons.id, lessonId)).get();
   if (!l || l.teacherId !== requireUser(ctx).id) throw notFound('Lesson');
-  return summaryOf(ctx.db, l);
+  const context = ctx.db.select().from(teachingContexts).where(eq(teachingContexts.id, l.contextId)).get();
+  if (!context || context.endedAt !== null) throw notFound('Lesson');
+  const summary = summaryOf(ctx.db, l);
+  if (summary.reflection && l.localDate < todayFor(ctx, getClass(ctx.db, l.classId))) summary.reflection = { ...summary.reflection, note: null };
+  return summary;
 }
 
 // ---------------------------------------------------------------- commands
@@ -178,8 +188,12 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
   const today = todayFor(ctx, cls);
   const existing = getActiveLesson(ctx.db, context.id);
   if (existing) {
-    // LES-2: never a second lesson. The client resumes the running one.
-    if (existing.localDate >= today) return { started: false, reason: 'LESSON_ALREADY_ACTIVE' as const, lessonId: existing.id };
+    // LES-2: never a second lesson. The client resumes the running one. The attendance the teacher
+    // just confirmed is shared daily data for today and is still applied (D-053), never dropped.
+    if (existing.localDate >= today) {
+      const attendanceKept = applyStartAttendance(ctx, context.id, cls, today, p, meta.opId);
+      return { started: false, reason: 'LESSON_ALREADY_ACTIVE' as const, lessonId: existing.id, attendanceKept };
+    }
     // Left running past the end of its day: abandon it (keep its data) and start fresh.
     updateLesson(ctx, existing, { status: 'abandoned', timerJson: { ...existing.timerJson, running: false, startedAt: null } });
     audit(ctx.db, ctx.actor, { action: 'lesson.abandon', entity: 'lesson', entityId: existing.id, after: { localDate: existing.localDate, reason: 'next_day' }, opId: meta.opId }, now);
@@ -209,11 +223,33 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
     updatedAt: now,
   };
   ctx.db.insert(lessons).values(row).run();
-  if (p.attendance?.length && isModuleEnabled(ctx.db, context.id, 'attendance')) {
-    for (const a of p.attendance) setDailyCore(ctx, cls, today, a.studentId, a.status, undefined, meta.opId);
-  }
+  const attendanceKept = applyStartAttendance(ctx, context.id, cls, today, p, meta.opId);
   audit(ctx.db, ctx.actor, { action: 'lesson.start', entity: 'lesson', entityId: row.id, after: { contextId: context.id, localDate: today, routine: routine.templateId, stages: routine.stages.length }, opId: meta.opId }, now);
-  return { started: true, lessonId: row.id };
+  return { started: true, lessonId: row.id, attendanceKept };
+}
+
+/**
+ * Daily attendance from the start screen (LES-1, ACC-8, D-053). Entries carrying `expected` are
+ * written only if the record still has that status (a colleague's newer record wins and is
+ * counted in the result); `othersPresent` then marks everyone still without a record present.
+ * Returns how many entries were kept unchanged because the record had changed.
+ */
+function applyStartAttendance(ctx: RequestContext, contextId: string, cls: ClassRow, today: string, p: P<'lesson.start'>, opId: string): number {
+  if (!isModuleEnabled(ctx.db, contextId, 'attendance')) return 0;
+  let kept = 0;
+  if (p.attendance?.length) {
+    const daily = dailyFor(ctx.db, cls.id, today);
+    for (const a of p.attendance) {
+      const current = daily.get(a.studentId)?.status ?? null;
+      if (a.expected !== undefined && current !== a.expected && current !== a.status) {
+        kept += 1;
+        continue;
+      }
+      setDailyCore(ctx, cls, today, a.studentId, a.status, undefined, opId);
+    }
+  }
+  if (p.othersPresent) markAllPresentCore(ctx, cls, today, opId);
+  return kept;
 }
 
 export function setStage(ctx: RequestContext, p: P<'lesson.setStage'>, meta: CommandMeta) {

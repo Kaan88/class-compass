@@ -56,7 +56,7 @@ describe('start and resume (LES-1, LES-2)', () => {
 
     // A second start with ANOTHER opId (second device, double tap) returns the running lesson.
     const second = await start(s.teacherA, s.ctxA.id);
-    expect(second).toEqual({ started: false, reason: 'LESSON_ALREADY_ACTIVE', lessonId: first.lessonId });
+    expect(second).toEqual({ started: false, reason: 'LESSON_ALREADY_ACTIVE', lessonId: first.lessonId, attendanceKept: 0 });
     const active = await ok(s.teacherA.get('/api/classroom/lessons/active'));
     expect(active.lessons).toHaveLength(1);
     expect(env.db.$client.prepare("select count(*) n from lessons where context_id = ?").get(s.ctxA.id)).toEqual({ n: 1 });
@@ -79,6 +79,39 @@ describe('start and resume (LES-1, LES-2)', () => {
     expect(ro.students.map((x: any) => x.effective).sort()).toEqual(['absent', 'present', 'present', 'present']);
     // Classroom roster never carries notes.
     expect(JSON.stringify(ro)).not.toContain('note');
+  });
+
+  it('a second start (another opId) still records the attendance confirmed on its start screen (LES-1, UX-11, review fix)', async () => {
+    const first = await start(s.teacherA, s.ctxA.id);
+    const kid = studentsA[2]!;
+    const second = await start(s.teacherA, s.ctxA.id, { attendance: [{ studentId: kid.id, status: 'absent', expected: null }], othersPresent: true });
+    expect(second).toEqual({ started: false, reason: 'LESSON_ALREADY_ACTIVE', lessonId: first.lessonId, attendanceKept: 0 });
+    const ro = await roster(s.teacherA, s.ctxA.id, first.lessonId);
+    expect(ro.students.find((x: any) => x.id === kid.id)).toMatchObject({ daily: 'absent', effective: 'absent' });
+    expect(ro.students.filter((x: any) => x.effective === 'present')).toHaveLength(3);
+  });
+
+  it("never silently overwrites a colleague's newer daily record from a stale start screen (ACC-8, review fix)", async () => {
+    await ok(s.admin.post('/api/admin/teaching-contexts', { teacherId: s.mehmet.id, classId: s.c3a.id, subjectId: s.maths.id }));
+    const [x, y, z] = studentsA;
+    // Ayşe's start screen loaded while nobody had a record. Meanwhile Mehmet records X absent, Y late.
+    await ok(s.teacherB.put(`/api/teacher/classes/${s.c3a.id}/attendance`, { date: '2026-11-09', studentId: x!.id, status: 'absent' }));
+    await ok(s.teacherB.put(`/api/teacher/classes/${s.c3a.id}/attendance`, { date: '2026-11-09', studentId: y!.id, status: 'late' }));
+    // She never touched X (only the default "present" applies) but tapped Y to excused and Z to absent.
+    const r = await start(s.teacherA, s.ctxA.id, {
+      attendance: [
+        { studentId: y!.id, status: 'excused', expected: null },
+        { studentId: z!.id, status: 'absent', expected: null },
+      ],
+      othersPresent: true,
+    });
+    expect(r).toMatchObject({ started: true, attendanceKept: 1 });
+    const ro = await roster(s.teacherA, s.ctxA.id, r.lessonId);
+    const by = (id: string) => ro.students.find((k: any) => k.id === id).daily;
+    expect(by(x!.id)).toBe('absent'); // untouched: Mehmet's record stays
+    expect(by(y!.id)).toBe('late'); // changed since the screen loaded: kept, reported
+    expect(by(z!.id)).toBe('absent');
+    expect(by(studentsA[3]!.id)).toBe('present'); // no record: default present
   });
 
   it('only the owner of the context can start or read its lesson (ACC-10)', async () => {
@@ -210,6 +243,16 @@ describe('attendance (ACC-8, ACC-9, ATT-2)', () => {
     expect((await eff(k2.id)).effective).toBe('present');
   });
 
+  it('refuses teacher-area exception edits once the teaching assignment has ended (ACC-10, review fix)', async () => {
+    const { lessonId } = await start(s.teacherA, s.ctxA.id);
+    const body = { studentId: studentsA[0]!.id, status: 'absent' };
+    await ok(s.teacherA.put(`/api/teacher/lessons/${lessonId}/exceptions`, body));
+    await cmd(s.teacherA, 'lesson.end', { contextId: s.ctxA.id, lessonId, steps: {} });
+    await ok(s.admin.post(`/api/admin/teaching-contexts/${s.ctxA.id}/end`));
+    expect((await s.teacherA.put(`/api/teacher/lessons/${lessonId}/exceptions`, { ...body, status: 'present' })).status).toBe(403);
+    expect(env.db.$client.prepare('select status from attendance_lesson_exceptions where lesson_id = ?').get(lessonId)).toEqual({ status: 'absent' });
+  });
+
   it('refuses students outside the class and teachers outside the class', async () => {
     const { lessonId } = await start(s.teacherA, s.ctxA.id);
     const other = await addStudent(s.teacherB, s.c3b.id, { fullName: 'Toprak Güneş' });
@@ -285,6 +328,16 @@ describe('routines (RTN-1..3)', () => {
     const reset = await cmd(s.teacherA, 'lesson.timer.reset', ref);
     expect(reset.result.timer.remainingMs).toBe(120_000);
   });
+
+  it('starts a finished timer again from its full duration (RTN-3, review fix)', async () => {
+    const { lessonId } = await start(s.teacherA, s.ctxA.id);
+    const ref = { contextId: s.ctxA.id, lessonId };
+    await cmd(s.teacherA, 'lesson.timer.set', { ...ref, durationMs: 60_000 });
+    await cmd(s.teacherA, 'lesson.timer.start', ref);
+    env.clock.advance(120_000);
+    const restarted = await cmd(s.teacherA, 'lesson.timer.start', ref);
+    expect(restarted.result.timer).toEqual({ durationMs: 60_000, startedAt: env.clock.now(), remainingMs: 60_000, running: true });
+  });
 });
 
 describe('end lesson (LES-3, CFG-1/2)', () => {
@@ -356,5 +409,13 @@ describe('local day boundaries (DSH-2)', () => {
     expect(prev).toMatchObject({ status: 'abandoned', endedAt: null, stageReached: 3, localDate: '2026-11-09' });
     expect(prev.attendance.absent).toBe(1);
     expect((await state(s.teacherA, s.ctxA.id)).lesson).toMatchObject({ id: fresh.lessonId, localDate: '2026-11-10', stageIndex: 0 });
+    // An earlier day's private reflection note is not readable through the classroom endpoint (PIN-1/PIN-8).
+    await cmd(s.teacherA, 'lesson.end', { contextId: s.ctxA.id, lessonId: fresh.lessonId, steps: { reflection: { rating: 2, note: 'Private thought' } } });
+    expect((await ok(s.teacherA.get(`/api/classroom/lessons/${fresh.lessonId}/summary`))).reflection).toEqual({ rating: 2, note: 'Private thought' });
+    env.clock.advance(24 * 3600_000);
+    await signInAgain();
+    expect((await ok(s.teacherA.get(`/api/classroom/lessons/${fresh.lessonId}/summary`))).reflection).toEqual({ rating: 2, note: null });
+    await ok(s.admin.post(`/api/admin/teaching-contexts/${s.ctxA.id}/end`));
+    expect((await s.teacherA.get(`/api/classroom/lessons/${fresh.lessonId}/summary`)).status).toBe(404);
   });
 });

@@ -110,3 +110,47 @@ test('start a lesson with 19 students, resume after refresh, switch classes, off
     await adminCtx.close();
   }
 });
+
+test('End Lesson drafts stay with their own class when switching (LES-4)', async ({ page }) => {
+  test.setTimeout(90_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  await endActiveLessons(page);
+  try {
+    // Lessons running in 3-A and 3-B (English), started through the command API.
+    const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; className: string; subjectName: { en: string } }>;
+    const ctxOf = (cls: string) => mine.find((c) => c.className === cls && c.subjectName.en === 'English')!.id;
+    for (const cls of ['3-A', '3-B']) {
+      const contextId = ctxOf(cls);
+      const r = await api(page, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'lesson.start', contextId, payload: { contextId } }] });
+      expect(r.body.results[0].ok).toBe(true);
+    }
+    await page.goto('/classroom');
+    const end = page.getByTestId('end-lesson');
+    const note = end.getByLabel('Note (optional)');
+
+    // Open End Lesson in 3-A and type a reflection.
+    await page.getByRole('button', { name: /3-A · English/ }).click();
+    await page.getByRole('button', { name: 'End lesson', exact: true }).click();
+    await end.getByRole('radio', { name: 'Great' }).click();
+    await note.fill('Only for 3-A');
+
+    // Open End Lesson in 3-B: nothing from 3-A is there.
+    await page.getByRole('button', { name: /3-B · English/ }).click();
+    await expect(page.getByTestId('class-banner-class')).toHaveText('3-B');
+    await page.getByRole('button', { name: 'End lesson', exact: true }).click();
+    await expect(end.getByRole('heading', { name: /3-B/ })).toBeVisible();
+    await expect(note).toHaveValue('');
+    await expect(end.getByRole('radio', { name: 'Great' })).toHaveAttribute('aria-checked', 'false');
+    await end.getByRole('radio', { name: 'Tough' }).click();
+
+    // Back to 3-A: its draft is still there, untouched by 3-B.
+    await page.getByRole('button', { name: /3-A · English/ }).click();
+    await expect(end.getByRole('heading', { name: /3-A/ })).toBeVisible();
+    await expect(note).toHaveValue('Only for 3-A');
+    await expect(end.getByRole('radio', { name: 'Great' })).toHaveAttribute('aria-checked', 'true');
+    await expect(end.getByRole('radio', { name: 'Tough' })).toHaveAttribute('aria-checked', 'false');
+  } finally {
+    await endActiveLessons(page);
+  }
+});

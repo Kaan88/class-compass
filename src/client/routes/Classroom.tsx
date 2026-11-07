@@ -18,9 +18,9 @@ import { useI18n } from '../lib/i18n.tsx';
 import { useOutboxStatus } from '../lib/outbox-client.ts';
 import { useMe } from '../lib/session.ts';
 import { classLabel, LessonDashboard } from '../modules/lessons/Dashboard.tsx';
-import { EndLessonFlow, LessonSummaryView } from '../modules/lessons/EndLesson.tsx';
+import { EndLessonFlow, LessonSummaryView, type EndDraft } from '../modules/lessons/EndLesson.tsx';
 import { serverNow, useActiveLessons, useLessonState, useServerOffset } from '../modules/lessons/lessonClient.ts';
-import { StartLessonFlow } from '../modules/lessons/StartLesson.tsx';
+import { emptyStartDraft, StartLessonFlow, type StartDraft } from '../modules/lessons/StartLesson.tsx';
 import { BigButton, Button, buttonClass } from '../ui/Button.tsx';
 import { EmptyState, OutboxAttentionTray, OutboxSaveBadge, registerCommandDescription } from '../ui/Feedback.tsx';
 import { Toggle } from '../ui/Fields.tsx';
@@ -61,7 +61,16 @@ const COMMAND_TEXT: Record<string, MessageKey> = {
   'attendance.markAllPresent': 'command.attendance',
 };
 
-type Mode = { kind: 'idle' } | { kind: 'starting' } | { kind: 'ending' } | { kind: 'summary'; lessonId: string; summary: LessonSummary | null };
+/**
+ * Screen state per class+subject, including the drafts of the Start / End Lesson flows, so switching
+ * away and back restores exactly what this class showed and nothing typed for one class can be sent
+ * for another (LES-4).
+ */
+type Mode =
+  | { kind: 'idle' }
+  | { kind: 'starting'; draft: StartDraft }
+  | { kind: 'ending'; lessonId: string; draft: EndDraft | null }
+  | { kind: 'summary'; lessonId: string; summary: LessonSummary | null };
 
 export const classroomContextsKey = ['classroom', 'contexts'] as const;
 
@@ -85,6 +94,8 @@ export function ClassroomPage() {
   const [modes, setModes] = useState<Record<string, Mode>>({});
   const mode: Mode = (active && modes[active.id]) || { kind: 'idle' };
   const setMode = (id: string, m: Mode) => setModes((all) => ({ ...all, [id]: m }));
+  /** Update a flow draft of one class; ignored once that class has left the flow. */
+  const updateMode = (id: string, fn: (m: Mode) => Mode) => setModes((all) => ({ ...all, [id]: fn(all[id] ?? { kind: 'idle' }) }));
 
   useEffect(() => {
     if (!active) return;
@@ -139,20 +150,28 @@ export function ClassroomPage() {
     }
     if (lessonQ.isLoading) return <p>{t('common.loading')}</p>;
     if (lesson && mode.kind === 'ending') {
+      const contextId = active.id;
       return (
         <EndLessonFlow
+          key={`${contextId}:${lesson.id}`}
           context={active}
           lesson={lesson}
+          draft={mode.lessonId === lesson.id ? mode.draft : null}
+          onDraft={(fn) => updateMode(contextId, (m) => (m.kind === 'ending' && m.lessonId === lesson.id ? { ...m, draft: fn(m.draft) } : m))}
           onCancel={() => setMode(active.id, { kind: 'idle' })}
           onEnded={(summary) => setMode(active.id, { kind: 'summary', lessonId: lesson.id, summary })}
         />
       );
     }
-    if (lesson) return <LessonDashboard context={active} lesson={lesson} onEnd={() => setMode(active.id, { kind: 'ending' })} />;
+    if (lesson) return <LessonDashboard key={active.id} context={active} lesson={lesson} onEnd={() => setMode(active.id, { kind: 'ending', lessonId: lesson.id, draft: null })} />;
     if (mode.kind === 'starting') {
+      const contextId = active.id;
       return (
         <StartLessonFlow
+          key={contextId}
           context={active}
+          draft={mode.draft}
+          onDraft={(fn) => updateMode(contextId, (m) => (m.kind === 'starting' ? { ...m, draft: fn(m.draft) } : m))}
           onCancel={() => setMode(active.id, { kind: 'idle' })}
           onStarted={async () => {
             // Show the dashboard only once the lesson is read back from the server (no flash of "no lesson").
@@ -167,7 +186,7 @@ export function ClassroomPage() {
       <section className="cc-card cc-stack" data-testid="no-lesson">
         <p className="cc-h2">{t('lesson.noneRunning', { cls: classLabel(active, locale) })}</p>
         <div>
-          <BigButton variant="primary" onPress={() => setMode(active.id, { kind: 'starting' })}>
+          <BigButton variant="primary" onPress={() => setMode(active.id, { kind: 'starting', draft: emptyStartDraft() })}>
             <IconPlay />
             {t('lesson.start')}
           </BigButton>

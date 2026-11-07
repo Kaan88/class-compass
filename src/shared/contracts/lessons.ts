@@ -141,8 +141,14 @@ export const LessonCommands = {
     contextId: Id,
     /** A template id, DEFAULT_ROUTINE_ID, or omitted for the context default. */
     routineTemplateId: z.string().max(64).optional(),
-    /** Daily attendance confirmed on the start screen (LES-1); only changes are written. */
-    attendance: z.array(z.object({ studentId: Id, status: AttendanceStatus })).max(200).optional(),
+    /**
+     * Daily attendance the teacher changed on the start screen (LES-1). `expected` is the daily
+     * status the screen showed; when given, the entry is only written if the record is still the
+     * same, so a colleague's newer record is never overwritten silently (ACC-8, D-053).
+     */
+    attendance: z.array(z.object({ studentId: Id, status: AttendanceStatus, expected: AttendanceStatus.nullable().optional() })).max(200).optional(),
+    /** Everyone who still has no daily record when the command runs becomes present (like markAllPresent). */
+    othersPresent: z.boolean().optional(),
   }),
   'lesson.setStage': z.object({ ...LessonRef, stageIndex: z.number().int().min(0).max(MAX_STAGES) }),
   'lesson.timer.start': z.object(LessonRef),
@@ -158,7 +164,13 @@ export type LessonCommandType = keyof typeof LessonCommands;
 export type LessonCommandPayload<T extends LessonCommandType> = z.input<(typeof LessonCommands)[T]>;
 
 /** Result of 'lesson.start': `started: false` + LESSON_ALREADY_ACTIVE means "resume this one" (LES-2). */
-export const StartLessonResult = z.object({ started: z.boolean(), reason: z.literal('LESSON_ALREADY_ACTIVE').optional(), lessonId: z.string() });
+export const StartLessonResult = z.object({
+  started: z.boolean(),
+  reason: z.literal('LESSON_ALREADY_ACTIVE').optional(),
+  lessonId: z.string(),
+  /** Start-screen entries not written because the record changed in the meantime (D-053). */
+  attendanceKept: z.number().int().optional(),
+});
 
 /** The core End Lesson step (LES-3): how did the lesson go? */
 export const ReflectionStepInput = z.object({ rating: z.number().int().min(1).max(4).nullable().default(null), note: z.string().trim().max(500).nullable().default(null) });

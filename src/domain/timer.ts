@@ -27,9 +27,15 @@ export function remainingAt(t: TimerState, now: number): number {
 
 export const isFinished = (t: TimerState, now: number) => remainingAt(t, now) === 0 && (t.running || t.remainingMs === 0);
 
-/** Start or resume. A finished timer starts again from its full duration. */
+/**
+ * Start or resume. A finished timer starts again from its full duration — including one that ran
+ * out while `running` (the stored state stays `running` after the countdown reaches 0).
+ */
 export function startTimer(t: TimerState, now: number): TimerState {
-  if (t.running) return t;
+  if (t.running) {
+    if (remainingAt(t, now) > 0) return t;
+    return { ...t, running: true, startedAt: now, remainingMs: t.durationMs };
+  }
   const left = t.remainingMs > 0 ? t.remainingMs : t.durationMs;
   return { ...t, running: true, startedAt: now, remainingMs: left };
 }

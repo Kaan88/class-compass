@@ -15,6 +15,8 @@ import { patchLesson, sendLessonCommand, serverNow } from './lessonClient.ts';
 import { pauseTimer, resetTimer, setTimer, startTimer } from '../../../domain/timer.ts';
 
 const PRESETS_MIN = [1, 3, 5, 10, 15];
+/** A run that ended at most this long ago still gets its tone when the screen first shows it. */
+const RECENT_END_MS = 3_000;
 
 function playSoftTone() {
   try {
@@ -50,15 +52,19 @@ export function LessonTimer({ lesson }: { lesson: LessonState }) {
   const left = remainingAt(timer, timer.running ? now : serverNow());
   const finished = timer.running && left === 0;
 
-  // One tone per finished run (keyed by the run's start time), never repeated.
+  // One tone per finished run, and only when the countdown reaches 0 while this screen shows it
+  // (or within the last few seconds): a run that finished long ago stays silent after a reload, on
+  // another device or when the dashboard is shown again.
+  const runKey = `${lesson.id}:${timer.startedAt}`;
+  const watched = useRef<string | null>(null);
   const signalled = useRef<string | null>(null);
   useEffect(() => {
-    const runKey = `${lesson.id}:${timer.startedAt}`;
-    if (finished && signalled.current !== runKey) {
-      signalled.current = runKey;
-      if (soundsAllowed(display)) playSoftTone();
-    }
-  }, [finished, lesson.id, timer.startedAt, display]);
+    if (timer.running && !finished) watched.current = runKey;
+    if (!finished || signalled.current === runKey) return;
+    signalled.current = runKey;
+    const endedAt = (timer.startedAt ?? 0) + timer.remainingMs;
+    if ((watched.current === runKey || serverNow() - endedAt <= RECENT_END_MS) && soundsAllowed(display)) playSoftTone();
+  }, [finished, runKey, timer.running, timer.startedAt, timer.remainingMs, display]);
 
   const ref = { contextId: lesson.contextId, lessonId: lesson.id };
   const apply = (fn: (tm: LessonState['timer']) => LessonState['timer']) => patchLesson(lesson.contextId, (l) => ({ ...l, timer: fn(l.timer) }));
@@ -96,7 +102,7 @@ export function LessonTimer({ lesson }: { lesson: LessonState }) {
             size="big"
             variant="primary"
             onPress={() => {
-              apply((tm) => startTimer(finished ? pauseTimer(tm, serverNow()) : tm, serverNow()));
+              apply((tm) => startTimer(tm, serverNow()));
               void sendLessonCommand('lesson.timer.start', ref);
             }}
           >

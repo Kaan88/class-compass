@@ -49,10 +49,30 @@ function ReflectionStep({ value, onChange }: { lesson: LessonState; value: Refle
 
 registerEndStepUi<ReflectionValue>({ key: 'reflection', title: 'reflection.title', initial: () => ({ rating: null, note: '' }), Component: ReflectionStep });
 
-export function EndLessonFlow({ context, lesson, onCancel, onEnded }: { context: ClassroomContext; lesson: LessonState; onCancel: () => void; onEnded: (summary: LessonSummary | null) => void }) {
+/** Values typed into the End Lesson steps so far; kept by the classroom page per class and lesson (LES-4). */
+export type EndDraft = Record<string, unknown>;
+
+export function EndLessonFlow({
+  context,
+  lesson,
+  draft,
+  onDraft,
+  onCancel,
+  onEnded,
+}: {
+  context: ClassroomContext;
+  lesson: LessonState;
+  /** null = nothing typed yet (each step starts from its initial value). */
+  draft: EndDraft | null;
+  onDraft: (update: (d: EndDraft | null) => EndDraft) => void;
+  onCancel: () => void;
+  onEnded: (summary: LessonSummary | null) => void;
+}) {
   const { t, locale } = useI18n();
   const uis = endStepUis(lesson.endSteps);
-  const [values, setValues] = useState<Record<string, unknown>>(() => Object.fromEntries(uis.map((u) => [u.key, u.initial()])));
+  const initial = (): EndDraft => Object.fromEntries(uis.map((u) => [u.key, u.initial()]));
+  const values: EndDraft = { ...initial(), ...draft };
+  const setValues = (fn: (v: EndDraft) => EndDraft) => onDraft((d) => fn({ ...initial(), ...d }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const label = classLabel(context, locale);

@@ -82,7 +82,9 @@ export function AttendancePage() {
   const setDaily = (studentId: string, status: AttendanceStatus | null, note?: string) =>
     run(() => call(L.setClassAttendance, { classId: cid, date: shownDate!, studentId, status, ...(note !== undefined ? { note } : {}) }), { invalidate: refresh });
   const nameOf = (id: string) => day.data?.students.find((s) => s.studentId === id)?.fullName ?? '—';
-  const fmtTime = (ms: number) => formatDate(ms, locale, Intl.DateTimeFormat().resolvedOptions().timeZone, { hour: '2-digit', minute: '2-digit' });
+  // Times in the class timezone like everywhere else (DSH-2), never the device's.
+  const classTz = contexts.data?.contexts.find((c) => c.classId === cid)?.timezone;
+  const fmtTime = (ms: number) => (classTz ? formatDate(ms, locale, classTz, { hour: '2-digit', minute: '2-digit' }) : '—');
 
   return (
     <main className="cc-page cc-stack" data-testid="attendance-page">

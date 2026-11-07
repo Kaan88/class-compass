@@ -15,7 +15,7 @@ import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId, sha256 } from '../../lib/crypto.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
-import { assertClassWritable, assertTeachesClass, getClass, getYear, todayFor, type ClassRow } from '../school/policy.ts';
+import { assertClassWritable, assertOwnsContext, assertTeachesClass, getClass, getYear, todayFor, type ClassRow } from '../school/policy.ts';
 import { rosterRowsOn } from '../students/service.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -224,6 +224,8 @@ export function setLessonExceptionTeacher(ctx: RequestContext, input: In<typeof 
   tx(ctx.db, () => {
     const lesson = ctx.db.select().from(lessons).where(eq(lessons.id, input.lessonId)).get();
     if (!lesson || lesson.teacherId !== requireUser(ctx).id) throw notFound('Lesson');
+    // The teacher must still teach this class+subject (ACC-10): an ended assignment is read-only history.
+    assertOwnsContext(ctx, lesson.contextId);
     assertClassWritable(ctx.db, getClass(ctx.db, lesson.classId));
     if (setExceptionCore(ctx, lesson, input.studentId, input.status, input.note)) {
       ctx.db.update(lessons).set({ version: lesson.version + 1, updatedAt: ctx.now() }).where(eq(lessons.id, lesson.id)).run();

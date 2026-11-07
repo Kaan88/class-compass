@@ -37,6 +37,11 @@ describe('classroom timer (RTN-3)', () => {
     expect(remainingAt(t, 300_000)).toBe(60_000);
     expect(resetTimer(t)).toEqual(idleTimer(60_000));
     expect(formatTimer(65_000)).toBe('1:05');
+    // Review fix: a timer that ran out while running (stored running: true) restarts on Start.
+    const ran = startTimer(setTimer(60_000), 0);
+    expect(startTimer(ran, 120_000)).toEqual({ durationMs: 60_000, startedAt: 120_000, remainingMs: 60_000, running: true });
+    // ...while a timer that is still counting is left alone.
+    expect(startTimer(ran, 30_000)).toBe(ran);
     expect(formatTimer(3_600_000)).toBe('1:00:00');
   });
   it('never reports negative or more than the remaining time (property)', () => {
