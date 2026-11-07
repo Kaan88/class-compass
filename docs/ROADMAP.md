@@ -169,6 +169,10 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [ ] Importer sheet picker; delete students (remove from class / deactivate / permanent delete); teachers change their class themes; "Add classroom"
 - [ ] Account invite links with the teacher's language; teachers choose password or email-link sign-in (always offered to teachers; admins keep passwords; PIN still required)
 
+## S13c Student achievements and avatars (owner request 2026-11-08)
+- [ ] Achievements: 60+ positive default badges, auto rules and manual awards, custom badges, original themeable icon library, student page with progress and celebrations, optional private levels, reports
+- [ ] Avatars: 120+ themeable avatars plus a builder, chosen by students, unlockable accessories, shown across the classroom and student pages
+
 ## S12 Super Speakers (school-wide English points)
 - [ ] Scorer links (with interface language) and PWA with pairing code for iPhone, live search, +1 and undo, offline queue
 - [ ] Big-screen board: top 3 with full name and class, class totals, placeholder when empty, weekly reset, live updates
