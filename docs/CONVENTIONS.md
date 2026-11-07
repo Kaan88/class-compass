@@ -24,7 +24,11 @@ These patterns are established in S0/S1 and every stage must follow them. If a p
 - Every endpoint is declared once in `src/shared/contracts/<module>.ts` with `endpoint({method, path, access, input, output})` and registered with `route(app, deps, ep, handler)`. Output schemas are allow-lists: never return rows directly when they contain fields the caller must not see.
 - Access classes (`define.ts`): `public | user | account | classroom | teacher | admin | student`. Classroom-safe actions (taps, attendance, stage changes) are `classroom`; anything showing reports, private notes, roster edits, settings, links is `teacher`/`admin` (PIN-gated in classroom mode server-side).
 - Resource authorisation is done in services with policy helpers (e.g. "teacher owns this teaching context", "teacher teaches in this class"). Never trust ids from the client without checking ownership. Student principals get `studentId` from the session only.
-- Errors: throw `AppError(code, message, details?)`. Stable codes in `ErrorCodes`.
+- Errors: throw `AppError(code, message, details?)`. Stable codes in `ErrorCodes`. Put a machine-readable `details.reason` (e.g. `YEAR_ARCHIVED`, `POSSIBLE_DUPLICATE`) on business conflicts and add a matching `error.<REASON>` i18n key.
+- **School policy helpers** (`src/server/modules/school/policy.ts`) — reuse them, never re-implement: `assertTeachesClass(ctx, classId)` (teacher has an active context in the class), `assertOwnsContext(ctx, contextId)` (returns the context; ACC-10), `assertYearWritable(db, yearId)` / `assertClassWritable(db, cls)` before **any** write touching a class or year (archived = read-only, DAT-1), `todayFor(deps, cls)` for local dates in the class timezone.
+- **Module gating** (`src/server/modules/school/modules.ts`): `isModuleEnabled(db, contextId, module)` / `assertModuleEnabled(...)` before serving or accepting module data; `getMediaPolicy(db)` before accepting photo/audio/document uploads (D-014, D-026). Disabled modules keep their data.
+- **Students**: create via `createStudentInClass` (students service) so names are normalised, duplicates flagged and enrolments opened consistently (teacher, admin, seed, importer). Classroom endpoints return only `id, fullName, initials, avatarHue`; levels and numbers are teacher-access only (GRP-7).
+- Optional services (mail) are injected through `AppDeps` (`deps.mailer`) so tests can pass fakes.
 - Classroom mutations that must survive flaky Wi-Fi go through **commands** (`defineCommand` in the module's `commands.ts`, imported by its routes file so it registers). Handlers are synchronous, run inside the transaction, re-verify ownership and lesson/context consistency, and may use `meta.opId` as the id of the row they create.
 - Important edits write `audit(db, ctx.actor, {...}, ctx.now())` in the same transaction (never include secrets or pre-reveal Secret Student identities).
 - Time: use `ctx.now()` (injectable clock), never `Date.now()` in services.
@@ -36,6 +40,7 @@ These patterns are established in S0/S1 and every stage must follow them. If a p
 - Respect `prefers-reduced-motion` and the per-class motion/sound switches; no repeated flashing.
 
 ## Tests
-- Server tests use `tests/helpers.ts` (`makeEnv`, `Client`, `seedUser`, controllable `Clock`). Test through HTTP where behaviour is user-visible; unit-test domain logic directly.
+- Server tests use `tests/helpers.ts` (`makeEnv`, `Client`, `seedUser`, controllable `Clock`, `FakeMailer`) and `tests/school-fixture.ts` (`buildSchool`: year, subjects, 3-A/3-B, two teachers with contexts).
+- `tests/server/permissions.test.ts` enumerates every registered endpoint against the access matrix; new endpoints are covered automatically — keep it green rather than adding exceptions. Test through HTTP where behaviour is user-visible; unit-test domain logic directly.
 - Every requirement ID touched by a stage needs at least one test referencing it in the test name or a comment.
 - Only fictional data. Synthetic Turkish/English names come from the demo seed / fixtures.

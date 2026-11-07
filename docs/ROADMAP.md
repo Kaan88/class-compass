@@ -18,24 +18,31 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Repo skeleton, boundaries lint, Vitest, GitHub Actions (Ubuntu + Windows), CONVENTIONS.md
 - [ ] Playwright setup; i18n/a11y/raw-colour lint rules (S3)
 - [x] Baseline migration, `/healthz`, redacted logging, CSP/security headers, robots/noindex
-- [ ] Synthetic Turkish/English fixture generator (fictional students only)
+- [x] Synthetic Turkish/English name generator (fictional students only) — `demoNames` in `src/server/seed/demo.ts` (S2)
 
 ## S1 Contracts, auth, audit
 - [x] Endpoint registry with mandatory access class; typed client
 - [x] Users, sessions, argon2id, CSRF/Origin, login lockout, `admin:create` + `admin:reset-password` CLI
-- [ ] Email password reset when SMTP configured (D-015) — S2
+- [x] Email password reset when SMTP configured (D-015) — done in S2
 - [x] Audit helper, command log, `/api/commands` idempotency
 - [x] Tests: session expiry, lockout, CSRF, per-teacher locale, PIN lock/unlock/lockout, command replay/conflict (22 tests)
-- [ ] Test enumerating every endpoint against the permission matrix — S2
+- [x] Test enumerating every endpoint against the permission matrix — done in S2 (`tests/server/permissions.test.ts`)
 
-## S2 School structure, admin, i18n
-- [ ] Years, terms, classes, subjects, teaching contexts, module policies; admin UI
-- [ ] Students, enrolments, manual + paste entry; Turkish text module; EN/TR with per-teacher locale
-- [ ] Tests: authorisation matrix, Turkish sort/case/initials, locale isolation
+## S2 School structure, admin, students (backend)
+- [x] Years, terms (archive = read-only guard), subjects, classes (theme, timezone, sounds/animations), teaching contexts, module policies + per-context module settings (`isModuleEnabled`, `getMediaPolicy`; media photos/audio OFF by default) — D-014, D-026
+- [x] Policy helpers for later stages: `assertTeachesClass`, `assertOwnsContext`, `assertYearWritable`, `assertClassWritable`
+- [x] Accounts admin: create (temporary password once), edit, deactivate/reactivate, password reset, clear PIN; school settings; audit-log query (filters, paging, secrets stripped)
+- [x] Students + enrolments: teacher/admin manual entry, edit (audited), duplicate warnings (never merged), Turkish normalisation/sorting, classroom-safe roster vs teacher roster, subject levels (teacher-only), deactivate/reactivate, move and whole-class promotion with history — D-021, D-022
+- [x] Email password reset when SMTP configured (nodemailer, injectable mailer) — D-015
+- [x] `seed:demo` fictional school (3-A 19, 3-B 20, 4-C 34, 2-D 3; random passwords printed once) — D-024
+- [x] Tests: permission matrix over all endpoints, unassigned-class/other-context denial, archived year read-only, promotion history, deactivated teacher + audit retained, media defaults, module disable keeps data, locale isolation, email reset, seed (66 tests total)
+- [ ] Admin UI and teacher roster/module screens — moved to S3 (this stage is backend only)
+- [ ] Paste entry of student lists — moved to S9 (it is the importer's paste input, IMP-1)
 
 ## S3 UI kit & themes
 - [ ] Tokens + 3 themes; StudentCard, CounterBar, SaveStateBadge, UndoToast, LockScreen, ClassBanner, ConfirmDestructive…
 - [ ] Text scale, reduced motion, sounds/animation switches; `/dev/catalog`
+- [ ] Admin screens on the S2 APIs (users, settings, years/terms, subjects, classes, assignments, module policies, students incl. move/promote, audit log) and teacher roster / module settings screens; password-reset page
 - [ ] Tests: screenshot matrix, axe, contrast, 20- and 40-student grids
 
 ## S4 Classroom mode & PIN
@@ -74,6 +81,6 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 
 ## S11 Reports, long-term data, operations
 - [ ] All report areas with denominators/coverage, CSV, print
-- [ ] Year archive, promotion, deactivation, full export
+- [ ] Full data export (year archive, promotion and deactivation APIs already done in S2)
 - [ ] Backup/restore CLI, timers, off-site, deploy with rollback; isolated install on Debian VM; ENG-5 report
 - [ ] Production go-live only with explicit owner authorisation
