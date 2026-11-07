@@ -1,6 +1,6 @@
 # Operations: Setup, Testing, Backup, Restore, Deployment
 
-Status: development setup, testing, demo seed and account recovery are implemented (S0–S2). Backup, restore and deployment are still the planned design (see ARCHITECTURE.md, D-018) and will be filled in and verified in S11.
+Status: development setup, testing, demo seed and account recovery are implemented (S0–S2). Backups, restore, exports and the school-year rollover are implemented and tested (S11). The Docker image, compose file and deployment steps below are written and statically checked, but **have not been run yet**: Docker is not installed on the development machine and no VPS deployment has been done (ROADMAP S11).
 
 ## Development setup
 1. Node 26, Git.
@@ -49,16 +49,93 @@ Safety rules (D-024):
 - Never commit `.env`, databases, uploads, backups or real student data (enforced by `.gitignore`).
 - Dev/test uses synthetic data only (demo seed, test fixtures).
 
-## Backup (planned, S11)
-- Hourly online snapshot of the database + uploads to `/var/lib/class-compass/<school>/backups`.
-- Nightly encrypted off-site copy (restic; Backblaze B2 and/or Cloudflare R2, D-017).
-- Weekly integrity check; admin Maintenance page warns if the last good off-site backup is >36 h old.
 
-## Restore (planned, S11)
-- `class-compass restore <snapshot>`: stops service, verifies snapshot, swaps DB + uploads, runs migrations, health check. Rehearsed in CI.
+## Reports (S11)
+- Teachers: **Teacher area → Reports** (PIN-gated in classroom mode; 423 while the classroom is locked). Only their own class+subject assignments, including ended ones and archived years. Filters: class+subject, student, period (day / week / month / term / school year / custom).
+- Administrators: **Admin → Reports**: the school-wide usage report (counts per class+subject and teacher, no student data, no notes) and every class+subject report (the teacher's lesson reflection notes are left out).
+- Every table has a CSV link (UTF-8 with BOM; cells starting with `=`, `+`, `-`, `@`, tab or CR get a leading `'` so spreadsheets never run them). Each download is audited.
+- Print: the browser's print dialog gives A4 pages with the school, class, subject, period and print time in the header; navigation and filters are hidden.
+- RPT-5: every count says what it is out of; "not recorded", "absent" and "not in the class" are words, never 0; there is no overall score. Attendance coverage counts Monday–Friday as school days (no holiday calendar yet).
 
-## Deployment (planned, S11)
-- Docker container (localhost-only port) published through Cloudflare Tunnel (D-018); TLS at Cloudflare.
-- `/opt/class-compass/releases/<sha>` + `current` symlink; config `/etc/class-compass/<school>.env` (mode 600); data `/var/lib/class-compass/<school>`.
-- Deploy: build → snapshot DB → migrate → health check → switch symlink, auto-rollback on failure.
-- **Debian test VM:** inspect first, preserve existing services, install in isolation (own user, port, dirs). Test access does not authorise production deployment.
+## Backups (S11, D-089)
+A backup is one file `DATA_DIR/backups/cc-backup-<UTC time>.tar` (folder: `BACKUP_DIR`) holding:
+- `class-compass.db`: an online copy made with SQLite's backup API (safe while the app runs);
+- `uploads/…`: every uploaded file;
+- `manifest.json`: format version, app version, migration level, row counts per table and the size + SHA-256 of every entry.
+
+Commands (in the container prefix them with `docker compose exec -T app`; in development use `npm run cli --`):
+
+| Command | What it does |
+|---|---|
+| `node src/server/cli.ts backup:create [--trigger timer]` | New local backup, then retention: newest per hour for `BACKUP_KEEP_HOURLY`=48 hours, per day for `BACKUP_KEEP_DAILY`=30 days, per month for `BACKUP_KEEP_MONTHLY`=12 months; the newest is always kept; the last 10 pre-migration snapshots are kept |
+| `node src/server/cli.ts backup:list` | Local backups, newest first |
+| `node src/server/cli.ts backup:verify [file]` | Checks every checksum, opens the database, runs `PRAGMA integrity_check` and compares row counts with the manifest |
+| `node src/server/cli.ts backup:restore <file> [--force]` | Restore (below) |
+| `node src/server/cli.ts backup:offsite [file or latest]` | Copies the backup to the restic repository, then `forget --prune` with `OFFSITE_KEEP_DAILY/WEEKLY/MONTHLY` (30/8/12) |
+| `node src/server/cli.ts backup:offsite-init` | Creates the restic repository once |
+| `node src/server/cli.ts backup:offsite-check [--read-data-subset 5%]` (alias `restic:check`) | `restic check`, optionally reading a share of the data |
+| `node src/server/cli.ts backup:offsite-snapshots` | Lists the off-site snapshots |
+| `node src/server/cli.ts version` | App version and migration level |
+
+- Every run (local, pre-migration, verify, off-site, off-site check, restore) is recorded in the `backup_runs` table and shown on **Admin → Maintenance**: last local backup, last off-site backup (a warning when none is newer than `OFFSITE_STALE_HOURS`=36 hours), last verification, last restore, disk usage, app version and migration level. "Back up now" and "Verify the latest backup" there need the administrator's PIN and are audited.
+- **Before every database update** the app takes a database-only snapshot `cc-premigration-<time>.tar` at start-up when migrations are pending (also the CLI `migrate`).
+- **Off-site (restic, D-017).** Storage credentials live only in `deploy/restic.env` (mode 600, never committed; see `deploy/restic.env.example`) and are given only to backup runs, never to the app container. The app passes restic just the restic/B2/AWS variables plus PATH/HOME and removes credential values from any message it prints or stores.
+  - Cloudflare R2: `RESTIC_REPOSITORY=s3:https://<account-id>.r2.cloudflarestorage.com/<bucket>` with `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (an R2 token limited to that bucket).
+  - Backblaze B2: `RESTIC_REPOSITORY=b2:<bucket>:class-compass` with `B2_ACCOUNT_ID` / `B2_ACCOUNT_KEY` (an application key limited to that bucket).
+  - `RESTIC_PASSWORD` (or `RESTIC_PASSWORD_FILE`): keep a copy away from the server, or the off-site backups cannot be read.
+- **Schedules** (pick one): the host timers in `deploy/systemd/` (hourly `backup:create`, nightly 01:30 `backup:offsite latest`), or the compose `backup` sidecar (`docker compose --profile backup up -d`, `src/server/backupLoop.ts`: hourly local backup, off-site once a day at `OFFSITE_HOUR_UTC`). Weekly check, e.g. by cron: `15 3 * * 0 cd /opt/class-compass && docker compose --profile backup run --rm --no-deps --entrypoint node backup src/server/cli.ts backup:offsite-check --read-data-subset 5%`.
+
+## Restore (S11, D-089)
+`backup:restore` refuses while a server uses the data folder: it asks `/healthz` and reads `DATA_DIR/server.lock` (written by the server at start, removed on a clean stop). A lock it cannot check (another container, or after a crash) needs `--force`, **only after you have made sure the service is stopped**. A live server process on the same host is never overridden.
+
+1. `docker compose stop app` (and the `backup` sidecar if used).
+2. Pick the file: `docker compose run --rm --no-deps app node src/server/cli.ts backup:list`. For an off-site copy, first `restic restore <snapshot> --target /tmp/r` on the host (with `deploy/restic.env` loaded) and copy the `.tar` into `data/backups/`.
+3. `docker compose run --rm --no-deps app node src/server/cli.ts backup:restore <file> --force`. The restore:
+   - extracts into a temporary folder in `DATA_DIR` and verifies every checksum, the integrity check and the row counts; a corrupted or truncated backup is refused and nothing changes;
+   - moves the current database and `uploads/` aside into `DATA_DIR/pre-restore-<time>/` (kept until you delete it), moves the restored files in (renames on the same disk) and puts everything back if a step fails;
+   - runs the database migrations of this app version and records the restore in `backup_runs`.
+4. `docker compose start app`, then check `/healthz`, sign in and open Admin → Maintenance. When all is well, delete `data/pre-restore-<time>/`.
+
+**Restore drill** (after the first deployment, then every term): restore the latest backup into a scratch data folder on the VM, e.g. `docker run --rm -v /opt/class-compass/data/backups:/b:ro -v /tmp/drill:/data class-compass:<tag> node src/server/cli.ts backup:restore /b/<file>`, then `backup:verify` the same file and compare the row counts it prints with Admin → Maintenance. Write the date into the school's operations log and delete `/tmp/drill`.
+
+## Exports (S11, D-090)
+- **Admin → Maintenance → Exports → Full school export** (type `EXPORT` to confirm): a ZIP with `tables/<table>.csv` for every table (header = column names, UTF-8 with BOM, formula-safe), optionally `uploads/<storage key>` for every uploaded file, and `manifest.json` (app version, migration level, row counts, size + SHA-256 per entry, what was left out). Columns are the database columns (see `src/server/db/schema.ts`: ids are UUIDs, `…_at` are epoch milliseconds UTC, local dates are `YYYY-MM-DD`, `…_json` columns hold JSON). Never exported: sessions, sign-in attempts, one-time tokens, the command log, password/PIN/token hashes (blanked), private teacher notes (only their count), and Secret Student choices of rounds that were never revealed.
+- **One student's data (KVKK access request):** Admin → Maintenance → Exports, choose the student, "Prepare export": every row that refers to the student, their uploaded files and the audit events about them. Private teacher notes stay with their author (the manifest gives how many exist); unrevealed Secret Student choices are left out.
+- An export is prepared in `DATA_DIR/exports/`, can be downloaded **once** within an hour and is then deleted. Preparing and downloading are audited.
+
+## New school year (S11, DAT-1/2)
+**Admin → Maintenance → New school year**: name and dates of the new year, then choose whether to create the classes again (grade + 1, e.g. 3-A → 4-A; names can be changed in the preview), keep the same teachers and subjects, move the students up on the first day of the new year, and archive the old year. "Preview" shows the classes, students and assignments and any problem; "Start the new year" needs the old year's name typed and runs everything in one transaction (audited). Enrolment history is kept; archived years are read-only and their reports stay available. Students who leave are deactivated (Admin → Students); their history stays in the reports of the periods they were in the class, and labels renamed since are shown as they were then, with the current text as a hint.
+
+## Deployment on a VPS (S11, D-018): written, not yet performed
+Docker is not installed on the development machine, so the image has not been built or run yet. Follow these steps on the VM and record the results. **Test access does not authorise a production go-live** (ROADMAP).
+
+### 1. Prerequisites and inspection (change nothing yet)
+- Debian 12 or Ubuntu 22.04+ VM, at least 2 vCPU / 2 GB RAM / 20 GB disk, outbound HTTPS, SSH with keys.
+- Inspect first and write down what you find: `sudo ss -tlnp` (ports in use), `docker ps -a` and `docker compose ls` (existing containers), `systemctl list-units --type=service --state=running`, `systemctl list-timers`, `df -h`, `free -h`, `ls /opt /srv`, and whether a `cloudflared` service already runs (`systemctl status cloudflared`). Do not stop, upgrade or reconfigure anything that is already there.
+- Install Docker Engine and the compose plugin from Docker's Debian/Ubuntu repository only if missing (`docker version`, `docker compose version`).
+
+### 2. Isolated install
+- User and folder: `sudo useradd --system --create-home --home-dir /opt/class-compass --shell /usr/sbin/nologin classcompass`, give it Docker access (`sudo usermod -aG docker classcompass`, or run compose via sudo), and put the code in `/opt/class-compass/app` (`git clone` of the private repository, or a release tarball).
+- In `/opt/class-compass` keep `docker-compose.yml` (from `docker-compose.example.yml`, with `build.context: ./app`), `app.env`, `tunnel.env`, `deploy/restic.env` (all mode 600, owner classcompass) and `data/` owned by the image user (uid 10001): `sudo install -d -o 10001 -g 10001 -m 700 /opt/class-compass/data`.
+- Pick a free local port (step 1) and set `APP_HOST_PORT` in a `.env` beside the compose file if 3210 is taken. The port is bound to 127.0.0.1 only.
+- `app.env` (from `.env.example`): `SECRET_PEPPER` (32 random bytes, base64, generated on the VM; keep a copy in the password manager, without it sessions and student links stop working), `PUBLIC_ORIGIN=https://<subdomain>.sareteacher.com` (subdomain still to be decided), `DEFAULT_TIMEZONE=Europe/Istanbul`, SMTP settings (below), upload quotas.
+- Build and start: `APP_TAG=$(git -C app rev-parse --short HEAD) docker compose build`, then `APP_TAG=<same> docker compose up -d app`; check `docker compose ps` (healthy) and `curl -fsS http://127.0.0.1:<port>/healthz`.
+
+### 3. Cloudflare Tunnel
+- In Cloudflare Zero Trust → Networks → Tunnels, create a tunnel for this VM, put its token into `tunnel.env` as `TUNNEL_TOKEN=…`, and add the public hostname `<subdomain>.sareteacher.com` → service `http://app:3210`. Then `docker compose --profile tunnel up -d cloudflared`.
+- If the VM already runs cloudflared for other sites, you may instead add this hostname to that tunnel with service `http://127.0.0.1:<port>`; do not replace its existing configuration.
+- For that hostname: turn **off** Web Analytics / Real User Monitoring automatic injection (it would add a script the CSP blocks and send page data to a third party); turn **off** caching (a Cache Rule "bypass cache" for the hostname; the app also sends `no-store` for private data); turn off Rocket Loader and email obfuscation; keep "Always Use HTTPS" on.
+- `TRUST_PROXY=true` is set in the compose file, so rate limits and the audit log use the visitor address from the tunnel.
+
+### 4. First administrator, mail, backups
+- `docker compose exec app node src/server/cli.ts admin:create --login <login> --name "<Name>"` (the password is read from the terminal, so it does not land in shell history). Sign in at `https://<subdomain>.sareteacher.com` and set a PIN in the profile (needed for Maintenance actions).
+- SMTP (optional, D-015): `SMTP_HOST`, `SMTP_PORT` (587 STARTTLS or 465), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` in `app.env`; `docker compose up -d app` applies them. Without SMTP, administrators reset passwords.
+- Off-site backups: fill `deploy/restic.env`, run `docker compose --profile backup run --rm --no-deps --entrypoint node backup src/server/cli.ts backup:offsite-init` once, then install the timers: copy `app/deploy/systemd/class-compass-*` to `/etc/systemd/system/`, `sudo systemctl daemon-reload`, `sudo systemctl enable --now class-compass-backup.timer class-compass-offsite.timer` (or use the sidecar profile instead, not both). Run both services once by hand (`sudo systemctl start class-compass-backup.service class-compass-offsite.service`) and check Admin → Maintenance.
+- Do the restore drill (above) before real data is entered.
+
+### 5. Upgrade and rollback
+1. `git -C app fetch` and `git -C app checkout <new tag or commit>`.
+2. `docker compose exec -T app node src/server/cli.ts backup:create` (a fresh backup); note the running image tag (`docker compose images app`).
+3. `APP_TAG=<new sha> docker compose build`, then `APP_TAG=<new sha> docker compose up -d app`. At start-up the app takes a pre-migration snapshot and applies pending migrations; watch `docker compose logs -f app` until healthy.
+4. Check `/healthz`, sign in; Admin → Maintenance shows the new version and migration level.
+5. **Rollback:** if the new version failed before migrating, start the old tag: `APP_TAG=<old sha> docker compose up -d app`. If it already migrated the database, the old code may not understand the new schema: stop the app, restore the `cc-premigration-<time>.tar` (or the backup from step 2) with the **old** image (`APP_TAG=<old sha> docker compose run --rm --no-deps app node src/server/cli.ts backup:restore <file> --force`), then start the old tag. Data entered after the upgrade is lost by such a restore: tell the teachers.

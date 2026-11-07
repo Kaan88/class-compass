@@ -35,3 +35,11 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Deployment secrets (S11, D-017/D-018) — examples end in .example
+app.env
+tunnel.env
+deploy/*.env
+data-test/
+*.db-wal
+*.db-shm

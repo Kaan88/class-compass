@@ -1,0 +1,14 @@
+# Hourly local backup of Class Compass (OPS-2). Install with the .timer of the same name.
+# Assumes the compose project in /opt/class-compass (see docs/OPERATIONS.md).
+[Unit]
+Description=Class Compass local backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=classcompass
+WorkingDirectory=/opt/class-compass
+ExecStart=/usr/bin/docker compose exec -T app node src/server/cli.ts backup:create --trigger timer
+Nice=10
+IOSchedulingClass=idle

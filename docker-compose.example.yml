@@ -1,0 +1,94 @@
+# Class Compass on a VPS behind Cloudflare Tunnel (D-018). Copy to docker-compose.yml next to a
+# filled `app.env` (see .env.example), `tunnel.env` (TUNNEL_TOKEN=...) and, for off-site backups,
+# `deploy/restic.env` (see deploy/restic.env.example). Nothing in this file is a secret.
+#
+#   docker compose up -d                                   # the app only
+#   docker compose --profile tunnel --profile backup up -d # + Cloudflare Tunnel + backup sidecar
+#   docker compose exec app node src/server/cli.ts admin:create --login <login> --name "<Name>"
+#
+# The app port is bound to 127.0.0.1 of the VM only; the public hostname comes from the tunnel,
+# which reaches the app over the internal network.
+name: class-compass
+
+services:
+  app:
+    image: class-compass:${APP_TAG:-latest}
+    build:
+      context: .
+      args:
+        APP_COMMIT: ${APP_TAG:-}
+    restart: unless-stopped
+    env_file:
+      - ./app.env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3210"
+      DATA_DIR: /data
+      # Behind cloudflared: trust CF-Connecting-IP for rate limits and the audit log.
+      TRUST_PROXY: "true"
+    ports:
+      - "127.0.0.1:${APP_HOST_PORT:-3210}:3210"
+    volumes:
+      - ./data:/data
+    networks:
+      - internal
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+
+  # Optional: Cloudflare Tunnel connector. The tunnel's public hostname points at http://app:3210.
+  cloudflared:
+    image: cloudflare/cloudflared:2025.10.0
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file:
+      - ./tunnel.env
+    networks:
+      - internal
+    depends_on:
+      app:
+        condition: service_healthy
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # Optional backup sidecar: a local backup every hour, the off-site copy once a day at
+  # OFFSITE_HOUR_UTC. Alternative: the host timers in deploy/systemd/ (use one, not both).
+  backup:
+    image: class-compass:${APP_TAG:-latest}
+    profiles: ["backup"]
+    restart: unless-stopped
+    env_file:
+      - ./app.env
+      - ./deploy/restic.env
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+      OFFSITE_HOUR_UTC: "01"
+      # restic keeps its cache under $HOME/.cache: on the tmpfs, since the image is read-only.
+      HOME: /tmp
+    volumes:
+      - ./data:/data
+    networks:
+      - internal
+    read_only: true
+    tmpfs:
+      - /tmp
+    entrypoint: ["/usr/bin/tini", "--", "node", "src/server/backupLoop.ts"]
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  internal:
+    driver: bridge

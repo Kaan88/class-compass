@@ -1,0 +1,15 @@
+# Nightly off-site copy with restic (D-017). Runs a one-off container from the compose `backup`
+# service definition, which is the only one that reads deploy/restic.env: the app container never
+# holds the storage credentials. Use these timers OR the backup sidecar (`--profile backup up`), not both.
+[Unit]
+Description=Class Compass off-site backup (restic)
+After=docker.service class-compass-backup.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=classcompass
+WorkingDirectory=/opt/class-compass
+ExecStart=/usr/bin/docker compose --profile backup run --rm --no-deps --entrypoint node backup src/server/cli.ts backup:offsite latest --trigger timer
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,43 @@
+# Keep the build context small and free of secrets and real data (D-018).
+.git
+.github
+node_modules
+dist
+coverage
+playwright-report
+test-results
+blob-report
+*.tsbuildinfo
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+app.env
+tunnel.env
+deploy/*.env
+# Real data: databases, uploads, backups, exports
+data/
+data-*/
+uploads/
+storage/
+backups/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.tar
+*.zip
+*.dump
+*.bak
+# Not needed in the image
+e2e/
+tests/
+docs/
+.claude/
+.vscode/
+.idea/
+*.log
