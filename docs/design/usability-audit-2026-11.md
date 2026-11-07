@@ -10,7 +10,8 @@ Screenshots are produced by the Playwright suite and are not committed (they sho
 data but change on every run). Run `npx playwright test e2e/classroom-layout.spec.ts` and look in:
 
 - `test-results/layout/<modules>-<theme>.png`: classroom dashboard for all modules on, all off,
-  counters only, and grouping + homework + assistant, in the explorer, animals and classroom themes.
+  counters only, grouping + homework + assistant, and each module off on its own (`without-<module>`),
+  in the explorer, animals and classroom themes.
 - `test-results/fit/<display>-normal.png`, `1440x900-large.png`, `1440x900-compact.png`: the dashboard
   at 1440×900, 1470×956, 1366×768, 1280×800, 1920×1080, 2560×1440 and a 4K panel at 150% and 200%.
 

@@ -159,7 +159,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Housekeeping: backup/verify runs survive a restore on the Maintenance page (D-104)
   - [x] Playwright + axe for teacher Goals, Student links (print cards), teacher Reports, admin Reports, Maintenance, New school year (`e2e/pages-a11y.spec.ts`)
 - [x] Bugs: homework check selections apply to students; layout/theme intact when modules are switched off; students can be moved between groups
-  - [x] Module-off matrix (4 module combinations x 3 themes, screenshots + layout assertions, `e2e/classroom-layout.spec.ts`); not every single module off on its own
+  - [x] Module-off matrix (all on, all off, counters only, groups+homework+assistant, and each of the 8 modules off on its own: 12 combinations x 3 themes, screenshots + layout assertions, `e2e/classroom-layout.spec.ts`)
 - [x] Grouping redesign: four arrangements (Lions/Eagles level-based, Dolphins/Tigers mixed) giving Group 1–5, Shuffle with undo, tap-to-move and drag-and-drop, Save to option, full-screen group screen with the timer, levels teacher-only, upper-case option, "Use the 4 default options" (D-098)
 - [ ] Per-class language mode (`mainLanguage` en|tr, `secondLanguageEnabled`): English only by default, Turkish only, EN+TR, TR+EN for everything class-facing; teacher UI language stays personal (D-099)
   - [x] Columns, admin and class-teacher setting, classroom display and student page in the class language, switch only with two languages, isolation tests, account interface language on creation
@@ -171,6 +171,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
   - [x] Usability audit written; critical and major issues fixed; minor ones listed
   - [ ] Size control in the teacher area; screenshot matrix for group screen, start/end lesson, teacher menu and admin home
 - [x] Classroom screen: assistant panel hide/show (lesson + class default), duty tick boxes recorded per day (history, reports), reminder boxes off by default, timer keypad, time's-up hook, top bar with quote/weather slots (D-100, D-102)
+- [x] Review fixes (S13a): time's-up tone and hook fire once per run with the group screen open; the keypad refuses seconds above 59; no rule-conflict count on the classroom group screen (teacher area only); "Today's focus" hidden without a topic and shown on the "Learning goal" stage; an archived topic is dropped from a replayed `lesson.start` / `lesson.setTopics` instead of failing it; new accounts preselect English; the first sign-in of a Turkish account is in Turkish (the sign-out cache reset no longer detaches the root layout from `me`)
 - [x] Lesson topic / skill focus (Listening, Reading, Vocabulary, Grammar, Writing, Speaking, Phonics, custom with icon) with a weekly plan, set at Start Lesson, changed mid-lesson, shown on the display, kept for reports, goal/evidence filter (D-101)
 
 ## S13b Classroom feedback round 1: sound, celebrations and data tools

@@ -13,13 +13,16 @@ export interface RoutineStage {
   name: LocalizedTextValue;
 }
 
+/** The "Learning goal" stage: the classroom shows the lesson's topics on it (S13a 7). Copies keep the id. */
+export const LEARNING_GOAL_STAGE_ID = 'learning-goal';
+
 /** The built-in default routine is not a database row: every teacher can use or copy it (RTN-1). */
 export const DEFAULT_ROUTINE_NAME: LocalizedTextValue = { en: 'Default routine', tr: 'Varsayılan rutin' };
 export const DEFAULT_ROUTINE_STAGES: readonly RoutineStage[] = [
   { id: 'greeting', name: { en: 'Greeting', tr: 'Selamlaşma' } },
   { id: 'date-weather', name: { en: 'Date and weather', tr: 'Tarih ve hava durumu' } },
   { id: 'assistant', name: { en: 'Assistant', tr: 'Günün yardımcısı' } },
-  { id: 'learning-goal', name: { en: 'Learning goal', tr: 'Öğrenme hedefi' } },
+  { id: LEARNING_GOAL_STAGE_ID, name: { en: 'Learning goal', tr: 'Öğrenme hedefi' } },
   { id: 'activities', name: { en: 'Activities', tr: 'Etkinlikler' } },
   { id: 'reflection', name: { en: 'Reflection', tr: 'Değerlendirme' } },
 ];

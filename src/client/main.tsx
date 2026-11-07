@@ -7,7 +7,7 @@ import { setDisplay } from './lib/display.ts';
 import { getOutbox } from './lib/outbox-client.ts';
 import { installClientModules } from './modules/registry.ts';
 import { purgeSensitive, queryClient } from './lib/queryClient.ts';
-import { markLocked, ME_KEY } from './lib/session.ts';
+import { markLocked, ME_KEY, resetSignedOut } from './lib/session.ts';
 import { clearAllToasts } from './lib/toast.ts';
 import { router } from './router.tsx';
 import { PUBLIC_PATHS } from './routes/guards.ts';
@@ -31,9 +31,8 @@ onAuthProblem((code) => {
     if (router.state.location.pathname !== '/change-password') void router.navigate({ to: '/change-password' });
     return;
   }
-  queryClient.clear();
+  resetSignedOut(queryClient);
   clearAllToasts();
-  queryClient.setQueryData(ME_KEY, null);
   const loc = router.state.location;
   if (!PUBLIC_PATHS.includes(loc.pathname)) void router.navigate({ to: '/login', search: { next: loc.href } });
 });

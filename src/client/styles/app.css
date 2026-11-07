@@ -2441,3 +2441,15 @@ html:has(.cc-classroom) {
     max-width: 100%;
   }
 }
+/* "Today's focus" on the routine's Learning goal stage, and the quiet action when no topic is set (S13a 7). */
+.cc-routine__focus {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.4rem;
+  min-width: 0;
+}
+.cc-focus-empty {
+  display: flex;
+  justify-content: flex-end;
+}

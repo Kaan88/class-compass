@@ -453,7 +453,7 @@ export function applyGrouping(ctx: RequestContext, p: z.infer<(typeof C.Grouping
     .run();
   updateLesson(ctx, lesson, {});
   audit(ctx.db, ctx.actor, { action: 'grouping.apply', entity: 'lesson', entityId: lesson.id, opId: meta.opId, after: { templateId: tpl.id, templateVersion: tpl.version, groups: groups.length, excluded: excluded.length, unsatisfied: unsatisfied.length } }, now);
-  return { groupingId: meta.opId, groups: groups.length, excludedCount: excluded.length, unsatisfiedCount: unsatisfied.length };
+  return { groupingId: meta.opId, groups: groups.length, excludedCount: excluded.length };
 }
 
 /** The live grouping of the lesson or a GROUPS_NOT_SHOWN refusal (S13a commands need groups on the display). */
@@ -593,7 +593,7 @@ export function clearGrouping(ctx: RequestContext, p: z.infer<(typeof C.Grouping
 export function groupingLessonState(db: Db, lesson: LessonRow): GroupingLessonState {
   const live = liveGrouping(db, lesson.id);
   const upperCaseNames = moduleConfig(db, lesson.contextId, 'grouping').upperCaseNames === true;
-  if (!live) return { applied: false, arrangementId: null, groupingId: null, upperCaseNames, notPlaced: [], groups: [], excludedCount: 0, notPlacedCount: 0, unsatisfiedCount: 0 };
+  if (!live) return { applied: false, arrangementId: null, groupingId: null, upperCaseNames, notPlaced: [], groups: [], excludedCount: 0, notPlacedCount: 0 };
   const away = awayIn(db, lesson);
   const ids = [...new Set(live.effectiveGroupsJson.flatMap((g) => g.memberIds))];
   const byId = new Map((ids.length ? db.select().from(students).where(inArray(students.id, ids)).all() : []).map((s) => [s.id, s]));
@@ -620,7 +620,6 @@ export function groupingLessonState(db: Db, lesson: LessonRow): GroupingLessonSt
     })),
     excludedCount: roster.filter((id) => away.has(id)).length,
     notPlacedCount: roster.filter((id) => !away.has(id) && !inGroup.has(id)).length,
-    unsatisfiedCount: live.unsatisfiedJson.length,
   };
 }
 

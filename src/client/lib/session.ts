@@ -53,13 +53,25 @@ export async function enterClassroom(qc: QueryClient = queryClient) {
   return freshMe(qc);
 }
 
+/**
+ * Forget everything cached for the previous account and mark the device signed out. The `me` query
+ * itself is kept (only its data becomes null): `qc.clear()` would detach the root layout's `useMe`
+ * observer from the cache, so the next sign-in would keep the previous language and text size until
+ * a reload (found in the S13a review: a Turkish account saw its first sign-in in English).
+ */
+export function resetSignedOut(qc: QueryClient = queryClient) {
+  void qc.cancelQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] });
+  qc.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] });
+  qc.getMutationCache().clear();
+  qc.setQueryData(ME_KEY, null);
+}
+
 export async function signOut(qc: QueryClient = queryClient) {
   try {
     await call(Auth.logout, {});
   } catch {
     /* already signed out */
   }
-  qc.clear();
+  resetSignedOut(qc);
   clearAllToasts();
-  qc.setQueryData(ME_KEY, null);
 }

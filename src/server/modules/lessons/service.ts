@@ -27,7 +27,7 @@ import { assertModuleEnabled, isModuleEnabled } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, effectiveTimezone, getClass, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { endStepsFor, type LessonRow } from './endSteps.ts';
 import { defaultTemplateId, resolveRoutine, usableTemplates } from './routines.ts';
-import { plannedTopics, topicSnapshots } from './topics.ts';
+import { plannedTopics, usableTopicSnapshots } from './topics.ts';
 
 type P<T extends keyof typeof LessonCommands> = z.infer<(typeof LessonCommands)[T]>;
 
@@ -250,6 +250,7 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
   const routinesOn = isModuleEnabled(ctx.db, context.id, 'routines');
   const routine = routinesOn ? resolveRoutine(ctx.db, tid, context.id, p.routineTemplateId) : { templateId: null, name: {}, stages: [] };
   const subject = ctx.db.select({ name: subjects.name }).from(subjects).where(eq(subjects.id, context.subjectId)).get();
+  const startTopics = usableTopicSnapshots(ctx.db, context, p.topicIds ?? plannedTopics(ctx.db, context, today));
   const row: LessonRow = {
     id: meta.opId,
     contextId: context.id,
@@ -266,7 +267,8 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
     timerJson: idleTimer(),
     reflectionJson: null,
     // Today's topic(s): as chosen on the start screen, otherwise the weekly plan's (S13a, D-101).
-    topicsJson: topicSnapshots(ctx.db, context, p.topicIds ?? plannedTopics(ctx.db, context, today)),
+    // A topic archived since the device cached its choices is dropped (audited), never a failed start.
+    topicsJson: startTopics.topics,
     displayJson: {},
     version: 1,
     classNameSnapshot: cls.name,
@@ -275,7 +277,7 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
   };
   ctx.db.insert(lessons).values(row).run();
   const attendanceKept = applyStartAttendance(ctx, context.id, cls, today, p, meta.opId);
-  audit(ctx.db, ctx.actor, { action: 'lesson.start', entity: 'lesson', entityId: row.id, after: { contextId: context.id, localDate: today, routine: routine.templateId, stages: routine.stages.length }, opId: meta.opId }, now);
+  audit(ctx.db, ctx.actor, { action: 'lesson.start', entity: 'lesson', entityId: row.id, after: { contextId: context.id, localDate: today, routine: routine.templateId, stages: routine.stages.length, ...(startTopics.dropped.length ? { droppedTopics: startTopics.dropped } : {}) }, opId: meta.opId }, now);
   return { started: true, lessonId: row.id, attendanceKept };
 }
 
@@ -317,10 +319,11 @@ export function setStage(ctx: RequestContext, p: P<'lesson.setStage'>, meta: Com
 /** 'lesson.setTopics' (S13a): change today's topic(s) during the lesson; snapshots kept (DAT-6). */
 export function setTopics(ctx: RequestContext, p: P<'lesson.setTopics'>, meta: CommandMeta) {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
-  const topics = topicSnapshots(ctx.db, context, p.topicIds);
+  // A topic archived since the device cached its choices is dropped (audited), not a rejected command.
+  const { topics, dropped } = usableTopicSnapshots(ctx.db, context, p.topicIds);
   if (JSON.stringify(topics.map((t) => t.id)) === JSON.stringify(lesson.topicsJson.map((t) => t.id))) return { changed: false, version: lesson.version };
   const next = updateLesson(ctx, lesson, { topicsJson: topics });
-  audit(ctx.db, ctx.actor, { action: 'lesson.topics', entity: 'lesson', entityId: lesson.id, opId: meta.opId, before: { topics: lesson.topicsJson.map((t) => t.id) }, after: { topics: topics.map((t) => t.id) } }, ctx.now());
+  audit(ctx.db, ctx.actor, { action: 'lesson.topics', entity: 'lesson', entityId: lesson.id, opId: meta.opId, before: { topics: lesson.topicsJson.map((t) => t.id) }, after: { topics: topics.map((t) => t.id), ...(dropped.length ? { droppedTopics: dropped } : {}) } }, ctx.now());
   return { changed: true, version: next.version };
 }
 

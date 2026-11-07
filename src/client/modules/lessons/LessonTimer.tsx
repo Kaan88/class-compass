@@ -5,7 +5,7 @@
  * (text + icon, no flashing), plays one soft tone only if sounds are on for the class AND this
  * device, and calls the time's-up handlers (`onTimeUp`, the S13b voice/chime hook).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatTimer, MAX_TIMER_MS, remainingAt } from '../../../domain/timer.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import { useDisplay } from '../../lib/display.ts';
@@ -19,6 +19,23 @@ import { patchLesson, sendLessonCommand, serverNow } from './lessonClient.ts';
 import { pauseTimer, resetTimer, setTimer, startTimer } from '../../../domain/timer.ts';
 
 const PRESETS_MIN = [1, 3, 5, 10, 15];
+
+/**
+ * Time's-up is signalled once per finished run for the whole page, not once per mounted timer: the
+ * group screen shows a second (compact) timer over the dashboard's, and the class must hear one tone
+ * and one S13b announcement. A run counts as watched when any mounted timer saw it counting down.
+ */
+const watchedRuns = new Set<string>();
+const signalledRuns = new Set<string>();
+const remember = (set: Set<string>, key: string) => {
+  set.add(key);
+  if (set.size > 50) set.delete(set.values().next().value as string);
+};
+/** Test hook: forget which runs were watched / signalled. */
+export function resetTimeUpSignals(): void {
+  watchedRuns.clear();
+  signalledRuns.clear();
+}
 /** A run that ended at most this long ago still gets its tone when the screen first shows it. */
 const RECENT_END_MS = 3_000;
 
@@ -29,7 +46,9 @@ export function keypadMs(digits: string): number {
   const min = Number(d.slice(0, -2) || '0');
   return (min * 60 + sec) * 1000;
 }
-const keypadText = (digits: string) => {
+/** The seconds part shown on the keypad must be 00-59, so the mm:ss display is exactly the time that is set. */
+export const keypadSecondsValid = (digits: string) => Number(digits.replace(/\D/g, '').slice(-4).slice(-2) || '0') < 60;
+export const keypadText = (digits: string) => {
   const d = digits.padStart(4, '0').slice(-4);
   return `${d.slice(0, 2)}:${d.slice(2)}`;
 };
@@ -38,7 +57,8 @@ function TimerKeypad({ isOpen, onOpenChange, onSet }: { isOpen: boolean; onOpenC
   const { t } = useI18n();
   const [digits, setDigits] = useState('');
   const ms = keypadMs(digits);
-  const valid = ms >= 1000 && ms <= MAX_TIMER_MS;
+  const secondsOk = keypadSecondsValid(digits);
+  const valid = secondsOk && ms >= 1000 && ms <= MAX_TIMER_MS;
   const press = (k: string) => setDigits((d) => (d + k).replace(/^0+/, '').slice(0, 4));
   const close = (v: boolean) => {
     if (!v) setDigits('');
@@ -66,7 +86,7 @@ function TimerKeypad({ isOpen, onOpenChange, onSet }: { isOpen: boolean; onOpenC
           <IconBackspace />
         </Button>
       </div>
-      {!valid && digits ? <p className="cc-muted">{t('timer.keypadRange')}</p> : null}
+      {!secondsOk ? <p className="cc-muted">{t('timer.keypadSeconds')}</p> : !valid && digits ? <p className="cc-muted">{t('timer.keypadRange')}</p> : null}
       <DialogActions>
         <Button onPress={() => close(false)}>{t('common.cancel')}</Button>
         <Button
@@ -104,15 +124,13 @@ export function LessonTimer({ lesson, compact = false }: { lesson: LessonState; 
   // (or within the last few seconds): a run that finished long ago stays silent after a reload, on
   // another device or when the dashboard is shown again.
   const runKey = `${lesson.id}:${timer.startedAt}`;
-  const watched = useRef<string | null>(null);
-  const signalled = useRef<string | null>(null);
   useEffect(() => {
-    if (timer.running && !finished) watched.current = runKey;
-    if (!finished || signalled.current === runKey) return;
-    signalled.current = runKey;
+    if (timer.running && !finished) remember(watchedRuns, runKey);
+    if (!finished || signalledRuns.has(runKey)) return;
+    remember(signalledRuns, runKey);
     const endedAt = (timer.startedAt ?? 0) + timer.remainingMs;
     // One soft tone of the class theme, only if the class and this device allow sounds (D-048, THM-5).
-    if (watched.current === runKey || serverNow() - endedAt <= RECENT_END_MS) {
+    if (watchedRuns.has(runKey) || serverNow() - endedAt <= RECENT_END_MS) {
       playThemeSound(display, theme, 'timerEnd');
       emitTimeUp({ lesson, display, locale });
     }

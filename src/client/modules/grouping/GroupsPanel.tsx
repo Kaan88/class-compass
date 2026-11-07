@@ -222,7 +222,6 @@ function GroupScreen({ context, lesson, st, isOpen, onOpenChange }: { context: C
                   </section>
                 ) : null}
                 {st.excludedCount ? <p className="cc-muted">{t('grouping.excluded', { count: st.excludedCount })}</p> : null}
-                {st.unsatisfiedCount ? <p className="cc-muted">{t('grouping.unsatisfiedCount', { count: st.unsatisfiedCount })}</p> : null}
               </>
             ) : (
               <p className="cc-h2 cc-muted">{t('grouping.pickOption')}</p>

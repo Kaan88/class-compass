@@ -48,6 +48,22 @@ export function topicSnapshots(db: Db, context: ContextRow, ids: readonly string
   return out;
 }
 
+/**
+ * Like `topicSnapshots`, but for outbox commands ('lesson.start', 'lesson.setTopics'): a topic that is
+ * no longer usable (archived since the device cached its choices, or unknown) is dropped instead of
+ * rejecting the whole command, and returned in `dropped` so the caller can audit it.
+ */
+export function usableTopicSnapshots(db: Db, context: ContextRow, ids: readonly string[]): { topics: LessonTopicJson[]; dropped: string[] } {
+  const topics: LessonTopicJson[] = [];
+  const dropped: string[] = [];
+  for (const id of [...new Set(ids)]) {
+    const c = getCategory(db, id);
+    if (!c || c.archivedAt !== null || !inScope(c, context.subjectId, [context.teacherId])) dropped.push(id);
+    else topics.push({ id: c.id, name: c.name, icon: iconOf(c.icon) });
+  }
+  return { topics, dropped };
+}
+
 /** The plan's topics for a local date (ids still usable; archived ones are skipped quietly). */
 export function plannedTopics(db: Db, context: ContextRow, date: string): string[] {
   const live = new Set(topicChoices(db, context).map((t) => t.id));

@@ -1,7 +1,8 @@
 /**
  * S13a classroom screen (feedback round 1, 2026-11-07). Fictional demo data only; every setting this
  * file changes (modules, class theme, class language, density) is put back afterwards.
- * 1. Bug 1b: the layout holds with modules switched off. A matrix of module combinations x themes at
+ * 1. Bug 1b: the layout holds with modules switched off. A matrix of module combinations (all on, all
+ *    off, counters only, groups+homework+assistant, and each module off on its own) x themes at
  *    1920x1080: no horizontal page scroll, the rail and the main area never overlap, and no empty
  *    panel is left behind. Screenshots go to test-results/layout/.
  * 2. Density and auto-fit (D-103): no horizontal scroll at 1440x900, 1470x956, 1366x768, 1280x800,
@@ -81,7 +82,7 @@ async function layoutFacts(page: Page) {
 }
 
 test('bug 1b: the classroom layout holds for module combinations x themes (no empty panels, no overlap, no horizontal scroll)', async ({ page, browser }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(900_000);
   mkdirSync('test-results/layout', { recursive: true });
   await login(page, 'english');
   await ensurePin(page);
@@ -99,6 +100,8 @@ test('bug 1b: the classroom layout holds for module combinations x themes (no em
     ['all-off', []],
     ['counters-only', ['counters']],
     ['groups-homework-assistant', ['grouping', 'homework', 'assistant']],
+    // Each module switched off on its own (bug 1b: "each one off").
+    ...MODULES.map((m): [string, readonly Module[]] => [`without-${m}`, MODULES.filter((x) => x !== m)]),
   ];
   try {
     for (const theme of THEMES) {
@@ -108,7 +111,8 @@ test('bug 1b: the classroom layout holds for module combinations x themes (no em
         await startLesson(page, ctx.id);
         await openClassroom(d);
         await expect(d.locator('html')).toHaveAttribute('data-theme', theme);
-        await expect(d.getByTestId('todays-focus')).toBeVisible();
+        // "Today's focus" when the lesson has a topic, otherwise only the quiet "Choose a topic" action.
+        await expect(d.getByTestId(/^todays-focus(-empty)?$/)).toBeVisible();
         const facts = await layoutFacts(d);
         await d.screenshot({ path: `test-results/layout/${name}-${theme}.png`, fullPage: true });
         expect(facts, `${name} / ${theme}`).toEqual({ hScroll: false, overlap: false, empty: [], overflowing: [] });

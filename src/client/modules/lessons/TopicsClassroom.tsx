@@ -1,7 +1,9 @@
 /**
  * Lesson topics on the classroom device (S13a, D-101): the "Today's topic" step of Start Lesson
  * (pre-filled from the weekly plan; the teacher confirms or changes it, up to three topics or none)
- * and "Today's focus" above the student grid with its icon, changeable during the lesson
+ * and "Today's focus" above the student grid with its icon, changeable during the lesson (hidden when
+ * no topic is set: only a small "Choose a topic" action stays; the routine's "Learning goal" stage
+ * shows the topics too)
  * ('lesson.setTopics', an outbox command naming the lesson). Topics are the subject's skill
  * categories (Reading, Speaking, Phonics … and the teacher's own).
  */
@@ -87,7 +89,7 @@ export const topicStartStep = startStep<TopicDraft>({
 });
 
 function TodaysFocus({ context, lesson }: { context: ClassroomContext; lesson: LessonState }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const q = useClassroomTopics(open ? context.id : null);
   const [draft, setDraft] = useState<string[]>([]);
@@ -102,37 +104,54 @@ function TodaysFocus({ context, lesson }: { context: ClassroomContext; lesson: L
     void sendLessonCommand('lesson.setTopics', { contextId: lesson.contextId, lessonId: lesson.id, topicIds: next.map((x) => x.id) });
     setOpen(false);
   };
+  const dialog = (
+    <Modal isOpen={open} onOpenChange={setOpen} title={t('lesson.topic.changeTitle')} size="wide">
+      {q.data ? <TopicChooser topics={q.data.topics} value={draft} onChange={setDraft} /> : <p className="cc-muted">{t('common.loading')}</p>}
+      <DialogActions>
+        <Button onPress={() => setOpen(false)}>{t('common.cancel')}</Button>
+        <Button variant="primary" onPress={save} isDisabled={!q.data}>
+          <IconCheck />
+          {t('lesson.topic.save')}
+        </Button>
+      </DialogActions>
+    </Modal>
+  );
+  // No topic: the focus strip is hidden; only a small, quiet "Choose a topic" action stays (S13a 7).
+  if (!lesson.topics.length)
+    return (
+      <div className="cc-focus-empty" data-testid="todays-focus-empty">
+        <Button size="small" variant="ghost" onPress={openDialog}>
+          {t('lesson.topic.choose')}
+        </Button>
+        {dialog}
+      </div>
+    );
   return (
     <section className="cc-focus" aria-labelledby="cc-focus-title" data-testid="todays-focus">
       <h2 id="cc-focus-title" className="cc-focus__title">
         {t('lesson.topic.todaysFocus')}
       </h2>
-      {lesson.topics.length ? (
-        <ul className="cc-focus__list">
-          {lesson.topics.map((tp) => (
-            <li key={tp.id} className="cc-focus__topic">
-              <TopicPicto icon={tp.icon} size="1.8em" />
-              <span>{pickText(tp.name, locale)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <span className="cc-muted">{t('lesson.topic.none')}</span>
-      )}
+      <FocusTopics topics={lesson.topics} />
       <Button size="small" className="cc-push-right" onPress={openDialog}>
-        {lesson.topics.length ? t('lesson.topic.change') : t('lesson.topic.choose')}
+        {t('lesson.topic.change')}
       </Button>
-      <Modal isOpen={open} onOpenChange={setOpen} title={t('lesson.topic.changeTitle')} size="wide">
-        {q.data ? <TopicChooser topics={q.data.topics} value={draft} onChange={setDraft} /> : <p className="cc-muted">{t('common.loading')}</p>}
-        <DialogActions>
-          <Button onPress={() => setOpen(false)}>{t('common.cancel')}</Button>
-          <Button variant="primary" onPress={save} isDisabled={!q.data}>
-            <IconCheck />
-            {t('lesson.topic.save')}
-          </Button>
-        </DialogActions>
-      </Modal>
+      {dialog}
     </section>
+  );
+}
+
+/** The lesson's topics as icon + name (the focus strip and the routine's "Learning goal" stage). */
+export function FocusTopics({ topics, size = '1.8em' }: { topics: readonly LessonTopic[]; size?: string }) {
+  const { locale } = useI18n();
+  return (
+    <ul className="cc-focus__list">
+      {topics.map((tp) => (
+        <li key={tp.id} className="cc-focus__topic">
+          <TopicPicto icon={tp.icon} size={size} />
+          <span>{pickText(tp.name, locale)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

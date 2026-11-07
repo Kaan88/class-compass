@@ -288,8 +288,7 @@ export const GroupingLessonState = z.object({
   excludedCount: z.number().int(),
   /** Students here now who are in no group yet (arrived late, joined the class), count only. */
   notPlacedCount: z.number().int(),
-  /** Rules this lesson's groups break (count only; the rules are teacher-area, GRP-7/8). */
-  unsatisfiedCount: z.number().int(),
+  // No rule conflicts here, not even a count: they are reported in the teacher area only (S13a 2, GRP-7/8).
 });
 export type GroupingLessonState = z.infer<typeof GroupingLessonState>;
 

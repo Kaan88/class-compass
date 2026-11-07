@@ -1,15 +1,17 @@
 /**
  * Routines on the classroom device (RTN-1..3), contributed through the routines manifest (D-069):
  * the Start Lesson routine choice (adds `routineTemplateId` to 'lesson.start') and the stage stepper
- * beside the lesson timer (dashboard `stage` region).
+ * beside the lesson timer (dashboard `stage` region). On the "Learning goal" stage the stepper also
+ * shows the lesson's topics ("Today's focus", S13a 7).
  */
-import { DEFAULT_ROUTINE_ID } from '../../../domain/routines.ts';
+import { DEFAULT_ROUTINE_ID, LEARNING_GOAL_STAGE_ID } from '../../../domain/routines.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import { pickText } from '../../../shared/i18n/index.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { IconCheck, IconNext, IconPrev } from '../../ui/icons.tsx';
 import { patchLesson, sendLessonCommand, useRoutines } from '../lessons/lessonClient.ts';
+import { FocusTopics } from '../lessons/TopicsClassroom.tsx';
 import { startStep, type ClassroomContext, type DashboardSlot, type StartStepProps } from '../types.ts';
 
 // ---------------------------------------------------------------- Start Lesson step
@@ -72,6 +74,12 @@ function RoutineStepper({ lesson }: { context: ClassroomContext; lesson: LessonS
       <div className="cc-routine__now" data-testid="current-stage">
         <span className="cc-routine__now-label">{t('routine.now', { n: idx + 1, total: stages.length })}</span>
         <span className="cc-routine__now-name">{current ? pickText(current.name, locale) : ''}</span>
+        {current?.id === LEARNING_GOAL_STAGE_ID && lesson.topics.length ? (
+          <div className="cc-routine__focus" data-testid="stage-focus">
+            <span className="cc-routine__now-label">{t('lesson.topic.todaysFocus')}</span>
+            <FocusTopics topics={lesson.topics} />
+          </div>
+        ) : null}
       </div>
       <ol className="cc-stepper" aria-label={t('routine.stages')}>
         {stages.map((s, i) => {

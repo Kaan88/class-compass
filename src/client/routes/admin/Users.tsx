@@ -80,7 +80,8 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'teacher' | 'admin'>('teacher');
-  const [locale, setLocale] = useState<'en' | 'tr' | ''>('');
+  // Required, visible choice, preselected to English (owner decision ACCOUNT CREATION, D-102).
+  const [locale, setLocale] = useState<'en' | 'tr'>('en');
   const [error, setError] = useState<string | null>(null);
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange} title={t('users.create')}>
@@ -89,17 +90,13 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
         onSubmit={async (e) => {
           e.preventDefault();
           setError(null);
-          if (!locale) {
-            setError(t('users.localeRequired'));
-            return;
-          }
           try {
             const r = await call(Admin.createUserByAdmin, { login, displayName: name, email: email.trim() || null, role, locale });
             void qc.invalidateQueries({ queryKey: USERS });
             setLogin('');
             setName('');
             setEmail('');
-            setLocale('');
+            setLocale('en');
             onOpenChange(false);
             onCreated(r.user.login, r.temporaryPassword);
           } catch (err) {
@@ -119,7 +116,7 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
             { id: 'admin', label: t('role.admin') },
           ]}
         />
-        <Select label={t('users.locale')} description={t('users.localeHint')} value={locale} placeholder={t('users.localePick')} onChange={(v) => setLocale(v === 'tr' ? 'tr' : 'en')} items={LOCALE_ITEMS(t)} />
+        <Select label={t('users.locale')} description={t('users.localeHint')} value={locale} onChange={(v) => setLocale(v === 'tr' ? 'tr' : 'en')} items={LOCALE_ITEMS(t)} />
         {error ? <Alert>{error}</Alert> : null}
         <DialogActions>
           <Button onPress={() => onOpenChange(false)}>{t('common.cancel')}</Button>

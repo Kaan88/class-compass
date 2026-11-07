@@ -95,6 +95,27 @@ describe('grouping in the lesson (S13a, D-098)', () => {
     expect((await cmd(s.teacherB, 'grouping.move', { contextId: ctx(), lessonId, studentId: who, toGroupId: g1.id })).ok).toBe(false);
   });
 
+  it('a move that breaks an apart rule shows no conflict on the classroom: no count, no text, teacher area only (S13a 2, GRP-7/8)', async () => {
+    const lessonId = await startLesson(s.teacherA, ctx(), { othersPresent: true });
+    const o = await ok(s.teacherA.get(`/api/teacher/contexts/${ctx()}/grouping`));
+    const lions = o.templates.find((t: any) => t.defaultKey === 'lions');
+    const applied = await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: lions.id });
+    const st = await lessonState(s.teacherA, ctx());
+    const [g1, g2] = st.grouping.groups;
+    const who = g1.members[0].id as string;
+    await ok(s.teacherA.post(`/api/teacher/contexts/${ctx()}/grouping/rules`, { studentA: who, studentB: g2.members[0].id, kind: 'apart', note: 'NOTEPRIVATE-apart' }));
+    const moved = await cmd(s.teacherA, 'grouping.move', { contextId: ctx(), lessonId, studentId: who, toGroupId: g2.id });
+    expect(moved.ok).toBe(true);
+    // The live grouping knows the rule is broken (teacher-side data) ...
+    const live = env.db.$client.prepare('select unsatisfied_json j from lesson_groupings where lesson_id = ? and cleared_at is null').get(lessonId) as { j: string };
+    expect(JSON.parse(live.j).length).toBeGreaterThan(0);
+    // ... but nothing about rules reaches the classroom device.
+    const after = await lessonState(s.teacherA, ctx());
+    const classroom = [JSON.stringify(applied), JSON.stringify(moved), JSON.stringify(after)].join(' ');
+    expect(classroom).not.toMatch(/unsatisfied|NOTEPRIVATE|"apart"|ARRANGED_BY_HAND/i);
+    expect(after.grouping.groups[1].members.map((m: any) => m.id)).toContain(who);
+  });
+
   it('no levels reach the classroom: lesson state, arrangements and command results (GRP-7)', async () => {
     await ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/levels`, { levels: kids.map((k, i) => ({ studentId: k.id, level: `LVLSECRET-${i % 3}` })) }));
     const lessonId = await startLesson(s.teacherA, ctx(), { othersPresent: true });
@@ -224,7 +245,8 @@ describe('lesson topics (S13a, D-101)', () => {
     expect((await lessonState(s.teacherA, ctx())).lesson.topics.map((x: any) => x.id)).toEqual([custom.id, speaking]);
     expect((await cmd(s.teacherA, 'lesson.setTopics', { contextId: ctx(), lessonId: '0190f0f0-0000-7000-8000-000000000000', topicIds: [reading] })).ok).toBe(false);
     expect((await cmd(s.teacherB, 'lesson.setTopics', { contextId: ctx(), lessonId: l1, topicIds: [reading] })).ok).toBe(false);
-    expect((await cmd(s.teacherA, 'lesson.setTopics', { contextId: ctx(), lessonId: l1, topicIds: ['0190f0f0-0000-7000-8000-000000000000'] })).error?.reason).toBe('UNKNOWN_TOPIC');
+    // An unknown (or meanwhile archived) topic is dropped, never a rejected outbox command.
+    expect((await cmd(s.teacherA, 'lesson.setTopics', { contextId: ctx(), lessonId: l1, topicIds: [custom.id, speaking, '0190f0f0-0000-7000-8000-000000000000'] })).result).toMatchObject({ changed: false });
     await endLesson(s.teacherA, ctx(), l1);
     const l2 = await startLesson(s.teacherA, ctx(), { topicIds: [speaking] });
     await endLesson(s.teacherA, ctx(), l2);
@@ -247,6 +269,25 @@ describe('lesson topics (S13a, D-101)', () => {
     expect(refl.tables[0].columns.at(-1).key).toBe('topic');
     const tl = await ok(s.teacherA.get(`/api/teacher/contexts/${ctx()}/students/${kids[0]!.id}/timeline?from=2026-11-01&to=2026-11-30`));
     expect(tl.events.filter((e: any) => e.what.k === 'report.timeline.lessonTopic')).toHaveLength(2);
+  });
+
+  it('a topic archived after the device cached it is dropped from a replayed lesson.start (and lesson.setTopics), not a failed start', async () => {
+    const t = await topics();
+    const reading = byName(t.topics, 'Reading').id;
+    const custom = await ok(s.teacherA.post(`/api/teacher/contexts/${ctx()}/goal-categories`, { name: { en: 'Rhymes', tr: 'Uyaklar' }, icon: 'music' }));
+    // The classroom device still offers "Rhymes"; the teacher archives it in the teacher area meanwhile.
+    await ok(s.teacherA.patch(`/api/teacher/goal-categories/${custom.id}`, { archived: true }));
+    expect(byName((await topics()).topics, 'Rhymes')).toBeUndefined();
+    const start = await cmd(s.teacherA, 'lesson.start', { contextId: ctx(), othersPresent: true, attendance: [], topicIds: [custom.id, reading] });
+    expect(start.ok).toBe(true);
+    const lessonId = start.result.lessonId as string;
+    expect((await lessonState(s.teacherA, ctx())).lesson.topics.map((x: any) => x.id)).toEqual([reading]);
+    const audited = env.db.$client.prepare("select after_json a from audit_events where action = 'lesson.start' and entity_id = ?").get(lessonId) as { a: string };
+    expect(JSON.parse(audited.a).droppedTopics).toEqual([custom.id]);
+    // A queued mid-lesson change naming the archived topic keeps the usable ones.
+    expect((await cmd(s.teacherA, 'lesson.setTopics', { contextId: ctx(), lessonId, topicIds: [custom.id] })).result).toMatchObject({ changed: true });
+    expect((await lessonState(s.teacherA, ctx())).lesson.topics).toEqual([]);
+    await endLesson(s.teacherA, ctx(), lessonId);
   });
 });
 
