@@ -168,9 +168,13 @@ function violated(r: PairRule, where: ReadonlyMap<string, number>): boolean {
 
 /** Level objective: spread inside groups (level mode) or distance of group means from the class mean (mixed). */
 function qualityCost(groups: readonly (readonly string[])[], rank: ReadonlyMap<string, number | null>, mode: GroupingMode): number {
-  // The unassessed bucket stays spread evenly (at most one apart per group) in both modes.
+  // The unassessed bucket stays spread evenly (at most one apart per group) in both modes. The cost is
+  // the sum of squares: with a fixed total, every spread whose counts differ by at most one has the
+  // same, minimal sum, and every single swap towards it lowers the sum. The earlier cost
+  // "max - min - 1" was flat for the swap 2,2,0,0 → 1,2,1,0, so the swap search stopped in an uneven
+  // spread (S10 counter-example: mixed, 10 students, 4 without a level, 4 groups).
   const unassessed = groups.map((g) => g.filter((id) => (rank.get(id) ?? null) === null).length);
-  let cost = unassessed.length ? Math.max(0, Math.max(...unassessed) - Math.min(...unassessed) - 1) * W_UNASSESSED : 0;
+  let cost = unassessed.reduce((a, u) => a + u * u, 0) * W_UNASSESSED;
   const all = [...rank.values()].filter((r): r is number => r !== null);
   const mean = all.length ? all.reduce((a, b) => a + b, 0) / all.length : 0;
   for (const g of groups) {

@@ -1042,6 +1042,7 @@ export const en = {
   'error.SCANNED_PDF': 'This PDF contains only a scanned image. Upload a photo of the page instead.',
   'error.OCR_NO_TEXT': 'No text could be read from this image. Try a sharper, straight photo in good light.',
   'error.OCR_TIMEOUT': 'Reading the image took too long. Try a smaller or sharper photo.',
+  'error.PARSE_TIMEOUT': 'Reading the file took too long. Try a smaller file, or copy the list and paste it.',
   'error.IMPORT_TYPE_NOT_SUPPORTED': 'This file type cannot be imported. Use Excel, CSV, Word, PDF or a photo.',
   'error.IMPORT_UNREADABLE': 'The file could not be read. It may be damaged or password-protected.',
   'error.IMPORT_EMPTY': 'Nothing was found to import.',

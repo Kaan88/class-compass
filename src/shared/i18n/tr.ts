@@ -1040,6 +1040,7 @@ export const tr = {
   'error.SCANNED_PDF': 'Bu PDF yalnızca taranmış bir görüntü içeriyor. Bunun yerine sayfanın fotoğrafını yükleyin.',
   'error.OCR_NO_TEXT': 'Bu görüntüden yazı okunamadı. İyi ışıkta, düz ve net bir fotoğraf deneyin.',
   'error.OCR_TIMEOUT': 'Görüntünün okunması çok uzun sürdü. Daha küçük veya daha net bir fotoğraf deneyin.',
+  'error.PARSE_TIMEOUT': 'Dosyanın okunması çok uzun sürdü. Daha küçük bir dosya deneyin ya da listeyi kopyalayıp yapıştırın.',
   'error.IMPORT_TYPE_NOT_SUPPORTED': 'Bu dosya türü aktarılamıyor. Excel, CSV, Word, PDF veya fotoğraf kullanın.',
   'error.IMPORT_UNREADABLE': 'Dosya okunamadı. Bozuk veya parolalı olabilir.',
   'error.IMPORT_EMPTY': 'Aktarılacak bir şey bulunamadı.',

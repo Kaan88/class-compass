@@ -1,16 +1,16 @@
 /**
  * Source → rows of cells (IMP-1). The parser is chosen by the SNIFFED type of the upload (never the
  * client's file name or type), with the file name only telling CSV and TXT apart for the notice.
+ * Workbooks, Word and PDF files are parsed in a worker thread with a time limit (runParser.ts), OCR
+ * in tesseract's own worker (ocr.ts); only plain text is decoded on the main thread.
  */
 import fsp from 'node:fs/promises';
 import { freeTextRows, MAX_IMPORT_ROWS, type SourceRow } from '../../../../domain/importing.ts';
 import type { Config } from '../../../config.ts';
 import { AppError } from '../../../lib/errors.ts';
 import { MIME } from '../../files/sniff.ts';
-import { parseDocx } from './docx.ts';
 import { recognise } from './ocr.ts';
-import { parsePdf } from './pdf.ts';
-import { parseWorkbook } from './spreadsheet.ts';
+import { runParser } from './runParser.ts';
 import { decodeText, parseText } from './text.ts';
 
 export type ImportSourceType = 'paste' | 'csv' | 'xlsx' | 'xls' | 'docx' | 'pdf' | 'image';
@@ -35,7 +35,7 @@ export function extractPaste(text: string): Extracted {
   return { sourceType: 'paste', rows: cap(parseText(text.normalize('NFC')), notices), notices };
 }
 
-export async function extractFile(config: Pick<Config, 'ocrCacheDir' | 'OCR_TIMEOUT_MS'>, file: { path: string; mime: string; name: string | null }): Promise<Extracted> {
+export async function extractFile(config: Pick<Config, 'ocrCacheDir' | 'OCR_TIMEOUT_MS' | 'PARSE_TIMEOUT_MS'>, file: { path: string; mime: string; name: string | null }): Promise<Extracted> {
   const buf = await fsp.readFile(file.path);
   const notices: string[] = [];
   const fail = (reason: string, message: string) => new AppError('VALIDATION', message, { reason });
@@ -49,14 +49,14 @@ export async function extractFile(config: Pick<Config, 'ocrCacheDir' | 'OCR_TIME
       }
       case MIME.xlsx:
       case MIME.xls: {
-        const { rows, sheets } = parseWorkbook(buf);
+        const { rows, sheets } = await runParser('workbook', buf, config.PARSE_TIMEOUT_MS);
         if (sheets > 1) notices.push('SHEETS_READ');
         return { sourceType: file.mime === MIME.xlsx ? 'xlsx' : 'xls', rows: cap(rows, notices), notices };
       }
       case MIME.docx:
-        return { sourceType: 'docx', rows: cap(await parseDocx(buf), notices), notices };
+        return { sourceType: 'docx', rows: cap(await runParser('docx', buf, config.PARSE_TIMEOUT_MS), notices), notices };
       case MIME.pdf: {
-        const { rows, scanned } = await parsePdf(buf);
+        const { rows, scanned } = await runParser('pdf', buf, config.PARSE_TIMEOUT_MS);
         if (scanned) throw fail('SCANNED_PDF', 'This PDF has no text (it is a scan). Upload a photo of the page instead.');
         return { sourceType: 'pdf', rows: cap(rows, notices), notices };
       }

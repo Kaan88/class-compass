@@ -29,6 +29,8 @@ const EnvSchema = z.object({
   UPLOAD_GLOBAL_QUOTA_MB: z.coerce.number().int().min(1).max(10_000_000).default(10_240),
   /** Local OCR (D-011): maximum time for one image before the OCR worker is stopped. */
   OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(90_000),
+  /** Workbook, Word and PDF parsing (worker thread): maximum time for one file before the thread is stopped. */
+  PARSE_TIMEOUT_MS: z.coerce.number().int().min(500).max(600_000).default(30_000),
 });
 
 /** Sign-in attempts per minute per address (production value). */

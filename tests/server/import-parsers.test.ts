@@ -13,7 +13,7 @@ import { detectEncoding } from '../../src/server/modules/import/parsers/text.ts'
 import { MIME } from '../../src/server/modules/files/sniff.ts';
 import { csv1254, docxTable, eOkulPdf, eOkulXls, eOkulXlsx, EXPECTED_NAMES, oversizedDimensionXlsx, PDF_STUDENTS, typedListPng, utf16Tsv } from '../import-fixtures.ts';
 
-const cfg = { ocrCacheDir: path.join(os.tmpdir(), 'cc-ocr-cache-test'), OCR_TIMEOUT_MS: 120_000 };
+const cfg = { ocrCacheDir: path.join(os.tmpdir(), 'cc-ocr-cache-test'), OCR_TIMEOUT_MS: 120_000, PARSE_TIMEOUT_MS: 60_000 };
 
 async function viaFile(buf: Buffer, mime: string, name: string) {
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'cc-imp-'));
@@ -145,5 +145,23 @@ describe('importer parsers (IMP-1, D-013)', () => {
     expect(out.rows.length).toBeLessThanOrEqual(2);
     expect(out.rows.every((r) => r.cells.length <= 2)).toBe(true);
     expect(out.rows[1]!.cells).toEqual(['101', 'Ayşe Kurgu']);
+  });
+
+  it('workbook, Word and PDF parsing run in a worker thread that is stopped at the time limit (S9 gap, S10)', async () => {
+    // A 1 ms limit cannot be met by starting a worker thread, so the parser is stopped with PARSE_TIMEOUT.
+    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'cc-imp-'));
+    const p = path.join(dir, 'f');
+    await fsp.writeFile(p, eOkulXlsx());
+    try {
+      await expect(extractFile({ ...cfg, PARSE_TIMEOUT_MS: 1 }, { path: p, mime: MIME.xlsx, name: 'liste.xlsx' })).rejects.toMatchObject({ details: { reason: 'PARSE_TIMEOUT' } });
+    } finally {
+      await fsp.rm(dir, { recursive: true, force: true });
+    }
+    // The main thread is not blocked while a worker parses: a timer fires during the parse.
+    let ticks = 0;
+    const iv = setInterval(() => ticks++, 1);
+    await viaFile(await eOkulPdf(), MIME.pdf, 'liste.pdf');
+    clearInterval(iv);
+    expect(ticks).toBeGreaterThan(0);
   });
 });

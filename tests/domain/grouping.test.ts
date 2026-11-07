@@ -6,6 +6,14 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { apartPlacement, evaluateRules, fitToPresent, groupSizes, levelRanks, orderedLevels, solveGroups, type GroupStudent, type PairRule, type Sizing } from '../../src/domain/grouping.ts';
 
+/**
+ * Fixed fast-check seed (S10 housekeeping): runs are reproducible, and fast-check prints the seed and
+ * the shrunk counter-example on failure. Set FC_SEED to explore other seeds locally
+ * (e.g. `FC_SEED=123 npx vitest run tests/domain/grouping.test.ts`).
+ */
+const FC_SEED = Number(process.env.FC_SEED ?? 20261107);
+fc.configureGlobal({ seed: FC_SEED });
+
 const ids = (n: number) => Array.from({ length: n }, (_, i) => `s${String(i).padStart(2, '0')}`);
 
 const studentsArb = fc
@@ -102,6 +110,23 @@ describe('solveGroups (GRP-1..3, GRP-8)', () => {
       }),
       { numRuns: 60 },
     );
+  });
+
+  it('spreads the unassessed bucket evenly for every small class (exhaustive regression, S10)', () => {
+    // The property above failed intermittently: with random inputs fast-check sometimes hit a mixed
+    // case such as 10 students, 4 without a level, 4 groups (2,2,0,0). The swap search's cost was
+    // flat for one swap; it is now a sum of squares. This grid covers every case the property draws.
+    const bad: string[] = [];
+    for (const mode of ['level', 'mixed'] as const)
+      for (let n = 2; n <= 30; n++)
+        for (let u = 0; u <= n; u++)
+          for (let k = 1; k <= 6; k++) {
+            const students = ids(n).map((id, i) => ({ id, levelRank: i < u ? null : i % 3 }));
+            const { groups } = solveGroups({ students, sizing: { groupCount: k }, mode, rules: [], seed: 'u' });
+            const per = groups.map((g) => g.filter((id) => Number(id.slice(1)) < u).length);
+            if (Math.max(...per) - Math.min(...per) > 1) bad.push(`${mode} n=${n} u=${u} k=${k}: ${per.join(',')}`);
+          }
+    expect(bad).toEqual([]);
   });
 
   it("honours 'apart' rules whenever they are satisfiable (GRP-4)", () => {

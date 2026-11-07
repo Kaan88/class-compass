@@ -5,8 +5,11 @@
  * Fictional names only.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { api, ensurePin, login, PIN } from './helpers.ts';
+
+/** The preview's count line (other status regions, such as the open-choices notice, may be shown too). */
+const summary = (preview: Locator) => preview.getByRole('status').filter({ hasText: /to add/ });
 
 const letters = () => Array.from({ length: 5 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
 
@@ -32,7 +35,7 @@ test('paste a list, fix a row, confirm, see the report; a re-import shows existi
 
     const preview = page.getByTestId('import-preview');
     await expect(preview).toBeVisible();
-    await expect(preview.getByRole('status')).toHaveText('3 to add, 0 existing, 0 skipped');
+    await expect(summary(preview)).toHaveText('3 to add, 0 existing, 0 skipped');
     // Names are kept whole and title-cased; headings are hidden by default.
     await expect(preview.getByRole('row').filter({ hasText: `Arda Kurgu${tag}` })).toBeVisible();
     await expect(preview.getByRole('row').filter({ hasText: 'Öğrenci Listesi' })).toHaveCount(0);
@@ -58,8 +61,12 @@ test('paste a list, fix a row, confirm, see the report; a re-import shows existi
     await ip.getByLabel('Import into class').selectOption({ label: '3-A' });
     await ip.getByLabel('Student list').fill(list);
     await ip.getByRole('button', { name: 'Preview' }).click();
-    await expect(preview.getByRole('status')).toHaveText('0 to add, 3 existing, 0 skipped');
+    await expect(summary(preview)).toHaveText('0 to add, 3 existing, 0 skipped');
     await expect(preview.getByRole('row').filter({ hasText: `Defne Kurgu${tag}` })).toContainText('Same number: existing student');
+    // "Mira Kurgu…" has Mira Su Kurgu…'s number but another name: the teacher must choose (D-081).
+    await expect(preview.getByRole('button', { name: 'Confirm: add 0, link 3' })).toBeDisabled();
+    await preview.getByLabel(`What happens with Mira Kurgu${tag}`).selectOption({ label: 'Existing student' });
+    await expect(preview.getByRole('status').filter({ hasText: 'may be an existing student' })).toHaveCount(0);
     await preview.getByRole('button', { name: 'Confirm: add 0, link 3' }).click();
     await expect(report.getByRole('status')).toHaveText('0 added, 3 existing, 1 skipped, 0 not possible');
     await expect(report.getByRole('row').filter({ hasText: `Defne Kurgu${tag}` })).toContainText('Already in this class');

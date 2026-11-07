@@ -272,7 +272,10 @@ function Preview({ batch, onChange, onClose }: { batch: Batch; onChange: (b: Bat
                   <Select
                     label={t('import.decisionFor', { name: r.parsed.fullName || String(r.idx + 1) })}
                     hideLabel
-                    value={r.decision}
+                    // An open choice shows "Choose" instead of the suggestion, so picking the suggested
+                    // option is a real change the teacher makes (S10 e2e fix; IMP-4).
+                    value={r.needsChoice ? '' : r.decision}
+                    {...(r.needsChoice ? { placeholder: t('import.needsChoice') } : {})}
                     onChange={(d) => void setDecision(r, d)}
                     items={Imp.IMPORT_DECISIONS.map((d) => ({ id: d, label: t(`import.decision.${d}`), disabled: d === 'match' && r.candidates.length === 0 }))}
                   />
