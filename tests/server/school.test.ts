@@ -45,6 +45,22 @@ describe('school years and terms (DAT-1)', () => {
     expect((await ok(s.admin.get('/api/admin/years'))).years[0].terms).toEqual([]);
   });
 
+  it('keeps terms inside the year and years from overlapping when dates change (DAT-1)', async () => {
+    await ok(s.admin.post(`/api/admin/years/${s.year.id}/terms`, { name: { en: 'Term 2' }, startsOn: '2027-02-09', endsOn: '2027-06-30' }));
+    const shrink = await s.admin.patch(`/api/admin/years/${s.year.id}`, { endsOn: '2027-06-15' });
+    expect(shrink.status).toBe(409);
+    expect(shrink.body.error.details.reason).toBe('TERM_OUTSIDE_YEAR');
+    const overlap = await s.admin.post('/api/admin/years', { name: '2027–2028', startsOn: '2027-06-01', endsOn: '2028-06-30' });
+    expect(overlap.status).toBe(409);
+    expect(overlap.body.error.details.reason).toBe('YEAR_OVERLAP');
+    const next = await ok(s.admin.post('/api/admin/years', { name: '2027–2028', startsOn: '2027-09-01', endsOn: '2028-06-30' }));
+    expect((await s.admin.patch(`/api/admin/years/${next.id}`, { startsOn: '2027-06-30' })).body.error.details.reason).toBe('YEAR_OVERLAP');
+    // Students enrolled from 9 Nov: the year cannot start after that.
+    await addStudent(s.teacherA, s.c3a.id, { fullName: 'Nil Akay' });
+    expect((await s.admin.patch(`/api/admin/years/${s.year.id}`, { startsOn: '2026-12-01' })).body.error.details.reason).toBe('ENROLMENT_OUTSIDE_YEAR');
+    await ok(s.admin.patch(`/api/admin/years/${s.year.id}`, { startsOn: '2026-09-07' }));
+  });
+
   it('makes an archived year read-only for admins and teachers, and reversible by unarchiving', async () => {
     const stu = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Elif Kaya' });
     const archived = await ok(s.admin.post(`/api/admin/years/${s.year.id}/archive`));

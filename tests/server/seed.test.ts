@@ -1,6 +1,6 @@
 /** Demo seed (OPS-5, ENG-4): fictional school, random passwords, refuses on real data/production. */
 import { afterEach, describe, expect, it } from 'vitest';
-import { schoolYears, students } from '../../src/server/db/schema.ts';
+import { schoolYears, students, users } from '../../src/server/db/schema.ts';
 import { SeedRefused, seedDemo } from '../../src/server/seed/demo.ts';
 import { Client, makeEnv, seedUser, type TestEnv } from '../helpers.ts';
 import { ok } from '../school-fixture.ts';
@@ -40,6 +40,17 @@ describe('seed:demo', () => {
     const admin = new Client(env);
     await admin.login('admin', r.accounts.find((a) => a.login === 'admin')!.password);
     expect((await ok(admin.get('/api/admin/settings'))).schoolName).toBe('Demo Primary School');
+  });
+
+  it('leaves nothing behind when it fails part-way, so a plain re-run works', async () => {
+    env = await makeEnv();
+    env.db.$client.exec(`create trigger fail_demo before insert on classes begin select raise(abort, 'simulated failure'); end;`);
+    await expect(seedDemo(env.deps)).rejects.toThrow(/simulated failure/);
+    expect(env.db.select().from(users).all()).toEqual([]);
+    expect(env.db.select().from(schoolYears).all()).toEqual([]);
+    env.db.$client.exec('drop trigger fail_demo');
+    const r = await seedDemo(env.deps);
+    expect(r.accounts.map((a) => a.login)).toEqual(['admin', 'english', 'classroom3a']);
   });
 
   it('refuses in production, on existing data, and with --force-demo when school data exists', async () => {

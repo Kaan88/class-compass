@@ -35,7 +35,8 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Students + enrolments: teacher/admin manual entry, edit (audited), duplicate warnings (never merged), Turkish normalisation/sorting, classroom-safe roster vs teacher roster, subject levels (teacher-only), deactivate/reactivate, move and whole-class promotion with history — D-021, D-022
 - [x] Email password reset when SMTP configured (nodemailer, injectable mailer) — D-015
 - [x] `seed:demo` fictional school (3-A 19, 3-B 20, 4-C 34, 2-D 3; random passwords printed once) — D-024
-- [x] Tests: permission matrix over all endpoints, unassigned-class/other-context denial, archived year read-only, promotion history, deactivated teacher + audit retained, media defaults, module disable keeps data, locale isolation, email reset, seed (66 tests total)
+- [x] Tests: permission matrix over all endpoints, unassigned-class/other-context denial, archived year read-only, promotion history, deactivated teacher + audit retained, media defaults, module disable keeps data, locale isolation, email reset, seed
+- [x] Review fixes (D-027…D-030): date-aware rosters (future-dated moves/promotions keep the current class until the date), move dates validated against the target year and old enrolments capped at the old year's end, no moves out of archived classes, year overlap / term / enrolment range checks on year edits, duplicate warning on rename and for deactivated students, reset links voided on email/password/state changes, SMTP STARTTLS required, atomic demo seed, missing `error.*` i18n keys (75 tests total)
 - [ ] Admin UI and teacher roster/module screens — moved to S3 (this stage is backend only)
 - [ ] Paste entry of student lists — moved to S9 (it is the importer's paste input, IMP-1)
 

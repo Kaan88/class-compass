@@ -13,7 +13,7 @@ import type { RequestContext, UserRow } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { hashPassword, randomToken } from '../../lib/crypto.ts';
 import { conflict, invalid, notFound } from '../../lib/errors.ts';
-import { createUser, revokeAllUserSessions } from '../auth/service.ts';
+import { createUser, invalidateResetTokens, revokeAllUserSessions } from '../auth/service.ts';
 import { getSchoolSettings } from '../school/policy.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -67,8 +67,10 @@ export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.update
     const u = getUser(ctx.db, input.userId);
     const patch: Partial<UserRow> = {};
     if (input.displayName !== undefined) patch.displayName = normaliseName(input.displayName);
-    if (input.email !== undefined) patch.email = input.email;
+    if (input.email !== undefined) patch.email = input.email?.trim().toLowerCase() || null;
     ctx.db.update(users).set({ ...patch, updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
+    // A reset link already mailed to the previous address must stop working (D-015).
+    if (patch.email !== undefined && patch.email !== u.email) invalidateResetTokens(ctx.db, u.id, ctx.now());
     const before = Object.fromEntries(Object.keys(patch).map((k) => [k, u[k as keyof UserRow]]));
     audit(ctx.db, ctx.actor, { action: 'user.update', entity: 'user', entityId: u.id, before, after: patch }, ctx.now());
     return adminUserDto(getUser(ctx.db, u.id));
@@ -96,7 +98,10 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
     if ((u.disabledAt === null) !== active) {
       const now = ctx.now();
       ctx.db.update(users).set({ disabledAt: active ? null : now, updatedAt: now }).where(eq(users.id, u.id)).run();
-      if (!active) revokeAllUserSessions(ctx.db, u.id, now);
+      if (!active) {
+        revokeAllUserSessions(ctx.db, u.id, now);
+        invalidateResetTokens(ctx.db, u.id, now);
+      }
       audit(ctx.db, ctx.actor, { action: active ? 'user.reactivate' : 'user.deactivate', entity: 'user', entityId: u.id }, now);
     }
     return adminUserDto(getUser(ctx.db, u.id));
@@ -112,6 +117,7 @@ export async function resetPasswordByAdmin(ctx: RequestContext, userId: string) 
     const now = ctx.now();
     ctx.db.update(users).set({ passwordHash, mustChangePassword: true, updatedAt: now }).where(eq(users.id, u.id)).run();
     revokeAllUserSessions(ctx.db, u.id, now);
+    invalidateResetTokens(ctx.db, u.id, now);
     audit(ctx.db, ctx.actor, { action: 'auth.password_reset_admin', entity: 'user', entityId: u.id }, now);
   });
   return { temporaryPassword: password };

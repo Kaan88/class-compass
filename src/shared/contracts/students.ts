@@ -88,6 +88,8 @@ export const updateStudent = endpoint({
     familyName: StudentInput.familyName,
     studentNumber: StudentInput.studentNumber,
     photoConsent: z.boolean().optional(),
+    /** Renaming to a name another student already has is a POSSIBLE_DUPLICATE warning unless confirmed (D-022). */
+    allowDuplicateName: z.boolean().optional(),
   }),
   output: StudentDetail,
 });

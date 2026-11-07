@@ -131,13 +131,28 @@ export function revokeAllUserSessions(db: Db, userId: string, now: number, excep
   db.update(sessions).set({ revokedAt: now }).where(cond).run();
 }
 
+/**
+ * Void every unused password-reset link of a user (D-015). Called whenever the account's email,
+ * password or active state changes, so a link sent to an old mailbox, or issued before an admin
+ * reset after a suspected compromise, can no longer be used.
+ */
+export function invalidateResetTokens(db: Db, userId: string, now: number) {
+  db.update(oneTimeTokens)
+    .set({ usedAt: now })
+    .where(and(eq(oneTimeTokens.userId, userId), eq(oneTimeTokens.kind, 'password_reset'), isNull(oneTimeTokens.usedAt)))
+    .run();
+}
+
 export async function changePassword(deps: AppDeps, user: UserRow, session: SessionRow, current: string, next: string) {
   if (!(await verifyPassword(user.passwordHash, current))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect');
   const passwordHash = await hashPassword(next);
   const now = deps.now();
-  deps.db.update(users).set({ passwordHash, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
-  revokeAllUserSessions(deps.db, user.id, now, session.id);
-  audit(deps.db, actorFor(user), { action: 'auth.password_change', entity: 'user', entityId: user.id }, now);
+  tx(deps.db, () => {
+    deps.db.update(users).set({ passwordHash, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
+    revokeAllUserSessions(deps.db, user.id, now, session.id);
+    invalidateResetTokens(deps.db, user.id, now);
+    audit(deps.db, actorFor(user), { action: 'auth.password_change', entity: 'user', entityId: user.id }, now);
+  });
 }
 
 export async function setPin(deps: AppDeps, user: UserRow, currentPassword: string, pin: string) {
@@ -191,32 +206,43 @@ export async function unlockPin(deps: AppDeps, user: UserRow, session: SessionRo
 
 export const actorFor = (user: UserRow): Actor => ({ type: 'user', id: user.id, role: user.role });
 
-/** Used by the CLI (initial admin, ACC-3) and the admin module. */
-export async function createUser(
-  db: Db,
-  input: {
-    login: string;
-    displayName: string;
-    role: 'admin' | 'teacher';
-    password: string;
-    email?: string | null;
-    mustChangePassword?: boolean;
-    locale?: 'en' | 'tr';
-  },
-  actor: Actor,
-  now: number,
-): Promise<UserRow> {
+export interface NewUserInput {
+  login: string;
+  displayName: string;
+  role: 'admin' | 'teacher';
+  email?: string | null;
+  mustChangePassword?: boolean;
+  locale?: 'en' | 'tr';
+}
+
+function assertNewUserValid(db: Db, input: NewUserInput, password: string | null): string {
   const login = normaliseLogin(input.login);
   if (!/^[\p{L}\p{N}._@-]{3,64}$/u.test(login)) throw new AppError('VALIDATION', 'Login must be 3–64 letters, digits or . _ @ -');
-  if (input.password.length < 10) throw new AppError('VALIDATION', 'Password must be at least 10 characters');
+  if (password !== null && password.length < 10) throw new AppError('VALIDATION', 'Password must be at least 10 characters');
   if (db.select({ id: users.id }).from(users).where(eq(users.login, login)).get()) throw new AppError('CONFLICT', 'Login already in use');
+  return login;
+}
+
+/** Used by the CLI (initial admin, ACC-3) and the admin module. */
+export async function createUser(db: Db, input: NewUserInput & { password: string }, actor: Actor, now: number): Promise<UserRow> {
+  assertNewUserValid(db, input, input.password);
+  const passwordHash = await hashPassword(input.password);
+  return insertUser(db, input, passwordHash, actor, now);
+}
+
+/**
+ * Synchronous insert with a pre-computed password hash, so callers can create accounts inside a
+ * transaction together with other rows (e.g. the demo seed). Re-validates the login.
+ */
+export function insertUser(db: Db, input: NewUserInput, passwordHash: string, actor: Actor, now: number): UserRow {
+  const login = assertNewUserValid(db, input, null);
   const row: UserRow = {
     id: newId(),
     login,
     email: input.email?.trim().toLowerCase() || null,
     displayName: input.displayName.trim(),
     role: input.role,
-    passwordHash: await hashPassword(input.password),
+    passwordHash,
     pinHash: null,
     locale: input.locale ?? 'en',
     textScale: 100,

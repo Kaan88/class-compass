@@ -29,7 +29,18 @@ import { newId } from '../../lib/crypto.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { contextModuleStates, getAvailability, mediaRecord, type ContextModuleState } from './modules.ts';
-import { assertClassWritable, assertOwnsContext, assertYearWritable, getClass, getSchoolSettings, getYear, type ClassRow, type ContextRow } from './policy.ts';
+import {
+  assertClassWritable,
+  assertOwnsContext,
+  assertYearWritable,
+  enrolmentActiveOn,
+  getClass,
+  getSchoolSettings,
+  getYear,
+  todayFor,
+  type ClassRow,
+  type ContextRow,
+} from './policy.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
@@ -89,9 +100,20 @@ export function listYears(db: Db) {
   return ys.map((y) => yearDto(db, y.id));
 }
 
+/** School years must not overlap: every local date belongs to at most one year (DAT-1). */
+function assertNoYearOverlap(db: Db, startsOn: string, endsOn: string, exceptId?: string) {
+  const clash = db
+    .select()
+    .from(schoolYears)
+    .all()
+    .find((y) => y.id !== exceptId && y.startsOn <= endsOn && startsOn <= y.endsOn);
+  if (clash) throw conflict(`These dates overlap the school year ${clash.name}`, { reason: 'YEAR_OVERLAP', yearId: clash.id });
+}
+
 export function createYear(ctx: RequestContext, input: In<typeof C.createYear>) {
   assertRange(input.startsOn, input.endsOn);
   return tx(ctx.db, () => {
+    assertNoYearOverlap(ctx.db, input.startsOn, input.endsOn);
     const now = ctx.now();
     const row = { id: newId(), name: normaliseName(input.name), startsOn: input.startsOn, endsOn: input.endsOn, archivedAt: null, createdAt: now, updatedAt: now };
     ctx.db.insert(schoolYears).values(row).run();
@@ -105,6 +127,21 @@ export function updateYear(ctx: RequestContext, input: In<typeof C.updateYear>) 
     const y = assertYearWritable(ctx.db, input.yearId);
     const next = { name: input.name !== undefined ? normaliseName(input.name) : y.name, startsOn: input.startsOn ?? y.startsOn, endsOn: input.endsOn ?? y.endsOn };
     assertRange(next.startsOn, next.endsOn);
+    assertNoYearOverlap(ctx.db, next.startsOn, next.endsOn, y.id);
+    // Keep existing data inside the year: terms (as on term create/update) and enrolment start dates.
+    const outsideTerm = ctx.db
+      .select()
+      .from(terms)
+      .where(eq(terms.schoolYearId, y.id))
+      .all()
+      .find((t) => t.startsOn < next.startsOn || t.endsOn > next.endsOn);
+    if (outsideTerm) throw conflict('A term of this year would fall outside the new dates; change the term first', { reason: 'TERM_OUTSIDE_YEAR', termId: outsideTerm.id });
+    const outsideEnrolment = ctx.db
+      .select({ id: enrolments.id })
+      .from(enrolments)
+      .where(and(eq(enrolments.schoolYearId, y.id), sql`(${enrolments.fromDate} < ${next.startsOn} or ${enrolments.fromDate} > ${next.endsOn})`))
+      .get();
+    if (outsideEnrolment) throw conflict('Students joined classes of this year on dates outside the new range', { reason: 'ENROLMENT_OUTSIDE_YEAR' });
     ctx.db.update(schoolYears).set({ ...next, updatedAt: ctx.now() }).where(eq(schoolYears.id, y.id)).run();
     audit(ctx.db, ctx.actor, { action: 'school_year.update', entity: 'school_year', entityId: y.id, before: { name: y.name, startsOn: y.startsOn, endsOn: y.endsOn }, after: next }, ctx.now());
     return yearDto(ctx.db, y.id);
@@ -215,18 +252,19 @@ export function setSubjectArchived(ctx: RequestContext, id: string, archived: bo
 }
 
 // ---------------------------------------------------------------- classes
-export function activeStudentCount(db: Db, classId: string): number {
-  const r = db
+/** Active students enrolled in the class today (class timezone), matching the rosters (D-021). */
+export function activeStudentCount(deps: Pick<AppDeps, 'db' | 'now'>, cls: ClassRow): number {
+  const r = deps.db
     .select({ n: sql<number>`count(*)` })
     .from(enrolments)
     .innerJoin(students, eq(students.id, enrolments.studentId))
-    .where(and(eq(enrolments.classId, classId), isNull(enrolments.toDate), isNull(students.deactivatedAt)))
+    .where(and(eq(enrolments.classId, cls.id), enrolmentActiveOn(todayFor(deps, cls)), isNull(students.deactivatedAt)))
     .get();
   return r?.n ?? 0;
 }
 
-export function classDto(db: Db, c: ClassRow) {
-  const y = getYear(db, c.schoolYearId);
+export function classDto(deps: Pick<AppDeps, 'db' | 'now'>, c: ClassRow) {
+  const y = getYear(deps.db, c.schoolYearId);
   return {
     id: c.id,
     schoolYearId: c.schoolYearId,
@@ -238,16 +276,17 @@ export function classDto(db: Db, c: ClassRow) {
     animationsEnabled: c.animationsEnabled,
     archived: c.archivedAt !== null,
     yearArchived: y.archivedAt !== null,
-    studentCount: activeStudentCount(db, c.id),
+    studentCount: activeStudentCount(deps, c),
   };
 }
 
-export function listClasses(db: Db, input: In<typeof C.listClasses>) {
+export function listClasses(deps: Pick<AppDeps, 'db' | 'now'>, input: In<typeof C.listClasses>) {
+  const { db } = deps;
   const conds = [];
   if (input.yearId) conds.push(eq(classes.schoolYearId, input.yearId));
   if (!input.includeArchived) conds.push(isNull(classes.archivedAt));
   const rows = db.select().from(classes).where(and(...conds)).all();
-  return rows.sort((a, b) => compareNames(a.name, b.name)).map((c) => classDto(db, c));
+  return rows.sort((a, b) => compareNames(a.name, b.name)).map((c) => classDto(deps, c));
 }
 
 function assertUniqueClassName(db: Db, yearId: string, name: string, exceptId?: string) {
@@ -283,7 +322,7 @@ export function createClass(ctx: RequestContext, input: In<typeof C.createClass>
     ctx.db.insert(classes).values(row).run();
     const { createdAt: _c, updatedAt: _u, ...after } = row;
     audit(ctx.db, ctx.actor, { action: 'class.create', entity: 'class', entityId: row.id, after }, now);
-    return classDto(ctx.db, row);
+    return classDto(ctx, row);
   });
 }
 
@@ -304,7 +343,7 @@ export function updateClass(ctx: RequestContext, input: In<typeof C.updateClass>
     ctx.db.update(classes).set({ ...patch, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
     const before = Object.fromEntries(Object.keys(patch).map((k) => [k, c[k as keyof ClassRow]]));
     audit(ctx.db, ctx.actor, { action: 'class.update', entity: 'class', entityId: c.id, before, after: patch }, ctx.now());
-    return classDto(ctx.db, getClass(ctx.db, c.id));
+    return classDto(ctx, getClass(ctx.db, c.id));
   });
 }
 
@@ -317,7 +356,7 @@ export function setClassArchived(ctx: RequestContext, classId: string, archived:
       ctx.db.update(classes).set({ archivedAt: archived ? ctx.now() : null, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
       audit(ctx.db, ctx.actor, { action: archived ? 'class.archive' : 'class.unarchive', entity: 'class', entityId: c.id }, ctx.now());
     }
-    return classDto(ctx.db, getClass(ctx.db, c.id));
+    return classDto(ctx, getClass(ctx.db, c.id));
   });
 }
 

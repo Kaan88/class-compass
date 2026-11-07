@@ -56,5 +56,11 @@ export const tr = {
   'error.DUPLICATE_CLASS_NAME': 'Bu eğitim yılında aynı adda bir sınıf zaten var.',
   'error.FEATURE_DISABLED': 'Bu özellik yöneticiniz tarafından kapatıldı.',
   'error.RESET_TOKEN_INVALID': 'Bu sıfırlama bağlantısı geçersiz ya da süresi dolmuş. Yeni bir bağlantı isteyin.',
+  'error.STUDENT_DEACTIVATED': 'Bu öğrenci pasif durumda. Bir yönetici yeniden etkinleştirebilir.',
+  'error.YEAR_OVERLAP': 'Bu tarihler başka bir eğitim yılıyla çakışıyor.',
+  'error.TERM_OUTSIDE_YEAR': 'Bir dönem eğitim yılının dışında kalır. Önce dönem tarihlerini değiştirin.',
+  'error.ENROLMENT_OUTSIDE_YEAR': 'Bazı öğrenciler sınıflarına yeni eğitim yılı tarihlerinin dışında bir tarihte katıldı.',
+  'error.MOVE_DATE_OUTSIDE_YEAR': 'Taşıma tarihi yeni sınıfın eğitim yılı içinde olmalıdır.',
+  'error.MOVE_DATE_BEFORE_ENROLMENT': 'Taşıma tarihi, öğrencinin şu anki sınıfına katıldığı tarihten önce.',
   'error.FORBIDDEN': 'Buna erişim izniniz yok.',
 } as const satisfies Messages;

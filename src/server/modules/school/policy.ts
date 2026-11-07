@@ -2,10 +2,10 @@
  * Resource-authorisation helpers (ACC-4, ACC-10, DAT-1) reused by every later stage. Access classes
  * only say *who* may call an endpoint; these say *which rows* they may touch.
  */
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, lte, or, type SQL } from 'drizzle-orm';
 import { localDate } from '../../../domain/dates.ts';
 import type { Db } from '../../db/client.ts';
-import { classes, schoolSettings, schoolYears, teachingContexts } from '../../db/schema.ts';
+import { classes, enrolments, schoolSettings, schoolYears, teachingContexts } from '../../db/schema.ts';
 import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 
@@ -24,6 +24,33 @@ export const effectiveTimezone = (db: Db, cls: Pick<ClassRow, 'timezone'> | null
 
 /** Today's local date for a class (or the school) using the injectable clock. */
 export const todayFor = (deps: Pick<AppDeps, 'db' | 'now'>, cls: Pick<ClassRow, 'timezone'> | null) => localDate(deps.now(), effectiveTimezone(deps.db, cls));
+
+/**
+ * An enrolment counts on local day `date` when fromDate <= date < toDate (toDate exclusive, open
+ * when null) — D-021. Rosters use this with `todayFor(class)`, so a move or promotion dated in the
+ * future leaves the student in the old class until that day.
+ */
+export const enrolmentActiveOn = (date: string): SQL => and(lte(enrolments.fromDate, date), or(isNull(enrolments.toDate), gt(enrolments.toDate, date)))!;
+
+/** Not yet ended on `date` (current or scheduled): toDate is null or after `date`. */
+export const enrolmentNotEndedOn = (date: string): SQL => or(isNull(enrolments.toDate), gt(enrolments.toDate, date))!;
+
+/** The calendar day after an ISO date (used for exclusive end dates). */
+export function dayAfter(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Default start date for a new enrolment in `cls`: today in the class timezone, clamped into the
+ * class's school year (a class of next year starts on its first day; of a past year, on its last).
+ */
+export function defaultEnrolmentDate(deps: Pick<AppDeps, 'db' | 'now'>, cls: ClassRow): string {
+  const today = todayFor(deps, cls);
+  const y = getYear(deps.db, cls.schoolYearId);
+  return today < y.startsOn ? y.startsOn : today > y.endsOn ? y.endsOn : today;
+}
 
 export function getClass(db: Db, classId: string): ClassRow {
   const c = db.select().from(classes).where(eq(classes.id, classId)).get();

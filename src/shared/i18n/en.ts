@@ -58,6 +58,12 @@ export const en = {
   'error.DUPLICATE_CLASS_NAME': 'A class with this name already exists in this school year.',
   'error.FEATURE_DISABLED': 'This feature has been turned off by your administrator.',
   'error.RESET_TOKEN_INVALID': 'This reset link is invalid or has expired. Ask for a new one.',
+  'error.STUDENT_DEACTIVATED': 'This student is deactivated. An administrator can reactivate them.',
+  'error.YEAR_OVERLAP': 'These dates overlap another school year.',
+  'error.TERM_OUTSIDE_YEAR': 'A term would fall outside the school year. Change the term dates first.',
+  'error.ENROLMENT_OUTSIDE_YEAR': 'Some students joined classes on dates outside the new school year dates.',
+  'error.MOVE_DATE_OUTSIDE_YEAR': 'The move date must fall inside the school year of the new class.',
+  'error.MOVE_DATE_BEFORE_ENROLMENT': 'The move date is before the student joined their current class.',
   'error.FORBIDDEN': 'You do not have access to this.',
 } as const;
 

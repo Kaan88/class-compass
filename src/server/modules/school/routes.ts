@@ -30,7 +30,7 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.unarchiveSubject, (ctx, input) => svc.setSubjectArchived(ctx, input.subjectId, false));
 
   // classes
-  route(app, deps, C.listClasses, (ctx, input) => ({ classes: svc.listClasses(ctx.db, input) }));
+  route(app, deps, C.listClasses, (ctx, input) => ({ classes: svc.listClasses(ctx, input) }));
   route(app, deps, C.createClass, (ctx, input) => svc.createClass(ctx, input));
   route(app, deps, C.updateClass, (ctx, input) => svc.updateClass(ctx, input));
   route(app, deps, C.archiveClass, (ctx, input) => svc.setClassArchived(ctx, input.classId, true));

@@ -14,8 +14,8 @@ export function registerStudentRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.setContextLevels, (ctx, input) => svc.setContextLevels(ctx, input));
 
   // admin
-  route(app, deps, C.adminListStudents, (ctx, input) => svc.adminListStudents(ctx.db, input));
-  route(app, deps, C.adminGetStudent, (ctx, input) => svc.adminGetStudent(ctx.db, input.studentId));
+  route(app, deps, C.adminListStudents, (ctx, input) => svc.adminListStudents(ctx, input));
+  route(app, deps, C.adminGetStudent, (ctx, input) => svc.adminGetStudent(ctx, input.studentId));
   route(app, deps, C.adminAddStudent, (ctx, input) => svc.adminAddStudent(ctx, input));
   route(app, deps, C.deactivateStudent, (ctx, input) => {
     svc.setStudentActive(ctx, input.studentId, false);

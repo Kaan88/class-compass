@@ -11,8 +11,8 @@ import { tx } from '../db/client.ts';
 import { classes, schoolSettings, schoolYears, students, subjects, teachingContexts, terms, users } from '../db/schema.ts';
 import { audit } from '../lib/audit.ts';
 import type { Actor, AppDeps } from '../lib/context.ts';
-import { newId, randomToken } from '../lib/crypto.ts';
-import { createUser, normaliseLogin } from '../modules/auth/service.ts';
+import { hashPassword, newId, randomToken } from '../lib/crypto.ts';
+import { insertUser, normaliseLogin } from '../modules/auth/service.ts';
 import { ensureSchoolDefaults } from '../modules/school/defaults.ts';
 import { getSchoolSettings, type ClassRow } from '../modules/school/policy.ts';
 import { createStudentInClass } from '../modules/students/service.ts';
@@ -121,17 +121,23 @@ export async function seedDemo(deps: AppDeps, opts: { force?: boolean } = {}): P
     }
   }
 
+  // Hash first (async), then write accounts and school data in ONE transaction, so a failed run
+  // leaves nothing behind and can simply be re-run.
   const now = deps.now();
-  const created: DemoAccount[] = [];
-  const ids: Record<string, string> = {};
+  const prepared: Array<(typeof demoAccounts)[number] & { password: string; passwordHash: string }> = [];
   for (const a of demoAccounts) {
     const password = randomToken(12);
-    const u = await createUser(deps.db, { login: a.login, displayName: a.displayName, role: a.role, password, email: a.email }, SYSTEM, now);
-    ids[a.login] = u.id;
-    created.push({ login: a.login, role: a.role, displayName: a.displayName, password });
+    prepared.push({ ...a, password, passwordHash: await hashPassword(password) });
   }
 
   return tx(deps.db, () => {
+    const created: DemoAccount[] = [];
+    const ids: Record<string, string> = {};
+    for (const a of prepared) {
+      const u = insertUser(deps.db, { login: a.login, displayName: a.displayName, role: a.role, email: a.email }, a.passwordHash, SYSTEM, now);
+      ids[a.login] = u.id;
+      created.push({ login: a.login, role: a.role, displayName: a.displayName, password: a.password });
+    }
     deps.db.update(schoolSettings).set({ schoolName: 'Demo Primary School', updatedAt: now }).where(eq(schoolSettings.id, 1)).run();
     const tz = getSchoolSettings(deps.db).timezone;
     const span = schoolYearFor(now, tz);

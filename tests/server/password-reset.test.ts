@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { oneTimeTokens } from '../../src/server/db/schema.ts';
 import { Client, FakeMailer, makeEnv, seedUser, type TestEnv } from '../helpers.ts';
 import { createUser } from '../../src/server/modules/auth/service.ts';
+import { smtpTransportOptions } from '../../src/server/lib/mailer.ts';
+import { ok } from '../school-fixture.ts';
 
 let env: TestEnv;
 afterEach(async () => env.app.close());
@@ -79,6 +81,54 @@ describe('email password reset (D-015)', () => {
     expect(mailer.sent).toHaveLength(3); // per-account cap per hour
     expect(statuses.slice(0, 5).every((s) => s === 200)).toBe(true);
     expect(statuses[5]).toBe(429); // per-IP rate limit
+  });
+
+  it('voids unused reset links when the email, password or account state changes (D-015)', async () => {
+    const mailer = await smtpEnv();
+    await seedUser(env, 'admin', 'root.admin');
+    const admin = new Client(env);
+    await admin.login('root.admin');
+    const ayse = (await admin.get('/api/admin/users')).body.users.find((u: any) => u.login === 'ayse.teacher');
+    const c = new Client(env);
+    const freshToken = async () => {
+      env.clock.advance(60 * 60 * 1000 + 1); // stay under the per-account hourly cap
+      await admin.login('root.admin');
+      await c.post('/api/auth/password-reset/request', { email: (await admin.get('/api/admin/users')).body.users.find((u: any) => u.id === ayse.id).email });
+      return tokenFrom(mailer.sent.at(-1)!.text);
+    };
+    const completeFails = async (token: string) => {
+      const r = await c.post('/api/auth/password-reset/complete', { token, newPassword: 'attacker-chosen-pass' });
+      expect(r.status).toBe(400);
+      expect(r.body.error.details.reason).toBe('RESET_TOKEN_INVALID');
+    };
+    // 1. Admin moves the account to a new mailbox: the link sent to the old one dies.
+    let token = await freshToken();
+    expect((await admin.patch(`/api/admin/users/${ayse.id}`, { email: 'ayse.new@school.example' })).status).toBe(200);
+    await completeFails(token);
+    // 2. Admin password reset (e.g. suspected compromise).
+    token = await freshToken();
+    expect((await admin.post(`/api/admin/users/${ayse.id}/reset-password`)).status).toBe(200);
+    await completeFails(token);
+    // 3. Deactivation (and later reactivation) does not revive the link.
+    token = await freshToken();
+    await ok(admin.post(`/api/admin/users/${ayse.id}/deactivate`));
+    await ok(admin.post(`/api/admin/users/${ayse.id}/reactivate`));
+    await completeFails(token);
+    // 4. The user changes their own password.
+    const tmp = (await ok(admin.post(`/api/admin/users/${ayse.id}/reset-password`))).temporaryPassword;
+    token = await freshToken();
+    const self = new Client(env);
+    await self.login('ayse.teacher', tmp);
+    await ok(self.post('/api/auth/password', { currentPassword: tmp, newPassword: 'my-own-new-secret' }));
+    await completeFails(token);
+    await new Client(env).login('ayse.teacher', 'my-own-new-secret');
+  });
+
+  it('requires TLS for SMTP: implicit on 465, STARTTLS enforced otherwise', () => {
+    const base = { SMTP_HOST: 'smtp.example.test', SMTP_USER: 'u', SMTP_PASS: 'p' };
+    const starttls = smtpTransportOptions({ ...env.config, ...base, SMTP_PORT: 587 });
+    expect(starttls).toMatchObject({ secure: false, requireTLS: true, tls: { rejectUnauthorized: true } });
+    expect(smtpTransportOptions({ ...env.config, ...base, SMTP_PORT: 465 })).toMatchObject({ secure: true, tls: { rejectUnauthorized: true } });
   });
 
   it('does not send to deactivated accounts', async () => {
