@@ -62,6 +62,7 @@ import { assertCanReadFile } from '../files/service.ts';
 import { storagePath } from '../files/storage.ts';
 import { assertClassWritable, assertTeachesClass, defaultEnrolmentDate, getClass, todayFor, type ClassRow } from '../school/policy.ts';
 import { taughtClassIds } from '../school/service.ts';
+import { GOALS_HISTORY_TABLES, goalsHistorySince } from '../goals/history.ts';
 import { SELECTIONS_TABLE_NAME, studentInContextSelections } from '../secret/service.ts';
 import { createStudentInClass, liveClassIdsOf, liveEnrolmentsOf } from '../students/service.ts';
 import { extractFile, extractPaste, type Extracted } from './parsers/index.ts';
@@ -789,6 +790,8 @@ export const ENROLMENT_HISTORY_TABLES = [
   'homework_mark_changes',
   'student_subject_levels',
   'files',
+  // S10: goals, reflections, evidence, feedback, private notes and personal links (through goalsHistorySince)
+  ...GOALS_HISTORY_TABLES,
 ] as const;
 
 /**
@@ -806,6 +809,7 @@ function enrolmentHasHistory(db: Db, e: typeof enrolments.$inferSelect): boolean
   if (att) return true;
   if (db.select({ id: studentSubjectLevels.studentId }).from(studentSubjectLevels).where(and(eq(studentSubjectLevels.studentId, studentId), gte(studentSubjectLevels.updatedAt, e.createdAt))).get()) return true;
   if (db.select({ id: files.id }).from(files).where(and(eq(files.ownerStudentId, studentId), gte(files.createdAt, e.createdAt))).get()) return true;
+  if (goalsHistorySince(db, studentId, e.createdAt)) return true;
   if (referencedInJson(db, studentId)) return true;
   const ctxIds = db.select({ id: teachingContexts.id }).from(teachingContexts).where(eq(teachingContexts.classId, classId)).all().map((r) => r.id);
   if (!ctxIds.length) return false;

@@ -1682,3 +1682,144 @@ a {
   font: inherit;
   color: var(--cc-text);
 }
+
+/* ------------------------------------------------------------------ goals, student page, links (S10) */
+/* Personal student page: mobile-first single column (UX-2), large touch targets, readable lines. */
+.cc-student {
+  max-width: 42rem;
+  padding-inline: 1rem;
+}
+.cc-student__bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 1rem 0;
+  max-width: 42rem;
+  margin: 0 auto;
+}
+.cc-student__head {
+  flex-wrap: nowrap;
+}
+.cc-student__who {
+  gap: 0.25rem;
+  min-width: 0;
+}
+.cc-student__who .cc-h1 {
+  font-size: 1.6rem;
+  overflow-wrap: anywhere;
+}
+.cc-student__subject {
+  font-size: 1.7rem;
+  padding-top: 0.5rem;
+  border-top: var(--cc-border-width-strong) solid var(--cc-border);
+}
+.cc-student__gone {
+  align-items: center;
+  text-align: center;
+  margin-top: 2rem;
+}
+.cc-student .cc-input,
+.cc-student .cc-select {
+  width: 100%;
+}
+.cc-lang {
+  gap: 0.4rem;
+}
+.cc-goal__text {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.cc-goal__summary {
+  gap: 0.5rem;
+}
+.cc-entry {
+  list-style: none;
+  border-inline-start: var(--cc-border-width-strong) solid var(--cc-border);
+  padding-inline-start: 0.75rem;
+}
+.cc-entry[data-author='teacher'] {
+  border-inline-start-color: var(--cc-accent);
+}
+.cc-entry__body {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cc-evidence__link {
+  overflow-wrap: anywhere;
+}
+.cc-evidence__thumb {
+  max-width: 10rem;
+  max-height: 10rem;
+  border-radius: var(--cc-radius-sm);
+  border: var(--cc-border-width) solid var(--cc-border);
+}
+.cc-evidence audio {
+  width: 100%;
+}
+.cc-confidence-picker {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.cc-confidence-picker .cc-btn {
+  min-width: var(--cc-touch);
+}
+.cc-private {
+  border-style: dashed;
+  border-width: var(--cc-border-width-strong);
+  background: var(--cc-warning-soft);
+}
+.cc-private .cc-h2 {
+  gap: 0.5rem;
+}
+/* Printable link cards (STU-1): 2 per row on A4, each with a locally drawn QR code. */
+.cc-link-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+.cc-link-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--cc-surface);
+  border: var(--cc-border-width-strong) dashed var(--cc-border-strong);
+  border-radius: var(--cc-radius);
+  text-align: center;
+  break-inside: avoid;
+}
+.cc-link-card__name {
+  font-size: 1.3rem;
+}
+.cc-link-card__url {
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
+}
+.cc-link-card__note {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.cc-qr {
+  width: 11rem;
+  height: 11rem;
+}
+.cc-qr__bg {
+  fill: var(--cc-surface);
+}
+.cc-qr__fg {
+  fill: var(--cc-text);
+}
+@media print {
+  .cc-link-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cc-print-sheet .cc-alert {
+    display: none;
+  }
+}

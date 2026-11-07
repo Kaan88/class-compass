@@ -875,4 +875,195 @@ export const importRows = sqliteTable(
   (t) => [uniqueIndex('import_rows_batch_idx_uq').on(t.batchId, t.idx)],
 );
 
+// ---------------------------------------------------------------- goals, reflections, evidence (S10)
+export const GOAL_STATUSES = ['active', 'achieved', 'archived'] as const;
+export const GOAL_AUTHOR_TYPES = ['teacher', 'student'] as const;
+export const GOAL_ENTRY_KINDS = ['progress', 'reflection', 'note', 'self_assessment'] as const;
+export const EVIDENCE_KINDS = ['text', 'link', 'file', 'audio'] as const;
+/** Label snapshot kept on a goal when it is created, so history stays readable after renames (DAT-6). */
+export type GoalLabelSnapshot = { category: LocalizedText; preset?: LocalizedText };
+
+/**
+ * Skill categories (GOL-1). Seeded defaults have no subject and no creator (global: Reading, Writing,
+ * Grammar, Vocabulary, Listening). Teachers add custom categories for one subject. Archived, never deleted.
+ */
+export const skillCategories = sqliteTable(
+  'skill_categories',
+  {
+    id: text('id').primaryKey(),
+    subjectId: text('subject_id').references(() => subjects.id),
+    name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdBy: text('created_by').references(() => users.id),
+    archivedAt: integer('archived_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('skill_categories_subject_idx').on(t.subjectId)],
+);
+
+/** Ready-made goals students (or teachers) can choose (GOL-1/2). Seeded defaults have no creator. */
+export const goalPresets = sqliteTable(
+  'goal_presets',
+  {
+    id: text('id').primaryKey(),
+    categoryId: text('category_id').notNull().references(() => skillCategories.id),
+    subjectId: text('subject_id').references(() => subjects.id),
+    text: text('text', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    createdBy: text('created_by').references(() => users.id),
+    archivedAt: integer('archived_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('goal_presets_category_idx').on(t.categoryId)],
+);
+
+/**
+ * A student's goal in one subject (GOL-2). `authorType`/`authorId` say who wrote it (a teacher or the
+ * student through the personal link); students may edit and delete only goals they wrote (GOL-5).
+ * `labelSnapshot` keeps the category name as it was (DAT-6). Deleted = `deletedAt` (kept for audit).
+ */
+export const goals = sqliteTable(
+  'goals',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    subjectId: text('subject_id').notNull().references(() => subjects.id),
+    contextId: text('context_id').references(() => teachingContexts.id),
+    categoryId: text('category_id').notNull().references(() => skillCategories.id),
+    authorType: text('author_type', { enum: GOAL_AUTHOR_TYPES }).notNull(),
+    authorId: text('author_id').notNull(),
+    presetId: text('preset_id').references(() => goalPresets.id),
+    text: text('text').notNull(),
+    practiceChoicesJson: text('practice_choices_json', { mode: 'json' }).$type<string[]>().notNull(),
+    reviewOn: text('review_on'),
+    status: text('status', { enum: GOAL_STATUSES }).notNull().default('active'),
+    labelSnapshot: text('label_snapshot', { mode: 'json' }).$type<GoalLabelSnapshot>().notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [index('goals_student_subject_idx').on(t.studentId, t.subjectId)],
+);
+
+/**
+ * Progress updates (teacher), reflections, notes and self-assessments (student) on a goal. A student
+ * self-assessment (`confidence` 1–5) is stored here, separate from teacher assessments (GOL-3).
+ */
+export const goalEntries = sqliteTable(
+  'goal_entries',
+  {
+    id: text('id').primaryKey(),
+    goalId: text('goal_id').notNull().references(() => goals.id),
+    authorType: text('author_type', { enum: GOAL_AUTHOR_TYPES }).notNull(),
+    authorId: text('author_id').notNull(),
+    kind: text('kind', { enum: GOAL_ENTRY_KINDS }).notNull(),
+    body: text('body').notNull(),
+    confidence: integer('confidence'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [index('goal_entries_goal_idx').on(t.goalId)],
+);
+
+/** Teacher outcome for a goal (GOL-2/3). Students can read it but never write it (GOL-5). History kept. */
+export const teacherAssessments = sqliteTable(
+  'teacher_assessments',
+  {
+    id: text('id').primaryKey(),
+    goalId: text('goal_id').notNull().references(() => goals.id),
+    teacherId: text('teacher_id').notNull().references(() => users.id),
+    outcome: text('outcome').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('teacher_assessments_goal_idx').on(t.goalId)],
+);
+
+/** Student-visible feedback from a teacher, on a goal or on the subject in general (GOL-6). */
+export const teacherFeedback = sqliteTable(
+  'teacher_feedback',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    subjectId: text('subject_id').notNull().references(() => subjects.id),
+    goalId: text('goal_id').references(() => goals.id),
+    teacherId: text('teacher_id').notNull().references(() => users.id),
+    body: text('body').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [index('teacher_feedback_student_idx').on(t.studentId, t.subjectId)],
+);
+
+/**
+ * Private teacher notes (GOL-6): readable only by the teacher who wrote them. There is no student read
+ * path at all; no student endpoint queries this table (test-enforced).
+ */
+export const privateTeacherNotes = sqliteTable(
+  'private_teacher_notes',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    subjectId: text('subject_id').notNull().references(() => subjects.id),
+    teacherId: text('teacher_id').notNull().references(() => users.id),
+    body: text('body').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [index('private_teacher_notes_student_idx').on(t.studentId, t.teacherId)],
+);
+
+/**
+ * Evidence of learning (GOL-4): text, a web link (http/https only, never fetched), an uploaded file
+ * (document or photo) or an audio recording, optionally on a goal. Files live in `files`
+ * (owner = the student) and are served only through the policy-checked endpoints (STU-8).
+ */
+export const evidence = sqliteTable(
+  'evidence',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    subjectId: text('subject_id').notNull().references(() => subjects.id),
+    goalId: text('goal_id').references(() => goals.id),
+    kind: text('kind', { enum: EVIDENCE_KINDS }).notNull(),
+    body: text('body'),
+    url: text('url'),
+    fileId: text('file_id').references(() => files.id),
+    authorType: text('author_type', { enum: GOAL_AUTHOR_TYPES }).notNull(),
+    authorId: text('author_id').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [index('evidence_student_subject_idx').on(t.studentId, t.subjectId), index('evidence_file_idx').on(t.fileId)],
+);
+
+// ---------------------------------------------------------------- personal student links (S10)
+/**
+ * Personal links (STU-1..6). Only an HMAC of the 256-bit token is stored (`tokenHash`, server
+ * pepper). At most one active (not revoked) link per student; regenerating revokes the old one and
+ * bumps `generation`. Student sessions point at the link, and every request re-checks it (STU-3).
+ */
+export const studentLinks = sqliteTable(
+  'student_links',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    tokenHash: text('token_hash').notNull(),
+    generation: integer('generation').notNull(),
+    createdBy: text('created_by').notNull().references(() => users.id),
+    createdAt: integer('created_at').notNull(),
+    revokedAt: integer('revoked_at'),
+    revokedBy: text('revoked_by').references(() => users.id),
+    lastUsedAt: integer('last_used_at'),
+  },
+  (t) => [
+    uniqueIndex('student_links_token_uq').on(t.tokenHash),
+    uniqueIndex('student_links_active_uq').on(t.studentId).where(sql`revoked_at IS NULL`),
+  ],
+);
+
 export const _sqlHelper = sql; // re-export for raw fragments in repos

@@ -13,8 +13,13 @@ import { clientIp } from './lib/http.ts';
 import { registerModules } from './modules/index.ts';
 import { ensureSchoolDefaults } from './modules/school/defaults.ts';
 import { MAX_UPLOAD_BYTES } from './modules/files/storage.ts';
+import { STUDENT_PAGE_PATH } from '../shared/contracts/links.ts';
 
 const CLIENT_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist/client');
+/** Built HTML of the student page entry (vite input `student.html`). */
+const STUDENT_HTML = 'student.html';
+/** `/s`, `/s?…`, `/s/…` and the built file itself: never cached, never indexed, no referrer. */
+const isStudentPagePath = (url: string) => url === STUDENT_PAGE_PATH || /^\/s[?/#]/u.test(url) || url.startsWith(`/${STUDENT_HTML}`);
 
 /** Log redaction: never log cookies, auth headers, PINs, passwords or tokens (STU-6). */
 const REDACT = [
@@ -75,7 +80,9 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
 
   app.addHook('onSend', async (req, reply) => {
     reply.header('X-Robots-Tag', 'noindex, nofollow');
-    if (req.url.startsWith('/api/') || req.url.startsWith('/s/')) reply.header('Cache-Control', 'no-store');
+    if (req.url.startsWith('/api/') || isStudentPagePath(req.url)) reply.header('Cache-Control', 'no-store');
+    // The student page and its API never send a referrer (STU-6; helmet sets it globally, kept explicit here).
+    if (isStudentPagePath(req.url) || req.url.startsWith('/api/student/')) reply.header('Referrer-Policy', 'no-referrer');
   });
 
   app.setErrorHandler((err, req, reply) => {
@@ -98,6 +105,13 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
   app.get('/robots.txt', async (_req, reply) => reply.type('text/plain').send('User-agent: *\nDisallow: /\n'));
 
   registerModules(app, deps);
+
+  // The personal student page (S10, STU-2): its own small client entry. The token is in the fragment,
+  // which browsers never send, so this URL carries no secret.
+  app.get(STUDENT_PAGE_PATH, (_req, reply) => {
+    if (fs.existsSync(path.join(CLIENT_DIST, STUDENT_HTML))) return reply.sendFile(STUDENT_HTML);
+    return reply.status(404).send('Client not built. Run `npm run build` or use `npm run dev`.');
+  });
 
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api/')) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });

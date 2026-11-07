@@ -134,9 +134,10 @@ describe('report and student-page hooks serve enabled modules only (CFG-2, ACC-1
   it('contributions are stamped with their manifest’s policy key and a disabled module’s sections are left out', async () => {
     installModules();
     const build = () => ({});
+    const none = () => null;
     const fake = [
-      defineServerModule({ key: 'fakeCore', policyKey: null, reports: [{ key: 'core', order: 20, build }], studentPage: [{ key: 'core', order: 20, build }] }),
-      defineServerModule({ key: 'fakeSecret', policyKey: 'secretStudents', reports: [{ key: 'secret', order: 10, build }], studentPage: [{ key: 'secret', order: 10, build }] }),
+      defineServerModule({ key: 'fakeCore', policyKey: null, reports: [{ key: 'core', order: 20, build }], studentPage: [{ key: 'homework', order: 20, build: none }] }),
+      defineServerModule({ key: 'fakeSecret', policyKey: 'secretStudents', reports: [{ key: 'secret', order: 10, build }], studentPage: [{ key: 'goals', order: 10, build: none }] }),
     ];
     const c = collectContributions(fake);
     expect(c.reports.map((r) => [r.key, r.module])).toEqual([
@@ -146,16 +147,23 @@ describe('report and student-page hooks serve enabled modules only (CFG-2, ACC-1
     expect(enabledContributions(c.reports, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['secret', 'core']);
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/secretStudents`, { enabled: false }));
     expect(enabledContributions(c.reports, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['core']);
-    expect(enabledContributions(c.studentPage, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['core']);
+    expect(enabledContributions(c.studentPage, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['homework']);
     expect(enabledContributions(c.reports, env.db, s.ctxB.id).map((r) => r.key)).toEqual(['secret', 'core']);
     // The registered lists go through the same filter: S8 adds the homework and grouping report
-    // sections (served from S11), left out once their module is switched off.
+    // sections (served from S11) and S10 the goals and homework student page sections, left out once
+    // their module is switched off.
+    expect(studentPageContributions(env.db, s.ctxA.id).map((r) => [r.key, r.module])).toEqual([
+      ['goals', 'goals'],
+      ['homework', 'homework'],
+    ]);
     expect(reportContributions(env.db, s.ctxA.id).map((r) => [r.key, r.module])).toEqual([
       ['homework', 'homework'],
       ['groupingHistory', 'grouping'],
     ]);
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/homework`, { enabled: false }));
     expect(reportContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(['groupingHistory']);
+    expect(studentPageContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(['goals']);
+    await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/goals`, { enabled: false }));
     expect(studentPageContributions(env.db, s.ctxA.id)).toEqual([]);
   });
 });

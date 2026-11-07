@@ -7,9 +7,9 @@
  * random key → quotas checked in the SAME transaction that inserts the files row.
  *
  * Access: a file is only ever served by `sendFile` after `assertCanReadFile` (owner scope): admins
- * any file; teachers files they uploaded and files owned by a student in a class they teach. Student
- * link sessions (S10) will get their own endpoint scoped to the session's student. Anything else is
- * a 404, so file ids reveal nothing.
+ * any file; teachers files they uploaded and files owned by a student in a class they teach; a student
+ * link session (S10) only files owned by its own student that the student uploaded or that are shown
+ * on that student's live evidence. Anything else is a 404, so file ids reveal nothing.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { ALLOWED_MIME, UPLOAD_LIMITS, type FileKind, type FileMeta } from '../../../shared/contracts/files.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { files, students } from '../../db/schema.ts';
+import { evidence, files, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
@@ -198,6 +198,17 @@ export function assertCanReadFile(ctx: RequestContext, fileId: string): FileRow 
     if (f.uploadedByType === 'user' && f.uploadedById === ctx.user.id) return f;
     // Import sources are private to the uploader (and admins); student files follow the class rule.
     if (f.kind !== 'import_source' && f.ownerStudentId && teacherSeesStudent(ctx, f.ownerStudentId)) return f;
+  }
+  if (ctx.student && f.kind !== 'import_source' && f.ownerStudentId === ctx.student.studentId) {
+    // Student-visible: their own upload, or a file on their own live evidence. Never a teacher's other
+    // files about them (e.g. a student photo), never another student's.
+    if (f.uploadedByType === 'student' && f.uploadedById === ctx.student.studentId) return f;
+    const shown = ctx.db
+      .select({ id: evidence.id })
+      .from(evidence)
+      .where(and(eq(evidence.studentId, ctx.student.studentId), eq(evidence.fileId, f.id), isNull(evidence.deletedAt)))
+      .get();
+    if (shown) return f;
   }
   throw notFound('File');
 }

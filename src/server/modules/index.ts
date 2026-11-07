@@ -15,11 +15,13 @@ import { attendanceManifest } from './attendance/manifest.ts';
 import { authManifest } from './auth/manifest.ts';
 import { countersManifest } from './counters/manifest.ts';
 import { filesManifest } from './files/manifest.ts';
+import { goalsManifest } from './goals/manifest.ts';
 import { groupingManifest } from './grouping/manifest.ts';
 import { homeworkManifest } from './homework/manifest.ts';
 import { importManifest } from './import/manifest.ts';
 import { registerEndLessonStep } from './lessons/endSteps.ts';
 import { lessonsManifest } from './lessons/manifest.ts';
+import { linksManifest } from './links/manifest.ts';
 import { registerLessonCloseHook, registerLessonStateContributor } from './lessons/service.ts';
 import type { ReportContribution, ServerModuleManifest, StudentPageContribution } from './manifest.ts';
 import { routinesManifest } from './routines/manifest.ts';
@@ -43,6 +45,8 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   homeworkManifest,
   filesManifest,
   importManifest,
+  goalsManifest,
+  linksManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */

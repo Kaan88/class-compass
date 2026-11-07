@@ -4,6 +4,7 @@ import { DEFAULT_HOMEWORK_STATUSES, HomeworkStatusSet } from '../../../shared/co
 import { defineServerModule } from '../manifest.ts';
 import { registerHomeworkRoutes } from './routes.ts';
 import { homeworkReport } from './service.ts';
+import { homeworkSection } from './student.ts';
 
 /** Status list for new assignments (HW-2) and whether checking may happen on the classroom screen (D-075). */
 export const homeworkConfigSchema = z.object({ statuses: HomeworkStatusSet, checkingInClassroom: z.boolean() });
@@ -13,5 +14,6 @@ export const homeworkManifest = defineServerModule({
   policyKey: 'homework',
   routes: registerHomeworkRoutes,
   reports: [{ key: 'homework', order: 60, build: homeworkReport }],
+  studentPage: [{ key: 'homework', order: 20, build: homeworkSection }],
   config: { schema: homeworkConfigSchema, defaults: { statuses: DEFAULT_HOMEWORK_STATUSES, checkingInClassroom: false } },
 });

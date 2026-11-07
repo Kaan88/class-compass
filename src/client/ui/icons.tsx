@@ -245,3 +245,39 @@ export const IconFace = ({ level }: { level: 1 | 2 | 3 | 4 }) => (
     {level === 1 ? <path d="M8.5 16.5c2-2 5-2 7 0" /> : level === 2 ? <path d="M9 15.5h6" /> : level === 3 ? <path d="M9 14.5c1.5 1.5 4.5 1.5 6 0" /> : <path d="M8 14c2 3 6 3 8 0z" />}
   </Icon>
 );
+export const IconTrash = () => (
+  <Icon>
+    <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
+  </Icon>
+);
+export const IconLink = () => (
+  <Icon>
+    <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+    <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+  </Icon>
+);
+export const IconMic = () => (
+  <Icon>
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+  </Icon>
+);
+export const IconFile = () => (
+  <Icon>
+    <path d="M14 3H6v18h12V7z" />
+    <path d="M14 3v4h4" />
+  </Icon>
+);
+export const IconPrint = () => (
+  <Icon>
+    <path d="M7 9V3h10v6" />
+    <rect x="3" y="9" width="18" height="8" rx="2" />
+    <path d="M7 14h10v7H7z" />
+  </Icon>
+);
+export const IconGlobe = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" />
+  </Icon>
+);

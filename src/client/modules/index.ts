@@ -6,9 +6,11 @@ import { assistantClientManifest } from './assistant/manifest.tsx';
 import { attendanceClientManifest } from './attendance/manifest.tsx';
 import { coreClientManifest } from './core/manifest.tsx';
 import { countersClientManifest } from './counters/manifest.tsx';
+import { goalsClientManifest } from './goals/manifest.tsx';
 import { groupingClientManifest } from './grouping/manifest.tsx';
 import { homeworkClientManifest } from './homework/manifest.tsx';
 import { lessonsClientManifest } from './lessons/manifest.tsx';
+import { linksClientManifest } from './links/manifest.tsx';
 import { routinesClientManifest } from './routines/manifest.tsx';
 import { secretClientManifest } from './secret/manifest.tsx';
 import type { ClientModuleManifest } from './types.ts';
@@ -23,4 +25,6 @@ export const CLIENT_MODULES: readonly ClientModuleManifest[] = [
   secretClientManifest,
   groupingClientManifest,
   homeworkClientManifest,
+  goalsClientManifest,
+  linksClientManifest,
 ];
