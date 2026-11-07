@@ -7,6 +7,7 @@ import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { executeCommand } from '../../lib/commands.ts';
 import { route, sessionCookieName } from '../../lib/http.ts';
+import { emailResetEnabled } from '../../lib/mailer.ts';
 import * as svc from './service.ts';
 
 function setSessionCookie(deps: AppDeps, reply: FastifyReply, token: string, maxAgeMs: number) {
@@ -87,6 +88,28 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     ctx.db.update(users).set(patch).where(eq(users.id, user.id)).run();
     return freshMe(ctx);
   });
+
+  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx) }));
+  route(
+    app,
+    deps,
+    C.requestPasswordReset,
+    (ctx, input) => {
+      svc.requestPasswordReset(ctx, input.email);
+      return { ok: true as const };
+    },
+    { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+  );
+  route(
+    app,
+    deps,
+    C.completePasswordReset,
+    async (ctx, input) => {
+      await svc.completePasswordReset(ctx, input.token, input.newPassword);
+      return { ok: true as const };
+    },
+    { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+  );
 
   route(app, deps, submitCommands, (ctx, input) => ({
     results: input.commands.map((c) => executeCommand(ctx, c)),

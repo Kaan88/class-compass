@@ -1,6 +1,7 @@
 import type { Config } from '../config.ts';
 import type { Db } from '../db/client.ts';
 import type { sessions, users } from '../db/schema.ts';
+import type { Mailer } from './mailer.ts';
 
 export type SessionRow = typeof sessions.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
@@ -21,6 +22,11 @@ export interface AppDeps {
   config: Config;
   /** Injectable clock (tests travel in time). */
   now: () => number;
+  /**
+   * Outgoing mail; absent when SMTP is not configured (email reset then disabled, D-015).
+   * Tests inject a fake transport here.
+   */
+  mailer?: Mailer | null;
 }
 
 export interface RequestContext extends AppDeps {

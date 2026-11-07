@@ -10,6 +10,7 @@ import type { AppDeps } from './lib/context.ts';
 import { AppError } from './lib/errors.ts';
 import { clientIp } from './lib/http.ts';
 import { registerModules } from './modules/index.ts';
+import { ensureSchoolDefaults } from './modules/school/defaults.ts';
 
 const CLIENT_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist/client');
 
@@ -26,6 +27,7 @@ const REDACT = [
 ];
 
 export async function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
+  ensureSchoolDefaults(deps);
   const app = Fastify({
     logger: opts.logger ? { level: deps.config.isProd ? 'info' : 'debug', redact: REDACT } : false,
     bodyLimit: 1024 * 1024,

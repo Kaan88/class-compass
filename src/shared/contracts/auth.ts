@@ -83,3 +83,30 @@ export const updatePreferences = endpoint({
   input: z.object({ locale: Locale.optional(), textScale: z.number().int().min(80).max(200).optional() }),
   output: Me,
 });
+
+// ---------------------------------------------------------------- email password reset (D-015)
+/** Whether email reset is offered (SMTP configured). Public so the sign-in page can show the link. */
+export const passwordResetAvailable = endpoint({
+  method: 'GET',
+  path: '/api/auth/password-reset',
+  access: 'public',
+  input: Empty,
+  output: z.object({ emailResetEnabled: z.boolean() }),
+});
+
+/** Always answers `{ ok: true }` so the response never reveals whether an account exists. */
+export const requestPasswordReset = endpoint({
+  method: 'POST',
+  path: '/api/auth/password-reset/request',
+  access: 'public',
+  input: z.object({ email: z.string().trim().max(200) }),
+  output: Ok,
+});
+
+export const completePasswordReset = endpoint({
+  method: 'POST',
+  path: '/api/auth/password-reset/complete',
+  access: 'public',
+  input: z.object({ token: z.string().min(20).max(200), newPassword: z.string().min(10).max(200) }),
+  output: Ok,
+});

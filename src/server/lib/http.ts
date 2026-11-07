@@ -81,11 +81,12 @@ function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext): void
     if (user.role !== 'teacher') throw new AppError('FORBIDDEN', 'Teacher account required');
     return;
   }
-  if (access === 'teacher' && user.role !== 'teacher') throw new AppError('FORBIDDEN', 'Teacher account required');
-  if (access === 'admin' && user.role !== 'admin') throw new AppError('FORBIDDEN', 'Administrator account required');
   // teacher | admin | account: sensitive — require PIN unlock in classroom mode (PIN-1, PIN-8).
+  // Checked before the role so a locked classroom device answers every sensitive URL the same way.
   const now = deps.now();
   if (!isPinUnlocked(session, now)) throw new AppError('PIN_REQUIRED', 'Unlock with your PIN');
+  if (access === 'teacher' && user.role !== 'teacher') throw new AppError('FORBIDDEN', 'Teacher account required');
+  if (access === 'admin' && user.role !== 'admin') throw new AppError('FORBIDDEN', 'Administrator account required');
   if (session.classroomMode) {
     // Sliding inactivity window (PIN-7).
     const until = now + PIN_UNLOCK_MS;

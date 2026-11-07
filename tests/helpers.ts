@@ -8,6 +8,7 @@ import { loadConfig, type Config } from '../src/server/config.ts';
 import { openDatabase, runMigrations, type Db } from '../src/server/db/client.ts';
 import { createUser } from '../src/server/modules/auth/service.ts';
 import type { AppDeps } from '../src/server/lib/context.ts';
+import type { Mailer, MailMessage } from '../src/server/lib/mailer.ts';
 
 export const TEST_ORIGIN = 'http://localhost:5173';
 
@@ -27,7 +28,15 @@ export interface TestEnv {
   deps: AppDeps;
 }
 
-export async function makeEnv(overrides: Partial<Config> = {}): Promise<TestEnv> {
+/** Fake mail transport (D-015): records messages instead of sending them. */
+export class FakeMailer implements Mailer {
+  sent: MailMessage[] = [];
+  async send(msg: MailMessage) {
+    this.sent.push(msg);
+  }
+}
+
+export async function makeEnv(overrides: Partial<Config> = {}, extra: { mailer?: Mailer | null } = {}): Promise<TestEnv> {
   const config = loadConfig(
     { NODE_ENV: 'test', SECRET_PEPPER: 'test-pepper-0123456789abcdef', PUBLIC_ORIGIN: TEST_ORIGIN, DATA_DIR: './data-test' },
     overrides,
@@ -35,7 +44,7 @@ export async function makeEnv(overrides: Partial<Config> = {}): Promise<TestEnv>
   const db = openDatabase(':memory:');
   runMigrations(db);
   const clock = new Clock();
-  const deps = { db, config, now: clock.now };
+  const deps: AppDeps = { db, config, now: clock.now, mailer: extra.mailer ?? null };
   const app = await buildApp(deps);
   await app.ready();
   return { app, db, clock, config, deps };
@@ -68,6 +77,8 @@ export class Client {
   get = (url: string) => this.req('GET', url);
   post = (url: string, body: unknown = {}) => this.req('POST', url, body);
   patch = (url: string, body: unknown = {}) => this.req('PATCH', url, body);
+  put = (url: string, body: unknown = {}) => this.req('PUT', url, body);
+  del = (url: string) => this.req('DELETE', url, {});
 
   async login(login: string, password = 'correct-horse-battery') {
     const r = await this.post('/api/auth/login', { login, password });

@@ -1,11 +1,13 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { openDatabase, runMigrations } from './db/client.ts';
+import { createSmtpMailer } from './lib/mailer.ts';
 
 const config = loadConfig();
 const db = openDatabase(config.dbPath);
 runMigrations(db);
-const app = await buildApp({ db, config, now: Date.now }, { logger: true });
+const mailer = config.smtpEnabled ? createSmtpMailer(config) : null;
+const app = await buildApp({ db, config, now: Date.now, mailer }, { logger: true });
 
 const shutdown = async () => {
   await app.close();

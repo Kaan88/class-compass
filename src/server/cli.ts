@@ -3,6 +3,7 @@
  *   node src/server/cli.ts migrate
  *   node src/server/cli.ts admin:create --login <login> --name "<Display Name>" [--email x]   (password via stdin)
  *   node src/server/cli.ts admin:reset-password --login <login>                                (password via stdin)
+ *   node src/server/cli.ts seed:demo [--force-demo]      fictional demo school (never in production)
  * Initial administrator setup (ACC-3): there is no web registration and no default password.
  */
 import { parseArgs } from 'node:util';
@@ -13,6 +14,7 @@ import { users } from './db/schema.ts';
 import { audit } from './lib/audit.ts';
 import { hashPassword } from './lib/crypto.ts';
 import { createUser, normaliseLogin, revokeAllUserSessions } from './modules/auth/service.ts';
+import { SeedRefused, seedDemo } from './seed/demo.ts';
 
 async function readSecret(prompt: string): Promise<string> {
   if (process.env.CC_PASSWORD) return process.env.CC_PASSWORD;
@@ -25,7 +27,7 @@ async function readSecret(prompt: string): Promise<string> {
 const [cmd, ...rest] = process.argv.slice(2);
 const { values } = parseArgs({
   args: rest,
-  options: { login: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' } },
+  options: { login: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' }, 'force-demo': { type: 'boolean' } },
   allowPositionals: true,
 });
 const config = loadConfig();
@@ -58,8 +60,24 @@ switch (cmd) {
     console.log(`Password reset for ${u.login}; they must change it at next sign-in.`);
     break;
   }
+  case 'seed:demo': {
+    runMigrations(db);
+    try {
+      const r = await seedDemo({ db, config, now: Date.now }, { force: values['force-demo'] === true });
+      console.log(`Demo school created (fictional data). School year ${r.schoolYear}.`);
+      for (const c of r.classes) console.log(`  class ${c.name}: ${c.students} students`);
+      console.log('');
+      console.log('Demo accounts. These passwords are shown ONCE; store them now:');
+      for (const a of r.accounts) console.log(`  ${a.role.padEnd(7)} ${a.login.padEnd(12)} ${a.password}`);
+    } catch (err) {
+      if (!(err instanceof SeedRefused)) throw err;
+      console.error(err.message);
+      process.exitCode = 1;
+    }
+    break;
+  }
   default:
-    console.error('Commands: migrate | admin:create | admin:reset-password');
+    console.error('Commands: migrate | admin:create | admin:reset-password | seed:demo [--force-demo]');
     process.exitCode = 1;
 }
 db.$client.close();

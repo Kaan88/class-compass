@@ -1,8 +1,11 @@
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import type { Me } from '../../../shared/contracts/auth.ts';
 import { foldForSearch } from '../../../shared/text/turkish.ts';
 import type { Db } from '../../db/client.ts';
-import { authAttempts, sessions, users } from '../../db/schema.ts';
+import { authAttempts, oneTimeTokens, sessions, users } from '../../db/schema.ts';
+import { tx } from '../../db/client.ts';
+import { translate } from '../../../shared/i18n/index.ts';
+import { emailResetEnabled } from '../../lib/mailer.ts';
 import { audit } from '../../lib/audit.ts';
 import type { AppDeps, Actor, SessionRow, UserRow } from '../../lib/context.ts';
 import { hashPassword, hashPin, newId, randomToken, tokenHash, verifyPassword, verifyPin } from '../../lib/crypto.ts';
@@ -191,7 +194,15 @@ export const actorFor = (user: UserRow): Actor => ({ type: 'user', id: user.id, 
 /** Used by the CLI (initial admin, ACC-3) and the admin module. */
 export async function createUser(
   db: Db,
-  input: { login: string; displayName: string; role: 'admin' | 'teacher'; password: string; email?: string | null; mustChangePassword?: boolean },
+  input: {
+    login: string;
+    displayName: string;
+    role: 'admin' | 'teacher';
+    password: string;
+    email?: string | null;
+    mustChangePassword?: boolean;
+    locale?: 'en' | 'tr';
+  },
   actor: Actor,
   now: number,
 ): Promise<UserRow> {
@@ -202,12 +213,12 @@ export async function createUser(
   const row: UserRow = {
     id: newId(),
     login,
-    email: input.email ?? null,
+    email: input.email?.trim().toLowerCase() || null,
     displayName: input.displayName.trim(),
     role: input.role,
     passwordHash: await hashPassword(input.password),
     pinHash: null,
-    locale: 'en',
+    locale: input.locale ?? 'en',
     textScale: 100,
     mustChangePassword: input.mustChangePassword ?? false,
     disabledAt: null,
@@ -217,4 +228,87 @@ export async function createUser(
   db.insert(users).values(row).run();
   audit(db, actor, { action: 'user.create', entity: 'user', entityId: row.id, after: { login, role: row.role, displayName: row.displayName } }, now);
   return row;
+}
+
+// ---------------------------------------------------------------- email password reset (D-015)
+export const RESET_TOKEN_MS = 60 * 60 * 1000;
+const RESET_MAX_PER_HOUR = 3;
+const SYSTEM: Actor = { type: 'system', id: null };
+
+/**
+ * Sends a single-use, 1-hour reset link when SMTP is configured and an active account has this
+ * email. The caller always answers `{ ok: true }` (no account enumeration). Tokens are stored as
+ * HMAC hashes; the link carries the token in the URL fragment so it never reaches server logs.
+ */
+export function requestPasswordReset(deps: AppDeps, emailInput: string): void {
+  if (!emailResetEnabled(deps)) return;
+  const email = emailInput.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+$/u.test(email)) return;
+  const { db } = deps;
+  const now = deps.now();
+  const matches = db
+    .select()
+    .from(users)
+    .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.disabledAt)))
+    .all();
+  for (const user of matches) {
+    const token = randomToken();
+    const sent = tx(db, () => {
+      const recent = db
+        .select({ n: sql<number>`count(*)` })
+        .from(oneTimeTokens)
+        .where(and(eq(oneTimeTokens.userId, user.id), eq(oneTimeTokens.kind, 'password_reset'), gt(oneTimeTokens.createdAt, now - RESET_TOKEN_MS)))
+        .get()?.n ?? 0;
+      if (recent >= RESET_MAX_PER_HOUR) return false;
+      // Only the newest link works.
+      db.update(oneTimeTokens)
+        .set({ usedAt: now })
+        .where(and(eq(oneTimeTokens.userId, user.id), eq(oneTimeTokens.kind, 'password_reset'), isNull(oneTimeTokens.usedAt)))
+        .run();
+      db.insert(oneTimeTokens)
+        .values({ id: newId(), kind: 'password_reset', userId: user.id, tokenHash: tokenHash(deps.config.SECRET_PEPPER, token), expiresAt: now + RESET_TOKEN_MS, usedAt: null, createdAt: now })
+        .run();
+      audit(db, SYSTEM, { action: 'auth.password_reset_requested', entity: 'user', entityId: user.id }, now);
+      return true;
+    });
+    if (!sent) continue;
+    const link = `${new URL(deps.config.PUBLIC_ORIGIN).origin}/reset-password#token=${token}`;
+    const locale = user.locale;
+    void deps
+      .mailer!.send({
+        to: user.email!,
+        subject: translate(locale, 'email.reset.subject'),
+        text: translate(locale, 'email.reset.body', { name: user.displayName, link }),
+      })
+      .catch(() => {
+        /* delivery failures are not reported to the requester (no enumeration) */
+      });
+  }
+}
+
+export async function completePasswordReset(deps: AppDeps, token: string, newPassword: string): Promise<void> {
+  const { db } = deps;
+  const hash = tokenHash(deps.config.SECRET_PEPPER, token);
+  const invalidLink = () => new AppError('VALIDATION', 'This reset link is invalid or has expired', { reason: 'RESET_TOKEN_INVALID' });
+  const find = () =>
+    db
+      .select()
+      .from(oneTimeTokens)
+      .where(and(eq(oneTimeTokens.tokenHash, hash), eq(oneTimeTokens.kind, 'password_reset'), isNull(oneTimeTokens.usedAt), gt(oneTimeTokens.expiresAt, deps.now())))
+      .get();
+  const row = find();
+  if (!row) throw invalidLink();
+  const passwordHash = await hashPassword(newPassword);
+  tx(db, () => {
+    const fresh = find(); // re-check inside the transaction: single use even under races
+    if (!fresh) throw invalidLink();
+    const user = db.select().from(users).where(eq(users.id, fresh.userId)).get();
+    if (!user || user.disabledAt) throw invalidLink();
+    const now = deps.now();
+    db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, fresh.id)).run();
+    db.update(users).set({ passwordHash, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
+    revokeAllUserSessions(db, user.id, now);
+    clearFailures(db, `login:user:${user.id}`);
+    audit(db, actorFor(user), { action: 'auth.password_reset_email', entity: 'user', entityId: user.id }, now);
+  });
 }

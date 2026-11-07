@@ -8,7 +8,7 @@
  * Each stage appends its tables to the relevant section; generate migrations with `npm run db:generate`.
  */
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, sqliteTable, text, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 export type LocalizedText = { en?: string; tr?: string };
 
@@ -21,6 +21,101 @@ export const schoolSettings = sqliteTable('school_settings', {
   defaultLocale: text('default_locale', { enum: ['en', 'tr'] }).notNull().default('en'),
   updatedAt: integer('updated_at').notNull(),
 });
+
+export const schoolYears = sqliteTable('school_years', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(), // e.g. '2026–2027'
+  startsOn: text('starts_on').notNull(), // YYYY-MM-DD
+  endsOn: text('ends_on').notNull(),
+  /** Archived years are read-only (DAT-1): see assertYearWritable. */
+  archivedAt: integer('archived_at'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const terms = sqliteTable(
+  'terms',
+  {
+    id: text('id').primaryKey(),
+    schoolYearId: text('school_year_id').notNull().references(() => schoolYears.id),
+    name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    startsOn: text('starts_on').notNull(),
+    endsOn: text('ends_on').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('terms_year_idx').on(t.schoolYearId)],
+);
+
+export const subjects = sqliteTable('subjects', {
+  id: text('id').primaryKey(),
+  name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),
+  archivedAt: integer('archived_at'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const CLASS_THEMES = ['explorer', 'animals', 'classroom'] as const;
+
+export const classes = sqliteTable(
+  'classes',
+  {
+    id: text('id').primaryKey(),
+    schoolYearId: text('school_year_id').notNull().references(() => schoolYears.id),
+    name: text('name').notNull(), // e.g. '3-A'
+    grade: integer('grade'),
+    theme: text('theme', { enum: CLASS_THEMES }).notNull().default('classroom'),
+    /** Null = use the school timezone. */
+    timezone: text('timezone'),
+    soundsEnabled: integer('sounds_enabled', { mode: 'boolean' }).notNull().default(true),
+    animationsEnabled: integer('animations_enabled', { mode: 'boolean' }).notNull().default(true),
+    archivedAt: integer('archived_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('classes_year_idx').on(t.schoolYearId)],
+);
+
+/** Teacher x class x subject (ARCHITECTURE section 3). Context-owned data hangs off this row. */
+export const teachingContexts = sqliteTable(
+  'teaching_contexts',
+  {
+    id: text('id').primaryKey(),
+    teacherId: text('teacher_id').notNull().references(() => users.id),
+    classId: text('class_id').notNull().references(() => classes.id),
+    subjectId: text('subject_id').notNull().references(() => subjects.id),
+    activeFrom: integer('active_from').notNull(),
+    endedAt: integer('ended_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('teaching_contexts_active_uq').on(t.teacherId, t.classId, t.subjectId).where(sql`ended_at IS NULL`),
+    index('teaching_contexts_class_idx').on(t.classId),
+    index('teaching_contexts_teacher_idx').on(t.teacherId),
+  ],
+);
+
+/** Admin-controlled global availability per module (ACC-12, CFG-1, D-014). */
+export const modulePolicies = sqliteTable('module_policies', {
+  module: text('module').primaryKey(),
+  availability: text('availability', { enum: ['enabled', 'disabled'] }).notNull(),
+  updatedAt: integer('updated_at').notNull(),
+  updatedBy: text('updated_by'),
+});
+
+/** Teacher's per-context module switch + config (ACC-5). No row = enabled with defaults. */
+export const contextModules = sqliteTable(
+  'context_modules',
+  {
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    module: text('module').notNull(),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull(),
+    configJson: text('config_json'),
+    updatedAt: integer('updated_at').notNull(),
+    updatedBy: text('updated_by'),
+  },
+  (t) => [primaryKey({ columns: [t.contextId, t.module] })],
+);
 
 // ---------------------------------------------------------------- accounts
 export const users = sqliteTable(
@@ -82,7 +177,7 @@ export const oneTimeTokens = sqliteTable('one_time_tokens', {
   expiresAt: integer('expires_at').notNull(),
   usedAt: integer('used_at'),
   createdAt: integer('created_at').notNull(),
-});
+}, (t) => [uniqueIndex('one_time_tokens_hash_uq').on(t.tokenHash), index('one_time_tokens_user_idx').on(t.userId)]);
 
 // ---------------------------------------------------------------- idempotency & audit
 /** Every client command (opId) is recorded with its result in the same transaction as its effect. */
@@ -111,6 +206,69 @@ export const auditEvents = sqliteTable(
     afterJson: text('after_json'),
   },
   (t) => [index('audit_entity_idx').on(t.entity, t.entityId), index('audit_at_idx').on(t.at)],
+);
+
+// ---------------------------------------------------------------- students
+/** One identity per student across classes and years (ACC-7). */
+export const students = sqliteTable(
+  'students',
+  {
+    id: text('id').primaryKey(),
+    /** e-Okul number; optional but unique when present (IMP-4). */
+    studentNumber: text('student_number'),
+    fullName: text('full_name').notNull(), // NFC, whitespace-collapsed (normaliseName)
+    givenNames: text('given_names'),
+    familyName: text('family_name'),
+    nameFold: text('name_fold').notNull(), // foldForSearch(fullName): duplicate flagging/search only
+    avatarHue: integer('avatar_hue').notNull(), // avatarHue(id): stable across renames
+    photoFileId: text('photo_file_id'),
+    photoConsent: integer('photo_consent', { mode: 'boolean' }).notNull().default(false),
+    deactivatedAt: integer('deactivated_at'),
+    createdByImportBatchId: text('created_by_import_batch_id'),
+    createdAt: integer('created_at').notNull(),
+    createdBy: text('created_by'),
+    updatedAt: integer('updated_at').notNull(),
+    updatedBy: text('updated_by'),
+  },
+  (t) => [uniqueIndex('students_number_uq').on(t.studentNumber), index('students_fold_idx').on(t.nameFold)],
+);
+
+/**
+ * Class membership history (DAT-2). `fromDate` inclusive, `toDate` exclusive (the day the student
+ * left); `toDate` null = current. At most one open enrolment per student per school year.
+ */
+export const enrolments = sqliteTable(
+  'enrolments',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    classId: text('class_id').notNull().references(() => classes.id),
+    schoolYearId: text('school_year_id').notNull().references(() => schoolYears.id),
+    fromDate: text('from_date').notNull(),
+    toDate: text('to_date'),
+    reason: text('reason', { enum: ['added', 'import', 'move', 'promotion'] }).notNull(),
+    importBatchId: text('import_batch_id'),
+    createdAt: integer('created_at').notNull(),
+    createdBy: text('created_by'),
+  },
+  (t) => [
+    uniqueIndex('enrolments_open_uq').on(t.studentId, t.schoolYearId).where(sql`to_date IS NULL`),
+    index('enrolments_class_idx').on(t.classId),
+    index('enrolments_student_idx').on(t.studentId),
+  ],
+);
+
+/** Subject-specific levels for grouping (GRP-3). Never returned by classroom endpoints (GRP-7). */
+export const studentSubjectLevels = sqliteTable(
+  'student_subject_levels',
+  {
+    studentId: text('student_id').notNull().references(() => students.id),
+    subjectId: text('subject_id').notNull().references(() => subjects.id),
+    level: text('level').notNull(),
+    updatedBy: text('updated_by'),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.studentId, t.subjectId] })],
 );
 
 export const _sqlHelper = sql; // re-export for raw fragments in repos
