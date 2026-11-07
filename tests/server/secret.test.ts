@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fc from 'fast-check';
+import { seededRank } from '../../src/domain/rotation.ts';
 import { fairnessCounts } from '../../src/server/modules/secret/service.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 import { cmd, endLesson, lessonState, startLesson } from '../lesson-helpers.ts';
@@ -172,6 +173,35 @@ describe('redraw (SEC-4, D-062)', () => {
     await cmd(s.teacherA, 'secret.reveal', { contextId: ctxId(), lessonId });
     const re = await cmd(s.teacherA, 'secret.redraw', { contextId: ctxId(), lessonId, confirm: true });
     expect(re.error?.reason).toBe('SECRET_ALREADY_REVEALED');
+  });
+});
+
+describe('the draw cannot be predicted from client-visible data (SEC-3, SEC-2, review fix)', () => {
+  it('the round id (= the client opId) and the roster do not determine who is chosen', async () => {
+    const lessonId = await startLesson(s.teacherA, ctxId(), { othersPresent: true });
+    // Redraws withdraw the old selections, which do not count, so every round starts with all counts at 0
+    // and the order is decided by the tie-break alone. Seeded by the round id, it would be fully predictable.
+    let predicted = 0;
+    const seen = new Set<string>();
+    const ROUNDS = 10;
+    for (let i = 0; i < ROUNDS; i++) {
+      const r = await cmd(s.teacherA, i === 0 ? 'secret.draw' : 'secret.redraw', i === 0 ? { contextId: ctxId(), lessonId } : { contextId: ctxId(), lessonId, confirm: true });
+      expect(r.ok).toBe(true);
+      const guess = [...kids]
+        .sort((a, b) => seededRank(r.result.roundId, a.id) - seededRank(r.result.roundId, b.id) || (a.id < b.id ? -1 : 1))
+        .slice(0, 2)
+        .map((k) => k.id)
+        .sort();
+      const actual = sealedIds(lessonId);
+      seen.add(actual.join(','));
+      if (guess.join(',') === actual.join(',')) predicted += 1;
+    }
+    // With fresh server randomness each guess is right with probability 1/15.
+    expect(predicted).toBeLessThan(ROUNDS);
+    expect(seen.size).toBeGreaterThan(1);
+    // The seed is not stored anywhere a client-facing read could reach it.
+    const cols = (env.db.$client.prepare("select name from pragma_table_info('secret_rounds')").all() as Array<{ name: string }>).map((c) => c.name);
+    expect(cols.some((c) => /seed/i.test(c))).toBe(false);
   });
 });
 

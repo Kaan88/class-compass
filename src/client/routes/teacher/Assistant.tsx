@@ -51,7 +51,7 @@ function Who({ s }: { s: Student }) {
 
 function reasonText(t: ReturnType<typeof useI18n>['t'], reason: string | null) {
   if (!reason) return '';
-  if (reason === 'absent' || reason === 'carry_forward' || reason === 'teacher_swap' || reason === 'teacher_override') return t(`assistant.reason.${reason}`);
+  if (reason === 'absent' || reason === 'carry_forward' || reason === 'teacher_swap' || reason === 'teacher_override' || reason === 'not_in_class') return t(`assistant.reason.${reason}`);
   return reason;
 }
 
@@ -288,7 +288,7 @@ function HistoryTab({ contextId }: { contextId: string }) {
           { key: 'day', header: t('assistant.col.day'), render: (r) => dayLabel(r.date, locale) },
           { key: 'planned', header: t('assistant.col.planned'), render: (r) => <Who s={r.planned} /> },
           { key: 'actual', header: t('assistant.col.actual'), render: (r) => (r.actual ? <Who s={r.actual} /> : <span className="cc-muted">{t('assistant.asPlanned')}</span>) },
-          { key: 'status', header: t('assistant.col.status'), render: (r) => `${t(statusKey(r.status))}${r.reason ? ` – ${reasonText(t, r.reason)}` : ''}` },
+          { key: 'status', header: t('assistant.col.status'), render: (r) => `${t(statusKey(r.status))}${r.reason ? ` – ${reasonText(t, r.reason)}` : ''}${r.absent.length ? ` (${t('assistant.absentNames', { names: r.absent.map((a) => a.fullName).join(', ') })})` : ''}` },
           { key: 'thanked', header: t('assistant.col.thanked'), render: (r) => (r.thanked ? t('common.yes') : t('common.no')) },
         ]}
       />

@@ -34,7 +34,10 @@ export const todayAssistant = endpoint({
   output: AssistantToday,
 });
 
-/** The weekly schedule as it may be shown on the classroom display (D-066): days and names only. */
+/**
+ * The weekly schedule as it may be shown on the classroom display (D-066, D-068): days and names
+ * only, for this week or next week, and only once announced (`days` is empty for a draft).
+ */
 export const assistantWeek = endpoint({
   method: 'GET',
   path: '/api/classroom/contexts/:contextId/assistant/week',
@@ -138,7 +141,18 @@ export const assistantHistory = endpoint({
   input: z.object({ contextId: Id }),
   output: z.object({
     students: z.array(z.object({ student: AssistantStudent, turns: z.number().int(), missed: z.number().int(), lastDate: z.string().nullable(), nextDate: z.string().nullable() })),
-    days: z.array(z.object({ date: z.string(), planned: AssistantStudent.nullable(), actual: AssistantStudent.nullable(), status: AssistantStatus, reason: z.string().nullable(), thanked: z.boolean() })),
+    days: z.array(
+      z.object({
+        date: z.string(),
+        planned: AssistantStudent.nullable(),
+        actual: AssistantStudent.nullable(),
+        /** Students who were this day's assistant and missed it because they were away (kept after swaps/overrides). */
+        absent: z.array(AssistantStudent),
+        status: AssistantStatus,
+        reason: z.string().nullable(),
+        thanked: z.boolean(),
+      }),
+    ),
   }),
 });
 

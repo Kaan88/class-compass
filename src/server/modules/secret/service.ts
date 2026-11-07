@@ -9,7 +9,11 @@
  * `selectedCount`; the replacement is reported only at the reveal.
  *
  * Fair rotation (SEC-2, D-062): the fewest counted selections in this class+subject this school year
- * first, then the longest since the last one, then a random order seeded by the round id. Counted:
+ * first, then the longest since the last one, then a random order. The tie-break seed is fresh
+ * server-side randomness (`randomToken`) that is never stored, logged or returned, so nothing a
+ * client knows (the round id = its own opId, the roster) can reproduce or steer the draw (SEC-3).
+ * Replays stay stable without it: a replayed command returns its stored result and a lesson has
+ * one live round. Counted:
  * sealed (live), revealed and unrevealed_abandoned (D-010). Not counted: withdrawn_absent and
  * withdrawn_redraw (the student never had the turn).
  */
@@ -25,7 +29,7 @@ import { lessons, secretRounds, secretSelections, students, teachingContexts } f
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
-import { newId } from '../../lib/crypto.ts';
+import { newId, randomToken } from '../../lib/crypto.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { rosterWithAttendance, type AttendanceChange } from '../attendance/service.ts';
 import type { LessonRow } from '../lessons/endSteps.ts';
@@ -120,7 +124,11 @@ export function fairnessCounts(db: Db, contextId: string, schoolYearId: string):
   return out;
 }
 
-function choose(db: Db, contextId: string, schoolYearId: string, ids: string[], n: number, seed: string): string[] {
+/** Secret tie-break seed: server-only randomness, never derived from client-visible values (SEC-3). */
+const freshSeed = () => randomToken(16);
+
+function choose(db: Db, contextId: string, schoolYearId: string, ids: string[], n: number): string[] {
+  const seed = freshSeed();
   const counts = fairnessCounts(db, contextId, schoolYearId);
   const cands: Candidate[] = ids.map((id) => ({ id, count: counts.get(id)?.count ?? 0, last: counts.get(id)?.last ?? null }));
   return pickFair(cands, n, { count: (c) => c.count, last: (c) => c.last, tie: (a, b) => seededRank(seed, a.id) - seededRank(seed, b.id) || (a.id < b.id ? -1 : 1) }).map((c) => c.id);
@@ -138,7 +146,7 @@ function createRound(ctx: RequestContext, context: ContextRow, lesson: LessonRow
   const cls = getClass(ctx.db, lesson.classId);
   const requested = configuredCount(ctx.db, context.id);
   const eligible = eligibleIds(ctx.db, lesson);
-  const chosen = choose(ctx.db, context.id, cls.schoolYearId, eligible, requested, roundId);
+  const chosen = choose(ctx.db, context.id, cls.schoolYearId, eligible, requested);
   const now = ctx.now();
   const round: RoundRow = {
     id: roundId,
@@ -227,7 +235,7 @@ export function onAttendanceChange(ctx: RequestContext, ch: AttendanceChange): v
     // Never the same student twice in one round: anyone already in it (in any status) is excluded.
     const inRound = new Set(ctx.db.select({ s: secretSelections.studentId }).from(secretSelections).where(eq(secretSelections.roundId, round.id)).all().map((r) => r.s));
     const pool = eligibleIds(ctx.db, lesson).filter((id) => !inRound.has(id));
-    const [next] = choose(ctx.db, round.contextId, round.schoolYearId, pool, 1, `${round.id}:${inRound.size}`);
+    const [next] = choose(ctx.db, round.contextId, round.schoolYearId, pool, 1);
     if (next) {
       ctx.db.insert(secretSelections).values({ id: newId(), roundId: round.id, contextId: round.contextId, studentId: next, status: 'sealed', replacedSelectionId: sel.id, outcome: null, note: null, celebration: false, selectedAt: now, updatedAt: now, outcomeBy: null }).run();
     }

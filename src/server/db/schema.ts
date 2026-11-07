@@ -552,6 +552,14 @@ export const secretSelections = sqliteTable(
 // ---------------------------------------------------------------- daily assistant (S7)
 export const ASSISTANT_STATUSES = ['planned', 'confirmed', 'replaced_absent', 'swapped', 'override'] as const;
 
+/** State before an absence replacement, so a same-day attendance correction can restore it (D-068). */
+export interface AssistantAbsenceUndo {
+  absentId: string;
+  replacement: string | null;
+  prev: { actualStudentId: string | null; status: (typeof ASSISTANT_STATUSES)[number]; reason: string | null };
+  partner: { id: string; actualStudentId: string | null; status: (typeof ASSISTANT_STATUSES)[number]; reason: string | null } | null;
+}
+
 /** A materialised weekly plan (AST-2): generated once, never regenerated silently, announceable. */
 export const assistantPlans = sqliteTable(
   'assistant_plans',
@@ -584,6 +592,13 @@ export const assistantAssignments = sqliteTable(
     actualStudentId: text('actual_student_id').references(() => students.id),
     status: text('status', { enum: ASSISTANT_STATUSES }).notNull(),
     reason: text('reason'),
+    /**
+     * Every student who was this day's assistant and missed the turn because they were away (AST-4/5).
+     * Kept when the day is later swapped or overridden, so a missed turn is never lost (review fix).
+     */
+    absentStudentIds: text('absent_student_ids', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    /** How to undo the latest absence replacement if the attendance is corrected the same day (D-068). */
+    absenceUndo: text('absence_undo', { mode: 'json' }).$type<AssistantAbsenceUndo>(),
     thankedAt: integer('thanked_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),

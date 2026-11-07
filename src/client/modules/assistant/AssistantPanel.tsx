@@ -60,7 +60,9 @@ function WeekDialog({ context, isOpen, onOpenChange }: { context: ClassroomConte
   const q = useQuery({ queryKey: ['classroom', 'assistant', 'week', context.id], queryFn: () => call(A.assistantWeek, { contextId: context.id }), enabled: isOpen });
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange} title={t('assistant.weekTitle')}>
-      {q.data ? (
+      {q.data && !q.data.announced ? (
+        <p className="cc-muted">{t('assistant.weekNotAnnounced')}</p>
+      ) : q.data ? (
         <ol className="cc-assistant__week">
           {q.data.days.map((d) => (
             <li key={d.date} className="cc-row">
@@ -120,6 +122,7 @@ function AssistantStartStep({ context }: { context: ClassroomContext }) {
     <div className="cc-stack">
       {q.data ? <TodayCard today={q.data} /> : <p className="cc-muted">{t('common.loading')}</p>}
       <p className="cc-muted">{t('assistant.absentHint')}</p>
+      <p className="cc-muted">{t('assistant.absentRestoreHint')}</p>
     </div>
   );
 }

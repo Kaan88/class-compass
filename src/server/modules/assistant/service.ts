@@ -1,5 +1,5 @@
 /**
- * Daily Assistant (S7: AST-1..6, DSH-3, LES-1, D-063, D-065, D-066).
+ * Daily Assistant (S7: AST-1..6, DSH-3, LES-1, D-063, D-065, D-066, D-068).
  *
  * - One assistant per teaching context and local day (unique row), shared by every lesson of that
  *   day (AST-1).
@@ -20,13 +20,13 @@ import type { z } from 'zod';
 import { planAssistants, nextAssistant, weekDates, type TurnInfo } from '../../../domain/assistant.ts';
 import { isAway } from '../../../domain/attendance.ts';
 import { weekStartOfDate } from '../../../domain/counters.ts';
-import { weekdayOf } from '../../../domain/dates.ts';
+import { addDays, weekdayOf } from '../../../domain/dates.ts';
 import type * as C from '../../../shared/contracts/assistant.ts';
 import { DEFAULT_SCHOOL_DAYS, type AssistantPlan, type AssistantStudent, type AssistantToday } from '../../../shared/contracts/assistant.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { initials, normaliseName, sortByName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { assistantAssignments, assistantPlans, assistantResponsibilities, students, teachingContexts } from '../../db/schema.ts';
+import { assistantAssignments, assistantPlans, assistantResponsibilities, students, teachingContexts, type AssistantAbsenceUndo } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId, sha256 } from '../../lib/crypto.ts';
@@ -200,23 +200,55 @@ function ensurePlan(ctx: RequestContext, context: ContextRow, cls: ClassRow, wee
   return row;
 }
 
-// ---------------------------------------------------------------- absence (AST-4, D-065)
-/** Today's assistant is away: carry forward or pick the next fair student who is in class. */
+// ---------------------------------------------------------------- absence (AST-4, D-065, D-068)
+/** Students on the class roster on `date` (enrolment-aware, D-027). */
+const enrolledOn = (db: Db, classId: string, date: string) => new Set(rosterRowsOn(db, classId, date).map(({ student }) => student.id));
+
+/**
+ * Today's assistant is away, no longer in the class, or nobody is assigned: carry forward or pick
+ * the next fair student who is in class. Only a real absence is recorded as a missed turn
+ * (`absentStudentIds`, kept even if the day is swapped or overridden later) and can be undone by a
+ * same-day attendance correction (`absenceUndo`, D-068).
+ */
 function replaceIfAway(ctx: RequestContext, context: ContextRow, cls: ClassRow, row: AssignmentRow): AssignmentRow {
-  const who = effective(row);
-  if (!who) return row;
+  // Replaced earlier with nobody left to choose: the day is vacant, not "the absent student again".
+  const vacant = row.status === 'replaced_absent' && row.actualStudentId === null;
+  const who = vacant ? null : effective(row);
   const daily = dailyFor(ctx.db, cls.id, row.localDate);
   const statusOf = (id: string) => daily.get(id)?.status ?? null;
   const away = (id: string) => {
-    const s = statusOf(id);
-    return s !== null && isAway(s);
+    const st = statusOf(id);
+    return st !== null && isAway(st);
   };
-  if (!away(who)) return row;
   const roster = rosterOn(ctx.db, cls.id)(row.localDate);
-  const inClass = roster.filter((s) => statusOf(s.id) === 'present' || statusOf(s.id) === 'late');
-  const pool = inClass.length ? inClass : roster.filter((s) => !away(s.id));
+  if (!roster.length) return row;
+  const gone = who !== null && !roster.some((st) => st.id === who);
+  if (who !== null && !gone && !away(who)) return row;
+  const inClass = roster.filter((st) => statusOf(st.id) === 'present' || statusOf(st.id) === 'late');
+  const pool = inClass.length ? inClass : roster.filter((st) => !away(st.id));
   const now = ctx.now();
   const uid = ctx.user?.id ?? null;
+  const turns = () => turnCounts(ctx.db, context.id, cls.schoolYearId, new Set([row.localDate]));
+
+  if (who === null) {
+    // Planned while the class had no students, or vacant after a replacement: fill today now.
+    const pick = nextAssistant(pool.filter((st) => !row.absentStudentIds.includes(st.id)), turns())?.id ?? null;
+    if (!pick) return row;
+    const patch = vacant ? { actualStudentId: pick, updatedAt: now, updatedBy: uid } : { plannedStudentId: pick, updatedAt: now, updatedBy: uid };
+    ctx.db.update(assistantAssignments).set(patch).where(eq(assistantAssignments.id, row.id)).run();
+    audit(ctx.db, ctx.actor, { action: 'assistant.fill_day', entity: 'assistant_assignment', entityId: row.id, after: { date: row.localDate, assistant: pick } }, now);
+    return { ...row, ...patch };
+  }
+
+  if (gone) {
+    // Left or moved class: not a missed turn, and nobody keeps a later day for them.
+    const replacement = nextAssistant(pool.filter((st) => st.id !== who), turns())?.id ?? null;
+    const patch = { actualStudentId: replacement, status: 'replaced_absent' as const, reason: 'not_in_class', absenceUndo: null, updatedAt: now, updatedBy: uid };
+    ctx.db.update(assistantAssignments).set(patch).where(eq(assistantAssignments.id, row.id)).run();
+    audit(ctx.db, ctx.actor, { action: 'assistant.replace_not_in_class', entity: 'assistant_assignment', entityId: row.id, before: { date: row.localDate, assistant: who }, after: { date: row.localDate, assistant: replacement } }, now);
+    return { ...row, ...patch };
+  }
+
   // 1) Carry forward: the earliest later planned assistant who is in class today swaps turns.
   const later = ctx.db
     .select()
@@ -226,17 +258,22 @@ function replaceIfAway(ctx: RequestContext, context: ContextRow, cls: ClassRow, 
     .all()
     .find((a) => {
       const id = effective(a);
-      return id !== null && id !== who && pool.some((s) => s.id === id);
+      return id !== null && id !== who && pool.some((st) => st.id === id) && enrolledOn(ctx.db, cls.id, a.localDate).has(who);
     });
   let replacement: string | null;
   if (later) {
     replacement = effective(later);
     ctx.db.update(assistantAssignments).set({ actualStudentId: who, status: 'swapped', reason: 'carry_forward', updatedAt: now, updatedBy: uid }).where(eq(assistantAssignments.id, later.id)).run();
   } else {
-    const turns = turnCounts(ctx.db, context.id, cls.schoolYearId, new Set([row.localDate]));
-    replacement = nextAssistant(pool.filter((s) => s.id !== who), turns)?.id ?? null;
+    replacement = nextAssistant(pool.filter((st) => st.id !== who), turns())?.id ?? null;
   }
-  const patch = { actualStudentId: replacement, status: 'replaced_absent' as const, reason: 'absent', updatedAt: now, updatedBy: uid };
+  const absenceUndo: AssistantAbsenceUndo = {
+    absentId: who,
+    replacement,
+    prev: { actualStudentId: row.actualStudentId, status: row.status, reason: row.reason },
+    partner: later ? { id: later.id, actualStudentId: later.actualStudentId, status: later.status, reason: later.reason } : null,
+  };
+  const patch = { actualStudentId: replacement, status: 'replaced_absent' as const, reason: 'absent', absentStudentIds: [...row.absentStudentIds, who], absenceUndo, updatedAt: now, updatedBy: uid };
   ctx.db.update(assistantAssignments).set(patch).where(eq(assistantAssignments.id, row.id)).run();
   audit(
     ctx.db,
@@ -247,11 +284,51 @@ function replaceIfAway(ctx: RequestContext, context: ContextRow, cls: ClassRow, 
   return { ...row, ...patch };
 }
 
-/** Attendance listener: today's assistant marked absent/excused in daily attendance (AST-4). */
+/**
+ * The absent assistant was marked present again (or the record was cleared) the same day: undo the
+ * latest replacement and its carry-forward partner, but only while neither day was changed since
+ * (no swap, override, thank-you or later replacement) (D-068).
+ */
+function restoreIfBack(ctx: RequestContext, row: AssignmentRow, studentId: string): void {
+  const undo = row.absenceUndo;
+  if (!undo || undo.absentId !== studentId) return;
+  if (row.status !== 'replaced_absent' || row.actualStudentId !== undo.replacement || row.thankedAt !== null) return;
+  const partner = undo.partner ? ctx.db.select().from(assistantAssignments).where(eq(assistantAssignments.id, undo.partner.id)).get() : undefined;
+  if (undo.partner && (!partner || partner.actualStudentId !== studentId || partner.status !== 'swapped' || partner.reason !== 'carry_forward' || partner.thankedAt !== null)) return;
+  const now = ctx.now();
+  const uid = ctx.user?.id ?? null;
+  const absent = [...row.absentStudentIds];
+  const i = absent.lastIndexOf(studentId);
+  if (i >= 0) absent.splice(i, 1);
+  ctx.db
+    .update(assistantAssignments)
+    .set({ actualStudentId: undo.prev.actualStudentId, status: undo.prev.status, reason: undo.prev.reason, absentStudentIds: absent, absenceUndo: null, updatedAt: now, updatedBy: uid })
+    .where(eq(assistantAssignments.id, row.id))
+    .run();
+  if (partner && undo.partner) {
+    ctx.db
+      .update(assistantAssignments)
+      .set({ actualStudentId: undo.partner.actualStudentId, status: undo.partner.status, reason: undo.partner.reason, updatedAt: now, updatedBy: uid })
+      .where(eq(assistantAssignments.id, partner.id))
+      .run();
+  }
+  audit(
+    ctx.db,
+    ctx.actor,
+    { action: 'assistant.restore_after_absence', entity: 'assistant_assignment', entityId: row.id, before: { date: row.localDate, assistant: undo.replacement }, after: { date: row.localDate, assistant: studentId, restoredDay: partner?.localDate ?? null } },
+    now,
+  );
+}
+
+/**
+ * Attendance listener (AST-4): today's assistant marked absent/excused in daily attendance is
+ * replaced; a same-day correction back to present (or "not recorded") restores the day (D-068).
+ */
 export function onAttendanceChange(ctx: RequestContext, ch: AttendanceChange): void {
-  if (ch.lessonId !== null || ch.status === null || !isAway(ch.status)) return;
+  if (ch.lessonId !== null) return;
   const cls = getClass(ctx.db, ch.classId);
-  if (ch.date !== todayFor(ctx, cls)) return;
+  if (!isWritable(ctx.db, cls) || ch.date !== todayFor(ctx, cls)) return;
+  const nowAway = ch.status !== null && isAway(ch.status);
   const contexts = ctx.db
     .select()
     .from(teachingContexts)
@@ -260,15 +337,48 @@ export function onAttendanceChange(ctx: RequestContext, ch: AttendanceChange): v
   for (const context of contexts) {
     if (!isModuleEnabled(ctx.db, context.id, 'assistant')) continue;
     const row = getAssignment(ctx.db, context.id, ch.date);
-    if (row && effective(row) === ch.studentId) replaceIfAway(ctx, context, cls, row);
+    if (!row) continue;
+    if (nowAway) {
+      if (effective(row) === ch.studentId) replaceIfAway(ctx, context, cls, row);
+    } else restoreIfBack(ctx, row, ch.studentId);
+  }
+}
+
+/**
+ * Later days whose assistant is no longer in the class (left or moved, D-068), or that have no
+ * assistant although the class now has students, get the next fair student. A day still `planned`
+ * is planned again; a day already changed by hand keeps its planned student and records the new one
+ * as actual (`not_in_class`). Inside a transaction.
+ */
+function refreshLaterDays(ctx: RequestContext, context: ContextRow, cls: ClassRow, today: string): void {
+  const rows = ctx.db
+    .select()
+    .from(assistantAssignments)
+    .where(and(eq(assistantAssignments.contextId, context.id), gt(assistantAssignments.localDate, today)))
+    .orderBy(asc(assistantAssignments.localDate))
+    .all();
+  for (const r of rows) {
+    const who = effective(r);
+    const roster = rosterOn(ctx.db, cls.id)(r.localDate);
+    if (!roster.length || (who !== null && roster.some((st) => st.id === who))) continue;
+    const pick = nextAssistant(roster, turnCounts(ctx.db, context.id, cls.schoolYearId, new Set([r.localDate])))?.id ?? null;
+    if (!pick) continue;
+    const now = ctx.now();
+    const patch = r.status === 'planned' ? { plannedStudentId: pick, actualStudentId: null } : { actualStudentId: pick, status: 'replaced_absent' as const, reason: 'not_in_class' };
+    ctx.db
+      .update(assistantAssignments)
+      .set({ ...patch, updatedAt: now, updatedBy: ctx.user?.id ?? null })
+      .where(eq(assistantAssignments.id, r.id))
+      .run();
+    audit(ctx.db, ctx.actor, { action: 'assistant.replace_not_in_class', entity: 'assistant_assignment', entityId: r.id, before: { date: r.localDate, assistant: who }, after: { date: r.localDate, assistant: pick } }, now);
   }
 }
 
 // ---------------------------------------------------------------- today
 /**
  * Today's assignment, created on first use (the current week's plan is generated if missing) and
- * checked for absence. Nothing is written in an archived class or year (DAT-1) or on a day that is
- * not a school day.
+ * checked for absence and for students who left the class (later days too). Nothing is written in
+ * an archived class or year (DAT-1) or on a day that is not a school day.
  */
 export function ensureToday(ctx: RequestContext, context: ContextRow): { today: string; schoolDay: boolean; row: AssignmentRow | null } {
   const cls = getClass(ctx.db, context.classId);
@@ -278,14 +388,18 @@ export function ensureToday(ctx: RequestContext, context: ContextRow): { today: 
   if (!isWritable(ctx.db, cls)) return { today, schoolDay, row: getAssignment(ctx.db, context.id, today) ?? null };
   const row = tx(ctx.db, () => {
     ensureResponsibilities(ctx, context);
-    if (!schoolDay) return getAssignment(ctx.db, context.id, today) ?? null;
-    let r = getAssignment(ctx.db, context.id, today);
-    if (!r) {
-      const plan = ensurePlan(ctx, context, cls, weekStartFor(ctx.db, today), today);
-      fillDates(ctx, context, cls, plan.id, [today]);
-      r = getAssignment(ctx.db, context.id, today)!;
+    let r: AssignmentRow | null = getAssignment(ctx.db, context.id, today) ?? null;
+    if (schoolDay) {
+      if (!r) {
+        const plan = ensurePlan(ctx, context, cls, weekStartFor(ctx.db, today), today);
+        fillDates(ctx, context, cls, plan.id, [today]);
+        r = getAssignment(ctx.db, context.id, today)!;
+      }
+      r = replaceIfAway(ctx, context, cls, r);
     }
-    return replaceIfAway(ctx, context, cls, r);
+    // Today first, so later days continue the rotation after it.
+    refreshLaterDays(ctx, context, cls, today);
+    return r;
   });
   return { today, schoolDay, row };
 }
@@ -343,16 +457,25 @@ function weekOf(ctx: RequestContext, context: ContextRow, cls: ClassRow, weekSta
   return { today, weekStart: ws, schoolDays, dates: all, byDate, plan: getPlan(ctx.db, context.id, ws) ?? null };
 }
 
-/** Classroom-safe week (D-066): effective names only. */
+/**
+ * Classroom-safe week (D-066, D-068): only the current week or the next one, and names only once the
+ * teacher has announced that week. Drafts and past weeks are teacher-area (PIN-1/PIN-8).
+ */
 export function classroomWeek(ctx: RequestContext, input: In<typeof C.assistantWeek>) {
   const context = assertOwnsContext(ctx, input.contextId);
   if (!isModuleEnabled(ctx.db, context.id, 'assistant')) throw new AppError('FEATURE_DISABLED', 'Module assistant is turned off', { module: 'assistant' });
   const cls = getClass(ctx.db, context.classId);
+  const current = weekStartFor(ctx.db, todayFor(ctx, cls));
+  const next = weekStartFor(ctx.db, addDays(current, 7));
+  if (input.weekStart && input.weekStart !== current && input.weekStart !== next) {
+    throw new AppError('FORBIDDEN', 'Only this week and next week can be shown in the classroom', { reason: 'WEEK_NOT_IN_CLASSROOM' });
+  }
   const w = weekOf(ctx, context, cls, input.weekStart);
+  if (!w.plan?.announcedAt) return { weekStart: w.weekStart, announced: false, days: [], responsibilities: responsibilities(ctx.db, context.id) };
   const byId = studentsById(ctx.db, [...w.byDate.values()].map(effective));
   return {
     weekStart: w.weekStart,
-    announced: Boolean(w.plan?.announcedAt),
+    announced: true,
     days: w.dates.map((d) => {
       const r = w.byDate.get(d);
       const s = r ? byId.get(effective(r) ?? '') : undefined;
@@ -489,8 +612,8 @@ export function swap(ctx: RequestContext, input: In<typeof C.swapAssistants>): A
     const eb = effective(b);
     const now = ctx.now();
     const uid = requireUser(ctx).id;
-    ctx.db.update(assistantAssignments).set({ actualStudentId: eb, status: 'swapped', reason: 'teacher_swap', updatedAt: now, updatedBy: uid }).where(eq(assistantAssignments.id, a.id)).run();
-    ctx.db.update(assistantAssignments).set({ actualStudentId: ea, status: 'swapped', reason: 'teacher_swap', updatedAt: now, updatedBy: uid }).where(eq(assistantAssignments.id, b.id)).run();
+    ctx.db.update(assistantAssignments).set({ actualStudentId: eb, status: 'swapped', reason: 'teacher_swap', absenceUndo: null, updatedAt: now, updatedBy: uid }).where(eq(assistantAssignments.id, a.id)).run();
+    ctx.db.update(assistantAssignments).set({ actualStudentId: ea, status: 'swapped', reason: 'teacher_swap', absenceUndo: null, updatedAt: now, updatedBy: uid }).where(eq(assistantAssignments.id, b.id)).run();
     audit(ctx.db, ctx.actor, { action: 'assistant.swap', entity: 'teaching_context', entityId: context.id, before: [{ date: a.localDate, student: ea }, { date: b.localDate, student: eb }], after: [{ date: a.localDate, student: eb }, { date: b.localDate, student: ea }] }, now);
     return planDto(ctx, context, cls, weekStartFor(ctx.db, input.dateA));
   });
@@ -507,7 +630,7 @@ export function override(ctx: RequestContext, input: In<typeof C.overrideAssista
     }
     const now = ctx.now();
     const reason = input.reason?.trim() ? input.reason.trim() : 'teacher_override';
-    ctx.db.update(assistantAssignments).set({ actualStudentId: input.studentId, status: 'override', reason, updatedAt: now, updatedBy: requireUser(ctx).id }).where(eq(assistantAssignments.id, r.id)).run();
+    ctx.db.update(assistantAssignments).set({ actualStudentId: input.studentId, status: 'override', reason, absenceUndo: null, updatedAt: now, updatedBy: requireUser(ctx).id }).where(eq(assistantAssignments.id, r.id)).run();
     audit(ctx.db, ctx.actor, { action: 'assistant.override', entity: 'assistant_assignment', entityId: r.id, before: { date: r.localDate, student: effective(r) }, after: { date: r.localDate, student: input.studentId, reason } }, now);
     return planDto(ctx, context, cls, weekStartFor(ctx.db, input.date));
   });
@@ -525,7 +648,7 @@ export function history(ctx: RequestContext, contextId: string) {
     .orderBy(asc(assistantAssignments.localDate))
     .all();
   const roster = rosterRowsOn(ctx.db, cls.id, today).map(({ student }) => student.id);
-  const byId = studentsById(ctx.db, [...roster, ...rows.flatMap((r) => [r.plannedStudentId, r.actualStudentId])]);
+  const byId = studentsById(ctx.db, [...roster, ...rows.flatMap((r) => [r.plannedStudentId, r.actualStudentId, ...r.absentStudentIds])]);
   const dto = (id: string | null) => {
     const s = id ? byId.get(id) : undefined;
     return s ? studentDto(s) : null;
@@ -541,7 +664,8 @@ export function history(ctx: RequestContext, contextId: string) {
         s.turns += 1;
         s.last = r.localDate;
       }
-      if (r.status === 'replaced_absent' && r.plannedStudentId && r.plannedStudentId !== who) stat(r.plannedStudentId).missed += 1;
+      // Missed turns come from the recorded absences, never from planned vs actual (D-068).
+      for (const id of new Set(r.absentStudentIds)) if (id !== who) stat(id).missed += 1;
     } else if (who) {
       const s = stat(who);
       if (!s.next) s.next = r.localDate;
@@ -552,6 +676,14 @@ export function history(ctx: RequestContext, contextId: string) {
     days: rows
       .filter((r) => r.localDate <= today)
       .reverse()
-      .map((r) => ({ date: r.localDate, planned: dto(r.plannedStudentId), actual: dto(r.actualStudentId), status: r.status, reason: r.reason, thanked: r.thankedAt !== null })),
+      .map((r) => ({
+        date: r.localDate,
+        planned: dto(r.plannedStudentId),
+        actual: dto(r.actualStudentId),
+        absent: [...new Set(r.absentStudentIds)].map(dto).filter((x): x is AssistantStudent => x !== null),
+        status: r.status,
+        reason: r.reason,
+        thanked: r.thankedAt !== null,
+      })),
   };
 }

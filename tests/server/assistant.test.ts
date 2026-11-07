@@ -221,3 +221,129 @@ describe('archived years are read-only (DAT-1)', () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe('review fixes: who missed the turn (AST-4, AST-5, D-068)', () => {
+  const hist = () => ok(s.teacherA.get(`/api/teacher/contexts/${ctxId()}/assistant/history`));
+  const missed = (h: any, name: string) => h.students.find((x: any) => x.student.fullName === name)?.missed;
+
+  it('a swapped-in assistant who is absent gets the missed turn, not the planned student; a replacement who is also absent too', async () => {
+    await lessonState(s.teacherA, ctxId()); // Mon Can, Tue Çağla, Wed Ilgaz, Thu Işıl, Fri İrem
+    await ok(s.teacherA.post(`/api/teacher/contexts/${ctxId()}/assistant/swap`, { dateA: '2026-11-09', dateB: '2026-11-11' }));
+    for (const n of NAMES) await markDaily(by[n]!, 'present', '2026-11-09');
+    await markDaily(by['Ilgaz Ok']!, 'absent', '2026-11-09');
+    let p = await plan();
+    // Wednesday is no longer 'planned' (swapped), so Tuesday's Çağla takes today and Ilgaz takes Tuesday.
+    expect(p.days[0]).toMatchObject({ planned: { fullName: 'Can Uslu' }, actual: { fullName: 'Çağla Ak' }, status: 'replaced_absent' });
+    expect(p.days[1]).toMatchObject({ actual: { fullName: 'Ilgaz Ok' }, status: 'swapped', reason: 'carry_forward' });
+    let h = await hist();
+    expect(missed(h, 'Ilgaz Ok')).toBe(1);
+    expect(missed(h, 'Can Uslu')).toBe(0);
+    expect(h.days[0].absent.map((x: any) => x.fullName)).toEqual(['Ilgaz Ok']);
+
+    await markDaily(by['Çağla Ak']!, 'excused', '2026-11-09');
+    p = await plan();
+    expect(p.days[0].assistant.fullName).toBe('Işıl Er'); // the next planned day still in class (Thursday)
+    expect(p.days[3]).toMatchObject({ actual: { fullName: 'Çağla Ak' }, reason: 'carry_forward' });
+    h = await hist();
+    expect(missed(h, 'Ilgaz Ok')).toBe(1);
+    expect(missed(h, 'Çağla Ak')).toBe(1);
+    expect(missed(h, 'Can Uslu')).toBe(0);
+    expect(h.days[0].absent.map((x: any) => x.fullName)).toEqual(['Ilgaz Ok', 'Çağla Ak']);
+  });
+
+  it('an override after an absence replacement keeps the missed turn', async () => {
+    await lessonState(s.teacherA, ctxId());
+    await markDaily(by['Can Uslu']!, 'absent', '2026-11-09');
+    await ok(s.teacherA.post(`/api/teacher/contexts/${ctxId()}/assistant/override`, { date: '2026-11-09', studentId: by['İrem Su'] }));
+    const h = await hist();
+    expect(h.days[0]).toMatchObject({ status: 'override', actual: { fullName: 'İrem Su' } });
+    expect(h.days[0].absent.map((x: any) => x.fullName)).toEqual(['Can Uslu']);
+    expect(missed(h, 'Can Uslu')).toBe(1);
+  });
+
+  it('marking the assistant present again the same day gives the day back and undoes the carry-forward', async () => {
+    await lessonState(s.teacherA, ctxId());
+    await markDaily(by['Can Uslu']!, 'absent', '2026-11-09');
+    expect((await lessonState(s.teacherA, ctxId())).assistant.assistant.fullName).toBe('Çağla Ak');
+    await markDaily(by['Can Uslu']!, 'present', '2026-11-09');
+    const p = await plan();
+    expect(p.days[0]).toMatchObject({ assistant: { fullName: 'Can Uslu' }, actual: null, status: 'planned' });
+    expect(p.days[1]).toMatchObject({ assistant: { fullName: 'Çağla Ak' }, actual: null, status: 'planned' });
+    expect(missed(await hist(), 'Can Uslu')).toBe(0);
+    expect(env.db.$client.prepare("select count(*) n from audit_events where action = 'assistant.restore_after_absence'").get()).toEqual({ n: 1 });
+    // Clearing the record ("not recorded") after a new mistake also restores.
+    await markDaily(by['Can Uslu']!, 'excused', '2026-11-09');
+    await ok(s.teacherA.put(`/api/teacher/classes/${s.c3a.id}/attendance`, { date: '2026-11-09', studentId: by['Can Uslu'], status: null }));
+    expect((await plan()).days[0]).toMatchObject({ assistant: { fullName: 'Can Uslu' }, status: 'planned' });
+  });
+
+  it('a correction does not undo a day the teacher thanked in the meantime', async () => {
+    const lessonId = await startLesson(s.teacherA, ctxId(), { othersPresent: true });
+    await lessonState(s.teacherA, ctxId()); // plan the week
+    await markDaily(by['Can Uslu']!, 'absent', '2026-11-09');
+    await endLesson(s.teacherA, ctxId(), lessonId, { assistantThanks: { thanked: true } });
+    await markDaily(by['Can Uslu']!, 'present', '2026-11-09');
+    const p = await plan();
+    expect(p.days[0]).toMatchObject({ assistant: { fullName: 'Çağla Ak' }, status: 'replaced_absent' });
+    expect(p.days[1]).toMatchObject({ assistant: { fullName: 'Can Uslu' }, reason: 'carry_forward' });
+  });
+});
+
+describe('review fixes: roster changes after planning (AST-1, AST-2, D-068)', () => {
+  it('a student who leaves mid-week is no longer shown; today and later days get someone in the class', async () => {
+    await ok(s.teacherA.post(`/api/teacher/contexts/${ctxId()}/assistant/plan`, {}));
+    await ok(s.teacherA.post(`/api/teacher/contexts/${ctxId()}/assistant/plan/announce`, { weekStart: '2026-11-09' }));
+    // Ilgaz (Wednesday) moves to 3-B from Wednesday; Can (today) moves today.
+    await ok(s.admin.post('/api/admin/students/move', { studentIds: [by['Ilgaz Ok']], toClassId: s.c3b.id, date: '2026-11-11' }));
+    await ok(s.admin.post('/api/admin/students/move', { studentIds: [by['Can Uslu']], toClassId: s.c3b.id, date: '2026-11-09' }));
+    const st = await lessonState(s.teacherA, ctxId());
+    expect(st.assistant.assistant).not.toBeNull();
+    expect(st.assistant.assistant.fullName).not.toBe('Can Uslu');
+    const p = await plan();
+    expect(p.days[0]).toMatchObject({ planned: { fullName: 'Can Uslu' }, status: 'replaced_absent', reason: 'not_in_class' });
+    expect(names(p)).not.toContain('Ilgaz Ok');
+    expect(names(p)).not.toContain('Can Uslu');
+    expect(names(p).every((n: string | null) => n !== null)).toBe(true);
+    const week = await ok(s.teacherA.get(`/api/classroom/contexts/${ctxId()}/assistant/week`));
+    expect(week.days.map((d: any) => d.assistant?.fullName)).not.toContain('Ilgaz Ok');
+    // Leaving is not a missed turn.
+    const h = await ok(s.teacherA.get(`/api/teacher/contexts/${ctxId()}/assistant/history`));
+    expect(h.days[0].absent).toEqual([]);
+  });
+
+  it('a week planned while the class had no students is filled once students are added', async () => {
+    const env2 = await makeEnv();
+    try {
+      const s2 = await buildSchool(env2);
+      const ctx2 = s2.ctxA.id as string;
+      expect((await lessonState(s2.teacherA, ctx2)).assistant).toMatchObject({ schoolDay: true, assistant: null });
+      for (const fullName of NAMES) await addStudent(s2.teacherA, s2.c3a.id, { fullName });
+      expect((await lessonState(s2.teacherA, ctx2)).assistant.assistant.fullName).toBe('Can Uslu');
+      const p = await ok(s2.teacherA.get(`/api/teacher/contexts/${ctx2}/assistant/plan`));
+      expect(names(p)).toEqual(TURKISH_ORDER);
+    } finally {
+      await env2.app.close();
+    }
+  });
+});
+
+describe('review fixes: the classroom sees only the announced week (AST-2, D-066, D-068, PIN-8)', () => {
+  it('a draft shows no names; past and far weeks are refused; next week only once announced', async () => {
+    await lessonState(s.teacherA, ctxId()); // this week planned, not announced
+    const draft = await ok(s.teacherA.get(`/api/classroom/contexts/${ctxId()}/assistant/week`));
+    expect(draft).toMatchObject({ weekStart: '2026-11-09', announced: false, days: [] });
+    const raw = JSON.stringify(draft);
+    for (const n of NAMES) expect(raw).not.toContain(n);
+    const past = await s.teacherA.get(`/api/classroom/contexts/${ctxId()}/assistant/week?weekStart=2026-11-02`);
+    expect(past.status).toBe(403);
+    expect(past.body.error.details.reason).toBe('WEEK_NOT_IN_CLASSROOM');
+    expect((await s.teacherA.get(`/api/classroom/contexts/${ctxId()}/assistant/week?weekStart=2026-11-23`)).status).toBe(403);
+    await ok(s.teacherA.post(`/api/teacher/contexts/${ctxId()}/assistant/plan`, { weekStart: '2026-11-16' }));
+    expect((await ok(s.teacherA.get(`/api/classroom/contexts/${ctxId()}/assistant/week?weekStart=2026-11-16`))).days).toEqual([]);
+    await ok(s.teacherA.post(`/api/teacher/contexts/${ctxId()}/assistant/plan/announce`, { weekStart: '2026-11-16' }));
+    expect((await ok(s.teacherA.get(`/api/classroom/contexts/${ctxId()}/assistant/week?weekStart=2026-11-16`))).days).toHaveLength(5);
+    // Next Monday, the old week is history (teacher area only).
+    await goTo('2026-11-16');
+    expect((await s.teacherA.get(`/api/classroom/contexts/${ctxId()}/assistant/week?weekStart=2026-11-09`)).status).toBe(403);
+  });
+});
