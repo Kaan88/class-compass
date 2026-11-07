@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens (ARCHITECTURE §5). Three layers:
+ *   1. primitives (raw palette) – only referenced here
+ *   2. semantic tokens (--cc-*) – the ONLY colours components may use
+ *   3. themes ([data-theme=…]) override semantic tokens + illustration/mascot set
+ * Text scale: --cc-text-scale set on <html> from the teacher's preference (THM-6).
+ */
+:root {
+  --cc-text-scale: 1;
+  --cc-radius: 1rem;
+  --cc-touch: 3.5rem; /* minimum touch target (UX-6) */
+
+  --cc-bg: #f7f8fc;
+  --cc-surface: #ffffff;
+  --cc-surface-2: #eef1f8;
+  --cc-text: #14182b;
+  --cc-text-muted: #4a5170;
+  --cc-border: #c9cfe0;
+  --cc-accent: #2f5bd3;
+  --cc-accent-text: #ffffff;
+  --cc-focus: #ffb000;
+  --cc-success: #17733f;
+  --cc-warning: #9a5b00;
+  --cc-danger: #b3261e;
+  /* counter depth levels: neutral → amber → red (CNT-6); always paired with numbers */
+  --cc-level-0: #e8ebf3;
+  --cc-level-1: #ffe2a8;
+  --cc-level-2: #ffbf69;
+  --cc-level-3: #f88a5a;
+  --cc-level-4: #d9483b;
+}
+
+[data-theme='explorer'] {
+  --cc-bg: #f4efe3;
+  --cc-surface: #fffaf0;
+  --cc-surface-2: #efe4cc;
+  --cc-accent: #1f6f5c;
+  --cc-border: #cdbf9f;
+}
+[data-theme='animals'] {
+  --cc-bg: #f2f7ef;
+  --cc-surface: #ffffff;
+  --cc-surface-2: #e3f0dc;
+  --cc-accent: #8a3fb8;
+  --cc-border: #c4d8b8;
+}
+[data-theme='classroom'] {
+  --cc-bg: #f7f8fc;
+  --cc-accent: #2f5bd3;
+}
+
+html {
+  font-size: calc(18px * var(--cc-text-scale));
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  font-family: system-ui, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+}
+body {
+  margin: 0;
+  background: var(--cc-bg);
+}
+:focus-visible {
+  outline: 4px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+[data-motion='off'] *,
+[data-motion='off'] *::before,
+[data-motion='off'] *::after {
+  animation: none !important;
+  transition: none !important;
+}

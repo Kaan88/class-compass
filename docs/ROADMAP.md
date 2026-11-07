@@ -10,19 +10,23 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] REQUIREMENTS.md, DECISIONS.md
 - [x] Stack options evaluated (3 independent proposals + judged synthesis) → ARCHITECTURE.md
 - [x] ROADMAP.md, OPERATIONS.md (skeleton)
-- [ ] **Owner decision on stack (D-005) and open questions** ← blocking
+- [x] Owner decisions recorded (D-005, D-012…D-018)
 
 ## S0 Spike & foundations
-- [ ] Verify native deps on Windows + Debian VM: better-sqlite3, sharp, argon2, tesseract.js (tur), SheetJS; pick Node LTS major
-- [ ] Repo skeleton, lint rules (boundaries, i18n, a11y, tokens), Vitest, Playwright, GitHub Actions (Ubuntu + Windows)
-- [ ] Baseline migration, `/healthz`, redacted logging, CSP/security headers
+- [x] Verify native deps on Windows (better-sqlite3, sharp, argon2) — Node 26 chosen (D-019)
+- [ ] Verify native deps inside Docker on the VPS; tesseract.js `tur` + SheetJS (S9)
+- [x] Repo skeleton, boundaries lint, Vitest, GitHub Actions (Ubuntu + Windows), CONVENTIONS.md
+- [ ] Playwright setup; i18n/a11y/raw-colour lint rules (S3)
+- [x] Baseline migration, `/healthz`, redacted logging, CSP/security headers, robots/noindex
 - [ ] Synthetic Turkish/English fixture generator (fictional students only)
 
 ## S1 Contracts, auth, audit
-- [ ] Endpoint registry with mandatory access class; typed client
-- [ ] Users, sessions, argon2id, CSRF/Origin, rate limits, `admin:create` CLI, password reset
-- [ ] Audit helper, command log, `/api/commands` idempotency
-- [ ] Tests: access-class coverage, session expiry, lockout, replay/409
+- [x] Endpoint registry with mandatory access class; typed client
+- [x] Users, sessions, argon2id, CSRF/Origin, login lockout, `admin:create` + `admin:reset-password` CLI
+- [ ] Email password reset when SMTP configured (D-015) — S2
+- [x] Audit helper, command log, `/api/commands` idempotency
+- [x] Tests: session expiry, lockout, CSRF, per-teacher locale, PIN lock/unlock/lockout, command replay/conflict (22 tests)
+- [ ] Test enumerating every endpoint against the permission matrix — S2
 
 ## S2 School structure, admin, i18n
 - [ ] Years, terms, classes, subjects, teaching contexts, module policies; admin UI

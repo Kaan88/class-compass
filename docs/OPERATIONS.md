@@ -28,7 +28,7 @@ Status: **skeleton** — commands below are the planned design (see ARCHITECTURE
 - `class-compass restore <snapshot>`: stops service, verifies snapshot, swaps DB + uploads, runs migrations, health check. Rehearsed in CI.
 
 ## Deployment (planned)
-- Debian, Caddy (HTTPS) → systemd service `class-compass@<school>`.
+- Docker container (localhost-only port) published through Cloudflare Tunnel (D-018); TLS at Cloudflare.
 - `/opt/class-compass/releases/<sha>` + `current` symlink; config `/etc/class-compass/<school>.env` (mode 600); data `/var/lib/class-compass/<school>`.
 - Deploy: build → snapshot DB → migrate → health check → switch symlink, auto-rollback on failure.
 - **Debian test VM:** inspect first, preserve existing services, install in isolation (own user, port, dirs). Test access does not authorise production deployment.
