@@ -1,16 +1,26 @@
 name: CI
+# Kept lean because GitHub Actions minutes on a private repo are limited (D-082):
+# - every push to main: one Ubuntu job (typecheck, lint, unit/integration tests, build);
+#   docs-only pushes are skipped and superseded runs are cancelled
+# - Windows and browser (e2e) jobs: weekly and on demand (Actions tab → CI → Run workflow).
+#   They are also run locally before each stage is committed.
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/**', '**/*.md']
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,8 +33,22 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  check-windows:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
   e2e:
     # Browser tests against a throw-away server with the fictional demo school (D-037).
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

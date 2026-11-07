@@ -207,3 +207,5 @@ Format: `D-NNN — date — decision — rationale — status`.
   - **Spreadsheets (STU-8).** Workbooks are parsed with `sheetRows` (2100), the range is shrunk to the cells that exist and clamped to 60 columns, at most 20 sheets are read and reading stops once 2000 rows are collected, so a tiny file declaring `A1:XFD1048576` cannot block or exhaust the server. Parsing still runs on the main thread (a worker with a timeout, as for OCR, is open).
   - **Photos (CRD-1).** Deleting a file through `DELETE /api/files/:id` that is a student's current photo also clears `students.photoFileId` (audited `student.photo_remove`); the Avatar falls back to initials when an image fails to load.
   - Decided by Claude.
+
+- **D-082** — 2026-11-07 — CI kept lean: GitHub Actions budget for the private repo ran out (jobs refused to start on 385f44c and 4b796a1; not code failures). Push to main runs one Ubuntu job (docs-only pushes skipped, superseded runs cancelled); Windows and e2e jobs run weekly and on demand. Every stage still runs check + e2e locally before committing. — Decided by Claude; owner may raise the Actions budget.
