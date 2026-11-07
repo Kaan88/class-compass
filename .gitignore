@@ -1,0 +1,34 @@
+# Dependencies & builds
+node_modules/
+dist/
+build/
+.next/
+coverage/
+*.tsbuildinfo
+
+# Secrets & local config — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Real data — never commit (student records, uploads, DBs, backups)
+data/
+uploads/
+storage/
+backups/
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+*.bak
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
