@@ -6,6 +6,8 @@
  *   student or anyone else, GOL-6).
  * - Library: the default categories and presets plus this teacher's own (rename/archive own).
  * - Settings: outcome labels (also the module's panel on the class settings page).
+ * S13a: goal categories are also the lesson topics (D-101); a student's goals and evidence can be
+ * filtered by topic.
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -179,13 +181,19 @@ function PrivateNotes({ contextId, data }: { contextId: string; data: TeacherStu
 }
 
 function StudentGoals({ contextId, studentId, onBack }: { contextId: string; studentId: string; onBack: () => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const [topic, setTopic] = useState('');
   const run = useRun();
   const q = useQuery({ queryKey: [...ALL, 'student', contextId, studentId], queryFn: () => call(G.teacherStudentGoals, { contextId, studentId }) });
   const [feedback, setFeedback] = useState('');
   const [feedbackGoal, setFeedbackGoal] = useState('');
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const d = q.data;
+  // Topic filter (S13a): goals by their category; evidence by the goal it belongs to.
+  const goalTopic = new Map(d.goals.map((g) => [g.id, g.category.id]));
+  const topics = [...new Map(d.goals.map((g) => [g.category.id, g.category])).values()];
+  const goals = topic ? d.goals.filter((g) => g.category.id === topic) : d.goals;
+  const evidence = topic ? d.evidence.filter((e) => e.goalId !== null && goalTopic.get(e.goalId) === topic) : d.evidence;
   return (
     <div className="cc-stack" data-testid="teacher-student-goals">
       <div className="cc-row">
@@ -201,9 +209,14 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
         <h3 id="goals-list" className="cc-h2">
           {t('goals.goals')}
         </h3>
-        {d.goals.length === 0 ? <p className="cc-muted">{t('goals.noGoals')}</p> : null}
+        {topics.length > 1 ? (
+          <div data-testid="goals-topic-filter">
+            <Select label={t('goals.topicFilter')} items={[{ id: '', label: t('goals.allTopics') }, ...topics.map((c) => ({ id: c.id, label: pickText(c.name, locale) }))]} value={topic} onChange={setTopic} />
+          </div>
+        ) : null}
+        {goals.length === 0 ? <p className="cc-muted">{t('goals.noGoals')}</p> : null}
         <ul className="cc-stack">
-          {d.goals.map((g) => (
+          {goals.map((g) => (
             <GoalCard key={g.id} goal={g} outcomes={d.library.outcomes} />
           ))}
         </ul>
@@ -247,9 +260,9 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
         <h3 id="goals-evidence" className="cc-h2">
           {t('goals.evidence')}
         </h3>
-        {d.evidence.length === 0 ? <p className="cc-muted">{t('goals.noEvidence')}</p> : null}
+        {evidence.length === 0 ? <p className="cc-muted">{t('goals.noEvidence')}</p> : null}
         <ul className="cc-stack">
-          {d.evidence.map((e) => (
+          {evidence.map((e) => (
             <EvidenceView key={e.id} item={e} fileUrl={G.teacherFileUrl} />
           ))}
         </ul>

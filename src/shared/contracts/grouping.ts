@@ -63,18 +63,30 @@ export const ROLE_SUGGESTIONS = [
 ] as const;
 
 /**
- * The five default arrangements (GRP-1): two level-based and three mixed-level. They are arrangements
- * (each makes several groups), created once per class+subject on first use and freely editable.
- * Arrangement names are shown on the classroom screen, so the defaults are neutral and never say
- * "level" (GRP-7); the teacher area shows the type next to the name.
+ * Option icons (S13a): original, theme-aware SVG icons drawn by the client (`OptionIcon`); the option's
+ * name is always written next to the icon, so meaning never depends on the picture or its colour.
  */
+export const OPTION_ICONS = ['lion', 'eagle', 'dolphin', 'tiger', 'owl', 'fox', 'turtle', 'bee'] as const;
+export type OptionIcon = (typeof OPTION_ICONS)[number];
+
+/**
+ * The default grouping options (GRP-1 as changed by the owner on 2026-11-07, D-098): FOUR options per
+ * class+subject, each arranging the present students into Group 1–5. Lions and Eagles are level-based
+ * (differentiated), Dolphins and Tigers mixed-level. The option names are neutral animal names; the
+ * classroom never shows the type or a level (GRP-7), only the teacher area does.
+ */
+export const DEFAULT_GROUP_COUNT = 5;
 export const DEFAULT_ARRANGEMENTS = [
-  { key: 'level-groups', mode: 'level', sizing: { groupCount: 3 }, name: { en: 'Three groups', tr: 'Üç grup' } },
-  { key: 'level-pairs', mode: 'level', sizing: { targetSize: 2 }, name: { en: 'Pairs A', tr: 'İkililer A' } },
-  { key: 'mixed-a', mode: 'mixed', sizing: { targetSize: 4 }, name: { en: 'Teams A', tr: 'Takımlar A' } },
-  { key: 'mixed-b', mode: 'mixed', sizing: { targetSize: 4 }, name: { en: 'Teams B', tr: 'Takımlar B' } },
-  { key: 'mixed-pairs', mode: 'mixed', sizing: { targetSize: 2 }, name: { en: 'Pairs B', tr: 'İkililer B' } },
-] as const satisfies ReadonlyArray<{ key: string; mode: GroupingMode; sizing: Sizing; name: { en: string; tr: string } }>;
+  { key: 'lions', mode: 'level', icon: 'lion', sizing: { groupCount: DEFAULT_GROUP_COUNT }, name: { en: 'Lions', tr: 'Aslanlar' } },
+  { key: 'eagles', mode: 'level', icon: 'eagle', sizing: { groupCount: DEFAULT_GROUP_COUNT }, name: { en: 'Eagles', tr: 'Kartallar' } },
+  { key: 'dolphins', mode: 'mixed', icon: 'dolphin', sizing: { groupCount: DEFAULT_GROUP_COUNT }, name: { en: 'Dolphins', tr: 'Yunuslar' } },
+  { key: 'tigers', mode: 'mixed', icon: 'tiger', sizing: { groupCount: DEFAULT_GROUP_COUNT }, name: { en: 'Tigers', tr: 'Kaplanlar' } },
+] as const satisfies ReadonlyArray<{ key: string; mode: GroupingMode; icon: OptionIcon; sizing: Sizing; name: { en: string; tr: string } }>;
+/** Keys of the S8 defaults (five arrangements), kept in older contexts as history. */
+export const LEGACY_DEFAULT_KEYS = ['level-groups', 'level-pairs', 'mixed-a', 'mixed-b', 'mixed-pairs'] as const;
+
+/** Group n (1-based) as a neutral name in both languages; the classroom shows it with its number. */
+export const groupName = (n: number) => ({ en: `Group ${n}`, tr: `Grup ${n}` });
 
 export const GroupRole = z.object({ studentId: z.string(), label: LocalizedText });
 export const SavedGroup = z.object({
@@ -107,6 +119,7 @@ export const GroupTemplate = z.object({
   /** Rules this arrangement breaks, with reasons (GRP-8). */
   unsatisfied: z.array(UnsatisfiedRule),
   defaultKey: z.string().nullable(),
+  icon: z.enum(OPTION_ICONS).nullable(),
   archived: z.boolean(),
   updatedAt: z.number(),
 });
@@ -130,6 +143,8 @@ export type PairRule = z.infer<typeof PairRule>;
 
 export const GroupingOverview = z.object({
   contextId: z.string(),
+  /** true while the context uses no S13a default option yet ("Use the 4 default options", D-098). */
+  canUseNewDefaults: z.boolean(),
   templates: z.array(GroupTemplate),
   students: z.array(TeacherGroupingStudent),
   rules: z.array(PairRule),
@@ -163,6 +178,7 @@ export const createGroupTemplate = endpoint({
     name: RequiredLocalizedText,
     mode: GroupingMode,
     sizing: Sizing,
+    icon: z.enum(OPTION_ICONS).nullable().optional(),
     /** Required for mode 'custom' (hand-made groups); ignored otherwise. */
     groups: z.array(GroupInput).max(MAX_GROUPS).optional(),
   }),
@@ -193,9 +209,22 @@ export const updateGroupTemplate = endpoint({
     name: RequiredLocalizedText.optional(),
     mode: GroupingMode.optional(),
     sizing: Sizing.optional(),
+    icon: z.enum(OPTION_ICONS).nullable().optional(),
     groups: z.array(GroupInput).max(MAX_GROUPS).optional(),
   }),
   output: GroupTemplate,
+});
+
+/**
+ * "Use the 4 default options" (D-098): contexts made before S13a keep their old arrangements as
+ * history (archived, restorable) and get the four default options.
+ */
+export const useDefaultGroupOptions = endpoint({
+  method: 'POST',
+  path: '/api/teacher/contexts/:contextId/grouping/use-defaults',
+  access: 'teacher',
+  input: z.object({ contextId: Id }),
+  output: GroupingOverview,
 });
 
 export const archiveGroupTemplate = endpoint({
@@ -237,7 +266,7 @@ export const classroomArrangements = endpoint({
   path: '/api/classroom/contexts/:contextId/grouping/arrangements',
   access: 'classroom',
   input: z.object({ contextId: Id }),
-  output: z.object({ arrangements: z.array(z.object({ id: z.string(), name: LocalizedText, groupCount: z.number().int() })) }),
+  output: z.object({ arrangements: z.array(z.object({ id: z.string(), name: LocalizedText, icon: z.enum(OPTION_ICONS).nullable(), groupCount: z.number().int() })) }),
 });
 
 export const DisplayMember = GroupingStudent.extend({ role: LocalizedText.nullable() });
@@ -248,6 +277,12 @@ export type DisplayGroup = z.infer<typeof DisplayGroup>;
 export const GroupingLessonState = z.object({
   applied: z.boolean(),
   arrangementId: z.string().nullable(),
+  /** The live lesson grouping (S13a): Shuffle's undo restores the previous one by id. */
+  groupingId: z.string().nullable(),
+  /** Per-class display option (S13a): names in Turkish-correct upper case. */
+  upperCaseNames: z.boolean(),
+  /** Students here now and in no group (classroom-safe fields), so they can be placed by a tap. */
+  notPlaced: z.array(GroupingStudent),
   groups: z.array(DisplayGroup),
   /** Students of the class who are absent or excused now, so not in a group (count only). */
   excludedCount: z.number().int(),
@@ -264,6 +299,14 @@ export const GroupingCommands = {
   'grouping.apply': z.object({ contextId: Id, lessonId: Id, templateId: Id }),
   /** Take the groups off the display. */
   'grouping.clear': z.object({ contextId: Id, lessonId: Id }),
+  /** S13a: a new seed for the option in use, for the present students (lesson only; undo = restore). */
+  'grouping.shuffle': z.object({ contextId: Id, lessonId: Id }),
+  /** S13a: bring back an earlier grouping of this lesson (Shuffle's undo). */
+  'grouping.restore': z.object({ contextId: Id, lessonId: Id, groupingId: Id }),
+  /** S13a: move one present student to another group of the lesson's groups (tap or drag). */
+  'grouping.move': z.object({ contextId: Id, lessonId: Id, studentId: Id, toGroupId: z.string().min(1).max(64) }),
+  /** S13a: save the lesson's groups into the option (absent students keep their saved group). */
+  'grouping.saveToOption': z.object({ contextId: Id, lessonId: Id }),
 } as const;
 export type GroupingCommandType = keyof typeof GroupingCommands;
 export type GroupingCommandPayload<T extends GroupingCommandType> = z.input<(typeof GroupingCommands)[T]>;

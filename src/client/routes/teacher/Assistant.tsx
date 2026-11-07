@@ -21,6 +21,7 @@ import { useRun } from '../../lib/useRun.ts';
 import { dayLabel } from '../../modules/assistant/AssistantPanel.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
+import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconCalendar, IconNext, IconPlus, IconPrev, IconSwap, IconSync, IconX } from '../../ui/icons.tsx';
@@ -197,6 +198,7 @@ function SettingsTab({ contextId }: { contextId: string }) {
   const q = useQuery({ queryKey: settingsKey(contextId), queryFn: () => call(A.getAssistantSettings, { contextId }) });
   const [days, setDays] = useState<number[] | null>(null);
   const [resp, setResp] = useState<RespDraft[] | null>(null);
+  const locales = useEditorLocales([contextId]);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const curDays = days ?? q.data.schoolDays;
   const curResp = resp ?? q.data.responsibilities.map((r) => ({ key: `r${seq++}`, id: r.id, en: r.label.en ?? '', tr: r.label.tr ?? '' }));
@@ -219,6 +221,12 @@ function SettingsTab({ contextId }: { contextId: string }) {
   };
   return (
     <div className="cc-stack">
+      <Toggle
+        label={t('assistant.showPanelSetting')}
+        description={t('assistant.showPanelSettingHint')}
+        isSelected={q.data.showPanel}
+        onChange={(v) => void run(() => call(A.setAssistantSettings, { contextId, showPanel: v }), { success: t('assistant.toast.settingsSaved'), invalidate: [ALL, ['classroom', 'lesson']] })}
+      />
       <fieldset className="cc-fieldset">
         <legend className="cc-h2">{t('assistant.schoolDays')}</legend>
         <p className="cc-muted">{t('assistant.schoolDaysHint')}</p>
@@ -234,8 +242,7 @@ function SettingsTab({ contextId }: { contextId: string }) {
         <ol className="cc-stack">
           {curResp.map((r, i) => (
             <li key={r.key} className="cc-row" style={{ alignItems: 'flex-end' }}>
-              <TextField label={t('assistant.respEn', { n: i + 1 })} value={r.en} onChange={(v) => setRow(i, { en: v })} maxLength={200} />
-              <TextField label={t('assistant.respTr', { n: i + 1 })} value={r.tr} onChange={(v) => setRow(i, { tr: v })} maxLength={200} />
+              <LangFields label={t('assistant.respN', { n: i + 1 })} value={{ en: r.en, tr: r.tr }} onChange={(v) => setRow(i, { en: v.en ?? '', tr: v.tr ?? '' })} locales={locales} />
               <Button aria-label={t('assistant.respRemove', { n: i + 1 })} onPress={() => setResp(curResp.filter((_, j) => j !== i))}>
                 <IconX />
               </Button>
@@ -290,6 +297,7 @@ function HistoryTab({ contextId }: { contextId: string }) {
           { key: 'actual', header: t('assistant.col.actual'), render: (r) => (r.actual ? <Who s={r.actual} /> : <span className="cc-muted">{t('assistant.asPlanned')}</span>) },
           { key: 'status', header: t('assistant.col.status'), render: (r) => `${t(statusKey(r.status))}${r.reason ? ` – ${reasonText(t, r.reason)}` : ''}${r.absent.length ? ` (${t('assistant.absentNames', { names: r.absent.map((a) => a.fullName).join(', ') })})` : ''}` },
           { key: 'thanked', header: t('assistant.col.thanked'), render: (r) => (r.thanked ? t('common.yes') : t('common.no')) },
+          { key: 'duties', header: t('assistant.col.duties'), render: (r) => (r.duties.length ? r.duties.map((x) => pickText(x.label, locale)).join(', ') : '–') },
         ]}
       />
     </div>

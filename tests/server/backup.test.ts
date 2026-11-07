@@ -102,9 +102,21 @@ describe('backup and restore (OPS-2, OPS-4, ENG-3)', () => {
 
     env = await fileEnv(path.join(dir, 'data'));
     const after = tableCounts(env.db.$client);
-    // backup_runs gains the restore record; everything else is as it was.
+    // backup_runs gains the restored backup's own run, the verification done by the restore and the
+    // restore record (S13a: Maintenance no longer says "never"); everything else is as it was.
     expect({ ...after, backup_runs: 0 }).toEqual({ ...countsBefore, backup_runs: 0 });
-    expect(after.backup_runs).toBe((countsBefore.backup_runs ?? 0) + 1);
+    expect(after.backup_runs).toBe((countsBefore.backup_runs ?? 0) + 3);
+    const runs = env.db.$client.prepare('select kind, status, file_name f, started_at s from backup_runs order by finished_at').all() as Array<{ kind: string; status: string; f: string; s: number }>;
+    const local = runs.find((x) => x.kind === 'local')!;
+    expect(local).toMatchObject({ status: 'ok', f: path.basename(b.file), s: Date.parse(b.manifest.createdAt) });
+    expect(runs.find((x) => x.kind === 'verify')).toMatchObject({ status: 'ok', f: path.basename(b.file) });
+    expect(runs.find((x) => x.kind === 'restore')).toMatchObject({ status: 'ok' });
+    const admin = new Client(env);
+    await admin.login('root.admin');
+    const m = await ok(admin.get('/api/admin/maintenance'));
+    expect(m.lastLocalOk?.fileName).toBe(path.basename(b.file));
+    expect(m.lastVerify?.status).toBe('ok');
+    expect(m.lastRestore?.status).toBe('ok');
     expect(uploadHashes(env.config.uploadsDir)).toEqual(hashesBefore);
   });
 

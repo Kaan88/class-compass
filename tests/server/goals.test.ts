@@ -60,8 +60,8 @@ describe('student page goals (GOL-1, GOL-2, GOL-4, STU-2)', () => {
   it('shows default EN/TR categories and presets; a student chooses a preset, reflects with confidence and adds text evidence', async () => {
     const page = await ok(adaPhone.get('/api/student/page'));
     const goals = goalsSection(page);
-    expect(goals.categories.map((c: any) => c.name.en)).toEqual(['Reading', 'Writing', 'Grammar', 'Vocabulary', 'Listening']);
-    expect(goals.categories.map((c: any) => c.name.tr)).toEqual(['Okuma', 'Yazma', 'Dil bilgisi', 'Kelime bilgisi', 'Dinleme']);
+    expect(goals.categories.map((c: any) => c.name.en)).toEqual(['Reading', 'Writing', 'Grammar', 'Vocabulary', 'Listening', 'Speaking', 'Phonics']);
+    expect(goals.categories.map((c: any) => c.name.tr)).toEqual(['Okuma', 'Yazma', 'Dil bilgisi', 'Kelime bilgisi', 'Dinleme', 'Konuşma', 'Sesletim']);
     expect(goals.presets.length).toBeGreaterThan(4);
     expect(goals.canWrite).toBe(true);
 

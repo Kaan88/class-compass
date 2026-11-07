@@ -11,6 +11,7 @@
  *   preview. Photo and audio evidence follow the admin media flags (D-014).
  */
 import { z } from 'zod';
+import { TOPIC_ICONS } from '../lessons.ts';
 import { LocalizedText, Ok, endpoint } from './define.ts';
 import { Id, IsoDate, QueryBool, RequiredLocalizedText, Theme } from './school.ts';
 
@@ -70,6 +71,8 @@ export const SafeUrl = z.string().trim().min(1).max(2000).refine(isSafeHttpUrl, 
 export const Category = z.object({
   id: z.string(),
   name: LocalizedText,
+  /** Topic icon (S13a lesson topics); null = a generic book. */
+  icon: z.enum(TOPIC_ICONS).nullable(),
   /** null = a default category for every subject. */
   subjectId: z.string().nullable(),
   /** Made by a teacher (editable by that teacher). */
@@ -241,14 +244,14 @@ export const createCategory = endpoint({
   method: 'POST',
   path: '/api/teacher/contexts/:contextId/goal-categories',
   access: 'teacher',
-  input: z.object({ contextId: Id, name: RequiredLocalizedText }),
+  input: z.object({ contextId: Id, name: RequiredLocalizedText, icon: z.enum(TOPIC_ICONS).nullable().optional() }),
   output: Category,
 });
 export const updateCategory = endpoint({
   method: 'PATCH',
   path: '/api/teacher/goal-categories/:categoryId',
   access: 'teacher',
-  input: z.object({ categoryId: Id, name: RequiredLocalizedText.optional(), archived: z.boolean().optional() }),
+  input: z.object({ categoryId: Id, name: RequiredLocalizedText.optional(), icon: z.enum(TOPIC_ICONS).nullable().optional(), archived: z.boolean().optional() }),
   output: Category,
 });
 export const createPreset = endpoint({
@@ -322,6 +325,8 @@ export const StudentPage = z.object({
   student: z.object({ fullName: z.string(), initials: z.string(), avatarHue: z.number().int() }),
   className: z.string().nullable(),
   theme: Theme,
+  /** The class language mode (S13a, D-099): the page is shown in it; the switch only when there are two. */
+  language: z.object({ mainLanguage: z.enum(['en', 'tr']), secondLanguageEnabled: z.boolean() }),
   media: z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean() }),
   subjects: z.array(z.object({ subjectId: z.string(), name: LocalizedText, sections: z.array(StudentPageSection) })),
 });

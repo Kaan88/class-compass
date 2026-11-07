@@ -1,4 +1,5 @@
 /** Grouping (GRP-1..8, DSH-8): saved arrangements, levels, pair rules, groups in the lesson. */
+import { z } from 'zod';
 import { defineServerModule } from '../manifest.ts';
 import { groupingCommands } from './commands.ts';
 import { groupingLessonState, registerGroupingRoutes } from './routes.ts';
@@ -12,4 +13,6 @@ export const groupingManifest = defineServerModule({
   lessonState: [groupingLessonState],
   reports: [{ key: 'groupingHistory', order: 80, build: groupingHistorySection }],
   timeline: [{ key: 'grouping', order: 80, build: groupingTimeline }],
+  // Per class+subject display option (S13a): student names on the group screen in Turkish-correct upper case.
+  config: { schema: z.object({ upperCaseNames: z.boolean() }), defaults: { upperCaseNames: false } },
 });

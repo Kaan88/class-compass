@@ -454,6 +454,7 @@ export async function restoreBackup(opts: {
   try {
     runMigrations(db);
     const after = migrationLevel(db.$client);
+    reRecordRestoredBackup(db, opts.file, manifest, verified, opts.trigger ?? 'cli', opts.now);
     recordRun(db, {
       kind: 'restore',
       trigger: opts.trigger ?? 'cli',
@@ -468,6 +469,24 @@ export async function restoreBackup(opts: {
   } finally {
     db.$client.close();
   }
+}
+
+/**
+ * A restored database was copied before its own backup run (and any verification of it) was written,
+ * so Maintenance would say "never" (S13a housekeeping). Re-record the run of the backup that was
+ * restored, at the time it was made, and the verification the restore just did, unless the restored
+ * `backup_runs` already has them.
+ */
+function reRecordRestoredBackup(db: Db, file: string, manifest: BackupManifest, verified: VerifyResult, trigger: RunRecord['trigger'], now: number) {
+  if (!db.$client.prepare("select 1 from sqlite_master where type = 'table' and name = 'backup_runs'").get()) return;
+  const fileName = path.basename(file);
+  const sizeBytes = fs.statSync(file).size;
+  const made = Date.parse(manifest.createdAt);
+  const has = (kind: string) => Boolean(db.$client.prepare("select 1 from backup_runs where kind = ? and file_name = ? and status = 'ok'").get(kind, fileName));
+  if (!has(manifest.kind) && Number.isFinite(made)) {
+    recordRun(db, { kind: manifest.kind, trigger, status: 'ok', startedAt: made, finishedAt: made, fileName, sizeBytes, details: { uploads: manifest.uploads.count, uploadBytes: manifest.uploads.bytes, recordedOnRestore: true } });
+  }
+  recordRun(db, { kind: 'verify', trigger, status: verified.ok ? 'ok' : 'failed', startedAt: now, finishedAt: Date.now(), fileName, sizeBytes, details: { tables: Object.keys(manifest.tables).length, duringRestore: true } });
 }
 
 // ---------------------------------------------------------------- backup runs

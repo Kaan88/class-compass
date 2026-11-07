@@ -1,17 +1,20 @@
 /**
- * Optional classroom timer (RTN-3, THM-5): big digits, start/pause/reset and a few presets. The
- * countdown is derived from the server state + server clock offset, so every device agrees. When
- * time is up the panel changes once (text + icon, no flashing) and plays one soft tone only if
- * sounds are on for the class AND this device.
+ * Optional classroom timer (RTN-3, THM-5): big digits, start/pause/reset, a few presets and (S13a)
+ * "Set time": a big mm:ss keypad for any time up to 3 hours. The countdown is derived from the
+ * server state + server clock offset, so every device agrees. When time is up the panel changes once
+ * (text + icon, no flashing), plays one soft tone only if sounds are on for the class AND this
+ * device, and calls the time's-up handlers (`onTimeUp`, the S13b voice/chime hook).
  */
 import { useEffect, useRef, useState } from 'react';
-import { formatTimer, remainingAt } from '../../../domain/timer.ts';
+import { formatTimer, MAX_TIMER_MS, remainingAt } from '../../../domain/timer.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import { useDisplay } from '../../lib/display.ts';
 import { playThemeSound, useTheme } from '../../themes/index.tsx';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
-import { IconBack, IconClock, IconPause, IconPlay } from '../../ui/icons.tsx';
+import { DialogActions, Modal } from '../../ui/Dialog.tsx';
+import { IconBack, IconBackspace, IconCheck, IconClock, IconPause, IconPlay } from '../../ui/icons.tsx';
+import { emitTimeUp } from '../classroomHooks.ts';
 import { patchLesson, sendLessonCommand, serverNow } from './lessonClient.ts';
 import { pauseTimer, resetTimer, setTimer, startTimer } from '../../../domain/timer.ts';
 
@@ -19,8 +22,72 @@ const PRESETS_MIN = [1, 3, 5, 10, 15];
 /** A run that ended at most this long ago still gets its tone when the screen first shows it. */
 const RECENT_END_MS = 3_000;
 
-export function LessonTimer({ lesson }: { lesson: LessonState }) {
+/** Keypad digits → milliseconds: the last two digits are seconds, the ones before are minutes ("130" = 1:30). */
+export function keypadMs(digits: string): number {
+  const d = digits.replace(/\D/g, '').slice(-4);
+  const sec = Number(d.slice(-2) || '0');
+  const min = Number(d.slice(0, -2) || '0');
+  return (min * 60 + sec) * 1000;
+}
+const keypadText = (digits: string) => {
+  const d = digits.padStart(4, '0').slice(-4);
+  return `${d.slice(0, 2)}:${d.slice(2)}`;
+};
+
+function TimerKeypad({ isOpen, onOpenChange, onSet }: { isOpen: boolean; onOpenChange: (v: boolean) => void; onSet: (ms: number) => void }) {
   const { t } = useI18n();
+  const [digits, setDigits] = useState('');
+  const ms = keypadMs(digits);
+  const valid = ms >= 1000 && ms <= MAX_TIMER_MS;
+  const press = (k: string) => setDigits((d) => (d + k).replace(/^0+/, '').slice(0, 4));
+  const close = (v: boolean) => {
+    if (!v) setDigits('');
+    onOpenChange(v);
+  };
+  return (
+    <Modal isOpen={isOpen} onOpenChange={close} title={t('timer.setTitle')} testId="timer-keypad">
+      <output className="cc-keypad__display" aria-live="polite" aria-label={t('timer.keypadValue')} data-testid="timer-keypad-value">
+        {keypadText(digits)}
+      </output>
+      <p className="cc-muted">{t('timer.keypadHint')}</p>
+      <div className="cc-keypad" role="group" aria-label={t('timer.keypad')}>
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((k) => (
+          <Button key={k} size="big" onPress={() => press(k)}>
+            {k}
+          </Button>
+        ))}
+        <Button size="big" onPress={() => setDigits('')}>
+          {t('timer.keypadClearShort')}
+        </Button>
+        <Button size="big" onPress={() => press('0')}>
+          0
+        </Button>
+        <Button size="big" onPress={() => setDigits((d) => d.slice(0, -1))} aria-label={t('timer.keypadBack')}>
+          <IconBackspace />
+        </Button>
+      </div>
+      {!valid && digits ? <p className="cc-muted">{t('timer.keypadRange')}</p> : null}
+      <DialogActions>
+        <Button onPress={() => close(false)}>{t('common.cancel')}</Button>
+        <Button
+          variant="primary"
+          isDisabled={!valid}
+          onPress={() => {
+            onSet(ms);
+            close(false);
+          }}
+        >
+          <IconCheck />
+          {t('timer.setTime')}
+        </Button>
+      </DialogActions>
+    </Modal>
+  );
+}
+
+export function LessonTimer({ lesson, compact = false }: { lesson: LessonState; compact?: boolean }) {
+  const { t, locale } = useI18n();
+  const [keypad, setKeypad] = useState(false);
   const display = useDisplay();
   const theme = useTheme();
   const timer = lesson.timer;
@@ -45,15 +112,19 @@ export function LessonTimer({ lesson }: { lesson: LessonState }) {
     signalled.current = runKey;
     const endedAt = (timer.startedAt ?? 0) + timer.remainingMs;
     // One soft tone of the class theme, only if the class and this device allow sounds (D-048, THM-5).
-    if (watched.current === runKey || serverNow() - endedAt <= RECENT_END_MS) playThemeSound(display, theme, 'timerEnd');
-  }, [finished, runKey, timer.running, timer.startedAt, timer.remainingMs, display, theme]);
+    if (watched.current === runKey || serverNow() - endedAt <= RECENT_END_MS) {
+      playThemeSound(display, theme, 'timerEnd');
+      emitTimeUp({ lesson, display, locale });
+    }
+  }, [finished, runKey, timer.running, timer.startedAt, timer.remainingMs, display, theme, lesson, locale]);
 
   const ref = { contextId: lesson.contextId, lessonId: lesson.id };
   const apply = (fn: (tm: LessonState['timer']) => LessonState['timer']) => patchLesson(lesson.contextId, (l) => ({ ...l, timer: fn(l.timer) }));
 
+  const titleId = compact ? 'cc-timer-title-compact' : 'cc-timer-title';
   return (
-    <section className="cc-card cc-stack cc-timer" data-finished={finished ? '' : undefined} aria-labelledby="cc-timer-title">
-      <h2 id="cc-timer-title" className="cc-h2 cc-row">
+    <section className="cc-card cc-stack cc-timer" data-compact={compact ? '' : undefined} data-finished={finished ? '' : undefined} aria-labelledby={titleId} data-testid={compact ? 'timer-compact' : 'timer'}>
+      <h2 id={titleId} className="cc-h2 cc-row">
         <IconClock />
         {t('timer.title')}
       </h2>
@@ -117,7 +188,19 @@ export function LessonTimer({ lesson }: { lesson: LessonState }) {
             {t('timer.minutes', { count: m })}
           </Button>
         ))}
+        <Button size="small" onPress={() => setKeypad(true)} aria-pressed={!timer.running && !PRESETS_MIN.some((m) => timer.durationMs === m * 60_000)}>
+          <IconClock />
+          {t('timer.setTime')}
+        </Button>
       </div>
+      <TimerKeypad
+        isOpen={keypad}
+        onOpenChange={setKeypad}
+        onSet={(ms) => {
+          apply(() => setTimer(ms));
+          void sendLessonCommand('lesson.timer.set', { ...ref, durationMs: ms });
+        }}
+      />
     </section>
   );
 }

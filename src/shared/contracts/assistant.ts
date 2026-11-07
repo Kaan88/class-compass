@@ -23,6 +23,10 @@ export const AssistantToday = z.object({
   assistant: AssistantStudent.nullable(),
   responsibilities: z.array(Responsibility),
   thanked: z.boolean(),
+  /** Responsibilities ticked today for today's assistant (S13a, D-100). */
+  checked: z.array(z.string()),
+  /** Class+subject default: is the assistant panel shown on the dashboard (S13a)? A lesson may override it. */
+  showPanel: z.boolean(),
 });
 export type AssistantToday = z.infer<typeof AssistantToday>;
 
@@ -112,7 +116,11 @@ export const overrideAssistant = endpoint({
   output: AssistantPlan,
 });
 
-export const AssistantSettings = z.object({ schoolDays: z.array(z.number().int().min(0).max(6)).min(1).max(7) });
+export const AssistantSettings = z.object({
+  schoolDays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  /** Show the assistant panel on the classroom dashboard by default (S13a); each lesson can hide/show it. */
+  showPanel: z.boolean(),
+});
 export const getAssistantSettings = endpoint({
   method: 'GET',
   path: '/api/teacher/contexts/:contextId/assistant/settings',
@@ -127,6 +135,7 @@ export const setAssistantSettings = endpoint({
   input: z.object({
     contextId: Id,
     schoolDays: AssistantSettings.shape.schoolDays.optional(),
+    showPanel: z.boolean().optional(),
     /** Replaces the list: kept ids are updated and reordered, missing ones archived (never deleted). */
     responsibilities: z.array(z.object({ id: Id.optional(), label: RequiredLocalizedText })).max(12).optional(),
   }),
@@ -151,6 +160,8 @@ export const assistantHistory = endpoint({
         status: AssistantStatus,
         reason: z.string().nullable(),
         thanked: z.boolean(),
+        /** Responsibilities ticked that day (S13a, D-100), as labelled now. */
+        duties: z.array(z.object({ id: z.string(), label: LocalizedText })),
       }),
     ),
   }),
@@ -158,3 +169,11 @@ export const assistantHistory = endpoint({
 
 /** End Lesson step 'assistantThanks' (optional): thank today's assistant. */
 export const AssistantEndStepInput = z.object({ thanked: z.boolean().default(false) });
+
+/** Classroom commands (POST /api/commands), lesson-scoped (S13a, D-100). */
+export const AssistantCommands = {
+  /** Tick (or untick) a responsibility for today's assistant. */
+  'assistant.checkDuty': z.object({ contextId: Id, lessonId: Id, responsibilityId: Id, checked: z.boolean() }),
+} as const;
+export type AssistantCommandType = keyof typeof AssistantCommands;
+export type AssistantCommandPayload<T extends AssistantCommandType> = z.input<(typeof AssistantCommands)[T]>;

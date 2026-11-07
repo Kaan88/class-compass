@@ -36,12 +36,14 @@ const setLevels = () => ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/levels
 const count = (sql: string) => (env.db.$client.prepare(sql).get() as { n: number }).n;
 
 describe('default arrangements (GRP-1, GRP-2)', () => {
-  it('creates five saved arrangements (two by level, three mixed) once per class+subject, never again after archiving', async () => {
+  it('creates the four default options (Lions/Eagles by level, Dolphins/Tigers mixed; Group 1–5) once per class+subject, never again after archiving (GRP-1 as changed, D-098)', async () => {
     const o = await overview();
-    expect(o.templates).toHaveLength(5);
-    expect(o.templates.map((t: any) => t.defaultKey)).toEqual(['level-groups', 'level-pairs', 'mixed-a', 'mixed-b', 'mixed-pairs']);
-    expect(o.templates.filter((t: any) => t.mode === 'level')).toHaveLength(2);
-    expect(o.templates.filter((t: any) => t.mode === 'mixed')).toHaveLength(3);
+    expect(o.templates).toHaveLength(4);
+    expect(o.templates.map((t: any) => t.defaultKey)).toEqual(['lions', 'eagles', 'dolphins', 'tigers']);
+    expect(o.templates.map((t: any) => t.name.en)).toEqual(['Lions', 'Eagles', 'Dolphins', 'Tigers']);
+    expect(o.templates.map((t: any) => t.icon)).toEqual(['lion', 'eagle', 'dolphin', 'tiger']);
+    expect(o.templates.map((t: any) => t.mode)).toEqual(['level', 'level', 'mixed', 'mixed']);
+    expect(o.canUseNewDefaults).toBe(false);
     // Arrangements, not groups: each makes several groups covering the whole class.
     for (const t of o.templates) {
       expect(t.groups.length).toBeGreaterThan(1);
@@ -49,21 +51,20 @@ describe('default arrangements (GRP-1, GRP-2)', () => {
       const sizes = t.groups.map((g: any) => g.memberIds.length);
       expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1); // GRP-8 uneven sizes
     }
-    expect(o.templates[0].groups).toHaveLength(3);
-    expect(o.templates[1].groups.map((g: any) => g.memberIds.length).sort()).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 3]); // 19 in pairs: one trio
-    // Child-friendly names with icons (GRP-6).
-    expect(o.templates[0].groups[0].name).toEqual({ en: 'Foxes', tr: 'Tilkiler' });
-    expect(o.templates[0].groups[0].icon).toBeTruthy();
+    for (const t of o.templates) expect(t.groups.map((g: any) => g.memberIds.length).sort()).toEqual([3, 4, 4, 4, 4]); // 19 in 5 groups
+    // Neutral group names "Group 1…5" with a number icon (S13a; GRP-6).
+    expect(o.templates[0].groups.map((g: any) => g.name.en)).toEqual(['Group 1', 'Group 2', 'Group 3', 'Group 4', 'Group 5']);
+    expect(o.templates[0].groups[0]).toMatchObject({ name: { en: 'Group 1', tr: 'Grup 1' }, icon: 'g1' });
 
     await overview();
     await ok(s.teacherA.get(`/api/classroom/contexts/${ctx()}/grouping/arrangements`));
-    expect(count("select count(*) n from group_templates")).toBe(5);
+    expect(count("select count(*) n from group_templates")).toBe(4);
     expect(count("select count(*) n from audit_events where action = 'grouping.defaults_created'")).toBe(1);
 
-    await ok(s.teacherA.post(`/api/teacher/grouping/templates/${o.templates[4].id}/archive`, { archived: true }));
-    expect((await overview()).templates).toHaveLength(4);
-    expect((await ok(s.teacherA.get(`/api/teacher/contexts/${ctx()}/grouping?includeArchived=1`))).templates).toHaveLength(5);
-    expect(count('select count(*) n from group_templates')).toBe(5);
+    await ok(s.teacherA.post(`/api/teacher/grouping/templates/${o.templates[3].id}/archive`, { archived: true }));
+    expect((await overview()).templates).toHaveLength(3);
+    expect((await ok(s.teacherA.get(`/api/teacher/contexts/${ctx()}/grouping?includeArchived=1`))).templates).toHaveLength(4);
+    expect(count('select count(*) n from group_templates')).toBe(4);
   });
 
   it('teachers create, regenerate, change type/size and archive their own arrangements', async () => {
@@ -116,7 +117,7 @@ describe('manual edits, names and roles (GRP-3, GRP-6)', () => {
     const copy = await ok(s.teacherA.post(`/api/teacher/contexts/${ctx()}/grouping/templates`, { name: { en: 'My groups' }, mode: 'custom', sizing: { groupCount: 3 }, groups }));
     expect(copy.mode).toBe('custom');
     expect(copy.groups.map((g: any) => g.memberIds)).toEqual(edited.groups.map((g: any) => g.memberIds));
-    expect((await overview()).templates).toHaveLength(6);
+    expect((await overview()).templates).toHaveLength(5);
   });
 });
 
@@ -128,20 +129,21 @@ describe('roster changes (GRP-1, GRP-3, review fixes)', () => {
     expect((await ok(s.teacherA.get(`/api/classroom/contexts/${c.id}/grouping/arrangements`))).arrangements).toEqual([]);
     for (const fullName of ['Ali Can', 'Bora Er', 'Cansu Ak', 'Doruk Su', 'Eda Ay', 'Ferit Ok', 'Gül Tan', 'Harun Gök', 'Işıl Nur']) await addStudent(s.teacherA, t.id, { fullName });
     const o = await ok(s.teacherA.get(`/api/teacher/contexts/${c.id}/grouping`));
-    expect(o.templates).toHaveLength(5);
-    const three = o.templates.find((x: any) => x.defaultKey === 'level-groups');
+    expect(o.templates).toHaveLength(4);
+    const three = await ok(s.teacherA.post(`/api/teacher/contexts/${c.id}/grouping/templates`, { name: { en: 'Three' }, mode: 'level', sizing: { groupCount: 3 } }));
     expect(three.groups.map((g: any) => g.memberIds.length)).toEqual([3, 3, 3]);
     const lessonId = await startLesson(s.teacherA, c.id, { othersPresent: true });
     expect((await cmd(s.teacherA, 'grouping.apply', { contextId: c.id, lessonId, templateId: three.id })).ok).toBe(true);
     expect((await lessonState(s.teacherA, c.id)).grouping.groups).toHaveLength(3);
     // A default saved without members (made by an earlier version while the class was empty) is used by
     // its type and size in the lesson, and filled in on the next read without changing its names.
-    env.db.$client.prepare("update group_templates set groups_json = '[]' where id = ?").run(three.id);
-    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: c.id, lessonId, templateId: three.id })).ok).toBe(true);
-    expect((await lessonState(s.teacherA, c.id)).grouping.groups.map((g: any) => g.members.length)).toEqual([3, 3, 3]);
-    const again = (await ok(s.teacherA.get(`/api/teacher/contexts/${c.id}/grouping`))).templates.find((x: any) => x.id === three.id);
-    expect(again.groups.map((g: any) => g.memberIds.length)).toEqual([3, 3, 3]);
-    expect(again.name).toEqual(three.name);
+    const lions = o.templates.find((x: any) => x.defaultKey === 'lions');
+    env.db.$client.prepare("update group_templates set groups_json = '[]' where id = ?").run(lions.id);
+    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: c.id, lessonId, templateId: lions.id })).ok).toBe(true);
+    expect((await lessonState(s.teacherA, c.id)).grouping.groups.map((g: any) => g.members.length).sort()).toEqual([1, 2, 2, 2, 2]);
+    const again = (await ok(s.teacherA.get(`/api/teacher/contexts/${c.id}/grouping`))).templates.find((x: any) => x.id === lions.id);
+    expect(again.groups.map((g: any) => g.memberIds.length).sort()).toEqual([1, 2, 2, 2, 2]);
+    expect(again.name).toEqual(lions.name);
   });
 
   it('an arrangement stays editable after one of its students leaves the class', async () => {
@@ -197,7 +199,7 @@ describe('groups in a lesson (GRP-5, GRP-7, DSH-8)', () => {
     const lessonId = await startLesson(s.teacherA, ctx(), { othersPresent: true });
     for (const k of kids.slice(0, 2)) expect((await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: k.id, status: 'absent' })).ok).toBe(true);
     const arr = await ok(s.teacherA.get(`/api/classroom/contexts/${ctx()}/grouping/arrangements`));
-    const mixed = arr.arrangements.find((x: any) => x.name.en === 'Teams A');
+    const mixed = arr.arrangements.find((x: any) => x.name.en === 'Dolphins');
     const before = env.db.$client.prepare('select * from group_templates where id = ?').get(mixed.id);
     const r = await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: mixed.id });
     expect(r.ok).toBe(true);
@@ -215,7 +217,7 @@ describe('groups in a lesson (GRP-5, GRP-7, DSH-8)', () => {
     const replay = await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: mixed.id }, { opId: r.opId });
     expect(replay.replayed).toBe(true);
     expect(count('select count(*) n from lesson_groupings')).toBe(1);
-    const pairs = arr.arrangements.find((x: any) => x.name.en === 'Pairs B');
+    const pairs = arr.arrangements.find((x: any) => x.name.en === 'Tigers');
     expect((await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: pairs.id })).ok).toBe(true);
     expect(count('select count(*) n from lesson_groupings where cleared_at is null')).toBe(1);
     // A student marked absent later disappears from the display without re-applying.
@@ -258,8 +260,8 @@ describe('groups in a lesson (GRP-5, GRP-7, DSH-8)', () => {
 
   it('a pairs arrangement with absent partners makes no "pair" of one; a late arrival is counted as not in a group yet (GRP-5, review fix)', async () => {
     const lessonId = await startLesson(s.teacherA, ctx(), { othersPresent: true });
-    const o = await overview();
-    const pairs = o.templates.find((t: any) => t.defaultKey === 'mixed-pairs');
+    await overview();
+    const pairs = await ok(s.teacherA.post(`/api/teacher/contexts/${ctx()}/grouping/templates`, { name: { en: 'Pairs' }, mode: 'mixed', sizing: { targetSize: 2 } }));
     // One member of each of four pairs is absent.
     const away = pairs.groups.slice(0, 4).map((g: any) => g.memberIds[0]);
     for (const id of away) expect((await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: id, status: 'absent' })).ok).toBe(true);

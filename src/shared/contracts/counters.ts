@@ -92,6 +92,8 @@ export const CountersLessonState = z.object({
   weekStart: z.string(),
   weekEnd: z.string(),
   counters: z.array(CounterLessonState),
+  /** Per class+subject (S13a): show the English-reminder boxes on student cards (hidden by default). */
+  showReminderBoxes: z.boolean(),
 });
 export type CountersLessonState = z.infer<typeof CountersLessonState>;
 

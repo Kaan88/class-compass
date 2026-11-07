@@ -68,6 +68,11 @@ function TempPasswordDialog({ value, onClose }: { value: { login: string; passwo
   );
 }
 
+const LOCALE_ITEMS = (t: ReturnType<typeof useI18n>['t']) => [
+  { id: 'en', label: t('language.en') },
+  { id: 'tr', label: t('language.tr') },
+];
+
 function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean; onOpenChange: (v: boolean) => void; onCreated: (login: string, password: string) => void }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -75,6 +80,7 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'teacher' | 'admin'>('teacher');
+  const [locale, setLocale] = useState<'en' | 'tr' | ''>('');
   const [error, setError] = useState<string | null>(null);
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange} title={t('users.create')}>
@@ -83,12 +89,17 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
         onSubmit={async (e) => {
           e.preventDefault();
           setError(null);
+          if (!locale) {
+            setError(t('users.localeRequired'));
+            return;
+          }
           try {
-            const r = await call(Admin.createUserByAdmin, { login, displayName: name, email: email.trim() || null, role });
+            const r = await call(Admin.createUserByAdmin, { login, displayName: name, email: email.trim() || null, role, locale });
             void qc.invalidateQueries({ queryKey: USERS });
             setLogin('');
             setName('');
             setEmail('');
+            setLocale('');
             onOpenChange(false);
             onCreated(r.user.login, r.temporaryPassword);
           } catch (err) {
@@ -108,6 +119,7 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
             { id: 'admin', label: t('role.admin') },
           ]}
         />
+        <Select label={t('users.locale')} description={t('users.localeHint')} value={locale} placeholder={t('users.localePick')} onChange={(v) => setLocale(v === 'tr' ? 'tr' : 'en')} items={LOCALE_ITEMS(t)} />
         {error ? <Alert>{error}</Alert> : null}
         <DialogActions>
           <Button onPress={() => onOpenChange(false)}>{t('common.cancel')}</Button>
@@ -125,12 +137,14 @@ function EditUserDialog({ user, onClose }: { user: AdminUser | null; onClose: ()
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [locale, setLocale] = useState<'en' | 'tr'>('en');
   const [error, setError] = useState<string | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   if (user && loadedFor !== user.id) {
     setLoadedFor(user.id);
     setName(user.displayName);
     setEmail(user.email ?? '');
+    setLocale(user.locale);
     setError(null);
   }
   return (
@@ -150,7 +164,7 @@ function EditUserDialog({ user, onClose }: { user: AdminUser | null; onClose: ()
           e.preventDefault();
           if (!user) return;
           try {
-            await call(Admin.updateUserByAdmin, { userId: user.id, displayName: name, email: email.trim() || null });
+            await call(Admin.updateUserByAdmin, { userId: user.id, displayName: name, email: email.trim() || null, locale });
             void qc.invalidateQueries({ queryKey: USERS });
             setLoadedFor(null);
             onClose();
@@ -161,6 +175,7 @@ function EditUserDialog({ user, onClose }: { user: AdminUser | null; onClose: ()
       >
         <TextField label={t('users.displayName')} value={name} onChange={setName} isRequired />
         <TextField label={t('users.emailOptional')} type="email" value={email} onChange={setEmail} />
+        <Select label={t('users.locale')} description={t('users.localeEditHint')} value={locale} onChange={(v) => setLocale(v === 'tr' ? 'tr' : 'en')} items={LOCALE_ITEMS(t)} />
         {error ? <Alert>{error}</Alert> : null}
         <DialogActions>
           <Button onPress={onClose}>{t('common.cancel')}</Button>

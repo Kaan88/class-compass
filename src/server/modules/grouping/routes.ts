@@ -19,6 +19,7 @@ export function registerGroupingRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.generateGroupTemplate, (ctx, input) => svc.generateTemplate(ctx, input));
   route(app, deps, C.updateGroupTemplate, (ctx, input) => svc.updateTemplate(ctx, input));
   route(app, deps, C.archiveGroupTemplate, (ctx, input) => svc.archiveTemplate(ctx, input));
+  route(app, deps, C.useDefaultGroupOptions, (ctx, input) => svc.useDefaultOptions(ctx, input.contextId));
   route(app, deps, C.createPairRule, (ctx, input) => svc.createRule(ctx, input));
   route(app, deps, C.updatePairRule, (ctx, input) => svc.updateRule(ctx, input));
   route(app, deps, C.removePairRule, (ctx, input) => svc.removeRule(ctx, input.ruleId));

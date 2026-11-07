@@ -4,7 +4,7 @@ import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
 import { getClass } from '../school/policy.ts';
 import type { LessonStateContributor } from '../lessons/service.ts';
-import { isModuleEnabled } from '../school/modules.ts';
+import { isModuleEnabled, moduleConfig } from '../school/modules.ts';
 import * as svc from './service.ts';
 
 // Counter bars and weekly counts ride on the polled lesson state (D-045, CNT-2/3).
@@ -14,7 +14,7 @@ export const countersLessonState: LessonStateContributor = {
     if (!isModuleEnabled(ctx.db, context.id, 'counters')) return 'off';
     // First use in an English class+subject creates the English preset (CNT-1).
     svc.ensureDefaultCounters(ctx, context, getClass(ctx.db, context.classId));
-    return svc.countersStamp(ctx.db, context.id);
+    return `${svc.countersStamp(ctx.db, context.id)}:${moduleConfig(ctx.db, context.id, 'counters').showReminderBoxes === true ? 'b' : 'n'}`;
   },
   body: (ctx, context, lesson) => {
     if (!lesson || !isModuleEnabled(ctx.db, context.id, 'counters')) return null;

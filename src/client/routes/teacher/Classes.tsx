@@ -19,6 +19,7 @@ import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { ThemePreview } from '../../ui/ThemePreview.tsx';
 import { settingsPanelFor } from '../../modules/registry.ts';
+import { ClassLanguageSelect } from '../../ui/ClassLanguageSelect.tsx';
 
 export const moduleLabelKey = (m: string) => `module.${m}` as MessageKey;
 
@@ -59,6 +60,23 @@ export function ClassSettingsPage() {
             onChange={setSelected}
             items={list.map((c) => ({ id: c.id, label: `${c.className} · ${pickText(c.subjectName, locale)}` }))}
           />
+          <section className="cc-card cc-stack" aria-labelledby="cc-class-language" data-testid="class-language">
+            <h2 id="cc-class-language" className="cc-h2">
+              {t('classLanguage.title')}
+            </h2>
+            <p className="cc-muted">{t('classLanguage.teacherHint', { cls: ctx.className })}</p>
+            <ClassLanguageSelect
+              value={ctx}
+              onChange={(v) =>
+                void call(School.setClassLanguage, { classId: ctx.classId, ...v })
+                  .then(() => {
+                    void qc.invalidateQueries({ queryKey: ['classroom', 'contexts'] });
+                    showToast({ message: t('save.saved'), kind: 'success' });
+                  })
+                  .catch((err: unknown) => showToast({ message: errorText(t, err), kind: 'error' }))
+              }
+            />
+          </section>
           <section className="cc-card cc-stack">
             <h2 className="cc-h2">{t('teacher.modules')}</h2>
             <p className="cc-muted">{t('teacher.modulesHint')}</p>

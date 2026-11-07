@@ -43,7 +43,7 @@ import { newId } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { rosterWithAttendance } from '../attendance/service.ts';
 import { getActiveLesson, lessonForCommand, updateLesson } from '../lessons/service.ts';
-import { assertModuleEnabled, isModuleEnabled } from '../school/modules.ts';
+import { assertModuleEnabled, isModuleEnabled, moduleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, effectiveTimezone, getClass, getSchoolSettings, getYear, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { rosterRowsOn } from '../students/service.ts';
 
@@ -341,7 +341,7 @@ export function countersLessonState(ctx: RequestContext, context: ContextRow, cl
             }),
     };
   });
-  return { weekStart, weekEnd: weekEndOf(weekStart), counters: list };
+  return { weekStart, weekEnd: weekEndOf(weekStart), counters: list, showReminderBoxes: moduleConfig(ctx.db, context.id, 'counters').showReminderBoxes === true };
 }
 
 // ---------------------------------------------------------------- commands

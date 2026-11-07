@@ -12,6 +12,8 @@ export const AdminUser = z.object({
   active: z.boolean(),
   hasPin: z.boolean(),
   mustChangePassword: z.boolean(),
+  /** Interface language of the account (S13a, D-099): first sign-in, password change and PIN setup use it. */
+  locale: z.enum(['en', 'tr']),
   createdAt: z.number(),
 });
 
@@ -29,6 +31,8 @@ export const createUserByAdmin = endpoint({
     displayName: z.string().trim().min(1).max(120),
     email: Email.nullable().optional(),
     role: z.enum(['admin', 'teacher']),
+    /** Required in the form (default English); the API falls back to English when it is left out. */
+    locale: z.enum(['en', 'tr']).default('en'),
   }),
   output: z.object({ user: AdminUser, temporaryPassword: z.string() }),
 });
@@ -37,7 +41,7 @@ export const updateUserByAdmin = endpoint({
   method: 'PATCH',
   path: '/api/admin/users/:userId',
   access: 'admin',
-  input: z.object({ userId: Id, displayName: z.string().trim().min(1).max(120).optional(), email: Email.nullable().optional() }),
+  input: z.object({ userId: Id, displayName: z.string().trim().min(1).max(120).optional(), email: Email.nullable().optional(), locale: z.enum(['en', 'tr']).optional() }),
   output: AdminUser,
 });
 

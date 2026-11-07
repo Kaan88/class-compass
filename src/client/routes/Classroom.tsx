@@ -5,6 +5,12 @@
  * date and day in the class timezone. Each context shows its running lesson (resumed from the
  * server after a refresh, reopen or class switch — never a new one, LES-2), the Start Lesson flow,
  * the End Lesson flow or the summary of the lesson just ended.
+ *
+ * S13a: the screen is shown in the class's language (D-099: main language, or the second one when it
+ * is on and picked on this device), with a top bar naming the class on the left, a quote-of-the-day
+ * slot in the centre and the date/time + a weather slot on the right (S13b fills the slots; empty
+ * slots are not rendered), and a Compact / Normal / Large size control remembered per device and
+ * teacher (D-103).
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
@@ -14,8 +20,9 @@ import * as School from '../../shared/contracts/school.ts';
 import { DEFAULT_THEME } from '../../shared/themes.ts';
 import { formatDate, type MessageKey } from '../../shared/i18n/index.ts';
 import { call } from '../lib/api.ts';
+import { useClassLocale, useDensity } from '../lib/classroomPrefs.ts';
 import { setDisplay, useDisplay } from '../lib/display.ts';
-import { useI18n } from '../lib/i18n.tsx';
+import { I18nProvider, useI18n } from '../lib/i18n.tsx';
 import { useOutboxStatus } from '../lib/outbox-client.ts';
 import { useMe } from '../lib/session.ts';
 import { classLabel, LessonDashboard } from '../modules/lessons/Dashboard.tsx';
@@ -26,7 +33,8 @@ import { BigButton, Button, buttonClass } from '../ui/Button.tsx';
 import { EmptyState, OutboxAttentionTray, OutboxSaveBadge, registerCommandDescription } from '../ui/Feedback.tsx';
 import { Toggle } from '../ui/Fields.tsx';
 import { IconLock, IconPlay } from '../ui/icons.tsx';
-import { ClassBanner, ClassSwitcher } from '../ui/Layout.tsx';
+import { ClassSwitcher } from '../ui/Layout.tsx';
+import { ClassroomTopBar } from '../ui/ClassroomTopBar.tsx';
 
 const ACTIVE_KEY = 'cc.activeContext';
 const readActive = () => {
@@ -69,6 +77,13 @@ const COMMAND_TEXT: Record<string, MessageKey> = {
   'secret.recordOutcome': 'command.secret.outcome',
   'grouping.apply': 'command.grouping.apply',
   'grouping.clear': 'command.grouping.clear',
+  'grouping.shuffle': 'command.grouping.shuffle',
+  'grouping.restore': 'command.grouping.restore',
+  'grouping.move': 'command.grouping.move',
+  'grouping.saveToOption': 'command.grouping.saveToOption',
+  'lesson.setTopics': 'command.lesson.setTopics',
+  'lesson.setDisplay': 'command.lesson.setDisplay',
+  'assistant.checkDuty': 'command.assistant.checkDuty',
 };
 
 /**
@@ -85,16 +100,41 @@ type Mode =
 export const classroomContextsKey = ['classroom', 'contexts'] as const;
 
 export function ClassroomPage() {
+  const me = useMe();
+  const { locale: own } = useI18n();
+  const contexts = useQuery({ queryKey: classroomContextsKey, queryFn: () => call(School.myContexts, {}), enabled: Boolean(me?.hasPin) });
+  const [activeId, setActiveId] = useState<string | null>(readActive);
+  const list = useMemo(() => contexts.data?.contexts ?? [], [contexts.data]);
+  const active = list.find((c) => c.id === activeId) ?? list[0] ?? null;
+  // The classroom speaks the class's language (D-099), not the teacher's own preference.
+  const [classLocale, setClassLocale] = useClassLocale(active?.classId ?? null, active);
+  return (
+    <I18nProvider locale={classLocale ?? own}>
+      <ClassroomScreen contexts={contexts} list={list} active={active} setActiveId={setActiveId} onLocale={setClassLocale} />
+    </I18nProvider>
+  );
+}
+
+function ClassroomScreen({
+  contexts,
+  list,
+  active,
+  setActiveId,
+  onLocale,
+}: {
+  contexts: { isLoading: boolean; isSuccess: boolean };
+  list: School.MyContext[];
+  active: School.MyContext | null;
+  setActiveId: (id: string) => void;
+  onLocale: (l: 'en' | 'tr') => void;
+}) {
   const { t, locale } = useI18n();
   const me = useMe();
   const navigate = useNavigate();
   const display = useDisplay();
   const now = useNow();
   const qc = useQueryClient();
-  const contexts = useQuery({ queryKey: classroomContextsKey, queryFn: () => call(School.myContexts, {}), enabled: Boolean(me?.hasPin) });
-  const [activeId, setActiveId] = useState<string | null>(readActive);
-  const list = useMemo(() => contexts.data?.contexts ?? [], [contexts.data]);
-  const active = list.find((c) => c.id === activeId) ?? list[0] ?? null;
+  const [density, setDensity] = useDensity(me?.id);
 
   const activeLessons = useActiveLessons(Boolean(me?.hasPin));
   const inProgress = useMemo(() => new Set((activeLessons.data?.lessons ?? []).map((l) => l.contextId)), [activeLessons.data]);
@@ -206,29 +246,35 @@ export function ClassroomPage() {
     );
   };
 
+  const tools = (
+    <>
+      <OutboxSaveBadge />
+      <Toggle label={t('classroom.sounds')} isSelected={display.deviceSounds} onChange={(v) => setDisplay({ deviceSounds: v })} />
+      <Button onPress={() => void navigate({ to: '/teacher' })}>
+        <IconLock />
+        {t('classroom.teacherArea')}
+      </Button>
+    </>
+  );
+
   return (
-    <div data-testid="classroom-shell">
-      <div className="cc-topbar">
-        <span className="cc-topbar__title">{t('app.name')}</span>
-        <OutboxSaveBadge />
-        <Toggle label={t('classroom.sounds')} isSelected={display.deviceSounds} onChange={(v) => setDisplay({ deviceSounds: v })} />
-        <Button onPress={() => void navigate({ to: '/teacher' })}>
-          <IconLock />
-          {t('classroom.teacherArea')}
-        </Button>
-      </div>
-      <main className="cc-page cc-page--wide cc-stack">
+    <div data-testid="classroom-shell" className="cc-classroom" data-density={density} lang={locale}>
+      <ClassroomTopBar
+        context={active}
+        dayLabel={active ? formatDate(now, locale, active.timezone, { weekday: 'long' }) : ''}
+        dateLabel={active ? formatDate(now, locale, active.timezone, { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+        timeLabel={active ? formatDate(now, locale, active.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : ''}
+        density={density}
+        onDensity={setDensity}
+        onLocale={onLocale}
+        tools={tools}
+      />
+      <main className="cc-page cc-page--wide cc-stack cc-classroom__main">
         {contexts.isLoading ? <p>{t('common.loading')}</p> : null}
         {contexts.isSuccess && list.length === 0 ? <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} /> : null}
         {active ? (
           <>
             {list.length > 1 ? <ClassSwitcher contexts={list} activeId={active.id} onSwitch={switchTo} inProgress={inProgress} /> : null}
-            <ClassBanner
-              className={active.className}
-              subjectName={active.subjectName}
-              dayLabel={formatDate(now, locale, active.timezone, { weekday: 'long' })}
-              dateLabel={formatDate(now, locale, active.timezone, { day: 'numeric', month: 'long', year: 'numeric' })}
-            />
             <OutboxAttentionTray />
             {body()}
           </>

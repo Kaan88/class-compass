@@ -5,6 +5,8 @@
  *   Rules an arrangement breaks are listed with the reason (GRP-8).
  * - Levels: the subject levels used by level-based arrangements (GRP-3). Teacher-only (GRP-7).
  * - Pair rules: should / should not work together, with a private note (GRP-4).
+ * S13a (D-098): the four default options with icons, "Use the 4 default options" for older classes,
+ * and the same tap-to-move editor as the group screen, plus the levels column (teacher-only).
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -23,6 +25,7 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconPlus, IconSync, IconUndo, IconX } from '../../ui/icons.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
+import { GroupPicto, OptionPicto } from '../../ui/pictos.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'grouping'] as const;
@@ -61,9 +64,10 @@ function TeacherGroups({ tpl, byId }: { tpl: GroupTemplate; byId: Map<string, St
         <li key={g.id} className="cc-group">
           <div className="cc-group__head">
             <span className="cc-group__icon" aria-hidden="true">
-              {g.icon}
+              <GroupPicto icon={g.icon} />
             </span>
             <span className="cc-group__name">{pickText(g.name, locale)}</span>
+            <span className="cc-chip">{t('grouping.memberCount', { count: g.memberIds.length })}</span>
           </div>
           <ul className="cc-group__members">
             {g.memberIds.map((id) => {
@@ -112,17 +116,33 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
   const run = useRun();
   const [groups, setGroups] = useState<Draft[]>(() => toDraft(tpl, (id) => byId.has(id)));
   const [copyName, setCopyName] = useState('');
+  // Tap a name, then "Move here" on a group (the same gesture as the classroom group screen, S13a).
+  const [picked, setPicked] = useState<string | null>(null);
   const leftCount = tpl.groups.flatMap((g) => g.memberIds).filter((id) => !byId.has(id)).length;
   const placed = new Set(groups.flatMap((g) => g.memberIds));
   const unplaced = [...byId.values()].filter((s) => !placed.has(s.id));
-  const move = (studentId: string, to: number) =>
+  const move = (studentId: string, to: number) => {
+    setPicked(null);
     setGroups((gs) => gs.map((g, i) => ({ ...g, memberIds: i === to ? [...g.memberIds.filter((x) => x !== studentId), studentId] : g.memberIds.filter((x) => x !== studentId) })));
+  };
+  const levelChip = (id: string) => {
+    const level = byId.get(id)?.level;
+    return level ? <span className="cc-chip" data-testid="editor-level">{t('grouping.levelChip', { level })}</span> : null;
+  };
+  const pickButton = (id: string, name: string) => (
+    <Button className="cc-group-member" aria-pressed={picked === id} data-testid="editor-member" onPress={() => setPicked(picked === id ? null : id)}>
+      {name}
+    </Button>
+  );
   const patch = (i: number, fn: (g: Draft) => Draft) => setGroups((gs) => gs.map((g, j) => (j === i ? fn(g) : g)));
   const valid = groups.every((g) => g.name.en.trim() || g.name.tr.trim());
   const groupItems = groups.map((g, i) => ({ id: String(i), label: pickText(g.name, locale) || t('grouping.groupN', { n: i + 1 }) }));
   return (
     <div className="cc-stack" data-testid="grouping-editor">
       {leftCount ? <Alert kind="warning">{t('grouping.leftRemoved', { count: leftCount })}</Alert> : null}
+      <p className="cc-muted" role="status">
+        {picked ? t('grouping.tapGroupFor', { name: byId.get(picked)?.fullName ?? '' }) : t('grouping.editorTapHint')}
+      </p>
       {unplaced.length ? (
         <fieldset className="cc-fieldset cc-stack" data-testid="grouping-unplaced">
           <legend>{t('grouping.unplaced')}</legend>
@@ -130,7 +150,8 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
           <ul className="cc-stack">
             {unplaced.map((s) => (
               <li key={s.id} className="cc-row">
-                <strong>{s.fullName}</strong>
+                {pickButton(s.id, s.fullName)}
+                {levelChip(s.id)}
                 <Select label={t('grouping.moveTo', { name: s.fullName })} items={groupItems} value="" placeholder={t('grouping.chooseGroup')} onChange={(v) => v !== '' && move(s.id, Number(v))} />
               </li>
             ))}
@@ -140,8 +161,13 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
       {groups.map((g, i) => (
         <fieldset key={g.id} className="cc-fieldset cc-stack">
           <legend>
-            <span aria-hidden="true">{g.icon}</span> {groupItems[i]!.label}
+            <GroupPicto icon={g.icon} /> {groupItems[i]!.label} ({t('grouping.memberCount', { count: g.memberIds.length })})
           </legend>
+          {picked && !g.memberIds.includes(picked) ? (
+            <Button variant="primary" data-testid="editor-move-here" onPress={() => move(picked, i)}>
+              {t('grouping.moveHere', { group: groupItems[i]!.label })}
+            </Button>
+          ) : null}
           <div className="cc-row">
             <TextField label={t('grouping.groupNameEn')} value={g.name.en} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, en: v } }))} />
             <TextField label={t('grouping.groupNameTr')} value={g.name.tr} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, tr: v } }))} />
@@ -152,7 +178,8 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
               const role = g.roles[id] ?? { en: '', tr: '' };
               return (
                 <li key={id} className="cc-row">
-                  <strong>{name}</strong>
+                  {pickButton(id, name)}
+                  {levelChip(id)}
                   <Select label={t('grouping.moveTo', { name })} items={groupItems} value={String(i)} onChange={(v) => move(id, Number(v))} />
                   <TextField label={t('grouping.roleEn', { name })} value={role.en} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, en: v } } }))} />
                   <TextField label={t('grouping.roleTr', { name })} value={role.tr} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, tr: v } } }))} />
@@ -194,6 +221,17 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
   );
 }
 
+const OPTION_ICON_KEYS = {
+  lion: 'grouping.icon.lion',
+  eagle: 'grouping.icon.eagle',
+  dolphin: 'grouping.icon.dolphin',
+  tiger: 'grouping.icon.tiger',
+  owl: 'grouping.icon.owl',
+  fox: 'grouping.icon.fox',
+  turtle: 'grouping.icon.turtle',
+  bee: 'grouping.icon.bee',
+} as const satisfies Record<G.OptionIcon, MessageKey>;
+
 function TemplateCard({ tpl, contextId, byId }: { tpl: GroupTemplate; contextId: string; byId: Map<string, Student> }) {
   const { t, locale } = useI18n();
   const run = useRun();
@@ -203,6 +241,7 @@ function TemplateCard({ tpl, contextId, byId }: { tpl: GroupTemplate; contextId:
   return (
     <section className="cc-card cc-stack" aria-label={title} data-testid="arrangement">
       <div className="cc-row">
+        <OptionPicto icon={tpl.icon} size="2rem" />
         <h2 className="cc-h2">{title}</h2>
         <span className="cc-chip">{t(`grouping.mode.${tpl.mode}`)}</span>
         <span className="cc-chip">{sizingText(t, tpl.sizing)}</span>
@@ -223,6 +262,13 @@ function TemplateCard({ tpl, contextId, byId }: { tpl: GroupTemplate; contextId:
                 </Button>
                 <Button onPress={() => setEditing(true)}>{t('grouping.edit')}</Button>
                 <TypeSize tpl={tpl} />
+                <Select
+                  label={t('grouping.optionIcon')}
+                  value={tpl.icon ?? ''}
+                  placeholder={t('grouping.noIcon')}
+                  items={G.OPTION_ICONS.map((i) => ({ id: i, label: t(OPTION_ICON_KEYS[i]) }))}
+                  onChange={(v) => void run(() => call(G.updateGroupTemplate, { templateId: tpl.id, expectedVersion: tpl.version, icon: v ? (v as G.OptionIcon) : null }), { invalidate: [ALL] })}
+                />
               </>
             ) : null}
             <Button className="cc-push-right" onPress={() => void run(() => call(G.archiveGroupTemplate, { templateId: tpl.id, archived: !tpl.archived }), { invalidate: [ALL] })}>
@@ -296,6 +342,7 @@ function NewArrangement({ contextId }: { contextId: string }) {
 
 function ArrangementsTab({ contextId }: { contextId: string }) {
   const { t } = useI18n();
+  const run = useRun();
   const [archived, setArchived] = useState(false);
   const q = useQuery({ queryKey: overviewKey(contextId, archived), queryFn: () => call(G.getGrouping, { contextId, ...(archived ? { includeArchived: '1' as const } : {}) }) });
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
@@ -303,6 +350,16 @@ function ArrangementsTab({ contextId }: { contextId: string }) {
   return (
     <div className="cc-stack">
       <p className="cc-muted">{t('grouping.teacherIntro')}</p>
+      {q.data.canUseNewDefaults ? (
+        <Alert kind="warning">
+          <div className="cc-stack" data-testid="use-default-options">
+            <span>{t('grouping.useDefaultsHint')}</span>
+            <Button variant="primary" onPress={() => void run(() => call(G.useDefaultGroupOptions, { contextId }), { success: t('grouping.toast.defaultsUsed'), invalidate: [ALL] })}>
+              {t('grouping.useDefaults')}
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
       <Toggle label={t('grouping.showArchived')} isSelected={archived} onChange={setArchived} />
       {q.data.templates.map((tpl) => (
         <TemplateCard key={`${tpl.id}.${tpl.version}`} tpl={tpl} contextId={contextId} byId={byId} />

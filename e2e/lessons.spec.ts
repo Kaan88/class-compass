@@ -45,6 +45,12 @@ test('start a lesson with 19 students, resume after refresh, switch classes, off
     // Daily Assistant step (S7, AST-1): who helps today, then the routine.
     await expect(start.getByText(/assistant/i).first()).toBeVisible();
     await start.getByRole('button', { name: 'Next', exact: true }).click();
+    // Today's topic (S13a, D-101): a core step, up to 3 topics.
+    const topicStep = start.getByTestId('topic-step');
+    await expect(topicStep).toBeVisible();
+    await topicStep.getByRole('button', { name: 'Reading' }).click();
+    await expect(topicStep.getByRole('button', { name: 'Reading' })).toHaveAttribute('aria-pressed', 'true');
+    await start.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(start.getByRole('radio').first()).toBeVisible();
     await start.getByRole('button', { name: 'Begin lesson' }).click();
 
@@ -54,6 +60,14 @@ test('start a lesson with 19 students, resume after refresh, switch classes, off
     expect(lessonId).toBeTruthy();
     await expect(page.getByTestId('current-stage')).toContainText('stage 1 of 6');
     await expect(page.getByTestId('lesson-in-progress')).toHaveCount(1);
+    // "Today's focus" shows the chosen topic; it can be changed mid-lesson (lesson.setTopics).
+    const focus = page.getByTestId('todays-focus');
+    await expect(focus).toContainText('Reading');
+    await focus.getByRole('button', { name: 'Change' }).click();
+    const topicDialog = page.getByRole('dialog');
+    await topicDialog.getByRole('button', { name: 'Speaking' }).click();
+    await topicDialog.getByRole('button', { name: 'Save' }).click();
+    await expect(focus).toContainText('Speaking');
 
     // Next stage, then refresh: the same lesson resumes at the same stage (LES-2).
     await page.getByRole('button', { name: 'Next stage' }).click();

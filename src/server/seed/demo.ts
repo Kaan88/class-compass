@@ -193,6 +193,8 @@ export async function seedDemo(deps: AppDeps, opts: SeedOptions = {}): Promise<D
         grade: spec.grade,
         theme: spec.theme,
         timezone: null,
+        mainLanguage: 'en',
+        secondLanguageEnabled: false,
         soundsEnabled: true,
         animationsEnabled: true,
         archivedAt: null,

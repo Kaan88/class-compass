@@ -10,6 +10,7 @@ import { assistantAssignments } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
 import { col, date, days, key, n, NA, NR, scopeIds, student, table } from '../reports/cells.ts';
+import { checksOn } from './duties.ts';
 
 function daysIn(ctx: RequestContext, scope: ReportScope) {
   const end = scope.to < scope.today ? scope.to : scope.today;
@@ -35,6 +36,9 @@ export function assistantSection(ctx: RequestContext, scope: ReportScope): Repor
     return { s, done: done.length, missed, last, inClassDays };
   });
   const filled = rows.filter((r) => who(r) !== null && (!scope.studentId || ids.has(who(r)!))).length;
+  // Duty ticks (S13a, D-100): only those of the day's assistant count.
+  const ticks = checksOn(ctx.db, scope.context.id, rows.map((r) => r.localDate)).filter((c) => rows.some((r) => r.localDate === c.localDate && who(r) === c.studentId) && (!scope.studentId || ids.has(c.studentId)));
+  const daysTicked = new Set(ticks.map((c) => c.localDate)).size;
   return {
     key: 'assistant',
     title: key('report.section.assistant'),
@@ -42,6 +46,8 @@ export function assistantSection(ctx: RequestContext, scope: ReportScope): Repor
     metrics: [
       { key: 'days', label: key('report.assistant.daysWithAssistant'), cell: n(rows.filter((r) => who(r) !== null).length, rows.length) },
       ...(scope.studentId ? [{ key: 'turns', label: key('report.assistant.turns'), cell: n(filled) }] : []),
+      { key: 'dutyDays', label: key('report.assistant.daysWithDuties'), cell: n(daysTicked, filled) },
+      { key: 'duties', label: key('report.assistant.dutiesTicked'), cell: n(ticks.length) },
     ],
     tables: [
       table({
@@ -67,8 +73,11 @@ export function assistantSection(ctx: RequestContext, scope: ReportScope): Repor
 }
 
 export function assistantTimeline(ctx: RequestContext, scope: ReportScope, studentId: string): TimelineEvent[] {
-  return daysIn(ctx, scope).flatMap((r): TimelineEvent[] => {
-    if (who(r) === studentId) return [{ date: r.localDate, at: null, module: 'assistant', what: key('report.timeline.assistant'), detail: null }];
+  const rows = daysIn(ctx, scope);
+  const ticks = checksOn(ctx.db, scope.context.id, rows.map((r) => r.localDate)).filter((c) => c.studentId === studentId);
+  return rows.flatMap((r): TimelineEvent[] => {
+    const done = ticks.filter((c) => c.localDate === r.localDate).length;
+    if (who(r) === studentId) return [{ date: r.localDate, at: null, module: 'assistant', what: key('report.timeline.assistant'), detail: done ? key('report.timeline.assistantDuties', { count: done }) : null }];
     if (r.absentStudentIds.includes(studentId)) return [{ date: r.localDate, at: null, module: 'assistant', what: key('report.timeline.assistantMissed'), detail: null }];
     return [];
   });

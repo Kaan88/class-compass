@@ -156,16 +156,26 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [ ] Production go-live only with explicit owner authorisation
 
 ## S13a Classroom feedback round 1: fixes and classroom flow (owner/teacher feedback 2026-11-07; before S12)
-- [ ] Housekeeping: backup/verify runs survive a restore on the Maintenance page
-- [ ] Bugs: homework check selections apply to students; layout/theme intact when modules are switched off
-- [ ] Grouping redesign: four arrangements (Lions/Eagles level-based, Dolphins/Tigers mixed) giving Group 1–5, Shuffle, tap-to-move, full-screen group screen with the timer, groups on the classroom screen and the dashboard, levels teacher-only (changes GRP-1)
-- [ ] Per-class language mode (`mainLanguage` en|tr, `secondLanguageEnabled`): English only by default, Turkish only, EN+TR, TR+EN for everything class-facing; teacher UI language stays personal
-- [ ] Size/density control and automatic fitting (MacBook Air), usability audit
-- [ ] Lesson topic / skill focus (Listening, Reading, Vocabulary, Grammar, Writing, Speaking, Phonics, custom) with a weekly plan, set at Start Lesson, shown on the display, kept for reports
+- [x] Housekeeping: backup/verify runs survive a restore on the Maintenance page (D-104)
+  - [x] Playwright + axe for teacher Goals, Student links (print cards), teacher Reports, admin Reports, Maintenance, New school year (`e2e/pages-a11y.spec.ts`)
+- [x] Bugs: homework check selections apply to students; layout/theme intact when modules are switched off; students can be moved between groups
+  - [x] Module-off matrix (4 module combinations x 3 themes, screenshots + layout assertions, `e2e/classroom-layout.spec.ts`); not every single module off on its own
+- [x] Grouping redesign: four arrangements (Lions/Eagles level-based, Dolphins/Tigers mixed) giving Group 1–5, Shuffle with undo, tap-to-move and drag-and-drop, Save to option, full-screen group screen with the timer, levels teacher-only, upper-case option, "Use the 4 default options" (D-098)
+- [ ] Per-class language mode (`mainLanguage` en|tr, `secondLanguageEnabled`): English only by default, Turkish only, EN+TR, TR+EN for everything class-facing; teacher UI language stays personal (D-099)
+  - [x] Columns, admin and class-teacher setting, classroom display and student page in the class language, switch only with two languages, isolation tests, account interface language on creation
+  - [x] `LangFields` with "Needs translation" for lesson topics and assistant responsibilities
+  - [ ] `LangFields` in the other label editors (routine stages, counter labels, homework statuses, goal presets, group names); Turkish-only editors still show English fields there
+  - [ ] Seeded defaults written only in the main language (both languages are still seeded; the class language decides which is shown); sample string scan of a Turkish-only display
+- [ ] Size/density control and automatic fitting (MacBook Air), usability audit (D-103, `docs/design/usability-audit-2026-11.md`)
+  - [x] Compact/Normal/Large on the classroom screen (per device + teacher), auto-fit, 19 cards at Normal on 1440x900, no horizontal scroll on the listed displays incl. 4K at 150/200%
+  - [x] Usability audit written; critical and major issues fixed; minor ones listed
+  - [ ] Size control in the teacher area; screenshot matrix for group screen, start/end lesson, teacher menu and admin home
+- [x] Classroom screen: assistant panel hide/show (lesson + class default), duty tick boxes recorded per day (history, reports), reminder boxes off by default, timer keypad, time's-up hook, top bar with quote/weather slots (D-100, D-102)
+- [x] Lesson topic / skill focus (Listening, Reading, Vocabulary, Grammar, Writing, Speaking, Phonics, custom with icon) with a weekly plan, set at Start Lesson, changed mid-lesson, shown on the display, kept for reports, goal/evidence filter (D-101)
 
 ## S13b Classroom feedback round 1: sound, celebrations and data tools
 - [ ] Theme engine v2: sounds, music and celebration sequences (Secret Student countdown + drumroll reveal, clapping + full-screen mascot + fireworks), `docs/THEMING.md`
-- [ ] Timer with any duration and a "Time's up! Time's up!" voice; hideable assistant panel with recorded duty tick boxes; weather (Ankara, Kızılay); quote of the day
+- [ ] Timer with any duration and a "Time's up! Time's up!" voice; hideable assistant panel with recorded duty tick boxes; weather (Ankara, Kızılay); quote of the day (the timer keypad and the assistant ticks/hide were done in S13a; the voice, weather and quote remain)
 - [ ] Importer sheet picker; delete students (remove from class / deactivate / permanent delete); teachers change their class themes; "Add classroom"
 - [ ] Account invite links with the teacher's language; teachers choose password or email-link sign-in (always offered to teachers; admins keep passwords; PIN still required)
 

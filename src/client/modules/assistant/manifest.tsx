@@ -2,7 +2,7 @@
 import { AssistantPage } from '../../routes/teacher/Assistant.tsx';
 import { IconCalendar } from '../../ui/icons.tsx';
 import { defineClientModule } from '../types.ts';
-import { assistantDashboardSlot, assistantEndStepUi, assistantStartStep } from './AssistantPanel.tsx';
+import { assistantDashboardSlot, assistantEndStepUi, assistantInvalidation, assistantStartStep } from './AssistantPanel.tsx';
 
 export const assistantClientManifest = defineClientModule({
   key: 'assistant',
@@ -11,5 +11,6 @@ export const assistantClientManifest = defineClientModule({
   dashboardSlots: [assistantDashboardSlot],
   startSteps: [assistantStartStep],
   endSteps: [assistantEndStepUi],
+  invalidations: [assistantInvalidation],
   teacherPages: [{ key: 'assistant', path: 'assistant', labelKey: 'teacher.assistant', Icon: IconCalendar, order: 70, Component: AssistantPage }],
 });

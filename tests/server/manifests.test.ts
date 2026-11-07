@@ -83,7 +83,7 @@ describe('module config through the manifest schema (CFG-1, CFG-3)', () => {
   it('defaults equal what the services use for a context without config', async () => {
     expect(moduleConfig(env.db, s.ctxA.id, 'secretStudents')).toEqual({ count: 2 });
     expect(await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/secret/settings`))).toEqual({ count: 2 });
-    expect(moduleConfig(env.db, s.ctxA.id, 'assistant')).toEqual({ schoolDays: [1, 2, 3, 4, 5] });
+    expect(moduleConfig(env.db, s.ctxA.id, 'assistant')).toEqual({ schoolDays: [1, 2, 3, 4, 5], showPanel: true });
     expect((await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/assistant/settings`))).schoolDays).toEqual([1, 2, 3, 4, 5]);
   });
 
@@ -156,7 +156,7 @@ describe('report and student-page hooks serve enabled modules only (CFG-2, ACC-1
       ['goals', 'goals'],
       ['homework', 'homework'],
     ]);
-    const sectionsBefore = ['overview', 'attendance', 'counters', 'homework', 'goals', 'lessonReflections', 'studentReflections', 'assistant', 'groupingHistory'];
+    const sectionsBefore = ['overview', 'lessonTopics', 'attendance', 'counters', 'homework', 'goals', 'lessonReflections', 'studentReflections', 'assistant', 'groupingHistory'];
     expect(reportContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(sectionsBefore);
     expect(reportContributions(env.db, s.ctxB.id).map((r) => r.key)).toContain('secretStudents');
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/homework`, { enabled: false }));

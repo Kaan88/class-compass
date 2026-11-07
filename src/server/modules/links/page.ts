@@ -34,6 +34,7 @@ export function studentPage(ctx: RequestContext): StudentPage {
     student: { fullName: scope.student.fullName, initials: initials(scope.student.fullName), avatarHue: scope.student.avatarHue },
     className: scope.classes.length ? scope.classes.map((c) => c.name).join(', ') : null,
     theme: scope.classes[0]?.theme ?? DEFAULT_THEME,
+    language: { mainLanguage: scope.classes[0]?.mainLanguage ?? 'en', secondLanguageEnabled: scope.classes[0]?.secondLanguageEnabled ?? false },
     media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments },
     subjects: subjects.filter((s) => s.sections.length > 0),
   };

@@ -10,6 +10,7 @@
 import { and, eq, isNull, or, type SQL } from 'drizzle-orm';
 import { DEFAULT_GOAL_OUTCOMES, OutcomeSet, type Category, type GoalLibrary, type OutcomeDef, type Preset } from '../../../shared/contracts/goals.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
+import type { TopicIcon } from '../../../shared/lessons.ts';
 import type { Db } from '../../db/client.ts';
 import { goalPresets, skillCategories } from '../../db/schema.ts';
 import { moduleConfig } from '../school/modules.ts';
@@ -17,9 +18,10 @@ import { moduleConfig } from '../school/modules.ts';
 export type CategoryRow = typeof skillCategories.$inferSelect;
 export type PresetRow = typeof goalPresets.$inferSelect;
 
-const DEFAULTS: Array<{ id: string; name: LocalizedTextValue; presets: Array<{ id: string; text: LocalizedTextValue }> }> = [
+const DEFAULTS: Array<{ id: string; name: LocalizedTextValue; icon: TopicIcon; presets: Array<{ id: string; text: LocalizedTextValue }> }> = [
   {
     id: '00000000-0000-7000-8000-00000000c001',
+    icon: 'book',
     name: { en: 'Reading', tr: 'Okuma' },
     presets: [
       { id: '00000000-0000-7000-8000-00000000d011', text: { en: 'I will read a short book every week.', tr: 'Her hafta kısa bir kitap okuyacağım.' } },
@@ -28,6 +30,7 @@ const DEFAULTS: Array<{ id: string; name: LocalizedTextValue; presets: Array<{ i
   },
   {
     id: '00000000-0000-7000-8000-00000000c002',
+    icon: 'pen',
     name: { en: 'Writing', tr: 'Yazma' },
     presets: [
       { id: '00000000-0000-7000-8000-00000000d021', text: { en: 'I will write three sentences about my day.', tr: 'Günümle ilgili üç cümle yazacağım.' } },
@@ -36,11 +39,13 @@ const DEFAULTS: Array<{ id: string; name: LocalizedTextValue; presets: Array<{ i
   },
   {
     id: '00000000-0000-7000-8000-00000000c003',
+    icon: 'grammar',
     name: { en: 'Grammar', tr: 'Dil bilgisi' },
     presets: [{ id: '00000000-0000-7000-8000-00000000d031', text: { en: 'I will use "is" and "are" correctly.', tr: '"is" ve "are"yı doğru kullanacağım.' } }],
   },
   {
     id: '00000000-0000-7000-8000-00000000c004',
+    icon: 'words',
     name: { en: 'Vocabulary', tr: 'Kelime bilgisi' },
     presets: [
       { id: '00000000-0000-7000-8000-00000000d041', text: { en: 'I will learn five new words every week.', tr: 'Her hafta beş yeni kelime öğreneceğim.' } },
@@ -49,22 +54,38 @@ const DEFAULTS: Array<{ id: string; name: LocalizedTextValue; presets: Array<{ i
   },
   {
     id: '00000000-0000-7000-8000-00000000c005',
+    icon: 'ear',
     name: { en: 'Listening', tr: 'Dinleme' },
     presets: [{ id: '00000000-0000-7000-8000-00000000d051', text: { en: 'I will listen to an English song and find three words.', tr: 'İngilizce bir şarkı dinleyip üç kelime bulacağım.' } }],
+  },
+  // S13a (D-101): Speaking and Phonics join the defaults, also as lesson topics.
+  {
+    id: '00000000-0000-7000-8000-00000000c006',
+    icon: 'speech',
+    name: { en: 'Speaking', tr: 'Konuşma' },
+    presets: [{ id: '00000000-0000-7000-8000-00000000d061', text: { en: 'I will answer a question in English in every lesson.', tr: 'Her derste bir soruyu İngilizce yanıtlayacağım.' } }],
+  },
+  {
+    id: '00000000-0000-7000-8000-00000000c007',
+    icon: 'letters',
+    name: { en: 'Phonics', tr: 'Sesletim' },
+    presets: [{ id: '00000000-0000-7000-8000-00000000d071', text: { en: 'I will practise two letter sounds every day.', tr: 'Her gün iki harf sesi çalışacağım.' } }],
   },
 ];
 
 /** Create the default categories and presets once (idempotent; never re-creates archived ones). */
 export function ensureGoalDefaults(db: Db, now: number): void {
   DEFAULTS.forEach((c, i) => {
-    db.insert(skillCategories).values({ id: c.id, subjectId: null, name: c.name, sortOrder: (i + 1) * 10, createdBy: null, archivedAt: null, createdAt: now, updatedAt: now }).onConflictDoNothing().run();
+    db.insert(skillCategories).values({ id: c.id, subjectId: null, name: c.name, icon: c.icon, sortOrder: (i + 1) * 10, createdBy: null, archivedAt: null, createdAt: now, updatedAt: now }).onConflictDoNothing().run();
+    // Rows made before S13a get their topic icon once (never overwriting a chosen one).
+    db.update(skillCategories).set({ icon: c.icon }).where(and(eq(skillCategories.id, c.id), isNull(skillCategories.icon))).run();
     for (const p of c.presets) {
       db.insert(goalPresets).values({ id: p.id, categoryId: c.id, subjectId: null, text: p.text, createdBy: null, archivedAt: null, createdAt: now, updatedAt: now }).onConflictDoNothing().run();
     }
   });
 }
 
-export const categoryDto = (c: CategoryRow): Category => ({ id: c.id, name: c.name, subjectId: c.subjectId, custom: c.createdBy !== null, archived: c.archivedAt !== null });
+export const categoryDto = (c: CategoryRow): Category => ({ id: c.id, name: c.name, icon: (c.icon as Category['icon']) ?? null, subjectId: c.subjectId, custom: c.createdBy !== null, archived: c.archivedAt !== null });
 export const presetDto = (p: PresetRow): Preset => ({ id: p.id, categoryId: p.categoryId, text: p.text, custom: p.createdBy !== null, archived: p.archivedAt !== null });
 
 /** Defaults, plus the custom rows of these teachers for this subject. */

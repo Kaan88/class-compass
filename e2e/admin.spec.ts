@@ -19,6 +19,10 @@ test('create a teacher, show the temporary password once, forced password change
     const dialog = admin.getByRole('dialog');
     await dialog.getByLabel('Username').fill(loginName);
     await dialog.getByLabel('Name', { exact: true }).fill('Ece Örnek (E2E)');
+    // The interface language must be chosen (S13a, D-099).
+    await dialog.getByRole('button', { name: 'New account' }).click();
+    await expect(dialog.getByText('Choose the interface language.')).toBeVisible();
+    await dialog.getByLabel('Interface language').selectOption({ label: 'English' });
     await dialog.getByRole('button', { name: 'New account' }).click();
     const temp = await admin.getByTestId('temp-password').innerText();
     expect(temp.length).toBeGreaterThanOrEqual(10);
@@ -31,6 +35,7 @@ test('create a teacher, show the temporary password once, forced password change
     // The new teacher must change the temporary password first.
     await login(fresh, loginName, temp);
     await expect(fresh).toHaveURL(/\/change-password/);
+    await expect(fresh.locator('html')).toHaveAttribute('lang', 'en');
     await fresh.getByLabel('Current password').fill(temp);
     await fresh.getByLabel('New password', { exact: true }).fill('a-new-e2e-password-123');
     await fresh.getByLabel('Repeat new password').fill('a-new-e2e-password-123');

@@ -5,6 +5,9 @@
  * - Start Lesson step: who helps today;
  * - End Lesson step (optional): thank today's assistant.
  * Plan editing, swaps, overrides and history live in the teacher area (/teacher/assistant).
+ * S13a (D-100): during a lesson each responsibility has a big tick box ('assistant.checkDuty', an
+ * outbox command recorded per day); the panel can be hidden for this lesson ('lesson.setDisplay'),
+ * with a class+subject default in the teacher area.
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -14,19 +17,38 @@ import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import { formatDate, pickText } from '../../../shared/i18n/index.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
+import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts';
+import { queryClient } from '../../lib/queryClient.ts';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
-import { IconCalendar, IconCheck } from '../../ui/icons.tsx';
+import { IconCalendar, IconCheck, IconChevronDown, IconChevronUp } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
-import { useLessonState } from '../lessons/lessonClient.ts';
+import { lessonKey, patchLesson, sendLessonCommand, useLessonState, type LessonQueryData } from '../lessons/lessonClient.ts';
 import { endStepUi, startStep, type ClassroomContext, type DashboardSlot } from '../types.ts';
 
 /** A local calendar date ('YYYY-MM-DD') as a weekday + day label. */
 export const dayLabel = (date: string, locale: 'en' | 'tr', opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }) =>
   formatDate(Date.parse(`${date}T12:00:00Z`), locale, 'UTC', opts);
 
-function TodayCard({ today }: { today: AssistantToday }) {
+/** Listed in the assistant manifest: duty ticks refresh the lesson state. */
+export const assistantInvalidation: CommandInvalidation = {
+  prefix: 'assistant.',
+  keys: (op) => (op.contextId ? [lessonKey(op.contextId)] : [['classroom', 'lesson']]),
+};
+
+async function tickDuty(lesson: LessonState, responsibilityId: string, checked: boolean) {
+  await queryClient.cancelQueries({ queryKey: lessonKey(lesson.contextId) });
+  queryClient.setQueryData<LessonQueryData>(lessonKey(lesson.contextId), (q) => {
+    const a = q?.data.assistant;
+    if (!q || !a) return q;
+    const next = checked ? [...new Set([...a.checked, responsibilityId])] : a.checked.filter((x) => x !== responsibilityId);
+    return { etag: null, data: { ...q.data, assistant: { ...a, checked: next } } };
+  });
+  return getOutbox().enqueue('assistant.checkDuty', { contextId: lesson.contextId, lessonId: lesson.id, responsibilityId, checked }, { contextId: lesson.contextId, lessonId: lesson.id });
+}
+
+function TodayCard({ today, lesson }: { today: AssistantToday; lesson?: LessonState }) {
   const { t, locale } = useI18n();
   if (!today.schoolDay) return <p className="cc-muted">{t('assistant.noSchoolDay')}</p>;
   if (!today.assistant) return <p className="cc-muted">{t('assistant.nobody')}</p>;
@@ -44,7 +66,18 @@ function TodayCard({ today }: { today: AssistantToday }) {
           </span>
         ) : null}
       </div>
-      {today.responsibilities.length ? (
+      {today.responsibilities.length && lesson ? (
+        <ul className="cc-assistant__ticks" aria-label={t('assistant.responsibilities')} data-testid="assistant-duties">
+          {today.responsibilities.map((r) => (
+            <li key={r.id}>
+              <label className="cc-tick">
+                <input type="checkbox" checked={today.checked.includes(r.id)} onChange={(e) => void tickDuty(lesson, r.id, e.target.checked)} />
+                <span>{pickText(r.label, locale)}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : today.responsibilities.length ? (
         <ul className="cc-assistant__jobs" aria-label={t('assistant.responsibilities')}>
           {today.responsibilities.map((r) => (
             <li key={r.id}>{pickText(r.label, locale)}</li>
@@ -90,23 +123,46 @@ function WeekDialog({ context, isOpen, onOpenChange }: { context: ClassroomConte
   );
 }
 
-function AssistantSlot({ context }: { context: ClassroomContext; lesson: LessonState }) {
+function setPanelVisible(lesson: LessonState, visible: boolean) {
+  patchLesson(lesson.contextId, (l) => ({ ...l, display: { ...l.display, assistantVisible: visible } }));
+  void sendLessonCommand('lesson.setDisplay', { contextId: lesson.contextId, lessonId: lesson.id, assistantVisible: visible });
+}
+
+function AssistantSlot({ context, lesson }: { context: ClassroomContext; lesson: LessonState }) {
   const { t } = useI18n();
   const today = useLessonState(context.id).data?.data.assistant ?? null;
   const [weekOpen, setWeekOpen] = useState(false);
   if (!today) return null;
+  // Per-lesson choice first, then the class+subject default (S13a).
+  const visible = lesson.display.assistantVisible ?? today.showPanel;
+  if (!visible) {
+    return (
+      <div className="cc-row">
+        <Button onPress={() => setPanelVisible(lesson, true)} data-testid="assistant-show">
+          <IconChevronDown />
+          {t('assistant.showPanel')}
+        </Button>
+      </div>
+    );
+  }
   return (
     <section className="cc-card cc-stack cc-assistant" aria-labelledby="cc-assistant-title" data-testid="assistant-panel">
       <div className="cc-row">
         <h2 id="cc-assistant-title" className="cc-h2">
           {t('assistant.title')}
         </h2>
-        <Button size="small" className="cc-push-right" onPress={() => setWeekOpen(true)}>
-          <IconCalendar />
-          {t('assistant.thisWeek')}
-        </Button>
+        <div className="cc-row cc-push-right">
+          <Button size="small" onPress={() => setWeekOpen(true)}>
+            <IconCalendar />
+            {t('assistant.thisWeek')}
+          </Button>
+          <Button size="small" onPress={() => setPanelVisible(lesson, false)} data-testid="assistant-hide">
+            <IconChevronUp />
+            {t('assistant.hidePanel')}
+          </Button>
+        </div>
       </div>
-      <TodayCard today={today} />
+      <TodayCard today={today} lesson={lesson} />
       <WeekDialog context={context} isOpen={weekOpen} onOpenChange={setWeekOpen} />
     </section>
   );

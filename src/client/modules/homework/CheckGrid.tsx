@@ -7,6 +7,9 @@
  * - "Mark selected as …" and "Mark all remaining as …" bulk actions; every action shows an 8-second
  *   Undo that restores the previous marks (the server skips a student changed again since);
  * - private notes only in the teacher area (`withNotes`).
+ * S13a (bug 1a, feedback round 1): the bulk bar stays in view (sticky) while the list scrolls, the
+ * whole student row (avatar + name) selects the student, and the classroom dialog is wide, so a
+ * selection made at the bottom of the list can always be applied.
  */
 import { useState } from 'react';
 import type { ClassroomHomeworkCheck, HomeworkCheck, HomeworkStatusDef } from '../../../shared/contracts/homework.ts';
@@ -113,8 +116,12 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
 
   return (
     <div className="cc-stack" data-testid="homework-check">
+      <div className="cc-hw-bulk cc-stack" data-testid="homework-bulk">
       <StatusSummary statuses={statuses} byStatus={check.assignment.counts.byStatus} />
       <div className="cc-row" style={{ alignItems: 'flex-end' }}>
+        <span className="cc-chip" role="status" data-testid="homework-selected">
+          {t('homework.selectedCount', { count: selected.size })}
+        </span>
         <Select label={t('homework.markSelectedAs')} items={items} value={bulkStatus} onChange={setBulkStatus} />
         <Button
           variant="primary"
@@ -143,20 +150,18 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
           {t('homework.applyRemaining')}
         </Button>
       </div>
+      </div>
       {check.attendanceEnabled ? <p className="cc-muted">{t('homework.attendanceOn', { date: check.attendanceDate })}</p> : null}
       <ul className="cc-hw-grid" aria-label={t('homework.gridLabel', { title: check.assignment.title })}>
         {rows.map((r) => (
-          <li key={r.student.id} className="cc-hw-row" data-testid="homework-row" data-reviewed={r.reviewed ? 'yes' : 'no'}>
+          <li key={r.student.id} className="cc-hw-row" data-testid="homework-row" data-reviewed={r.reviewed ? 'yes' : 'no'} data-selected={selected.has(r.student.id) ? '' : undefined}>
             <div className="cc-row">
-              <input
-                type="checkbox"
-                style={{ width: '1.6rem', height: '1.6rem' }}
-                checked={selected.has(r.student.id)}
-                onChange={() => toggle(r.student.id)}
-                aria-label={t('homework.selectStudent', { name: r.student.fullName })}
-              />
-              <Avatar name={r.student.fullName} id={r.student.id} hue={r.student.avatarHue} initials={r.student.initials} size="sm" />
-              <strong>{r.student.fullName}</strong>
+              {/* The whole name area is the selection target (S13a), not only the box. */}
+              <label className="cc-hw-pick">
+                <input type="checkbox" checked={selected.has(r.student.id)} onChange={() => toggle(r.student.id)} aria-label={t('homework.selectStudent', { name: r.student.fullName })} />
+                <Avatar name={r.student.fullName} id={r.student.id} hue={r.student.avatarHue} initials={r.student.initials} size="sm" />
+                <strong>{r.student.fullName}</strong>
+              </label>
               {r.attendance ? <AttendanceChip status={r.attendance} /> : null}
               {!r.enrolled ? <span className="cc-chip">{t('homework.leftClass')}</span> : null}
               <Select

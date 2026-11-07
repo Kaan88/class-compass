@@ -34,6 +34,7 @@ import {
 import { tx, type Db } from '../../db/client.ts';
 import {
   assistantAssignments,
+  assistantDutyChecks,
   attendanceDaily,
   attendanceLessonExceptions,
   classes,
@@ -785,6 +786,7 @@ export const ENROLMENT_HISTORY_TABLES = [
   'counter_events',
   SELECTIONS_TABLE_NAME, // through studentInContextSelections (Secret Student boundary, D-064)
   'assistant_assignments',
+  'assistant_duty_checks',
   'pair_constraints',
   'homework_marks',
   'homework_mark_changes',
@@ -825,6 +827,7 @@ function enrolmentHasHistory(db: Db, e: typeof enrolments.$inferSelect): boolean
     .where(and(inArray(assistantAssignments.contextId, ctxIds), or(eq(assistantAssignments.plannedStudentId, studentId), eq(assistantAssignments.actualStudentId, studentId))))
     .get();
   if (assistant) return true;
+  if (db.select({ id: assistantDutyChecks.id }).from(assistantDutyChecks).where(and(inArray(assistantDutyChecks.contextId, ctxIds), eq(assistantDutyChecks.studentId, studentId))).get()) return true;
   const pair = db
     .select({ id: pairConstraints.id })
     .from(pairConstraints)

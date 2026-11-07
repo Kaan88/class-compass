@@ -24,18 +24,22 @@ export interface ClassroomContext {
   subjectName: { en?: string | undefined; tr?: string | undefined };
   timezone: string;
   modules: Partial<Record<ContextModule, boolean>>;
+  /** Class language mode (S13a, D-099); absent in older callers = English only. */
+  mainLanguage?: 'en' | 'tr';
+  secondLanguageEnabled?: boolean;
 }
 
 /**
- * Where a dashboard slot is shown: `stage` beside the lesson timer (e.g. the routine stepper),
- * `actions` in the button row before End Lesson (e.g. the attendance button), `panels` (default) in
- * the module panel area.
+ * Where a dashboard slot is shown (S13a layout: the student grid is the main area, a side rail holds
+ * the rest): `top` above the student grid (e.g. today's focus), `stage` at the top of the rail before
+ * the timer (e.g. the routine stepper), `actions` in the button row before End Lesson (e.g. the
+ * attendance button), `panels` (default) in the rail below them.
  */
-export type DashboardRegion = 'stage' | 'actions' | 'panels';
+export type DashboardRegion = 'top' | 'stage' | 'actions' | 'panels';
 
 export interface DashboardSlot {
   key: string;
-  module: ContextModule;
+  module: ContextModule | null;
   order: number;
   region?: DashboardRegion;
   /** May render nothing (null) when it has nothing to show for this lesson. */
@@ -54,7 +58,7 @@ export interface StartStepProps<V> {
 
 export interface StartStep<V = unknown> {
   key: string;
-  module: ContextModule;
+  module: ContextModule | null;
   order: number;
   title: MessageKey;
   initial: () => V;
@@ -96,7 +100,7 @@ export interface StudentCardExtras {
  */
 export interface StudentCardAddon {
   key: string;
-  module: ContextModule;
+  module: ContextModule | null;
   /**
    * `summary` is a short line beside the student heading (visible even with the grid closed);
    * `header` is shown above the grid.

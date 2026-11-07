@@ -315,7 +315,7 @@ export function createCategory(ctx: RequestContext, input: In<typeof C.createCat
     const s = scopeOf(ctx, input.contextId);
     assertClassWritable(ctx.db, s.cls);
     const now = ctx.now();
-    const row = { id: newId(), subjectId: s.context.subjectId, name: cleanText(input.name), sortOrder: 1000, createdBy: requireUser(ctx).id, archivedAt: null, createdAt: now, updatedAt: now };
+    const row = { id: newId(), subjectId: s.context.subjectId, name: cleanText(input.name), icon: input.icon ?? null, sortOrder: 1000, createdBy: requireUser(ctx).id, archivedAt: null, createdAt: now, updatedAt: now };
     ctx.db.insert(skillCategories).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'goal_category.create', entity: 'skill_category', entityId: row.id, after: { name: row.name, subjectId: row.subjectId } }, now);
     return categoryDto(row);
@@ -330,6 +330,7 @@ export function updateCategory(ctx: RequestContext, input: In<typeof C.updateCat
     assertLibraryWritable(ctx, c.subjectId, 'Category');
     const patch: Partial<typeof skillCategories.$inferInsert> = { updatedAt: ctx.now() };
     if (input.name) patch.name = cleanText(input.name);
+    if (input.icon !== undefined) patch.icon = input.icon;
     if (input.archived !== undefined) patch.archivedAt = input.archived ? ctx.now() : null;
     ctx.db.update(skillCategories).set(patch).where(eq(skillCategories.id, c.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal_category.update', entity: 'skill_category', entityId: c.id, before: { name: c.name, archived: c.archivedAt !== null }, after: { name: patch.name, archived: input.archived } }, ctx.now());

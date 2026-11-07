@@ -120,6 +120,9 @@ export const SchoolClass = z.object({
   timezone: z.string().nullable(),
   soundsEnabled: z.boolean(),
   animationsEnabled: z.boolean(),
+  /** Class language mode (S13a, D-099). */
+  mainLanguage: Locale,
+  secondLanguageEnabled: z.boolean(),
   archived: z.boolean(),
   yearArchived: z.boolean(),
   studentCount: z.number().int(),
@@ -151,6 +154,8 @@ export const createClass = endpoint({
     timezone: ClassFields.timezone.optional(),
     soundsEnabled: z.boolean().optional(),
     animationsEnabled: z.boolean().optional(),
+    mainLanguage: Locale.optional(),
+    secondLanguageEnabled: z.boolean().optional(),
   }),
   output: SchoolClass,
 });
@@ -166,6 +171,8 @@ export const updateClass = endpoint({
     timezone: ClassFields.timezone.optional(),
     soundsEnabled: z.boolean().optional(),
     animationsEnabled: z.boolean().optional(),
+    mainLanguage: Locale.optional(),
+    secondLanguageEnabled: z.boolean().optional(),
   }),
   output: SchoolClass,
 });
@@ -235,14 +242,30 @@ export const MyContext = z.object({
   timezone: z.string(),
   soundsEnabled: z.boolean(),
   animationsEnabled: z.boolean(),
+  /** Class language mode (S13a, D-099): what the classroom display and the label editors use. */
+  mainLanguage: Locale,
+  secondLanguageEnabled: z.boolean(),
   modules: z.record(ContextModuleKey, z.boolean()),
 });
+export type MyContext = z.infer<typeof MyContext>;
 export const myContexts = endpoint({
   method: 'GET',
   path: '/api/teacher/contexts',
   access: 'classroom',
   input: Empty,
   output: z.object({ contexts: z.array(MyContext), media: z.record(z.enum(MEDIA_MODULES), z.boolean()) }),
+});
+
+/**
+ * Class language mode set by a teacher of the class (S13a, D-099; admins use updateClass). Shared by
+ * every teacher of the class, audited; label data in a language switched off is kept.
+ */
+export const setClassLanguage = endpoint({
+  method: 'PUT',
+  path: '/api/teacher/classes/:classId/language',
+  access: 'teacher',
+  input: z.object({ classId: Id, mainLanguage: Locale, secondLanguageEnabled: z.boolean() }),
+  output: z.object({ classId: z.string(), mainLanguage: Locale, secondLanguageEnabled: z.boolean() }),
 });
 
 export const ContextModuleSetting = z.object({

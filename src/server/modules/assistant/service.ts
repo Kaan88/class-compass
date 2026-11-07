@@ -36,6 +36,7 @@ import type { LessonRow } from '../lessons/endSteps.ts';
 import { isModuleEnabled, mergeModuleConfig, moduleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, getClass, getSchoolSettings, getYear, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { rosterRowsOn } from '../students/service.ts';
+import { checksOn } from './duties.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 type AssignmentRow = typeof assistantAssignments.$inferSelect;
@@ -97,7 +98,7 @@ export function getSettings(ctx: RequestContext, contextId: string) {
   const context = assertOwnsContext(ctx, contextId);
   const cls = getClass(ctx.db, context.classId);
   if (isWritable(ctx.db, cls)) tx(ctx.db, () => ensureResponsibilities(ctx, context));
-  return { schoolDays: schoolDaysOf(ctx.db, context.id), responsibilities: responsibilities(ctx.db, context.id) };
+  return { schoolDays: schoolDaysOf(ctx.db, context.id), showPanel: moduleConfig(ctx.db, context.id, 'assistant').showPanel !== false, responsibilities: responsibilities(ctx.db, context.id) };
 }
 
 const cleanLabel = (t: LocalizedTextValue): LocalizedTextValue => ({ ...(t.en?.trim() ? { en: normaliseName(t.en) } : {}), ...(t.tr?.trim() ? { tr: normaliseName(t.tr) } : {}) });
@@ -114,6 +115,10 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setAssistant
       const days = [...new Set(input.schoolDays)].sort();
       mergeModuleConfig(ctx.db, context.id, 'assistant', { schoolDays: days }, uid, now);
       audit(ctx.db, ctx.actor, { action: 'assistant.settings', entity: 'teaching_context', entityId: context.id, before: { schoolDays: before }, after: { schoolDays: days } }, now);
+    }
+    if (input.showPanel !== undefined) {
+      mergeModuleConfig(ctx.db, context.id, 'assistant', { showPanel: input.showPanel }, uid, now);
+      audit(ctx.db, ctx.actor, { action: 'assistant.settings', entity: 'teaching_context', entityId: context.id, after: { showPanel: input.showPanel } }, now);
     }
     if (input.responsibilities) {
       const before = responsibilities(ctx.db, context.id);
@@ -133,7 +138,7 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setAssistant
       }
       audit(ctx.db, ctx.actor, { action: 'assistant.responsibilities', entity: 'teaching_context', entityId: context.id, before, after: responsibilities(ctx.db, context.id) }, now);
     }
-    return { schoolDays: schoolDaysOf(ctx.db, context.id), responsibilities: responsibilities(ctx.db, context.id) };
+    return { schoolDays: schoolDaysOf(ctx.db, context.id), showPanel: moduleConfig(ctx.db, context.id, 'assistant').showPanel !== false, responsibilities: responsibilities(ctx.db, context.id) };
   });
 }
 
@@ -409,7 +414,16 @@ export function todayDto(ctx: RequestContext, context: ContextRow): AssistantTod
   const { today, schoolDay, row } = ensureToday(ctx, context);
   const who = row ? effective(row) : null;
   const s = who ? studentsById(ctx.db, [who]).get(who) : undefined;
-  return { localDate: today, schoolDay, assistant: s ? studentDto(s) : null, responsibilities: responsibilities(ctx.db, context.id), thanked: Boolean(row?.thankedAt) };
+  const checked = who ? checksOn(ctx.db, context.id, [today]).filter((c) => c.studentId === who).map((c) => c.responsibilityId) : [];
+  return {
+    localDate: today,
+    schoolDay,
+    assistant: s ? studentDto(s) : null,
+    responsibilities: responsibilities(ctx.db, context.id),
+    thanked: Boolean(row?.thankedAt),
+    checked,
+    showPanel: moduleConfig(ctx.db, context.id, 'assistant').showPanel !== false,
+  };
 }
 
 export function todayAssistant(ctx: RequestContext, contextId: string): AssistantToday {
@@ -422,7 +436,9 @@ export function todayAssistant(ctx: RequestContext, contextId: string): Assistan
 export function assistantStamp(ctx: RequestContext, context: ContextRow): string {
   const { row } = ensureToday(ctx, context);
   const resp = responsibilityRows(ctx.db, context.id).map((r) => `${r.id}:${r.updatedAt}`);
-  return sha256(`${row ? `${row.id}:${row.updatedAt}:${effective(row)}:${row.thankedAt}` : '-'}|${resp.join(',')}`).slice(0, 12);
+  const ticks = row ? checksOn(ctx.db, context.id, [row.localDate]).map((c) => `${c.id}:${c.checkedAt}`) : [];
+  const show = moduleConfig(ctx.db, context.id, 'assistant').showPanel !== false;
+  return sha256(`${row ? `${row.id}:${row.updatedAt}:${effective(row)}:${row.thankedAt}` : '-'}|${resp.join(',')}|${ticks.join(',')}|${show}`).slice(0, 12);
 }
 
 /** End Lesson step 'assistantThanks' (optional). */
@@ -672,6 +688,15 @@ export function history(ctx: RequestContext, contextId: string) {
       if (!s.next) s.next = r.localDate;
     }
   }
+  const allResp = new Map(ctx.db.select().from(assistantResponsibilities).where(eq(assistantResponsibilities.contextId, context.id)).all().map((r) => [r.id, r]));
+  const ticks = checksOn(ctx.db, context.id, rows.filter((r) => r.localDate <= today).map((r) => r.localDate));
+  const dutiesOn = (r: AssignmentRow) =>
+    ticks
+      .filter((c) => c.localDate === r.localDate && c.studentId === effective(r))
+      .map((c) => allResp.get(c.responsibilityId))
+      .filter((x): x is NonNullable<typeof x> => Boolean(x))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((x) => ({ id: x.id, label: x.labelJson }));
   return {
     students: sortByName([...stats.entries()].filter(([id]) => byId.has(id)), ([id]) => byId.get(id)!.fullName).map(([id, s]) => ({ student: dto(id)!, turns: s.turns, missed: s.missed, lastDate: s.last, nextDate: s.next })),
     days: rows
@@ -685,6 +710,7 @@ export function history(ctx: RequestContext, contextId: string) {
         status: r.status,
         reason: r.reason,
         thanked: r.thankedAt !== null,
+        duties: dutiesOn(r),
       })),
   };
 }

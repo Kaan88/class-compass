@@ -10,8 +10,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { api, ensurePin, login } from './helpers.ts';
 
 async function context3A(page: Page) {
-  const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; className: string; subjectName: { en: string } }>;
-  return mine.find((c) => c.className === '3-A' && c.subjectName.en === 'English')!.id;
+  const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; classId: string; className: string; subjectName: { en: string } }>;
+  return mine.find((c) => c.className === '3-A' && c.subjectName.en === 'English')!;
 }
 
 async function seriousViolations(page: Page) {
@@ -23,7 +23,10 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
   test.setTimeout(180_000);
   await login(page, 'english');
   await ensurePin(page);
-  const contextId = await context3A(page);
+  const ctx3A = await context3A(page);
+  const contextId = ctx3A.id;
+  const setLanguage = async (mainLanguage: 'en' | 'tr', secondLanguageEnabled: boolean) =>
+    expect((await api(page, 'PUT', `/api/teacher/classes/${ctx3A.classId}/language`, { mainLanguage, secondLanguageEnabled })).status).toBe(200);
   const roster = (await api(page, 'GET', `/api/classroom/contexts/${contextId}/roster`)).body.students as Array<{ id: string; fullName: string }>;
   // One student per project: both projects run against the same demo database.
   const student = roster[test.info().project.name === 'mobile' ? 4 : 3]!;
@@ -86,7 +89,11 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
     expect(duplicateIds).toEqual([]);
     expect(await seriousViolations(p)).toEqual([]);
 
-    // Language switch, remembered on this device only (UX-3/4).
+    // An English-only class (the default, D-099) shows no language switch.
+    await expect(p.getByRole('button', { name: 'Türkçe' })).toHaveCount(0);
+    // With the second language on: the switch, remembered on this device only (UX-3/4).
+    await setLanguage('en', true);
+    await p.reload();
     await p.getByRole('button', { name: 'Türkçe' }).click();
     await expect(p.getByRole('heading', { name: `Merhaba, ${student.fullName}!` })).toBeVisible();
     await p.reload();
@@ -117,6 +124,7 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
     }
   } finally {
     await phone.close();
+    await setLanguage('en', false);
   }
 });
 
@@ -124,7 +132,7 @@ test('a busy server (429) offers "Try again" instead of "this link no longer wor
   test.setTimeout(120_000);
   await login(page, 'english');
   await ensurePin(page);
-  const contextId = await context3A(page);
+  const contextId = (await context3A(page)).id;
   const roster = (await api(page, 'GET', `/api/classroom/contexts/${contextId}/roster`)).body.students as Array<{ id: string; fullName: string }>;
   const student = roster[test.info().project.name === 'mobile' ? 6 : 5]!;
   const url = (await api(page, 'POST', `/api/teacher/students/${student.id}/link`)).body.url as string;

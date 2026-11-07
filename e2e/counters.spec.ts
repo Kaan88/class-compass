@@ -9,6 +9,14 @@ import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { api, ensurePin, login, PIN } from './helpers.ts';
 
+/** The per-student reminder boxes on the cards are off by default since S13a (D-102); this test turns them on. */
+async function setReminderBoxes(page: Page, contextId: string, on: boolean) {
+  const mods = (await api(page, 'GET', `/api/teacher/contexts/${contextId}/modules`)).body.modules as Array<{ module: string; enabled: boolean; config: Record<string, unknown> | null }>;
+  const m = mods.find((x) => x.module === 'counters')!;
+  const r = await api(page, 'PUT', `/api/teacher/contexts/${contextId}/modules/counters`, { enabled: m.enabled, config: { ...(m.config ?? {}), showReminderBoxes: on } });
+  expect(r.status).toBe(200);
+}
+
 async function endActiveLessons(page: Page) {
   const active = await api(page, 'GET', '/api/classroom/lessons/active');
   for (const l of (active.body?.lessons ?? []) as Array<{ contextId: string; lessonId: string }>) {
@@ -32,6 +40,7 @@ test('tap + on students, bar and weekly counts, undo, double tap guard, offline 
   await endActiveLessons(page);
   const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; className: string; subjectName: { en: string } }>;
   const contextId = mine.find((c) => c.className === '3-A' && c.subjectName.en === 'English')!.id;
+  await setReminderBoxes(page, contextId, true);
   const started = await api(page, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'lesson.start', contextId, payload: { contextId } }] });
   expect(started.body.results[0].ok).toBe(true);
   const counter = async (): Promise<CounterState> => {
@@ -133,6 +142,7 @@ test('tap + on students, bar and weekly counts, undo, double tap guard, offline 
   // the weekly history with explicit week ranges (CNT-7).
   expect((await api(page, 'POST', '/api/auth/pin/unlock', { pin: PIN })).status).toBe(200);
   expect((await api(page, 'POST', '/api/classroom/leave')).status).toBe(200);
+  await setReminderBoxes(page, contextId, false);
   await page.goto('/teacher/counters');
   await expect(page.getByTestId('counters-page')).toBeVisible();
   await expect(page.getByTestId('counter-settings').first()).toContainText('Our English Time');

@@ -48,8 +48,12 @@ describe('client module manifests', () => {
     for (const m of CLIENT_MODULES) {
       if (m.policyKey !== null) expect(CONTEXT_MODULES as readonly string[]).toContain(m.policyKey);
       for (const p of [...(m.dashboardSlots ?? []), ...(m.startSteps ?? []), ...(m.studentCardAddons ?? [])]) {
-        expect(CONTEXT_MODULES as readonly string[]).toContain(p.module);
-        if (m.policyKey !== null) expect(p.module, `${m.key}/${p.key}`).toBe(m.policyKey);
+        // A core manifest (policyKey null, e.g. lessons) owns core pieces (module null) that are always on (S13a).
+        if (m.policyKey === null) expect(p.module, `${m.key}/${p.key}`).toBeNull();
+        else {
+          expect(CONTEXT_MODULES as readonly string[]).toContain(p.module);
+          expect(p.module, `${m.key}/${p.key}`).toBe(m.policyKey);
+        }
       }
     }
   });
@@ -90,10 +94,11 @@ describe('classroom pieces come from the manifests (D-069): no module is hard-co
   const ctx = (modules: ClassroomContext['modules']): ClassroomContext => ({ id: 'ctx-1', classId: 'cls-1', className: '3A', subjectName: { en: 'English' }, timezone: 'Europe/Istanbul', modules });
   const allOn = ctx({ attendance: true, routines: true, assistant: true, counters: true, secretStudents: true });
 
-  it('Start Lesson steps: attendance → assistant → routine, only for enabled modules (LES-1)', () => {
-    expect(startStepsFor(allOn).map((s) => s.key)).toEqual(['attendance', 'assistant', 'routine']);
-    expect(startStepsFor(ctx({ routines: true })).map((s) => s.key)).toEqual(['routine']);
-    expect(startStepsFor(ctx({}))).toEqual([]);
+  it('Start Lesson steps: attendance → assistant → topics → routine; module steps only for enabled modules (LES-1, S13a)', () => {
+    expect(startStepsFor(allOn).map((s) => s.key)).toEqual(['attendance', 'assistant', 'topics', 'routine']);
+    expect(startStepsFor(ctx({ routines: true })).map((s) => s.key)).toEqual(['topics', 'routine']);
+    // "Today's topic" is a core step: it is there with every module off.
+    expect(startStepsFor(ctx({})).map((s) => s.key)).toEqual(['topics']);
   });
 
   it('dashboard regions: routine stepper beside the timer, attendance before End Lesson, module panels', () => {
@@ -101,6 +106,8 @@ describe('classroom pieces come from the manifests (D-069): no module is hard-co
     expect(dashboardSlotsFor(allOn, 'actions').map((s) => s.key)).toEqual(['attendance']);
     expect(dashboardSlotsFor(allOn, 'panels').map((s) => s.key)).toEqual(['counters', 'assistant', 'secret']);
     expect([...dashboardSlotsFor(ctx({}), 'stage'), ...dashboardSlotsFor(ctx({}), 'actions'), ...dashboardSlotsFor(ctx({}), 'panels')]).toEqual([]);
+    // The top region holds the core "Today's focus" strip (S13a), on with every module off.
+    expect(dashboardSlotsFor(ctx({}), 'top').map((s) => s.key)).toEqual(['topics']);
   });
 
   it('the lesson screens and the router name no module (no hard-coded attendance, routine or counter pieces)', () => {

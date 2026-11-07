@@ -33,6 +33,7 @@ import { DEFAULT_THEME } from '../../../shared/themes.ts';
 import {
   assertClassWritable,
   assertOwnsContext,
+  assertTeachesClass,
   assertYearWritable,
   enrolmentActiveOn,
   getClass,
@@ -275,6 +276,8 @@ export function classDto(deps: Pick<AppDeps, 'db' | 'now'>, c: ClassRow) {
     timezone: c.timezone,
     soundsEnabled: c.soundsEnabled,
     animationsEnabled: c.animationsEnabled,
+    mainLanguage: c.mainLanguage,
+    secondLanguageEnabled: c.secondLanguageEnabled,
     archived: c.archivedAt !== null,
     yearArchived: y.archivedAt !== null,
     studentCount: activeStudentCount(deps, c),
@@ -316,6 +319,8 @@ export function createClass(ctx: RequestContext, input: In<typeof C.createClass>
       timezone: input.timezone ?? null,
       soundsEnabled: input.soundsEnabled ?? true,
       animationsEnabled: input.animationsEnabled ?? true,
+      mainLanguage: input.mainLanguage ?? 'en',
+      secondLanguageEnabled: input.secondLanguageEnabled ?? false,
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -341,6 +346,8 @@ export function updateClass(ctx: RequestContext, input: In<typeof C.updateClass>
     if (input.timezone !== undefined) patch.timezone = input.timezone;
     if (input.soundsEnabled !== undefined) patch.soundsEnabled = input.soundsEnabled;
     if (input.animationsEnabled !== undefined) patch.animationsEnabled = input.animationsEnabled;
+    if (input.mainLanguage !== undefined) patch.mainLanguage = input.mainLanguage;
+    if (input.secondLanguageEnabled !== undefined) patch.secondLanguageEnabled = input.secondLanguageEnabled;
     ctx.db.update(classes).set({ ...patch, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
     const before = Object.fromEntries(Object.keys(patch).map((k) => [k, c[k as keyof ClassRow]]));
     audit(ctx.db, ctx.actor, { action: 'class.update', entity: 'class', entityId: c.id, before, after: patch }, ctx.now());
@@ -477,11 +484,29 @@ export function myContexts(ctx: RequestContext) {
         timezone: cls.timezone ?? schoolTz,
         soundsEnabled: cls.soundsEnabled,
         animationsEnabled: cls.animationsEnabled,
+        mainLanguage: cls.mainLanguage,
+        secondLanguageEnabled: cls.secondLanguageEnabled,
         modules: Object.fromEntries(states.map((s) => [s.module, s.effective])) as Record<ContextModule, boolean>,
       };
     })
     .sort((a, b) => compareNames(a.className, b.className) || compareNames(subjectSortKey({ name: a.subjectName }), subjectSortKey({ name: b.subjectName })));
   return { contexts, media: mediaRecord(ctx.db) };
+}
+
+/** Class language mode by a teacher of the class (S13a, D-099). Never touches label data. */
+export function setClassLanguage(ctx: RequestContext, input: In<typeof C.setClassLanguage>) {
+  return tx(ctx.db, () => {
+    const c = getClass(ctx.db, input.classId);
+    if (ctx.user?.role !== 'admin') assertTeachesClass(ctx, c.id);
+    assertClassWritable(ctx.db, c);
+    const before = { mainLanguage: c.mainLanguage, secondLanguageEnabled: c.secondLanguageEnabled };
+    const after = { mainLanguage: input.mainLanguage, secondLanguageEnabled: input.secondLanguageEnabled };
+    if (before.mainLanguage !== after.mainLanguage || before.secondLanguageEnabled !== after.secondLanguageEnabled) {
+      ctx.db.update(classes).set({ ...after, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
+      audit(ctx.db, ctx.actor, { action: 'class.language', entity: 'class', entityId: c.id, before, after }, ctx.now());
+    }
+    return { classId: c.id, ...after };
+  });
 }
 
 export function getContextModules(ctx: RequestContext, contextId: string) {

@@ -3,6 +3,7 @@ import * as C from '../../../shared/contracts/lessons.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
 import * as svc from './service.ts';
+import * as topics from './topics.ts';
 
 export function registerLessonRoutes(app: FastifyInstance, deps: AppDeps) {
   // classroom (polling with ETag/304, LES-2)
@@ -19,4 +20,8 @@ export function registerLessonRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.lessonRoutines, (ctx, input) => svc.lessonRoutines(ctx, input.contextId));
   route(app, deps, C.lessonRoster, (ctx, input) => svc.lessonRoster(ctx, input.contextId, input.lessonId));
   route(app, deps, C.lessonSummary, (ctx, input) => svc.lessonSummary(ctx, input.lessonId));
+  // lesson topics (S13a, D-101)
+  route(app, deps, C.classroomTopics, (ctx, input) => topics.classroomTopics(ctx, input.contextId));
+  route(app, deps, C.getTopicPlan, (ctx, input) => topics.getPlan(ctx, input.contextId));
+  route(app, deps, C.setTopicPlan, (ctx, input) => topics.setPlan(ctx, input.contextId, input.plan));
 }

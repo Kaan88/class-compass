@@ -24,6 +24,7 @@ import { Alert } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconCheck } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
+import { ClassLanguageSelect } from '../../ui/ClassLanguageSelect.tsx';
 import { ThemePicker, ThemePreview, themeLabelKey } from '../../ui/ThemePreview.tsx';
 import { moduleLabelKey } from '../teacher/Classes.tsx';
 import { ADMIN } from './Admin.tsx';
@@ -408,6 +409,8 @@ interface ClassDraft {
   timezone: string;
   soundsEnabled: boolean;
   animationsEnabled: boolean;
+  mainLanguage: 'en' | 'tr';
+  secondLanguageEnabled: boolean;
 }
 
 function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; onDone: () => void }) {
@@ -422,6 +425,8 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
     timezone: cls?.timezone ?? '',
     soundsEnabled: cls?.soundsEnabled ?? true,
     animationsEnabled: cls?.animationsEnabled ?? true,
+    mainLanguage: cls?.mainLanguage ?? 'en',
+    secondLanguageEnabled: cls?.secondLanguageEnabled ?? false,
   });
   const [error, setError] = useState<string | null>(null);
   const set = (p: Partial<ClassDraft>) => setD((x) => ({ ...x, ...p }));
@@ -432,7 +437,16 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
         e.preventDefault();
         setError(null);
         const grade = d.grade.trim() === '' ? null : Number(d.grade);
-        const body = { name: d.name, grade, theme: d.theme, timezone: d.timezone.trim() || null, soundsEnabled: d.soundsEnabled, animationsEnabled: d.animationsEnabled };
+        const body = {
+          name: d.name,
+          grade,
+          theme: d.theme,
+          timezone: d.timezone.trim() || null,
+          soundsEnabled: d.soundsEnabled,
+          animationsEnabled: d.animationsEnabled,
+          mainLanguage: d.mainLanguage,
+          secondLanguageEnabled: d.secondLanguageEnabled,
+        };
         try {
           if (cls) await call(S.updateClass, { classId: cls.id, ...body });
           else await call(S.createClass, { schoolYearId: yearId, ...body });
@@ -452,6 +466,7 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
       <ThemePicker label={t('classes.theme')} value={d.theme} onChange={(v) => set({ theme: v })} />
       <ThemePreview theme={d.theme} />
       <TextField label={t('classes.timezone')} description={t('classes.timezoneHint')} value={d.timezone} onChange={(v) => set({ timezone: v })} placeholder="Europe/Istanbul" />
+      <ClassLanguageSelect value={d} onChange={(v) => set(v)} />
       <Toggle label={t('classes.sounds')} isSelected={d.soundsEnabled} onChange={(v) => set({ soundsEnabled: v })} />
       <Toggle label={t('classes.animations')} description={t('classes.animationsHint')} isSelected={d.animationsEnabled} onChange={(v) => set({ animationsEnabled: v })} />
       {error ? <Alert>{error}</Alert> : null}

@@ -27,6 +27,7 @@ import { assertModuleEnabled, isModuleEnabled } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, effectiveTimezone, getClass, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { endStepsFor, type LessonRow } from './endSteps.ts';
 import { defaultTemplateId, resolveRoutine, usableTemplates } from './routines.ts';
+import { plannedTopics, topicSnapshots } from './topics.ts';
 
 type P<T extends keyof typeof LessonCommands> = z.infer<(typeof LessonCommands)[T]>;
 
@@ -55,6 +56,8 @@ export function lessonDto(db: Db, l: LessonRow): LessonState {
     routine: { templateId: l.routineTemplateId, name: l.routineNameJson, stages: l.routineSnapshotJson },
     stageIndex: l.stageIndex,
     timer: l.timerJson,
+    topics: l.topicsJson.map((t) => ({ id: t.id, name: t.name, icon: (t.icon as LessonState['topics'][number]['icon']) ?? null })),
+    display: { assistantVisible: l.displayJson.assistantVisible ?? null },
     endSteps: endStepsFor(db, l.contextId).map((s) => s.key),
   };
 }
@@ -262,6 +265,9 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
     stageIndex: 0,
     timerJson: idleTimer(),
     reflectionJson: null,
+    // Today's topic(s): as chosen on the start screen, otherwise the weekly plan's (S13a, D-101).
+    topicsJson: topicSnapshots(ctx.db, context, p.topicIds ?? plannedTopics(ctx.db, context, today)),
+    displayJson: {},
     version: 1,
     classNameSnapshot: cls.name,
     subjectNameSnapshot: subject?.name ?? {},
@@ -306,6 +312,26 @@ export function setStage(ctx: RequestContext, p: P<'lesson.setStage'>, meta: Com
   if (index === lesson.stageIndex) return { stageIndex: index, version: lesson.version };
   const next = updateLesson(ctx, lesson, { stageIndex: index });
   return { stageIndex: index, version: next.version };
+}
+
+/** 'lesson.setTopics' (S13a): change today's topic(s) during the lesson; snapshots kept (DAT-6). */
+export function setTopics(ctx: RequestContext, p: P<'lesson.setTopics'>, meta: CommandMeta) {
+  const { context, lesson } = lessonForCommand(ctx, p, meta);
+  const topics = topicSnapshots(ctx.db, context, p.topicIds);
+  if (JSON.stringify(topics.map((t) => t.id)) === JSON.stringify(lesson.topicsJson.map((t) => t.id))) return { changed: false, version: lesson.version };
+  const next = updateLesson(ctx, lesson, { topicsJson: topics });
+  audit(ctx.db, ctx.actor, { action: 'lesson.topics', entity: 'lesson', entityId: lesson.id, opId: meta.opId, before: { topics: lesson.topicsJson.map((t) => t.id) }, after: { topics: topics.map((t) => t.id) } }, ctx.now());
+  return { changed: true, version: next.version };
+}
+
+/** 'lesson.setDisplay' (S13a): per-lesson display choices shared by every device of the lesson. */
+export function setDisplay(ctx: RequestContext, p: P<'lesson.setDisplay'>, meta: CommandMeta) {
+  const { lesson } = lessonForCommand(ctx, p, meta);
+  const display = { ...lesson.displayJson };
+  if (p.assistantVisible === null) delete display.assistantVisible;
+  else display.assistantVisible = p.assistantVisible;
+  const next = updateLesson(ctx, lesson, { displayJson: display });
+  return { version: next.version };
 }
 
 export function changeTimer(ctx: RequestContext, p: { contextId: string; lessonId: string }, meta: CommandMeta, fn: (t: TimerState, now: number) => TimerState) {

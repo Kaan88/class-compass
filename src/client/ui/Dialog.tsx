@@ -15,6 +15,8 @@ export function Modal({
   children,
   dismissable = true,
   role = 'dialog',
+  size = 'normal',
+  testId,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -22,10 +24,13 @@ export function Modal({
   children: ReactNode;
   dismissable?: boolean;
   role?: 'dialog' | 'alertdialog';
+  /** 'wide' for grids (homework checking), 'full' for full-screen classroom screens (groups, S13a). */
+  size?: 'normal' | 'wide' | 'full';
+  testId?: string;
 }) {
   return (
-    <ModalOverlay isOpen={isOpen} onOpenChange={onOpenChange} isDismissable={dismissable} isKeyboardDismissDisabled={!dismissable} className="cc-modal-overlay">
-      <RACModal className="cc-modal">
+    <ModalOverlay isOpen={isOpen} onOpenChange={onOpenChange} isDismissable={dismissable} isKeyboardDismissDisabled={!dismissable} className={`cc-modal-overlay cc-modal-overlay--${size}`}>
+      <RACModal className={`cc-modal cc-modal--${size}`} data-testid={testId}>
         <Dialog className="cc-dialog" role={role}>
           <Heading slot="title" className="cc-h2">
             {title}

@@ -73,6 +73,14 @@ export const classes = sqliteTable(
     timezone: text('timezone'),
     soundsEnabled: integer('sounds_enabled', { mode: 'boolean' }).notNull().default(true),
     animationsEnabled: integer('animations_enabled', { mode: 'boolean' }).notNull().default(true),
+    /**
+     * Class language mode (S13a, D-099): the language of everything class-facing (classroom display,
+     * the class's student pages, seeded defaults, label editors). English only by default; the second
+     * language ('tr' when main is 'en' and vice versa) only when enabled. Label data in a language that
+     * is off is kept, never deleted.
+     */
+    mainLanguage: text('main_language', { enum: ['en', 'tr'] }).notNull().default('en'),
+    secondLanguageEnabled: integer('second_language_enabled', { mode: 'boolean' }).notNull().default(false),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -304,9 +312,17 @@ export const contextLessonSettings = sqliteTable('context_lesson_settings', {
   contextId: text('context_id').primaryKey().references(() => teachingContexts.id),
   /** A routine_templates id or DEFAULT_ROUTINE_ID. */
   defaultTemplateId: text('default_template_id').notNull(),
+  /**
+   * Weekly topic plan (S13a, D-101): ISO weekday (1 = Monday … 7) → skill category ids used as the
+   * default lesson topics on that day. Optional; `{}` = no plan.
+   */
+  topicPlanJson: text('topic_plan_json', { mode: 'json' }).$type<Record<string, string[]>>().notNull().default(sql`'{}'`),
   updatedAt: integer('updated_at').notNull(),
   updatedBy: text('updated_by'),
 });
+
+export type LessonTopicJson = { id: string; name: LocalizedText; icon: string | null };
+export type LessonDisplayJson = { assistantVisible?: boolean };
 
 /**
  * Lessons (LES-1..4). At most one ACTIVE lesson per teaching context (DB-enforced). The routine is
@@ -330,6 +346,10 @@ export const lessons = sqliteTable(
     stageIndex: integer('stage_index').notNull().default(0),
     timerJson: text('timer_json', { mode: 'json' }).$type<TimerJson>().notNull(),
     reflectionJson: text('reflection_json', { mode: 'json' }).$type<ReflectionJson>(),
+    /** Today's topic(s) / skill focus (S13a, D-101): category ids with name + icon snapshots (DAT-6). */
+    topicsJson: text('topics_json', { mode: 'json' }).$type<LessonTopicJson[]>().notNull().default(sql`'[]'`),
+    /** Per-lesson display choices (S13a): null = the class default (e.g. the assistant panel shown). */
+    displayJson: text('display_json', { mode: 'json' }).$type<LessonDisplayJson>().notNull().default(sql`'{}'`),
     version: integer('version').notNull().default(1),
     classNameSnapshot: text('class_name_snapshot').notNull(),
     subjectNameSnapshot: text('subject_name_snapshot', { mode: 'json' }).$type<LocalizedText>().notNull(),
@@ -626,6 +646,26 @@ export const assistantResponsibilities = sqliteTable(
   (t) => [index('assistant_responsibilities_context_idx').on(t.contextId)],
 );
 
+/**
+ * Assistant duty ticks (S13a, D-100): one row per context, day, student and responsibility, ticked on
+ * the classroom screen through outbox commands (id = opId of the tick). Unticking sets `uncheckedAt`
+ * (history kept); ticking again revives the row.
+ */
+export const assistantDutyChecks = sqliteTable(
+  'assistant_duty_checks',
+  {
+    id: text('id').primaryKey(),
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    localDate: text('local_date').notNull(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    responsibilityId: text('responsibility_id').notNull().references(() => assistantResponsibilities.id),
+    checkedAt: integer('checked_at').notNull(),
+    checkedBy: text('checked_by').notNull().references(() => users.id),
+    uncheckedAt: integer('unchecked_at'),
+  },
+  (t) => [uniqueIndex('assistant_duty_checks_uq').on(t.contextId, t.localDate, t.studentId, t.responsibilityId), index('assistant_duty_checks_date_idx').on(t.contextId, t.localDate)],
+);
+
 // ---------------------------------------------------------------- grouping (S8)
 export type GroupJson = { id: string; name: LocalizedText; icon: string; memberIds: string[]; roles: Array<{ studentId: string; label: LocalizedText }> };
 export type SizingJson = { groupCount: number } | { targetSize: number };
@@ -650,6 +690,8 @@ export const groupTemplates = sqliteTable(
     groupsJson: text('groups_json', { mode: 'json' }).$type<GroupJson[]>().notNull(),
     unsatisfiedJson: text('unsatisfied_json', { mode: 'json' }).$type<UnsatisfiedJson[]>().notNull(),
     defaultKey: text('default_key'),
+    /** Option icon key (S13a, GRP-1 change: lion, eagle, dolphin, tiger…); null = a generic group icon. */
+    icon: text('icon'),
     sortOrder: integer('sort_order').notNull().default(0),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
@@ -893,6 +935,8 @@ export const skillCategories = sqliteTable(
     id: text('id').primaryKey(),
     subjectId: text('subject_id').references(() => subjects.id),
     name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    /** Simple icon key for lesson topics (S13a, `TOPIC_ICONS`); null = a generic book. */
+    icon: text('icon'),
     sortOrder: integer('sort_order').notNull().default(0),
     createdBy: text('created_by').references(() => users.id),
     archivedAt: integer('archived_at'),

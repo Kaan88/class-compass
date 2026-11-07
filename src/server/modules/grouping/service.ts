@@ -19,7 +19,7 @@ import { evaluateRules, fitToPresent, levelRanks, solveGroups, type PairRule as 
 import type * as C from '../../../shared/contracts/grouping.ts';
 import {
   DEFAULT_ARRANGEMENTS,
-  GROUP_NAME_LIST,
+  groupName,
   type GroupInput,
   type GroupTemplate,
   type GroupingLessonState,
@@ -40,7 +40,7 @@ import { AppError, notFound } from '../../lib/errors.ts';
 import { dailyFor, exceptionsFor } from '../attendance/service.ts';
 import type { LessonRow } from '../lessons/endSteps.ts';
 import { lessonForCommand, updateLesson } from '../lessons/service.ts';
-import { assertModuleEnabled, isModuleEnabled } from '../school/modules.ts';
+import { assertModuleEnabled, isModuleEnabled, moduleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, getClass, getYear, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { rosterRowsOn, type StudentRow } from '../students/service.ts';
 
@@ -69,7 +69,8 @@ function ruleRows(db: Db, contextId: string): RuleRow[] {
 }
 const domainRules = (rows: readonly RuleRow[]): DomainRule[] => rows.map((r) => ({ id: r.id, a: r.studentA, b: r.studentB, kind: r.kind }));
 
-const defaultName = (i: number) => GROUP_NAME_LIST[i % GROUP_NAME_LIST.length]!;
+/** Group n+1: a neutral "Group N" with a number badge (S13a: the cards show 'Group N' + icon + count). */
+const defaultName = (i: number) => ({ name: groupName(i + 1), icon: `g${i + 1}` });
 
 /** Groups for `mode` + `sizing`, keeping the names and icons of `previous` groups by position. */
 function generateGroups(ctx: RequestContext, context: ContextRow, mode: Exclude<GroupingMode, 'custom'>, sizing: Sizing, seed: string, previous: readonly GroupJson[] = []) {
@@ -99,6 +100,7 @@ const toTemplate = (r: TemplateRow): GroupTemplate => ({
   groups: r.groupsJson,
   unsatisfied: r.unsatisfiedJson as GroupTemplate['unsatisfied'],
   defaultKey: r.defaultKey,
+  icon: (r.icon as GroupTemplate['icon']) ?? null,
   archived: r.archivedAt !== null,
   updatedAt: r.updatedAt,
 });
@@ -133,17 +135,48 @@ export function ensureDefaultArrangements(ctx: RequestContext, context: ContextR
       }
       return;
     }
-    const now = ctx.now();
-    DEFAULT_ARRANGEMENTS.forEach((d, i) => {
-      const seed = `${context.id}:${d.key}`;
-      const { groups, unsatisfied } = generateFor(ctx.db, context, roster, d.mode, d.sizing, seed, []);
-      ctx.db
-        .insert(groupTemplates)
-        .values({ id: newId(), contextId: context.id, name: { ...d.name }, mode: d.mode, sizingJson: d.sizing, seed, version: 1, groupsJson: groups, unsatisfiedJson: unsatisfied, defaultKey: d.key, sortOrder: i, archivedAt: null, createdAt: now, createdBy: ctx.user?.id ?? null, updatedAt: now, updatedBy: ctx.user?.id ?? null })
-        .run();
-    });
-    audit(ctx.db, ctx.actor, { action: 'grouping.defaults_created', entity: 'teaching_context', entityId: context.id, after: { count: DEFAULT_ARRANGEMENTS.length } }, now);
+    insertDefaults(ctx, context, roster, 0);
   });
+}
+
+/** The four default options (GRP-1 as changed in S13a, D-098), after `sortFrom` existing rows. */
+function insertDefaults(ctx: RequestContext, context: ContextRow, roster: readonly StudentRow[], sortFrom: number): void {
+  const now = ctx.now();
+  DEFAULT_ARRANGEMENTS.forEach((d, j) => {
+    const i = sortFrom + j;
+    const seed = `${context.id}:${d.key}`;
+    const { groups, unsatisfied } = generateFor(ctx.db, context, roster, d.mode, d.sizing, seed, []);
+    ctx.db
+      .insert(groupTemplates)
+      .values({ id: newId(), contextId: context.id, name: { ...d.name }, mode: d.mode, sizingJson: d.sizing, seed, version: 1, groupsJson: groups, unsatisfiedJson: unsatisfied, defaultKey: d.key, icon: d.icon, sortOrder: i, archivedAt: null, createdAt: now, createdBy: ctx.user?.id ?? null, updatedAt: now, updatedBy: ctx.user?.id ?? null })
+      .run();
+  });
+  audit(ctx.db, ctx.actor, { action: 'grouping.defaults_created', entity: 'teaching_context', entityId: context.id, after: { count: DEFAULT_ARRANGEMENTS.length } }, now);
+}
+
+const NEW_DEFAULT_KEYS = new Set<string>(DEFAULT_ARRANGEMENTS.map((d) => d.key));
+const usesNewDefaults = (rows: readonly TemplateRow[]) => rows.some((r) => r.defaultKey !== null && NEW_DEFAULT_KEYS.has(r.defaultKey));
+
+/**
+ * "Use the 4 default options" (D-098): the context's current arrangements are archived (kept as
+ * history, restorable, lessons keep referring to them) and the four default options are created.
+ * Refused when the context already has them.
+ */
+export function useDefaultOptions(ctx: RequestContext, contextId: string): GroupingOverview {
+  tx(ctx.db, () => {
+    const context = assertOwnsContext(ctx, contextId);
+    const cls = getClass(ctx.db, context.classId);
+    assertClassWritable(ctx.db, cls);
+    assertModuleEnabled(ctx.db, context.id, 'grouping');
+    const rows = templateRows(ctx.db, context.id, true);
+    if (usesNewDefaults(rows)) throw new AppError('CONFLICT', 'The default options are already there', { reason: 'DEFAULTS_ALREADY_USED' });
+    const now = ctx.now();
+    const archived = rows.filter((r) => r.archivedAt === null);
+    for (const r of archived) ctx.db.update(groupTemplates).set({ archivedAt: now, updatedAt: now, updatedBy: requireUser(ctx).id, version: r.version + 1 }).where(eq(groupTemplates.id, r.id)).run();
+    audit(ctx.db, ctx.actor, { action: 'grouping.use_defaults', entity: 'teaching_context', entityId: context.id, after: { archived: archived.length } }, now);
+    insertDefaults(ctx, context, rosterOn(ctx.db, cls, todayFor(ctx, cls)), rows.reduce((m, r) => Math.max(m, r.sortOrder), -1) + 1);
+  });
+  return overview(ctx, contextId, false);
 }
 
 // ---------------------------------------------------------------- teacher area
@@ -155,6 +188,7 @@ export function overview(ctx: RequestContext, contextId: string, includeArchived
   const levels = levelsOf(ctx.db, context.subjectId, roster.map((s) => s.id));
   return {
     contextId: context.id,
+    canUseNewDefaults: !usesNewDefaults(templateRows(ctx.db, context.id, true)),
     templates: templateRows(ctx.db, context.id, includeArchived).map(toTemplate),
     students: roster.map((s) => ({ id: s.id, fullName: s.fullName, initials: initials(s.fullName), avatarHue: s.avatarHue, level: levels.get(s.id) ?? null })),
     rules: ruleRows(ctx.db, context.id).map(toRule),
@@ -218,7 +252,7 @@ export function createTemplate(ctx: RequestContext, input: In<typeof C.createGro
     const id = newId();
     ctx.db
       .insert(groupTemplates)
-      .values({ id, contextId: context.id, name: cleanText(input.name), mode: input.mode, sizingJson: input.sizing, seed, version: 1, groupsJson: groups, unsatisfiedJson: unsatisfied, defaultKey: null, sortOrder: last + 1, archivedAt: null, createdAt: now, createdBy: requireUser(ctx).id, updatedAt: now, updatedBy: requireUser(ctx).id })
+      .values({ id, contextId: context.id, name: cleanText(input.name), mode: input.mode, sizingJson: input.sizing, seed, version: 1, groupsJson: groups, unsatisfiedJson: unsatisfied, defaultKey: null, icon: input.icon ?? null, sortOrder: last + 1, archivedAt: null, createdAt: now, createdBy: requireUser(ctx).id, updatedAt: now, updatedBy: requireUser(ctx).id })
       .run();
     audit(ctx.db, ctx.actor, { action: 'grouping.template_create', entity: 'group_template', entityId: id, after: { name: input.name, mode: input.mode, sizing: input.sizing, groups: groups.length } }, now);
     return toTemplate(ctx.db.select().from(groupTemplates).where(eq(groupTemplates.id, id)).get()!);
@@ -257,6 +291,7 @@ export function updateTemplate(ctx: RequestContext, input: In<typeof C.updateGro
     assertVersion(row, input.expectedVersion);
     const patch: Partial<TemplateRow> = {};
     if (input.name) patch.name = cleanText(input.name);
+    if (input.icon !== undefined) patch.icon = input.icon;
     const mode = input.mode ?? row.mode;
     const sizing = input.sizing ?? row.sizingJson;
     patch.mode = mode;
@@ -350,7 +385,7 @@ export function classroomArrangements(ctx: RequestContext, contextId: string) {
   const context = assertOwnsContext(ctx, contextId);
   assertModuleEnabled(ctx.db, context.id, 'grouping');
   ensureDefaultArrangements(ctx, context);
-  return { arrangements: templateRows(ctx.db, context.id, false).map((r) => ({ id: r.id, name: r.name, groupCount: r.groupsJson.filter((g) => g.memberIds.length > 0).length })) };
+  return { arrangements: templateRows(ctx.db, context.id, false).map((r) => ({ id: r.id, name: r.name, icon: (r.icon as GroupTemplate['icon']) ?? null, groupCount: r.groupsJson.filter((g) => g.memberIds.length > 0).length })) };
 }
 
 /** Students away for this lesson (effective attendance absent / excused). Empty with Attendance off. */
@@ -421,6 +456,122 @@ export function applyGrouping(ctx: RequestContext, p: z.infer<(typeof C.Grouping
   return { groupingId: meta.opId, groups: groups.length, excludedCount: excluded.length, unsatisfiedCount: unsatisfied.length };
 }
 
+/** The live grouping of the lesson or a GROUPS_NOT_SHOWN refusal (S13a commands need groups on the display). */
+function requireLive(db: Db, lessonId: string) {
+  const live = liveGrouping(db, lessonId);
+  if (!live) throw new AppError('CONFLICT', 'No groups are shown in this lesson', { reason: 'GROUPS_NOT_SHOWN' });
+  return live;
+}
+
+function presentStudents(db: Db, lesson: LessonRow) {
+  const away = awayIn(db, lesson);
+  return rosterRowsOn(db, lesson.classId, lesson.localDate)
+    .map((r) => r.student)
+    .filter((st) => !away.has(st.id));
+}
+
+function insertLessonGrouping(ctx: RequestContext, lesson: LessonRow, tpl: TemplateRow, id: string, groups: GroupJson[], unsatisfied: UnsatisfiedJson[]) {
+  const away = awayIn(ctx.db, lesson);
+  const roster = rosterRowsOn(ctx.db, lesson.classId, lesson.localDate).map((r) => r.student.id);
+  const now = ctx.now();
+  ctx.db.update(lessonGroupings).set({ clearedAt: now }).where(and(eq(lessonGroupings.lessonId, lesson.id), isNull(lessonGroupings.clearedAt))).run();
+  ctx.db
+    .insert(lessonGroupings)
+    .values({ id, lessonId: lesson.id, contextId: lesson.contextId, templateId: tpl.id, templateVersion: tpl.version, effectiveGroupsJson: groups, excludedAbsentIds: roster.filter((x) => away.has(x)), unsatisfiedJson: unsatisfied, appliedAt: now, appliedBy: requireUser(ctx).id, clearedAt: null })
+    .run();
+}
+
+/**
+ * 'grouping.shuffle' (S13a): new groups for the option in use from a new seed, for the students present
+ * now; the saved option is not changed. The previous grouping stays in the history so 'grouping.restore'
+ * can undo the shuffle. Id = opId; the seed is derived from it, so a replay is harmless.
+ */
+export function shuffleGrouping(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.shuffle']>, meta: CommandMeta) {
+  const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertModuleEnabled(ctx.db, context.id, 'grouping');
+  const live = requireLive(ctx.db, lesson.id);
+  const tpl = ctx.db.select().from(groupTemplates).where(eq(groupTemplates.id, live.templateId)).get();
+  if (!tpl) throw new AppError('NOT_FOUND', 'Arrangement not found', { reason: 'ARRANGEMENT_NOT_FOUND' });
+  const mode = tpl.mode === 'custom' ? 'mixed' : tpl.mode;
+  const sizing: Sizing = tpl.mode === 'custom' ? { groupCount: Math.max(1, tpl.groupsJson.filter((g) => g.memberIds.length).length) } : tpl.sizingJson;
+  const { groups, unsatisfied } = generateFor(ctx.db, context, presentStudents(ctx.db, lesson), mode, sizing, `shuffle:${meta.opId}`, tpl.groupsJson);
+  const kept = groups.filter((g) => g.memberIds.length > 0);
+  insertLessonGrouping(ctx, lesson, tpl, meta.opId, kept, unsatisfied);
+  updateLesson(ctx, lesson, {});
+  audit(ctx.db, ctx.actor, { action: 'grouping.shuffle', entity: 'lesson', entityId: lesson.id, opId: meta.opId, before: { groupingId: live.id }, after: { templateId: tpl.id, groups: kept.length } }, ctx.now());
+  return { groupingId: meta.opId, previousId: live.id };
+}
+
+/** 'grouping.restore' (S13a): show an earlier grouping of this lesson again (undo of Shuffle). */
+export function restoreGrouping(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.restore']>, meta: CommandMeta) {
+  const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertModuleEnabled(ctx.db, context.id, 'grouping');
+  const row = ctx.db.select().from(lessonGroupings).where(eq(lessonGroupings.id, p.groupingId)).get();
+  if (!row || row.lessonId !== lesson.id) throw new AppError('NOT_FOUND', 'Grouping not found', { reason: 'GROUPING_NOT_FOUND' });
+  if (row.clearedAt === null) return { groupingId: row.id, restored: false };
+  const now = ctx.now();
+  ctx.db.update(lessonGroupings).set({ clearedAt: now }).where(and(eq(lessonGroupings.lessonId, lesson.id), isNull(lessonGroupings.clearedAt))).run();
+  ctx.db.update(lessonGroupings).set({ clearedAt: null }).where(eq(lessonGroupings.id, row.id)).run();
+  updateLesson(ctx, lesson, {});
+  audit(ctx.db, ctx.actor, { action: 'grouping.restore', entity: 'lesson', entityId: lesson.id, opId: meta.opId, after: { groupingId: row.id } }, now);
+  return { groupingId: row.id, restored: true };
+}
+
+/**
+ * 'grouping.move' (S13a): one student into another group of the lesson's groups (tap a student, tap a
+ * group; or drag). Only students of the class who are here now; a student in no group yet (a late
+ * arrival) is placed. Applies to this lesson at once; 'grouping.saveToOption' keeps it for later.
+ */
+export function moveInGrouping(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.move']>, meta: CommandMeta) {
+  const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertModuleEnabled(ctx.db, context.id, 'grouping');
+  const live = requireLive(ctx.db, lesson.id);
+  if (!presentStudents(ctx.db, lesson).some((st) => st.id === p.studentId)) throw new AppError('CONFLICT', 'This student is not here in this lesson', { reason: 'STUDENT_NOT_PRESENT' });
+  const groups = live.effectiveGroupsJson;
+  if (!groups.some((g) => g.id === p.toGroupId)) throw new AppError('NOT_FOUND', 'Group not found', { reason: 'GROUP_NOT_FOUND' });
+  const from = groups.find((g) => g.memberIds.includes(p.studentId))?.id ?? null;
+  if (from === p.toGroupId) return { moved: false, from };
+  const next = groups.map((g) => ({
+    ...g,
+    memberIds: g.id === p.toGroupId ? [...g.memberIds.filter((x) => x !== p.studentId), p.studentId] : g.memberIds.filter((x) => x !== p.studentId),
+    roles: g.id === p.toGroupId ? g.roles : g.roles.filter((r) => r.studentId !== p.studentId),
+  }));
+  const unsatisfied = evaluateRules(next.map((g) => g.memberIds), domainRules(ruleRows(ctx.db, context.id)), { byHand: true }) as UnsatisfiedJson[];
+  ctx.db.update(lessonGroupings).set({ effectiveGroupsJson: next, unsatisfiedJson: unsatisfied }).where(eq(lessonGroupings.id, live.id)).run();
+  updateLesson(ctx, lesson, {});
+  audit(ctx.db, ctx.actor, { action: 'grouping.move', entity: 'lesson', entityId: lesson.id, opId: meta.opId, after: { groupingId: live.id, studentId: p.studentId, from, to: p.toGroupId } }, ctx.now());
+  return { moved: true, from };
+}
+
+/**
+ * 'grouping.saveToOption' (S13a): the lesson's groups become the option's saved groups. Students away
+ * in this lesson keep the group they had in the option; groups made only for the lesson are added.
+ * Bumps the option's version (audited); the option keeps its type, so Shuffle still works.
+ */
+export function saveGroupingToOption(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.saveToOption']>, meta: CommandMeta) {
+  const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertModuleEnabled(ctx.db, context.id, 'grouping');
+  assertClassWritable(ctx.db, getClass(ctx.db, context.classId));
+  const live = requireLive(ctx.db, lesson.id);
+  const tpl = ctx.db.select().from(groupTemplates).where(eq(groupTemplates.id, live.templateId)).get();
+  if (!tpl || tpl.archivedAt !== null) throw new AppError('NOT_FOUND', 'Arrangement not found', { reason: 'ARRANGEMENT_NOT_FOUND' });
+  const inLesson = new Set(live.effectiveGroupsJson.flatMap((g) => g.memberIds));
+  const saved: GroupJson[] = tpl.groupsJson.map((g) => {
+    const lessonGroup = live.effectiveGroupsJson.find((x) => x.id === g.id);
+    const keep = g.memberIds.filter((x) => !inLesson.has(x));
+    const members = [...(lessonGroup?.memberIds ?? []), ...keep];
+    const set = new Set(members);
+    return { ...g, memberIds: members, roles: [...(lessonGroup?.roles ?? []), ...g.roles.filter((r) => keep.includes(r.studentId))].filter((r) => set.has(r.studentId)) };
+  });
+  for (const g of live.effectiveGroupsJson) if (!tpl.groupsJson.some((x) => x.id === g.id)) saved.push({ ...g, id: newId() });
+  const unsatisfied = evaluateRules(saved.map((g) => g.memberIds), domainRules(ruleRows(ctx.db, context.id)), { byHand: true }) as UnsatisfiedJson[];
+  const now = ctx.now();
+  ctx.db.update(groupTemplates).set({ groupsJson: saved, unsatisfiedJson: unsatisfied, version: tpl.version + 1, updatedAt: now, updatedBy: requireUser(ctx).id }).where(eq(groupTemplates.id, tpl.id)).run();
+  audit(ctx.db, ctx.actor, { action: 'grouping.save_to_option', entity: 'group_template', entityId: tpl.id, opId: meta.opId, before: { version: tpl.version, groups: tpl.groupsJson.map((g) => g.memberIds) }, after: { groups: saved.map((g) => g.memberIds) } }, now);
+  updateLesson(ctx, lesson, {});
+  return { templateId: tpl.id, version: tpl.version + 1 };
+}
+
 export function clearGrouping(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.clear']>, meta: CommandMeta) {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
   assertModuleEnabled(ctx.db, context.id, 'grouping');
@@ -441,15 +592,20 @@ export function clearGrouping(ctx: RequestContext, p: z.infer<(typeof C.Grouping
  */
 export function groupingLessonState(db: Db, lesson: LessonRow): GroupingLessonState {
   const live = liveGrouping(db, lesson.id);
-  if (!live) return { applied: false, arrangementId: null, groups: [], excludedCount: 0, notPlacedCount: 0, unsatisfiedCount: 0 };
+  const upperCaseNames = moduleConfig(db, lesson.contextId, 'grouping').upperCaseNames === true;
+  if (!live) return { applied: false, arrangementId: null, groupingId: null, upperCaseNames, notPlaced: [], groups: [], excludedCount: 0, notPlacedCount: 0, unsatisfiedCount: 0 };
   const away = awayIn(db, lesson);
   const ids = [...new Set(live.effectiveGroupsJson.flatMap((g) => g.memberIds))];
   const byId = new Map((ids.length ? db.select().from(students).where(inArray(students.id, ids)).all() : []).map((s) => [s.id, s]));
   const inGroup = new Set(ids);
-  const roster = rosterRowsOn(db, lesson.classId, lesson.localDate).map((r) => r.student.id);
+  const rosterRows = rosterRowsOn(db, lesson.classId, lesson.localDate).map((r) => r.student);
+  const roster = rosterRows.map((st) => st.id);
   return {
     applied: true,
     arrangementId: live.templateId,
+    groupingId: live.id,
+    upperCaseNames,
+    notPlaced: rosterRows.filter((st) => !away.has(st.id) && !inGroup.has(st.id)).map((st) => ({ id: st.id, fullName: st.fullName, initials: initials(st.fullName), avatarHue: st.avatarHue })),
     groups: live.effectiveGroupsJson.map((g) => ({
       id: g.id,
       name: g.name,

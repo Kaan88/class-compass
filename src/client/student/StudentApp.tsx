@@ -23,6 +23,7 @@ import { Avatar } from '../ui/Students.tsx';
 import { ThemeBackdrop, ThemeIllustration } from '../ui/Mascot.tsx';
 import { STUDENT_PAGE_KEY } from './keys.ts';
 import { STUDENT_SECTIONS } from './sections.tsx';
+import { displayLocale, type ClassLanguage } from '../../shared/classLanguage.ts';
 
 const LOCALE_KEY = 'cc.studentLocale';
 
@@ -70,12 +71,13 @@ function LinkGone() {
   );
 }
 
-function Page() {
+function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
   const { t, locale } = useI18n();
   const q = useQuery({ queryKey: STUDENT_PAGE_KEY, queryFn: () => call(studentPage, {}) });
   useEffect(() => {
     if (q.data) setDisplay({ theme: q.data.theme });
-  }, [q.data]);
+    if (q.data) onLanguage(q.data.language);
+  }, [q.data, onLanguage]);
   if (q.error) return q.error instanceof ApiError && q.error.status === 401 ? <LinkGone /> : <p className="cc-page">{t('common.error')}</p>;
   if (!q.data) return <p className="cc-page cc-muted">{t('common.loading')}</p>;
   const page = q.data;
@@ -155,19 +157,25 @@ export function StudentApp({ token, open = openLink }: { token: string | null; o
     setState('opening');
     setAttempt((a) => a + 1);
   }, []);
-  const [locale, setLocale] = useState<Locale>(readStudentLocale);
+  const [chosen, setChosen] = useState<Locale>(readStudentLocale);
+  // The class language decides (S13a, D-099): its main language, or the student's pick when the class has two.
+  const [classLang, setClassLang] = useState<ClassLanguage | null>(null);
+  const locale = classLang ? displayLocale(classLang, chosen) : chosen;
+  useEffect(() => setDisplay({ locale }), [locale]);
   const change = (l: Locale) => {
-    setLocale(l);
+    setChosen(l);
     saveLocale(l);
-    setDisplay({ locale: l });
   };
+  const onLanguage = useCallback((l: ClassLanguage) => setClassLang((old) => (old && old.mainLanguage === l.mainLanguage && old.secondLanguageEnabled === l.secondLanguageEnabled ? old : l)), []);
   return (
     <I18nProvider locale={locale}>
       <ThemeBackdrop />
-      <div className="cc-student__bar">
-        <LanguageSwitch locale={locale} onChange={change} />
-      </div>
-      {state === 'opening' ? null : state === 'invalid' ? <LinkGone /> : state === 'retry' ? <TryAgain onRetry={retry} /> : <Page />}
+      {!classLang || classLang.secondLanguageEnabled ? (
+        <div className="cc-student__bar">
+          <LanguageSwitch locale={locale} onChange={change} />
+        </div>
+      ) : null}
+      {state === 'opening' ? null : state === 'invalid' ? <LinkGone /> : state === 'retry' ? <TryAgain onRetry={retry} /> : <Page onLanguage={onLanguage} />}
       <Toaster />
     </I18nProvider>
   );

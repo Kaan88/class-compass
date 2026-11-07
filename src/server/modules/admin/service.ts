@@ -14,7 +14,6 @@ import { requireUser } from '../../lib/context.ts';
 import { hashPassword, randomToken } from '../../lib/crypto.ts';
 import { conflict, invalid, notFound } from '../../lib/errors.ts';
 import { createUser, invalidateResetTokens, revokeAllUserSessions } from '../auth/service.ts';
-import { getSchoolSettings } from '../school/policy.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
@@ -31,6 +30,7 @@ export function adminUserDto(u: UserRow) {
     active: u.disabledAt === null,
     hasPin: u.pinHash !== null,
     mustChangePassword: u.mustChangePassword,
+    locale: u.locale,
     createdAt: u.createdAt,
   };
 }
@@ -52,7 +52,8 @@ export function listUsers(db: Db) {
 
 export async function createUserByAdmin(ctx: RequestContext, input: In<typeof C.createUserByAdmin>) {
   const password = temporaryPassword();
-  const locale = getSchoolSettings(ctx.db).defaultLocale;
+  // The admin chooses the new account's interface language (S13a, D-099), English by default.
+  const locale = input.locale;
   const u = await createUser(
     ctx.db,
     { login: input.login, displayName: normaliseName(input.displayName), role: input.role, password, email: input.email ?? null, mustChangePassword: true, locale },
@@ -68,6 +69,7 @@ export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.update
     const patch: Partial<UserRow> = {};
     if (input.displayName !== undefined) patch.displayName = normaliseName(input.displayName);
     if (input.email !== undefined) patch.email = input.email?.trim().toLowerCase() || null;
+    if (input.locale !== undefined) patch.locale = input.locale;
     ctx.db.update(users).set({ ...patch, updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
     // A reset link already mailed to the previous address must stop working (D-015).
     if (patch.email !== undefined && patch.email !== u.email) invalidateResetTokens(ctx.db, u.id, ctx.now());

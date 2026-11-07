@@ -4,7 +4,7 @@
  * `teacher` (PIN-gated in classroom mode). Classroom writes are commands (see LessonCommands).
  */
 import { z } from 'zod';
-import { ATTENDANCE_STATUSES, MAX_STAGES, MAX_TIMER_MS } from '../lessons.ts';
+import { ATTENDANCE_STATUSES, MAX_LESSON_TOPICS, MAX_STAGES, MAX_TIMER_MS, TOPIC_ICONS } from '../lessons.ts';
 import { LocalizedText, Ok, endpoint } from './define.ts';
 import { AssistantToday } from './assistant.ts';
 import { CountersLessonState } from './counters.ts';
@@ -18,6 +18,10 @@ const Note = z.string().trim().max(300);
 
 export const RoutineStage = z.object({ id: z.string(), name: LocalizedText });
 export const Timer = z.object({ durationMs: z.number().int(), startedAt: z.number().int().nullable(), remainingMs: z.number().int(), running: z.boolean() });
+/** A lesson topic (S13a, D-101): a skill category as it was when chosen (name + icon snapshot, DAT-6). */
+export const LessonTopic = z.object({ id: z.string(), name: LocalizedText, icon: z.enum(TOPIC_ICONS).nullable() });
+export type LessonTopic = z.infer<typeof LessonTopic>;
+export const TopicIds = z.array(Id).max(MAX_LESSON_TOPICS);
 export const Reflection = z.object({ rating: z.number().int().min(1).max(4).nullable(), note: z.string().max(500).nullable() });
 
 /** The lesson as every classroom device sees it (no notes, no identities beyond the roster). */
@@ -34,6 +38,10 @@ export const LessonState = z.object({
   routine: z.object({ templateId: z.string().nullable(), name: LocalizedText, stages: z.array(RoutineStage) }),
   stageIndex: z.number().int(),
   timer: Timer,
+  /** Today's topic(s) (S13a); empty = none set (the display hides the topic). */
+  topics: z.array(LessonTopic),
+  /** Per-lesson display choices (S13a): null = the class default. */
+  display: z.object({ assistantVisible: z.boolean().nullable() }),
   /** End Lesson steps contributed by the enabled modules, in order (LES-3). 'reflection' is core. */
   endSteps: z.array(z.string()),
 });
@@ -168,6 +176,8 @@ export const LessonCommands = {
     attendance: z.array(z.object({ studentId: Id, status: AttendanceStatus, expected: AttendanceStatus.nullable().optional() })).max(200).optional(),
     /** Everyone who still has no daily record when the command runs becomes present (like markAllPresent). */
     othersPresent: z.boolean().optional(),
+    /** Today's topic(s) (S13a): omitted = the weekly plan's topics for today; [] = no topic. */
+    topicIds: TopicIds.optional(),
   }),
   'lesson.setStage': z.object({ ...LessonRef, stageIndex: z.number().int().min(0).max(MAX_STAGES) }),
   'lesson.timer.start': z.object(LessonRef),
@@ -175,6 +185,10 @@ export const LessonCommands = {
   'lesson.timer.reset': z.object(LessonRef),
   'lesson.timer.set': z.object({ ...LessonRef, durationMs: z.number().int().min(1000).max(MAX_TIMER_MS) }),
   'lesson.end': z.object({ ...LessonRef, steps: z.record(z.string(), z.unknown()).default({}) }),
+  /** Change today's topic(s) during the lesson (S13a, classroom-safe). */
+  'lesson.setTopics': z.object({ ...LessonRef, topicIds: TopicIds }),
+  /** Per-lesson display choices (S13a): show or hide the assistant panel (null = class default). */
+  'lesson.setDisplay': z.object({ ...LessonRef, assistantVisible: z.boolean().nullable() }),
   'attendance.setDaily': z.object({ ...LessonRef, studentId: Id, status: AttendanceStatus.nullable() }),
   'attendance.setLessonException': z.object({ ...LessonRef, studentId: Id, status: AttendanceStatus.nullable() }),
   'attendance.markAllPresent': z.object(LessonRef),
@@ -298,4 +312,32 @@ export const attendanceHistory = endpoint({
       }),
     ),
   }),
+});
+
+// ---------------------------------------------------------------- lesson topics (S13a, D-101)
+/** Topics to choose from on the classroom screen (names + icons only) and the weekly plan's topics for today. */
+export const classroomTopics = endpoint({
+  method: 'GET',
+  path: '/api/classroom/contexts/:contextId/topics',
+  access: 'classroom',
+  input: z.object({ contextId: Id }),
+  output: z.object({ topics: z.array(LessonTopic), plannedToday: z.array(z.string()), weekday: z.number().int() }),
+});
+
+/** Weekly topic plan: ISO weekday '1'…'7' → topic ids (optional; at most MAX_LESSON_TOPICS per day). */
+export const TopicPlan = z.partialRecord(z.enum(['1', '2', '3', '4', '5', '6', '7']), TopicIds);
+export type TopicPlan = z.infer<typeof TopicPlan>;
+export const getTopicPlan = endpoint({
+  method: 'GET',
+  path: '/api/teacher/contexts/:contextId/topic-plan',
+  access: 'teacher',
+  input: z.object({ contextId: Id }),
+  output: z.object({ topics: z.array(LessonTopic), plan: TopicPlan }),
+});
+export const setTopicPlan = endpoint({
+  method: 'PUT',
+  path: '/api/teacher/contexts/:contextId/topic-plan',
+  access: 'teacher',
+  input: z.object({ contextId: Id, plan: TopicPlan }),
+  output: z.object({ topics: z.array(LessonTopic), plan: TopicPlan }),
 });

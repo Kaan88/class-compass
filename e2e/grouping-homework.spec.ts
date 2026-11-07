@@ -1,8 +1,9 @@
 /**
  * Grouping and Homework (S8: GRP-5..7, DSH-8, HW-1..4, UX-9). Fictional demo data only.
- * 1. 3-A (19 students), 2 marked absent at the start: choose mixed groups on the classroom display.
- *    The 17 present students are in groups, the absent ones are not, and no level (set just before
- *    in the teacher area) reaches the display or any classroom response (GRP-7).
+ * 1. 3-A (19 students), 2 marked absent at the start: open the full-screen group screen and choose
+ *    the Dolphins option (mixed, Group 1-5). The 17 present students are in groups, the absent ones
+ *    are not, and no level (set just before in the teacher area) reaches the display or any
+ *    classroom response (GRP-7). S13a: Shuffle with undo, tap-to-move, drag-and-drop, Save to option.
  * 2. Teacher area: check a homework with "mark all remaining as Completed", then correct one student
  *    to Missing. Not-checked students are never counted as missing (HW-4).
  * Demo data is put back afterwards (attendance cleared, levels restored, the homework archived).
@@ -78,29 +79,68 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     await expect(panel).toBeVisible();
     await expect(panel.getByText('No groups are shown in this lesson.')).toBeVisible();
 
-    // Two taps: Choose groups → an arrangement (GRP-5).
+    // Two taps: Choose groups → an option on the full-screen group screen (GRP-5, D-098).
     await panel.getByRole('button', { name: 'Choose groups' }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: /Teams A/ }).click();
-    await expect(dialog).toHaveCount(0);
-    const groups = panel.locator('.cc-group');
-    await expect(groups.first()).toBeVisible();
-    await expect(panel.getByText('2 absent students are not in a group this lesson.')).toBeVisible();
+    const screen = page.getByTestId('group-screen');
+    await expect(screen).toBeVisible();
+    await expect(screen.getByTestId('group-options').getByRole('button')).toHaveCount(4);
+    await screen.getByTestId('group-options').getByRole('button', { name: /Dolphins/ }).click();
+    const cards = screen.getByTestId('group-card');
+    await expect(cards).toHaveCount(5);
+    await expect(cards.first()).toContainText('Group 1');
+    await expect(screen.getByTestId('group-options').getByRole('button', { name: /Dolphins/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(screen.getByText('2 absent students are not in a group this lesson.')).toBeVisible();
+    // The timer is on the group screen too.
+    await expect(screen.getByTestId('timer-compact')).toBeVisible();
 
     // The 17 present students are each in exactly one group; the absent ones are in none.
-    const text = await panel.innerText();
+    const groupList = screen.locator('.cc-groups--screen');
+    const text = await groupList.innerText();
     for (const s of roster.slice(2)) expect(text.split(s.fullName).length - 1, s.fullName).toBe(1);
     expect(text).not.toContain(absentA.fullName);
     expect(text).not.toContain(absentB.fullName);
-    const members = await panel.locator('.cc-group__members > li').count();
-    expect(members).toBe(17);
-    const sizes = await groups.evaluateAll((els) => els.map((e) => e.querySelectorAll('.cc-group__members > li').length));
-    expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1);
+    await expect(screen.getByTestId('group-member')).toHaveCount(17);
+    const sizes = () => cards.evaluateAll((els) => els.map((e) => e.querySelectorAll('.cc-group__members > li').length));
+    const first = await sizes();
+    expect(Math.max(...first) - Math.min(...first)).toBeLessThanOrEqual(1);
+    await axe(page, '[data-testid="group-screen"]');
 
-    // Refresh: the groups come back from the server (lesson state).
+    // Shuffle makes new groups; Undo brings the previous ones back.
+    const membersOf = () => cards.evaluateAll((els) => els.map((e) => [...e.querySelectorAll('[data-student-id]')].map((m) => m.getAttribute('data-student-id')).join(',')).join('|'));
+    const beforeShuffle = await membersOf();
+    await screen.getByRole('button', { name: 'Shuffle' }).click();
+    await expect(screen.getByTestId('group-move-hint')).toHaveText('New groups made.');
+    await expect.poll(membersOf).not.toBe(beforeShuffle);
+    // Undo is on the group screen itself (the toast area is outside the full-screen dialog).
+    await screen.getByTestId('group-undo').click();
+    await expect.poll(membersOf).toBe(beforeShuffle);
+    await expect(screen.getByTestId('group-undo')).toHaveCount(0);
+
+    // Tap-to-move: tap a name, then "Move here" on another group; it applies at once.
+    const firstMember = cards.nth(0).getByTestId('group-member').first();
+    const movedId = (await firstMember.getAttribute('data-student-id'))!;
+    await cards.nth(0).getByRole('button', { name: /^Move / }).first().click();
+    await expect(screen.getByTestId('group-move-hint')).toContainText('Now tap the group for');
+    await cards.nth(1).getByRole('button', { name: /^Move here: Group 2/ }).click();
+    await expect(cards.nth(1).locator(`[data-student-id="${movedId}"]`)).toHaveCount(1);
+    await expect(cards.nth(0).locator(`[data-student-id="${movedId}"]`)).toHaveCount(0);
+
+    // Drag-and-drop: drag a name onto another group.
+    const dragged = cards.nth(2).getByTestId('group-member').first();
+    const draggedId = (await dragged.getAttribute('data-student-id'))!;
+    await dragged.dragTo(cards.nth(3));
+    await expect(cards.nth(3).locator(`[data-student-id="${draggedId}"]`)).toHaveCount(1);
+    await expect(screen.getByTestId('group-member')).toHaveCount(17);
+
+    // The moves are kept by the server: after a refresh the same groups come back (lesson state).
+    const afterMoves = await membersOf();
+    await screen.getByRole('button', { name: 'Save to option' }).click();
+    await expect(screen.getByTestId('group-move-hint')).toHaveText('The groups are saved in this option for next time.');
     await page.reload();
-    await expect(page.getByTestId('groups-panel').locator('.cc-group__members > li')).toHaveCount(17);
-    await axe(page, '[data-testid="groups-panel"]');
+    await expect(page.getByTestId('groups-panel').locator('.cc-group-chip')).toHaveCount(5);
+    await page.getByTestId('groups-panel').getByRole('button', { name: 'Open groups' }).click();
+    await expect(screen.getByTestId('group-member')).toHaveCount(17);
+    await expect.poll(membersOf).toBe(afterMoves);
     if (await page.getByTestId('homework-panel').count()) await axe(page, '[data-testid="homework-panel"]');
 
     // No level anywhere on the display or in any classroom response (GRP-7).
@@ -110,7 +150,8 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     for (const b of classroomBodies) expect(b.body, b.url).not.toContain('LVLE2E');
 
     // Hide groups.
-    await page.getByTestId('groups-panel').getByRole('button', { name: 'Hide groups' }).click();
+    await screen.getByRole('button', { name: 'Hide groups' }).click();
+    await screen.getByRole('button', { name: 'Close' }).click();
     await expect(page.getByTestId('groups-panel').getByText('No groups are shown in this lesson.')).toBeVisible();
   } finally {
     // Put the demo data back: clear the two absences, restore the levels, end the lesson.
@@ -128,13 +169,21 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     await api(page, 'POST', '/api/classroom/leave');
   }
 
-  // Teacher area: the five default arrangements, with the levels only here (GRP-1, GRP-7).
+  // Teacher area: the four default options (D-098), with the levels only here (GRP-1, GRP-7).
   await page.goto('/teacher/grouping');
   const gp = page.getByTestId('grouping-page');
   await expect(gp).toBeVisible();
   await gp.getByLabel('Class', { exact: true }).selectOption({ label: '3-A · English' });
-  await expect(gp.getByTestId('arrangement')).toHaveCount(5);
+  await expect(gp.getByTestId('arrangement')).toHaveCount(4);
+  await expect(gp.getByTestId('arrangement').filter({ hasText: 'Dolphins' })).toBeVisible();
   await axe(page, '[data-testid="grouping-page"]');
+  // The same tap-to-move editor in the teacher area.
+  const lions = gp.getByTestId('arrangement').filter({ hasText: 'Lions' });
+  await lions.getByRole('button', { name: 'Edit' }).click();
+  const editor = gp.getByTestId('grouping-editor');
+  await editor.getByTestId('editor-member').first().click();
+  await expect(editor.getByTestId('editor-move-here').first()).toBeVisible();
+  await editor.getByRole('button', { name: 'Cancel' }).click();
 });
 
 test('check homework with a bulk action, then correct one student', async ({ page }) => {

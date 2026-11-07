@@ -26,10 +26,10 @@ describe('school settings', () => {
     await ok(s.teacherA.patch('/api/auth/preferences', { locale: 'tr' }));
     expect((await s.teacherB.get('/api/auth/me')).body.locale).toBe('en');
     expect((await s.teacherA.get('/api/auth/me')).body.locale).toBe('tr');
-    // New accounts start in the school default language.
+    // S13a (D-099): the admin chooses the new account's interface language (English unless chosen).
     const created = await ok(s.admin.post('/api/admin/users', { login: 'new.teacher', displayName: 'New Teacher', role: 'teacher' }));
     const c = new Client(env);
-    expect((await c.login('new.teacher', created.temporaryPassword)).body.locale).toBe('tr');
+    expect((await c.login('new.teacher', created.temporaryPassword)).body.locale).toBe('en');
   });
 });
 

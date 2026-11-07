@@ -34,7 +34,7 @@ function CheckDialog({ assignmentId, contextId, onClose }: { assignmentId: strin
     undo: (batchId) => call(H.classroomUndoHomeworkMarks, { assignmentId, batchId }),
   };
   return (
-    <Modal isOpen onOpenChange={(o) => !o && onClose()} title={q.data ? t('homework.checkTitle', { title: q.data.assignment.title }) : t('homework.check')}>
+    <Modal isOpen onOpenChange={(o) => !o && onClose()} size="wide" title={q.data ? t('homework.checkTitle', { title: q.data.assignment.title }) : t('homework.check')}>
       {q.data ? (
         <CheckGrid
           check={q.data}
