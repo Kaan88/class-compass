@@ -90,6 +90,11 @@ function currentAndScheduledEnrolments(deps: Deps, studentId: string): LiveEnrol
   return out;
 }
 
+/** Enrolments the student is in today or is scheduled to start (D-021, D-027), with their ids and years. */
+export function liveEnrolmentsOf(deps: Deps, studentId: string): EnrolmentRow[] {
+  return currentAndScheduledEnrolments(deps, studentId);
+}
+
 /** Classes the student is in today or is scheduled to join (D-021). */
 export function liveClassIdsOf(deps: Deps, studentId: string): string[] {
   return currentAndScheduledEnrolments(deps, studentId).map((e) => e.classId);

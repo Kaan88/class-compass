@@ -49,7 +49,11 @@ export type RowFlag =
   | 'missing_name'
   | 'missing_number'
   | 'heading_ignored'
-  | 'class_mismatch';
+  | 'class_mismatch'
+  | 'possible_heading'
+  | 'same_name_in_file'
+  | 'name_elsewhere'
+  | 'number_conflict';
 
 export interface ClassifiedRow {
   /** Index into the source rows. */
@@ -58,11 +62,19 @@ export interface ClassifiedRow {
   page: number | null;
   confidence: number | null;
   heading: boolean;
+  /**
+   * Looks like a title only because of a generic word that can also be a name ("Page", "Öğretmen",
+   * "Class"): shown with the `possible_heading` flag and skipped by default, never hidden (IMP-3).
+   */
+  possibleHeading: boolean;
   parsed: Parsed;
   flags: RowFlag[];
   /** Second or later occurrence of a duplicate (the first one is the one to keep). */
   repeat: boolean;
 }
+
+/** At most this many rows are read from one source (D-079, notice TOO_MANY_ROWS). */
+export const MAX_IMPORT_ROWS = 2000;
 
 /** OCR lines below this confidence are flagged for checking (IMP-2). */
 export const LOW_CONFIDENCE = 75;
@@ -116,21 +128,45 @@ export function detectHeader(rows: readonly SourceRow[]): { row: number; fields:
 }
 
 // ---------------------------------------------------------------- free text
-const LIST_MARKER = /^\s*(?:[-*•·▪◦]\s+|\(?\d{1,3}[.)]\s+|\d{1,3}\s*[-–]\s+)/u;
+const LIST_MARKER = /^\s*(?:[-*•·▪◦]\s+|\(?\d{1,3}[.)]\s+)/u;
+/** "245 - Ayşe Yılmaz": a list position only when the numbers run 1, 2, 3…, else a student number. */
+const DASH_NUMBER = /^(\p{N}{1,12})\s*[-–]\s+/u;
 const NUMBER_TOKEN = /^[\p{N}][\p{N}-]{0,15}$/u;
+
+/**
+ * Running list positions rather than student numbers: start at 3 or less and go up mostly by one.
+ * Tolerates a few missing lines (an OCR line dropped, a line deleted from a paste: steps of 2–3) and
+ * the count restarting on a new page (IMP-2, IMP-4).
+ */
+export function looksLikePositions(nums: readonly number[]): boolean {
+  if (nums.length === 0 || !nums.every((n) => Number.isInteger(n)) || nums[0]! > 3) return false;
+  if (nums.length === 1) return true;
+  let unit = 0;
+  for (let i = 1; i < nums.length; i++) {
+    const d = nums[i]! - nums[i - 1]!;
+    if (d === 1 || (d < 1 && nums[i]! <= 3)) unit++;
+    else if (d < 1 || d > 3) return false;
+  }
+  return unit / (nums.length - 1) >= 0.6;
+}
 
 /**
  * Lines without column separators (a pasted numbered list, OCR lines) → cells `[number, name]`.
  * List markers ("1.", "2)", "-", "•") are list positions, not student numbers. A bare leading number
- * is a list position when the lines count 1, 2, 3…, otherwise a student number; a number after the
- * name is a student number.
+ * (or "N - name") is a list position when the lines count 1, 2, 3… (`looksLikePositions`), otherwise
+ * a student number; a number after the name is a student number.
  */
 export function freeTextRows(lines: ReadonlyArray<{ text: string; page?: number | null; confidence?: number | null }>): SourceRow[] {
   const split = lines.map((l) => {
     const text = clean(l.text.replace(/[|¦]/gu, ' '));
-    const stripped = text.replace(LIST_MARKER, '');
-    const tokens = stripped.split(' ').filter(Boolean);
+    let stripped = text.replace(LIST_MARKER, '');
     const lead: string[] = [];
+    const dash = DASH_NUMBER.exec(stripped);
+    if (dash) {
+      lead.push(dash[1]!);
+      stripped = stripped.slice(dash[0].length);
+    }
+    const tokens = stripped.split(' ').filter(Boolean);
     while (tokens.length && NUMBER_TOKEN.test(tokens[0]!)) lead.push(tokens.shift()!);
     const trail: string[] = [];
     while (tokens.length && NUMBER_TOKEN.test(tokens[tokens.length - 1]!)) trail.unshift(tokens.pop()!);
@@ -138,9 +174,7 @@ export function freeTextRows(lines: ReadonlyArray<{ text: string; page?: number 
   });
   // Is a single leading number a running position (1, 2, 3…) across the list?
   const singles = split.filter((s) => s.lead.length === 1 && s.name).map((s) => Number(s.lead[0]));
-  let sequential = singles.length >= 2 && singles[0]! <= 3;
-  for (let i = 1; i < singles.length && sequential; i++) if (singles[i]! !== singles[i - 1]! + 1) sequential = false;
-  if (singles.length === 1) sequential = singles[0]! <= 3;
+  const sequential = looksLikePositions(singles);
   return split.map((s) => {
     if (!s.name) return { cells: ['', s.text], page: s.page, confidence: s.confidence };
     let number = '';
@@ -179,6 +213,7 @@ function columnValues(rows: readonly SourceRow[], col: number): string[] {
 function isSequential(values: readonly string[]): boolean {
   const nums = values.map((v) => Number(v)).filter((n) => Number.isInteger(n));
   if (nums.length < 2) return false;
+  if (looksLikePositions(nums)) return true;
   let ok = 0;
   for (let i = 1; i < nums.length; i++) if (nums[i] === nums[i - 1]! + 1) ok++;
   return ok / (nums.length - 1) >= SEQ_TOLERANCE && nums[0]! <= 3;
@@ -279,19 +314,61 @@ export function columnLabels(rows: readonly SourceRow[], mapping: Mapping): stri
 }
 
 // ---------------------------------------------------------------- rows
-const HEADING_WORDS =
-  /(^|\s)(t\.?\s?c\.?|mudurlugu|bakanligi|milli egitim|ogrenci listesi|sinif listesi|sube listesi|ogrenci liste|e-?okul|sayfa|page|egitim ogretim|ogretim yili|okulu|ilkokulu|ortaokulu|lisesi|anaokulu|school|class list|student list|list of|sinif|class|liste|list|toplam|total|tarih|date|imza|signature|ogretmen|teacher)(\s|$|:)/u;
+/**
+ * Words and phrases that never occur in a child's name (folded): a row containing one is a title or
+ * a footer. "… listesi" covers "3-A Listesi", "Sınıf Listesi", "Öğrenci Listesi".
+ */
+const STRONG_HEADING =
+  /(^|\s)(t\.?\s?c\.?|mudurlugu|bakanligi|milli egitim|\S*listesi|ogrenci liste|sinif liste|e-?okul|egitim ogretim|ogretim yili|okulu|ilkokulu|ortaokulu|lisesi|anaokulu|class list|student list|list of|imza|signature)(\s|$|:)/u;
+/**
+ * Generic words that also occur in names ("Ellen Page", "Mehmet Öğretmen", "Grace Class"). On their
+ * own (with numbers, dates or class labels) they make a heading; next to other words only a hint.
+ */
+const WEAK_HEADING_WORD = /^(sayfa|page|school|okul|sinif|sinifi|class|liste|list|toplam|total|tarih|date|ogretmen|ogretmeni|teacher|sube|subesi|sira|adet|kisi|ogrenci|students?|pupils?)$/u;
 const DATE_LIKE = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/u;
 const PAGE_LIKE = /^(sayfa|page)?\s*\d+\s*(\/|of|-)\s*\d+$/u;
 
+/**
+ * How strongly a text looks like a title, page number or footer rather than a student (IMP-3):
+ * - `strong`: a date or page pattern, a trailing ":" or a "Label: value" line, a column label, a
+ *   phrase no name contains ("Sınıf Listesi", "… Okulu", "T.C."), or only generic heading words with
+ *   numbers, dates or class labels ("Sayfa 2", "Toplam 32", "Sınıf 3-A");
+ * - `weak`: a generic heading word next to other words, which may simply be a name ("Ellen Page");
+ * - `null`: nothing heading-like.
+ */
+export function headingSignal(text: string): 'strong' | 'weak' | null {
+  const f = foldForSearch(text)
+    .replace(/[^\p{L}\p{N}./:\s-]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!f) return null;
+  if (DATE_LIKE.test(f) || PAGE_LIKE.test(f)) return 'strong';
+  if (/:$/u.test(text.trim())) return 'strong';
+  if (headerField(text) !== null) return 'strong';
+  if (STRONG_HEADING.test(f)) return 'strong';
+  const label = /^([^:]{1,40}):\s*\S/u.exec(f);
+  if (label && label[1]!.split(' ').some((w) => WEAK_HEADING_WORD.test(w) || headerField(w) !== null)) return 'strong';
+  const words = f
+    .split(' ')
+    .map((w) => w.replace(/[:.]+$/u, ''))
+    .filter(Boolean);
+  if (!words.some((w) => WEAK_HEADING_WORD.test(w))) return null;
+  const rest = words.filter((w) => !WEAK_HEADING_WORD.test(w));
+  return rest.every((w) => !hasLetter(w) || classKey(w) !== null) ? 'strong' : 'weak';
+}
+
+/** Every word with letters is a generic heading word ("Sayfa", "Toplam", "Sınıf Öğretmeni"): not a name. */
+function headingWordsOnly(text: string): boolean {
+  const words = foldForSearch(text)
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/u)
+    .filter((w) => hasLetter(w));
+  return words.length > 0 && words.every((w) => WEAK_HEADING_WORD.test(w));
+}
+
 /** A title, page or footer line rather than a student (IMP-3: headings are ignored). */
 export function isHeadingText(text: string): boolean {
-  const f = foldForSearch(text).replace(/[^\p{L}\p{N}./:\s-]/gu, ' ').replace(/\s+/gu, ' ').trim();
-  if (!f) return false;
-  if (DATE_LIKE.test(f) || PAGE_LIKE.test(f)) return true;
-  if (/:$/u.test(text.trim())) return true;
-  if (headerField(text) !== null) return true;
-  return HEADING_WORDS.test(f);
+  return headingSignal(text) === 'strong';
 }
 
 const cleanNumber = (s: string) => {
@@ -347,14 +424,22 @@ export function classifyRows(rows: readonly SourceRow[], mapping: Mapping, opts:
     const filled = r.cells.map((c) => clean(c)).filter(Boolean);
     const nameCell = mapping.fullName !== null ? clean(r.cells[mapping.fullName]) : [clean(r.cells[mapping.givenNames ?? -1]), clean(r.cells[mapping.familyName ?? -1])].join(' ').trim();
     let heading = false;
+    let possibleHeading = false;
+    // Only strong signals hide a row; a generic word that may be part of a name only flags it.
+    const signal = (t: string) => (t ? headingSignal(t) : null);
+    const lineSignal = filled.length <= 2 ? signal(filled.join(' ')) : null;
+    const nameSignal = signal(nameCell);
     if (mapping.headerRow !== null && source <= mapping.headerRow) heading = true;
     else if (isRepeatedHeader(r.cells, header)) heading = true;
-    else if (!parsed.studentNumber && filled.length <= 2 && isHeadingText(filled.join(' '))) heading = true;
-    else if (nameCell && isHeadingText(nameCell) && !parsed.studentNumber) heading = true;
-    else if (!nameCell && !parsed.studentNumber && filled.length > 0 && filled.every((c) => isHeadingText(c) || !hasLetter(c))) heading = true;
+    else if (!parsed.studentNumber && (lineSignal === 'strong' || nameSignal === 'strong')) heading = true;
+    // "Sayfa 2", "Toplam 32": the number is a page or a count, not a student number.
+    else if (nameCell && headingWordsOnly(nameCell)) heading = true;
+    else if (!nameCell && !parsed.studentNumber && filled.length > 0 && filled.every((c) => signal(c) !== null || !hasLetter(c))) heading = true;
+    else if (!parsed.studentNumber && (lineSignal === 'weak' || nameSignal === 'weak')) possibleHeading = true;
     const flags: RowFlag[] = [];
     if (heading) flags.push('heading_ignored');
     else {
+      if (possibleHeading) flags.push('possible_heading');
       if (!hasLetter(parsed.fullName)) flags.push('missing_name');
       if (mapping.studentNumber !== null && !parsed.studentNumber) flags.push('missing_number');
       if (r.confidence !== null && r.confidence < LOW_CONFIDENCE) flags.push('low_confidence');
@@ -363,33 +448,48 @@ export function classifyRows(rows: readonly SourceRow[], mapping: Mapping, opts:
         if (k && k !== targetKey) flags.push('class_mismatch');
       }
     }
-    out.push({ source, cells: [...r.cells], page: r.page, confidence: r.confidence, heading, parsed: heading ? { ...parsed, fullName: filled.join(' ') } : parsed, flags, repeat: false });
+    out.push({ source, cells: [...r.cells], page: r.page, confidence: r.confidence, heading, possibleHeading, parsed: heading ? { ...parsed, fullName: filled.join(' ') } : parsed, flags, repeat: false });
   });
   markDuplicates(out);
   return out;
 }
 
-/** Flag every occurrence of a folded name or a student number that appears more than once (IMP-2). */
+/**
+ * Duplicates within the file (IMP-2). The same student number twice, or the same folded name twice
+ * where at most one of the two rows has a number, is a duplicate: every copy is flagged
+ * `duplicate_in_file` and the later copies are `repeat` (skipped by default). The same name with two
+ * DIFFERENT numbers is two children (common in Turkish schools): both rows are only flagged
+ * `same_name_in_file` and both stay in the import.
+ */
 export function markDuplicates(rows: ClassifiedRow[]): void {
-  const seenName = new Map<string, number>();
+  const seenName = new Map<string, number[]>();
   const seenNumber = new Map<string, number>();
+  const flag = (j: number, f: RowFlag) => {
+    if (!rows[j]!.flags.includes(f)) rows[j]!.flags.push(f);
+  };
   for (const r of rows) {
-    r.flags = r.flags.filter((f) => f !== 'duplicate_in_file');
+    r.flags = r.flags.filter((f) => f !== 'duplicate_in_file' && f !== 'same_name_in_file');
     r.repeat = false;
   }
   rows.forEach((r, i) => {
     if (r.heading || !hasLetter(r.parsed.fullName)) return;
     const name = foldForSearch(r.parsed.fullName);
     const num = r.parsed.studentNumber;
-    const firstName = seenName.get(name);
-    const firstNum = num ? seenNumber.get(num) : undefined;
-    const first = firstNum ?? firstName;
+    const earlier = seenName.get(name) ?? [];
+    let first = num ? seenNumber.get(num) : undefined;
+    first ??= earlier.find((j) => {
+      const other = rows[j]!.parsed.studentNumber;
+      return !(num && other && other !== num);
+    });
     if (first !== undefined) {
-      for (const j of [first, i]) if (!rows[j]!.flags.includes('duplicate_in_file')) rows[j]!.flags.push('duplicate_in_file');
+      flag(first, 'duplicate_in_file');
+      flag(i, 'duplicate_in_file');
       r.repeat = true;
+    } else if (earlier.length) {
+      for (const j of [...earlier, i]) flag(j, 'same_name_in_file');
     }
-    if (firstName === undefined) seenName.set(name, i);
-    if (num && firstNum === undefined) seenNumber.set(num, i);
+    seenName.set(name, [...earlier, i]);
+    if (num && !seenNumber.has(num)) seenNumber.set(num, i);
   });
 }
 

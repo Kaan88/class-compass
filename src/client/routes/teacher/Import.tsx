@@ -49,7 +49,18 @@ function codeText(t: T, prefix: 'import.reason' | 'import.revert', code: string 
     .join(' · ');
 }
 
-const WARN_FLAGS = new Set<Imp.ImportFlag>(['low_confidence', 'duplicate_in_file', 'possible_match', 'missing_name', 'number_elsewhere', 'class_mismatch']);
+const WARN_FLAGS = new Set<Imp.ImportFlag>([
+  'low_confidence',
+  'duplicate_in_file',
+  'possible_match',
+  'missing_name',
+  'number_elsewhere',
+  'class_mismatch',
+  'possible_heading',
+  'same_name_in_file',
+  'name_elsewhere',
+  'number_conflict',
+]);
 
 /** Flags as chips: icon + text, never colour only (UX-7). */
 function FlagChips({ row }: { row: Row }) {

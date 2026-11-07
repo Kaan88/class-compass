@@ -208,6 +208,19 @@ describe('uploads (STU-8, D-014)', () => {
     expect(after.students.find((x: { id: string }) => x.id === ada.id).photoUrl).toBeNull();
     expect((await raw(env, s.teacherA, okUp.body.photoUrl)).statusCode).toBe(404);
   });
+
+  it('deleting the file of a current photo clears the photo, so cards show initials again (CRD-1, IMP-6)', async () => {
+    await setMedia(s, 'media.studentPhotos', true);
+    const up = await upload(s.teacherA, `/api/students/${ada.id}/photo?consent=true`, await jpeg(), 'p.jpg', 'image/jpeg');
+    expect(up.status).toBe(200);
+    const fileId = new URL(up.body.photoUrl, 'http://x').searchParams.get('v')!;
+    expect((await s.teacherA.req('DELETE', `/api/files/${fileId}`)).status).toBe(200);
+    const roster = await ok(s.teacherA.get(`/api/teacher/classes/${s.c3a.id}/students`));
+    expect(roster.students.find((x: { id: string }) => x.id === ada.id).photoUrl).toBeNull();
+    const audit = await ok(s.admin.get(`/api/admin/audit?entity=student&entityId=${ada.id}`));
+    expect(JSON.stringify(audit)).toContain('student.photo_remove');
+    await setMedia(s, 'media.studentPhotos', false);
+  });
 });
 
 describe('upload quotas (STU-8)', () => {

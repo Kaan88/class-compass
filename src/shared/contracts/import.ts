@@ -22,6 +22,14 @@ export const IMPORT_FLAGS = [
   'missing_number',
   'heading_ignored',
   'class_mismatch',
+  /** A generic heading word that may also be a name ("Page", "Öğretmen"): visible, skipped by default. */
+  'possible_heading',
+  /** The same name with a different student number elsewhere in the file: two children, both kept. */
+  'same_name_in_file',
+  /** A student with this name exists outside the caller's classes (count only, ACC-4): needs a choice. */
+  'name_elsewhere',
+  /** The number matches an existing student whose name differs: needs a choice (IMP-4). */
+  'number_conflict',
 ] as const;
 export type ImportFlag = (typeof IMPORT_FLAGS)[number];
 export const IMPORT_DECISIONS = ['add', 'match', 'skip'] as const;

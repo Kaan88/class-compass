@@ -17,7 +17,7 @@
  * sealed (live), revealed and unrevealed_abandoned (D-010). Not counted: withdrawn_absent and
  * withdrawn_redraw (the student never had the turn).
  */
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, getTableName, inArray, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
 import { isAway } from '../../../domain/attendance.ts';
 import { pickFair, seededRank } from '../../../domain/rotation.ts';
@@ -44,6 +44,25 @@ type StudentRow = typeof students.$inferSelect;
 
 /** Statuses that count as "had a secret turn" for the rotation (D-062). */
 export const FAIRNESS_STATUSES = ['sealed', 'revealed', 'unrevealed_abandoned'] as const;
+
+/**
+ * Whether the student was ever chosen in any round of these teaching contexts (import revert, IMP-5:
+ * history check). Returns only a boolean and never leaves a trace (no audit, no stamp), so it reveals
+ * nothing about a sealed round to anyone (SEC-3).
+ */
+/** SQL name of the selections table, for schema coverage lists elsewhere (they use the helper below, never the table). */
+export const SELECTIONS_TABLE_NAME = getTableName(secretSelections);
+
+export function studentInContextSelections(db: Db, studentId: string, contextIds: readonly string[]): boolean {
+  if (!contextIds.length) return false;
+  return Boolean(
+    db
+      .select({ id: secretSelections.id })
+      .from(secretSelections)
+      .where(and(eq(secretSelections.studentId, studentId), inArray(secretSelections.contextId, [...contextIds])))
+      .get(),
+  );
+}
 
 // ---------------------------------------------------------------- settings
 /** The manifest default overlaid with a schema-valid stored count (D-069); an invalid stored value falls back to the default. */

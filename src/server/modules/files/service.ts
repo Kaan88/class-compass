@@ -19,7 +19,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { ALLOWED_MIME, UPLOAD_LIMITS, type FileKind, type FileMeta } from '../../../shared/contracts/files.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { files } from '../../db/schema.ts';
+import { files, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
@@ -277,6 +277,12 @@ export async function deleteFileRow(ctx: RequestContext, f: FileRow): Promise<vo
   tx(ctx.db, () => {
     ctx.db.update(files).set({ deletedAt: ctx.now() }).where(eq(files.id, f.id)).run();
     audit(ctx.db, ctx.actor, { action: 'file.delete', entity: 'file', entityId: f.id, before: { kind: f.kind, ownerStudentId: f.ownerStudentId } }, ctx.now());
+    // A student's current photo (CRD-1): clear the reference too, so cards fall back to initials
+    // instead of pointing at a file that no longer exists.
+    for (const st of ctx.db.select({ id: students.id }).from(students).where(eq(students.photoFileId, f.id)).all()) {
+      ctx.db.update(students).set({ photoFileId: null, updatedAt: ctx.now(), updatedBy: ctx.user?.id ?? null }).where(eq(students.id, st.id)).run();
+      audit(ctx.db, ctx.actor, { action: 'student.photo_remove', entity: 'student', entityId: st.id, before: { photoFileId: f.id } }, ctx.now());
+    }
   });
   await removeKey(ctx.config, f.storageKey);
   await removeKey(ctx.config, f.thumbStorageKey);

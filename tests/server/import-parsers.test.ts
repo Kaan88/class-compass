@@ -11,7 +11,7 @@ import { classifyRows, inferMapping, type ClassifiedRow } from '../../src/domain
 import { extractFile, extractPaste } from '../../src/server/modules/import/parsers/index.ts';
 import { detectEncoding } from '../../src/server/modules/import/parsers/text.ts';
 import { MIME } from '../../src/server/modules/files/sniff.ts';
-import { csv1254, docxTable, eOkulPdf, eOkulXls, eOkulXlsx, EXPECTED_NAMES, PDF_STUDENTS, typedListPng, utf16Tsv } from '../import-fixtures.ts';
+import { csv1254, docxTable, eOkulPdf, eOkulXls, eOkulXlsx, EXPECTED_NAMES, oversizedDimensionXlsx, PDF_STUDENTS, typedListPng, utf16Tsv } from '../import-fixtures.ts';
 
 const cfg = { ocrCacheDir: path.join(os.tmpdir(), 'cc-ocr-cache-test'), OCR_TIMEOUT_MS: 120_000 };
 
@@ -135,4 +135,15 @@ describe('importer parsers (IMP-1, D-013)', () => {
     },
     180_000,
   );
+
+  it('a tiny workbook declaring a huge sheet dimension is read quickly without expanding blank cells (STU-8, D-079)', async () => {
+    const buf = oversizedDimensionXlsx();
+    expect(buf.length).toBeLessThan(50_000);
+    const started = Date.now();
+    const out = await viaFile(buf, MIME.xlsx, 'liste.xlsx');
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(out.rows.length).toBeLessThanOrEqual(2);
+    expect(out.rows.every((r) => r.cells.length <= 2)).toBe(true);
+    expect(out.rows[1]!.cells).toEqual(['101', 'Ayşe Kurgu']);
+  });
 });

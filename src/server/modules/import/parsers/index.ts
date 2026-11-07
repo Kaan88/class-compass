@@ -3,7 +3,7 @@
  * client's file name or type), with the file name only telling CSV and TXT apart for the notice.
  */
 import fsp from 'node:fs/promises';
-import { freeTextRows, type SourceRow } from '../../../../domain/importing.ts';
+import { freeTextRows, MAX_IMPORT_ROWS, type SourceRow } from '../../../../domain/importing.ts';
 import type { Config } from '../../../config.ts';
 import { AppError } from '../../../lib/errors.ts';
 import { MIME } from '../../files/sniff.ts';
@@ -22,7 +22,7 @@ export interface Extracted {
   notices: string[];
 }
 
-const MAX_ROWS = 2000;
+const MAX_ROWS = MAX_IMPORT_ROWS;
 
 function cap(rows: SourceRow[], notices: string[]): SourceRow[] {
   if (rows.length <= MAX_ROWS) return rows;

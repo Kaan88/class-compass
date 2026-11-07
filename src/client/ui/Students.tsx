@@ -3,7 +3,7 @@
  * CounterBar, MetricCell. Designed for 18–20 cards on one 1920×1080 classroom screen; a compact
  * density kicks in automatically for larger classes (34+).
  */
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { isAway, type EffectiveAttendance } from '../../domain/attendance.ts';
 import { avatarHue, initials as initialsOf } from '../../shared/text/turkish.ts';
 import { useI18n } from '../lib/i18n.tsx';
@@ -30,9 +30,12 @@ export function Avatar({
 }) {
   const h = hue ?? avatarHue(id ?? name);
   const style = { '--cc-avatar-hue': String(h) } as CSSProperties;
+  // A photo that cannot be loaded (removed, no longer allowed) falls back to the initials (IMP-6).
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showPhoto = photoAllowed && photoUrl && failedUrl !== photoUrl;
   return (
     <span className={`cc-avatar ${size === 'md' ? '' : `cc-avatar--${size}`}`} style={style} aria-hidden="true">
-      {photoAllowed && photoUrl ? <img src={photoUrl} alt="" /> : (initials ?? initialsOf(name))}
+      {showPhoto ? <img src={photoUrl} alt="" onError={() => setFailedUrl(photoUrl)} /> : (initials ?? initialsOf(name))}
     </span>
   );
 }

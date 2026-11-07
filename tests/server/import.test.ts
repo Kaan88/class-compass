@@ -70,11 +70,12 @@ describe('student list importer (IMP-1..5)', () => {
   });
 
   it('flags duplicates within the file and skips the second copy (IMP-2)', async () => {
-    const b = await paste(s.teacherA, s.c3a.id, 'Öğrenci No\tAdı Soyadı\n401\tSelin Ay\n402\tSelin Ay\n403\tTuna Er\n403\tTuna Erk\n');
+    const b = await paste(s.teacherA, s.c3a.id, 'Öğrenci No\tAdı Soyadı\n401\tSelin Ay\n\tSelin Ay\n403\tTuna Er\n403\tTuna Erk\n');
     const st = studentRows(b);
     expect(st.filter((r) => r.flags.includes('duplicate_in_file')).map((r) => r.idx)).toHaveLength(4);
     expect(st.map((r) => r.decision)).toEqual(['add', 'skip', 'add', 'skip']);
   });
+
 
   it('student number match vs name-only possible match: never a silent merge (IMP-4)', async () => {
     const numbered = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Bora Yıldız', studentNumber: '5001' });

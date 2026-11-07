@@ -53,6 +53,23 @@ function eOkulWorkbook() {
 export const eOkulXlsx = (): Buffer => XLSX.write(eOkulWorkbook(), { type: 'buffer', bookType: 'xlsx' }) as Buffer;
 export const eOkulXls = (): Buffer => XLSX.write(eOkulWorkbook(), { type: 'buffer', bookType: 'biff8' }) as Buffer;
 
+/**
+ * A tiny workbook that DECLARES a whole-sheet dimension (A1:XFD1048576) around two real rows (S9
+ * review: blank-cell expansion). Written normally, then the sheet XML's <dimension> is patched in
+ * the zip (writing such a range directly would itself expand every cell).
+ */
+export function oversizedDimensionXlsx(): Buffer {
+  const ws = XLSX.utils.aoa_to_sheet([['Öğrenci No', 'Adı Soyadı'], ['101', 'Ayşe Kurgu']]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Liste');
+  const zip = XLSX.CFB.read(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer, { type: 'buffer' });
+  const entry = zip.FileIndex[zip.FullPaths.findIndex((f: string) => f.endsWith('xl/worksheets/sheet1.xml'))]!;
+  const xml = Buffer.from(entry.content as Uint8Array).toString('utf8');
+  if (!xml.includes('<dimension ref="A1:B2"')) throw new Error('unexpected sheet XML');
+  entry.content = Buffer.from(xml.replace('<dimension ref="A1:B2"', '<dimension ref="A1:XFD1048576"'), 'utf8');
+  return Buffer.from(XLSX.CFB.write(zip, { type: 'buffer', fileType: 'zip' }) as Uint8Array);
+}
+
 // ---------------------------------------------------------------- Windows-1254 CSV
 const CP1254: Record<string, number> = { Ç: 0xc7, Ğ: 0xd0, İ: 0xdd, Ö: 0xd6, Ş: 0xde, Ü: 0xdc, ç: 0xe7, ğ: 0xf0, ı: 0xfd, ö: 0xf6, ş: 0xfe, ü: 0xfc };
 
