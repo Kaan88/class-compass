@@ -40,6 +40,7 @@ export const changePassword = endpoint({
   method: 'POST',
   path: '/api/auth/password',
   access: 'account',
+  allowWithTemporaryPassword: true,
   input: z.object({ currentPassword: z.string().min(1).max(200), newPassword: z.string().min(10).max(200) }),
   output: Ok,
 });

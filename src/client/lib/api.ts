@@ -13,8 +13,12 @@ export class ApiError extends Error {
   }
 }
 
-/** Listeners notified on PIN_REQUIRED / UNAUTHENTICATED so the shell can lock or sign out. */
-type AuthListener = (code: 'PIN_REQUIRED' | 'UNAUTHENTICATED') => void;
+/**
+ * Listeners notified on PIN_REQUIRED / UNAUTHENTICATED / MUST_CHANGE_PASSWORD so the shell can lock,
+ * sign out or show the forced password change.
+ */
+export type AuthProblem = 'PIN_REQUIRED' | 'UNAUTHENTICATED' | 'MUST_CHANGE_PASSWORD';
+type AuthListener = (code: AuthProblem) => void;
 const authListeners = new Set<AuthListener>();
 export const onAuthProblem = (fn: AuthListener) => {
   authListeners.add(fn);
@@ -47,9 +51,12 @@ export async function call<I extends z.ZodType, O extends z.ZodType>(ep: Endpoin
   if (!res.ok) {
     const code: string = body?.error?.code ?? 'INTERNAL';
     // A 401 with a business reason (WRONG_PIN, WRONG_PASSWORD) is a form error, not a sign-out.
-    const hasReason = typeof body?.error?.details?.reason === 'string';
+    const reason: unknown = body?.error?.details?.reason;
+    const hasReason = typeof reason === 'string';
     if (code === 'PIN_REQUIRED' || (code === 'UNAUTHENTICATED' && ep.access !== 'public' && !hasReason)) {
-      authListeners.forEach((l) => l(code as 'PIN_REQUIRED' | 'UNAUTHENTICATED'));
+      authListeners.forEach((l) => l(code as AuthProblem));
+    } else if (code === 'FORBIDDEN' && reason === 'MUST_CHANGE_PASSWORD') {
+      authListeners.forEach((l) => l('MUST_CHANGE_PASSWORD'));
     }
     throw new ApiError(res.status, code, body?.error?.message ?? res.statusText, body?.error?.details);
   }

@@ -48,6 +48,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Offline outbox client (Dexie/IndexedDB, ordered, single-flight, backoff, needs-attention retry/dismiss) with unit tests — D-035 (used by lesson commands from S5)
 - [x] Lint tests: no raw colours, en/tr key + placeholder parity, no untranslated JSX text
 - [~] Tests: axe per theme (incl. contrast), 20- and 34-student grids on 1920×1080, 200 % text, admin/PIN/preferences flows on desktop + mobile (11 e2e) — a pixel-diff screenshot baseline and a 40-student grid are not done yet (D-037)
+- [x] Review fixes (D-039…D-041): outbox partitioned per account (`asUser` checked server-side, no Retry for opId conflicts, translated tray reasons), server-side enforcement of temporary passwords, relative PIN lockout countdown + sign-out warning, menu-first in every tab, toasts cleared on lock and undo toasts never evicted, visible current-class marker in the class switcher, add-student dialog reset on Cancel (tests: outbox user switch / WRONG_ACCOUNT / conflict, toast store, PIN lockout details, temporary-password matrix, two-tab e2e, no toast after lock)
 - [ ] Verify the e2e CI job on Ubuntu stays reliable over several runs
 
 ## S4 Classroom mode & PIN

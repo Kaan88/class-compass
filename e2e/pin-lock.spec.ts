@@ -93,7 +93,58 @@ test('Lock button and a 423 swap straight to the lock screen', async ({ page }) 
   await page.getByRole('link', { name: 'Class settings' }).first().click();
   const toggle = page.getByText('Homework', { exact: true });
   await expect(toggle).toBeVisible();
+
+  // Toasts from the teacher area do not survive the lock (PIN-3). Toggle twice to leave the demo data as it was.
+  await toggle.click();
+  await expect(page.getByTestId('toast').first()).toBeVisible();
+  await toggle.click();
+  await expect(page.getByTestId('toast').first()).toBeVisible();
+  await page.getByTestId('display-banner').getByRole('button', { name: 'Lock' }).click();
+  await expectLockedAndClean(page);
+  await expect(page.getByTestId('toast')).toHaveCount(0);
+  await page.getByLabel('Enter your PIN').fill(PIN);
+  await page.getByRole('button', { name: 'Unlock' }).click();
+  await expect(page.getByTestId('teacher-menu')).toBeVisible();
+  await page.getByRole('link', { name: 'Class settings' }).first().click();
+  await expect(toggle).toBeVisible();
+
   await api(page, 'POST', '/api/auth/lock', {});
   await toggle.click();
+  await expectLockedAndClean(page);
+});
+
+test('PIN-4 in every tab: a second tab waiting on a deep link shows the teacher menu first after unlock', async ({ page, context }) => {
+  await login(page, 'english');
+  await ensurePin(page);
+  await page.goto('/classroom');
+  await expect(page.getByTestId('classroom-shell')).toBeVisible();
+
+  // Tab 2 sits on the lock screen of a deep link. Its clock is controllable so its cached `me` can go stale.
+  const other = await context.newPage();
+  await other.clock.install();
+  await other.goto('/teacher/profile');
+  await expectLockedAndClean(other);
+
+  // The PIN is typed in the first tab.
+  await page.goto('/teacher');
+  await page.getByLabel('Enter your PIN').fill(PIN);
+  await page.getByRole('button', { name: 'Unlock' }).click();
+  await expect(page.getByTestId('teacher-menu')).toBeVisible();
+
+  // Tab 2 refetches `me` when it regains focus and sees the unlocked session: menu first, never the profile.
+  await other.clock.fastForward(60_000);
+  await other.bringToFront();
+  await other.evaluate(() => {
+    window.dispatchEvent(new Event('focus'));
+    window.dispatchEvent(new Event('visibilitychange'));
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(other.getByTestId('teacher-menu')).toBeVisible();
+  await expect(other).toHaveURL(/\/teacher$/);
+  await expect(other.getByTestId('profile-page')).toHaveCount(0);
+  await other.close();
+
+  // Leave the device relocked for the next test.
+  await page.getByTestId('display-banner').getByRole('button', { name: 'Lock' }).click();
   await expectLockedAndClean(page);
 });

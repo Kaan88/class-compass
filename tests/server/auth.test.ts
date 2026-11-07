@@ -105,16 +105,27 @@ describe('classroom PIN lock (PIN-1…9)', () => {
     expect((await c.post('/api/classroom/leave')).status).toBe(423);
   });
 
-  it('locks out after repeated wrong PINs and revokes the session after 10', async () => {
+  it('locks out after repeated wrong PINs and revokes the session after 10 (PIN-7)', async () => {
     const c = await classroomTeacher();
-    for (let i = 0; i < 4; i++) expect((await c.post('/api/auth/pin/unlock', { pin: '0000' })).status).toBe(401);
+    for (let i = 0; i < 4; i++) {
+      const r = await c.post('/api/auth/pin/unlock', { pin: '0000' });
+      expect(r.status).toBe(401);
+      expect(r.body.error.details).toMatchObject({ reason: 'WRONG_PIN', failures: i + 1, triesBeforePause: 4 - i, attemptsBeforeSignOut: 9 - i });
+    }
     const fifth = await c.post('/api/auth/pin/unlock', { pin: '0000' });
     expect(fifth.body.error.code).toBe('PIN_LOCKED_OUT');
-    expect((await c.post('/api/auth/pin/unlock', { pin: '2468' })).body.error.code).toBe('PIN_LOCKED_OUT');
+    // Relative wait (D-032: the client never compares server time with its own clock) + sign-out warning.
+    expect(fifth.body.error.details).toMatchObject({ retryAfterMs: 5 * 60_000, failures: 5, attemptsBeforeSignOut: 5 });
+    env.clock.advance(60_000);
+    const still = await c.post('/api/auth/pin/unlock', { pin: '2468' });
+    expect(still.body.error.code).toBe('PIN_LOCKED_OUT');
+    expect(still.body.error.details).toMatchObject({ retryAfterMs: 4 * 60_000, attemptsBeforeSignOut: 5 });
     // Each further wrong PIN re-locks for 5 minutes; the 10th wrong PIN revokes the session.
     for (let i = 0; i < 4; i++) {
       env.clock.advance(5 * 60_000 + 1);
-      expect((await c.post('/api/auth/pin/unlock', { pin: '0000' })).body.error.code).toBe('PIN_LOCKED_OUT');
+      const r = await c.post('/api/auth/pin/unlock', { pin: '0000' });
+      expect(r.body.error.code).toBe('PIN_LOCKED_OUT');
+      expect(r.body.error.details.attemptsBeforeSignOut).toBe(4 - i);
     }
     env.clock.advance(5 * 60_000 + 1);
     const tenth = await c.post('/api/auth/pin/unlock', { pin: '0000' });

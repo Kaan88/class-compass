@@ -23,3 +23,14 @@ export function errorText(t: T, err: unknown): string {
 
 export const reasonOf = (err: unknown): string | undefined =>
   err instanceof ApiError ? ((err.details as { reason?: string } | undefined)?.reason ?? undefined) : undefined;
+
+/**
+ * User-facing text for a command the server rejected (Needs-attention tray, UX-3): the translated
+ * reason, else the translated code, else a generic message. The server's English `message` is for
+ * diagnostics only and is never shown.
+ */
+export function commandErrorText(t: T, error: { code: string; reason?: string | undefined } | undefined): string {
+  if (error?.reason && isKey(`error.${error.reason}`)) return t(`error.${error.reason}` as MessageKey);
+  if (error?.code && isKey(`error.${error.code}`)) return t(`error.${error.code}` as MessageKey);
+  return t('common.error');
+}

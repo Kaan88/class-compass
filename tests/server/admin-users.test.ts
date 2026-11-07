@@ -42,6 +42,32 @@ describe('account administration (ACC-1/2/3, DAT-3)', () => {
     expect((await again.login('ayse.teacher')).body.locale).toBe('tr');
   });
 
+  it('enforces the forced password change on the server, not only in the client (ACC-2)', async () => {
+    const t = await ok(s.admin.post('/api/admin/users', { login: 'temp.teacher', displayName: 'Geçici Öğretmen', role: 'teacher' }));
+    const a = await ok(s.admin.post('/api/admin/users', { login: 'temp.admin', displayName: 'Temp Admin', role: 'admin' }));
+    const teacher = new Client(env);
+    await teacher.login('temp.teacher', t.temporaryPassword);
+    const admin = new Client(env);
+    await admin.login('temp.admin', a.temporaryPassword);
+    for (const [c, url] of [
+      [admin, '/api/admin/users'],
+      [teacher, '/api/teacher/contexts'],
+    ] as const) {
+      const r = await c.get(url);
+      expect(r.status).toBe(403);
+      expect(r.body.error.details.reason).toBe('MUST_CHANGE_PASSWORD');
+    }
+    const cmd = await teacher.post('/api/commands', { commands: [{ opId: '0190a0a0-0000-7000-8000-000000000000', type: 'x', payload: {} }] });
+    expect(cmd.body.error.details.reason).toBe('MUST_CHANGE_PASSWORD');
+    expect((await teacher.post('/api/auth/pin', { currentPassword: t.temporaryPassword, pin: '1357' })).body.error.details.reason).toBe('MUST_CHANGE_PASSWORD');
+    // Session basics still work, and changing the password lifts the restriction.
+    expect((await teacher.get('/api/auth/me')).body.mustChangePassword).toBe(true);
+    await ok(teacher.post('/api/auth/password', { currentPassword: t.temporaryPassword, newPassword: 'a-new-long-password' }));
+    expect((await teacher.get('/api/teacher/contexts')).status).toBe(200);
+    await ok(admin.post('/api/auth/password', { currentPassword: a.temporaryPassword, newPassword: 'another-long-password' }));
+    expect((await admin.get('/api/admin/users')).status).toBe(200);
+  });
+
   it('refuses to deactivate yourself or the last active administrator', async () => {
     expect((await s.admin.post(`/api/admin/users/${s.adminUser.id}/deactivate`)).status).toBe(400);
   });

@@ -4,7 +4,7 @@ import { pickText } from '../../shared/i18n/index.ts';
 import type { LocalizedTextValue } from '../../shared/contracts/define.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
-import { IconBoard, IconLock } from './icons.tsx';
+import { IconBoard, IconCheck, IconLock } from './icons.tsx';
 import { Mascot, ThemeDecoration } from './Mascot.tsx';
 
 /** Always names the active class AND subject, so nothing is recorded against the wrong class (LES-4). */
@@ -78,8 +78,10 @@ export function ClassSwitcher({ contexts, activeId, onSwitch }: { contexts: Swit
     <nav className="cc-class-switcher" aria-label={t('classroom.switchClass')}>
       {contexts.map((c) => (
         <Button key={c.id} aria-pressed={c.id === activeId} onPress={() => onSwitch(c.id)}>
+          {/* The active class is marked by an icon and visible text, not by colour alone (UX-7, LES-4). */}
+          {c.id === activeId ? <IconCheck /> : null}
           {c.className} · {pickText(c.subjectName, locale)}
-          {c.id === activeId ? <span className="cc-visually-hidden">{t('classroom.current')}</span> : null}
+          {c.id === activeId ? <span className="cc-class-switcher__current">{t('classroom.current')}</span> : null}
         </Button>
       ))}
     </nav>

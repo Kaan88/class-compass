@@ -7,6 +7,7 @@ import { setDisplay } from './lib/display.ts';
 import { getOutbox } from './lib/outbox-client.ts';
 import { purgeSensitive, queryClient } from './lib/queryClient.ts';
 import { markLocked, ME_KEY } from './lib/session.ts';
+import { clearAllToasts } from './lib/toast.ts';
 import { router } from './router.tsx';
 import { PUBLIC_PATHS } from './routes/guards.ts';
 import './styles/app.css';
@@ -20,7 +21,14 @@ onAuthProblem((code) => {
     markLocked(queryClient);
     return;
   }
+  if (code === 'MUST_CHANGE_PASSWORD') {
+    // The server refuses everything but the password change until the temporary password is replaced.
+    void queryClient.invalidateQueries({ queryKey: ME_KEY });
+    if (router.state.location.pathname !== '/change-password') void router.navigate({ to: '/change-password' });
+    return;
+  }
   queryClient.clear();
+  clearAllToasts();
   queryClient.setQueryData(ME_KEY, null);
   const loc = router.state.location;
   if (!PUBLIC_PATHS.includes(loc.pathname)) void router.navigate({ to: '/login', search: { next: loc.href } });

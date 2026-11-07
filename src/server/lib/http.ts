@@ -68,7 +68,12 @@ export function isPinUnlocked(session: SessionRow, now: number): boolean {
   return !session.classroomMode || (session.pinUnlockedUntil !== null && session.pinUnlockedUntil > now);
 }
 
-function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext): void {
+export interface AccessOptions {
+  /** See Endpoint.allowWithTemporaryPassword. */
+  allowWithTemporaryPassword?: boolean | undefined;
+}
+
+function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext, opts: AccessOptions = {}): void {
   if (access === 'public') return;
   if (access === 'student') {
     if (!ctx.student) throw new AppError('UNAUTHENTICATED', 'Student link session required');
@@ -77,7 +82,14 @@ function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext): void
   const { user, session } = ctx;
   if (!user || !session) throw new AppError('UNAUTHENTICATED', 'Sign in required');
   if (access === 'user') return;
+  // A temporary password (admin-issued, ACC-2) is only good for changing it: the server enforces the
+  // forced password change, not just the client's routing.
+  const mustChange = user.mustChangePassword && !opts.allowWithTemporaryPassword;
+  const refuseTemporary = () => {
+    throw new AppError('FORBIDDEN', 'Change your temporary password first', { reason: 'MUST_CHANGE_PASSWORD' });
+  };
   if (access === 'classroom') {
+    if (mustChange) refuseTemporary();
     if (user.role !== 'teacher') throw new AppError('FORBIDDEN', 'Teacher account required');
     return;
   }
@@ -85,6 +97,7 @@ function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext): void
   // Checked before the role so a locked classroom device answers every sensitive URL the same way.
   const now = deps.now();
   if (!isPinUnlocked(session, now)) throw new AppError('PIN_REQUIRED', 'Unlock with your PIN');
+  if (mustChange) refuseTemporary();
   if (access === 'teacher' && user.role !== 'teacher') throw new AppError('FORBIDDEN', 'Teacher account required');
   if (access === 'admin' && user.role !== 'admin') throw new AppError('FORBIDDEN', 'Administrator account required');
   if (session.classroomMode) {
@@ -124,11 +137,11 @@ export type Handler<I extends z.ZodType, O extends z.ZodType> = (
 ) => z.input<O> | Promise<z.input<O>>;
 
 /** Build the per-request context and enforce access. Exported for non-JSON routes (files, CSV). */
-export function contextFor(deps: AppDeps, req: FastifyRequest, access: Access): RequestContext {
+export function contextFor(deps: AppDeps, req: FastifyRequest, access: Access, opts: AccessOptions = {}): RequestContext {
   enforceCsrf(deps, req);
   const { session, user, student } = loadSession(deps, req);
   const ctx: RequestContext = { ...deps, ip: clientIp(deps, req), session, user, student, actor: actorOf(user, student) };
-  enforceAccess(deps, access, ctx);
+  enforceAccess(deps, access, ctx, opts);
   return ctx;
 }
 
@@ -147,7 +160,7 @@ export function route<I extends z.ZodType, O extends z.ZodType>(
     url: ep.path,
     config: opts.rateLimit ? { rateLimit: opts.rateLimit } : {},
     handler: async (req, reply) => {
-      const ctx = contextFor(deps, req, ep.access);
+      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword });
       const params = (req.params ?? {}) as Record<string, unknown>;
       const raw = ep.method === 'GET' ? { ...(req.query as object), ...params } : { ...((req.body as object) ?? {}), ...params };
       const parsed = ep.input.safeParse(raw);

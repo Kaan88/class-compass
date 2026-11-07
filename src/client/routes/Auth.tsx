@@ -55,7 +55,7 @@ export function LoginPage() {
     try {
       const me = await call(Auth.login, { login, password });
       qc.setQueryData(ME_KEY, me);
-      void getOutbox().resume();
+      void getOutbox().resume(me.id); // only this account's queued commands are sent (ACC-9)
       const next = safeNext(search.next);
       await navigate({ to: me.mustChangePassword ? '/change-password' : (next ?? homeFor(me)) });
     } catch (err) {

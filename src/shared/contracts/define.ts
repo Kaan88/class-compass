@@ -25,6 +25,12 @@ export interface Endpoint<I extends z.ZodType = z.ZodType, O extends z.ZodType =
   output: O;
   /** Responses carry sensitive data: forbid caching (always true for non-public). */
   sensitive?: boolean;
+  /**
+   * Usable by an account that still has an admin-issued temporary password (`mustChangePassword`).
+   * Every other `classroom`/`teacher`/`admin`/`account` endpoint refuses such accounts with
+   * 403 MUST_CHANGE_PASSWORD; `user` endpoints (me, logout, lock/unlock, preferences) stay open.
+   */
+  allowWithTemporaryPassword?: boolean;
 }
 
 export function endpoint<I extends z.ZodType, O extends z.ZodType>(e: Endpoint<I, O>): Endpoint<I, O> {

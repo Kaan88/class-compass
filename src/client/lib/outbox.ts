@@ -14,6 +14,12 @@
  *  - 401 (signed out)                → paused until `resume()` after the next sign-in
  * Offline (navigator.onLine false) nothing is sent; the `online` event resumes sending.
  *
+ * Shared classroom PCs (ACC-9, UX-11): every command records the account that queued it (`ownerId`).
+ * Only the current owner's commands are sent, counted and shown; the request carries `asUser` and the
+ * server refuses it (409 WRONG_ACCOUNT) if another account is signed in, so another teacher's queued
+ * commands are never applied or audited as the wrong person. They stay parked on the device until
+ * their owner signs in again. With no owner (signed out) nothing is sent and nothing can be enqueued.
+ *
  * The module is framework-free so it can be unit-tested with fake-indexeddb; the React binding is
  * `useOutboxStatus()` in outbox-client.ts.
  */
@@ -25,6 +31,8 @@ export interface OutboxOp {
   /** Auto-increment key: the enqueue order, preserved when sending. */
   seq?: number;
   opId: string;
+  /** User id of the account that queued the command; only that account ever sends it. */
+  ownerId?: string | undefined;
   type: string;
   payload: unknown;
   lessonId?: string | undefined;
@@ -32,9 +40,23 @@ export interface OutboxOp {
   clientTime: number;
   state: 'pending' | 'rejected';
   attempts: number;
-  error?: { code: string; message: string } | undefined;
+  error?: OutboxError | undefined;
   createdAt: number;
 }
+
+export interface OutboxError {
+  code: string;
+  /** English diagnostics only; the UI translates `reason`/`code`. */
+  message: string;
+  reason?: string | undefined;
+}
+
+/**
+ * Retry re-sends under a NEW opId (D-035). That is only safe when the server definitely did not apply
+ * the original: an opId conflict means it may have been applied already (possibly under another
+ * account), so those commands can only be dismissed.
+ */
+export const isRetryable = (op: OutboxOp) => op.error?.reason !== 'OP_ID_REUSED' && op.error?.reason !== 'UNKNOWN_COMMAND';
 
 export interface OutboxStatus {
   /** Commands waiting to be sent (not counting rejected ones). */
@@ -46,6 +68,8 @@ export interface OutboxStatus {
   authPaused: boolean;
   /** Commands the server refused; shown in the Needs-attention tray. */
   rejected: OutboxOp[];
+  /** Commands on this device that belong to other accounts (parked, never sent or shown here). */
+  otherAccounts: number;
   /** Time of the last successful save (ms), or null. */
   lastSavedAt: number | null;
   /** When the next automatic retry happens after a failure (ms), or null. */
@@ -54,7 +78,7 @@ export interface OutboxStatus {
   failures: number;
 }
 
-export type SendFn = (commands: CommandEnvelope[]) => Promise<CommandResult[]>;
+export type SendFn = (commands: CommandEnvelope[], asUser: string) => Promise<CommandResult[]>;
 export type FailureKind = 'transient' | 'auth' | 'reject';
 type Timer = { cancel: () => void };
 
@@ -72,12 +96,22 @@ export interface OutboxOptions {
   maxDelayMs?: number;
   /** Decide what a thrown send error means. Default: by HTTP status (see `classifyFailure`). */
   classify?: (err: unknown) => FailureKind;
+  /** The signed-in account at start (usually set later with `setOwner`). */
+  owner?: string | null;
   /** Serialise sending across browser tabs (Web Locks); optional. */
   lock?: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 
+function reasonOf(err: unknown): string | undefined {
+  const details = typeof err === 'object' && err !== null && 'details' in err ? (err as { details: unknown }).details : undefined;
+  const reason = typeof details === 'object' && details !== null && 'reason' in details ? (details as { reason: unknown }).reason : undefined;
+  return typeof reason === 'string' ? reason : undefined;
+}
+
 /** Default failure classification by the HTTP status carried on the error (ApiError has `status`). */
 export function classifyFailure(err: unknown): FailureKind {
+  // Another account is signed in, or the account must change its temporary password: wait, do not park.
+  if (reasonOf(err) === 'WRONG_ACCOUNT' || reasonOf(err) === 'MUST_CHANGE_PASSWORD') return 'auth';
   const status = typeof err === 'object' && err !== null && 'status' in err ? Number((err as { status: unknown }).status) : NaN;
   if (status === 401) return 'auth';
   if (status === 400 || status === 403 || status === 404 || status === 409 || status === 413 || status === 422) return 'reject';
@@ -87,16 +121,20 @@ export function classifyFailure(err: unknown): FailureKind {
 export const backoffDelay = (failures: number, base: number, max: number) => Math.min(max, base * 2 ** Math.max(0, failures - 1));
 
 export interface Outbox {
+  /** Queue a command for the current owner. Throws when nobody is signed in. */
   enqueue(type: string, payload: unknown, meta?: { lessonId?: string | undefined; contextId?: string | undefined }): Promise<string>;
+  /** The signed-in account changed (sign-in, sign-out, user switch). Null = nobody: nothing is sent. */
+  setOwner(userId: string | null): Promise<void>;
+  getOwner(): string | null;
   start(): Promise<void>;
   stop(): void;
   /** Try to send now (single-flight: concurrent calls share one run). */
   flush(): Promise<void>;
-  /** Re-queue a rejected command under a NEW opId (the old one is recorded as rejected on the server). */
+  /** Re-queue a rejected command under a NEW opId (the old one is recorded as rejected on the server). Ignored unless `isRetryable` and owned. */
   retry(opId: string): Promise<void>;
   dismiss(opId: string): Promise<void>;
-  /** After signing in again. */
-  resume(): Promise<void>;
+  /** After signing in again (as `ownerId`, which becomes the owner). */
+  resume(ownerId?: string): Promise<void>;
   getStatus(): OutboxStatus;
   subscribe(fn: () => void): () => void;
   onSuccess(fn: (op: OutboxOp, result: CommandResult) => void): () => void;
@@ -132,7 +170,8 @@ export function createOutbox(opts: OutboxOptions): Outbox {
   const lock = opts.lock ?? (<T,>(fn: () => Promise<T>) => fn());
   const events = opts.events === undefined ? (typeof window === 'undefined' ? null : window) : opts.events;
 
-  let status: OutboxStatus = { pending: 0, sending: false, online: isOnline(), authPaused: false, rejected: [], lastSavedAt: null, retryAt: null, failures: 0 };
+  let owner: string | null = opts.owner ?? null;
+  let status: OutboxStatus = { pending: 0, sending: false, online: isOnline(), authPaused: false, rejected: [], otherAccounts: 0, lastSavedAt: null, retryAt: null, failures: 0 };
   const listeners = new Set<() => void>();
   const successListeners = new Set<(op: OutboxOp, result: CommandResult) => void>();
   let running: Promise<void> | null = null;
@@ -145,15 +184,20 @@ export function createOutbox(opts: OutboxOptions): Outbox {
     listeners.forEach((l) => l());
   };
 
+  const mine = (o: OutboxOp) => owner !== null && o.ownerId === owner;
+
   async function refresh() {
-    const [pending, rejected] = await Promise.all([
-      db.ops.where('state').equals('pending').count(),
-      db.ops.where('state').equals('rejected').sortBy('seq'),
-    ]);
-    setStatus({ pending, rejected, online: isOnline() });
+    const all = await db.ops.orderBy('seq').toArray();
+    const own = all.filter(mine);
+    setStatus({
+      pending: own.filter((o) => o.state === 'pending').length,
+      rejected: own.filter((o) => o.state === 'rejected'),
+      otherAccounts: all.length - own.length,
+      online: isOnline(),
+    });
   }
 
-  const canSend = () => !stopped && isOnline() && !status.authPaused && retryTimer === null;
+  const canSend = () => !stopped && owner !== null && isOnline() && !status.authPaused && retryTimer === null;
 
   const envelope = (op: OutboxOp): CommandEnvelope => ({
     opId: op.opId,
@@ -179,16 +223,17 @@ export function createOutbox(opts: OutboxOptions): Outbox {
   /** Send pending commands in order until the queue is empty or sending must pause. */
   async function drain() {
     while (canSend()) {
+      const asUser = owner!;
       const batch = await db.ops
         .orderBy('seq')
-        .filter((o) => o.state === 'pending')
+        .filter((o) => o.state === 'pending' && o.ownerId === asUser)
         .limit(batchSize)
         .toArray();
       if (batch.length === 0) return;
       setStatus({ sending: true });
       let results: CommandResult[];
       try {
-        results = await send(batch.map(envelope));
+        results = await send(batch.map(envelope), asUser);
       } catch (err) {
         setStatus({ sending: false });
         const kind = classify(err);
@@ -200,7 +245,9 @@ export function createOutbox(opts: OutboxOptions): Outbox {
           // The whole request was refused (e.g. malformed): park the batch for the teacher.
           const message = err instanceof Error ? err.message : 'Rejected';
           const code = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code: unknown }).code) : 'REJECTED';
-          await db.ops.bulkUpdate(batch.map((o) => ({ key: o.seq!, changes: { state: 'rejected' as const, error: { code, message } } })));
+          const reason = reasonOf(err);
+          const error: OutboxError = { code, message, ...(reason ? { reason } : {}) };
+          await db.ops.bulkUpdate(batch.map((o) => ({ key: o.seq!, changes: { state: 'rejected' as const, error } })));
           await refresh();
           continue;
         }
@@ -270,6 +317,17 @@ export function createOutbox(opts: OutboxOptions): Outbox {
   };
   const onOffline = () => setStatus({ online: false });
 
+  async function setOwner(userId: string | null) {
+    if (userId === owner) return;
+    owner = userId;
+    // A different account (or none): a pause or backoff caused by the previous account no longer applies.
+    retryTimer?.cancel();
+    retryTimer = null;
+    setStatus({ authPaused: false, failures: 0, retryAt: null, lastSavedAt: null });
+    await refresh();
+    if (owner !== null) await kick();
+  }
+
   function stop() {
     stopped = true;
     events?.removeEventListener('online', onOnline);
@@ -280,8 +338,10 @@ export function createOutbox(opts: OutboxOptions): Outbox {
 
   return {
     async enqueue(type, payload, meta = {}) {
+      if (owner === null) throw new Error('Outbox: no signed-in account to queue commands for');
       const op: OutboxOp = {
         opId: newOpId(),
+        ownerId: owner,
         type,
         payload,
         lessonId: meta.lessonId,
@@ -306,9 +366,11 @@ export function createOutbox(opts: OutboxOptions): Outbox {
     },
     stop,
     flush: () => kick(),
+    setOwner,
+    getOwner: () => owner,
     async retry(opId) {
       const op = await db.ops.where('opId').equals(opId).first();
-      if (!op || op.state !== 'rejected') return;
+      if (!op || op.state !== 'rejected' || !mine(op) || !isRetryable(op)) return;
       await db.transaction('rw', db.ops, async () => {
         await db.ops.delete(op.seq!);
         const { seq: _seq, error: _error, ...rest } = op;
@@ -318,11 +380,18 @@ export function createOutbox(opts: OutboxOptions): Outbox {
       void kick();
     },
     async dismiss(opId) {
-      await db.ops.where('opId').equals(opId).delete();
+      // Only the owner can drop their own commands; another teacher's parked commands are untouchable.
+      await db.ops
+        .where('opId')
+        .equals(opId)
+        .filter((o) => mine(o))
+        .delete();
       await refresh();
     },
-    async resume() {
+    async resume(ownerId) {
+      if (ownerId !== undefined && ownerId !== owner) return setOwner(ownerId);
       setStatus({ authPaused: false });
+      await refresh();
       await kick();
     },
     getStatus: () => status,

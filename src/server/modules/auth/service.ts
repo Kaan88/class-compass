@@ -179,10 +179,19 @@ export function lockNow(deps: AppDeps, session: SessionRow) {
 }
 
 /** PIN unlock with per-session lockout (PIN-7). 10 failures revoke the session entirely. */
+/**
+ * Lockout details for the client (PIN-7, D-032): `retryAfterMs` is RELATIVE so the lock screen counts
+ * down from the moment it received the answer and never compares server time with its own clock;
+ * `attemptsBeforeSignOut` lets it warn before the failure that revokes the session.
+ */
+function pinLockoutDetails(lockedUntil: number, failures: number, now: number) {
+  return { retryAt: lockedUntil, retryAfterMs: Math.max(0, lockedUntil - now), failures, attemptsBeforeSignOut: Math.max(0, PIN_REVOKE_FAILURES - failures) };
+}
+
 export async function unlockPin(deps: AppDeps, user: UserRow, session: SessionRow, pin: string): Promise<number> {
   let now = deps.now();
   if (session.pinLockedUntil && session.pinLockedUntil > now) {
-    throw new AppError('PIN_LOCKED_OUT', 'Too many wrong PINs. Wait and try again.', { retryAt: session.pinLockedUntil });
+    throw new AppError('PIN_LOCKED_OUT', 'Too many wrong PINs. Wait and try again.', pinLockoutDetails(session.pinLockedUntil, session.pinFailures, now));
   }
   if (!user.pinHash) throw new AppError('VALIDATION', 'No PIN set', { reason: 'PIN_NOT_SET' });
   const ok = await verifyPin(deps.config.SECRET_PEPPER, user.pinHash, pin);
@@ -197,8 +206,13 @@ export async function unlockPin(deps: AppDeps, user: UserRow, session: SessionRo
     const pinLockedUntil = failures >= PIN_FREE_FAILURES ? now + PIN_LOCKOUT_MS : null;
     deps.db.update(sessions).set({ pinFailures: failures, pinLockedUntil }).where(eq(sessions.id, session.id)).run();
     audit(deps.db, actorFor(user), { action: 'auth.pin_failed', entity: 'session', entityId: session.id, after: { failures } }, now);
-    if (pinLockedUntil) throw new AppError('PIN_LOCKED_OUT', 'Too many wrong PINs. Wait and try again.', { retryAt: pinLockedUntil });
-    throw new AppError('UNAUTHENTICATED', 'Wrong PIN', { reason: 'WRONG_PIN', failures });
+    if (pinLockedUntil) throw new AppError('PIN_LOCKED_OUT', 'Too many wrong PINs. Wait and try again.', pinLockoutDetails(pinLockedUntil, failures, now));
+    throw new AppError('UNAUTHENTICATED', 'Wrong PIN', {
+      reason: 'WRONG_PIN',
+      failures,
+      triesBeforePause: Math.max(0, PIN_FREE_FAILURES - failures),
+      attemptsBeforeSignOut: Math.max(0, PIN_REVOKE_FAILURES - failures),
+    });
   }
   const until = now + PIN_UNLOCK_MS;
   deps.db.update(sessions).set({ pinUnlockedUntil: until, pinFailures: 0, pinLockedUntil: null }).where(eq(sessions.id, session.id)).run();

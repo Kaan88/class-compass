@@ -22,7 +22,12 @@ export const CommandResult = z.object({
   ok: z.boolean(),
   replayed: z.boolean(),
   result: z.unknown().optional(),
-  error: z.object({ code: z.string(), message: z.string() }).optional(),
+  /**
+   * `code` is a stable ErrorCode; `reason` is the machine-readable business reason (details.reason of
+   * the AppError, or OP_ID_REUSED / UNKNOWN_COMMAND) that the client translates. `message` is English
+   * diagnostics only and is never shown to teachers.
+   */
+  error: z.object({ code: z.string(), message: z.string(), reason: z.string().optional() }).optional(),
 });
 export type CommandResult = z.infer<typeof CommandResult>;
 
@@ -30,6 +35,11 @@ export const submitCommands = endpoint({
   method: 'POST',
   path: '/api/commands',
   access: 'classroom',
-  input: z.object({ commands: z.array(CommandEnvelope).min(1).max(50) }),
+  /**
+   * `asUser`: the account that queued these commands on the device. When it is not the signed-in
+   * account the whole request is refused (409 WRONG_ACCOUNT), so commands queued by one teacher are
+   * never applied or audited as another teacher on a shared classroom PC (ACC-9, UX-11).
+   */
+  input: z.object({ commands: z.array(CommandEnvelope).min(1).max(50), asUser: z.string().optional() }),
   output: z.object({ results: z.array(CommandResult) }),
 });

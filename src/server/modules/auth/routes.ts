@@ -6,6 +6,7 @@ import { sessions, users } from '../../db/schema.ts';
 import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { executeCommand } from '../../lib/commands.ts';
+import { AppError } from '../../lib/errors.ts';
 import { route, sessionCookieName } from '../../lib/http.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
 import * as svc from './service.ts';
@@ -111,7 +112,10 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     { rateLimit: { max: 10, timeWindow: '15 minutes' } },
   );
 
-  route(app, deps, submitCommands, (ctx, input) => ({
-    results: input.commands.map((c) => executeCommand(ctx, c)),
-  }));
+  route(app, deps, submitCommands, (ctx, input) => {
+    if (input.asUser !== undefined && input.asUser !== requireUser(ctx).id) {
+      throw new AppError('CONFLICT', 'These commands were queued by another account', { reason: 'WRONG_ACCOUNT' });
+    }
+    return { results: input.commands.map((c) => executeCommand(ctx, c)) };
+  });
 }

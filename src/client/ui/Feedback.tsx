@@ -5,7 +5,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import type { OutboxOp } from '../lib/outbox.ts';
-import { saveStateOf, type SaveState } from '../lib/outbox.ts';
+import { isRetryable, saveStateOf, type SaveState } from '../lib/outbox.ts';
+import { commandErrorText } from '../lib/errors.ts';
 import { getOutbox, useOutboxStatus } from '../lib/outbox-client.ts';
 import { dismissToast, useToasts, type Toast } from '../lib/toast.ts';
 import { Button } from './Button.tsx';
@@ -21,7 +22,7 @@ function ToastView({ toast }: { toast: Toast }) {
     return () => clearInterval(h);
   }, [toast]);
   return (
-    <div className="cc-toast" data-kind={toast.kind}>
+    <div className="cc-toast" data-kind={toast.kind} data-testid="toast">
       {toast.kind === 'error' ? <IconAlert /> : toast.kind === 'success' ? <IconCheck /> : null}
       <span className="cc-toast__msg">{toast.message}</span>
       {toast.undo ? (
@@ -91,6 +92,8 @@ export interface AttentionItem {
   id: string;
   title: string;
   detail: string;
+  /** False when re-sending could apply the action twice: only Dismiss is offered. */
+  canRetry?: boolean;
 }
 
 /** Commands the server refused; never silently dropped (UX-11). */
@@ -111,9 +114,11 @@ export function NeedsAttentionTray({ items, onRetry, onDismiss }: { items: Atten
               <div>{i.title}</div>
               <div className="cc-muted">{i.detail}</div>
             </div>
-            <Button size="small" variant="primary" onPress={() => onRetry(i.id)}>
-              {t('attention.retry')}
-            </Button>
+            {i.canRetry === false ? null : (
+              <Button size="small" variant="primary" onPress={() => onRetry(i.id)}>
+                {t('attention.retry')}
+              </Button>
+            )}
             <Button size="small" onPress={() => onDismiss(i.id)}>
               {t('attention.dismiss')}
             </Button>
@@ -137,7 +142,8 @@ export function OutboxAttentionTray() {
   const items = status.rejected.map((op) => ({
     id: op.opId,
     title: describers.get(op.type)?.(op) ?? t('attention.unknownAction', { type: op.type }),
-    detail: op.error?.message ?? '',
+    detail: commandErrorText(t, op.error),
+    canRetry: isRetryable(op),
   }));
   return <NeedsAttentionTray items={items} onRetry={(id) => void getOutbox().retry(id)} onDismiss={(id) => void getOutbox().dismiss(id)} />;
 }

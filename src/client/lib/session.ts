@@ -2,6 +2,7 @@ import { useQuery, type QueryClient } from '@tanstack/react-query';
 import * as Auth from '../../shared/contracts/auth.ts';
 import { ApiError, call } from './api.ts';
 import { purgeSensitive, queryClient } from './queryClient.ts';
+import { clearAllToasts, clearSensitiveToasts } from './toast.ts';
 
 export type Me = Auth.Me;
 export const ME_KEY = ['me'] as const;
@@ -31,6 +32,7 @@ export const isLocked = (me: Me | null) => me !== null && me.classroomMode && !m
 /** Mark the session locked locally (after a 423, the lock button or inactivity) and purge sensitive data. */
 export function markLocked(qc: QueryClient = queryClient) {
   purgeSensitive(qc);
+  clearSensitiveToasts(); // e.g. "Student added: <name>" must not stay over the lock screen (PIN-3)
   qc.setQueryData<Me | null>(ME_KEY, (m) => (m ? { ...m, pinUnlocked: false, pinUnlockedUntil: null } : m));
 }
 
@@ -46,6 +48,7 @@ export async function lockNow(qc: QueryClient = queryClient) {
 /** Enter (or re-enter) classroom mode: relocks the teacher area on this device (PIN-6). */
 export async function enterClassroom(qc: QueryClient = queryClient) {
   purgeSensitive(qc);
+  clearSensitiveToasts();
   await call(Auth.enterClassroom, {});
   return freshMe(qc);
 }
@@ -57,5 +60,6 @@ export async function signOut(qc: QueryClient = queryClient) {
     /* already signed out */
   }
   qc.clear();
+  clearAllToasts();
   qc.setQueryData(ME_KEY, null);
 }

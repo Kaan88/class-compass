@@ -997,6 +997,14 @@ a {
   background: var(--cc-accent);
   color: var(--cc-accent-text);
   border-color: var(--cc-accent-strong);
+  /* Not colour alone (UX-7): heavier border + underline, plus the check icon and "(current)" text. */
+  border-width: 3px;
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.25em;
+}
+.cc-class-switcher__current {
+  font-weight: 700;
 }
 
 /* ------------------------------------------------------------------ lock screen & PIN pad (PIN-2/3) */

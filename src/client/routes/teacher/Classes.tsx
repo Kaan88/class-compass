@@ -187,23 +187,21 @@ export function AddStudentDialog({
     try {
       await onAdd({ fullName, givenNames: given.trim() || null, familyName: family.trim() || null, studentNumber: number.trim() || null, allowDuplicateName });
       showToast({ message: t('students.added', { name: fullName }), kind: 'success' });
-      reset();
-      onOpenChange(false);
+      close(false);
       onDone();
     } catch (err) {
       if (reasonOf(err) === 'POSSIBLE_DUPLICATE') setDupWarning(true);
       else setError(errorText(t, err));
     }
   };
+  // Every way of closing (Cancel, Escape, the close button, success) clears what was typed, so a
+  // reopened dialog never carries stale names or a stale "Add anyway" confirmation.
+  const close = (v: boolean) => {
+    if (!v) reset();
+    onOpenChange(v);
+  };
   return (
-    <Modal
-      isOpen={isOpen}
-      onOpenChange={(v) => {
-        if (!v) reset();
-        onOpenChange(v);
-      }}
-      title={t('students.add')}
-    >
+    <Modal isOpen={isOpen} onOpenChange={close} title={t('students.add')}>
       <form
         className="cc-stack"
         onSubmit={(e) => {
@@ -225,7 +223,7 @@ export function AddStudentDialog({
           </Alert>
         ) : null}
         <DialogActions>
-          <Button onPress={() => onOpenChange(false)}>{t('common.cancel')}</Button>
+          <Button onPress={() => close(false)}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary">
             {t('students.add')}
           </Button>

@@ -48,7 +48,7 @@ function actorKey(ctx: RequestContext) {
  */
 export function executeCommand(ctx: RequestContext, env: CommandEnvelope): CommandResult {
   const def = registry.get(env.type);
-  if (!def) return { opId: env.opId, ok: false, replayed: false, error: { code: 'VALIDATION', message: `Unknown command ${env.type}` } };
+  if (!def) return { opId: env.opId, ok: false, replayed: false, error: { code: 'VALIDATION', message: `Unknown command ${env.type}`, reason: 'UNKNOWN_COMMAND' } };
   const requestHash = sha256(stableStringify({ type: env.type, payload: env.payload, lessonId: env.lessonId, contextId: env.contextId }));
   const key = actorKey(ctx);
 
@@ -56,7 +56,7 @@ export function executeCommand(ctx: RequestContext, env: CommandEnvelope): Comma
     const prev = ctx.db.select().from(commandLog).where(eq(commandLog.opId, env.opId)).get();
     if (!prev) return null;
     if (prev.requestHash !== requestHash || prev.actorKey !== key) {
-      return { opId: env.opId, ok: false, replayed: true, error: { code: 'CONFLICT', message: 'Operation id reused with different content' } };
+      return { opId: env.opId, ok: false, replayed: true, error: { code: 'CONFLICT', message: 'Operation id reused with different content', reason: 'OP_ID_REUSED' } };
     }
     return { ...(JSON.parse(prev.resultJson) as CommandResult), replayed: true };
   };
@@ -82,7 +82,13 @@ export function executeCommand(ctx: RequestContext, env: CommandEnvelope): Comma
     });
   } catch (err) {
     if (err instanceof AppError) {
-      const result: CommandResult = { opId: env.opId, ok: false, replayed: false, error: { code: err.code, message: err.message } };
+      const reason = (err.details as { reason?: unknown } | undefined)?.reason;
+      const result: CommandResult = {
+        opId: env.opId,
+        ok: false,
+        replayed: false,
+        error: { code: err.code, message: err.message, ...(typeof reason === 'string' ? { reason } : {}) },
+      };
       try {
         tx(ctx.db, () => {
           if (!replay()) record(result);
