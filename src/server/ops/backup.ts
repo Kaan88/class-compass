@@ -332,11 +332,36 @@ function pidAlive(pid: number): boolean {
 }
 
 /**
- * Is a server using this data folder? `running` when it answers /healthz or its lock names a live
- * process on this machine; `unknown` when a lock exists that cannot be checked (another container or
- * a crash); `stopped` otherwise.
+ * Does another connection hold the database open right now? Asks SQLite itself: in WAL mode every
+ * open connection keeps a shared lock on the database file, so an exclusive lock fails while any
+ * process uses it, also one in another container that shares the data folder (the bind mount), where
+ * neither the pid nor /healthz can be checked. Nothing is changed: the probe only locks and unlocks.
+ */
+export function databaseInUse(dbPath: string): boolean {
+  if (!fs.existsSync(dbPath)) return false;
+  let probe: Database.Database | null = null;
+  try {
+    probe = new Database(dbPath, { fileMustExist: true, timeout: 0 });
+    probe.pragma('locking_mode = EXCLUSIVE');
+    probe.exec('BEGIN EXCLUSIVE');
+    probe.exec('COMMIT');
+    return false;
+  } catch (err) {
+    const code = (err as { code?: string }).code ?? '';
+    return code.startsWith('SQLITE_BUSY') || code.startsWith('SQLITE_LOCKED');
+  } finally {
+    probe?.close();
+  }
+}
+
+/**
+ * Is a server using this data folder? `running` when another process holds the database open
+ * (SQLite lock, works across containers), when it answers /healthz, or when its lock names a live
+ * process on this machine; `unknown` when a lock file exists that cannot be checked (a crash);
+ * `stopped` otherwise.
  */
 export async function serverState(config: Pick<Config, 'dbPath' | 'HOST' | 'PORT'>, probe: (url: string) => Promise<boolean> = httpProbe): Promise<ServerState> {
+  if (databaseInUse(config.dbPath)) return 'running';
   if (await probe(`http://${config.HOST === '0.0.0.0' ? '127.0.0.1' : config.HOST}:${config.PORT}/healthz`)) return 'running';
   const file = path.join(path.dirname(config.dbPath), LOCK_FILE);
   if (!fs.existsSync(file)) return 'stopped';
@@ -384,7 +409,7 @@ export async function restoreBackup(opts: {
 }): Promise<RestoreResult> {
   const { config } = opts;
   const state = await serverState(config, opts.probe);
-  if (state === 'running') throw new RestoreRefused('The server is running on this data folder. Stop it first (docker compose stop app).');
+  if (state === 'running') throw new RestoreRefused('The server is running on this data folder (or another process holds the database open). Stop it first (docker compose stop app backup); --force does not override this.');
   if (state === 'unknown' && !opts.force) {
     throw new RestoreRefused('A server lock exists that cannot be checked from here. Make sure the service is stopped, then run again with --force.');
   }
@@ -459,8 +484,12 @@ export interface RunRecord {
   actorId?: string | null;
 }
 
-/** Records a run in `backup_runs` (best effort when the table does not exist yet). */
+/**
+ * Records a run in `backup_runs`. Best effort when the table does not exist (a database older than
+ * the migration that adds it, which backup commands never migrate); other errors are thrown.
+ */
 export function recordRun(db: Db, r: RunRecord): void {
+  if (!db.$client.prepare("select 1 from sqlite_master where type = 'table' and name = 'backup_runs'").get()) return;
   db.insert(backupRuns)
     .values({
       id: newId(),

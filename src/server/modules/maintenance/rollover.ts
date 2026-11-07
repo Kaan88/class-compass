@@ -2,7 +2,9 @@
  * School-year rollover wizard (DAT-1, DAT-2, D-092). One transaction built from the existing,
  * audited school and student services (no new write paths):
  *   1. create the new year;
- *   2. optionally create its classes from the old ones (grade + 1, name with the grade raised);
+ *   2. optionally create its classes from the old ones (grade + 1, name with the grade raised or as
+ *      the administrator typed it); classes in `excludeClassIds` (a graduating final grade) end with
+ *      the old year: they are not re-created and nobody is promoted out of them;
  *   3. optionally assign the same teachers and subjects (active assignments only);
  *   4. optionally promote each old class's active students on the new year's first day (history
  *      kept: the old enrolment ends, a `promotion` enrolment starts);
@@ -45,6 +47,7 @@ function plan(ctx: RequestContext, input: Input): RolloverPlan {
   if (year.archivedAt !== null && input.promote) problems.push({ reason: 'OLD_YEAR_ARCHIVED', classId: null });
   if (input.copyAssignments && !input.copyClasses) problems.push({ reason: 'ASSIGNMENTS_NEED_CLASSES', classId: null });
   if (input.promote && !input.copyClasses) problems.push({ reason: 'PROMOTE_NEEDS_CLASSES', classId: null });
+  const excluded = new Set(input.excludeClassIds ?? []);
   const rows = old.map((c) => {
     const newName = (input.classNames?.[c.id] ?? nextClassName(c.name, c.grade)).trim();
     const activeStudents = ctx.db
@@ -57,10 +60,10 @@ function plan(ctx: RequestContext, input: Input): RolloverPlan {
       .from(teachingContexts)
       .where(and(eq(teachingContexts.classId, c.id), isNull(teachingContexts.endedAt)))
       .all().length;
-    return { id: c.id, name: c.name, newName, grade: c.grade, newGrade: c.grade === null ? null : c.grade + 1, activeStudents, assignments };
+    return { id: c.id, name: c.name, newName, grade: c.grade, newGrade: c.grade === null ? null : c.grade + 1, activeStudents, assignments, included: !excluded.has(c.id) };
   });
   const seen = new Map<string, string>();
-  for (const r of rows) {
+  for (const r of rows.filter((x) => x.included)) {
     const k = r.newName.toLocaleLowerCase('tr');
     if (seen.has(k)) problems.push({ reason: 'DUPLICATE_CLASS_NAME', classId: r.id });
     seen.set(k, r.id);
@@ -81,7 +84,7 @@ export function rolloverApply(ctx: RequestContext, input: Input & { confirm: str
     let studentsPromoted = 0;
     let studentsSkipped = 0;
     if (input.copyClasses) {
-      for (const c of p.classes) {
+      for (const c of p.classes.filter((x) => x.included)) {
         const old = ctx.db.select().from(classes).where(eq(classes.id, c.id)).get()!;
         const created = createClass(ctx, {
           schoolYearId: year.id,
@@ -112,7 +115,7 @@ export function rolloverApply(ctx: RequestContext, input: Input & { confirm: str
       }
     }
     if (input.archiveOld) setYearArchived(ctx, p.fromYear.id, true);
-    const result = { yearId: year.id, classesCreated, assignmentsCreated, studentsPromoted, studentsSkipped, archivedOld: input.archiveOld };
+    const result = { yearId: year.id, classesCreated, classesNotContinued: input.copyClasses ? p.classes.filter((c) => !c.included).length : 0, assignmentsCreated, studentsPromoted, studentsSkipped, archivedOld: input.archiveOld };
     audit(ctx.db, ctx.actor, { action: 'school_year.rollover', entity: 'school_year', entityId: p.fromYear.id, after: result }, ctx.now());
     return result;
   });

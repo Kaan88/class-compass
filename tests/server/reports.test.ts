@@ -2,6 +2,7 @@
  * Reports (S11): RPT-1..6, DAT-2/6. Test clock starts Monday 2026-11-09 10:00 Europe/Istanbul.
  * Fictional names only.
  */
+import crypto from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CSV_BOM } from '../../src/domain/csv.ts';
 import type { Report, ReportCell, ReportSection } from '../../src/shared/contracts/reports.ts';
@@ -79,10 +80,14 @@ describe('RPT-5: zero, absent, not recorded and denominators', () => {
     const perStudent = (i: number) => rowOf(counters, `students-${counterId}`, kids[i]!.id);
     const cols = counters.tables.find((t) => t.key === `students-${counterId}`)!.columns.map((c) => c.key);
     const at = (k: string) => cols.indexOf(k);
-    // Ece: 2 reminders in 1 attended lesson; Arda: absent → no attended lesson; Işıl: present, 0.
+    // Ece: 2 reminders in 1 attended lesson; Arda: absent for every recorded lesson → "absent", not 0 / 0; Işıl: present, 0.
     expect(perStudent(0)[at('perAttended')]).toEqual({ t: 'n', v: 2, d: 1 });
-    expect(perStudent(1)[at('perAttended')]).toEqual({ t: 'n', v: 0, d: 0 });
+    expect(perStudent(1)[at('perAttended')]).toEqual({ t: 'absent' });
     expect(perStudent(2)[at('perAttended')]).toEqual({ t: 'n', v: 0, d: 1 });
+    // A week the student missed every lesson of is "absent"; a present student's quiet week is 0.
+    expect(perStudent(1)[at('w-2026-11-09')]).toEqual({ t: 'absent' });
+    expect(perStudent(1)[at('total')]).toEqual({ t: 'n', v: 0 });
+    expect(perStudent(1)[at('unrecorded')]).toEqual({ t: 'n', v: 0, d: 1 });
     // The current week had a lesson: counts. Earlier weeks of the term without lessons: not recorded.
     expect(perStudent(2)[at('w-2026-11-09')]).toEqual({ t: 'n', v: 0 });
     expect(perStudent(2)[at('w-2026-11-02')]).toEqual({ t: 'na' });
@@ -180,7 +185,7 @@ describe('timeline and other sections', () => {
     const one = await report(s.teacherA, `?studentId=${kids[0]!.id}`);
     expect(one.student?.id).toBe(kids[0]!.id);
     expect(one.students).toHaveLength(3);
-    expect((await s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?studentId=${kids[0]!.id.replace(/.$/, '0')}`)).status).toBe(404);
+    expect((await s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?studentId=${kids[0]!.id.replace(/.$/, (c) => (c === '0' ? '1' : '0'))}`)).status).toBe(404);
   });
 
   it('the school-wide usage report has no student names', async () => {
@@ -191,5 +196,83 @@ describe('timeline and other sections', () => {
     expect(u.sections[0].tables[0].rows).toHaveLength(2);
     const csv = await s.admin.get('/api/admin/reports/usage/csv?section=usage&table=contexts');
     expect(csv.status).toBe(200);
+  });
+});
+
+describe('S11 review fixes', () => {
+  it('RPT-5: with the Attendance module off, totals still count and the per-attended-lesson columns are "not recorded"', async () => {
+    await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/attendance`, { enabled: false }));
+    const { counterId } = await lessonWithTaps([[0, 2]]);
+    const counters = section(await report(), 'counters');
+    const t = counters.tables.find((x) => x.key === `students-${counterId}`)!;
+    const at = (k: string) => t.columns.findIndex((c) => c.key === k);
+    const ece = t.rows.find((r) => r.key === kids[0]!.id)!.cells;
+    const isil = t.rows.find((r) => r.key === kids[2]!.id)!.cells;
+    expect(ece[at('total')]).toEqual({ t: 'n', v: 2 });
+    expect(isil[at('total')]).toEqual({ t: 'n', v: 0 });
+    for (const row of [ece, isil]) {
+      expect(row[at('perAttended')]).toEqual({ t: 'nr' });
+      expect(row[at('unrecorded')]).toEqual({ t: 'nr' });
+    }
+    expect(ece[at('w-2026-11-09')]).toEqual({ t: 'n', v: 2 });
+  });
+
+  it('RPT-3: the goals report counts entries by kind and evidence, and shows the self-assessment history by week apart from teacher outcomes', async () => {
+    const READING = '00000000-0000-7000-8000-00000000c001';
+    const goal = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${kids[0]!.id}/goals`, { categoryId: READING, text: 'Read aloud daily' }));
+    const now = env.clock.now();
+    const insEntry = env.db.$client.prepare('insert into goal_entries (id, goal_id, author_type, author_id, kind, body, confidence, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    insEntry.run(crypto.randomUUID(), goal.id, 'student', kids[0]!.id, 'self_assessment', 'Fictional: I feel fine', 4, now, now);
+    insEntry.run(crypto.randomUUID(), goal.id, 'teacher', s.ayse.id, 'progress', 'Fictional progress note', null, now, now);
+    env.db.$client
+      .prepare('insert into evidence (id, student_id, subject_id, goal_id, kind, body, author_type, author_id, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID(), kids[0]!.id, s.english.id, goal.id, 'text', 'Fictional book list', 'student', kids[0]!.id, now, now);
+    const goals = section(await report(s.teacherA, '?from=2026-11-02&to=2026-11-15'), 'goals');
+    expect(goals.metrics.find((m) => m.key === 'evidenceInPeriod')!.cell).toEqual({ t: 'n', v: 1 });
+    expect(goals.metrics.find((m) => m.key === 'entriesInPeriod')!.cell).toEqual({ t: 'n', v: 2 });
+    const activity = goals.tables.find((x) => x.key === 'activity')!;
+    expect(activity.columns.map((c) => c.key)).toEqual(['student', 'progress', 'reflection', 'note', 'self_assessment', 'evidence']);
+    expect(rowOf(goals, 'activity', kids[0]!.id).slice(1)).toEqual([{ t: 'n', v: 1 }, { t: 'n', v: 0 }, { t: 'n', v: 0 }, { t: 'n', v: 1 }, { t: 'n', v: 1 }]);
+    // No goal: nothing could be written on one ("not recorded"); evidence is still counted (0).
+    expect(rowOf(goals, 'activity', kids[1]!.id).slice(1)).toEqual([{ t: 'nr' }, { t: 'nr' }, { t: 'nr' }, { t: 'nr' }, { t: 'n', v: 0 }]);
+    const history = goals.tables.find((x) => x.key === 'confidenceHistory')!;
+    expect(history.rows.map((r) => r.key)).toEqual(['2026-11-02', '2026-11-09']);
+    expect(rowOf(goals, 'confidenceHistory', '2026-11-02').slice(1)).toEqual([{ t: 'n', v: 0 }, { t: 'nr' }, { t: 'nr' }, { t: 'nr' }, { t: 'nr' }, { t: 'nr' }]);
+    expect(rowOf(goals, 'confidenceHistory', '2026-11-09').slice(1)).toEqual([{ t: 'n', v: 1 }, { t: 'n', v: 0, d: 1 }, { t: 'n', v: 0, d: 1 }, { t: 'n', v: 0, d: 1 }, { t: 'n', v: 1, d: 1 }, { t: 'n', v: 0, d: 1 }]);
+    // The teacher's outcome table is separate and still says "not assessed".
+    expect(rowOf(goals, 'teacherAssessment', 'none')[1]).toEqual({ t: 'n', v: 1, d: 1 });
+  });
+
+  it('ACC-4, ACC-10: a teacher whose assignment ended sees nothing recorded after it ended', async () => {
+    const READING = '00000000-0000-7000-8000-00000000c001';
+    await lessonWithTaps([[0, 1]]);
+    env.clock.advance(2 * 24 * 3600_000); // Wednesday 2026-11-11
+    await s.admin.login('root.admin');
+    await ok(s.admin.post(`/api/admin/teaching-contexts/${s.ctxA.id}/end`));
+    const successor = await ok(s.admin.post('/api/admin/teaching-contexts', { teacherId: s.mehmet.id, classId: s.c3a.id, subjectId: s.english.id }));
+    env.clock.advance(2 * 24 * 3600_000); // Friday 2026-11-13
+    await s.teacherA.login('ayse.teacher');
+    await s.teacherB.login('mehmet.teacher');
+    const newcomer = await addStudent(s.teacherB, s.c3a.id, { fullName: 'Deniz Yenigelen' });
+    await ok(s.teacherB.post(`/api/teacher/contexts/${successor.id}/students/${kids[0]!.id}/goals`, { categoryId: READING, text: 'Successor-only fictional goal' }));
+
+    const r = await report();
+    expect(r.context.ended).toBe(true);
+    expect([r.from, r.to]).toEqual(['2026-11-09', '2026-11-11']);
+    expect(r.students.map((x) => x.id)).not.toContain(newcomer.id);
+    expect(JSON.stringify(r)).not.toContain('Successor-only fictional goal');
+    expect(section(r, 'goals').metrics.find((m) => m.key === 'goals')!.cell).toEqual({ t: 'n', v: 0 });
+    // A custom range is cut to the assignment; one entirely after it is refused.
+    const custom = await report(s.teacherA, '?from=2026-11-01&to=2026-11-30');
+    expect([custom.from, custom.to]).toEqual(['2026-11-09', '2026-11-11']);
+    const after = await s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?from=2026-11-12&to=2026-11-13`);
+    expect(after.status).toBe(400);
+    expect(after.body.error.details.reason).toBe('RANGE_OUTSIDE_ASSIGNMENT');
+    const tl = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/students/${kids[0]!.id}/timeline`));
+    expect(JSON.stringify(tl)).not.toContain('Successor-only fictional goal');
+    expect((await s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/students/${newcomer.id}/timeline`)).status).toBe(404);
+    // The successor sees the class as it is now.
+    const succ: Report = await ok(s.teacherB.get(`/api/teacher/contexts/${successor.id}/report`));
+    expect(succ.students.map((x) => x.id)).toContain(newcomer.id);
   });
 });

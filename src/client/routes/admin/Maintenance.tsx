@@ -138,7 +138,7 @@ export function MaintenancePanel() {
           </dd>
         </div>
       </dl>
-      <p className="cc-muted">{s.offsiteConfigured ? t('maint.offsiteConfigured') : t('maint.offsiteNotConfigured')}</p>
+      <p className="cc-muted">{t(s.offsiteSetup === 'configured' ? 'maint.offsiteConfigured' : s.offsiteSetup === 'not_configured' ? 'maint.offsiteNotConfigured' : 'maint.offsiteUnknown')}</p>
       <p className="cc-muted">{t('maint.retention', { hourly: s.retention.hourly, daily: s.retention.daily, monthly: s.retention.monthly })}</p>
       <div className="cc-row">
         <PinAction
@@ -290,11 +290,20 @@ export function RolloverPanel() {
   const from = list.find((y) => y.id === (fromYearId || list.find((x) => !x.archived)?.id));
   const [form, setForm] = useState({ name: '', startsOn: '', endsOn: '' });
   const [opts, setOpts] = useState({ copyClasses: true, copyAssignments: true, promote: true, archiveOld: true });
-  const [plan, setPlan] = useState<M.RolloverPlan | null>(null);
+  // Per old class: a new name typed by the administrator, and the classes that end with the old year.
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [excluded, setExcluded] = useState<string[]>([]);
+  // The plan together with exactly the input it was made from: Apply sends that input, and any change
+  // after the preview makes it stale (Apply waits for a new preview).
+  const [preview, setPreview] = useState<{ input: M.RolloverInputValue; plan: M.RolloverPlan } | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [done, setDone] = useState<string | null>(null);
-  const input = from ? { fromYearId: from.id, ...form, ...opts } : null;
+  const input: M.RolloverInputValue | null = from
+    ? { fromYearId: from.id, ...form, ...opts, classNames: Object.fromEntries(Object.entries(names).filter(([, v]) => v.trim())), excludeClassIds: [...excluded].sort() }
+    : null;
   const ready = Boolean(input && form.name && form.startsOn && form.endsOn);
+  const stale = preview !== null && JSON.stringify(preview.input) !== JSON.stringify(input);
+  const plan = preview?.plan ?? null;
   return (
     <section className="cc-card cc-stack" aria-labelledby="roll">
       <h2 className="cc-h2" id="roll">
@@ -302,7 +311,17 @@ export function RolloverPanel() {
       </h2>
       <p>{t('rollover.explain')}</p>
       <div className="cc-report-filters">
-        <Select label={t('rollover.fromYear')} items={list.map((y) => ({ id: y.id, label: y.archived ? `${y.name} (${t('report.ui.ended')})` : y.name }))} value={from?.id ?? ''} onChange={setFromYearId} />
+        <Select
+          label={t('rollover.fromYear')}
+          items={list.map((y) => ({ id: y.id, label: y.archived ? `${y.name} (${t('report.ui.ended')})` : y.name }))}
+          value={from?.id ?? ''}
+          onChange={(v) => {
+            setFromYearId(v);
+            setNames({});
+            setExcluded([]);
+            setPreview(null);
+          }}
+        />
         <TextField label={t('rollover.newName')} value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="2027–2028" />
         <TextField label={t('rollover.startsOn')} value={form.startsOn} onChange={(v) => setForm((f) => ({ ...f, startsOn: v }))} placeholder="2027-09-01" />
         <TextField label={t('rollover.endsOn')} value={form.endsOn} onChange={(v) => setForm((f) => ({ ...f, endsOn: v }))} placeholder="2028-06-30" />
@@ -317,27 +336,31 @@ export function RolloverPanel() {
         <Button
           isDisabled={!ready}
           onPress={async () => {
-            const p = await run(() => call(M.rolloverPreview, input!));
-            if (p) setPlan(p);
+            const sent = input!;
+            const p = await run(() => call(M.rolloverPreview, sent));
+            if (p) setPreview({ input: sent, plan: p });
           }}
         >
-          {t('rollover.preview')}
+          {plan ? t('rollover.previewAgain') : t('rollover.preview')}
         </Button>
-        <Button variant="danger" isDisabled={!plan || plan.problems.length > 0} onPress={() => setConfirm(true)}>
+        <Button variant="danger" isDisabled={!plan || stale || plan.problems.length > 0} onPress={() => setConfirm(true)}>
           {t('rollover.apply')}
         </Button>
       </div>
+      {stale ? <Alert kind="warning">{t('rollover.stale')}</Alert> : null}
       {plan ? (
         <div className="cc-stack">
           {plan.problems.map((p, i) => (
             <Alert key={i}>{t(`rollover.problem.${p.reason}` as MessageKey)}</Alert>
           ))}
+          <p className="cc-muted">{t('rollover.perClassHint')}</p>
           <div className="cc-table-wrap">
             <table className="cc-table">
               <caption>{t('rollover.planCaption', { year: plan.fromYear.name })}</caption>
               <thead>
                 <tr>
                   <th scope="col">{t('rollover.oldClass')}</th>
+                  <th scope="col">{t('rollover.continues')}</th>
                   <th scope="col">{t('rollover.newClass')}</th>
                   <th scope="col" className="cc-num">
                     {t('rollover.students')}
@@ -348,32 +371,51 @@ export function RolloverPanel() {
                 </tr>
               </thead>
               <tbody>
-                {plan.classes.map((c) => (
-                  <tr key={c.id}>
-                    <th scope="row">{c.name}</th>
-                    <td>{opts.copyClasses ? c.newName : '—'}</td>
-                    <td className="cc-num">{c.activeStudents}</td>
-                    <td className="cc-num">{c.assignments}</td>
-                  </tr>
-                ))}
+                {plan.classes.map((c) => {
+                  const continues = !excluded.includes(c.id);
+                  return (
+                    <tr key={c.id}>
+                      <th scope="row">{c.name}</th>
+                      <td>
+                        <Toggle
+                          label={t('rollover.continuesFor', { name: c.name })}
+                          isSelected={continues}
+                          isDisabled={!opts.copyClasses}
+                          onChange={(v) => setExcluded((xs) => (v ? xs.filter((x) => x !== c.id) : [...xs, c.id]))}
+                        />
+                      </td>
+                      <td>
+                        {opts.copyClasses && continues ? (
+                          <TextField label={t('rollover.newNameFor', { name: c.name })} value={names[c.id] ?? c.newName} onChange={(v) => setNames((ns) => ({ ...ns, [c.id]: v }))} />
+                        ) : (
+                          t('rollover.notContinued')
+                        )}
+                      </td>
+                      <td className="cc-num">{c.activeStudents}</td>
+                      <td className="cc-num">{c.assignments}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       ) : null}
       {done ? <Alert kind="success">{done}</Alert> : null}
-      {plan && input ? (
+      {preview && !stale ? (
         <ConfirmDestructive
           isOpen={confirm}
           onOpenChange={setConfirm}
           title={t('rollover.apply')}
-          description={t('rollover.confirmExplain', { year: plan.fromYear.name })}
-          confirmText={plan.fromYear.name}
+          description={t('rollover.confirmExplain', { year: preview.plan.fromYear.name })}
+          confirmText={preview.plan.fromYear.name}
           actionLabel={t('rollover.apply')}
           onConfirm={async () => {
-            const r = await call(M.rolloverApply, { ...input, confirm: plan.fromYear.name });
+            const r = await call(M.rolloverApply, { ...preview.input, confirm: preview.plan.fromYear.name });
             setDone(t('rollover.done', { classes: r.classesCreated, assignments: r.assignmentsCreated, students: r.studentsPromoted }));
-            setPlan(null);
+            setPreview(null);
+            setNames({});
+            setExcluded([]);
           }}
         />
       ) : null}

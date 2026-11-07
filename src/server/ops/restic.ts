@@ -129,7 +129,9 @@ export async function offsiteBackup(file: string, keep: { daily: number; weekly:
     }
   }
   const f = await restic(
-    ['forget', '--tag', 'class-compass', '--host', host, '--keep-daily', String(keep.daily), '--keep-weekly', String(keep.weekly), '--keep-monthly', String(keep.monthly), '--prune'],
+    // Every backup file has its own name (cc-backup-<time>.tar), so restic's default grouping by
+    // host + paths would put each snapshot in a group of one and keep them all: group by host + tags.
+    ['forget', '--tag', 'class-compass', '--host', host, '--group-by', 'host,tags', '--keep-daily', String(keep.daily), '--keep-weekly', String(keep.weekly), '--keep-monthly', String(keep.monthly), '--prune'],
     o,
   );
   if (f.code !== 0) return { ok: false, snapshotId, message: `backup stored, but forget/prune failed: ${tail(f.stderr || f.stdout)}` };

@@ -1,11 +1,14 @@
 /**
  * Who may see which report (RPT-6, ACC-4, ACC-10) and what a report covers (RPT-2).
  * - A teacher sees the reports of their own class+subject assignments, including ended ones and
- *   archived school years (read-only history, DAT-1); never another teacher's.
+ *   archived school years (read-only history, DAT-1); never another teacher's. An ENDED assignment
+ *   only covers the days the teacher held it (activeFrom..endedAt in the class timezone): nothing
+ *   recorded after it ended (a successor's goals, attendance, new classmates) is shown (ACC-4, ACC-10).
  * - An administrator sees every class+subject (school-wide reporting).
  * Both access classes are PIN-gated in classroom mode (423 before anything else, PIN-8).
  */
 import { and, asc, eq, gt, gte, inArray, isNull, lte, or } from 'drizzle-orm';
+import { localDate } from '../../../domain/dates.ts';
 import { daysBetween } from '../../../domain/periods.ts';
 import { MAX_REPORT_DAYS, type ReportContextInfo } from '../../../shared/contracts/reports.ts';
 import { compareNames, sortByName } from '../../../shared/text/turkish.ts';
@@ -64,7 +67,7 @@ export function listReportContexts(ctx: RequestContext, viewer: Viewer): ReportC
  * The period of a report: the given dates, by default the school year up to today. Clamped to the
  * school year (enrolments and school days are per year); at most MAX_REPORT_DAYS long.
  */
-export function reportRange(info: ReportContextInfo, from?: string, to?: string): { from: string; to: string } {
+export function reportRange(info: ReportContextInfo, from?: string, to?: string, held?: { from: string; to: string } | null): { from: string; to: string } {
   const y = info.year;
   const defTo = info.today < y.startsOn ? y.startsOn : info.today > y.endsOn ? y.endsOn : info.today;
   let f = from ?? y.startsOn;
@@ -73,8 +76,22 @@ export function reportRange(info: ReportContextInfo, from?: string, to?: string)
   if (f < y.startsOn) f = y.startsOn;
   if (t > y.endsOn) t = y.endsOn;
   if (f > t) throw new AppError('VALIDATION', 'The period is outside this school year', { reason: 'RANGE_OUTSIDE_YEAR' });
+  if (held) {
+    if (f < held.from) f = held.from;
+    if (t > held.to) t = held.to;
+    if (f > t) throw new AppError('VALIDATION', 'The period is outside the time you taught this class and subject', { reason: 'RANGE_OUTSIDE_ASSIGNMENT' });
+  }
   if (daysBetween(f, t) > MAX_REPORT_DAYS) throw new AppError('VALIDATION', 'The period is too long', { reason: 'RANGE_TOO_LONG' });
   return { from: f, to: t };
+}
+
+/**
+ * The days a teacher held an ended assignment (null = no limit: an administrator, or an assignment
+ * still running, whose teacher can see the class anyway).
+ */
+export function heldPeriod(context: ContextRow, viewer: Viewer, timezone: string): { from: string; to: string } | null {
+  if (viewer !== 'teacher' || context.endedAt === null) return null;
+  return { from: localDate(context.activeFrom, timezone), to: localDate(context.endedAt, timezone) };
 }
 
 /** Enrolment intervals of this class overlapping [from, to] (toDate exclusive, D-021). */
@@ -89,7 +106,7 @@ function classEnrolments(db: Db, classId: string, from: string, to: string) {
 export function buildScope(ctx: RequestContext, contextId: string, viewer: Viewer, input: { from?: string | undefined; to?: string | undefined; studentId?: string | undefined }): { scope: ReportScope; info: ReportContextInfo } {
   const context = reportableContext(ctx, contextId, viewer);
   const info = contextInfo(ctx, context);
-  const { from, to } = reportRange(info, input.from, input.to);
+  const { from, to } = reportRange(info, input.from, input.to, heldPeriod(context, viewer, info.timezone));
   const cls = getClass(ctx.db, context.classId);
   const year = getYear(ctx.db, cls.schoolYearId);
   const spans = classEnrolments(ctx.db, cls.id, from, to);

@@ -5,7 +5,7 @@
  *   node src/server/cli.ts admin:reset-password --login <login>                                (password via stdin)
  *   node src/server/cli.ts seed:demo [--force-demo]      fictional demo school (never in production)
  *     CC_DEMO_PASSWORD=<pw> (NODE_ENV=test only) gives every demo account that password — for E2E tests
- *   node src/server/cli.ts backup:create [--trigger timer]   local backup (DB + uploads + manifest) + retention
+ *   node src/server/cli.ts backup:create [--trigger timer]   local backup (DB + uploads + manifest) + retention; never migrates
  *   node src/server/cli.ts backup:list
  *   node src/server/cli.ts backup:verify [<file>|latest]
  *   node src/server/cli.ts backup:restore <file> [--force]   service must be stopped
@@ -25,7 +25,7 @@ import { hashPassword } from './lib/crypto.ts';
 import { createUser, normaliseLogin, revokeAllUserSessions } from './modules/auth/service.ts';
 import { backupNow, errorSummary, listBackups, migrateWithSnapshot, recordRun, resolveBackupFile, restoreBackup, RestoreRefused, verifyBackup, type RunRecord } from './ops/backup.ts';
 import { offsiteBackup, offsiteCheck, offsiteInit, offsiteProblems, offsiteSnapshots, tail } from './ops/restic.ts';
-import { appVersion, levelText, migrationLevel } from './ops/version.ts';
+import { appVersion, hasAppTables, levelText, migrationLevel } from './ops/version.ts';
 import { SeedRefused, seedDemo } from './seed/demo.ts';
 
 async function readSecret(prompt: string): Promise<string> {
@@ -111,7 +111,14 @@ switch (cmd) {
     break;
   }
   case 'backup:create': {
-    await migrate();
+    // Never migrates: a backup job (sidecar, timer) may run another image version than the app and
+    // must not change the schema of a database the app owns. The database is backed up as it is.
+    const level = migrationLevel(db().$client);
+    if (!hasAppTables(db().$client)) {
+      fail(`Nothing to back up: ${config.dbPath} holds no Class Compass data yet (start the app or run migrate first).`);
+      break;
+    }
+    if (level.pending > 0) console.warn(`Note: the database is at migration ${levelText(level)}; this code ships ${level.shipped}. Backing it up as it is (migrations are applied only by the app's start-up or 'migrate').`);
     const r = await backupNow({ db: db(), config, now: Date.now, trigger });
     if (!r.ok) fail(`Backup FAILED: ${r.error}`);
     else {
@@ -169,7 +176,7 @@ switch (cmd) {
       }
     };
     if (problems.length) {
-      record('failed', null, { error: problems.join('; ') });
+      record('failed', null, { error: problems.join('; '), notConfigured: true });
       fail(`Off-site backup not configured: ${problems.join('; ')}`);
       break;
     }

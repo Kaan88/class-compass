@@ -25,6 +25,8 @@ services:
       HOST: 0.0.0.0
       PORT: "3210"
       DATA_DIR: /data
+      # The OCR language data baked into the image (wins over app.env, so it is never copied to /data).
+      OCR_CACHE_DIR: /opt/class-compass/ocr
       # Behind cloudflared: trust CF-Connecting-IP for rate limits and the audit log.
       TRUST_PROXY: "true"
     ports:

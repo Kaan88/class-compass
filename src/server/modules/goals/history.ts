@@ -25,7 +25,7 @@ export function goalsHistorySince(db: Db, studentId: string, since: number): boo
  */
 export const PRIVATE_NOTES_TABLE = 'private_teacher_notes';
 
-/** How many private notes exist about a student (a number only, for the export manifest). */
-export function privateNotesCount(db: Db, studentId: string): number {
-  return db.select({ id: privateTeacherNotes.id }).from(privateTeacherNotes).where(eq(privateTeacherNotes.studentId, studentId)).all().length;
+/** How many private notes exist about a student, or in the whole school (a number only, for export manifests). */
+export function privateNotesCount(db: Db, studentId?: string): number {
+  return db.select({ id: privateTeacherNotes.id }).from(privateTeacherNotes).where(studentId ? eq(privateTeacherNotes.studentId, studentId) : undefined).all().length;
 }

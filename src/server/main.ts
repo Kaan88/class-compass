@@ -2,6 +2,7 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { openDatabase } from './db/client.ts';
 import { createSmtpMailer } from './lib/mailer.ts';
+import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
 import { migrateWithSnapshot, writeServerLock } from './ops/backup.ts';
 
 const config = loadConfig();
@@ -12,8 +13,14 @@ if (snapshot) console.log(`Database snapshot before migrating: ${snapshot}`);
 const releaseLock = writeServerLock(config, Date.now());
 const mailer = config.smtpEnabled ? createSmtpMailer(config) : null;
 const app = await buildApp({ db, config, now: Date.now, mailer }, { logger: true });
+// Prepared exports hold student data: remove the ones that expired without a download (D-090).
+const sweepExports = () => void cleanupExpiredExports(config, Date.now()).catch((err: unknown) => app.log.warn({ err }, 'export clean-up failed'));
+sweepExports();
+const exportSweep = setInterval(sweepExports, 5 * 60_000);
+exportSweep.unref();
 
 const shutdown = async () => {
+  clearInterval(exportSweep);
   await app.close();
   db.$client.close();
   releaseLock();

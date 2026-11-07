@@ -4,8 +4,10 @@
  * - per lesson: the lesson total = live events of that lesson (CNT-8), class-only taps, undone taps;
  * - per week: explicit week ranges in the class timezone, lessons held, total (trend);
  * - per student: weekly counts (a week without lessons is "not recorded", a week outside the class
- *   "not in the class", never 0), the period total, and reminders per attended lesson shown as the
- *   numerator / denominator, counting only lessons whose attendance was recorded.
+ *   "not in the class", a week the student was recorded absent or excused for every lesson "absent";
+ *   never 0), the period total, and reminders per attended lesson shown as the numerator /
+ *   denominator, counting only lessons whose attendance was recorded ("absent" when every recorded
+ *   lesson was missed; "not recorded" when nothing was recorded or the Attendance module is off).
  * Only lessons that were held (ended) count; labels are the ones used at the time, with today's
  * label when it was renamed since (DAT-6).
  */
@@ -19,7 +21,7 @@ import type { RequestContext } from '../../lib/context.ts';
 import { lessonAttendance } from '../attendance/report.ts';
 import { isModuleEnabled } from '../school/modules.ts';
 import type { ReportScope } from '../manifest.ts';
-import { col, countOrNr, date, key, n, NA, NR, range, scopeIds, student, table, text } from '../reports/cells.ts';
+import { ABSENT, col, countOrNr, date, key, n, NA, NR, range, scopeIds, student, table, text } from '../reports/cells.ts';
 
 /** Most weekly columns in the per-student table (the newest weeks of the period). */
 export const MAX_WEEK_COLUMNS = 16;
@@ -43,7 +45,7 @@ function labelsOf(c: CounterRow, events: EventRow[]): CounterLabelSnapshotJson {
   return last?.labelSnapshotJson ?? { main: c.labelsJson.main, individual: c.labelsJson.individual };
 }
 
-function counterTables(ctx: RequestContext, scope: ReportScope, c: CounterRow, events: EventRow[], attendance: ReturnType<typeof lessonAttendance>): ReportTable[] {
+function counterTables(ctx: RequestContext, scope: ReportScope, c: CounterRow, events: EventRow[], attendance: ReturnType<typeof lessonAttendance>, attendanceOn: boolean): ReportTable[] {
   const snap = labelsOf(c, events);
   const main = text(snap.main, c.labelsJson.main);
   const individual = text(snap.individual, c.labelsJson.individual);
@@ -86,37 +88,45 @@ function counterTables(ctx: RequestContext, scope: ReportScope, c: CounterRow, e
   if (c.scope !== 'lesson') {
     const allWeeks = weekStartsBetween({ from: scope.from, to: scope.to }, scope.weekStartsOn);
     const weeks = allWeeks.slice(-MAX_WEEK_COLUMNS);
-    const lessonsInWeek = (w: string) => scope.lessons.filter((l) => l.localDate >= w && l.localDate <= addDays(w, 6));
     const rows = scope.students.map((s) => {
       const theirs = live.filter((e) => e.studentId === s.id);
+      // Lessons held while the student was in the class, with their attendance (undefined = not recorded
+      // or the Attendance module is off: the absence of a record is never read as present or absent).
+      const enrolled = scope.lessons.filter((l) => scope.enrolledOn(s.id, l.localDate));
+      const statusOf = (l: { id: string }) => (attendanceOn ? attendance.get(`${l.id}|${s.id}`) : undefined);
+      const away = (l: { id: string }) => {
+        const st = statusOf(l);
+        return st === 'absent' || st === 'excused';
+      };
       const weekCells = weeks.map((w) => {
         const we = addDays(w, 6);
         let inClass = false;
         for (let d = w; d <= we; d = addDays(d, 1)) if (d >= scope.from && d <= scope.to && scope.enrolledOn(s.id, d)) inClass = true;
         if (!inClass) return NA;
-        const ls = lessonsInWeek(w);
+        const ls = enrolled.filter((l) => l.localDate >= w && l.localDate <= we);
         if (!ls.length) return NR;
         const lsIds = new Set(ls.map((l) => l.id));
-        return n(theirs.filter((e) => lsIds.has(e.lessonId)).length);
+        const count = theirs.filter((e) => lsIds.has(e.lessonId)).length;
+        // Away for every lesson of the week (recorded): "absent", never a 0 that looks like a good week (RPT-5).
+        return count === 0 && ls.every(away) ? ABSENT : n(count);
       });
       // Reminders per attended lesson: only lessons whose attendance for this student was recorded.
       let attended = 0;
       let inAttended = 0;
       let unrecorded = 0;
-      let enrolledLessons = 0;
-      for (const l of scope.lessons) {
-        const st = attendance.get(`${l.id}|${s.id}`);
-        if (st === undefined) continue;
-        enrolledLessons += 1;
-        if (st === 'not_recorded') unrecorded += 1;
+      for (const l of enrolled) {
+        const st = statusOf(l);
+        if (st === undefined || st === 'not_recorded') unrecorded += 1;
         else if (st === 'present' || st === 'late') {
           attended += 1;
           inAttended += theirs.filter((e) => e.lessonId === l.id).length;
         }
       }
-      const total = enrolledLessons ? n(theirs.length) : NA;
-      const perAttended = attended ? n(inAttended, attended) : enrolledLessons - unrecorded > 0 ? n(0, 0) : NR;
-      return { key: s.id, cells: [student(s), ...weekCells, total, perAttended, enrolledLessons ? n(unrecorded, enrolledLessons) : NA] };
+      const total = enrolled.length ? n(theirs.length) : NR;
+      const recorded = enrolled.length - unrecorded;
+      const perAttended = !attendanceOn || !enrolled.length ? NR : attended ? n(inAttended, attended) : recorded > 0 ? ABSENT : NR;
+      const unrecordedCell = !attendanceOn || !enrolled.length ? NR : n(unrecorded, enrolled.length);
+      return { key: s.id, cells: [student(s), ...weekCells, total, perAttended, unrecordedCell] };
     });
     tables.push(
       table({
@@ -144,7 +154,8 @@ export function countersSection(ctx: RequestContext, scope: ReportScope): Report
   const events = eventsOf(ctx.db, all.map((c) => c.id), lessonIds);
   const used = all.filter((c) => c.archivedAt === null || events.some((e) => e.counterId === c.id));
   if (!used.length) return null;
-  const attendance = isModuleEnabled(ctx.db, scope.context.id, 'attendance') ? lessonAttendance(ctx.db, scope) : new Map();
+  const attendanceOn = isModuleEnabled(ctx.db, scope.context.id, 'attendance');
+  const attendance: ReturnType<typeof lessonAttendance> = attendanceOn ? lessonAttendance(ctx.db, scope) : new Map();
   const ids = new Set(scopeIds(scope));
   return {
     key: 'counters',
@@ -154,7 +165,7 @@ export function countersSection(ctx: RequestContext, scope: ReportScope): Report
       const live = events.filter((e) => e.counterId === c.id && e.voidedAt === null && (!scope.studentId || (e.studentId !== null && ids.has(e.studentId))));
       return { key: c.id, label: text(labelsOf(c, events).main, c.labelsJson.main), cell: n(live.length) };
     }),
-    tables: used.flatMap((c) => counterTables(ctx, scope, c, events, attendance)),
+    tables: used.flatMap((c) => counterTables(ctx, scope, c, events, attendance, attendanceOn)),
     notes: [key('report.counters.noScore'), key('report.counters.heldOnly')],
   };
 }

@@ -2,7 +2,8 @@
  * Admin Maintenance page (OPS-2..5, D-089): the state of local backups, the off-site copy and the
  * last verification, disk usage, versions and migration level. "Back up now" and "verify" need the
  * administrator's PIN and are recorded in `backup_runs` and the audit log. Off-site runs stay on the
- * command line / timer (restic credentials live only in the service environment, never in the app).
+ * command line / timer (restic credentials live only in the backup job's environment, never in the
+ * app's; the page reads the off-site state from the recorded runs).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,7 +14,6 @@ import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { AppError } from '../../lib/errors.ts';
 import { backupNow, errorSummary, listBackups, recordRun, resolveBackupFile, verifyBackup } from '../../ops/backup.ts';
-import { offsiteProblems } from '../../ops/restic.ts';
 import { appVersion, migrationLevel } from '../../ops/version.ts';
 import { unlockPin } from '../auth/service.ts';
 
@@ -63,6 +63,16 @@ export function folderBytes(dir: string): number {
 
 const fileBytes = (f: string) => fs.statSync(f, { throwIfNoEntry: false })?.size ?? 0;
 
+/**
+ * Whether off-site copies are set up, from what the last off-site run recorded. The restic
+ * credentials live only in the backup job's environment (sidecar or timer), never in the app's, so
+ * the app cannot look at its own environment to tell (D-089).
+ */
+function offsiteSetup(last: RunRow | undefined): MaintenanceStatus['offsiteSetup'] {
+  if (!last) return 'unknown';
+  return last.detailsJson?.notConfigured === true ? 'not_configured' : 'configured';
+}
+
 export function maintenanceStatus(ctx: RequestContext): MaintenanceStatus {
   const now = ctx.now();
   const cfg = ctx.config;
@@ -88,7 +98,7 @@ export function maintenanceStatus(ctx: RequestContext): MaintenanceStatus {
     lastRestore: dto(lastRun(ctx, 'restore')),
     offsiteStale: !offsiteOk || now - offsiteOk.finishedAt > staleMs,
     offsiteStaleHours: cfg.OFFSITE_STALE_HOURS,
-    offsiteConfigured: offsiteProblems(process.env).length === 0,
+    offsiteSetup: offsiteSetup(lastRun(ctx, 'offsite')),
     disk: {
       totalBytes,
       freeBytes,

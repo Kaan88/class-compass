@@ -2,6 +2,7 @@
  * Backups, restore, exports and the year rollover (S11: OPS-2..5, DAT-1..5, ENG-3). Works on a real
  * database file in a temporary data folder. Fictional data only.
  */
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,13 +14,15 @@ import { loadConfig } from '../../src/server/config.ts';
 import { openDatabase, runMigrations } from '../../src/server/db/client.ts';
 import type { AppDeps } from '../../src/server/lib/context.ts';
 import { DEFAULT_RETENTION, backupsToKeep } from '../../src/domain/retention.ts';
-import { createBackup, LOCK_FILE, listBackups, restoreBackup, RestoreRefused, verifyBackup, writeServerLock } from '../../src/server/ops/backup.ts';
+import { createBackup, databaseInUse, LOCK_FILE, listBackups, recordRun, restoreBackup, RestoreRefused, verifyBackup, writeServerLock } from '../../src/server/ops/backup.ts';
+import { cleanupExpiredExports, EXPORT_TTL_MS } from '../../src/server/modules/maintenance/exports.ts';
 import { offsiteBackup, offsiteProblems, redact, repositoryKind, type ResticRunner } from '../../src/server/ops/restic.ts';
 import { tableCounts } from '../../src/server/ops/version.ts';
-import { Clock, type TestEnv } from '../helpers.ts';
+import { Client, Clock, seedUser, type TestEnv } from '../helpers.ts';
 import { cmd, endLesson, startLesson } from '../lesson-helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 
+const ROOT = path.join(import.meta.dirname, '..', '..');
 let dir: string;
 let env: TestEnv;
 let s: School;
@@ -129,6 +132,15 @@ describe('backup and restore (OPS-2, OPS-4, ENG-3)', () => {
 
   it('refuses to restore while the server holds the database; --force only helps when it cannot be checked', async () => {
     const b = await createBackup({ config: env.config, sqlite: env.db.$client, now: env.clock.now(), kind: 'local', includeUploads: false });
+    // The app's connection is open: SQLite's lock shows it even without a lock file or /healthz
+    // (an app in another container sharing the data folder), and --force does not override it.
+    expect(databaseInUse(env.config.dbPath)).toBe(true);
+    const dbHash = sha(env.config.dbPath);
+    await expect(restoreBackup({ config: env.config, file: b.file, now: Date.now(), force: true, probe: async () => false })).rejects.toThrow(/running/u);
+    expect(sha(env.config.dbPath)).toBe(dbHash);
+    await env.app.close();
+    env.db.$client.close();
+    expect(databaseInUse(env.config.dbPath)).toBe(false);
     const release = writeServerLock(env.config, Date.now());
     expect(fs.existsSync(path.join(path.dirname(env.config.dbPath), LOCK_FILE))).toBe(true);
     const lockFile = path.join(path.dirname(env.config.dbPath), LOCK_FILE);
@@ -142,6 +154,25 @@ describe('backup and restore (OPS-2, OPS-4, ENG-3)', () => {
     fs.writeFileSync(lockFile, JSON.stringify(lock));
     release();
     expect(fs.existsSync(path.join(path.dirname(env.config.dbPath), LOCK_FILE))).toBe(false);
+    env = await fileEnv(path.join(dir, 'data'));
+  });
+
+  it('backup:create never migrates: a database with pending migrations is backed up as it is (OPS, DAT-4)', async () => {
+    // Pretend the running code ships one more migration than the database has (another image version).
+    const last = env.db.$client.prepare('select rowid as id from __drizzle_migrations order by created_at desc, rowid desc limit 1').get() as { id: number };
+    env.db.$client.prepare('delete from __drizzle_migrations where rowid = ?').run(last.id);
+    const before = (env.db.$client.prepare('select count(*) as n from __drizzle_migrations').get() as { n: number }).n;
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'src', 'server', 'cli.ts'), 'backup:create'], {
+      env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', NODE_ENV: 'test', SECRET_PEPPER: 'test-pepper-0123456789abcdef', PUBLIC_ORIGIN: 'http://localhost:5173', DATA_DIR: path.join(dir, 'data') },
+      encoding: 'utf8',
+      timeout: 60_000,
+    });
+    expect(r.status, `${r.stdout}
+${r.stderr}`).toBe(0);
+    expect(`${r.stdout}${r.stderr}`).toMatch(/Backing it up as it is/u);
+    expect((env.db.$client.prepare('select count(*) as n from __drizzle_migrations').get() as { n: number }).n).toBe(before);
+    expect(listBackups(env.config).filter((x) => x.kind === 'local')).toHaveLength(1);
+    expect(listBackups(env.config).filter((x) => x.kind === 'pre_migration')).toHaveLength(0);
   });
 
   it('retention keeps the newest per hour, day and month', () => {
@@ -183,6 +214,11 @@ describe('off-site with restic (D-017)', () => {
     expect(r.ok).toBe(false); // forget/prune failed
     expect(r.message).not.toContain('fictional-key-123');
     expect(calls[1]!.slice(0, 1)).toEqual(['forget']);
+    // Each backup file has its own name: without grouping by host + tags every snapshot would be a
+    // group of one and the keep-* rules would never remove anything (D-017 retention).
+    const forget = calls[1]!;
+    expect(forget[forget.indexOf('--group-by') + 1]).toBe('host,tags');
+    expect(forget).toContain('--prune');
   });
 });
 
@@ -200,6 +236,12 @@ describe('maintenance page and exports (OPS-3, DAT-4, DAT-5)', () => {
     expect(verified.run).toMatchObject({ kind: 'verify', status: 'ok' });
     const after = await ok(s.admin.get('/api/admin/maintenance'));
     expect(after.backups).toHaveLength(1);
+    // The off-site state comes from the recorded runs (the app never holds the restic credentials).
+    expect(st.offsiteSetup).toBe('unknown');
+    recordRun(env.db, { kind: 'offsite', trigger: 'timer', status: 'failed', startedAt: env.clock.now(), finishedAt: env.clock.now(), details: { error: 'RESTIC_REPOSITORY is not set', notConfigured: true } });
+    expect((await ok(s.admin.get('/api/admin/maintenance'))).offsiteSetup).toBe('not_configured');
+    recordRun(env.db, { kind: 'offsite', trigger: 'timer', status: 'ok', startedAt: env.clock.now() + 1, finishedAt: env.clock.now() + 1, fileName: 'cc-backup-x.tar', details: { snapshotId: 'abc' } });
+    expect((await ok(s.admin.get('/api/admin/maintenance'))).offsiteSetup).toBe('configured');
     expect(after.lastLocalOk.fileName).toBe(after.backups[0].name);
     expect((await s.teacherA.get('/api/admin/maintenance')).status).toBe(403);
   });
@@ -227,11 +269,27 @@ describe('maintenance page and exports (OPS-3, DAT-4, DAT-5)', () => {
     expect(usersCsv).not.toContain('$argon2');
     const manifest = JSON.parse(entries['manifest.json']!.toString('utf8'));
     expect(manifest.tables.students).toBe(1);
+    expect(manifest.privateNotesNotIncluded).toBe(0);
     expect(manifest.files.find((f: any) => f.name === 'tables/students.csv').sha256).toBe(crypto.createHash('sha256').update(entries['tables/students.csv']!).digest('hex'));
     // Once only.
     expect((await s.admin.get(`/api/admin/exports/${ready.token}`)).status).toBe(404);
     const audits = env.db.$client.prepare("select action from audit_events where action like 'export.%' order by at").all() as Array<{ action: string }>;
     expect(audits.map((a) => a.action)).toEqual(['export.full', 'export.download']);
+  });
+
+  it('an export can be downloaded only by the administrator who prepared it, and an expired one is deleted without a download (D-090)', async () => {
+    await seedUser(env, 'admin', 'second.admin');
+    const other = new Client(env);
+    await other.login('second.admin');
+    const ready = await ok(s.admin.post('/api/admin/exports/full', { confirm: 'EXPORT', includeUploads: false }));
+    expect((await other.get(`/api/admin/exports/${ready.token}`)).status).toBe(404);
+    const exportsDir = path.join(path.dirname(env.config.dbPath), 'exports');
+    expect(fs.existsSync(path.join(exportsDir, `${ready.token}.zip`))).toBe(true);
+    // Not yet expired: kept. After the hour: removed by the sweep the server runs on a timer.
+    expect(await cleanupExpiredExports(env.config, env.clock.now())).toBe(0);
+    expect(await cleanupExpiredExports(env.config, env.clock.now() + EXPORT_TTL_MS + 1)).toBe(1);
+    expect(fs.readdirSync(exportsDir)).toEqual([]);
+    expect((await s.admin.get(`/api/admin/exports/${ready.token}`)).status).toBe(404);
   });
 
   it('the student export holds only that student’s rows and their files', async () => {
@@ -255,6 +313,38 @@ describe('maintenance page and exports (OPS-3, DAT-4, DAT-5)', () => {
     expect(entries['tables/enrolments.csv']).toBeDefined();
     const manifest = JSON.parse(entries['manifest.json']!.toString('utf8'));
     expect(manifest).toMatchObject({ kind: 'student', studentId: a.id, privateNotesNotIncluded: 0 });
+  });
+
+  it('the student export finds the student inside JSON lists (groups, roles, absentees, missed assistant turns) without other students (KVKK)', async () => {
+    const a = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Ece Deniz Kaya' });
+    const b = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Arda Yıldız' });
+    const now = env.clock.now();
+    const groups = [
+      { id: 'g1', name: { en: 'Owls' }, icon: 'owl', memberIds: [a.id, b.id], roles: [{ studentId: a.id, label: { en: 'Reader' } }, { studentId: b.id, label: { en: 'Writer' } }] },
+      { id: 'g2', name: { en: 'Foxes' }, icon: 'fox', memberIds: [], roles: [] },
+    ];
+    env.db.$client
+      .prepare('insert into group_templates (id, context_id, name, mode, sizing_json, seed, version, groups_json, unsatisfied_json, sort_order, created_at, updated_at) values (?, ?, ?, ?, ?, ?, 1, ?, ?, 0, ?, ?)')
+      .run('00000000-0000-7000-8000-0000000000a1', s.ctxA.id, JSON.stringify({ en: 'Fictional pairs' }), 'custom', JSON.stringify({ groupCount: 2 }), 'seed', JSON.stringify(groups), '[]', now, now);
+    env.db.$client
+      .prepare('insert into assistant_assignments (id, context_id, school_year_id, local_date, planned_student_id, actual_student_id, status, absent_student_ids, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('00000000-0000-7000-8000-0000000000a2', s.ctxA.id, s.year.id, '2026-11-09', a.id, b.id, 'replaced_absent', JSON.stringify([a.id]), now, now);
+    const ready = await ok(s.admin.post(`/api/admin/students/${a.id}/export`));
+    const res = await env.app.inject({ method: 'GET', url: `/api/admin/exports/${ready.token}`, headers: { cookie: [...s.admin.cookies].map(([k, v]) => `${k}=${v}`).join('; ') } });
+    const entries = unzip(res.rawPayload);
+    const templates = entries['tables/group_templates.csv']?.toString('utf8') ?? '';
+    expect(templates).toContain('Owls');
+    expect(templates).toContain('Reader');
+    expect(templates).not.toContain('Foxes');
+    expect(templates).not.toContain('Writer');
+    const assistant = entries['tables/assistant_assignments.csv']?.toString('utf8') ?? '';
+    expect(assistant).toContain('2026-11-09');
+    const all = Object.entries(entries)
+      .filter(([n]) => n.endsWith('.csv'))
+      .map(([, v]) => v.toString('utf8'))
+      .join('\n');
+    expect(all).not.toContain(b.id);
+    expect(all).not.toContain('Arda Yıldız');
   });
 });
 
@@ -282,6 +372,21 @@ describe('school-year rollover (DAT-1, DAT-2)', () => {
     expect((await s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report`)).status).toBe(200);
     const audit = env.db.$client.prepare("select count(*) as n from audit_events where action = 'school_year.rollover'").get() as { n: number };
     expect(audit.n).toBe(1);
+  });
+
+  it('leaves out a class that ends with the year (graduating) and uses the names typed in the preview', async () => {
+    const kid = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Ece Deniz Kaya' });
+    const body = { fromYearId: s.year.id, name: '2027–2028', startsOn: '2027-09-01', endsOn: '2028-06-30', copyClasses: true, copyAssignments: true, promote: true, archiveOld: true, excludeClassIds: [s.c3b.id], classNames: { [s.c3a.id]: '4-Owls' } };
+    const preview = await ok(s.admin.post('/api/admin/rollover/preview', body));
+    expect(preview.classes.map((c: any) => [c.name, c.newName, c.included])).toEqual([
+      ['3-A', '4-Owls', true],
+      ['3-B', '4-B', false],
+    ]);
+    const r = await ok(s.admin.post('/api/admin/rollover/apply', { ...body, confirm: '2026–2027' }));
+    expect(r).toMatchObject({ classesCreated: 1, classesNotContinued: 1, assignmentsCreated: 1, studentsPromoted: 1 });
+    const names = (env.db.$client.prepare('select c.name from classes c join school_years y on y.id = c.school_year_id where y.name = ?').all('2027–2028') as Array<{ name: string }>).map((x) => x.name);
+    expect(names).toEqual(['4-Owls']);
+    expect((env.db.$client.prepare('select count(*) as n from enrolments where student_id = ?').get(kid.id) as { n: number }).n).toBe(2);
   });
 });
 

@@ -2,17 +2,21 @@
  * Goals and skills report (RPT-1, RPT-5, GOL-3). The student's own self-assessment (confidence 1–5)
  * and the teacher's assessment (outcome) are ALWAYS separate tables, never merged into one figure.
  * Goals counted: the students' goals in this subject that existed by the end of the period; the
- * latest assessment of each kind up to the end of the period. Student reflections are a section of
+ * latest assessment of each kind up to the end of the period. Also per student: the entries written
+ * on their goals in the period by kind (progress, reflection, note, self-assessment) and the evidence
+ * added in the period; and the self-assessment (confidence) history week by week, kept apart from
+ * the teacher's outcomes (RPT-3). Student reflections are a section of
  * their own (counts and dates; the text stays on the goal page). Private teacher notes are never read
  * here (GOL-6).
  */
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { localDate } from '../../../domain/dates.ts';
+import { addDays, localDate } from '../../../domain/dates.ts';
+import { weekStartsBetween } from '../../../domain/periods.ts';
 import type { ReportSectionData, TimelineEvent } from '../../../shared/contracts/reports.ts';
-import { goalEntries, goals, skillCategories, teacherAssessments } from '../../db/schema.ts';
+import { evidence, GOAL_ENTRY_KINDS, goalEntries, goals, skillCategories, teacherAssessments } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
-import { col, date, key, lbl, n, NA, NR, scopeIds, student, table, text } from '../reports/cells.ts';
+import { col, date, key, lbl, n, NA, NR, range, scopeIds, student, table, text } from '../reports/cells.ts';
 import { outcomesOf } from './library.ts';
 
 const CONFIDENCE = [1, 2, 3, 4, 5] as const;
@@ -49,8 +53,25 @@ function load(ctx: RequestContext, scope: ReportScope) {
   return { gs, entries, assessments, day, lastTeacher: latest(assessments), lastSelf: latest(self), self };
 }
 
+/** Evidence of the scope's students in this subject added in the period (not deleted). */
+function evidenceInPeriod(ctx: RequestContext, scope: ReportScope, day: (ms: number) => string) {
+  const ids = scopeIds(scope);
+  if (!ids.length) return [];
+  return ctx.db
+    .select({ studentId: evidence.studentId, kind: evidence.kind, createdAt: evidence.createdAt })
+    .from(evidence)
+    .where(and(inArray(evidence.studentId, ids), eq(evidence.subjectId, scope.context.subjectId), isNull(evidence.deletedAt)))
+    .all()
+    .filter((e) => day(e.createdAt) >= scope.from && day(e.createdAt) <= scope.to);
+}
+
 export function goalsReportSection(ctx: RequestContext, scope: ReportScope): ReportSectionData {
-  const { gs, assessments, day, lastTeacher, lastSelf, self } = load(ctx, scope);
+  const { gs, entries, assessments, day, lastTeacher, lastSelf, self } = load(ctx, scope);
+  const owner = new Map(gs.map((g) => [g.id, g.studentId]));
+  const entriesInPeriod = entries.filter((e) => day(e.createdAt) >= scope.from);
+  const ev = evidenceInPeriod(ctx, scope, day);
+  const selfInPeriod = self.filter((e) => day(e.createdAt) >= scope.from);
+  const weeks = weekStartsBetween({ from: scope.from, to: scope.to }, scope.weekStartsOn);
   const outcomes = outcomesOf(ctx.db, scope.context.id);
   const catIds = [...new Set(gs.map((g) => g.categoryId))];
   const cats = catIds.length ? ctx.db.select().from(skillCategories).where(inArray(skillCategories.id, catIds)).all() : [];
@@ -66,6 +87,8 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
       { key: 'teacherAssessed', label: key('report.goals.teacherAssessed'), cell: n(lastTeacher.size, gs.length) },
       { key: 'selfAssessed', label: key('report.goals.selfAssessed'), cell: n(lastSelf.size, gs.length) },
       { key: 'assessmentsInPeriod', label: key('report.goals.assessmentsInPeriod'), cell: n(assessments.filter((a) => inPeriod(a.createdAt)).length) },
+      { key: 'entriesInPeriod', label: key('report.goals.entriesInPeriod'), cell: n(entriesInPeriod.length) },
+      { key: 'evidenceInPeriod', label: key('report.goals.evidence'), cell: n(ev.length) },
     ],
     tables: [
       table({
@@ -126,6 +149,40 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
               n(self.filter((e) => ids.has(e.goalId) && inPeriod(e.createdAt)).length),
             ],
           };
+        }),
+      }),
+      table({
+        key: 'activity',
+        title: key('report.goals.activity'),
+        note: key('report.goals.activityNote'),
+        columns: [
+          col('student', key('report.col.student')),
+          ...GOAL_ENTRY_KINDS.map((k) => col(k, key(`report.goals.kind.${k}`), true)),
+          col('evidence', key('report.goals.evidence'), true),
+        ],
+        rows: scope.students.map((s) => {
+          const hasGoals = gs.some((g) => g.studentId === s.id);
+          const mine = entriesInPeriod.filter((e) => owner.get(e.goalId) === s.id);
+          return {
+            key: s.id,
+            cells: [student(s), ...GOAL_ENTRY_KINDS.map((k) => (hasGoals ? n(mine.filter((e) => e.kind === k).length) : NR)), n(ev.filter((e) => e.studentId === s.id).length)],
+          };
+        }),
+      }),
+      table({
+        key: 'confidenceHistory',
+        title: key('report.goals.confidenceHistory'),
+        note: key('report.goals.confidenceHistoryNote'),
+        columns: [
+          col('week', key('report.col.week')),
+          col('count', key('report.goals.kind.self_assessment'), true),
+          ...CONFIDENCE.map((c) => col(`c${c}`, key('report.goals.confidenceValue', { value: c }), true)),
+        ],
+        rows: weeks.map((w) => {
+          const we = addDays(w, 6);
+          const inWeek = selfInPeriod.filter((e) => day(e.createdAt) >= w && day(e.createdAt) <= we);
+          // A week without any self-assessment has no distribution: "not recorded", never 0 of 0.
+          return { key: w, cells: [range(w, we), n(inWeek.length), ...CONFIDENCE.map((c) => (inWeek.length ? n(inWeek.filter((e) => e.confidence === c).length, inWeek.length) : NR))] };
         }),
       }),
     ],

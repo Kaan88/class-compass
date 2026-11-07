@@ -38,7 +38,11 @@ export const MaintenanceStatus = z.object({
   /** Off-site copy older than OFFSITE_STALE_HOURS (or none at all). */
   offsiteStale: z.boolean(),
   offsiteStaleHours: z.number(),
-  offsiteConfigured: z.boolean(),
+  /**
+   * Off-site setup as the last off-site run reported it (the app itself never holds the restic
+   * credentials): `unknown` = no off-site run recorded yet.
+   */
+  offsiteSetup: z.enum(['configured', 'not_configured', 'unknown']),
   disk: z.object({ totalBytes: z.number().nullable(), freeBytes: z.number().nullable(), databaseBytes: z.number(), uploadsBytes: z.number(), backupsBytes: z.number() }),
   backups: z.array(z.object({ name: z.string(), kind: z.string(), at: z.number(), size: z.number() })),
   retention: z.object({ hourly: z.number(), daily: z.number(), monthly: z.number() }),
@@ -76,10 +80,13 @@ export const RolloverInput = z.object({
   archiveOld: z.boolean(),
   /** New names per old class id (default: the old name with its grade number raised, e.g. 3-A → 4-A). */
   classNames: z.record(z.string(), z.string().trim().min(1).max(40)).optional(),
+  /** Old classes that end with the old year (e.g. a graduating final grade): not re-created, nobody promoted from them. */
+  excludeClassIds: z.array(Id).max(500).optional(),
 });
+export type RolloverInputValue = z.infer<typeof RolloverInput>;
 export const RolloverPlan = z.object({
   fromYear: z.object({ id: z.string(), name: z.string(), startsOn: z.string(), endsOn: z.string(), archived: z.boolean() }),
-  classes: z.array(z.object({ id: z.string(), name: z.string(), newName: z.string(), grade: z.number().nullable(), newGrade: z.number().nullable(), activeStudents: z.number(), assignments: z.number() })),
+  classes: z.array(z.object({ id: z.string(), name: z.string(), newName: z.string(), grade: z.number().nullable(), newGrade: z.number().nullable(), activeStudents: z.number(), assignments: z.number(), included: z.boolean() })),
   problems: z.array(z.object({ reason: z.string(), classId: z.string().nullable() })),
 });
 export type RolloverPlan = z.infer<typeof RolloverPlan>;
@@ -89,5 +96,5 @@ export const rolloverApply = endpoint({
   path: '/api/admin/rollover/apply',
   access: 'admin',
   input: RolloverInput.extend({ confirm: z.string().max(80) }),
-  output: z.object({ yearId: z.string(), classesCreated: z.number(), assignmentsCreated: z.number(), studentsPromoted: z.number(), studentsSkipped: z.number(), archivedOld: z.boolean() }),
+  output: z.object({ yearId: z.string(), classesCreated: z.number(), classesNotContinued: z.number(), assignmentsCreated: z.number(), studentsPromoted: z.number(), studentsSkipped: z.number(), archivedOld: z.boolean() }),
 });
