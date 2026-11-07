@@ -4,7 +4,7 @@ import { pickText } from '../../shared/i18n/index.ts';
 import type { LocalizedTextValue } from '../../shared/contracts/define.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
-import { IconBoard, IconCheck, IconLock } from './icons.tsx';
+import { IconBoard, IconCheck, IconLock, IconPlay } from './icons.tsx';
 import { Mascot, ThemeDecoration } from './Mascot.tsx';
 
 /** Always names the active class AND subject, so nothing is recorded against the wrong class (LES-4). */
@@ -71,8 +71,21 @@ export interface SwitchableContext {
   subjectName: LocalizedTextValue;
 }
 
-/** Quick class switching (LES-4): one tap per class+subject, the active one marked by text and state. */
-export function ClassSwitcher({ contexts, activeId, onSwitch }: { contexts: SwitchableContext[]; activeId: string | null; onSwitch: (id: string) => void }) {
+/**
+ * Quick class switching (LES-4): one tap per class+subject, the active one marked by text and state.
+ * `inProgress` marks contexts with a running lesson (icon + text, not colour alone).
+ */
+export function ClassSwitcher({
+  contexts,
+  activeId,
+  onSwitch,
+  inProgress,
+}: {
+  contexts: SwitchableContext[];
+  activeId: string | null;
+  onSwitch: (id: string) => void;
+  inProgress?: ReadonlySet<string>;
+}) {
   const { t, locale } = useI18n();
   return (
     <nav className="cc-class-switcher" aria-label={t('classroom.switchClass')}>
@@ -82,6 +95,12 @@ export function ClassSwitcher({ contexts, activeId, onSwitch }: { contexts: Swit
           {c.id === activeId ? <IconCheck /> : null}
           {c.className} · {pickText(c.subjectName, locale)}
           {c.id === activeId ? <span className="cc-class-switcher__current">{t('classroom.current')}</span> : null}
+          {inProgress?.has(c.id) ? (
+            <span className="cc-class-switcher__live" data-testid="lesson-in-progress">
+              <IconPlay />
+              {t('lesson.inProgress')}
+            </span>
+          ) : null}
         </Button>
       ))}
     </nav>

@@ -4,10 +4,11 @@
  * density kicks in automatically for larger classes (34+).
  */
 import type { CSSProperties } from 'react';
+import { isAway, type EffectiveAttendance } from '../../domain/attendance.ts';
 import { avatarHue, initials as initialsOf } from '../../shared/text/turkish.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
-import { IconAlert, IconDot, IconPlus, IconUp, IconUserOff } from './icons.tsx';
+import { IconAlert, IconCheck, IconClock, IconDot, IconMinus, IconNote, IconPlus, IconUp, IconUserOff } from './icons.tsx';
 
 export function Avatar({
   name,
@@ -57,33 +58,57 @@ export interface StudentCardData {
   avatarHue?: number;
 }
 
+/**
+ * Attendance status as icon + text + border pattern, never colour alone (UX-7, ATT-2).
+ * `lessonOnly` marks a lesson exception ("this lesson").
+ */
+export function AttendanceChip({ status, lessonOnly = false }: { status: EffectiveAttendance; lessonOnly?: boolean }) {
+  const { t } = useI18n();
+  const icon = status === 'present' ? <IconCheck /> : status === 'absent' ? <IconUserOff /> : status === 'late' ? <IconClock /> : status === 'excused' ? <IconNote /> : <IconMinus />;
+  return (
+    <span className="cc-att-chip" data-status={status}>
+      {icon}
+      {t(`attendance.status.${status}`)}
+      {lessonOnly ? <span className="cc-att-chip__scope">{t('attendance.thisLesson')}</span> : null}
+    </span>
+  );
+}
+
 export function StudentCard({
   student,
   weeklyCount,
   level,
   absent = false,
+  attendance,
   onAdd,
   disabled = false,
 }: {
   student: StudentCardData;
-  weeklyCount: number;
-  level: CountLevel;
+  /** Counter values (S6). Omitted = no counter shown (never a fake zero). */
+  weeklyCount?: number;
+  level?: CountLevel;
   absent?: boolean;
+  /** Effective attendance for the lesson; absent/excused render the card as away. */
+  attendance?: EffectiveAttendance;
   onAdd?: () => void;
   disabled?: boolean;
 }) {
   const { t } = useI18n();
+  const away = absent || (attendance !== undefined && isAway(attendance));
   return (
-    <article className="cc-student-card" data-absent={absent ? '' : undefined} aria-label={student.fullName}>
+    <article className="cc-student-card" data-absent={away ? '' : undefined} aria-label={student.fullName}>
       <Avatar name={student.fullName} id={student.id} hue={student.avatarHue} initials={student.initials} />
       <div className="cc-student-card__name">{student.fullName}</div>
       <div className="cc-student-card__meta">
-        {absent ? (
+        {attendance !== undefined && attendance !== 'present' && attendance !== 'not_recorded' ? (
+          <AttendanceChip status={attendance} />
+        ) : absent ? (
           <span className="cc-chip">
             <IconUserOff />
             {t('card.absent')}
           </span>
-        ) : (
+        ) : null}
+        {!away && weeklyCount !== undefined ? (
           <>
             <span className="cc-student-card__count" aria-label={t('card.weeklyCount', { count: weeklyCount })}>
               {weeklyCount}
@@ -91,11 +116,11 @@ export function StudentCard({
             <span className="cc-muted cc-student-card__week" aria-hidden="true">
               {t('card.thisWeek')}
             </span>
-            <LevelChip level={level} />
+            {level !== undefined ? <LevelChip level={level} /> : null}
           </>
-        )}
+        ) : null}
       </div>
-      {onAdd && !absent ? (
+      {onAdd && !away ? (
         <Button variant="primary" className="cc-student-card__add" aria-label={t('card.add', { name: student.fullName })} onPress={onAdd} isDisabled={disabled}>
           <IconPlus />
         </Button>

@@ -185,3 +185,63 @@ export const IconSound = () => (
     <path d="M16.5 8.5a5 5 0 0 1 0 7" />
   </Icon>
 );
+export const IconClock = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </Icon>
+);
+export const IconPlay = () => (
+  <Icon>
+    <path d="M7 5l12 7-12 7z" />
+  </Icon>
+);
+export const IconPause = () => (
+  <Icon>
+    <path d="M8 5v14M16 5v14" />
+  </Icon>
+);
+export const IconNext = () => (
+  <Icon>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </Icon>
+);
+export const IconPrev = () => (
+  <Icon>
+    <path d="M19 12H5M11 6l-6 6 6 6" />
+  </Icon>
+);
+export const IconFlag = () => (
+  <Icon>
+    <path d="M5 21V4M5 4h11l-2 4 2 4H5" />
+  </Icon>
+);
+export const IconChevronDown = () => (
+  <Icon>
+    <path d="M6 9l6 6 6-6" />
+  </Icon>
+);
+export const IconChevronUp = () => (
+  <Icon>
+    <path d="M6 15l6-6 6 6" />
+  </Icon>
+);
+export const IconNote = () => (
+  <Icon>
+    <path d="M6 3h9l3 3v15H6z" />
+    <path d="M9 11h6M9 15h6" />
+  </Icon>
+);
+export const IconMinus = () => (
+  <Icon>
+    <path d="M6 12h12" />
+  </Icon>
+);
+/** Reflection faces 1 (tough) … 4 (great): the mouth curve changes; always shown with a text label. */
+export const IconFace = ({ level }: { level: 1 | 2 | 3 | 4 }) => (
+  <Icon>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9 10h.01M15 10h.01" />
+    {level === 1 ? <path d="M8.5 16.5c2-2 5-2 7 0" /> : level === 2 ? <path d="M9 15.5h6" /> : level === 3 ? <path d="M9 14.5c1.5 1.5 4.5 1.5 6 0" /> : <path d="M8 14c2 3 6 3 8 0z" />}
+  </Icon>
+);

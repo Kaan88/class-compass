@@ -1130,3 +1130,367 @@ a {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ lessons (S5: DSH, LES, RTN, ATT) */
+.cc-page--wide {
+  max-width: 120rem;
+}
+.cc-push-right {
+  margin-inline-start: auto;
+}
+.cc-lesson-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.cc-lesson-grid > :only-child {
+  grid-column: 1 / -1;
+}
+@media (max-width: 60rem) {
+  .cc-lesson-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Attendance chip: icon + text + border pattern, never colour alone (UX-7). */
+.cc-att-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 2px solid var(--cc-border);
+  background: var(--cc-surface-2);
+  color: var(--cc-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cc-att-chip svg {
+  width: 1em;
+  height: 1em;
+}
+.cc-att-chip[data-status='present'] {
+  border-color: var(--cc-success);
+  background: var(--cc-success-soft);
+}
+.cc-att-chip[data-status='absent'] {
+  border-color: var(--cc-danger);
+  border-style: dashed;
+  background: var(--cc-danger-soft);
+}
+.cc-att-chip[data-status='late'] {
+  border-color: var(--cc-warning);
+  border-style: double;
+  border-width: 3px;
+  background: var(--cc-warning-soft);
+}
+.cc-att-chip[data-status='excused'] {
+  border-color: var(--cc-border-strong);
+  border-style: dotted;
+  background: var(--cc-accent-soft);
+}
+.cc-att-chip[data-status='not_recorded'] {
+  border-style: dotted;
+  color: var(--cc-text-muted);
+}
+.cc-att-chip__scope {
+  font-weight: 600;
+  font-size: 0.8em;
+  padding-inline-start: 0.3rem;
+  border-inline-start: 2px solid currentColor;
+}
+.cc-att-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.6rem;
+}
+.cc-att-grid[data-density='compact'] {
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  gap: 0.4rem;
+}
+.cc-att-item.cc-btn {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'avatar name'
+    'avatar chip';
+  justify-items: start;
+  align-items: center;
+  column-gap: 0.6rem;
+  row-gap: 0.2rem;
+  min-height: 4.5rem;
+  padding: 0.5rem 0.7rem;
+  text-align: start;
+  font-weight: 400;
+}
+.cc-att-item > .cc-avatar {
+  grid-area: avatar;
+}
+.cc-att-item > .cc-att-chip {
+  grid-area: chip;
+}
+.cc-att-item[data-status='absent'] {
+  border-style: dashed;
+  background: var(--cc-surface-2);
+}
+.cc-att-item__name {
+  grid-area: name;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+.cc-att-counts {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Timer (RTN-3): a finished timer changes once (border, text and icon) with no flashing. */
+.cc-timer__digits {
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.cc-timer[data-finished] {
+  border-color: var(--cc-warning);
+  border-width: 4px;
+  background: var(--cc-warning-soft);
+}
+.cc-timer__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--cc-warning);
+}
+
+/* Routine stepper (RTN-1/3). */
+.cc-routine__now {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--cc-radius);
+  border: 3px solid var(--cc-accent);
+  background: var(--cc-accent-soft);
+}
+.cc-routine__now-label {
+  font-weight: 700;
+  color: var(--cc-text-muted);
+}
+.cc-routine__now-name {
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  font-weight: 850;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.cc-stepper {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cc-stepper__btn.cc-btn {
+  min-height: var(--cc-touch);
+  gap: 0.45rem;
+}
+.cc-stepper__num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.cc-stepper li[data-state='done'] .cc-btn {
+  color: var(--cc-text-muted);
+}
+.cc-stepper li[data-state='current'] .cc-btn {
+  border-color: var(--cc-accent-strong);
+  border-width: 3px;
+  background: var(--cc-accent-soft);
+  font-weight: 800;
+}
+.cc-stepper__mark {
+  font-size: 0.8em;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* Start / End Lesson flows. */
+.cc-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cc-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 2px solid var(--cc-border);
+  font-weight: 650;
+}
+.cc-steps li[data-state='current'] {
+  border-color: var(--cc-accent-strong);
+  border-width: 3px;
+  background: var(--cc-accent-soft);
+  font-weight: 800;
+}
+.cc-steps li[data-state='done'] {
+  color: var(--cc-text-muted);
+}
+.cc-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.cc-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.75rem;
+  row-gap: 0.2rem;
+  align-items: center;
+  min-height: var(--cc-touch);
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface);
+  cursor: pointer;
+}
+.cc-choice input {
+  width: 1.5rem;
+  height: 1.5rem;
+  grid-row: span 2;
+  accent-color: var(--cc-accent);
+}
+.cc-choice[data-selected] {
+  border-color: var(--cc-accent-strong);
+  border-width: 3px;
+  background: var(--cc-accent-soft);
+}
+.cc-choice:focus-within {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-choice__title {
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+.cc-reflect {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+.cc-reflect__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--cc-touch-big);
+  padding: 0.75rem;
+  border: 2px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cc-reflect__option svg {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.cc-reflect__option[aria-checked='true'] {
+  border-color: var(--cc-accent-strong);
+  border-width: 3px;
+  background: var(--cc-accent-soft);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.cc-reflect__option:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-summary {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.6rem 1.25rem;
+  margin: 0;
+}
+.cc-summary dt {
+  font-weight: 750;
+  color: var(--cc-text-muted);
+}
+.cc-summary dd {
+  margin: 0;
+}
+@media (max-width: 40rem) {
+  .cc-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Routine templates (teacher area). */
+.cc-stage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cc-stage-list__num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--cc-surface-2);
+  font-weight: 800;
+}
+.cc-stage-preview {
+  margin: 0;
+  padding-inline-start: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.75rem;
+}
+.cc-segmented {
+  gap: 0.35rem;
+}
+.cc-segmented .cc-btn[aria-pressed='true'] {
+  background: var(--cc-segment-on);
+  color: var(--cc-accent-text);
+  border-color: var(--cc-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.cc-class-switcher__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 2px dashed currentColor;
+  font-size: 0.85em;
+  font-weight: 700;
+}
+.cc-class-switcher__live svg {
+  width: 0.9em;
+  height: 0.9em;
+}

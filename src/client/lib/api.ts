@@ -25,11 +25,7 @@ export const onAuthProblem = (fn: AuthListener) => {
   return () => authListeners.delete(fn);
 };
 
-/**
- * Typed call for a contract endpoint. Path params (`:name`) are filled from input; GET sends the rest
- * as query string, others as JSON body. Same-origin cookies + CSRF header.
- */
-export async function call<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, O>, input: z.input<I>): Promise<z.infer<O>> {
+function buildRequest<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, O>, input: z.input<I>): { url: string; init: RequestInit } {
   const rest: Record<string, unknown> = { ...(input as Record<string, unknown>) };
   const path = ep.path.replace(/:([A-Za-z0-9_]+)/g, (_m, k: string) => {
     const v = rest[k];
@@ -46,19 +42,48 @@ export async function call<I extends z.ZodType, O extends z.ZodType>(ep: Endpoin
     init.headers = { ...init.headers, 'content-type': 'application/json' };
     init.body = JSON.stringify(rest);
   }
+  return { url, init };
+}
+
+function failure(ep: Endpoint, res: Response, body: any): ApiError {
+  const code: string = body?.error?.code ?? 'INTERNAL';
+  // A 401 with a business reason (WRONG_PIN, WRONG_PASSWORD) is a form error, not a sign-out.
+  const reason: unknown = body?.error?.details?.reason;
+  const hasReason = typeof reason === 'string';
+  if (code === 'PIN_REQUIRED' || (code === 'UNAUTHENTICATED' && ep.access !== 'public' && !hasReason)) {
+    authListeners.forEach((l) => l(code as AuthProblem));
+  } else if (code === 'FORBIDDEN' && reason === 'MUST_CHANGE_PASSWORD') {
+    authListeners.forEach((l) => l('MUST_CHANGE_PASSWORD'));
+  }
+  return new ApiError(res.status, code, body?.error?.message ?? res.statusText, body?.error?.details);
+}
+
+/**
+ * Typed call for a contract endpoint. Path params (`:name`) are filled from input; GET sends the rest
+ * as query string, others as JSON body. Same-origin cookies + CSRF header.
+ */
+export async function call<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, O>, input: z.input<I>): Promise<z.infer<O>> {
+  const { url, init } = buildRequest(ep, input);
   const res = await fetch(url, init);
   const body = res.status === 204 ? null : await res.json().catch(() => null);
-  if (!res.ok) {
-    const code: string = body?.error?.code ?? 'INTERNAL';
-    // A 401 with a business reason (WRONG_PIN, WRONG_PASSWORD) is a form error, not a sign-out.
-    const reason: unknown = body?.error?.details?.reason;
-    const hasReason = typeof reason === 'string';
-    if (code === 'PIN_REQUIRED' || (code === 'UNAUTHENTICATED' && ep.access !== 'public' && !hasReason)) {
-      authListeners.forEach((l) => l(code as AuthProblem));
-    } else if (code === 'FORBIDDEN' && reason === 'MUST_CHANGE_PASSWORD') {
-      authListeners.forEach((l) => l('MUST_CHANGE_PASSWORD'));
-    }
-    throw new ApiError(res.status, code, body?.error?.message ?? res.statusText, body?.error?.details);
-  }
+  if (!res.ok) throw failure(ep as unknown as Endpoint, res, body);
   return body as z.infer<O>;
+}
+
+/**
+ * Conditional GET for polled endpoints (lesson state): sends `If-None-Match` and resolves to
+ * `{ notModified: true }` on 304, so an unchanged poll costs no body and no re-render.
+ */
+export async function callConditional<I extends z.ZodType, O extends z.ZodType>(
+  ep: Endpoint<I, O>,
+  input: z.input<I>,
+  etag: string | null,
+): Promise<{ notModified: true } | { notModified: false; data: z.infer<O>; etag: string | null; receivedAt: number }> {
+  const { url, init } = buildRequest(ep, input);
+  if (etag) init.headers = { ...init.headers, 'if-none-match': etag };
+  const res = await fetch(url, init);
+  if (res.status === 304) return { notModified: true };
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw failure(ep as unknown as Endpoint, res, body);
+  return { notModified: false, data: body as z.infer<O>, etag: res.headers.get('etag'), receivedAt: Date.now() };
 }

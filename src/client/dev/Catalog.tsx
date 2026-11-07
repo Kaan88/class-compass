@@ -16,7 +16,7 @@ import { IconLock, IconPlus, IconSettings, IconUndo } from '../ui/icons.tsx';
 import { ClassBanner, ClassSwitcher, DataTable, DisplayBanner } from '../ui/Layout.tsx';
 import { Mascot, ThemeDecoration, ThemeScope } from '../ui/Mascot.tsx';
 import { PinPad } from '../ui/PinPad.tsx';
-import { Avatar, CounterBar, MetricCell, StudentCard, StudentGrid } from '../ui/Students.tsx';
+import { AttendanceChip, Avatar, CounterBar, MetricCell, StudentCard, StudentGrid } from '../ui/Students.tsx';
 import { Tabs } from '../ui/Tabs.tsx';
 import { themeLabelKey } from '../ui/ThemePreview.tsx';
 import { TEXT_SCALES } from '../routes/teacher/Teacher.tsx';
@@ -150,6 +150,14 @@ function Everything() {
           <StudentCard student={sample[2]!} weeklyCount={6} level={2} onAdd={() => undefined} />
           <StudentCard student={sample[3]!} weeklyCount={0} level={0} absent onAdd={() => undefined} />
         </StudentGrid>
+        <div className="cc-row">
+          <AttendanceChip status="present" />
+          <AttendanceChip status="absent" />
+          <AttendanceChip status="late" />
+          <AttendanceChip status="excused" />
+          <AttendanceChip status="not_recorded" />
+          <AttendanceChip status="late" lessonOnly />
+        </div>
       </Section>
       <Section title={t('catalog.counters')}>
         <CounterBar value={3} max={10} label={t('catalog.sampleCounter')} />

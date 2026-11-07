@@ -56,9 +56,15 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [~] Tests: direct URL / back / refresh / raw API bypass and 423 swap covered in `e2e/pin-lock.spec.ts`; bfcache restore and inactivity relock not yet covered by e2e
 
 ## S5 Lessons, outbox, attendance, routines
-- [ ] Start / resume / end lesson; class switching; outbox + needs-attention tray; polling — outbox client, tray, save badge and class switcher exist (S3); lesson flows, polling and dashboard slot contents do not
-- [ ] Daily attendance + lesson exceptions; routine templates, stages, timer; dashboard date/timezone
-- [ ] Tests: new vs resumed, switching with queued ops, offline/abort-after-commit, attendance independence
+- [x] Start / resume / end lesson as outbox commands (lesson id = start opId, one active lesson per class+subject, resumed after refresh/reopen/class switch, never a second one); class switcher with "lesson in progress" mark and per-class screen state; commands naming another lesson/class refused with `WRONG_LESSON`; ETag/304 polling paused while commands are pending — D-042…D-046
+- [x] Daily attendance shared by the teachers of a class (audited with actor) + lesson-only exceptions; start-screen attendance (everyone present by default, one tap per change), in-lesson attendance dialog with undo, teacher attendance page (any day of the school year, history, change log) — D-049, D-050
+- [x] Routine templates (built-in default RTN-1, own templates with add/remove/reorder/rename stages, per-class default), snapshot at lesson start, stepper with current stage; server-timed classroom timer with one soft tone — D-047, D-048
+- [x] End Lesson: step registry (core reflection step; module steps plug in later), works with every optional module off; lesson summary — D-051
+- [x] Dashboard: live local date/day in the class timezone, collapsible student grid with attendance chips, module slot registry (only enabled modules that contribute a slot are shown) — D-052
+- [~] Dashboard slots for assistant (DSH-3), main counter (DSH-5), Secret Students (DSH-6), groups/homework (DSH-8) and the assistant start step are not built yet: the registries exist and nothing is registered, so they are omitted (S6–S8)
+- [~] ATT-1 "shown alongside homework": attendance is stored separately; the homework view and the cross-test (`it.todo`) come with S8
+- [x] Tests: new vs resumed, start replay, switching with queued ops (WRONG_LESSON / LESSON_ENDED), ETag 304, shared attendance + audit actor, exception precedence, template edits vs snapshot, end with all modules off, Istanbul midnight boundary, overnight auto-abandon; e2e: 19-student start on 1920×1080 touch, refresh resume, class switch and back, offline attendance tap synced once (`e2e/lessons.spec.ts`)
+- [ ] D-006 offline cold start: starting a lesson while offline waits in the outbox until the connection returns (no service worker yet)
 
 ## S6 Counters
 - [ ] English reminder preset; custom counters; void/undo; thresholds & responses
