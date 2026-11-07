@@ -1,8 +1,9 @@
 /**
  * Client module manifest types (SX, D-069; ARCHITECTURE §2). Each folder under `src/client/modules/`
  * has ONE `manifest.tsx` that lists what the module contributes to the app:
- * - classroom: dashboard slots, Start Lesson steps, End Lesson step screens (matching the server's
- *   steps by key), student-card add-ons;
+ * - classroom: dashboard slots (stage / actions / panels), Start Lesson steps (each adds its part
+ *   of the 'lesson.start' command), End Lesson step screens (matching the server's steps by key),
+ *   student-card add-ons;
  * - teacher area: menu entries + their routes (PIN-gated inside TeacherLayout), a class settings panel;
  * - outbox: which queries to refresh after the module's commands;
  * - i18n: the key namespace its strings live under (test-enforced in en + tr).
@@ -10,7 +11,8 @@
  * shown for modules that contribute nothing, so the classroom never displays a placeholder (D-052).
  */
 import type { ComponentType, ReactNode } from 'react';
-import type { LessonState } from '../../shared/contracts/lessons.ts';
+import type { EffectiveAttendance } from '../../domain/attendance.ts';
+import type { LessonCommandPayload, LessonState } from '../../shared/contracts/lessons.ts';
 import type { ContextModule } from '../../shared/modules.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import type { CommandInvalidation } from '../lib/outbox-client.ts';
@@ -24,19 +26,46 @@ export interface ClassroomContext {
   modules: Partial<Record<ContextModule, boolean>>;
 }
 
+/**
+ * Where a dashboard slot is shown: `stage` beside the lesson timer (e.g. the routine stepper),
+ * `actions` in the button row before End Lesson (e.g. the attendance button), `panels` (default) in
+ * the module panel area.
+ */
+export type DashboardRegion = 'stage' | 'actions' | 'panels';
+
 export interface DashboardSlot {
   key: string;
   module: ContextModule;
   order: number;
+  region?: DashboardRegion;
+  /** May render nothing (null) when it has nothing to show for this lesson. */
   Component: ComponentType<{ context: ClassroomContext; lesson: LessonState }>;
 }
 
-export interface StartStep {
+/** What a Start Lesson step may add to the one 'lesson.start' command (everything but the context). */
+export type StartLessonContribution = Partial<Omit<LessonCommandPayload<'lesson.start'>, 'contextId'>>;
+
+export interface StartStepProps<V> {
+  context: ClassroomContext;
+  /** The step's value from the per-class start draft (kept when switching classes, LES-4). */
+  value: V;
+  onChange: (update: (v: V) => V) => void;
+}
+
+export interface StartStep<V = unknown> {
   key: string;
   module: ContextModule;
   order: number;
   title: MessageKey;
-  Component: ComponentType<{ context: ClassroomContext }>;
+  initial: () => V;
+  Component: ComponentType<StartStepProps<V>>;
+  /**
+   * Optional React hook: what this step adds to 'lesson.start' and whether "Begin" may be pressed
+   * (e.g. false while the step's data is loading). It is called on every Start Lesson render for every
+   * registered step, with `enabled` false when the module is off (then it must contribute nothing),
+   * so the number of hook calls never changes. Contributions are merged in step order.
+   */
+  useContribution?: (context: ClassroomContext, value: V, enabled: boolean) => { input: StartLessonContribution; ready: boolean };
 }
 
 export interface EndStepUi<V = unknown> {
@@ -56,6 +85,8 @@ export interface StudentCardExtras {
   addLabel?: string;
   onAdd?: () => void;
   notice?: string | null;
+  /** Effective attendance for the lesson (attendance module). */
+  attendance?: EffectiveAttendance;
 }
 
 /**
@@ -66,10 +97,25 @@ export interface StudentCardExtras {
 export interface StudentCardAddon {
   key: string;
   module: ContextModule;
-  useAddon: (context: ClassroomContext, lesson: LessonState, enabled: boolean) => { header?: ReactNode; cardProps: (studentId: string, fullName: string) => StudentCardExtras } | null;
+  /**
+   * `summary` is a short line beside the student heading (visible even with the grid closed);
+   * `header` is shown above the grid.
+   */
+  useAddon: (
+    context: ClassroomContext,
+    lesson: LessonState,
+    enabled: boolean,
+  ) => { summary?: ReactNode; header?: ReactNode; cardProps: (studentId: string, fullName: string) => StudentCardExtras } | null;
 }
 
-/** A teacher-area page: a menu tile + nav link + route `/teacher/<path>` (inside the PIN gate). */
+/** Search parameters of a teacher page URL (`/teacher/<path>?a=b`), as strings. */
+export type TeacherPageSearch = Readonly<Record<string, string | undefined>>;
+
+/**
+ * A teacher-area page: the route `/teacher/<path>` (inside the PIN gate) plus, unless `menu` is
+ * false, a menu tile and nav link. A sub-page reached from another page (e.g. counter history) sets
+ * `menu: false`.
+ */
 export interface TeacherPage {
   key: string;
   /** Path below /teacher, without slashes (e.g. 'counters'). */
@@ -78,7 +124,9 @@ export interface TeacherPage {
   Icon: ComponentType;
   /** Menu order (lower first). */
   order: number;
-  Component: ComponentType;
+  /** false = route only, no menu tile or nav link. */
+  menu?: boolean;
+  Component: ComponentType<{ search: TeacherPageSearch }>;
 }
 
 /** Per-class module settings shown under the module's switch on the class settings page. */
@@ -105,3 +153,4 @@ export interface ClientModuleManifest {
 /** Identity helpers that type-check manifest pieces. */
 export const defineClientModule = (m: ClientModuleManifest): ClientModuleManifest => m;
 export const endStepUi = <V,>(step: EndStepUi<V>): EndStepUi => step as unknown as EndStepUi;
+export const startStep = <V,>(step: StartStep<V>): StartStep => step as unknown as StartStep;

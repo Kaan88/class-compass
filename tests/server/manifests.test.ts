@@ -10,9 +10,11 @@ import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
 import { CONTEXT_MODULES, MODULE_KEYS, moduleLabelKey } from '../../src/shared/modules.ts';
 import { registeredCommandTypes } from '../../src/server/lib/commands.ts';
-import { installModules, SERVER_MODULES } from '../../src/server/modules/index.ts';
+import { contextModules } from '../../src/server/db/schema.ts';
+import { collectContributions, enabledContributions, installModules, reportContributions, SERVER_MODULES, studentPageContributions } from '../../src/server/modules/index.ts';
+import { defineServerModule } from '../../src/server/modules/manifest.ts';
 import { allEndSteps } from '../../src/server/modules/lessons/endSteps.ts';
-import { moduleConfig, moduleConfigSpec } from '../../src/server/modules/school/modules.ts';
+import { mergeModuleConfig, moduleConfig, moduleConfigSpec } from '../../src/server/modules/school/modules.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
 
@@ -94,5 +96,60 @@ describe('module config through the manifest schema (CFG-1, CFG-3)', () => {
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/secretStudents`, { enabled: true, config: { count: 3 } }));
     expect(moduleConfig(env.db, s.ctxA.id, 'secretStudents')).toEqual({ count: 3 });
     expect(await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/secret/settings`))).toEqual({ count: 3 });
+  });
+
+  it('a stored value that fails the schema (e.g. written before SX) falls back to the manifest default in the services (D-069)', async () => {
+    installModules();
+    const now = Date.now();
+    for (const [module, configJson] of [
+      ['secretStudents', JSON.stringify({ count: 99 })],
+      ['assistant', JSON.stringify({ schoolDays: [1, 9] })],
+    ] as const) {
+      env.db.insert(contextModules).values({ contextId: s.ctxA.id, module, enabled: true, configJson, updatedAt: now, updatedBy: null }).run();
+    }
+    expect(moduleConfig(env.db, s.ctxA.id, 'secretStudents')).toEqual({ count: 2 });
+    expect(await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/secret/settings`))).toEqual({ count: 2 });
+    expect((await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/assistant/settings`))).schoolDays).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('mergeModuleConfig (the services’ write path) validates the patch against the manifest schema', () => {
+    installModules();
+    const uid = s.ayse.id;
+    expect(() => mergeModuleConfig(env.db, s.ctxA.id, 'secretStudents', { count: 99 }, uid, Date.now())).toThrow(expect.objectContaining({ code: 'VALIDATION', details: expect.objectContaining({ reason: 'INVALID_MODULE_CONFIG' }) }));
+    expect(() => mergeModuleConfig(env.db, s.ctxA.id, 'assistant', { surprise: true }, uid, Date.now())).toThrow(expect.objectContaining({ code: 'VALIDATION' }));
+    expect(moduleConfig(env.db, s.ctxA.id, 'secretStudents')).toEqual({ count: 2 });
+    expect(mergeModuleConfig(env.db, s.ctxA.id, 'secretStudents', { count: 3 }, uid, Date.now())).toEqual({ count: 3 });
+  });
+});
+
+describe('report and student-page hooks serve enabled modules only (CFG-2, ACC-12)', () => {
+  let env: TestEnv;
+  let s: School;
+  beforeEach(async () => {
+    env = await makeEnv();
+    s = await buildSchool(env);
+  });
+  afterEach(async () => env.app.close());
+
+  it('contributions are stamped with their manifest’s policy key and a disabled module’s sections are left out', async () => {
+    installModules();
+    const build = () => ({});
+    const fake = [
+      defineServerModule({ key: 'fakeCore', policyKey: null, reports: [{ key: 'core', order: 20, build }], studentPage: [{ key: 'core', order: 20, build }] }),
+      defineServerModule({ key: 'fakeSecret', policyKey: 'secretStudents', reports: [{ key: 'secret', order: 10, build }], studentPage: [{ key: 'secret', order: 10, build }] }),
+    ];
+    const c = collectContributions(fake);
+    expect(c.reports.map((r) => [r.key, r.module])).toEqual([
+      ['secret', 'secretStudents'],
+      ['core', null],
+    ]);
+    expect(enabledContributions(c.reports, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['secret', 'core']);
+    await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/secretStudents`, { enabled: false }));
+    expect(enabledContributions(c.reports, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['core']);
+    expect(enabledContributions(c.studentPage, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['core']);
+    expect(enabledContributions(c.reports, env.db, s.ctxB.id).map((r) => r.key)).toEqual(['secret', 'core']);
+    // The registered lists (empty until S10/S11) go through the same filter.
+    expect(reportContributions(env.db, s.ctxA.id)).toEqual([]);
+    expect(studentPageContributions(env.db, s.ctxA.id)).toEqual([]);
   });
 });

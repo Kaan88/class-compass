@@ -5,7 +5,7 @@
  */
 import { registerInvalidation } from '../lib/outbox-client.ts';
 import { CLIENT_MODULES } from './index.ts';
-import type { ClassroomContext, ClientModuleManifest, DashboardSlot, EndStepUi, StartStep, StudentCardAddon, TeacherPage } from './types.ts';
+import type { ClassroomContext, ClientModuleManifest, DashboardRegion, DashboardSlot, EndStepUi, StartLessonContribution, StartStep, StudentCardAddon, TeacherPage } from './types.ts';
 
 export type { ClassroomContext, StudentCardExtras } from './types.ts';
 
@@ -19,10 +19,34 @@ const enabled = (ctx: ClassroomContext, m: ClientModuleManifest['policyKey']) =>
 export const allDashboardSlots = (): DashboardSlot[] => byOrder(all((m) => m.dashboardSlots));
 export const allStartSteps = (): StartStep[] => byOrder(all((m) => m.startSteps));
 export const allTeacherPages = (): TeacherPage[] => byOrder(all((m) => m.teacherPages));
+/** Pages with a menu tile and nav link (sub-pages with `menu: false` are routes only). */
+export const menuTeacherPages = (): TeacherPage[] => allTeacherPages().filter((p) => p.menu !== false);
 const cardAddons = (): StudentCardAddon[] => all((m) => m.studentCardAddons);
 
-export const dashboardSlotsFor = (ctx: ClassroomContext) => allDashboardSlots().filter((s) => enabled(ctx, s.module));
+export const dashboardSlotsFor = (ctx: ClassroomContext, region: DashboardRegion = 'panels') =>
+  allDashboardSlots().filter((s) => (s.region ?? 'panels') === region && enabled(ctx, s.module));
 export const startStepsFor = (ctx: ClassroomContext) => allStartSteps().filter((s) => enabled(ctx, s.module));
+
+/** Initial values of every registered Start Lesson step, by key. */
+export const initialStartValues = (): Record<string, unknown> => Object.fromEntries(allStartSteps().map((s) => [s.key, s.initial()]));
+
+/**
+ * Calls every registered start step's `useContribution` hook (stable order and count) and merges what
+ * the enabled ones add to 'lesson.start'; `ready` is false while any enabled step is not ready.
+ */
+export function useStartContributions(ctx: ClassroomContext, values: Readonly<Record<string, unknown>>): { input: StartLessonContribution; ready: boolean } {
+  let input: StartLessonContribution = {};
+  let ready = true;
+  for (const s of allStartSteps()) {
+    if (!s.useContribution) continue;
+    const on = enabled(ctx, s.module);
+    const r = s.useContribution(ctx, values[s.key], on);
+    if (!on) continue;
+    input = { ...input, ...r.input };
+    ready &&= r.ready;
+  }
+  return { input, ready };
+}
 
 /** Screens for the server's step list (the server decides which steps run); a step without a screen runs with its defaults. */
 export function endStepUis(keys: readonly string[]): EndStepUi[] {

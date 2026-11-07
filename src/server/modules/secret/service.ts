@@ -34,7 +34,7 @@ import { AppError, notFound } from '../../lib/errors.ts';
 import { rosterWithAttendance, type AttendanceChange } from '../attendance/service.ts';
 import type { LessonRow } from '../lessons/endSteps.ts';
 import { lessonForCommand, updateLesson } from '../lessons/service.ts';
-import { assertModuleEnabled, getModuleConfig, isModuleEnabled, mergeModuleConfig } from '../school/modules.ts';
+import { assertModuleEnabled, isModuleEnabled, mergeModuleConfig, moduleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, getClass, todayFor, type ContextRow } from '../school/policy.ts';
 
 type P<T extends keyof typeof C.SecretCommands> = z.infer<(typeof C.SecretCommands)[T]>;
@@ -46,9 +46,10 @@ type StudentRow = typeof students.$inferSelect;
 export const FAIRNESS_STATUSES = ['sealed', 'revealed', 'unrevealed_abandoned'] as const;
 
 // ---------------------------------------------------------------- settings
+/** The manifest default overlaid with a schema-valid stored count (D-069); an invalid stored value falls back to the default. */
 export function configuredCount(db: Db, contextId: string): number {
-  const n = Number(getModuleConfig(db, contextId, 'secretStudents')?.count);
-  return Number.isInteger(n) && n >= 1 ? Math.min(n, SECRET_MAX_COUNT) : SECRET_DEFAULT_COUNT;
+  const n = moduleConfig(db, contextId, 'secretStudents').count;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= SECRET_MAX_COUNT ? n : SECRET_DEFAULT_COUNT;
 }
 
 export function getSettings(ctx: RequestContext, contextId: string) {

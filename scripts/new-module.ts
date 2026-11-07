@@ -111,7 +111,8 @@ export const ${key}ClientManifest = defineClientModule({
   policyKey: ${lit(key)},
   i18nNamespace: ${lit(key)},
   dashboardSlots: [${key}DashboardSlot],
-  // startSteps, endSteps (same keys as the server steps), studentCardAddons,
+  // startSteps (startStep({ ..., initial, Component, useContribution? })), endSteps (same keys
+  // as the server steps), studentCardAddons,
   // teacherPages (menu tile + /teacher/<path>), settingsPanel, invalidations
 });
 `,

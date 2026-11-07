@@ -307,7 +307,7 @@ export function CountersPage() {
             {t('counters.addEnglish')}
           </Button>
         ) : null}
-        <Link to="/teacher/counter-history" search={{ counterId: undefined }} className={buttonClass('secondary')}>
+        <Link to="/teacher/$page" params={{ page: 'counter-history' }} className={buttonClass('secondary')}>
           <IconCalendar />
           {t('counters.history')}
         </Link>
@@ -341,7 +341,7 @@ export function CountersPage() {
           ) : (
             <div className="cc-row">
               {!c.archived ? <Button onPress={() => setEditing(c.id)}>{t('counters.edit')}</Button> : null}
-              <Button onPress={() => void navigate({ to: '/teacher/counter-history', search: { counterId: c.id } })}>
+              <Button onPress={() => void navigate({ to: '/teacher/$page', params: { page: 'counter-history' }, search: { counterId: c.id } })}>
                 <IconCalendar />
                 {t('counters.history')}
               </Button>

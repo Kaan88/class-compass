@@ -11,7 +11,7 @@ import { freshMe, ME_KEY, signOut, useMe, type Me } from '../../lib/session.ts';
 import { Button, BigButton } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
-import { allTeacherPages } from '../../modules/registry.ts';
+import { menuTeacherPages } from '../../modules/registry.ts';
 import { IconBoard } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
@@ -41,7 +41,7 @@ export function TeacherLayout() {
               <Link to="/teacher" activeOptions={{ exact: true }}>
                 {t('teacher.menu')}
               </Link>
-              {allTeacherPages().map((p) => (
+              {menuTeacherPages().map((p) => (
                 <Link key={p.key} to="/teacher/$page" params={{ page: p.path }}>
                   {t(p.labelKey)}
                 </Link>
@@ -79,7 +79,7 @@ export function TeacherMenu() {
         {me.classroomMode ? t('teacher.backToClassroom') : t('teacher.openClassroom')}
       </BigButton>
       <div className="cc-menu-grid">
-        {allTeacherPages().map((p) => (
+        {menuTeacherPages().map((p) => (
           <Link key={p.key} to="/teacher/$page" params={{ page: p.path }} className="cc-menu-tile">
             <p.Icon />
             {t(p.labelKey)}

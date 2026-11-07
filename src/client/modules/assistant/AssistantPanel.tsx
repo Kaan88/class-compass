@@ -20,7 +20,7 @@ import { IconCalendar, IconCheck } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { useLessonState } from '../lessons/lessonClient.ts';
-import { endStepUi, type ClassroomContext, type DashboardSlot, type StartStep } from '../types.ts';
+import { endStepUi, startStep, type ClassroomContext, type DashboardSlot } from '../types.ts';
 
 /** A local calendar date ('YYYY-MM-DD') as a weekday + day label. */
 export const dayLabel = (date: string, locale: 'en' | 'tr', opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }) =>
@@ -127,7 +127,7 @@ function AssistantStartStep({ context }: { context: ClassroomContext }) {
   );
 }
 
-export const assistantStartStep: StartStep = { key: 'assistant', module: 'assistant', order: 10, title: 'assistant.startTitle', Component: AssistantStartStep };
+export const assistantStartStep = startStep<null>({ key: 'assistant', module: 'assistant', order: 20, title: 'assistant.startTitle', initial: () => null, Component: AssistantStartStep });
 
 /** End Lesson step (optional): thank today's assistant. */
 type ThanksValue = { thanked: boolean };

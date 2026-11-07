@@ -33,7 +33,7 @@ import { newId, sha256 } from '../../lib/crypto.ts';
 import { AppError, invalid } from '../../lib/errors.ts';
 import { dailyFor, type AttendanceChange } from '../attendance/service.ts';
 import type { LessonRow } from '../lessons/endSteps.ts';
-import { getModuleConfig, isModuleEnabled, mergeModuleConfig } from '../school/modules.ts';
+import { isModuleEnabled, mergeModuleConfig, moduleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, getClass, getSchoolSettings, getYear, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { rosterRowsOn } from '../students/service.ts';
 
@@ -61,8 +61,9 @@ function studentsById(db: Db, ids: Array<string | null>): Map<string, StudentRow
 }
 
 // ---------------------------------------------------------------- settings & responsibilities
+/** The manifest default overlaid with schema-valid stored school days (D-069), deduplicated and sorted. */
 export function schoolDaysOf(db: Db, contextId: string): number[] {
-  const raw = getModuleConfig(db, contextId, 'assistant')?.schoolDays;
+  const raw = moduleConfig(db, contextId, 'assistant').schoolDays;
   if (Array.isArray(raw)) {
     const days = [...new Set(raw.filter((d): d is number => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6))].sort();
     if (days.length) return days;

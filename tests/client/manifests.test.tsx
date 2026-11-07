@@ -4,11 +4,27 @@
  * exists in en + tr, ordering is deterministic, and client and server agree (every server End Lesson
  * step has a screen, every optional client module has a server module with the same policy key).
  */
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
+import { rosterKey, routinesKey } from '../../src/client/modules/lessons/lessonClient.ts';
+import type { ClassroomContext } from '../../src/client/modules/types.ts';
 import { CLIENT_MODULES } from '../../src/client/modules/index.ts';
-import { allDashboardSlots, allStartSteps, allTeacherPages, byOrder, endStepUis } from '../../src/client/modules/registry.ts';
+import {
+  allDashboardSlots,
+  allStartSteps,
+  allTeacherPages,
+  byOrder,
+  dashboardSlotsFor,
+  endStepUis,
+  initialStartValues,
+  menuTeacherPages,
+  startStepsFor,
+  useStartContributions,
+} from '../../src/client/modules/registry.ts';
 import { SERVER_MODULES } from '../../src/server/modules/index.ts';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
@@ -67,5 +83,72 @@ describe('client module manifests', () => {
     expect(endStepUis(serverSteps).map((s) => s.key)).toEqual(serverSteps);
     const serverPolicies = new Set(SERVER_MODULES.flatMap((m) => (m.policyKey ? [m.policyKey] : [])));
     for (const m of CLIENT_MODULES) if (m.policyKey !== null) expect(serverPolicies.has(m.policyKey), m.key).toBe(true);
+  });
+});
+
+describe('classroom pieces come from the manifests (D-069): no module is hard-coded in the lesson screens', () => {
+  const ctx = (modules: ClassroomContext['modules']): ClassroomContext => ({ id: 'ctx-1', classId: 'cls-1', className: '3A', subjectName: { en: 'English' }, timezone: 'Europe/Istanbul', modules });
+  const allOn = ctx({ attendance: true, routines: true, assistant: true, counters: true, secretStudents: true });
+
+  it('Start Lesson steps: attendance → assistant → routine, only for enabled modules (LES-1)', () => {
+    expect(startStepsFor(allOn).map((s) => s.key)).toEqual(['attendance', 'assistant', 'routine']);
+    expect(startStepsFor(ctx({ routines: true })).map((s) => s.key)).toEqual(['routine']);
+    expect(startStepsFor(ctx({}))).toEqual([]);
+  });
+
+  it('dashboard regions: routine stepper beside the timer, attendance before End Lesson, module panels', () => {
+    expect(dashboardSlotsFor(allOn, 'stage').map((s) => s.key)).toEqual(['routine']);
+    expect(dashboardSlotsFor(allOn, 'actions').map((s) => s.key)).toEqual(['attendance']);
+    expect(dashboardSlotsFor(allOn, 'panels').map((s) => s.key)).toEqual(['counters', 'assistant', 'secret']);
+    expect([...dashboardSlotsFor(ctx({}), 'stage'), ...dashboardSlotsFor(ctx({}), 'actions'), ...dashboardSlotsFor(ctx({}), 'panels')]).toEqual([]);
+  });
+
+  it('the lesson screens and the router name no module (no hard-coded attendance, routine or counter pieces)', () => {
+    const src = (f: string) => readFileSync(join(MODULES_DIR, '..', f), 'utf8');
+    for (const f of ['modules/lessons/StartLesson.tsx', 'modules/lessons/Dashboard.tsx']) {
+      expect(src(f), f).not.toMatch(/modules\.(attendance|routines|counters|assistant|secretStudents)|useRoutines|AttendanceList|routineTemplateId/);
+    }
+    expect(src('router.tsx')).not.toMatch(/counter-history|CounterHistory|routes\/teacher\/(?!Teacher)/);
+  });
+
+  it('counter history is a counters manifest page without a menu tile', () => {
+    const page = allTeacherPages().find((p) => p.path === 'counter-history');
+    expect(page?.key).toBe('counterHistory');
+    expect(CLIENT_MODULES.find((m) => m.key === 'counters')?.teacherPages).toContain(page);
+    expect(menuTeacherPages()).not.toContain(page);
+    expect(menuTeacherPages().map((p) => p.key)).toEqual(allTeacherPages().filter((p) => p.menu !== false).map((p) => p.key));
+  });
+
+  it('start steps build the one lesson.start payload: changed attendance with what the screen showed, others present, the routine', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+    qc.setQueryData(rosterKey('ctx-1', null), {
+      localDate: '2026-11-09',
+      attendanceEnabled: true,
+      students: [
+        { id: 'stu-a', fullName: 'Ada Example', initials: 'AE', avatarHue: 10, daily: null, exception: null, effective: 'not_recorded' },
+        { id: 'stu-b', fullName: 'Can Example', initials: 'CE', avatarHue: 20, daily: 'absent', exception: null, effective: 'absent' },
+      ],
+    });
+    qc.setQueryData(routinesKey('ctx-1'), { enabled: true, defaultTemplateId: 'tpl-class', templates: [] });
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    const values = { ...initialStartValues(), attendance: { 'stu-a': 'absent', 'stu-b': 'absent' } };
+
+    const on = renderHook(() => useStartContributions(allOn, values), { wrapper }).result.current;
+    expect(on.ready).toBe(true);
+    expect(on.input).toEqual({ attendance: [{ studentId: 'stu-a', status: 'absent', expected: null }], othersPresent: true, routineTemplateId: 'tpl-class' });
+
+    const picked = renderHook(() => useStartContributions(allOn, { ...values, routine: 'tpl-other' }), { wrapper }).result.current;
+    expect(picked.input.routineTemplateId).toBe('tpl-other');
+
+    // A switched-off module adds nothing (its hook still runs, so the hook count never changes).
+    const off = renderHook(() => useStartContributions(ctx({ assistant: true }), values), { wrapper }).result.current;
+    expect(off).toEqual({ input: {}, ready: true });
+  });
+
+  it('Begin waits while the attendance roster is loading', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    const r = renderHook(() => useStartContributions(ctx({ attendance: true }), initialStartValues()), { wrapper }).result.current;
+    expect(r.ready).toBe(false);
   });
 });

@@ -6,6 +6,8 @@
 import type { FastifyInstance } from 'fastify';
 import { defineCommand } from '../lib/commands.ts';
 import type { AppDeps } from '../lib/context.ts';
+import type { Db } from '../db/client.ts';
+import type { ContextModule } from '../../shared/modules.ts';
 import { adminManifest } from './admin/manifest.ts';
 import { assistantManifest } from './assistant/manifest.ts';
 import { registerAttendanceListener } from './attendance/service.ts';
@@ -18,7 +20,7 @@ import { registerLessonCloseHook, registerLessonStateContributor } from './lesso
 import type { ReportContribution, ServerModuleManifest, StudentPageContribution } from './manifest.ts';
 import { routinesManifest } from './routines/manifest.ts';
 import { schoolManifest } from './school/manifest.ts';
-import { registerModuleConfig } from './school/modules.ts';
+import { isModuleEnabled, registerModuleConfig } from './school/modules.ts';
 import { secretManifest } from './secret/manifest.ts';
 import { studentsManifest } from './students/manifest.ts';
 
@@ -35,11 +37,30 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   secretManifest,
 ];
 
-const reports: ReportContribution[] = [];
-const studentPage: StudentPageContribution[] = [];
+/** A contribution as registered: stamped with the policy key of the manifest that declared it. */
+export type Registered<T> = T & { readonly module: ContextModule | null };
+
+let reports: Registered<ReportContribution>[] = [];
+let studentPage: Registered<StudentPageContribution>[] = [];
 let installed = false;
 
 const byOrder = <T extends { order: number; key: string }>(xs: T[]) => xs.sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
+
+/**
+ * Report and student-page contributions of `manifests`, each stamped with its manifest's policy key
+ * (so callers can leave out the sections of a module that is switched off, CFG-2/ACC-12), in order.
+ */
+export function collectContributions(manifests: readonly ServerModuleManifest[]) {
+  const stamp = <T,>(m: ServerModuleManifest, xs: readonly T[] | undefined): Registered<T>[] => (xs ?? []).map((x) => ({ ...x, module: m.policyKey }));
+  return {
+    reports: byOrder(manifests.flatMap((m) => stamp(m, m.reports))),
+    studentPage: byOrder(manifests.flatMap((m) => stamp(m, m.studentPage))),
+  };
+}
+
+/** Keeps the contributions of core modules and of modules enabled for this class+subject. */
+export const enabledContributions = <T extends { module: ContextModule | null }>(list: readonly T[], db: Db, contextId: string): T[] =>
+  list.filter((c) => c.module === null || isModuleEnabled(db, contextId, c.module));
 
 /**
  * Registers every manifest's commands, lesson hooks and config schema, once per process. Throws on a
@@ -64,11 +85,8 @@ export function installModules(): void {
       if (!m.policyKey) throw new Error(`Module ${m.key} has a config but no policy key`);
       registerModuleConfig(m.policyKey, m.config);
     }
-    reports.push(...(m.reports ?? []));
-    studentPage.push(...(m.studentPage ?? []));
   }
-  byOrder(reports);
-  byOrder(studentPage);
+  ({ reports, studentPage } = collectContributions(SERVER_MODULES));
   installed = true;
 }
 
@@ -78,7 +96,7 @@ export function registerModules(app: FastifyInstance, deps: AppDeps) {
   for (const m of SERVER_MODULES) m.routes?.(app, deps);
 }
 
-/** S11 hook: report sections contributed by modules, in order. */
-export const reportContributions = (): readonly ReportContribution[] => reports;
-/** S10 hook: student page sections contributed by modules, in order. */
-export const studentPageContributions = (): readonly StudentPageContribution[] => studentPage;
+/** S11 hook: report sections of the modules enabled for `contextId`, in order (a disabled module's section is never served). */
+export const reportContributions = (db: Db, contextId: string): Registered<ReportContribution>[] => enabledContributions(reports, db, contextId);
+/** S10 hook: student page sections of the modules enabled for `contextId`, in order. */
+export const studentPageContributions = (db: Db, contextId: string): Registered<StudentPageContribution>[] => enabledContributions(studentPage, db, contextId);

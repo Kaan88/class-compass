@@ -41,8 +41,8 @@ The placeholder panel is **not** a finished feature. Replace it before ticking a
 | `lessonState` | `{ key, stamp, build }` contributors to the polled lesson state (classroom-safe only; `stamp` feeds the ETag). |
 | `endSteps` | `endLessonStep({ key, module, order, input, apply })`. `module` must equal `policyKey` (checked at start-up). Order below 100 runs before the core reflection. |
 | `lessonCloseHooks`, `attendanceListeners` | Synchronous hooks inside the writing transaction (D-067). |
-| `reports`, `studentPage` | S11 and S10 hooks. They are collected now (`reportContributions()`, `studentPageContributions()`) but not served yet. |
-| `config` | `{ schema: z.object({...}), defaults }`. A teacher's patch is validated with `schema.partial().strict()`; an invalid one gets 400 `VALIDATION` with `details.reason` `INVALID_MODULE_CONFIG`. Read it with `moduleConfig(db, contextId, module)`, which returns the defaults overlaid with the stored values. Defaults must satisfy the schema (test-enforced). |
+| `reports`, `studentPage` | S11 and S10 hooks. Each contribution is stamped with the manifest's `policyKey` when it is registered, and `reportContributions(db, contextId)` / `studentPageContributions(db, contextId)` return only those of core modules and of modules enabled for that class+subject, so a switched-off module's section is never served (CFG-2, ACC-12). Nothing serves them until S10/S11. |
+| `config` | `{ schema: z.object({...}), defaults }`. A teacher's patch is validated with `schema.partial().strict()`; an invalid one gets 400 `VALIDATION` with `details.reason` `INVALID_MODULE_CONFIG`. Services read it with `moduleConfig(db, contextId, module)`, which returns the defaults overlaid with the stored values that pass the schema (an invalid stored value, e.g. from before SX, falls back to its default); never read `getModuleConfig` (raw JSON) in a service. Services write with `mergeModuleConfig`, which validates the patch the same way. Defaults must satisfy the schema (test-enforced). |
 
 The list order in `SERVER_MODULES` is the registration order, which matters for hooks that run in
 sequence.
@@ -53,11 +53,11 @@ sequence.
 |---|---|
 | `key`, `policyKey` | Same meaning as on the server. Every client `policyKey` needs a server manifest with the same key (test-enforced). |
 | `i18nNamespace` | Prefix of the module's strings. Keys under it must exist in en and tr. |
-| `dashboardSlots` | `{ key, module, order, Component }` on the classroom dashboard. Shown only while the module is enabled. |
-| `startSteps` | `{ key, module, order, title, Component }` in Start Lesson. |
+| `dashboardSlots` | `{ key, module, order, region?, Component }` on the classroom dashboard, shown only while the module is enabled. `region`: `stage` beside the lesson timer (the routine stepper), `actions` in the button row before End Lesson (the attendance button and dialog), `panels` (default) in the module panel area. A slot may render `null` when it has nothing to show. |
+| `startSteps` | `startStep({ key, module, order, title, initial, Component, useContribution? })` in Start Lesson. `Component` gets `{ context, value, onChange }`; the value is kept in the per-class start draft. `useContribution(context, value, enabled)` is a hook (called for every registered step, with `enabled` false when the module is off, and then it must add nothing) that returns `{ input, ready }`: `input` is the step's part of the one `lesson.start` command (attendance adds `attendance` + `othersPresent`, routines add `routineTemplateId`), and `ready: false` keeps "Begin" disabled (e.g. while loading). A start step that needs a new field also extends `LessonCommands['lesson.start']` and the server's start command. |
 | `endSteps` | `endStepUi({ key, title, initial, Component })`. `key` equals the server step key; every server step needs one (test-enforced). |
-| `studentCardAddons` | `{ key, module, useAddon }`: header rows and per-card extras on the student grid. `useAddon` is a hook that is always called. |
-| `teacherPages` | `{ key, path, labelKey, Icon, order, Component }`: a menu tile, a nav link and the route `/teacher/<path>` inside the PIN gate. Link with `<Link to="/teacher/$page" params={{ page: 'x' }}>`. |
+| `studentCardAddons` | `{ key, module, useAddon }`: a `summary` beside the student heading, `header` rows above the grid and per-card extras (counts, the attendance chip). `useAddon` is a hook that is always called. |
+| `teacherPages` | `{ key, path, labelKey, Icon, order, menu?, Component }`: the route `/teacher/<path>` inside the PIN gate plus, unless `menu: false`, a menu tile and nav link (a sub-page such as counter history sets `menu: false`). `Component` gets `{ search }`, the URL's string search parameters. Link with `<Link to="/teacher/$page" params={{ page: 'x' }}>` (add `search={{ id }}` to preselect something). |
 | `settingsPanel` | `{ Component }`, shown under the module's switch on the class settings page. |
 | `invalidations` | Outbox command prefix to the query keys to refresh. |
 

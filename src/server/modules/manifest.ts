@@ -24,8 +24,10 @@ export interface ReportQuery {
 }
 
 /**
- * A module's section of the teacher reports (RPT-1..5). Hook for S11: the reports module will call
- * every registered contribution whose module is enabled; until then the list is only collected.
+ * A module's section of the teacher reports (RPT-1..5). Hook for S11: the reports module calls
+ * `reportContributions(db, contextId)`, which returns only the contributions of core modules and of
+ * modules enabled for that class+subject (each is stamped with its manifest's policy key at
+ * registration); until then nothing serves them.
  */
 export interface ReportContribution {
   key: string;
@@ -35,8 +37,9 @@ export interface ReportContribution {
 
 /**
  * A module's section of a student's personal page (STU-2). Hook for S10: the student-links module
- * will call it with the student id from the link session only (STU-4/5); until then the list is only
- * collected. Contributions must return only that student's permitted records.
+ * gets the sections with `studentPageContributions(db, contextId)` (enabled modules only) and calls
+ * them with the student id from the link session only (STU-4/5); until then nothing serves them.
+ * Contributions must return only that student's permitted records.
  */
 export interface StudentPageContribution {
   key: string;
