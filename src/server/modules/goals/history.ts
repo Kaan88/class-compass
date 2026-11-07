@@ -18,3 +18,14 @@ export function goalsHistorySince(db: Db, studentId: string, since: number): boo
       db.select({ id: studentLinks.id }).from(studentLinks).where(and(eq(studentLinks.studentId, studentId), gte(studentLinks.createdAt, since))).get(),
   );
 }
+
+/**
+ * SQL name of the private notes table, so generic exports can leave it out without naming it (GOL-6:
+ * readable only by the teacher who wrote it, also not by administrators or in exports).
+ */
+export const PRIVATE_NOTES_TABLE = 'private_teacher_notes';
+
+/** How many private notes exist about a student (a number only, for the export manifest). */
+export function privateNotesCount(db: Db, studentId: string): number {
+  return db.select({ id: privateTeacherNotes.id }).from(privateTeacherNotes).where(eq(privateTeacherNotes.studentId, studentId)).all().length;
+}

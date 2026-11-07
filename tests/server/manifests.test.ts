@@ -133,7 +133,7 @@ describe('report and student-page hooks serve enabled modules only (CFG-2, ACC-1
 
   it('contributions are stamped with their manifest’s policy key and a disabled module’s sections are left out', async () => {
     installModules();
-    const build = () => ({});
+    const build = () => ({ key: 'x', title: { raw: 'x' }, metrics: [], tables: [], notes: [] });
     const none = () => null;
     const fake = [
       defineServerModule({ key: 'fakeCore', policyKey: null, reports: [{ key: 'core', order: 20, build }], studentPage: [{ key: 'homework', order: 20, build: none }] }),
@@ -149,19 +149,18 @@ describe('report and student-page hooks serve enabled modules only (CFG-2, ACC-1
     expect(enabledContributions(c.reports, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['core']);
     expect(enabledContributions(c.studentPage, env.db, s.ctxA.id).map((r) => r.key)).toEqual(['homework']);
     expect(enabledContributions(c.reports, env.db, s.ctxB.id).map((r) => r.key)).toEqual(['secret', 'core']);
-    // The registered lists go through the same filter: S8 adds the homework and grouping report
-    // sections (served from S11) and S10 the goals and homework student page sections, left out once
-    // their module is switched off.
+    // The registered lists go through the same filter: every module contributes its report section
+    // (S11, ordered by `order`; Secret Students is switched off above) and S10 the goals and homework
+    // student page sections, left out once their module is switched off.
     expect(studentPageContributions(env.db, s.ctxA.id).map((r) => [r.key, r.module])).toEqual([
       ['goals', 'goals'],
       ['homework', 'homework'],
     ]);
-    expect(reportContributions(env.db, s.ctxA.id).map((r) => [r.key, r.module])).toEqual([
-      ['homework', 'homework'],
-      ['groupingHistory', 'grouping'],
-    ]);
+    const sectionsBefore = ['overview', 'attendance', 'counters', 'homework', 'goals', 'lessonReflections', 'studentReflections', 'assistant', 'groupingHistory'];
+    expect(reportContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(sectionsBefore);
+    expect(reportContributions(env.db, s.ctxB.id).map((r) => r.key)).toContain('secretStudents');
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/homework`, { enabled: false }));
-    expect(reportContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(['groupingHistory']);
+    expect(reportContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(sectionsBefore.filter((k) => k !== 'homework'));
     expect(studentPageContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(['goals']);
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/goals`, { enabled: false }));
     expect(studentPageContributions(env.db, s.ctxA.id)).toEqual([]);

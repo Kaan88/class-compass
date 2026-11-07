@@ -2,7 +2,7 @@
 import { defineServerModule } from '../manifest.ts';
 import { groupingCommands } from './commands.ts';
 import { groupingLessonState, registerGroupingRoutes } from './routes.ts';
-import { groupingReport } from './service.ts';
+import { groupingHistorySection, groupingTimeline } from './report.ts';
 
 export const groupingManifest = defineServerModule({
   key: 'grouping',
@@ -10,5 +10,6 @@ export const groupingManifest = defineServerModule({
   routes: registerGroupingRoutes,
   commands: groupingCommands,
   lessonState: [groupingLessonState],
-  reports: [{ key: 'groupingHistory', order: 70, build: groupingReport }],
+  reports: [{ key: 'groupingHistory', order: 80, build: groupingHistorySection }],
+  timeline: [{ key: 'grouping', order: 80, build: groupingTimeline }],
 });

@@ -1066,4 +1066,34 @@ export const studentLinks = sqliteTable(
   ],
 );
 
+// ---------------------------------------------------------------- operations (S11)
+export const BACKUP_RUN_KINDS = ['local', 'pre_migration', 'verify', 'offsite', 'offsite_check', 'restore'] as const;
+export const BACKUP_RUN_TRIGGERS = ['cli', 'admin', 'startup', 'timer'] as const;
+
+/**
+ * Every backup, verification, off-site copy, repository check and restore (DAT-4, D-089). Written by
+ * the CLI and the admin "back up now" button; read by the admin Maintenance page. `detailsJson`
+ * holds counts, checksums summary or a sanitised error message (never credentials or repository
+ * passwords). A restore is recorded in the restored database after the swap.
+ */
+export const backupRuns = sqliteTable(
+  'backup_runs',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind', { enum: BACKUP_RUN_KINDS }).notNull(),
+    trigger: text('trigger', { enum: BACKUP_RUN_TRIGGERS }).notNull(),
+    status: text('status', { enum: ['ok', 'failed'] }).notNull(),
+    startedAt: integer('started_at').notNull(),
+    finishedAt: integer('finished_at').notNull(),
+    /** Backup file name (no directory). */
+    fileName: text('file_name'),
+    sizeBytes: integer('size_bytes'),
+    appVersion: text('app_version').notNull(),
+    migrationLevel: text('migration_level').notNull(),
+    detailsJson: text('details_json', { mode: 'json' }).$type<Record<string, unknown>>(),
+    actorId: text('actor_id'),
+  },
+  (t) => [index('backup_runs_kind_idx').on(t.kind, t.finishedAt)],
+);
+
 export const _sqlHelper = sql; // re-export for raw fragments in repos

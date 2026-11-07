@@ -31,6 +31,18 @@ const EnvSchema = z.object({
   OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(90_000),
   /** Workbook, Word and PDF parsing (worker thread): maximum time for one file before the thread is stopped. */
   PARSE_TIMEOUT_MS: z.coerce.number().int().min(500).max(600_000).default(30_000),
+  /** Local backups (D-089): folder (default DATA_DIR/backups) and retention (newest per hour / day / month). */
+  BACKUP_DIR: z.string().optional(),
+  BACKUP_KEEP_HOURLY: z.coerce.number().int().min(0).max(10_000).default(48),
+  BACKUP_KEEP_DAILY: z.coerce.number().int().min(0).max(10_000).default(30),
+  BACKUP_KEEP_MONTHLY: z.coerce.number().int().min(0).max(10_000).default(12),
+  /** Off-site copies (restic, D-017): snapshots kept by `restic forget`, and when the Maintenance page warns. */
+  OFFSITE_KEEP_DAILY: z.coerce.number().int().min(1).max(10_000).default(30),
+  OFFSITE_KEEP_WEEKLY: z.coerce.number().int().min(0).max(10_000).default(8),
+  OFFSITE_KEEP_MONTHLY: z.coerce.number().int().min(0).max(10_000).default(12),
+  OFFSITE_STALE_HOURS: z.coerce.number().int().min(1).max(24 * 365).default(36),
+  /** OCR language data folder (default DATA_DIR/ocr-cache); the Docker image points it at data baked in at build time. */
+  OCR_CACHE_DIR: z.string().optional(),
 });
 
 /** Sign-in attempts per minute per address (production value). */
@@ -71,8 +83,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
     ...e,
     dbPath: path.join(dataDir, 'class-compass.db'),
     uploadsDir: path.join(dataDir, 'uploads'),
-    backupsDir: path.join(dataDir, 'backups'),
-    ocrCacheDir: path.join(dataDir, 'ocr-cache'),
+    backupsDir: e.BACKUP_DIR ? path.resolve(e.BACKUP_DIR) : path.join(dataDir, 'backups'),
+    ocrCacheDir: e.OCR_CACHE_DIR ? path.resolve(e.OCR_CACHE_DIR) : path.join(dataDir, 'ocr-cache'),
     isProd: e.NODE_ENV === 'production',
     smtpEnabled: e.SMTP_HOST.length > 0,
     loginRateLimit: loginRateLimitMax(e),

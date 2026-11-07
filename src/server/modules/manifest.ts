@@ -15,26 +15,59 @@ import type { AttendanceListener } from './attendance/service.ts';
 import type { EndLessonStep } from './lessons/endSteps.ts';
 import type { LessonCloseHook, LessonStateContributor } from './lessons/service.ts';
 import type { ModuleConfigSpec } from './school/modules.ts';
-import type { ClassRow, ContextRow } from './school/policy.ts';
+import type { ClassRow, ContextRow, YearRow } from './school/policy.ts';
+import type { StudentRow } from './students/service.ts';
+import type { lessons } from '../db/schema.ts';
+import type { ReportSectionData, TimelineEvent } from '../../shared/contracts/reports.ts';
 import type { StudentPageSection } from '../../shared/contracts/goals.ts';
 
-/** Filter of a report request (S11). */
-export interface ReportQuery {
-  contextId: string;
+type LessonRow = typeof lessons.$inferSelect;
+
+/**
+ * What a report is built for (S11, RPT-2): one class+subject (teaching context), a period of local
+ * dates and optionally one student. Built once by the reports module after the access check; section
+ * builders only read.
+ */
+export interface ReportScope {
+  context: ContextRow;
+  cls: ClassRow;
+  year: YearRow;
   from: string;
   to: string;
+  today: string;
+  timezone: string;
+  weekStartsOn: number;
+  /** The class+subject's own teacher, or an administrator (who never sees lesson reflection notes). */
+  viewer: 'teacher' | 'admin';
+  /** null = the whole class. */
+  studentId: string | null;
+  /** Students in the class at any time in the period (just the chosen one with a student filter), by name. */
+  students: StudentRow[];
+  /** Was the student in this class on that local date (date-aware enrolments, D-027)? */
+  enrolledOn: (studentId: string, date: string) => boolean;
+  /** Lessons of this class+subject that were held (ended) in the period, oldest first. */
+  lessons: LessonRow[];
 }
 
 /**
- * A module's section of the teacher reports (RPT-1..5). Hook for S11: the reports module calls
+ * A module's section of the reports (RPT-1..5, D-091). The reports module calls
  * `reportContributions(db, contextId)`, which returns only the contributions of core modules and of
- * modules enabled for that class+subject (each is stamped with its manifest's policy key at
- * registration); until then nothing serves them.
+ * modules enabled for that class+subject (each is stamped with its manifest's policy key). `build`
+ * returns typed cells only (shared `ReportSection`): counts with denominators, "not recorded",
+ * "absent", "not applicable" — never an invented metric or an overall score — or null to leave the
+ * section out. It must not return pre-reveal Secret Student identities or private teacher notes.
  */
 export interface ReportContribution {
   key: string;
   order: number;
-  build: (ctx: RequestContext, query: ReportQuery) => unknown;
+  build: (ctx: RequestContext, scope: ReportScope) => ReportSectionData | null;
+}
+
+/** A module's events in one student's timeline (RPT-1): only records the teacher may see. */
+export interface TimelineContribution {
+  key: string;
+  order: number;
+  build: (ctx: RequestContext, scope: ReportScope, studentId: string) => TimelineEvent[];
 }
 
 /** What a student page section is built for: the student (from the link session only) in one class+subject. */
@@ -78,8 +111,10 @@ export interface ServerModuleManifest {
   lessonCloseHooks?: readonly LessonCloseHook[];
   /** Runs inside every attendance write (D-067). */
   attendanceListeners?: readonly AttendanceListener[];
-  /** S11 reports hook (collected, not yet served). */
+  /** Report sections (S11, served by the reports module). */
   reports?: readonly ReportContribution[];
+  /** Student timeline events (S11, served by the reports module). */
+  timeline?: readonly TimelineContribution[];
   /** S10 student page sections (served by the links module's `/api/student/page`). */
   studentPage?: readonly StudentPageContribution[];
   /** Default config + Zod schema for `context_modules.configJson` of `policyKey`. */

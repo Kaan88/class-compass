@@ -461,3 +461,19 @@ export function history(ctx: RequestContext, contextId: string) {
 function isLessonClosed(db: Db, lessonId: string): boolean {
   return db.select({ s: lessons.status }).from(lessons).where(eq(lessons.id, lessonId)).get()?.s !== 'active';
 }
+
+/**
+ * Selections that may leave the module in an export (DAT-4/5, SEC-3): only those of REVEALED rounds,
+ * as raw rows; `hidden` counts the rest (sealed or never revealed), which are never exported.
+ */
+export function exportableSelections(db: Db, studentId?: string): { rows: Array<Record<string, unknown>>; hidden: number } {
+  const all = db
+    .select({ s: secretSelections, revealedAt: secretRounds.revealedAt })
+    .from(secretSelections)
+    .innerJoin(secretRounds, eq(secretRounds.id, secretSelections.roundId))
+    .where(studentId ? eq(secretSelections.studentId, studentId) : undefined)
+    .orderBy(asc(secretSelections.selectedAt))
+    .all();
+  const shown = all.filter((r) => r.revealedAt !== null);
+  return { rows: shown.map((r) => ({ ...r.s })), hidden: all.length - shown.length };
+}

@@ -78,12 +78,12 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setHomeworkS
 // ---------------------------------------------------------------- reads
 const studentDto = (s: StudentRow) => ({ id: s.id, fullName: s.fullName, initials: initials(s.fullName), avatarHue: s.avatarHue });
 
-function marksOf(db: Db, assignmentId: string): Map<string, MarkRow> {
+export function marksOf(db: Db, assignmentId: string): Map<string, MarkRow> {
   return new Map(db.select().from(homeworkMarks).where(eq(homeworkMarks.assignmentId, assignmentId)).all().map((m) => [m.studentId, m]));
 }
 
 /** Students expected to hand it in: enrolled on the due date, plus anyone already marked. */
-function expectedStudents(db: Db, a: AssignmentRow, classId: string, marks: ReadonlyMap<string, MarkRow>) {
+export function expectedStudents(db: Db, a: AssignmentRow, classId: string, marks: ReadonlyMap<string, MarkRow>) {
   const roster = rosterRowsOn(db, classId, a.dueOn).map((r) => r.student);
   const inRoster = new Set(roster.map((s) => s.id));
   const extraIds = [...marks.keys()].filter((id) => !inRoster.has(id));
@@ -475,28 +475,5 @@ export function classroomCurrent(ctx: RequestContext, contextId: string) {
     checkingInClassroom: settingsOf(ctx.db, context.id).checkingInClassroom,
     assignments: rows.map((a) => ({ id: a.id, title: a.title, details: a.details, assignedOn: a.assignedOn, dueOn: a.dueOn })),
   };
-}
-
-// ---------------------------------------------------------------- reports hook (S11)
-/**
- * RPT-3/RPT-5: per status kind, how many marks for assignments due in the period, with the
- * denominator (students expected) and "not checked" kept apart from "missing".
- */
-export function homeworkReport(ctx: RequestContext, q: { contextId: string; from: string; to: string }) {
-  const context = ctxRow(ctx.db, q.contextId);
-  const rows = ctx.db
-    .select()
-    .from(homeworkAssignments)
-    .where(and(eq(homeworkAssignments.contextId, q.contextId), isNull(homeworkAssignments.archivedAt), gte(homeworkAssignments.dueOn, q.from), lte(homeworkAssignments.dueOn, q.to)))
-    .all();
-  const byKind: Record<string, number> = {};
-  let expected = 0;
-  for (const a of rows) {
-    const c = counts(ctx.db, a, context.classId);
-    expected += c.total;
-    const kindOf = new Map(a.statusSetJson.map((s) => [s.key, s.kind]));
-    for (const [k, n] of Object.entries(c.byStatus)) byKind[kindOf.get(k) ?? 'other'] = (byKind[kindOf.get(k) ?? 'other'] ?? 0) + n;
-  }
-  return { assignments: rows.length, expected, byKind };
 }
 

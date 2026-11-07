@@ -1,5 +1,6 @@
 /** Shared daily attendance and lesson exceptions (ACC-8, ATT-2). */
 import { defineServerModule } from '../manifest.ts';
+import { attendanceSection, attendanceTimeline } from './report.ts';
 import { attendanceCommands } from './commands.ts';
 import { registerAttendanceRoutes } from './routes.ts';
 
@@ -8,4 +9,6 @@ export const attendanceManifest = defineServerModule({
   policyKey: 'attendance',
   routes: registerAttendanceRoutes,
   commands: attendanceCommands,
+  reports: [{ key: 'attendance', order: 20, build: attendanceSection }],
+  timeline: [{ key: 'attendance', order: 20, build: attendanceTimeline }],
 });

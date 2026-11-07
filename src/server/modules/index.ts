@@ -23,7 +23,9 @@ import { registerEndLessonStep } from './lessons/endSteps.ts';
 import { lessonsManifest } from './lessons/manifest.ts';
 import { linksManifest } from './links/manifest.ts';
 import { registerLessonCloseHook, registerLessonStateContributor } from './lessons/service.ts';
-import type { ReportContribution, ServerModuleManifest, StudentPageContribution } from './manifest.ts';
+import type { ReportContribution, ServerModuleManifest, StudentPageContribution, TimelineContribution } from './manifest.ts';
+import { maintenanceManifest } from './maintenance/manifest.ts';
+import { reportsManifest } from './reports/manifest.ts';
 import { routinesManifest } from './routines/manifest.ts';
 import { schoolManifest } from './school/manifest.ts';
 import { isModuleEnabled, registerModuleConfig } from './school/modules.ts';
@@ -47,6 +49,8 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   importManifest,
   goalsManifest,
   linksManifest,
+  reportsManifest,
+  maintenanceManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */
@@ -54,6 +58,7 @@ export type Registered<T> = T & { readonly module: ContextModule | null };
 
 let reports: Registered<ReportContribution>[] = [];
 let studentPage: Registered<StudentPageContribution>[] = [];
+let timeline: Registered<TimelineContribution>[] = [];
 let installed = false;
 
 const byOrder = <T extends { order: number; key: string }>(xs: T[]) => xs.sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
@@ -67,6 +72,7 @@ export function collectContributions(manifests: readonly ServerModuleManifest[])
   return {
     reports: byOrder(manifests.flatMap((m) => stamp(m, m.reports))),
     studentPage: byOrder(manifests.flatMap((m) => stamp(m, m.studentPage))),
+    timeline: byOrder(manifests.flatMap((m) => stamp(m, m.timeline))),
   };
 }
 
@@ -98,7 +104,7 @@ export function installModules(): void {
       registerModuleConfig(m.policyKey, m.config);
     }
   }
-  ({ reports, studentPage } = collectContributions(SERVER_MODULES));
+  ({ reports, studentPage, timeline } = collectContributions(SERVER_MODULES));
   installed = true;
 }
 
@@ -108,7 +114,9 @@ export function registerModules(app: FastifyInstance, deps: AppDeps) {
   for (const m of SERVER_MODULES) m.routes?.(app, deps);
 }
 
-/** S11 hook: report sections of the modules enabled for `contextId`, in order (a disabled module's section is never served). */
+/** Report sections of the modules enabled for `contextId`, in order (a disabled module's section is never served). */
 export const reportContributions = (db: Db, contextId: string): Registered<ReportContribution>[] => enabledContributions(reports, db, contextId);
 /** S10 hook: student page sections of the modules enabled for `contextId`, in order. */
 export const studentPageContributions = (db: Db, contextId: string): Registered<StudentPageContribution>[] => enabledContributions(studentPage, db, contextId);
+/** Student timeline contributions of the modules enabled for `contextId`, in order. */
+export const timelineContributions = (db: Db, contextId: string): Registered<TimelineContribution>[] => enabledContributions(timeline, db, contextId);
