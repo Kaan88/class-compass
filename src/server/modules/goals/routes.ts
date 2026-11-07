@@ -56,8 +56,8 @@ export function registerGoalRoutes(app: FastifyInstance, deps: AppDeps) {
   });
   route(app, deps, C.studentAddEvidence, (ctx, input) => student.addEvidence(ctx, input));
   route(app, deps, C.studentUpdateEvidence, (ctx, input) => student.updateEvidence(ctx, input));
-  route(app, deps, C.studentDeleteEvidence, (ctx, input) => {
-    student.deleteEvidence(ctx, input.evidenceId);
+  route(app, deps, C.studentDeleteEvidence, async (ctx, input) => {
+    await student.deleteEvidence(ctx, input.evidenceId);
     return ok;
   });
   rawRoute(app, deps, C.studentUploadFile, (ctx, input, { req }) => student.uploadEvidenceFile(ctx, req, input.kind), { rateLimit: STUDENT_UPLOAD_RATE });

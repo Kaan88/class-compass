@@ -11,7 +11,12 @@ import { api, ensurePin, login, PIN } from './helpers.ts';
 /** The preview's count line (other status regions, such as the open-choices notice, may be shown too). */
 const summary = (preview: Locator) => preview.getByRole('status').filter({ hasText: /to add/ });
 
-const letters = () => Array.from({ length: 5 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+/**
+ * Random name tag without 'i': the list has an all-caps name, and Turkish title case turns 'I' into 'ı'
+ * (correctly), so a tag with 'i' made the row lookup fail about once in six runs.
+ */
+const TAG_LETTERS = 'abcdefghjklmnoprstuvyz';
+const letters = () => Array.from({ length: 5 }, () => TAG_LETTERS[Math.floor(Math.random() * TAG_LETTERS.length)]).join('');
 
 test('paste a list, fix a row, confirm, see the report; a re-import shows existing students', async ({ page }) => {
   test.setTimeout(120_000);

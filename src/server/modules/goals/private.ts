@@ -35,11 +35,15 @@ export function addPrivateNote(ctx: RequestContext, studentId: string, subjectId
   return dto(row);
 }
 
-/** Only the author may delete (anyone else gets the same 404 as for a missing note). */
-export function deletePrivateNote(ctx: RequestContext, noteId: string): void {
+/**
+ * Only the author may delete (anyone else gets the same 404 as for a missing note). `guard` is the
+ * caller's scope check (still teaches the student, writable class and year); it sees no note text.
+ */
+export function deletePrivateNote(ctx: RequestContext, noteId: string, guard: (note: { studentId: string; subjectId: string }) => void): void {
   tx(ctx.db, () => {
     const n = ctx.db.select().from(privateTeacherNotes).where(eq(privateTeacherNotes.id, noteId)).get();
     if (!n || n.deletedAt !== null || n.teacherId !== requireUser(ctx).id) throw notFound('Note');
+    guard({ studentId: n.studentId, subjectId: n.subjectId });
     ctx.db.update(privateTeacherNotes).set({ deletedAt: ctx.now(), updatedAt: ctx.now() }).where(eq(privateTeacherNotes.id, n.id)).run();
     audit(ctx.db, ctx.actor, { action: 'private_note.delete', entity: 'private_teacher_note', entityId: n.id, before: { studentId: n.studentId, subjectId: n.subjectId } }, ctx.now());
   });

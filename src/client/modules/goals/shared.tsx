@@ -14,6 +14,8 @@ export const CONFIDENCE_LEVELS = [1, 2, 3, 4, 5] as const;
 /** The goal's words: a preset in the viewer's language, else what was written. */
 export const goalText = (g: Goal, locale: Locale) => (g.presetText ? pickText(g.presetText, locale) || g.text : g.text);
 
+/** A local calendar date ('YYYY-MM-DD') in the viewer's language, without any timezone shift. */
+export const calendarDateText = (date: string, locale: Locale) => formatDate(Date.parse(`${date}T12:00:00Z`), locale, 'UTC', { day: 'numeric', month: 'short', year: 'numeric' });
 export const whenText = (ms: number, locale: Locale) => formatDate(ms, locale, Intl.DateTimeFormat().resolvedOptions().timeZone, { day: 'numeric', month: 'short', year: 'numeric' });
 
 /** Current category name; the name at the time the goal was set when it was renamed since (DAT-6). */
@@ -88,7 +90,7 @@ export function GoalSummary({ goal, outcomes }: { goal: Goal; outcomes: readonly
       {goal.practiceChoices.length ? (
         <p className="cc-muted">{t('goals.practiceList', { list: goal.practiceChoices.join(', ') })}</p>
       ) : null}
-      {goal.reviewOn ? <p className="cc-muted">{t('goals.reviewOn', { date: goal.reviewOn })}</p> : null}
+      {goal.reviewOn ? <p className="cc-muted">{t('goals.reviewOn', { date: calendarDateText(goal.reviewOn, locale) })}</p> : null}
     </div>
   );
 }

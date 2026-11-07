@@ -112,12 +112,12 @@ function AddGoal({ data, subjectId }: { data: StudentGoalsSection; subjectId: st
   );
 }
 
-function MyGoals({ data, canWrite }: { data: StudentGoalsSection; canWrite: boolean }) {
+function MyGoals({ data, canWrite, subjectId }: { data: StudentGoalsSection; canWrite: boolean; subjectId: string }) {
   const { t } = useI18n();
   const run = useStudentRun();
   return (
-    <section className="cc-stack" aria-labelledby="my-goals">
-      <h3 id="my-goals" className="cc-h2">
+    <section className="cc-stack" aria-labelledby={`my-goals-${subjectId}`}>
+      <h3 id={`my-goals-${subjectId}`} className="cc-h2">
         {t('student.myGoals')}
       </h3>
       {data.goals.length === 0 ? <p className="cc-muted">{t('student.noGoals')}</p> : null}
@@ -155,7 +155,7 @@ function MyGoals({ data, canWrite }: { data: StudentGoalsSection; canWrite: bool
   );
 }
 
-function Reflections({ data, canWrite }: { data: StudentGoalsSection; canWrite: boolean }) {
+function Reflections({ data, canWrite, subjectId }: { data: StudentGoalsSection; canWrite: boolean; subjectId: string }) {
   const { t, locale } = useI18n();
   const run = useStudentRun();
   const [goalId, setGoalId] = useState('');
@@ -174,8 +174,8 @@ function Reflections({ data, canWrite }: { data: StudentGoalsSection; canWrite: 
     }
   };
   return (
-    <section className="cc-stack" aria-labelledby="my-reflections">
-      <h3 id="my-reflections" className="cc-h2">
+    <section className="cc-stack" aria-labelledby={`my-reflections-${subjectId}`}>
+      <h3 id={`my-reflections-${subjectId}`} className="cc-h2">
         {t('student.myReflections')}
       </h3>
       {canWrite && live.length ? (
@@ -317,9 +317,9 @@ export function GoalsSection({ data, subjectId, media }: { data: StudentGoalsSec
   return (
     <div className="cc-stack" data-testid="student-goals">
       {!data.canWrite ? <p className="cc-card cc-muted">{t('student.readOnly')}</p> : null}
-      <MyGoals data={data} canWrite={data.canWrite} />
+      <MyGoals data={data} canWrite={data.canWrite} subjectId={subjectId} />
       {data.canWrite ? <AddGoal data={data} subjectId={subjectId} /> : null}
-      <Reflections data={data} canWrite={data.canWrite} />
+      <Reflections data={data} canWrite={data.canWrite} subjectId={subjectId} />
       <section className="cc-stack" aria-labelledby={`my-evidence-${subjectId}`}>
         <h3 id={`my-evidence-${subjectId}`} className="cc-h2">
           {t('student.myEvidence')}

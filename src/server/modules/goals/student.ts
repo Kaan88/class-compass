@@ -8,7 +8,7 @@
  *   403 (their own record written by a teacher) or 404 (someone else's record), so ids reveal nothing.
  * - This file never touches private teacher notes (GOL-6, test-enforced).
  */
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, lt } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/goals.ts';
@@ -19,7 +19,7 @@ import { audit } from '../../lib/audit.ts';
 import { requireStudent, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
-import { assertMediaAllowed, ingestUpload } from '../files/service.ts';
+import { assertMediaAllowed, deleteFileRow, ingestUpload, type FileRow } from '../files/service.ts';
 import { studentScope, type ScopeContext, type StudentScope } from '../links/scope.ts';
 import type { StudentPageInput } from '../manifest.ts';
 import { isModuleEnabled } from '../school/modules.ts';
@@ -257,20 +257,56 @@ export function updateEvidence(ctx: RequestContext, input: In<typeof C.studentUp
   });
 }
 
-export function deleteEvidence(ctx: RequestContext, evidenceId: string): void {
-  tx(ctx.db, () => {
+/** The file is this student's own upload and no live evidence shows it any more. */
+const isOwnLooseUpload = (ctx: RequestContext, studentId: string, f: FileRow) =>
+  f.deletedAt === null &&
+  f.ownerStudentId === studentId &&
+  f.uploadedByType === 'student' &&
+  f.uploadedById === studentId &&
+  !ctx.db.select({ id: evidence.id }).from(evidence).where(and(eq(evidence.fileId, f.id), isNull(evidence.deletedAt))).get();
+
+/**
+ * Deleting own evidence (GOL-5) also deletes the file the student uploaded for it when nothing else
+ * shows it (STU-8): the bytes go, the upload space is freed and neither the student nor teachers can
+ * open it any more. The file delete is audited by `deleteFileRow`.
+ */
+export async function deleteEvidence(ctx: RequestContext, evidenceId: string): Promise<void> {
+  const { studentId } = requireStudent(ctx);
+  const loose = tx(ctx.db, () => {
     const e = ownEvidence(ctx, evidenceId);
     ctx.db.update(evidence).set({ deletedAt: ctx.now(), updatedAt: ctx.now() }).where(eq(evidence.id, e.id)).run();
     audit(ctx.db, ctx.actor, { action: 'evidence.delete', entity: 'evidence', entityId: e.id, before: { kind: e.kind, fileId: e.fileId } }, ctx.now());
+    const f = e.fileId ? ctx.db.select().from(files).where(eq(files.id, e.fileId)).get() : undefined;
+    return f && isOwnLooseUpload(ctx, studentId, f) ? f : null;
   });
+  if (loose) await deleteFileRow(ctx, loose);
 }
 
-/** Student upload (STU-8): media flag first (before the body is read), then the usual pipeline with the student as owner. */
+/** An upload the student never attached is removed after this long (it still counts until then). */
+export const LOOSE_UPLOAD_GRACE_MS = 60 * 60_000;
+
+/** Remove the student's own uploads that no live evidence shows and that are older than the grace period. */
+async function removeLooseUploads(ctx: RequestContext, studentId: string): Promise<void> {
+  const old = ctx.db
+    .select()
+    .from(files)
+    .where(and(eq(files.ownerStudentId, studentId), eq(files.uploadedByType, 'student'), eq(files.uploadedById, studentId), isNull(files.deletedAt), lt(files.createdAt, ctx.now() - LOOSE_UPLOAD_GRACE_MS)))
+    .all();
+  for (const f of old) if (isOwnLooseUpload(ctx, studentId, f)) await deleteFileRow(ctx, f);
+}
+
+/**
+ * Student upload (STU-8): media flag first (before the body is read), then the usual pipeline with the
+ * student as owner. The client attaches the file at once (`addEvidence`).
+ */
 export async function uploadEvidenceFile(ctx: RequestContext, req: FastifyRequest, kind: In<typeof C.studentUploadFile>['kind']) {
   const { studentId } = requireStudent(ctx);
   assertMediaAllowed(ctx.db, kind, 'evidence');
   const scope = studentScope(ctx, studentId);
   if (!scope.contexts.some((c) => canWriteIn(ctx, c))) throw new AppError('FEATURE_DISABLED', 'Evidence cannot be added now', { reason: 'GOALS_READ_ONLY' });
+  // Uploads never attached (a failed save, or someone with the link filling the space) do not keep
+  // the student's quota full: they are removed before the quota is checked again.
+  await removeLooseUploads(ctx, studentId);
   const f = await ingestUpload(ctx, req, { kind, ownerStudentId: studentId });
   return { id: f.id, kind, mime: f.sniffedMime, name: f.originalName, size: f.size, hasThumbnail: f.thumbStorageKey !== null };
 }

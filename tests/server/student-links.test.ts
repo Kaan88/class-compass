@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { auditEvents, sessions, studentLinks } from '../../src/server/db/schema.ts';
 import { studentCookieName } from '../../src/server/lib/http.ts';
+import { EXCHANGE_FAILURE_WINDOW_MS, EXCHANGE_FREE_FAILURES } from '../../src/server/modules/links/service.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 import { openLink, tokenOf } from '../student-helpers.ts';
@@ -69,10 +70,27 @@ describe('link generation and exchange (STU-1, STU-4)', () => {
     await openLink(env, second.url);
   });
 
-  it('rate-limits the public exchange', async () => {
-    let last = 0;
-    for (let i = 0; i < 31; i++) last = (await new Client(env).post('/api/student/session', { token: `guess-${i}-`.padEnd(43, 'a') })).status;
-    expect(last).toBe(429);
+  it('rate-limits refused tokens per address, but a valid link still opens (STU-4)', async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < EXCHANGE_FREE_FAILURES + 1; i++) statuses.push((await new Client(env).post('/api/student/session', { token: `guess-${i}-`.padEnd(43, 'a') })).status);
+    expect(statuses.slice(0, EXCHANGE_FREE_FAILURES).every((x) => x === 401)).toBe(true);
+    expect(statuses.at(-1)).toBe(429);
+    // A real link from the same school network is not caught by someone else's guessing.
+    await openLink(env, (await ok(s.teacherA.post(`/api/teacher/students/${ada.id}/link`))).url);
+    // The window passes since the last failure: refused tokens get the normal answer again.
+    env.clock.advance(EXCHANGE_FAILURE_WINDOW_MS + 1);
+    expect((await new Client(env).post('/api/student/session', { token: 'z'.repeat(43) })).status).toBe(401);
+  });
+
+  it('a whole class behind one school address opens its links in the same minute (STU-1, review fix)', async () => {
+    const urls: string[] = [];
+    for (let i = 0; i < 40; i++) {
+      const st = await addStudent(s.teacherA, s.c3a.id, { fullName: `Kurgu Öğrenci ${i}` });
+      urls.push((await ok(s.teacherA.post(`/api/teacher/students/${st.id}/link`))).url);
+    }
+    for (const url of urls) await openLink(env, url);
+    // Opening the same link again (a reload with the fragment) also keeps working.
+    for (const url of urls.slice(0, 10)) await openLink(env, url);
   });
 });
 

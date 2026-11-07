@@ -307,3 +307,84 @@ describe('boundaries (GOL-6, STU-5)', () => {
     }
   });
 });
+
+describe('S10 review fixes: student uploads can be removed (STU-8, GOL-5)', () => {
+  beforeEach(setup);
+  afterEach(teardown);
+
+  it('deleting own file evidence deletes the uploaded file for the student and every teacher', async () => {
+    const file = await ok(upload(adaPhone, '/api/student/files?kind=document', Buffer.from('Ada’s poem'), 'poem.txt', 'text/plain'));
+    const ev = await ok(adaPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'file', fileId: file.id }));
+    expect((await s.teacherA.get(`/api/files/${file.id}`)).status).toBe(200);
+    await ok(adaPhone.del(`/api/student/evidence/${ev.id}`));
+    expect((await adaPhone.get(`/api/student/files/${file.id}`)).status).toBe(404);
+    expect((await s.teacherA.get(`/api/files/${file.id}`)).status).toBe(404);
+    const audit = env.db.$client.prepare("SELECT actor_type FROM audit_events WHERE action = 'file.delete' AND entity_id = ?").all(file.id) as { actor_type: string }[];
+    expect(audit).toEqual([{ actor_type: 'student' }]);
+  });
+
+  it('uploads never attached stop filling the student quota after the grace period', async () => {
+    (env.config as { UPLOAD_STUDENT_QUOTA_MB: number }).UPLOAD_STUDENT_QUOTA_MB = 0.001; // ≈1 kB
+    const blob = Buffer.from('x'.repeat(700));
+    const loose = await ok(upload(adaPhone, '/api/student/files?kind=document', blob, 'a.txt', 'text/plain'));
+    const full = await upload(adaPhone, '/api/student/files?kind=document', blob, 'b.txt', 'text/plain');
+    expect(full.body.error.details.reason).toBe('QUOTA_STUDENT');
+    env.clock.advance(61 * 60_000);
+    await ok(upload(adaPhone, '/api/student/files?kind=document', blob, 'c.txt', 'text/plain'));
+    expect((await adaPhone.get(`/api/student/files/${loose.id}`)).status).toBe(404);
+  });
+
+  it('an attached upload is kept by the clean-up', async () => {
+    const file = await ok(upload(adaPhone, '/api/student/files?kind=document', Buffer.from('kept'), 'k.txt', 'text/plain'));
+    await ok(adaPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'file', fileId: file.id }));
+    env.clock.advance(2 * 60 * 60_000);
+    await ok(upload(adaPhone, '/api/student/files?kind=document', Buffer.from('next'), 'n.txt', 'text/plain'));
+    expect((await adaPhone.get(`/api/student/files/${file.id}`)).status).toBe(200);
+  });
+});
+
+describe('S10 review fixes: teacher deletes and library edits follow DAT-1 and ACC-10', () => {
+  beforeEach(setup);
+  afterEach(teardown);
+
+  const prepare = async () => {
+    const fb = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/feedback`, { body: 'Well done.' }));
+    const note = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/private-notes`, { body: 'note' }));
+    const cat = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/goal-categories`, { name: { en: 'Speaking' } }));
+    const preset = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/goal-presets`, { categoryId: cat.id, text: { en: 'Say hello' } }));
+    return { fb, note, cat, preset };
+  };
+
+  it('an archived year is read-only for feedback, private notes, categories and presets (DAT-1)', async () => {
+    const { fb, note, cat, preset } = await prepare();
+    await ok(s.admin.post(`/api/admin/years/${s.year.id}/archive`, {}));
+    for (const r of [
+      await s.teacherA.del(`/api/teacher/feedback/${fb.id}`),
+      await s.teacherA.del(`/api/teacher/private-notes/${note.id}`),
+      await s.teacherA.patch(`/api/teacher/goal-categories/${cat.id}`, { archived: true }),
+      await s.teacherA.patch(`/api/teacher/goal-presets/${preset.id}`, { text: { en: 'Changed' } }),
+    ]) {
+      expect(r.status).toBe(409);
+      expect(r.body.error.details.reason).toBe('YEAR_ARCHIVED');
+    }
+    const detail = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/goals`));
+    expect(detail.feedback).toHaveLength(1);
+    expect(detail.privateNotes).toHaveLength(1);
+  });
+
+  it('a teacher who no longer teaches the student cannot delete what they wrote (404, ACC-10)', async () => {
+    const { fb, note } = await prepare();
+    await ok(s.admin.post(`/api/admin/teaching-contexts/${s.ctxA.id}/end`, {}));
+    expect((await s.teacherA.del(`/api/teacher/feedback/${fb.id}`)).status).toBe(404);
+    expect((await s.teacherA.del(`/api/teacher/private-notes/${note.id}`)).status).toBe(404);
+  });
+
+  it('a switched-off module refuses deleting feedback; a writable class allows it', async () => {
+    const { fb, note } = await prepare();
+    await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/goals`, { enabled: false }));
+    expect((await s.teacherA.del(`/api/teacher/feedback/${fb.id}`)).body.error.code).toBe('FEATURE_DISABLED');
+    await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/goals`, { enabled: true }));
+    await ok(s.teacherA.del(`/api/teacher/feedback/${fb.id}`));
+    await ok(s.teacherA.del(`/api/teacher/private-notes/${note.id}`));
+  });
+});

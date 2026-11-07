@@ -68,6 +68,50 @@ function goalForTeacher(ctx: RequestContext, goalId: string): { goal: GoalRow } 
   return { goal, context, cls: getClass(ctx.db, context.classId) };
 }
 
+/**
+ * The signed-in teacher's active context for this subject in one of the student's classes (ACC-10),
+ * or the same 404 as a missing record: a teacher who no longer teaches the student cannot change
+ * what they wrote about them.
+ */
+function scopeForStudent(ctx: RequestContext, studentId: string, subjectId: string, what: string): TeacherScope {
+  const classIds = liveClassIdsOf(ctx, studentId);
+  const context = classIds.length
+    ? ctx.db
+        .select()
+        .from(teachingContexts)
+        .where(and(eq(teachingContexts.teacherId, requireUser(ctx).id), eq(teachingContexts.subjectId, subjectId), inArray(teachingContexts.classId, classIds), isNull(teachingContexts.endedAt)))
+        .get()
+    : undefined;
+  if (!context) throw notFound(what);
+  return { context, cls: getClass(ctx.db, context.classId) };
+}
+
+/**
+ * Library entries (own categories and presets) belong to a subject, not to one class: changing them
+ * needs at least one active context of the teacher in that subject whose class and year are writable
+ * (DAT-1). Otherwise the archived-class answer of the first context, or 404 when none is left.
+ */
+function assertLibraryWritable(ctx: RequestContext, subjectId: string | null, what: string): void {
+  const contexts = subjectId
+    ? ctx.db
+        .select()
+        .from(teachingContexts)
+        .where(and(eq(teachingContexts.teacherId, requireUser(ctx).id), eq(teachingContexts.subjectId, subjectId), isNull(teachingContexts.endedAt)))
+        .all()
+    : [];
+  if (!contexts.length) throw notFound(what);
+  let first: unknown = null;
+  for (const c of contexts) {
+    try {
+      assertClassWritable(ctx.db, getClass(ctx.db, c.classId));
+      return;
+    } catch (e) {
+      first ??= e;
+    }
+  }
+  throw first;
+}
+
 function teacherIdsOf(s: TeacherScope): string[] {
   return [s.context.teacherId];
 }
@@ -245,6 +289,8 @@ export function deleteFeedback(ctx: RequestContext, feedbackId: string): void {
   tx(ctx.db, () => {
     const f = ctx.db.select().from(teacherFeedback).where(eq(teacherFeedback.id, feedbackId)).get();
     if (!f || f.deletedAt !== null || f.teacherId !== requireUser(ctx).id) throw notFound('Feedback');
+    // Like every write: the teacher still teaches the student here, module on, class and year writable.
+    assertWritable(ctx, scopeForStudent(ctx, f.studentId, f.subjectId, 'Feedback'));
     ctx.db.update(teacherFeedback).set({ deletedAt: ctx.now(), updatedAt: ctx.now() }).where(eq(teacherFeedback.id, f.id)).run();
     audit(ctx.db, ctx.actor, { action: 'feedback.delete', entity: 'teacher_feedback', entityId: f.id, before: { studentId: f.studentId, goalId: f.goalId } }, ctx.now());
   });
@@ -259,7 +305,9 @@ export function privateNote(ctx: RequestContext, input: In<typeof C.teacherAddPr
   });
 }
 
-export const removePrivateNote = (ctx: RequestContext, noteId: string) => deletePrivateNote(ctx, noteId);
+/** The author deletes their note while they still teach the student and the class and year are writable (DAT-1). */
+export const removePrivateNote = (ctx: RequestContext, noteId: string) =>
+  deletePrivateNote(ctx, noteId, (n) => assertClassWritable(ctx.db, scopeForStudent(ctx, n.studentId, n.subjectId, 'Note').cls));
 
 // ---------------------------------------------------------------- categories, presets, outcome labels (GOL-1)
 export function createCategory(ctx: RequestContext, input: In<typeof C.createCategory>): Category {
@@ -279,6 +327,7 @@ export function updateCategory(ctx: RequestContext, input: In<typeof C.updateCat
     const c = getCategory(ctx.db, input.categoryId);
     // Default categories belong to the school; teachers edit only their own.
     if (!c || c.createdBy !== requireUser(ctx).id) throw notFound('Category');
+    assertLibraryWritable(ctx, c.subjectId, 'Category');
     const patch: Partial<typeof skillCategories.$inferInsert> = { updatedAt: ctx.now() };
     if (input.name) patch.name = cleanText(input.name);
     if (input.archived !== undefined) patch.archivedAt = input.archived ? ctx.now() : null;
@@ -306,6 +355,7 @@ export function updatePreset(ctx: RequestContext, input: In<typeof C.updatePrese
   return tx(ctx.db, () => {
     const p = getPreset(ctx.db, input.presetId);
     if (!p || p.createdBy !== requireUser(ctx).id) throw notFound('Preset goal');
+    assertLibraryWritable(ctx, p.subjectId, 'Preset goal');
     const patch: Partial<typeof goalPresets.$inferInsert> = { updatedAt: ctx.now() };
     if (input.text) patch.text = cleanText(input.text);
     if (input.archived !== undefined) patch.archivedAt = input.archived ? ctx.now() : null;

@@ -16,7 +16,7 @@ import type * as C from '../../../shared/contracts/links.ts';
 import { studentLinkUrl, type NewLink } from '../../../shared/contracts/links.ts';
 import { initials } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { sessions, studentLinks, students } from '../../db/schema.ts';
+import { authAttempts, sessions, studentLinks, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { AppDeps, RequestContext, SessionRow, StudentPrincipal } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
@@ -50,19 +50,43 @@ export function resolveStudent(deps: AppDeps, session: SessionRow): StudentPrinc
 
 // ---------------------------------------------------------------- exchange (public)
 /**
- * The token from the fragment → a new student session. Unknown, revoked and replaced tokens get the
- * same answer (401 LINK_INVALID), so the endpoint reveals nothing about which links existed.
+ * Refused exchanges per address (STU-4): only FAILED attempts count, so a whole class behind one school
+ * network can open valid links together. After `EXCHANGE_FREE_FAILURES` failures within the window,
+ * further refused tokens answer 429 until the window has passed since the last failure. A valid token is
+ * still accepted (guessing a 256-bit token is not feasible; the cap is defence in depth against
+ * flooding and keeps the per-route request limit as the outer bound).
  */
-export function exchangeToken(deps: AppDeps, token: string): { token: string } {
+export const EXCHANGE_FREE_FAILURES = 20;
+export const EXCHANGE_FAILURE_WINDOW_MS = 10 * 60_000;
+
+function recordExchangeFailure(deps: AppDeps, ip: string, now: number): number {
+  const key = `student_link:ip:${ip}`;
+  const cur = deps.db.select().from(authAttempts).where(eq(authAttempts.key, key)).get();
+  const failures = cur && now - cur.updatedAt < EXCHANGE_FAILURE_WINDOW_MS ? cur.failures + 1 : 1;
+  deps.db
+    .insert(authAttempts)
+    .values({ key, failures, lockedUntil: null, updatedAt: now })
+    .onConflictDoUpdate({ target: authAttempts.key, set: { failures, updatedAt: now } })
+    .run();
+  return failures;
+}
+
+/**
+ * The token from the fragment → a new student session. Unknown, revoked and replaced tokens get the
+ * same answer (401 LINK_INVALID), so the endpoint reveals nothing about which links existed; too many
+ * of them from one address answer 429 instead.
+ */
+export function exchangeToken(deps: AppDeps, ip: string, token: string): { token: string } {
   const hash = tokenHash(deps.config.SECRET_PEPPER, token);
   const link = deps.db.select().from(studentLinks).where(eq(studentLinks.tokenHash, hash)).get();
   // The lookup is by HMAC (an attacker cannot steer it); the final comparison is constant-time.
   const valid = link !== undefined && timingSafeEqualStr(link.tokenHash, hash) && link.revokedAt === null;
   const student = valid ? deps.db.select({ deactivatedAt: students.deactivatedAt }).from(students).where(eq(students.id, link.studentId)).get() : undefined;
+  const now = deps.now();
   if (!valid || !student || student.deactivatedAt !== null) {
+    if (recordExchangeFailure(deps, ip, now) > EXCHANGE_FREE_FAILURES) throw new AppError('RATE_LIMITED', 'Too many attempts. Try again later.');
     throw new AppError('UNAUTHENTICATED', 'This link no longer works', { reason: 'LINK_INVALID' });
   }
-  const now = deps.now();
   return tx(deps.db, () => {
     const { token: sessionToken } = createSession(deps, { kind: 'student', studentLinkId: link.id }, now, STUDENT_SESSION_ABSOLUTE_MS);
     deps.db.update(studentLinks).set({ lastUsedAt: now }).where(eq(studentLinks.id, link.id)).run();

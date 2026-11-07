@@ -75,6 +75,15 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
     // Teacher feedback, read-only.
     await expect(english.getByTestId('student-feedback')).toContainText(feedback);
 
+    // More than one subject has Goals (3-A also has Mathematics and Science): every id on the page is
+    // unique, so each aria-labelledby names its own subject's heading (review fix; axe-core 4.14 no
+    // longer reports duplicate ids, so this is checked directly).
+    expect(await p.getByTestId('student-goals').count()).toBeGreaterThanOrEqual(2);
+    const duplicateIds = await p.evaluate(() => {
+      const ids = [...document.querySelectorAll('[id]')].map((e) => e.id);
+      return ids.filter((id, i) => ids.indexOf(id) !== i);
+    });
+    expect(duplicateIds).toEqual([]);
     expect(await seriousViolations(p)).toEqual([]);
 
     // Language switch, remembered on this device only (UX-3/4).
@@ -108,5 +117,37 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
     }
   } finally {
     await phone.close();
+  }
+});
+
+test('a busy server (429) offers "Try again" instead of "this link no longer works", and the retry opens the page @mobile', async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  const contextId = await context3A(page);
+  const roster = (await api(page, 'GET', `/api/classroom/contexts/${contextId}/roster`)).body.students as Array<{ id: string; fullName: string }>;
+  const student = roster[test.info().project.name === 'mobile' ? 6 : 5]!;
+  const url = (await api(page, 'POST', `/api/teacher/students/${student.id}/link`)).body.url as string;
+
+  const phone = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true, locale: 'en-GB' });
+  const p = await phone.newPage();
+  try {
+    let first = true;
+    await p.route('**/api/student/session', async (route) => {
+      if (first) {
+        first = false;
+        await route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: { code: 'RATE_LIMITED', message: 'Too many requests' } }) });
+      } else await route.continue();
+    });
+    await p.goto(url);
+    await expect(p.getByTestId('student-link-retry')).toBeVisible();
+    await expect(p.getByTestId('student-link-gone')).toHaveCount(0);
+    expect(p.url()).not.toContain('#');
+    expect(await seriousViolations(p)).toEqual([]);
+    await p.getByRole('button', { name: 'Try again' }).click();
+    await expect(p.getByRole('heading', { name: `Hello, ${student.fullName}!` })).toBeVisible();
+  } finally {
+    await phone.close();
+    await api(page, 'DELETE', `/api/teacher/students/${student.id}/link`, {});
   }
 });

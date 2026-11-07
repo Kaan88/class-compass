@@ -6,8 +6,12 @@ import { route, STUDENT_SESSION_ABSOLUTE_MS, studentCookieName } from '../../lib
 import { studentPage as buildStudentPage } from './page.ts';
 import * as svc from './service.ts';
 
-/** Token exchanges per minute per address (STU-4): enough for a class on one school network, too few to guess. */
-const EXCHANGE_RATE = { max: 30, timeWindow: '1 minute' };
+/**
+ * Outer bound on exchange requests per minute per address (STU-4): several classes behind one school
+ * network can open their links in the same minute. Refused tokens are limited much more tightly in the
+ * service (`EXCHANGE_FREE_FAILURES`), and valid ones never count towards that.
+ */
+const EXCHANGE_RATE = { max: 300, timeWindow: '1 minute' };
 
 export function registerLinkRoutes(app: FastifyInstance, deps: AppDeps) {
   route(
@@ -15,7 +19,7 @@ export function registerLinkRoutes(app: FastifyInstance, deps: AppDeps) {
     deps,
     C.exchangeStudentLink,
     (ctx, input, { reply }) => {
-      const { token } = svc.exchangeToken(ctx, input.token);
+      const { token } = svc.exchangeToken(ctx, ctx.ip, input.token);
       // A separate, strict cookie (STU-4): never sent on cross-site requests, not readable by scripts.
       reply.setCookie(studentCookieName(deps), token, {
         path: '/',

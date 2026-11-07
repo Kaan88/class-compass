@@ -4,12 +4,14 @@
  * - Theme: the student's class theme.
  * - Each subject shows the sections its modules contribute (server `studentPage` manifests), in the
  *   server's order; a key without a screen here is skipped.
- * - A refused or revoked link shows a friendly "this link no longer works" page (STU-3).
+ * - A refused or revoked link (401) shows a friendly "this link no longer works" page (STU-3). A busy
+ *   server (429), a server error or no connection shows "try again" instead: the token is kept in
+ *   memory (never stored) so the student can retry without the link, which has left the address bar.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { studentPage } from '../../shared/contracts/goals.ts';
-import { leaveStudentSession } from '../../shared/contracts/links.ts';
+import { exchangeStudentLink, leaveStudentSession } from '../../shared/contracts/links.ts';
 import { pickText, translate, type Locale } from '../../shared/i18n/index.ts';
 import { ApiError, call } from '../lib/api.ts';
 import { setDisplay } from '../lib/display.ts';
@@ -108,11 +110,51 @@ function Page() {
   );
 }
 
-export function StudentApp({ opened }: { opened: Promise<'ok' | 'invalid' | 'none'> }) {
-  const [state, setState] = useState<'ok' | 'invalid' | 'none' | null>(null);
+/** Outcome of posting the link's token: only a 401 means the link itself is refused. */
+export type OpenResult = 'ok' | 'invalid' | 'retry';
+
+export async function openLink(token: string): Promise<OpenResult> {
+  try {
+    await call(exchangeStudentLink, { token });
+    return 'ok';
+  } catch (e) {
+    return e instanceof ApiError && e.status === 401 ? 'invalid' : 'retry';
+  }
+}
+
+function TryAgain({ onRetry }: { onRetry: () => void }) {
+  const { t } = useI18n();
+  return (
+    <main className="cc-page cc-student" data-testid="student-link-retry">
+      <section className="cc-card cc-stack cc-student__gone" role="alert">
+        <h1 className="cc-h1">{t('student.retry.title')}</h1>
+        <p>{t('student.retry.body')}</p>
+        <div>
+          <Button variant="primary" onPress={onRetry}>
+            {t('student.retry.button')}
+          </Button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+type OpenState = OpenResult | 'opening' | 'none';
+
+export function StudentApp({ token, open = openLink }: { token: string | null; open?: (token: string) => Promise<OpenResult> }) {
+  const [state, setState] = useState<OpenState>(token ? 'opening' : 'none');
+  const [attempt, setAttempt] = useState(0);
+  // One exchange per attempt, also under StrictMode's double effects.
+  const started = useRef(-1);
   useEffect(() => {
-    void opened.then(setState);
-  }, [opened]);
+    if (!token || started.current === attempt) return;
+    started.current = attempt;
+    void open(token).then(setState);
+  }, [token, attempt, open]);
+  const retry = useCallback(() => {
+    setState('opening');
+    setAttempt((a) => a + 1);
+  }, []);
   const [locale, setLocale] = useState<Locale>(readStudentLocale);
   const change = (l: Locale) => {
     setLocale(l);
@@ -125,7 +167,7 @@ export function StudentApp({ opened }: { opened: Promise<'ok' | 'invalid' | 'non
       <div className="cc-student__bar">
         <LanguageSwitch locale={locale} onChange={change} />
       </div>
-      {state === null ? null : state === 'invalid' ? <LinkGone /> : <Page />}
+      {state === 'opening' ? null : state === 'invalid' ? <LinkGone /> : state === 'retry' ? <TryAgain onRetry={retry} /> : <Page />}
       <Toaster />
     </I18nProvider>
   );
