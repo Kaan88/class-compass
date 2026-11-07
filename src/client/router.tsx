@@ -30,6 +30,8 @@ const AssignmentsPage = lazyRouteComponent(school, 'AssignmentsPage');
 const ModulesPage = lazyRouteComponent(school, 'ModulesPage');
 const AdminStudentsPage = lazyRouteComponent(() => import('./routes/admin/StudentsAdmin.tsx'), 'AdminStudentsPage');
 const AuditPage = lazyRouteComponent(() => import('./routes/admin/Audit.tsx'), 'AuditPage');
+const MaintenancePage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'MaintenancePage');
+const AdminReportsPage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'AdminReportsPage');
 const CatalogPage = lazyRouteComponent(() => import('./dev/Catalog.tsx'), 'CatalogPage');
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
@@ -103,6 +105,8 @@ const adminAssignments = createRoute({ getParentRoute: () => adminRoute, path: '
 const adminModules = createRoute({ getParentRoute: () => adminRoute, path: 'modules', component: ModulesPage });
 const adminStudents = createRoute({ getParentRoute: () => adminRoute, path: 'students', component: AdminStudentsPage });
 const adminAudit = createRoute({ getParentRoute: () => adminRoute, path: 'audit', component: AuditPage });
+const adminReports = createRoute({ getParentRoute: () => adminRoute, path: 'reports', component: AdminReportsPage });
+const adminMaintenance = createRoute({ getParentRoute: () => adminRoute, path: 'maintenance', component: MaintenancePage });
 const adminProfile = createRoute({ getParentRoute: () => adminRoute, path: 'profile', component: ProfilePage });
 
 /** Component catalog: signed-in users only; fictional data only. */
@@ -115,7 +119,7 @@ const routeTree = rootRoute.addChildren([
   changePasswordRoute,
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),
-  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminAudit, adminProfile]),
+  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminMaintenance, adminAudit, adminProfile]),
   catalogRoute,
 ]);
 

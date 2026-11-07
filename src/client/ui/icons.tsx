@@ -281,3 +281,15 @@ export const IconGlobe = () => (
     <path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" />
   </Icon>
 );
+export const IconChart = () => (
+  <Icon>
+    <path d="M4 20V4M4 20h16" />
+    <path d="M8 16v-5M12 16V8M16 16v-3M20 16V6" />
+  </Icon>
+);
+export const IconDatabase = () => (
+  <Icon>
+    <ellipse cx="12" cy="5" rx="8" ry="3" />
+    <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+  </Icon>
+);

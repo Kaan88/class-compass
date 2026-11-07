@@ -109,3 +109,12 @@ export async function upload<I extends z.ZodType, O extends z.ZodType>(ep: Endpo
   if (!res.ok) throw failure(ep as unknown as Endpoint, res, body);
   return body as z.infer<O>;
 }
+
+/**
+ * URL of a GET endpoint for a plain link (downloads such as report CSVs and exports): the browser
+ * sends the same-origin session cookie; GET needs no CSRF header.
+ */
+export function urlFor<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, O>, input: z.input<I>): string {
+  if (ep.method !== 'GET') throw new Error(`${ep.path} is not a GET endpoint`);
+  return buildRequest(ep, input).url;
+}

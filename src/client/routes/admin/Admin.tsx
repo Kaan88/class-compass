@@ -5,7 +5,7 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { signOut, useMe } from '../../lib/session.ts';
 import { Button } from '../../ui/Button.tsx';
 import { EmptyState } from '../../ui/Feedback.tsx';
-import { IconArchive, IconBook, IconCalendar, IconKey, IconList, IconSettings, IconShield, IconSwap, IconUser, IconUsers } from '../../ui/icons.tsx';
+import { IconArchive, IconBook, IconCalendar, IconChart, IconDatabase, IconKey, IconList, IconSettings, IconShield, IconSwap, IconUser, IconUsers } from '../../ui/icons.tsx';
 import { SensitiveGate } from '../Lock.tsx';
 
 export const ADMIN = ['sensitive', 'admin'] as const;
@@ -19,6 +19,8 @@ const SECTIONS = [
   { to: '/admin/assignments', key: 'admin.assignments', icon: <IconSwap /> },
   { to: '/admin/modules', key: 'admin.modules', icon: <IconShield /> },
   { to: '/admin/students', key: 'admin.students', icon: <IconUsers /> },
+  { to: '/admin/reports', key: 'admin.reports', icon: <IconChart /> },
+  { to: '/admin/maintenance', key: 'admin.maintenance', icon: <IconDatabase /> },
   { to: '/admin/audit', key: 'admin.audit', icon: <IconList /> },
   { to: '/admin/profile', key: 'teacher.profile', icon: <IconUser /> },
 ] as const;
