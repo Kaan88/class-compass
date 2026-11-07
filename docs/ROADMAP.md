@@ -150,11 +150,13 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Review fixes — D-094: counters "absent" weeks and per-attended-lesson cells, correct totals with the Attendance module off; goals report with entries by kind, evidence counts and a weekly self-assessment history; ended assignments limited to the days they were held; restic `forget --group-by host,tags`; backup commands never migrate (upgrade/rollback steps stop and restart the backup jobs with the same tag); restore refuses a database held by another process even with `--force` (SQLite lock, works across containers); Maintenance off-site state from recorded runs; exports swept when expired and downloadable only by their creator; per-student export covers JSON group/role/absentee lists, missed assistant turns, importer rows, evidence files and the photo; rollover can leave out and rename classes and applies exactly the previewed plan; `OCR_CACHE_DIR` no longer hides the baked OCR data
 - [ ] Owner decision: should the full admin export include private teacher notes? The S11 brief says "excludes nothing"; they stay out (author-only, D-086/D-090) with their count in the manifest until the owner decides (unrevealed Secret Student choices stay out by SEC-3)
 - [ ] Restic exercised against a real R2/B2 repository (only the command wrapper and redaction are tested, with a fake restic)
+- [x] Test install on the LAN test VM (D-096): image built and run, demo data, sign-in, restore drill passed (OPERATIONS → Test VM install)
 - [ ] Isolated install on the Debian VM behind Cloudflare Tunnel (sareteacher.com subdomain still to be chosen), first restore drill, ENG-5 report
 - [ ] Not yet: e2e/axe for the Reports, Admin Reports and Maintenance pages, a print e2e; a school holiday calendar (coverage counts Monday–Friday)
 - [ ] Production go-live only with explicit owner authorisation
 
 ## S13a Classroom feedback round 1: fixes and classroom flow (owner/teacher feedback 2026-11-07; before S12)
+- [ ] Housekeeping: backup/verify runs survive a restore on the Maintenance page
 - [ ] Bugs: homework check selections apply to students; layout/theme intact when modules are switched off
 - [ ] Grouping redesign: four arrangements (Lions/Eagles level-based, Dolphins/Tigers mixed) giving Group 1–5, Shuffle, tap-to-move, full-screen group screen with the timer, groups on the classroom screen and the dashboard, levels teacher-only (changes GRP-1)
 - [ ] Per-class language mode (`mainLanguage` en|tr, `secondLanguageEnabled`): English only by default, Turkish only, EN+TR, TR+EN for everything class-facing; teacher UI language stays personal
