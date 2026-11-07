@@ -61,6 +61,8 @@ export interface StudentCardData {
   fullName: string;
   initials?: string;
   avatarHue?: number;
+  /** Set by the server only when photos are on, consent is recorded and there is a photo (CRD-1, D-014). */
+  photoUrl?: string | null;
 }
 
 /**
@@ -114,7 +116,7 @@ export function StudentCard({
   const away = absent || (attendance !== undefined && isAway(attendance));
   return (
     <article className="cc-student-card" data-absent={away ? '' : undefined} aria-label={student.fullName}>
-      <Avatar name={student.fullName} id={student.id} hue={student.avatarHue} initials={student.initials} />
+      <Avatar name={student.fullName} id={student.id} hue={student.avatarHue} initials={student.initials} photoUrl={student.photoUrl} photoAllowed={Boolean(student.photoUrl)} />
       <div className="cc-student-card__name">{student.fullName}</div>
       <div className="cc-student-card__meta">
         {attendance !== undefined && attendance !== 'present' && attendance !== 'not_recorded' ? (

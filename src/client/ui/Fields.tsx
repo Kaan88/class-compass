@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from 'react';
-import { FieldError, Input, Label, Switch, Text, TextField as RACTextField, type TextFieldProps as RACTextFieldProps } from 'react-aria-components';
+import { FieldError, Input, Label, Switch, Text, TextArea as RACTextArea, TextField as RACTextField, type TextFieldProps as RACTextFieldProps } from 'react-aria-components';
 import { useI18n } from '../lib/i18n.tsx';
 
 export interface TextFieldProps extends Omit<RACTextFieldProps, 'className' | 'children'> {
@@ -17,6 +17,22 @@ export function TextField({ label, description, errorMessage, placeholder, class
     <RACTextField {...rest} isInvalid={Boolean(errorMessage) || rest.isInvalid} className={`cc-field ${className}`}>
       <Label className="cc-field__label">{label}</Label>
       <Input className={`cc-input ${inputClassName}`} placeholder={placeholder} />
+      {description ? (
+        <Text slot="description" className="cc-field__hint">
+          {description}
+        </Text>
+      ) : null}
+      <FieldError className="cc-field__error">{errorMessage ? `⚠ ${errorMessage}` : null}</FieldError>
+    </RACTextField>
+  );
+}
+
+/** Labelled multi-line text input (pasted lists, notes). Same field chrome as TextField. */
+export function TextArea({ label, description, errorMessage, placeholder, rows = 8, className = '', ...rest }: TextFieldProps & { rows?: number }) {
+  return (
+    <RACTextField {...rest} isInvalid={Boolean(errorMessage) || rest.isInvalid} className={`cc-field ${className}`}>
+      <Label className="cc-field__label">{label}</Label>
+      <RACTextArea className="cc-input cc-textarea" placeholder={placeholder} rows={rows} />
       {description ? (
         <Text slot="description" className="cc-field__hint">
           {description}
@@ -47,6 +63,7 @@ export function Select({
   disabled,
   placeholder,
   className = '',
+  hideLabel = false,
 }: {
   label: string;
   items: SelectItem[];
@@ -57,11 +74,13 @@ export function Select({
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  /** Keep the label for screen readers only (e.g. one select per table row under a column header). */
+  hideLabel?: boolean;
 }) {
   const id = useId();
   return (
     <div className={`cc-field ${className}`}>
-      <label htmlFor={id} className="cc-field__label">
+      <label htmlFor={id} className={hideLabel ? 'cc-visually-hidden' : 'cc-field__label'}>
         {label}
       </label>
       <select

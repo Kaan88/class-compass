@@ -67,9 +67,9 @@ One school per instance. Times in UTC; events also store `local_date` and `week_
 - **Grouping:** `group_templates{mode level|mixed, count|target_size, seed, groups}`, `pair_constraints{must|must_not}`, `lesson_groupings{effective_groups, unsatisfied}`.
 - **Homework:** `homework{context, title, details, assigned_on, due_on}`, `homework_marks{status, note}` — no row = *Not checked*, never Missing.
 - **Goals:** `skill_categories`, `goals{author_type, preset?, review_on}`, `goal_entries{author_type, kind reflection|progress|self_assessment}`, `teacher_assessments`, `teacher_feedback` (student-visible), `private_teacher_notes`, `evidence{kind text|link|file|audio}`.
-- **Files:** `files{storage_key, sha256, size, sniffed_mime, owner_student?, uploaded_by, deleted_at}`.
+- **Files:** `files{storage_key, thumb_storage_key?, sha256, size, sniffed_mime, kind image|document|audio|import_source, original_name?, owner_student?, uploaded_by, deleted_at}` (S9, D-076): bytes under `uploads/xx/yy/<uuid>`, served only by `/api/files/:id` after the policy check.
 - **Links:** `student_links{student, token_hash (HMAC with server pepper), generation, revoked_at, last_used_at}`; token delivered in the URL fragment then exchanged for a strict cookie, so it never reaches logs or referrers.
-- **Import:** `import_batches{source, target_class, status draft|committed|reverted, counts}`, `import_rows{raw, parsed, ocr_conf, flags, decision, matched/created ids}` — enables preview, report and safe reversal.
+- **Import:** `import_batches{source, file?, target_class, status draft|committed|reverted, columns, mapping, notices, counts}`, `import_rows{raw, page, parsed, edited, ocr_conf, flags, candidates, decision, matched/created ids, fill_number, outcome, revert_outcome}` — enables preview, report and safe reversal (S9, D-078). Parsers live in `server/modules/import/parsers/`, the pure row logic in `src/domain/importing.ts`.
 - **Audit/ops:** `command_log(op_id)`, `audit_events{actor, action, entity, before, after}` (insert-only), `backup_runs`.
 - **Renames (DAT-6):** historical rows keep label snapshots, so renamed classes/goals/counters stay understandable.
 

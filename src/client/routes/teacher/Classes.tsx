@@ -1,11 +1,12 @@
 /** Teacher class settings (ACC-5, CFG-1/2) and class roster (ACC-4/7). */
 import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ACCEPT_HINT, removeStudentPhoto, uploadStudentPhoto } from '../../../shared/contracts/files.ts';
 import * as School from '../../../shared/contracts/school.ts';
 import * as Students from '../../../shared/contracts/students.ts';
 import { pickText, type MessageKey } from '../../../shared/i18n/index.ts';
 import { sortByName } from '../../../shared/text/turkish.ts';
-import { call } from '../../lib/api.ts';
+import { call, upload } from '../../lib/api.ts';
 import { errorText, reasonOf } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
@@ -106,6 +107,9 @@ export function TeacherStudentsPage() {
   const cid = classId || classes[0]?.id || '';
   const roster = useQuery({ queryKey: [SENSITIVE, 'teacher', 'roster', cid], queryFn: () => call(Students.teacherRoster, { classId: cid }), enabled: Boolean(cid) });
   const [adding, setAdding] = useState(false);
+  const [photoFor, setPhotoFor] = useState<{ id: string; fullName: string; photoUrl: string | null } | null>(null);
+  // Photo controls only while the admin has turned student photos on (D-014); the server enforces it too.
+  const photosOn = contexts.data?.media['media.studentPhotos'] === true;
   if (contexts.isSuccess && classes.length === 0) return <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} />;
   return (
     <main className="cc-page cc-stack">
@@ -129,13 +133,26 @@ export function TeacherStudentsPage() {
               sortValue: (s) => s.fullName,
               render: (s) => (
                 <span className="cc-row">
-                  <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
+                  <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} photoUrl={s.photoUrl} photoAllowed={photosOn && Boolean(s.photoUrl)} size="sm" />
                   {s.fullName}
                 </span>
               ),
             },
             { key: 'number', header: t('students.number'), sortValue: (s) => s.studentNumber ?? '', render: (s) => s.studentNumber ?? '—' },
             { key: 'since', header: t('students.since'), render: (s) => s.enrolledFrom ?? '—' },
+            ...(photosOn
+              ? [
+                  {
+                    key: 'photo',
+                    header: t('students.photo.title'),
+                    render: (s: (typeof roster.data.students)[number]) => (
+                      <Button size="small" onPress={() => setPhotoFor({ id: s.id, fullName: s.fullName, photoUrl: s.photoUrl ?? null })}>
+                        {s.photoUrl ? t('students.photo.change') : t('students.photo.add')}
+                      </Button>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       ) : null}
@@ -145,7 +162,71 @@ export function TeacherStudentsPage() {
         onAdd={(input) => call(Students.addStudentToClass, { classId: cid, ...input })}
         onDone={() => void qc.invalidateQueries({ queryKey: [SENSITIVE, 'teacher', 'roster', cid] })}
       />
+      {photoFor ? (
+        <StudentPhotoDialog
+          student={photoFor}
+          onClose={() => setPhotoFor(null)}
+          onDone={() => {
+            setPhotoFor(null);
+            void qc.invalidateQueries({ queryKey: [SENSITIVE, 'teacher', 'roster', cid] });
+            void qc.invalidateQueries({ queryKey: ['classroom'] });
+          }}
+        />
+      ) : null}
     </main>
+  );
+}
+
+/**
+ * Student photo (CRD-1, D-014): only offered while the admin enabled student photos. The teacher
+ * confirms that consent was given; the confirmation is stored and audited on the server. The image is
+ * re-encoded on the server (EXIF/GPS removed).
+ */
+function StudentPhotoDialog({ student, onClose, onDone }: { student: { id: string; fullName: string; photoUrl: string | null }; onClose: () => void; onDone: () => void }) {
+  const { t } = useI18n();
+  const [file, setFile] = useState<File | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const act = async (fn: () => Promise<unknown>, message: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      showToast({ message, kind: 'success' });
+      onDone();
+    } catch (err) {
+      setError(errorText(t, err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal isOpen onOpenChange={(o) => (o ? null : onClose())} title={t('students.photo.dialogTitle', { name: student.fullName })}>
+      <div className="cc-stack">
+        <p className="cc-muted">{t('students.photo.hint')}</p>
+        <label className="cc-field">
+          <span className="cc-field__label">{t('students.photo.file')}</span>
+          <input type="file" className="cc-file-input" accept={ACCEPT_HINT.image} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        </label>
+        <label className="cc-row">
+          <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+          <span>{t('students.photo.consent')}</span>
+        </label>
+        {error ? <Alert>{error}</Alert> : null}
+        <DialogActions>
+          {student.photoUrl ? (
+            <Button variant="danger" isDisabled={busy} onPress={() => void act(() => call(removeStudentPhoto, { studentId: student.id }), t('students.photo.removed'))}>
+              {t('students.photo.remove')}
+            </Button>
+          ) : null}
+          <Button onPress={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" isDisabled={!file || !consent || busy} onPress={() => void act(() => upload(uploadStudentPhoto, { studentId: student.id, consent: true }, file!), t('students.photo.saved'))}>
+            {t('students.photo.save')}
+          </Button>
+        </DialogActions>
+      </div>
+    </Modal>
   );
 }
 

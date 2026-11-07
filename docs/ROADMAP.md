@@ -14,7 +14,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 
 ## S0 Spike & foundations
 - [x] Verify native deps on Windows (better-sqlite3, sharp, argon2) — Node 26 chosen (D-019)
-- [ ] Verify native deps inside Docker on the VPS; tesseract.js `tur` + SheetJS (S9)
+- [~] Verify native deps inside Docker on the VPS; tesseract.js `tur` + SheetJS (S9) — tesseract.js 7 (pinned `tur`/`eng` data), SheetJS 0.20.3 and sharp verified on Windows (Node 26) and through the test suite; the Docker/VPS check stays with S11
 - [x] Repo skeleton, boundaries lint, Vitest, GitHub Actions (Ubuntu + Windows), CONVENTIONS.md
 - [x] Playwright setup; i18n/a11y/raw-colour lint rules — done in S3 (`tests/client/lint-rules.test.ts`, axe in e2e)
 - [x] Baseline migration, `/healthz`, redacted logging, CSP/security headers, robots/noindex
@@ -38,7 +38,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Tests: permission matrix over all endpoints, unassigned-class/other-context denial, archived year read-only, promotion history, deactivated teacher + audit retained, media defaults, module disable keeps data, locale isolation, email reset, seed
 - [x] Review fixes (D-027…D-030): date-aware rosters (future-dated moves/promotions keep the current class until the date), move dates validated against the target year and old enrolments capped at the old year's end, no moves out of archived classes, year overlap / term / enrolment range checks on year edits, duplicate warning on rename and for deactivated students, reset links voided on email/password/state changes, SMTP STARTTLS required, atomic demo seed, missing `error.*` i18n keys (75 tests total)
 - [x] Admin UI and teacher roster/module screens — done in S3
-- [ ] Paste entry of student lists — moved to S9 (it is the importer's paste input, IMP-1)
+- [x] Paste entry of student lists — done in S9 as the importer's paste input (IMP-1)
 
 ## S3 UI kit & themes
 - [x] Tokens (primitive → semantic → theme) + 3 themes (explorer, animals, classroom) with mascots; UI kit in `src/client/ui`: buttons, fields, native select, switches, dialogs, ConfirmDestructive, tabs, toasts + undo toast, SaveStateBadge, NeedsAttentionTray, StudentCard/Grid (compact > 24), CounterBar, MetricCell (not recorded ≠ 0), ClassBanner, DisplayBanner, ClassSwitcher, DataTable, PinPad, ThemePicker/preview — D-036
@@ -116,9 +116,13 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [ ] Ordered level picker / per-class level list for grouping (levels stay free text; known word scales, numbers and codes are ranked, other words alphabetically after them, and the order used is shown)
 
 ## S9 Files, import, OCR
-- [ ] Upload pipeline, photos with consent, quotas
-- [ ] Importer: paste/CSV/XLSX/XLS/DOCX/PDF/OCR, preview, mapping, flags, batches, revert
-- [ ] Tests: polyglot files, quotas, reimport no-dup, no similar-name merge, low-confidence OCR flagged
+- [x] Upload pipeline: `files` table with random storage keys, multipart with per-kind size limits, content sniffing against an allow-list (SVG/HTML/JS always refused), sharp re-encode (EXIF/GPS stripped, 2560 px, thumbnail), per-student and global quotas in the insert transaction, policy-checked serving (sandbox CSP, nosniff, no-store, attachment, audio Range), media flags enforced server-side — D-076
+- [x] Student photos with a recorded, audited consent; shown on cards and rosters only when allowed (initials otherwise); upload dialog only while `media.studentPhotos` is on — D-077, CRD-1
+- [x] Importer: paste / CSV (encoding detection incl. Windows-1254) / XLSX / XLS (SheetJS) / DOCX / PDF text (scanned PDF → "upload a photo") / photo OCR (local tesseract.js tur+eng, per-line confidence, timeout); e-Okul header and repeated page headers; preview with field mapping, row editing, flags, decisions, bulk choices; number match vs possible match that needs a choice; re-import without duplicates; report; revert with history check and audit; teacher page with the always-visible local-processing/OCR notice — D-078…D-080, IMP-1..7
+- [x] Tests: upload validation incl. polyglot and spoofed types, EXIF/GPS stripping, quotas, owner isolation, media flags, audio Range, photos with consent; every importer fixture (fictional e-Okul xlsx/xls with repeated headers, CSV-1254, UTF-16, docx table, pdf text, scanned pdf, paste with headings and blank lines, OCR with a low-confidence line); multi-part names, duplicates in the file, number vs name match, re-import, fill number, revert (removed vs deactivated), access; domain unit + property tests; e2e paste → preview → fix a row → confirm → report → re-import shows existing students (`e2e/import.spec.ts`)
+- [ ] Admin screen for the importer (admins can import into any class through the API; the page is in the teacher area only)
+- [ ] Evidence uploads (image/document/audio kinds) have the API and tests but no screen yet (S10 goals/evidence)
+- [ ] HTML-table `.xls` exports are refused (re-save as .xlsx or paste) — D-079
 
 ## S10 Goals, evidence, student links
 - [ ] Categories, goals, self vs teacher assessment, private notes, evidence incl. audio recording

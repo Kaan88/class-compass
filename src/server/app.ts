@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import type { AppDeps } from './lib/context.ts';
@@ -11,6 +12,7 @@ import { AppError } from './lib/errors.ts';
 import { clientIp } from './lib/http.ts';
 import { registerModules } from './modules/index.ts';
 import { ensureSchoolDefaults } from './modules/school/defaults.ts';
+import { MAX_UPLOAD_BYTES } from './modules/files/storage.ts';
 
 const CLIENT_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist/client');
 
@@ -47,6 +49,8 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
   });
 
   await app.register(cookie);
+  // Uploads (S9, STU-8): one file per request; per-kind size limits are applied again by the files module.
+  await app.register(multipart, { limits: { files: 1, fields: 10, parts: 11, fieldSize: 4096, fileSize: MAX_UPLOAD_BYTES } });
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {

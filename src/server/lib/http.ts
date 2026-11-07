@@ -145,6 +145,38 @@ export function contextFor(deps: AppDeps, req: FastifyRequest, access: Access, o
   return ctx;
 }
 
+/**
+ * Register a contract-defined endpoint whose request or response is not JSON (multipart uploads,
+ * file downloads). Access is enforced exactly like `route()`, before anything is read from the body.
+ * The declared input is parsed from the query string and path parameters only (the body is the
+ * upload stream); the handler sends the reply itself or returns a value checked against the output
+ * schema.
+ */
+export function rawRoute<I extends z.ZodType, O extends z.ZodType>(
+  app: FastifyInstance,
+  deps: AppDeps,
+  ep: Endpoint<I, O>,
+  handler: Handler<I, O>,
+  opts: { rateLimit?: { max: number; timeWindow: string } } = {},
+) {
+  if (!ep.access) throw new Error(`Endpoint ${ep.method} ${ep.path} has no access class`);
+  registeredEndpoints.push(ep as unknown as Endpoint);
+  app.route({
+    method: ep.method,
+    url: ep.path,
+    config: opts.rateLimit ? { rateLimit: opts.rateLimit } : {},
+    handler: async (req, reply) => {
+      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword });
+      const raw = { ...((req.query as object) ?? {}), ...((req.params as object) ?? {}) };
+      const parsed = ep.input.safeParse(raw);
+      if (!parsed.success) throw new AppError('VALIDATION', 'Invalid input', z.treeifyError(parsed.error));
+      const result = await handler(ctx, parsed.data, { req, reply });
+      if (reply.sent) return reply;
+      return ep.output.parse(result);
+    },
+  });
+}
+
 /** Register a contract-defined JSON endpoint. */
 export function route<I extends z.ZodType, O extends z.ZodType>(
   app: FastifyInstance,

@@ -24,6 +24,11 @@ const EnvSchema = z.object({
    * always ignored in production (see `loginRateLimitMax`).
    */
   CC_TEST_LOGIN_RATE_LIMIT: z.coerce.number().int().min(1).max(10_000).optional(),
+  /** Upload quotas in MB (STU-8): all files of one student, and all files on the server. */
+  UPLOAD_STUDENT_QUOTA_MB: z.coerce.number().int().min(1).max(100_000).default(100),
+  UPLOAD_GLOBAL_QUOTA_MB: z.coerce.number().int().min(1).max(10_000_000).default(10_240),
+  /** Local OCR (D-011): maximum time for one image before the OCR worker is stopped. */
+  OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(90_000),
 });
 
 /** Sign-in attempts per minute per address (production value). */
@@ -41,6 +46,8 @@ export type Config = z.infer<typeof EnvSchema> & {
   dbPath: string;
   uploadsDir: string;
   backupsDir: string;
+  /** Local OCR language data cache (copied from the pinned @tesseract.js-data packages, D-011). */
+  ocrCacheDir: string;
   isProd: boolean;
   smtpEnabled: boolean;
   /** Effective sign-in attempts per minute per address (20 except under NODE_ENV=test with the override). */
@@ -63,6 +70,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
     dbPath: path.join(dataDir, 'class-compass.db'),
     uploadsDir: path.join(dataDir, 'uploads'),
     backupsDir: path.join(dataDir, 'backups'),
+    ocrCacheDir: path.join(dataDir, 'ocr-cache'),
     isProd: e.NODE_ENV === 'production',
     smtpEnabled: e.SMTP_HOST.length > 0,
     loginRateLimit: loginRateLimitMax(e),

@@ -102,6 +102,8 @@ export const LessonStudent = z.object({
   fullName: z.string(),
   initials: z.string(),
   avatarHue: z.number().int(),
+  /** Card photo (CRD-1): only when photos are on and consent is recorded (D-014). */
+  photoUrl: z.string().nullable().optional(),
   daily: AttendanceStatus.nullable(),
   exception: AttendanceStatus.nullable(),
   effective: EffectiveAttendance,

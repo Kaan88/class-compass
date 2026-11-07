@@ -13,7 +13,7 @@ import { useMe } from '../lib/session.ts';
 import { Button, BigButton, IconButton } from '../ui/Button.tsx';
 import { ConfirmDestructive, DialogActions, Modal } from '../ui/Dialog.tsx';
 import { Alert, EmptyState, NeedsAttentionTray, SaveStateBadge } from '../ui/Feedback.tsx';
-import { Select, TextField, Toggle } from '../ui/Fields.tsx';
+import { Select, TextArea, TextField, Toggle } from '../ui/Fields.tsx';
 import { IconLock, IconPlus, IconSettings, IconUndo } from '../ui/icons.tsx';
 import { ClassBanner, ClassSwitcher, DataTable, DisplayBanner } from '../ui/Layout.tsx';
 import { Mascot, ThemeBackdrop, ThemeDecoration, ThemeIllustration } from '../ui/Mascot.tsx';
@@ -80,6 +80,7 @@ function Everything() {
         <div className="cc-row" style={{ alignItems: 'flex-start' }}>
           <TextField label={t('students.name')} value={text} onChange={setText} description={t('catalog.hint')} />
           <TextField label={t('auth.email')} value="" errorMessage={t('catalog.sampleError')} />
+          <TextArea label={t('import.pasteLabel')} rows={3} description={t('import.pasteHint')} />
           <Select
             label={t('language.label')}
             value={select}

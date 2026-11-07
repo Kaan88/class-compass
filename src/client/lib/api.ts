@@ -87,3 +87,25 @@ export async function callConditional<I extends z.ZodType, O extends z.ZodType>(
   if (!res.ok) throw failure(ep as unknown as Endpoint, res, body);
   return { notModified: false, data: body as z.infer<O>, etag: res.headers.get('etag'), receivedAt: Date.now() };
 }
+
+/**
+ * Upload one file to a multipart contract endpoint (S9, `rawRoute` on the server): the declared
+ * input goes into the path and query string, the file into the multipart field `file`. The browser
+ * sets the multipart content type; the server sniffs the content and never trusts the file name.
+ */
+export async function upload<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, O>, input: z.input<I>, file: Blob, fileName?: string): Promise<z.infer<O>> {
+  const rest: Record<string, unknown> = { ...(input as Record<string, unknown>) };
+  const path = ep.path.replace(/:([A-Za-z0-9_]+)/g, (_m, k: string) => {
+    const v = rest[k];
+    delete rest[k];
+    return encodeURIComponent(String(v));
+  });
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(rest)) if (v !== undefined && v !== null) qs.set(k, String(v));
+  const form = new FormData();
+  form.append('file', file, fileName ?? (file instanceof File ? file.name : 'upload'));
+  const res = await fetch([...qs].length ? `${path}?${qs}` : path, { method: ep.method, credentials: 'same-origin', headers: { 'x-cc-csrf': '1' }, body: form });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw failure(ep as unknown as Endpoint, res, body);
+  return body as z.infer<O>;
+}

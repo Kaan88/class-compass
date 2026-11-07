@@ -279,6 +279,13 @@ a {
   font: inherit;
   min-width: 0;
 }
+.cc-textarea {
+  padding: 0.6rem 0.8rem;
+  min-height: 8rem;
+  resize: vertical;
+  line-height: 1.4;
+  font-family: inherit;
+}
 .cc-input[data-invalid] {
   border-color: var(--cc-danger);
   border-width: 3px;
@@ -1653,4 +1660,25 @@ a {
   .cc-print-sheet table {
     width: 100%;
   }
+}
+
+/* ------------------------------------------------------------------ importer (S9) */
+.cc-import-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.cc-import-raw {
+  font-size: 0.85rem;
+  color: var(--cc-text-muted);
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+}
+.cc-import-row[data-heading] {
+  opacity: 0.7;
+}
+.cc-file-input {
+  min-height: var(--cc-touch);
+  font: inherit;
+  color: var(--cc-text);
 }

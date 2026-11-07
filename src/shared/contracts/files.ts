@@ -1,0 +1,157 @@
+/**
+ * Uploads (S9: STU-8, D-014, CRD-1). Files are uploaded as multipart form data and served only
+ * through policy-checked endpoints; the type is sniffed from the content, never taken from the
+ * client. Upload endpoints are declared here like every other endpoint (access class, output
+ * allow-list) and registered with `rawRoute()` on the server.
+ */
+import { z } from 'zod';
+import { Ok, endpoint } from './define.ts';
+import { Id, QueryBool } from './school.ts';
+
+export const FILE_KINDS = ['image', 'document', 'audio', 'import_source'] as const;
+export type FileKind = (typeof FILE_KINDS)[number];
+export const FileKindSchema = z.enum(FILE_KINDS);
+
+const MB = 1024 * 1024;
+/** Hard size limit per kind (bytes), enforced while streaming (STU-8). */
+export const UPLOAD_LIMITS: Record<FileKind, number> = {
+  image: 10 * MB,
+  document: 20 * MB,
+  audio: 25 * MB,
+  import_source: 20 * MB,
+};
+
+/**
+ * Allow-list of sniffed types per kind. Never SVG, HTML, XML or scripts. `text/plain` covers CSV and
+ * TXT (checked to be text without markup); `application/x-cfb` is accepted only when it is an
+ * Excel 97-2003 workbook.
+ */
+export const ALLOWED_MIME: Record<FileKind, readonly string[]> = {
+  image: ['image/jpeg', 'image/png', 'image/webp'],
+  document: [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'text/plain',
+  ],
+  audio: ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg'],
+  import_source: [
+    'text/plain',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+  ],
+};
+
+/** `accept` attribute for file inputs (a hint for the picker only; the server sniffs the content). */
+export const ACCEPT_HINT: Record<FileKind, string> = {
+  image: 'image/jpeg,image/png,image/webp',
+  document: '.pdf,.docx,.xlsx,.xls,.csv,.txt',
+  audio: 'audio/webm,audio/ogg,audio/mp4,audio/mpeg,.m4a,.mp3',
+  import_source: '.csv,.txt,.xlsx,.xls,.docx,.pdf,image/jpeg,image/png,image/webp',
+};
+
+export const FileMeta = z.object({
+  id: z.string(),
+  kind: FileKindSchema,
+  mime: z.string(),
+  size: z.number().int(),
+  name: z.string().nullable(),
+  ownerStudentId: z.string().nullable(),
+  hasThumbnail: z.boolean(),
+  createdAt: z.number(),
+});
+export type FileMeta = z.infer<typeof FileMeta>;
+
+/**
+ * Upload one file (multipart field `file`). Kinds image/document/audio are evidence files and need
+ * `ownerStudentId` plus the matching media flag (D-014: photos and audio OFF by default →
+ * 403 FEATURE_DISABLED); `import_source` is a student list for the importer (IMP-1).
+ * Query-string input (the body is the multipart stream).
+ */
+export const uploadFile = endpoint({
+  method: 'POST',
+  path: '/api/files',
+  access: 'account',
+  input: z.object({ kind: FileKindSchema, ownerStudentId: Id.optional() }),
+  output: FileMeta,
+});
+
+/**
+ * Download a file after the policy check (owner scope). Binary response with
+ * `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`,
+ * attachment for anything but images and audio, Range support for audio. `thumb=true` serves the
+ * image thumbnail.
+ */
+export const getFile = endpoint({
+  method: 'GET',
+  path: '/api/files/:fileId',
+  access: 'account',
+  input: z.object({ fileId: Id, thumb: QueryBool.optional() }),
+  output: z.unknown(),
+});
+
+export const getFileMeta = endpoint({
+  method: 'GET',
+  path: '/api/files/:fileId/meta',
+  access: 'account',
+  input: z.object({ fileId: Id }),
+  output: FileMeta,
+});
+
+/** Soft-delete a file (row kept, bytes removed). Uploader or admin; a student photo through removeStudentPhoto. */
+export const deleteFile = endpoint({
+  method: 'DELETE',
+  path: '/api/files/:fileId',
+  access: 'account',
+  input: z.object({ fileId: Id }),
+  output: Ok,
+});
+
+// ---------------------------------------------------------------- student photos (CRD-1, D-014)
+/**
+ * Upload a student photo (multipart field `file`, query `consent=true`). Only while the admin
+ * enabled `media.studentPhotos` (default OFF → 403 FEATURE_DISABLED); the consent confirmation is
+ * recorded on the student and in the audit log. Teachers of the student's class, or an admin.
+ */
+export const uploadStudentPhoto = endpoint({
+  method: 'POST',
+  path: '/api/students/:studentId/photo',
+  access: 'account',
+  input: z.object({ studentId: Id, consent: QueryBool.optional() }),
+  output: z.object({ studentId: z.string(), photoUrl: z.string().nullable(), photoConsent: z.boolean() }),
+});
+
+export const removeStudentPhoto = endpoint({
+  method: 'DELETE',
+  path: '/api/students/:studentId/photo',
+  access: 'account',
+  input: z.object({ studentId: Id }),
+  output: Ok,
+});
+
+/**
+ * The photo for classroom cards: served only when photos are enabled, the student has consent and a
+ * photo, and the teacher teaches the student's class (404 otherwise). Classroom access, so student
+ * cards can show it while the device is locked.
+ */
+export const classroomStudentPhoto = endpoint({
+  method: 'GET',
+  path: '/api/classroom/students/:studentId/photo',
+  access: 'classroom',
+  input: z.object({ studentId: Id, v: z.string().max(64).optional() }),
+  output: z.unknown(),
+});
+
+/** URL of a student's classroom photo (cache-busted by the file id). */
+export const studentPhotoUrl = (studentId: string, fileId: string) => `/api/classroom/students/${encodeURIComponent(studentId)}/photo?v=${encodeURIComponent(fileId)}`;
+
+/** The classroom photo URL of a student, or null unless photos are on (D-014), consent is recorded and there is a photo (CRD-1). */
+export function photoUrlOf(s: { id: string; photoFileId: string | null; photoConsent: boolean }, photosOn: boolean): string | null {
+  return photosOn && s.photoConsent && s.photoFileId ? studentPhotoUrl(s.id, s.photoFileId) : null;
+}

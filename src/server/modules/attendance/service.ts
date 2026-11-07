@@ -7,6 +7,7 @@
 import { and, desc, eq, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { countAttendance, effectiveAttendance, type AttendanceStatus, type EffectiveAttendance } from '../../../domain/attendance.ts';
+import { photoUrlOf } from '../../../shared/contracts/files.ts';
 import type * as C from '../../../shared/contracts/lessons.ts';
 import { initials } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
@@ -16,6 +17,7 @@ import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId, sha256 } from '../../lib/crypto.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { assertClassWritable, assertOwnsContext, assertTeachesClass, getClass, getYear, todayFor, type ClassRow } from '../school/policy.ts';
+import { getMediaPolicy } from '../school/modules.ts';
 import { rosterRowsOn } from '../students/service.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -173,10 +175,11 @@ export function markAllPresentCore(ctx: RequestContext, cls: ClassRow, date: str
 export function rosterWithAttendance(db: Db, classId: string, date: string, lessonId: string | null, attendanceEnabled: boolean) {
   const daily = attendanceEnabled ? dailyFor(db, classId, date) : new Map<string, DailyRowDb>();
   const exc = attendanceEnabled && lessonId ? exceptionsFor(db, lessonId) : new Map<string, { status: AttendanceStatus }>();
+  const photosOn = getMediaPolicy(db).studentPhotos;
   return rosterRowsOn(db, classId, date).map(({ student: s }) => {
     const d = daily.get(s.id)?.status ?? null;
     const e = exc.get(s.id)?.status ?? null;
-    return { id: s.id, fullName: s.fullName, initials: initials(s.fullName), avatarHue: s.avatarHue, daily: d, exception: e, effective: effectiveAttendance(e, d) };
+    return { id: s.id, fullName: s.fullName, initials: initials(s.fullName), avatarHue: s.avatarHue, photoUrl: photoUrlOf(s, photosOn), daily: d, exception: e, effective: effectiveAttendance(e, d) };
   });
 }
 

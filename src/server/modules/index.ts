@@ -14,8 +14,10 @@ import { registerAttendanceListener } from './attendance/service.ts';
 import { attendanceManifest } from './attendance/manifest.ts';
 import { authManifest } from './auth/manifest.ts';
 import { countersManifest } from './counters/manifest.ts';
+import { filesManifest } from './files/manifest.ts';
 import { groupingManifest } from './grouping/manifest.ts';
 import { homeworkManifest } from './homework/manifest.ts';
+import { importManifest } from './import/manifest.ts';
 import { registerEndLessonStep } from './lessons/endSteps.ts';
 import { lessonsManifest } from './lessons/manifest.ts';
 import { registerLessonCloseHook, registerLessonStateContributor } from './lessons/service.ts';
@@ -39,6 +41,8 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   secretManifest,
   groupingManifest,
   homeworkManifest,
+  filesManifest,
+  importManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */

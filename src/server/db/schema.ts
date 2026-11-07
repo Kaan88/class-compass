@@ -10,6 +10,8 @@
 import { sql } from 'drizzle-orm';
 import { integer, primaryKey, sqliteTable, text, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { THEME_KEYS } from '../../shared/themes.ts';
+import { FILE_KINDS } from '../../shared/contracts/files.ts';
+import { IMPORT_SOURCE_TYPES, type ImportFlag } from '../../shared/contracts/import.ts';
 
 export type LocalizedText = { en?: string; tr?: string };
 
@@ -768,6 +770,109 @@ export const homeworkMarkChanges = sqliteTable(
     undoneBy: text('undone_by').references(() => users.id),
   },
   (t) => [index('homework_mark_changes_batch_idx').on(t.batchId), index('homework_mark_changes_assignment_idx').on(t.assignmentId, t.studentId)],
+);
+
+// ---------------------------------------------------------------- files (S9)
+
+/**
+ * Uploaded files (STU-8, D-014). Bytes live under DATA_DIR/uploads at `storageKey` (random
+ * `xx/yy/<uuid>`, no extension, never derived from the client's name); images are re-encoded (EXIF/GPS
+ * stripped) and get a thumbnail at `thumbStorageKey`. `sniffedMime` comes from the content, never
+ * from the client. `ownerStudentId` scopes access and the per-student quota. Served only through the
+ * policy-checked file endpoints. Deleted files keep their row (`deletedAt`); the bytes are removed.
+ */
+export const files = sqliteTable(
+  'files',
+  {
+    id: text('id').primaryKey(),
+    storageKey: text('storage_key').notNull(),
+    thumbStorageKey: text('thumb_storage_key'),
+    sha256: text('sha256').notNull(),
+    size: integer('size').notNull(),
+    thumbSize: integer('thumb_size'),
+    sniffedMime: text('sniffed_mime').notNull(),
+    kind: text('kind', { enum: FILE_KINDS }).notNull(),
+    /** Display name for downloads only (sanitised); never used for storage or type decisions. */
+    originalName: text('original_name'),
+    ownerStudentId: text('owner_student_id').references(() => students.id),
+    uploadedByType: text('uploaded_by_type', { enum: ['user', 'student', 'system'] }).notNull(),
+    uploadedById: text('uploaded_by_id'),
+    createdAt: integer('created_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [uniqueIndex('files_storage_key_uq').on(t.storageKey), index('files_owner_idx').on(t.ownerStudentId), index('files_uploader_idx').on(t.uploadedById)],
+);
+
+// ---------------------------------------------------------------- student list importer (S9)
+export type ImportParsedJson = { fullName: string; givenNames: string | null; familyName: string | null; studentNumber: string | null; className: string | null };
+export type ImportMappingJson = { headerRow: number | null; fullName: number | null; givenNames: number | null; familyName: number | null; studentNumber: number | null; className: number | null };
+export type ImportCandidateJson = { id: string; fullName: string; className: string | null; studentNumber: string | null; active: boolean; score: number };
+export type ImportCountsJson = Record<string, number>;
+
+/**
+ * One import of a student list into a class (IMP-1..5). A draft holds the extracted rows for the
+ * editable preview; commit creates/matches students; revert undoes what the batch created when
+ * nothing has happened to it since (otherwise it deactivates and reports).
+ */
+export const importBatches = sqliteTable(
+  'import_batches',
+  {
+    id: text('id').primaryKey(),
+    sourceType: text('source_type', { enum: IMPORT_SOURCE_TYPES }).notNull(),
+    fileId: text('file_id').references(() => files.id),
+    targetClassId: text('target_class_id').notNull().references(() => classes.id),
+    schoolYearId: text('school_year_id').notNull().references(() => schoolYears.id),
+    createdBy: text('created_by').notNull().references(() => users.id),
+    status: text('status', { enum: ['draft', 'committed', 'reverted'] }).notNull(),
+    /** Column labels of the extracted table (for the field mapping) and the current mapping. */
+    columnsJson: text('columns_json', { mode: 'json' }).$type<string[]>().notNull(),
+    mappingJson: text('mapping_json', { mode: 'json' }).$type<ImportMappingJson>().notNull(),
+    /** Machine-readable notices about the extraction (e.g. OCR_USED, SHEETS_READ). */
+    noticesJson: text('notices_json', { mode: 'json' }).$type<string[]>().notNull(),
+    countsJson: text('counts_json', { mode: 'json' }).$type<ImportCountsJson>().notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    committedAt: integer('committed_at'),
+    committedBy: text('committed_by').references(() => users.id),
+    revertedAt: integer('reverted_at'),
+    revertedBy: text('reverted_by').references(() => users.id),
+  },
+  (t) => [index('import_batches_class_idx').on(t.targetClassId), index('import_batches_creator_idx').on(t.createdBy)],
+);
+
+/**
+ * One extracted line/row of an import. `rawJson` = the cells as extracted (kept so the mapping can be
+ * changed), `parsedJson` = the editable fields. Student ids are plain columns (no foreign keys), so a
+ * revert can remove a student the batch created.
+ */
+export const importRows = sqliteTable(
+  'import_rows',
+  {
+    id: text('id').primaryKey(),
+    batchId: text('batch_id').notNull().references(() => importBatches.id),
+    idx: integer('idx').notNull(),
+    rawJson: text('raw_json', { mode: 'json' }).$type<string[]>().notNull(),
+    page: integer('page'),
+    parsedJson: text('parsed_json', { mode: 'json' }).$type<ImportParsedJson>().notNull(),
+    /** The teacher edited the parsed fields by hand (a new mapping keeps them). */
+    edited: integer('edited', { mode: 'boolean' }).notNull().default(false),
+    ocrConfidence: integer('ocr_confidence'),
+    flagsJson: text('flags_json', { mode: 'json' }).$type<ImportFlag[]>().notNull(),
+    candidatesJson: text('candidates_json', { mode: 'json' }).$type<ImportCandidateJson[]>().notNull(),
+    decision: text('decision', { enum: ['add', 'match', 'skip'] }).notNull(),
+    /** 'auto' = suggested by the importer; 'teacher' = chosen in the preview (possible matches need it, IMP-4). */
+    decisionSource: text('decision_source', { enum: ['auto', 'teacher'] }).notNull(),
+    matchedStudentId: text('matched_student_id'),
+    /** The teacher confirmed filling the matched student's missing number from this row (IMP-5). */
+    fillNumber: integer('fill_number', { mode: 'boolean' }).notNull().default(false),
+    filledNumber: integer('filled_number', { mode: 'boolean' }).notNull().default(false),
+    createdStudentId: text('created_student_id'),
+    createdEnrolmentId: text('created_enrolment_id'),
+    outcome: text('outcome', { enum: ['added', 'matched', 'skipped', 'failed'] }),
+    reason: text('reason'),
+    revertOutcome: text('revert_outcome'),
+  },
+  (t) => [uniqueIndex('import_rows_batch_idx_uq').on(t.batchId, t.idx)],
 );
 
 export const _sqlHelper = sql; // re-export for raw fragments in repos

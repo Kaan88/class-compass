@@ -16,7 +16,7 @@ const StudentNumber = z
   .regex(/^[\p{L}\p{N}-]*$/u, 'Student number: letters, digits and - only');
 
 /** Classroom-safe card data (CRD-1). */
-export const RosterEntry = z.object({ id: z.string(), fullName: z.string(), initials: z.string(), avatarHue: z.number().int() });
+export const RosterEntry = z.object({ id: z.string(), fullName: z.string(), initials: z.string(), avatarHue: z.number().int(), photoUrl: z.string().nullable().optional() });
 export const classroomRoster = endpoint({
   method: 'GET',
   path: '/api/classroom/classes/:classId/roster',
@@ -44,6 +44,8 @@ export const StudentDetail = z.object({
   initials: z.string(),
   avatarHue: z.number().int(),
   photoConsent: z.boolean(),
+  /** Classroom photo URL: only when photos are on, consent is recorded and a photo exists (D-014); null for admins. */
+  photoUrl: z.string().nullable(),
   active: z.boolean(),
   enrolledFrom: z.string().nullable(),
 });

@@ -39,6 +39,12 @@ Safety rules (D-024):
 - `npm run test:e2e` — Playwright (planned, S3/S4): touchscreen, mobile student pages, PIN bypass attempts, screenshot matrix.
 - CI runs on Ubuntu and Windows.
 
+## Uploads and OCR (S9)
+- Uploaded files live in `DATA_DIR/uploads` (random `xx/yy/<uuid>` keys; never serve this folder directly, files are served only by the app after a permission check). Temporary parts go to `DATA_DIR/uploads/tmp` and are removed after each request.
+- Quotas: `UPLOAD_STUDENT_QUOTA_MB` (default 100) per student and `UPLOAD_GLOBAL_QUOTA_MB` (default 10240) for the server.
+- OCR runs locally (D-080). The Turkish/English models come from npm packages and are copied to `DATA_DIR/ocr-cache/tessdata` on first use (SHA-256 checked); no network access is needed. `OCR_TIMEOUT_MS` (default 90000) stops a stuck recognition. Back up `uploads/`; `ocr-cache/` can be deleted at any time.
+- Photos and audio stay off until an administrator turns on the media policy (D-014).
+
 ## Data rules
 - Never commit `.env`, databases, uploads, backups or real student data (enforced by `.gitignore`).
 - Dev/test uses synthetic data only (demo seed, test fixtures).

@@ -6,6 +6,7 @@
  */
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
+import { photoUrlOf } from '../../../shared/contracts/files.ts';
 import type * as C from '../../../shared/contracts/students.ts';
 import { avatarHue, foldForSearch, initials, smartTitleCase, sortByName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
@@ -28,6 +29,7 @@ import {
   todayFor,
   type ClassRow,
 } from '../school/policy.ts';
+import { getMediaPolicy } from '../school/modules.ts';
 import { taughtClassIds } from '../school/service.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -39,7 +41,8 @@ const cleanName = (s: string) => smartTitleCase(s);
 const cleanOptName = (s: string | null | undefined) => (s === undefined ? undefined : s === null || !s.trim() ? null : cleanName(s));
 const cleanNumber = (s: string | null | undefined) => (s === undefined ? undefined : s === null || !s.trim() ? null : s.trim());
 
-export function studentDetail(s: StudentRow, enrolledFrom: string | null = null) {
+/** `photosOn`: media.studentPhotos (D-014); the photo URL is only given to teachers (classroom endpoint). */
+export function studentDetail(s: StudentRow, enrolledFrom: string | null = null, photosOn = false) {
   return {
     id: s.id,
     fullName: s.fullName,
@@ -49,6 +52,7 @@ export function studentDetail(s: StudentRow, enrolledFrom: string | null = null)
     initials: initials(s.fullName),
     avatarHue: s.avatarHue,
     photoConsent: s.photoConsent,
+    photoUrl: photoUrlOf(s, photosOn),
     active: s.deactivatedAt === null,
     enrolledFrom,
   };
@@ -84,6 +88,21 @@ function currentAndScheduledEnrolments(deps: Deps, studentId: string): LiveEnrol
     out.push({ ...e, activeToday: e.fromDate <= today, className: cls.name });
   }
   return out;
+}
+
+/** Classes the student is in today or is scheduled to join (D-021). */
+export function liveClassIdsOf(deps: Deps, studentId: string): string[] {
+  return currentAndScheduledEnrolments(deps, studentId).map((e) => e.classId);
+}
+
+/**
+ * Shared-class-data rule (ARCHITECTURE §3) for a teacher: the student is (or will be) in a class the
+ * teacher teaches. Used for photos and files owned by a student (STU-8).
+ */
+export function teacherSeesStudent(ctx: RequestContext, studentId: string): boolean {
+  const user = requireUser(ctx);
+  const taught = taughtClassIds(ctx.db, user.id);
+  return liveClassIdsOf(ctx, studentId).some((c) => taught.includes(c));
 }
 
 /**
@@ -226,7 +245,7 @@ export function teacherAddStudent(ctx: RequestContext, input: In<typeof C.addStu
   return tx(ctx.db, () => {
     const cls = assertTeachesClass(ctx, input.classId);
     const row = createStudentInClass(ctx, ctx.actor, cls, input, { visibleClassIds: taughtClassIds(ctx.db, requireUser(ctx).id) });
-    return studentDetail(row, openEnrolments(ctx.db, row.id)[0]?.fromDate ?? null);
+    return studentDetail(row, openEnrolments(ctx.db, row.id)[0]?.fromDate ?? null, getMediaPolicy(ctx.db).studentPhotos);
   });
 }
 
@@ -272,7 +291,7 @@ export function teacherUpdateStudent(ctx: RequestContext, input: In<typeof C.upd
       const pick = (o: Partial<StudentRow>) => Object.fromEntries(changedKeys.map((k) => [k, o[k as keyof StudentRow]]));
       audit(ctx.db, ctx.actor, { action: 'student.update', entity: 'student', entityId: s.id, before: pick(s), after: pick(patch) }, ctx.now());
     }
-    return studentDetail(getStudent(ctx.db, s.id), enrol.fromDate);
+    return studentDetail(getStudent(ctx.db, s.id), enrol.fromDate, getMediaPolicy(ctx.db).studentPhotos);
   });
 }
 
@@ -289,7 +308,8 @@ export function classroomRoster(ctx: RequestContext, classId: string) {
 
 export function teacherRoster(ctx: RequestContext, classId: string) {
   const cls = assertTeachesClass(ctx, classId);
-  return { classId: cls.id, className: cls.name, students: rosterRows(ctx, cls).map(({ student, enrolment }) => studentDetail(student, enrolment.fromDate)) };
+  const photosOn = getMediaPolicy(ctx.db).studentPhotos;
+  return { classId: cls.id, className: cls.name, students: rosterRows(ctx, cls).map(({ student, enrolment }) => studentDetail(student, enrolment.fromDate, photosOn)) };
 }
 
 // ---------------------------------------------------------------- subject levels (GRP-3, GRP-7)
