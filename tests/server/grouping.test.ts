@@ -5,6 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Endpoint } from '../../src/shared/contracts/define.ts';
 import { registeredEndpoints } from '../../src/server/lib/http.ts';
+import { groupingReport } from '../../src/server/modules/grouping/service.ts';
+import type { RequestContext } from '../../src/server/lib/context.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 import { cmd, lessonState, startLesson } from '../lesson-helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
@@ -118,6 +120,48 @@ describe('manual edits, names and roles (GRP-3, GRP-6)', () => {
   });
 });
 
+describe('roster changes (GRP-1, GRP-3, review fixes)', () => {
+  it('opening grouping before any student is added creates no empty defaults; they are made once students exist', async () => {
+    const t = await ok(s.admin.post('/api/admin/classes', { schoolYearId: s.year.id, name: '3-C', grade: 3 }));
+    const c = await ok(s.admin.post('/api/admin/teaching-contexts', { teacherId: s.ayse.id, classId: t.id, subjectId: s.english.id }));
+    expect((await ok(s.teacherA.get(`/api/teacher/contexts/${c.id}/grouping`))).templates).toEqual([]);
+    expect((await ok(s.teacherA.get(`/api/classroom/contexts/${c.id}/grouping/arrangements`))).arrangements).toEqual([]);
+    for (const fullName of ['Ali Can', 'Bora Er', 'Cansu Ak', 'Doruk Su', 'Eda Ay', 'Ferit Ok', 'Gül Tan', 'Harun Gök', 'Işıl Nur']) await addStudent(s.teacherA, t.id, { fullName });
+    const o = await ok(s.teacherA.get(`/api/teacher/contexts/${c.id}/grouping`));
+    expect(o.templates).toHaveLength(5);
+    const three = o.templates.find((x: any) => x.defaultKey === 'level-groups');
+    expect(three.groups.map((g: any) => g.memberIds.length)).toEqual([3, 3, 3]);
+    const lessonId = await startLesson(s.teacherA, c.id, { othersPresent: true });
+    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: c.id, lessonId, templateId: three.id })).ok).toBe(true);
+    expect((await lessonState(s.teacherA, c.id)).grouping.groups).toHaveLength(3);
+    // A default saved without members (made by an earlier version while the class was empty) is used by
+    // its type and size in the lesson, and filled in on the next read without changing its names.
+    env.db.$client.prepare("update group_templates set groups_json = '[]' where id = ?").run(three.id);
+    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: c.id, lessonId, templateId: three.id })).ok).toBe(true);
+    expect((await lessonState(s.teacherA, c.id)).grouping.groups.map((g: any) => g.members.length)).toEqual([3, 3, 3]);
+    const again = (await ok(s.teacherA.get(`/api/teacher/contexts/${c.id}/grouping`))).templates.find((x: any) => x.id === three.id);
+    expect(again.groups.map((g: any) => g.memberIds.length)).toEqual([3, 3, 3]);
+    expect(again.name).toEqual(three.name);
+  });
+
+  it('an arrangement stays editable after one of its students leaves the class', async () => {
+    const o = await overview();
+    const t = o.templates[0];
+    const leaver = t.groups[0].memberIds[0];
+    await ok(s.admin.post('/api/admin/students/move', { studentIds: [leaver], toClassId: s.c3b.id }));
+    // The (stale) screen sends every saved member back, including the student who left.
+    const groups = t.groups.map((g: any, i: number) => ({ id: g.id, name: i === 0 ? { en: 'Comets' } : g.name, icon: g.icon, memberIds: g.memberIds, roles: [] }));
+    const saved = await ok(s.teacherA.put(`/api/teacher/grouping/templates/${t.id}`, { expectedVersion: t.version, groups }));
+    expect(saved.groups[0].name).toEqual({ en: 'Comets' });
+    expect(saved.groups.flatMap((g: any) => g.memberIds)).not.toContain(leaver);
+    expect(saved.groups.flatMap((g: any) => g.memberIds)).toHaveLength(18);
+    // A student of another class who was never in the arrangement is still refused.
+    const outsider = await addStudent(s.teacherB, s.c3b.id, { fullName: 'Toprak Güneş' });
+    const bad = await s.teacherA.put(`/api/teacher/grouping/templates/${t.id}`, { expectedVersion: saved.version, groups: [{ name: { en: 'A' }, memberIds: [outsider.id] }] });
+    expect(bad.body.error.details.reason).toBe('STUDENT_NOT_IN_CLASS');
+  });
+});
+
 describe('pair rules (GRP-4, GRP-8)', () => {
   it("keeps 'apart' students apart, and reports rules that cannot be met with a reason", async () => {
     const [a, b, c] = kids;
@@ -153,7 +197,7 @@ describe('groups in a lesson (GRP-5, GRP-7, DSH-8)', () => {
     const lessonId = await startLesson(s.teacherA, ctx(), { othersPresent: true });
     for (const k of kids.slice(0, 2)) expect((await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: k.id, status: 'absent' })).ok).toBe(true);
     const arr = await ok(s.teacherA.get(`/api/classroom/contexts/${ctx()}/grouping/arrangements`));
-    const mixed = arr.arrangements.find((x: any) => x.name.en === 'Mixed teams A');
+    const mixed = arr.arrangements.find((x: any) => x.name.en === 'Teams A');
     const before = env.db.$client.prepare('select * from group_templates where id = ?').get(mixed.id);
     const r = await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: mixed.id });
     expect(r.ok).toBe(true);
@@ -171,7 +215,7 @@ describe('groups in a lesson (GRP-5, GRP-7, DSH-8)', () => {
     const replay = await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: mixed.id }, { opId: r.opId });
     expect(replay.replayed).toBe(true);
     expect(count('select count(*) n from lesson_groupings')).toBe(1);
-    const pairs = arr.arrangements.find((x: any) => x.name.en === 'Mixed pairs');
+    const pairs = arr.arrangements.find((x: any) => x.name.en === 'Pairs B');
     expect((await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: pairs.id })).ok).toBe(true);
     expect(count('select count(*) n from lesson_groupings where cleared_at is null')).toBe(1);
     // A student marked absent later disappears from the display without re-applying.
@@ -207,8 +251,35 @@ describe('groups in a lesson (GRP-5, GRP-7, DSH-8)', () => {
     expect(all).not.toContain('LVLSECRET');
     expect(all).not.toContain(NOTE);
     // (Counter card levels are numbers 0–3, CNT-6; a subject level would be a string.)
-    const forbidden = /"mode"|"level":"|"rules"|"unsatisfied"|"studentA"/;
+    // Arrangement names must not say "level" either (default names are neutral; review fix).
+    const forbidden = /"mode"|"level":"|"rules"|"unsatisfied"|"studentA"|Level|Seviye|seviye/;
     expect(bodies.filter((b) => forbidden.test(b)).map((b) => b.slice(0, 160))).toEqual([]);
+  });
+
+  it('a pairs arrangement with absent partners makes no "pair" of one; a late arrival is counted as not in a group yet (GRP-5, review fix)', async () => {
+    const lessonId = await startLesson(s.teacherA, ctx(), { othersPresent: true });
+    const o = await overview();
+    const pairs = o.templates.find((t: any) => t.defaultKey === 'mixed-pairs');
+    // One member of each of four pairs is absent.
+    const away = pairs.groups.slice(0, 4).map((g: any) => g.memberIds[0]);
+    for (const id of away) expect((await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: id, status: 'absent' })).ok).toBe(true);
+    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: pairs.id })).ok).toBe(true);
+    let st = (await lessonState(s.teacherA, ctx())).grouping;
+    const sizes = st.groups.map((g: any) => g.members.length);
+    expect(sizes.reduce((a: number, b: number) => a + b, 0)).toBe(15);
+    expect(Math.min(...sizes)).toBe(2);
+    expect(st).toMatchObject({ excludedCount: 4, notPlacedCount: 0 });
+    // One of them arrives late: present now, in no group until the groups are chosen again.
+    await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: away[0], status: 'present' });
+    st = (await lessonState(s.teacherA, ctx())).grouping;
+    expect(st).toMatchObject({ excludedCount: 3, notPlacedCount: 1 });
+    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: pairs.id })).ok).toBe(true);
+    st = (await lessonState(s.teacherA, ctx())).grouping;
+    expect(st).toMatchObject({ excludedCount: 3, notPlacedCount: 0 });
+    expect(st.groups.flatMap((g: any) => g.members.map((m: any) => m.id))).toContain(away[0]);
+    // RPT-5: applying again in the same lesson does not count the lesson twice.
+    const report = groupingReport({ db: env.db } as unknown as RequestContext, { contextId: ctx(), from: '2026-11-01', to: '2026-11-30' });
+    expect(report).toEqual({ lessonsWithGroups: 1, arrangementsUsed: [{ templateId: pairs.id, lessons: 1 }] });
   });
 
   it('switching the module off keeps every arrangement and rule; classroom access answers FEATURE_DISABLED (CFG-1, CFG-2)', async () => {

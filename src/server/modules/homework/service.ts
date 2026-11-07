@@ -310,7 +310,7 @@ function replayed(db: Db, batchId: string, assignmentId: string): number | null 
  * Apply one batch of mark changes inside a transaction. Setting "not checked" removes the mark (no
  * row = not checked); the change table keeps the history. Unchanged students are skipped.
  */
-function applyChanges(ctx: RequestContext, a: AssignmentRow, cls: { id: string }, batchId: string, changes: readonly Change[], kind: string): number {
+function applyChanges(ctx: RequestContext, a: AssignmentRow, cls: { id: string }, batchId: string, changes: readonly Change[], kind: string, classroom: boolean): number {
   const keys = new Set(a.statusSetJson.map((s) => s.key));
   const marks = marksOf(ctx.db, a.id);
   const allowed = new Set([...rosterRowsOn(ctx.db, cls.id, a.dueOn).map((r) => r.student.id), ...marks.keys()]);
@@ -325,6 +325,9 @@ function applyChanges(ctx: RequestContext, a: AssignmentRow, cls: { id: string }
     seen.add(c.studentId);
     const cur = marks.get(c.studentId) ?? null;
     const afterStatus = c.status === NOT_CHECKED ? null : c.status;
+    // Classroom checking never shows or changes notes (D-075): "not checked" deletes the mark row, so for a
+    // mark with a private note that correction is refused there and is made in the teacher area.
+    if (classroom && afterStatus === null && cur?.note) throw new AppError('CONFLICT', 'This mark has a private note', { reason: 'MARK_HAS_NOTE' });
     const afterNote = afterStatus === null ? null : c.note === undefined ? (cur?.note ?? null) : c.note?.trim() || null;
     if ((cur?.status ?? null) === afterStatus && (cur?.note ?? null) === afterNote) continue;
     if (afterStatus === null) ctx.db.delete(homeworkMarks).where(and(eq(homeworkMarks.assignmentId, a.id), eq(homeworkMarks.studentId, c.studentId))).run();
@@ -352,7 +355,7 @@ function runMarks(ctx: RequestContext, assignmentId: string, batchId: string | u
     const prev = replayed(ctx.db, id, a.id);
     if (prev !== null) return { batchId: id, changed: prev, replayed: true, check: checkView(ctx.db, a, context) };
     const { changes, kind } = build(a);
-    const changed = applyChanges(ctx, a, cls, id, changes, kind);
+    const changed = applyChanges(ctx, a, cls, id, changes, kind, classroom);
     return { batchId: id, changed, replayed: false, check: checkView(ctx.db, a, context) };
   });
 }
@@ -384,6 +387,9 @@ export function undoMarks(ctx: RequestContext, input: In<typeof C.undoHomeworkMa
     assertClassWritable(ctx.db, cls);
     const rows = ctx.db.select().from(homeworkMarkChanges).where(and(eq(homeworkMarkChanges.batchId, input.batchId), eq(homeworkMarkChanges.assignmentId, a.id))).all();
     if (!rows.length) throw new AppError('NOT_FOUND', 'Nothing to undo', { reason: 'NOTHING_TO_UNDO' });
+    // Classroom writes never change notes, so a batch that changed one was made in the teacher area and
+    // is undone there only (D-075).
+    if (classroom && rows.some((r) => r.undoneAt === null && (r.beforeNote ?? null) !== (r.afterNote ?? null))) throw new AppError('FORBIDDEN', 'Undo this in the teacher area', { reason: 'MARK_HAS_NOTE' });
     const marks = marksOf(ctx.db, a.id);
     const now = ctx.now();
     const uid = requireUser(ctx).id;

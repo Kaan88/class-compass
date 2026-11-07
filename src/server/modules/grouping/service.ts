@@ -113,16 +113,27 @@ function templateRows(db: Db, contextId: string, includeArchived: boolean): Temp
 /**
  * The five default arrangements, created once per class+subject: only while the context has no
  * arrangement row at all, so an archived or edited default is never recreated (D-072). Nothing is
- * written in an archived class or school year (DAT-1).
+ * written in an archived class or school year (DAT-1), and nothing while the class has no students
+ * yet (the defaults would have no groups). A default that was saved without any member (made before
+ * this rule) is generated again, keeping its names, once the class has students.
  */
 export function ensureDefaultArrangements(ctx: RequestContext, context: ContextRow): void {
   const cls = getClass(ctx.db, context.classId);
   if (!isWritable(ctx.db, cls)) return;
   tx(ctx.db, () => {
-    const any = ctx.db.select({ id: groupTemplates.id }).from(groupTemplates).where(eq(groupTemplates.contextId, context.id)).limit(1).get();
-    if (any) return;
-    const now = ctx.now();
     const roster = rosterOn(ctx.db, cls, todayFor(ctx, cls));
+    if (!roster.length) return;
+    const rows = templateRows(ctx.db, context.id, true);
+    if (rows.length) {
+      for (const row of rows) {
+        if (row.defaultKey === null || row.mode === 'custom' || row.archivedAt !== null || row.groupsJson.some((g) => g.memberIds.length > 0)) continue;
+        const { groups, unsatisfied } = generateFor(ctx.db, context, roster, row.mode, row.sizingJson, row.seed, row.groupsJson);
+        ctx.db.update(groupTemplates).set({ groupsJson: groups, unsatisfiedJson: unsatisfied, version: row.version + 1, updatedAt: ctx.now() }).where(eq(groupTemplates.id, row.id)).run();
+        audit(ctx.db, ctx.actor, { action: 'grouping.defaults_filled', entity: 'group_template', entityId: row.id, after: { groups: groups.length } }, ctx.now());
+      }
+      return;
+    }
+    const now = ctx.now();
     DEFAULT_ARRANGEMENTS.forEach((d, i) => {
       const seed = `${context.id}:${d.key}`;
       const { groups, unsatisfied } = generateFor(ctx.db, context, roster, d.mode, d.sizing, seed, []);
@@ -164,21 +175,27 @@ function ownedTemplate(ctx: RequestContext, templateId: string, write: boolean) 
 
 const cleanText = (t: LocalizedTextValue): LocalizedTextValue => ({ ...(t.en?.trim() ? { en: normaliseName(t.en) } : {}), ...(t.tr?.trim() ? { tr: normaliseName(t.tr) } : {}) });
 
-/** Hand-made groups: every member is a current student of the class, at most once (GRP-3). */
+/**
+ * Hand-made groups: every member is a current student of the class, at most once (GRP-3). Students
+ * of the saved arrangement who have since left the class are dropped (so an older arrangement stays
+ * editable even from a stale screen); any other student outside the class is refused.
+ */
 function groupsFromInput(ctx: RequestContext, context: ContextRow, input: readonly GroupInput[], previous: readonly GroupJson[]): GroupJson[] {
   const cls = getClass(ctx.db, context.classId);
   const roster = new Set(rosterOn(ctx.db, cls, todayFor(ctx, cls)).map((s) => s.id));
+  const left = new Set(previous.flatMap((g) => g.memberIds).filter((id) => !roster.has(id)));
   const seen = new Set<string>();
   const prevIds = new Set(previous.map((g) => g.id));
   return input.map((g, i) => {
-    for (const id of g.memberIds) {
+    const memberIds = g.memberIds.filter((id) => !left.has(id));
+    for (const id of memberIds) {
       if (!roster.has(id)) throw new AppError('VALIDATION', 'Student is not in this class', { reason: 'STUDENT_NOT_IN_CLASS' });
       if (seen.has(id)) throw new AppError('VALIDATION', 'A student can be in one group only', { reason: 'STUDENT_IN_TWO_GROUPS' });
       seen.add(id);
     }
-    const members = new Set(g.memberIds);
+    const members = new Set(memberIds);
     const roles = (g.roles ?? []).filter((r) => members.has(r.studentId) && (r.label.en?.trim() || r.label.tr?.trim())).map((r) => ({ studentId: r.studentId, label: cleanText(r.label) }));
-    return { id: g.id && prevIds.has(g.id) ? g.id : newId(), name: cleanText(g.name), icon: g.icon ?? defaultName(i).icon, memberIds: [...g.memberIds], roles };
+    return { id: g.id && prevIds.has(g.id) ? g.id : newId(), name: cleanText(g.name), icon: g.icon ?? defaultName(i).icon, memberIds, roles };
   });
 }
 
@@ -363,22 +380,36 @@ export function applyGrouping(ctx: RequestContext, p: z.infer<(typeof C.Grouping
   const away = awayIn(ctx.db, lesson);
   const present = roster.filter((id) => !away.has(id));
   const rules = domainRules(ruleRows(ctx.db, context.id));
-  const fitted = fitToPresent(
-    tpl.groupsJson.map((g) => g.memberIds),
-    present,
-    rules,
-    `${tpl.seed}:${lesson.id}`,
-  );
-  const groups: GroupJson[] = fitted.groups
-    .map((memberIds, i) => {
-      const saved = tpl.groupsJson[i];
-      const d = defaultName(i);
-      const members = new Set(memberIds);
-      return { id: saved?.id ?? `extra-${i}`, name: saved?.name ?? { ...d.name }, icon: saved?.icon ?? d.icon, memberIds, roles: (saved?.roles ?? []).filter((r) => members.has(r.studentId)) };
-    })
-    .filter((g) => g.memberIds.length > 0);
-  const unsatisfied = evaluateRules(groups.map((g) => g.memberIds), rules, { byHand: tpl.mode === 'custom' }) as UnsatisfiedJson[];
-  const excluded = tpl.groupsJson.flatMap((g) => g.memberIds).filter((id) => away.has(id));
+  let groups: GroupJson[];
+  let unsatisfied: UnsatisfiedJson[];
+  if (!tpl.groupsJson.some((g) => g.memberIds.length > 0) && present.length) {
+    // Nothing saved to fit (made before the class had students): make groups for this lesson from
+    // the arrangement's type and size, without changing the arrangement (GRP-5).
+    const here = new Set(present);
+    const rows = rosterRowsOn(ctx.db, lesson.classId, lesson.localDate)
+      .map((r) => r.student)
+      .filter((st) => here.has(st.id));
+    ({ groups, unsatisfied } = generateFor(ctx.db, context, rows, tpl.mode === 'custom' ? 'mixed' : tpl.mode, tpl.sizingJson, `${tpl.seed}:${lesson.id}`, tpl.groupsJson));
+  } else {
+    // Target-size arrangements also merge groups left too small by absences (no "pair" of one).
+    const fitted = fitToPresent(
+      tpl.groupsJson.map((g) => g.memberIds),
+      present,
+      rules,
+      `${tpl.seed}:${lesson.id}`,
+      tpl.sizingJson,
+    );
+    groups = fitted.groups
+      .map((memberIds, i) => {
+        const saved = tpl.groupsJson[i];
+        const d = defaultName(i);
+        const members = new Set(memberIds);
+        return { id: saved?.id ?? `extra-${i}`, name: saved?.name ?? { ...d.name }, icon: saved?.icon ?? d.icon, memberIds, roles: (saved?.roles ?? []).filter((r) => members.has(r.studentId)) };
+      })
+      .filter((g) => g.memberIds.length > 0);
+    unsatisfied = evaluateRules(groups.map((g) => g.memberIds), rules, { byHand: tpl.mode === 'custom' }) as UnsatisfiedJson[];
+  }
+  const excluded = roster.filter((id) => away.has(id));
   const now = ctx.now();
   ctx.db.update(lessonGroupings).set({ clearedAt: now }).where(and(eq(lessonGroupings.lessonId, lesson.id), isNull(lessonGroupings.clearedAt))).run();
   ctx.db
@@ -402,14 +433,20 @@ export function clearGrouping(ctx: RequestContext, p: z.infer<(typeof C.Grouping
   return { cleared: true };
 }
 
-/** Polled lesson state (DSH-8): classroom-safe groups; students marked away since are left out too. */
+/**
+ * Polled lesson state (DSH-8): classroom-safe groups; students marked away since are left out too.
+ * The counts follow current attendance: `excludedCount` = students of the class away now,
+ * `notPlacedCount` = students here now who are in no group (a late arrival, a new student) until the
+ * teacher chooses the groups again.
+ */
 export function groupingLessonState(db: Db, lesson: LessonRow): GroupingLessonState {
   const live = liveGrouping(db, lesson.id);
-  if (!live) return { applied: false, arrangementId: null, groups: [], excludedCount: 0, unsatisfiedCount: 0 };
+  if (!live) return { applied: false, arrangementId: null, groups: [], excludedCount: 0, notPlacedCount: 0, unsatisfiedCount: 0 };
   const away = awayIn(db, lesson);
   const ids = [...new Set(live.effectiveGroupsJson.flatMap((g) => g.memberIds))];
   const byId = new Map((ids.length ? db.select().from(students).where(inArray(students.id, ids)).all() : []).map((s) => [s.id, s]));
-  const nowAway = ids.filter((id) => away.has(id)).length;
+  const inGroup = new Set(ids);
+  const roster = rosterRowsOn(db, lesson.classId, lesson.localDate).map((r) => r.student.id);
   return {
     applied: true,
     arrangementId: live.templateId,
@@ -425,7 +462,8 @@ export function groupingLessonState(db: Db, lesson: LessonRow): GroupingLessonSt
           return { id: s.id, fullName: s.fullName, initials: initials(s.fullName), avatarHue: s.avatarHue, role };
         }),
     })),
-    excludedCount: live.excludedAbsentIds.length + nowAway,
+    excludedCount: roster.filter((id) => away.has(id)).length,
+    notPlacedCount: roster.filter((id) => !away.has(id) && !inGroup.has(id)).length,
     unsatisfiedCount: live.unsatisfiedJson.length,
   };
 }
@@ -433,15 +471,20 @@ export function groupingLessonState(db: Db, lesson: LessonRow): GroupingLessonSt
 export const groupingStamp = (db: Db, lesson: LessonRow | null) => (lesson ? `g${liveGrouping(db, lesson.id)?.id ?? 'none'}` : 'g-');
 
 // ---------------------------------------------------------------- reports hook (S11)
-/** RPT-1 "grouping history": how often each arrangement was used in lessons of the period (counts only). */
+/**
+ * RPT-1 "grouping history" (RPT-5, counts only): `lessonsWithGroups` = distinct lessons of the period
+ * in which groups were shown; per arrangement, `lessons` = distinct lessons in which it was shown.
+ * Applying it again in the same lesson (e.g. after a late arrival) does not count twice; a lesson that
+ * switched arrangements counts once for each arrangement shown.
+ */
 export function groupingReport(ctx: RequestContext, q: { contextId: string; from: string; to: string }) {
   const rows = ctx.db
-    .select({ templateId: lessonGroupings.templateId, localDate: lessons.localDate })
+    .select({ templateId: lessonGroupings.templateId, lessonId: lessonGroupings.lessonId, localDate: lessons.localDate })
     .from(lessonGroupings)
     .innerJoin(lessons, eq(lessons.id, lessonGroupings.lessonId))
     .where(and(eq(lessonGroupings.contextId, q.contextId), gte(lessons.localDate, q.from), lte(lessons.localDate, q.to)))
     .all();
-  const uses = new Map<string, number>();
-  for (const r of rows) uses.set(r.templateId, (uses.get(r.templateId) ?? 0) + 1);
-  return { lessonsWithGroups: rows.length, arrangementsUsed: [...uses].map(([templateId, count]) => ({ templateId, count })) };
+  const uses = new Map<string, Set<string>>();
+  for (const r of rows) uses.set(r.templateId, (uses.get(r.templateId) ?? new Set<string>()).add(r.lessonId));
+  return { lessonsWithGroups: new Set(rows.map((r) => r.lessonId)).size, arrangementsUsed: [...uses].map(([templateId, ls]) => ({ templateId, lessons: ls.size })) };
 }

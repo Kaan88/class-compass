@@ -81,7 +81,7 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     // Two taps: Choose groups → an arrangement (GRP-5).
     await panel.getByRole('button', { name: 'Choose groups' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: /Mixed teams A/ }).click();
+    await dialog.getByRole('button', { name: /Teams A/ }).click();
     await expect(dialog).toHaveCount(0);
     const groups = panel.locator('.cc-group');
     await expect(groups.first()).toBeVisible();

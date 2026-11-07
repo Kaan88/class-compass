@@ -177,6 +177,18 @@ describe('classroom panel and classroom checking (DSH-8, D-075, PIN-1)', () => {
     await ok(s.teacherA.post(`/api/classroom/homework/${hw.id}/marks`, { changes: [{ studentId: kids[0]!.id, status: 'submitted_late', note: 'ignored' }] }));
     const teacherView = await check(hw.id);
     expect(teacherView.rows[0]).toMatchObject({ status: 'submitted_late', note: NOTE });
+    // Review fix: "not checked" would delete the mark and its private note, so the classroom refuses it.
+    const cleared = await s.teacherA.post(`/api/classroom/homework/${hw.id}/marks`, { changes: [{ studentId: kids[0]!.id, status: 'not_checked' }] });
+    expect(cleared.status).toBe(409);
+    expect(cleared.body.error.details.reason).toBe('MARK_HAS_NOTE');
+    // A teacher-area batch that changed a note cannot be undone from the classroom.
+    const noted = await ok(s.teacherA.post(`/api/teacher/homework/${hw.id}/marks`, { changes: [{ studentId: kids[1]!.id, status: 'missing', note: NOTE }] }));
+    const undo = await s.teacherA.post(`/api/classroom/homework/${hw.id}/marks/undo`, { batchId: noted.batchId });
+    expect(undo.status).toBe(403);
+    expect(undo.body.error.details.reason).toBe('MARK_HAS_NOTE');
+    const after = await check(hw.id);
+    expect(after.rows.find((r: any) => r.student.id === kids[0]!.id)).toMatchObject({ status: 'submitted_late', note: NOTE });
+    expect(after.rows.find((r: any) => r.student.id === kids[1]!.id)).toMatchObject({ status: 'missing', note: NOTE });
   });
 
   it('statuses are configurable per class+subject; an assignment keeps the list it was created with (HW-2, DAT-6)', async () => {

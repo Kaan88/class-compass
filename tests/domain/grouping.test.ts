@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { evaluateRules, fitToPresent, groupSizes, levelRanks, solveGroups, type GroupStudent, type PairRule, type Sizing } from '../../src/domain/grouping.ts';
+import { apartPlacement, evaluateRules, fitToPresent, groupSizes, levelRanks, orderedLevels, solveGroups, type GroupStudent, type PairRule, type Sizing } from '../../src/domain/grouping.ts';
 
 const ids = (n: number) => Array.from({ length: n }, (_, i) => `s${String(i).padStart(2, '0')}`);
 
@@ -30,6 +30,22 @@ describe('groupSizes (GRP-2, GRP-8)', () => {
     expect(groupSizes(17, { targetSize: 2 })).toEqual([3, 2, 2, 2, 2, 2, 2, 2]);
     expect(groupSizes(1, { targetSize: 2 })).toEqual([1]);
     expect(groupSizes(2, { groupCount: 5 })).toEqual([1, 1]); // tiny class: never empty groups
+  });
+  it('a target size gives groups near the target, not one big group, in small classes (review fix)', () => {
+    expect(groupSizes(7, { targetSize: 4 })).toEqual([4, 3]);
+    expect(groupSizes(6, { targetSize: 4 })).toEqual([3, 3]);
+    expect(groupSizes(5, { targetSize: 3 })).toEqual([3, 2]);
+    expect(groupSizes(3, { targetSize: 2 })).toEqual([3]); // pairs: an odd count still makes one trio
+    expect(groupSizes(19, { targetSize: 4 })).toEqual([5, 5, 5, 4]);
+    fc.assert(
+      fc.property(fc.integer({ min: 2, max: 60 }), fc.integer({ min: 2, max: 8 }), (n, target) => {
+        const sizes = groupSizes(n, { targetSize: target });
+        // Never further from the target than one single group would be, and never a group of one.
+        expect(Math.max(...sizes.map((x) => Math.abs(x - target)))).toBeLessThanOrEqual(Math.abs(n - target));
+        expect(Math.min(...sizes)).toBeGreaterThanOrEqual(2);
+        if (target >= 3 && n >= 2 * target - 1) expect(sizes.length).toBeGreaterThanOrEqual(2);
+      }),
+    );
   });
 });
 
@@ -153,6 +169,79 @@ describe('solveGroups (GRP-1..3, GRP-8)', () => {
     expect(solveGroups({ students, sizing: { groupCount: 1 }, mode: 'mixed', rules: [{ id: 'r', a: 's00', b: 'gone', kind: 'apart' }], seed: 's' }).unsatisfied).toEqual([]);
   });
 
+  it("an 'apart' rule is reported only when no arrangement with these sizes meets every 'apart' rule (brute force, GRP-8)", () => {
+    // Exhaustive check for small classes: the solver must find a solution whenever one exists.
+    const feasible = (n: number, sizes: number[], rules: PairRule[]) => {
+      const k = sizes.length;
+      const want = [...sizes].sort().join();
+      const at = new Array<number>(n).fill(0);
+      const total = k ** n;
+      for (let code = 0; code < total; code++) {
+        let c = code;
+        for (let i = 0; i < n; i++) {
+          at[i] = c % k;
+          c = Math.floor(c / k);
+        }
+        const count = new Array<number>(k).fill(0);
+        for (const g of at) count[g]!++;
+        if (count.sort().join() !== want) continue;
+        if (rules.every((r) => at[Number(r.a.slice(1))] !== at[Number(r.b.slice(1))])) return true;
+      }
+      return false;
+    };
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 2, max: 8 }),
+        fc.integer({ min: 2, max: 3 }),
+        fc.array(fc.tuple(fc.nat(7), fc.nat(7)), { maxLength: 9 }),
+        fc.string(),
+        (n, k, raw, seed) => {
+          const list = ids(n);
+          const rules: PairRule[] = raw.filter(([a, b]) => a < n && b < n && a !== b).map(([a, b], i) => ({ id: `r${i}`, a: list[a]!, b: list[b]!, kind: 'apart' }));
+          const sizing = { groupCount: Math.min(k, n) };
+          const res = solveGroups({ students: list.map((id) => ({ id, levelRank: null })), sizing, mode: 'mixed', rules, seed });
+          const broken = res.unsatisfied.filter((u) => u.kind === 'apart');
+          if (feasible(n, groupSizes(n, sizing), rules)) expect(broken).toEqual([]);
+          else {
+            expect(broken.length).toBeGreaterThan(0);
+            expect(broken.every((u) => u.reason === 'NOT_POSSIBLE_WITH_OTHER_RULES')).toBe(true);
+          }
+        },
+      ),
+      { numRuns: 400 },
+    );
+    // The reviewer's counter-example: satisfiable, so nothing may be reported.
+    const list = ids(7);
+    const rules: PairRule[] = [[0, 6], [3, 2], [3, 1], [3, 5], [6, 3]].map(([a, b], i) => ({ id: `r${i}`, a: list[a!]!, b: list[b!]!, kind: 'apart' }));
+    expect(solveGroups({ students: list.map((id) => ({ id, levelRank: null })), sizing: { groupCount: 2 }, mode: 'mixed', rules, seed: 'x' }).unsatisfied).toEqual([]);
+  });
+
+  it('the exact search proves impossibility, or says it gave up (softer reason)', () => {
+    const list = ids(3);
+    const triangle: PairRule[] = [
+      { id: 'r1', a: 's00', b: 's01', kind: 'apart' },
+      { id: 'r2', a: 's01', b: 's02', kind: 'apart' },
+      { id: 'r3', a: 's00', b: 's02', kind: 'apart' },
+    ];
+    expect(apartPlacement(list, [2, 1], triangle)).toBe('impossible');
+    expect(apartPlacement(ids(6), [2, 2, 2], triangle)).not.toBe('impossible');
+    expect(apartPlacement(ids(6), [2, 2, 2], triangle, 1)).toBe('gave_up');
+    const groups = [['s00', 's01'], ['s02']];
+    expect(evaluateRules(groups, triangle, { apartSearch: 'gave_up' }).map((u) => u.reason)).toEqual(['NO_ARRANGEMENT_FOUND']);
+    expect(evaluateRules(groups, triangle).map((u) => u.reason)).toEqual(['NOT_POSSIBLE_WITH_OTHER_RULES']);
+  });
+
+  it("level groups are not in level order: a group's position (name, icon) does not reveal its level (GRP-7)", () => {
+    const students = ids(18).map((id, i) => ({ id, levelRank: i % 3 }));
+    const firstGroupLevel = new Set<number>();
+    for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+      const { groups } = solveGroups({ students, sizing: { groupCount: 3 }, mode: 'level', rules: [], seed });
+      for (const g of groups) expect(new Set(g.map((id) => Number(id.slice(1)) % 3)).size).toBe(1); // still level groups
+      firstGroupLevel.add(Number(groups[0]![0]!.slice(1)) % 3);
+    }
+    expect(firstGroupLevel.size).toBeGreaterThan(1);
+  });
+
   it('handles tiny classes (0, 1, 2 students)', () => {
     expect(solveGroups({ students: [], sizing: { groupCount: 3 }, mode: 'level', rules: [], seed: 'x' })).toEqual({ groups: [], unsatisfied: [] });
     expect(solveGroups({ students: [{ id: 'a', levelRank: null }], sizing: { targetSize: 4 }, mode: 'mixed', rules: [], seed: 'x' }).groups).toEqual([['a']]);
@@ -176,6 +265,21 @@ describe('levelRanks (GRP-3)', () => {
     expect(r.get('c')).toBeNull();
     expect(r.get('f')).toBeNull();
   });
+  it('ranks EN and TR level words in their real order, not alphabetically (review fix)', () => {
+    expect(orderedLevels(['Advanced', 'Beginner', 'Intermediate', 'Elementary'])).toEqual(['Beginner', 'Elementary', 'Intermediate', 'Advanced']);
+    expect(orderedLevels(['İleri', 'Orta', 'Başlangıç', 'Orta üstü', 'temel'])).toEqual(['Başlangıç', 'temel', 'Orta', 'Orta üstü', 'İleri']);
+    expect(orderedLevels(['Upper-Intermediate', 'Pre-intermediate', 'ADVANCED'])).toEqual(['Pre-intermediate', 'Upper-Intermediate', 'ADVANCED']);
+    expect(orderedLevels(['yüksek', 'düşük', 'orta'])).toEqual(['düşük', 'orta', 'yüksek']);
+    const r = levelRanks(new Map([['a', 'Advanced'], ['b', 'Başlangıç'], ['c', 'Beginner'], ['d', 'İleri'], ['e', 'Intermediate'], ['f', 'Orta']]));
+    expect(r.get('b')).toBe(r.get('c')); // Başlangıç = Beginner
+    expect(r.get('e')).toBe(r.get('f')); // Orta = Intermediate
+    expect(r.get('a')).toBe(r.get('d')); // İleri = Advanced
+    expect(r.get('c')!).toBeLessThan(r.get('e')!);
+    expect(r.get('e')!).toBeLessThan(r.get('a')!);
+    // Other words follow the known ones, alphabetically; numbers and codes stay natural.
+    expect(orderedLevels(['Zebra', 'Beginner', 'Apple'])).toEqual(['Beginner', 'Apple', 'Zebra']);
+    expect(orderedLevels(['B1', 'A2', 'A1', 'C1'])).toEqual(['A1', 'A2', 'B1', 'C1']);
+  });
 });
 
 describe('fitToPresent (GRP-5)', () => {
@@ -195,6 +299,28 @@ describe('fitToPresent (GRP-5)', () => {
       }),
       { numRuns: 60 },
     );
+  });
+  it('a pairs arrangement with absences never leaves a child alone in a "pair" (GRP-5, review fix)', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 2, max: 30 }), fc.integer({ min: 2, max: 5 }), fc.array(fc.boolean(), { minLength: 30, maxLength: 30 }), (n, target, absentFlags) => {
+        const list = ids(n);
+        const sizing = { targetSize: target };
+        const saved = solveGroups({ students: list.map((id) => ({ id, levelRank: null })), sizing, mode: 'mixed', rules: [], seed: 'p' }).groups;
+        const present = list.filter((_, i) => !absentFlags[i]);
+        const { groups } = fitToPresent(saved, present, [], 'seed', sizing);
+        const used = groups.filter((g) => g.length > 0);
+        expect(used.flat().sort()).toEqual([...present].sort());
+        if (present.length >= 2) expect(Math.min(...used.map((g) => g.length))).toBeGreaterThanOrEqual(2);
+        expect(used.length).toBeLessThanOrEqual(Math.max(1, groupSizes(present.length, sizing).length));
+        if (used.length) expect(Math.max(...used.map((g) => g.length)) - Math.min(...used.map((g) => g.length))).toBeLessThanOrEqual(1);
+      }),
+      { numRuns: 100 },
+    );
+    // The reviewer's case: 18 in pairs, one of each of 4 pairs absent → 7 pairs.
+    const saved = solveGroups({ students: ids(18).map((id) => ({ id, levelRank: null })), sizing: { targetSize: 2 }, mode: 'mixed', rules: [], seed: 'z' }).groups;
+    const away = new Set(saved.slice(0, 4).map((g) => g[0]!));
+    const fitted = fitToPresent(saved, saved.flat().filter((x) => !away.has(x)), [], 's', { targetSize: 2 });
+    expect(fitted.groups.filter((g) => g.length).map((g) => g.length)).toEqual([2, 2, 2, 2, 2, 2, 2]);
   });
   it('keeps the groups as saved when everyone is present', () => {
     const saved = [['a', 'b'], ['c', 'd']];

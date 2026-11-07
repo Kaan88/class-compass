@@ -13,7 +13,7 @@ import type { ClassroomHomeworkCheck, HomeworkCheck, HomeworkStatusDef } from '.
 import { NOT_CHECKED } from '../../../shared/contracts/homework.ts';
 import { pickText, type Locale } from '../../../shared/i18n/index.ts';
 import { useI18n } from '../../lib/i18n.tsx';
-import { showUndoToast } from '../../lib/toast.ts';
+import { showToast, showUndoToast } from '../../lib/toast.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
@@ -94,7 +94,7 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
         const u = await run(() => actions.undo(batchId));
         if (!u) return;
         onCheck(u.check);
-        if (u.skipped) showUndoToast(t('homework.toast.undoSkipped', { count: u.skipped }), () => undefined, { scope });
+        if (u.skipped) showToast({ message: t('homework.toast.undoSkipped', { count: u.skipped }), kind: 'info', scope });
       },
       { scope },
     );

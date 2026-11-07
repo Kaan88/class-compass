@@ -15,7 +15,7 @@ export const GroupingMode = z.enum(GROUPING_MODES);
 export type GroupingMode = z.infer<typeof GroupingMode>;
 export const PAIR_RULE_KINDS = ['together', 'apart'] as const;
 export const PairRuleKind = z.enum(PAIR_RULE_KINDS);
-export const UNSATISFIED_REASONS = ['ONE_GROUP', 'GROUP_TOO_SMALL', 'CONFLICTS_WITH_APART', 'NOT_POSSIBLE_WITH_OTHER_RULES', 'ARRANGED_BY_HAND'] as const;
+export const UNSATISFIED_REASONS = ['ONE_GROUP', 'GROUP_TOO_SMALL', 'CONFLICTS_WITH_APART', 'NOT_POSSIBLE_WITH_OTHER_RULES', 'NO_ARRANGEMENT_FOUND', 'ARRANGED_BY_HAND'] as const;
 export const MAX_GROUPS = 20;
 export const MAX_GROUP_SIZE = 20;
 
@@ -65,13 +65,15 @@ export const ROLE_SUGGESTIONS = [
 /**
  * The five default arrangements (GRP-1): two level-based and three mixed-level. They are arrangements
  * (each makes several groups), created once per class+subject on first use and freely editable.
+ * Arrangement names are shown on the classroom screen, so the defaults are neutral and never say
+ * "level" (GRP-7); the teacher area shows the type next to the name.
  */
 export const DEFAULT_ARRANGEMENTS = [
-  { key: 'level-groups', mode: 'level', sizing: { groupCount: 3 }, name: { en: 'Level groups (3 groups)', tr: 'Seviye grupları (3 grup)' } },
-  { key: 'level-pairs', mode: 'level', sizing: { targetSize: 2 }, name: { en: 'Level pairs', tr: 'Seviye eşleri' } },
-  { key: 'mixed-a', mode: 'mixed', sizing: { targetSize: 4 }, name: { en: 'Mixed teams A', tr: 'Karma takımlar A' } },
-  { key: 'mixed-b', mode: 'mixed', sizing: { targetSize: 4 }, name: { en: 'Mixed teams B', tr: 'Karma takımlar B' } },
-  { key: 'mixed-pairs', mode: 'mixed', sizing: { targetSize: 2 }, name: { en: 'Mixed pairs', tr: 'Karma eşler' } },
+  { key: 'level-groups', mode: 'level', sizing: { groupCount: 3 }, name: { en: 'Three groups', tr: 'Üç grup' } },
+  { key: 'level-pairs', mode: 'level', sizing: { targetSize: 2 }, name: { en: 'Pairs A', tr: 'İkililer A' } },
+  { key: 'mixed-a', mode: 'mixed', sizing: { targetSize: 4 }, name: { en: 'Teams A', tr: 'Takımlar A' } },
+  { key: 'mixed-b', mode: 'mixed', sizing: { targetSize: 4 }, name: { en: 'Teams B', tr: 'Takımlar B' } },
+  { key: 'mixed-pairs', mode: 'mixed', sizing: { targetSize: 2 }, name: { en: 'Pairs B', tr: 'İkililer B' } },
 ] as const satisfies ReadonlyArray<{ key: string; mode: GroupingMode; sizing: Sizing; name: { en: string; tr: string } }>;
 
 export const GroupRole = z.object({ studentId: z.string(), label: LocalizedText });
@@ -247,8 +249,10 @@ export const GroupingLessonState = z.object({
   applied: z.boolean(),
   arrangementId: z.string().nullable(),
   groups: z.array(DisplayGroup),
-  /** Students left out because they were absent or excused (count only). */
+  /** Students of the class who are absent or excused now, so not in a group (count only). */
   excludedCount: z.number().int(),
+  /** Students here now who are in no group yet (arrived late, joined the class), count only. */
+  notPlacedCount: z.number().int(),
   /** Rules this lesson's groups break (count only; the rules are teacher-area, GRP-7/8). */
   unsatisfiedCount: z.number().int(),
 });

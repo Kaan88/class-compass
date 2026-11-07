@@ -135,6 +135,7 @@ function GroupsSlot({ context, lesson }: { context: ClassroomContext; lesson: Le
             ))}
           </ul>
           {st.excludedCount ? <p className="cc-muted">{t('grouping.excluded', { count: st.excludedCount })}</p> : null}
+          {st.notPlacedCount ? <p className="cc-muted">{t('grouping.notPlaced', { count: st.notPlacedCount })}</p> : null}
           {st.unsatisfiedCount ? <p className="cc-muted">{t('grouping.unsatisfiedCount', { count: st.unsatisfiedCount })}</p> : null}
         </>
       ) : (

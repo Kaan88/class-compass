@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { orderedLevels } from '../../../domain/grouping.ts';
 import * as G from '../../../shared/contracts/grouping.ts';
 import type { GroupTemplate, GroupingOverview, PairRule, Sizing } from '../../../shared/contracts/grouping.ts';
 import * as School from '../../../shared/contracts/school.ts';
@@ -85,13 +86,14 @@ function TeacherGroups({ tpl, byId }: { tpl: GroupTemplate; byId: Map<string, St
 
 type Draft = { id: string; name: { en: string; tr: string }; icon: string; memberIds: string[]; roles: Record<string, { en: string; tr: string }> };
 
-function toDraft(tpl: GroupTemplate): Draft[] {
+/** Editable copy of the groups: students who have left the class are taken out (GRP-3). */
+function toDraft(tpl: GroupTemplate, inClass: (id: string) => boolean): Draft[] {
   return tpl.groups.map((g) => ({
     id: g.id,
     name: { en: g.name.en ?? '', tr: g.name.tr ?? '' },
     icon: g.icon,
-    memberIds: [...g.memberIds],
-    roles: Object.fromEntries(g.roles.map((r) => [r.studentId, { en: r.label.en ?? '', tr: r.label.tr ?? '' }])),
+    memberIds: g.memberIds.filter(inClass),
+    roles: Object.fromEntries(g.roles.filter((r) => inClass(r.studentId)).map((r) => [r.studentId, { en: r.label.en ?? '', tr: r.label.tr ?? '' }])),
   }));
 }
 /** Leaves an empty language out, so the other one is shown instead of an empty label. */
@@ -108,8 +110,11 @@ const fromDraft = (d: Draft[]) =>
 function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextId: string; byId: Map<string, Student>; onDone: () => void }) {
   const { t, locale } = useI18n();
   const run = useRun();
-  const [groups, setGroups] = useState<Draft[]>(() => toDraft(tpl));
+  const [groups, setGroups] = useState<Draft[]>(() => toDraft(tpl, (id) => byId.has(id)));
   const [copyName, setCopyName] = useState('');
+  const leftCount = tpl.groups.flatMap((g) => g.memberIds).filter((id) => !byId.has(id)).length;
+  const placed = new Set(groups.flatMap((g) => g.memberIds));
+  const unplaced = [...byId.values()].filter((s) => !placed.has(s.id));
   const move = (studentId: string, to: number) =>
     setGroups((gs) => gs.map((g, i) => ({ ...g, memberIds: i === to ? [...g.memberIds.filter((x) => x !== studentId), studentId] : g.memberIds.filter((x) => x !== studentId) })));
   const patch = (i: number, fn: (g: Draft) => Draft) => setGroups((gs) => gs.map((g, j) => (j === i ? fn(g) : g)));
@@ -117,6 +122,21 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
   const groupItems = groups.map((g, i) => ({ id: String(i), label: pickText(g.name, locale) || t('grouping.groupN', { n: i + 1 }) }));
   return (
     <div className="cc-stack" data-testid="grouping-editor">
+      {leftCount ? <Alert kind="warning">{t('grouping.leftRemoved', { count: leftCount })}</Alert> : null}
+      {unplaced.length ? (
+        <fieldset className="cc-fieldset cc-stack" data-testid="grouping-unplaced">
+          <legend>{t('grouping.unplaced')}</legend>
+          <p className="cc-muted">{t('grouping.unplacedHint')}</p>
+          <ul className="cc-stack">
+            {unplaced.map((s) => (
+              <li key={s.id} className="cc-row">
+                <strong>{s.fullName}</strong>
+                <Select label={t('grouping.moveTo', { name: s.fullName })} items={groupItems} value="" placeholder={t('grouping.chooseGroup')} onChange={(v) => v !== '' && move(s.id, Number(v))} />
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      ) : null}
       {groups.map((g, i) => (
         <fieldset key={g.id} className="cc-fieldset cc-stack">
           <legend>
@@ -156,7 +176,7 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
         <Button onPress={onDone}>{t('common.cancel')}</Button>
       </div>
       <div className="cc-row" style={{ alignItems: 'flex-end' }}>
-        <TextField label={t('grouping.saveAsName')} value={copyName} onChange={setCopyName} />
+        <TextField label={t('grouping.saveAsName')} description={t('grouping.nameShownHint')} value={copyName} onChange={setCopyName} />
         <Button
           isDisabled={!valid || !copyName.trim()}
           onPress={() =>
@@ -252,7 +272,7 @@ function NewArrangement({ contextId }: { contextId: string }) {
         {t('grouping.new')}
       </h2>
       <div className="cc-row" style={{ alignItems: 'flex-end' }}>
-        <TextField label={t('grouping.nameEn')} value={name.en} onChange={(v) => setName({ ...name, en: v })} />
+        <TextField label={t('grouping.nameEn')} description={t('grouping.nameShownHint')} value={name.en} onChange={(v) => setName({ ...name, en: v })} />
         <TextField label={t('grouping.nameTr')} value={name.tr} onChange={(v) => setName({ ...name, tr: v })} />
         <Select label={t('grouping.type')} items={[{ id: 'mixed', label: t('grouping.mode.mixed') }, { id: 'level', label: t('grouping.mode.level') }]} value={mode} onChange={(v) => setMode(v as 'level' | 'mixed')} />
         <Select label={t('grouping.sizeBy')} items={[{ id: 'size', label: t('grouping.groupSize') }, { id: 'count', label: t('grouping.groupsCount') }]} value={kind} onChange={(v) => setKind(v as 'count' | 'size')} />
@@ -299,9 +319,17 @@ function LevelsTab({ contextId }: { contextId: string }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const changed = q.data.students.filter((s) => draft[s.id] !== undefined && draft[s.id]!.trim() !== (s.level ?? ''));
+  // The order the solver will use for the levels as typed now (GRP-3), so it is never a surprise.
+  const order = orderedLevels(q.data.students.map((s) => draft[s.id] ?? s.level));
   return (
     <div className="cc-stack">
       <p className="cc-muted">{t('grouping.levelsIntro')}</p>
+      <p className="cc-muted">{t('grouping.levelsFormat')}</p>
+      {order.length ? (
+        <p data-testid="level-order">
+          {t('grouping.levelOrder', { order: order.join(' < ') })}
+        </p>
+      ) : null}
       <ul className="cc-stack">
         {q.data.students.map((s) => (
           <li key={s.id} className="cc-row">
