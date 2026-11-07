@@ -153,3 +153,24 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [ ] Isolated install on the Debian VM behind Cloudflare Tunnel (sareteacher.com subdomain still to be chosen), first restore drill, ENG-5 report
 - [ ] Not yet: e2e/axe for the Reports, Admin Reports and Maintenance pages, a print e2e; a school holiday calendar (coverage counts Monday–Friday)
 - [ ] Production go-live only with explicit owner authorisation
+
+## S13a Classroom feedback round 1: fixes and classroom flow (owner/teacher feedback 2026-11-07; before S12)
+- [ ] Bugs: homework check selections apply to students; layout/theme intact when modules are switched off
+- [ ] Grouping redesign: four arrangements (Lions/Eagles level-based, Dolphins/Tigers mixed) giving Group 1–5, Shuffle, tap-to-move, full-screen group screen with the timer, groups on the classroom screen and the dashboard, levels teacher-only (changes GRP-1)
+- [ ] Per-class language mode (`mainLanguage` en|tr, `secondLanguageEnabled`): English only by default, Turkish only, EN+TR, TR+EN for everything class-facing; teacher UI language stays personal
+- [ ] Size/density control and automatic fitting (MacBook Air), usability audit
+- [ ] Lesson topic / skill focus (Listening, Reading, Vocabulary, Grammar, Writing, Speaking, Phonics, custom) with a weekly plan, set at Start Lesson, shown on the display, kept for reports
+
+## S13b Classroom feedback round 1: sound, celebrations and data tools
+- [ ] Theme engine v2: sounds, music and celebration sequences (Secret Student countdown + drumroll reveal, clapping + full-screen mascot + fireworks), `docs/THEMING.md`
+- [ ] Timer with any duration and a "Time's up! Time's up!" voice; hideable assistant panel with recorded duty tick boxes; weather (Ankara, Kızılay); quote of the day
+- [ ] Importer sheet picker; delete students (remove from class / deactivate / permanent delete); teachers change their class themes; "Add classroom"
+- [ ] Account invite links with the teacher's language; teachers choose password or email-link sign-in (always offered to teachers; admins keep passwords; PIN still required)
+
+## S12 Super Speakers (school-wide English points)
+- [ ] Scorer links (with interface language) and PWA with pairing code for iPhone, live search, +1 and undo, offline queue
+- [ ] Big-screen board: top 3 with full name and class, class totals, placeholder when empty, weekly reset, live updates
+- [ ] Admin page, award log, weekly history in reports
+
+## User documentation (after S12)
+- [ ] Teacher, admin, Super Speakers and student/parent guides in English and Turkish (format to be chosen with the owner)
