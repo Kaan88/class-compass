@@ -30,3 +30,10 @@ export function schoolYearFor(ms: number, tz: string): SchoolYearSpan {
 export function weekdayOf(date: string): number {
   return new Date(`${date}T12:00:00Z`).getUTCDay();
 }
+
+/** `date` ('YYYY-MM-DD') plus `n` calendar days (n may be negative). */
+export function addDays(date: string, n: number): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}

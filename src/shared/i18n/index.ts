@@ -31,3 +31,15 @@ export function pickText(t: LocalizedText | null | undefined, locale: Locale): s
 export function formatDate(ms: number, locale: Locale, timeZone: string, opts: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { timeZone, ...opts }).format(ms);
 }
+
+/**
+ * Explicit week range for counter history (CNT-7): "Mon 9 Nov – Sun 15 Nov 2026, Europe/Istanbul".
+ * `start` / `end` are local calendar dates of the class timezone `timeZone`.
+ */
+export function formatWeekRange(start: string, end: string, locale: Locale, timeZone: string): string {
+  const at = (d: string) => Date.parse(`${d}T12:00:00Z`);
+  const tag = locale === 'tr' ? 'tr-TR' : 'en-GB';
+  const part = (d: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...o }).format(at(d));
+  const day = (d: string) => `${part(d, { weekday: 'short' })} ${part(d, { day: 'numeric', month: 'short' })}`;
+  return `${day(start)} – ${day(end)} ${part(end, { year: 'numeric' })}, ${timeZone}`;
+}

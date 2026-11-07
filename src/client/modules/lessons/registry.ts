@@ -9,7 +9,7 @@
  * that have no registered piece, so the classroom never displays a placeholder for an unbuilt
  * feature.
  */
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import type { ContextModule } from '../../../shared/contracts/school.ts';
 import type { MessageKey } from '../../../shared/i18n/index.ts';
@@ -46,7 +46,30 @@ export interface EndStepUi<V = unknown> {
   Component: ComponentType<{ lesson: LessonState; value: V; onChange: (v: V) => void }>;
 }
 
+/** Extra props a module puts on every student card (S6: weekly count, level, + button). */
+export interface StudentCardExtras {
+  weeklyCount?: number;
+  level?: 0 | 1 | 2 | 3;
+  countLabel?: string;
+  periodLabel?: string;
+  addLabel?: string;
+  onAdd?: () => void;
+  notice?: string | null;
+}
+
+/**
+ * A module's contribution to the student grid. `useAddon` is a React hook: it is called on every
+ * dashboard render for every registered addon (with `enabled` false when the module is off), so the
+ * number of hook calls never changes; it returns null when it has nothing to add.
+ */
+export interface StudentCardAddon {
+  key: string;
+  module: ContextModule;
+  useAddon: (context: ClassroomContext, lesson: LessonState, enabled: boolean) => { header?: ReactNode; cardProps: (studentId: string, fullName: string) => StudentCardExtras } | null;
+}
+
 const slots: DashboardSlot[] = [];
+const cardAddons: StudentCardAddon[] = [];
 const startSteps: StartStep[] = [];
 const endSteps = new Map<string, EndStepUi>();
 
@@ -62,6 +85,9 @@ export function registerStartStep(step: StartStep) {
   startSteps.push(step);
   byOrder(startSteps);
 }
+export function registerStudentCardAddon(addon: StudentCardAddon) {
+  if (!cardAddons.some((a) => a.key === addon.key)) cardAddons.push(addon);
+}
 export function registerEndStepUi<V>(step: EndStepUi<V>) {
   endSteps.set(step.key, step as unknown as EndStepUi);
 }
@@ -71,3 +97,13 @@ export const dashboardSlotsFor = (ctx: ClassroomContext) => slots.filter((s) => 
 export const startStepsFor = (ctx: ClassroomContext) => startSteps.filter((s) => enabled(ctx, s.module));
 /** Screens for the server's step list; a step without a screen runs with its defaults. */
 export const endStepUis = (keys: readonly string[]) => keys.map((k) => endSteps.get(k)).filter((s): s is EndStepUi => Boolean(s));
+
+/** Calls every registered student-card addon hook (stable order and count) and keeps the active ones. */
+export function useStudentCardAddons(ctx: ClassroomContext, lesson: LessonState) {
+  const out: Array<NonNullable<ReturnType<StudentCardAddon['useAddon']>> & { key: string }> = [];
+  for (const a of cardAddons) {
+    const r = a.useAddon(ctx, lesson, enabled(ctx, a.module));
+    if (r) out.push({ ...r, key: a.key });
+  }
+  return out;
+}

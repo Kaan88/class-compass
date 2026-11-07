@@ -11,7 +11,7 @@ import { freshMe, ME_KEY, signOut, useMe, type Me } from '../../lib/session.ts';
 import { Button, BigButton } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
-import { IconBoard, IconCalendar, IconList, IconSettings, IconUser, IconUsers } from '../../ui/icons.tsx';
+import { IconBoard, IconCalendar, IconList, IconPlus, IconSettings, IconUser, IconUsers } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
 import { SensitiveGate } from '../Lock.tsx';
@@ -45,6 +45,7 @@ export function TeacherLayout() {
               <Link to="/teacher/students">{t('teacher.students')}</Link>
               <Link to="/teacher/attendance">{t('teacher.attendance')}</Link>
               <Link to="/teacher/routines">{t('teacher.routines')}</Link>
+              <Link to="/teacher/counters">{t('teacher.counters')}</Link>
             </div>
           </nav>
           <Outlet />
@@ -97,6 +98,10 @@ export function TeacherMenu() {
         <Link to="/teacher/routines" className="cc-menu-tile">
           <IconList />
           {t('teacher.routines')}
+        </Link>
+        <Link to="/teacher/counters" className="cc-menu-tile">
+          <IconPlus />
+          {t('teacher.counters')}
         </Link>
       </div>
       <div className="cc-row">

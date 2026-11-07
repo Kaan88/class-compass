@@ -375,4 +375,116 @@ export const attendanceLessonExceptions = sqliteTable(
   (t) => [primaryKey({ columns: [t.lessonId, t.studentId] })],
 );
 
+// ---------------------------------------------------------------- counters (S6)
+export type CounterLabelsJson = { main: LocalizedText; supporting: LocalizedText; individual: LocalizedText };
+export type ThresholdResponseJson = {
+  id: string;
+  label: LocalizedText;
+  message: LocalizedText;
+  mascot: boolean;
+  kind: 'message' | 'no_breaktime' | 'class_reset' | 'practice_challenge' | 'custom';
+};
+export type CounterLabelSnapshotJson = { main: LocalizedText; individual: LocalizedText };
+
+/**
+ * Counters (CNT-1..12) owned by a teaching context (ACC-10). `kind` english_reminders = the English
+ * preset (CNT-1), custom = teacher-made (CNT-12). `barSegments` is the lesson threshold (class bar
+ * limit). `studentThresholdsJson` = ascending visual levels of individual counts (CNT-6);
+ * `responsesJson` = threshold responses, `activeResponseId` the selected one (CNT-9). Archived
+ * counters disappear from the classroom; their events stay (CFG-2).
+ */
+export const counters = sqliteTable(
+  'counters',
+  {
+    id: text('id').primaryKey(),
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    kind: text('kind', { enum: ['english_reminders', 'custom'] }).notNull(),
+    labelsJson: text('labels_json', { mode: 'json' }).$type<CounterLabelsJson>().notNull(),
+    scope: text('scope', { enum: ['lesson', 'student', 'both'] }).notNull(),
+    barSegments: integer('bar_segments').notNull().default(10),
+    studentResetPeriod: text('student_reset_period', { enum: ['week', 'term', 'never'] }).notNull().default('week'),
+    studentThresholdsJson: text('student_thresholds_json', { mode: 'json' }).$type<number[]>().notNull(),
+    responsesJson: text('responses_json', { mode: 'json' }).$type<ThresholdResponseJson[]>().notNull(),
+    activeResponseId: text('active_response_id'),
+    colour: text('colour').notNull().default('accent'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    archivedAt: integer('archived_at'),
+    createdBy: text('created_by').notNull().references(() => users.id),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('counters_context_idx').on(t.contextId)],
+);
+
+/**
+ * One tap = one event (CNT-3). id = the opId of the 'counter.tap' command, so a retried or replayed
+ * tap can never count twice (CNT-5). `studentId` null = class-only tap. `seq` orders events within
+ * a lesson (reset markers refer to it). `localDate` / `weekStart` are computed at write time in the
+ * class timezone (D-003). Undo voids the event (actor + time + opId) and never deletes it (CNT-4).
+ * `labelSnapshotJson` keeps the labels used at the time (DAT-6).
+ */
+export const counterEvents = sqliteTable(
+  'counter_events',
+  {
+    id: text('id').primaryKey(),
+    counterId: text('counter_id').notNull().references(() => counters.id),
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    lessonId: text('lesson_id').notNull().references(() => lessons.id),
+    studentId: text('student_id').references(() => students.id),
+    seq: integer('seq').notNull(),
+    occurredAt: integer('occurred_at').notNull(),
+    localDate: text('local_date').notNull(),
+    weekStart: text('week_start').notNull(),
+    recordedBy: text('recorded_by').notNull().references(() => users.id),
+    voidedAt: integer('voided_at'),
+    voidedBy: text('voided_by').references(() => users.id),
+    voidOpId: text('void_op_id'),
+    labelSnapshotJson: text('label_snapshot_json', { mode: 'json' }).$type<CounterLabelSnapshotJson>().notNull(),
+  },
+  (t) => [
+    uniqueIndex('counter_events_lesson_seq_uq').on(t.counterId, t.lessonId, t.seq),
+    index('counter_events_student_week_idx').on(t.counterId, t.studentId, t.weekStart),
+    index('counter_events_lesson_idx').on(t.lessonId),
+  ],
+);
+
+/**
+ * Threshold crossings of a lesson's class bar (D-004). A crossing opens when the bar reaches the
+ * limit (the response fires once for it) and is cleared when the bar drops below the limit (void) or
+ * the class bar is reset. `eventId` is the event that completed the bar: kept for accountability,
+ * never sent to the classroom (CNT-9).
+ */
+export const thresholdCrossings = sqliteTable(
+  'threshold_crossings',
+  {
+    id: text('id').primaryKey(),
+    counterId: text('counter_id').notNull().references(() => counters.id),
+    lessonId: text('lesson_id').notNull().references(() => lessons.id),
+    crossingSeq: integer('crossing_seq').notNull(),
+    crossedAt: integer('crossed_at').notNull(),
+    clearedAt: integer('cleared_at'),
+    clearedReason: text('cleared_reason', { enum: ['void', 'reset', 'limit'] }),
+    eventId: text('event_id').notNull(),
+    responseId: text('response_id'),
+  },
+  (t) => [uniqueIndex('threshold_crossings_seq_uq').on(t.counterId, t.lessonId, t.crossingSeq)],
+);
+
+/**
+ * Class bar reset markers (D-058): the bar shows live events with seq > afterSeq of the latest
+ * marker; events are never deleted, so the lesson total (CNT-8) and weekly counts are unchanged.
+ */
+export const counterLessonResets = sqliteTable(
+  'counter_lesson_resets',
+  {
+    id: text('id').primaryKey(), // = opId
+    counterId: text('counter_id').notNull().references(() => counters.id),
+    lessonId: text('lesson_id').notNull().references(() => lessons.id),
+    afterSeq: integer('after_seq').notNull(),
+    resetAt: integer('reset_at').notNull(),
+    resetBy: text('reset_by').notNull().references(() => users.id),
+  },
+  (t) => [index('counter_lesson_resets_idx').on(t.counterId, t.lessonId)],
+);
+
 export const _sqlHelper = sql; // re-export for raw fragments in repos

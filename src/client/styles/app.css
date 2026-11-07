@@ -25,6 +25,8 @@
   --p-amber-500: #ffb000;
   --p-amber-700: #8a5100;
   --p-amber-100: #fff1d1;
+  --p-amber-300: #ffd27a;
+  --p-amber-800: #6e3f00;
   --p-green-700: #17733f;
   --p-green-100: #dcf3e5;
   --p-red-700: #b3261e;
@@ -88,13 +90,28 @@
   --cc-display-banner-bg: var(--p-amber-100);
   --cc-display-banner-text: var(--p-ink-900);
   --cc-display-banner-border: var(--p-amber-700);
-  /* counter depth levels: neutral → amber → red (CNT-6); always paired with numbers + icons */
+  /* counter depth levels: neutral → amber → deeper amber → red (CNT-6); always paired with numbers + icons */
   --cc-level-0: var(--p-ink-100);
   --cc-level-1: var(--p-amber-100);
-  --cc-level-2: var(--p-red-100);
+  --cc-level-2: var(--p-amber-300);
+  --cc-level-3: var(--p-red-100);
   --cc-level-edge-0: var(--p-ink-300);
   --cc-level-edge-1: var(--p-amber-700);
-  --cc-level-edge-2: var(--p-red-700);
+  --cc-level-edge-2: var(--p-amber-800);
+  --cc-level-edge-3: var(--p-red-700);
+  /* counter colour keys (CNT-12): teachers pick a name, never a raw colour */
+  --cc-counter-accent: var(--cc-accent);
+  --cc-counter-accent-edge: var(--cc-accent-strong);
+  --cc-counter-teal: var(--p-teal-700);
+  --cc-counter-teal-edge: var(--p-teal-800);
+  --cc-counter-plum: var(--p-plum-700);
+  --cc-counter-plum-edge: var(--p-plum-800);
+  --cc-counter-rust: var(--p-rust-500);
+  --cc-counter-rust-edge: var(--p-amber-800);
+  --cc-counter-leaf: var(--p-leaf-500);
+  --cc-counter-leaf-edge: var(--p-green-700);
+  --cc-counter-berry: var(--p-berry-400);
+  --cc-counter-berry-edge: var(--p-red-800);
   --cc-segment-on: var(--cc-accent);
   --cc-segment-off: var(--cc-surface-2);
   /* avatars: hue comes from the student id (avatarHue), saturation/lightness from the theme */
@@ -829,8 +846,13 @@ a {
 .cc-level[data-level='2'] {
   border-color: var(--cc-level-edge-2);
   border-width: 3px;
-  background: repeating-linear-gradient(45deg, var(--cc-level-2) 0 4px, var(--cc-surface) 4px 6px),
-    repeating-linear-gradient(135deg, var(--cc-level-2) 0 4px, transparent 4px 6px);
+  background: repeating-linear-gradient(135deg, var(--cc-level-2) 0 6px, var(--cc-surface) 6px 8px);
+}
+.cc-level[data-level='3'] {
+  border-color: var(--cc-level-edge-3);
+  border-width: 3px;
+  background: repeating-linear-gradient(45deg, var(--cc-level-3) 0 4px, var(--cc-surface) 4px 6px),
+    repeating-linear-gradient(135deg, var(--cc-level-3) 0 4px, transparent 4px 6px);
 }
 
 /* ------------------------------------------------------------------ counter bar & metrics */
@@ -854,7 +876,105 @@ a {
 }
 .cc-counterbar__seg[data-on] {
   background: var(--cc-segment-on);
-  border-color: var(--cc-accent-strong);
+  border-color: var(--cc-segment-edge, var(--cc-accent-strong));
+}
+.cc-counterbar[data-colour='teal'] { --cc-segment-on: var(--cc-counter-teal); --cc-segment-edge: var(--cc-counter-teal-edge); }
+.cc-counterbar[data-colour='plum'] { --cc-segment-on: var(--cc-counter-plum); --cc-segment-edge: var(--cc-counter-plum-edge); }
+.cc-counterbar[data-colour='rust'] { --cc-segment-on: var(--cc-counter-rust); --cc-segment-edge: var(--cc-counter-rust-edge); }
+.cc-counterbar[data-colour='leaf'] { --cc-segment-on: var(--cc-counter-leaf); --cc-segment-edge: var(--cc-counter-leaf-edge); }
+.cc-counterbar[data-colour='berry'] { --cc-segment-on: var(--cc-counter-berry); --cc-segment-edge: var(--cc-counter-berry-edge); }
+.cc-counterbar[data-reached] .cc-counterbar__segments {
+  outline: 3px dashed var(--cc-border-strong);
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+}
+
+/* ------------------------------------------------------------------ counters panel (S6) */
+.cc-counter-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+.cc-counter {
+  display: grid;
+  gap: 0.4rem;
+}
+.cc-counter__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+}
+.cc-counter__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 850;
+}
+.cc-counter__supporting {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cc-counter__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.cc-counter__row > .cc-counterbar {
+  flex: 1;
+}
+.cc-counter-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cc-counter-picker [aria-pressed='true'] {
+  outline: 3px solid var(--cc-accent-strong);
+  outline-offset: 2px;
+}
+.cc-threshold {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--cc-radius);
+  border: 3px dashed var(--cc-border-strong);
+  background: var(--cc-surface-2);
+  font-weight: 700;
+}
+.cc-threshold__overlay {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+.cc-threshold__message {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.35;
+  margin: 0;
+}
+.cc-student-card__notice {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cc-text-muted);
+}
+.cc-response-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cc-response-list > li {
+  border: 2px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  padding: 0.75rem;
+}
+.cc-week-range {
+  white-space: nowrap;
+  font-weight: 700;
 }
 .cc-counterbar__label {
   font-size: 1.4rem;

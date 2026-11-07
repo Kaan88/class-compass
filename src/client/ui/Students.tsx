@@ -37,16 +37,21 @@ export function Avatar({
   );
 }
 
-/** 0 = within limits, 1 = near the threshold, 2 = threshold reached. Icon + text + pattern (UX-7). */
-export type CountLevel = 0 | 1 | 2;
+/**
+ * Visual level of an individual count (CNT-6): 0 neutral, 1 amber, 2 deeper amber, 3 red.
+ * Always icon + text + pattern next to the number, never colour alone (UX-7).
+ */
+export type CountLevel = 0 | 1 | 2 | 3;
+
+const LEVEL_KEYS = ['card.level.0', 'card.level.1', 'card.level.2', 'card.level.3'] as const;
 
 export function LevelChip({ level }: { level: CountLevel }) {
   const { t } = useI18n();
-  const icon = level === 0 ? <IconDot /> : level === 1 ? <IconUp /> : <IconAlert />;
+  const icon = level === 0 ? <IconDot /> : level === 3 ? <IconAlert /> : <IconUp />;
   return (
     <span className="cc-level" data-level={level}>
       {icon}
-      {t(level === 0 ? 'card.level.0' : level === 1 ? 'card.level.1' : 'card.level.2')}
+      {t(LEVEL_KEYS[level])}
     </span>
   );
 }
@@ -82,11 +87,23 @@ export function StudentCard({
   attendance,
   onAdd,
   disabled = false,
+  countLabel,
+  periodLabel,
+  addLabel,
+  notice,
 }: {
   student: StudentCardData;
   /** Counter values (S6). Omitted = no counter shown (never a fake zero). */
   weeklyCount?: number;
   level?: CountLevel;
+  /** Accessible name of the count (default "{count} reminders this week"). */
+  countLabel?: string;
+  /** Short visible period text next to the count (default "this week"). */
+  periodLabel?: string;
+  /** Accessible name of the + button (default "Add a reminder for {name}"). */
+  addLabel?: string;
+  /** Short message shown on the card, e.g. the double-tap guard (announced politely). */
+  notice?: string | null;
   absent?: boolean;
   /** Effective attendance for the lesson; absent/excused render the card as away. */
   attendance?: EffectiveAttendance;
@@ -110,18 +127,23 @@ export function StudentCard({
         ) : null}
         {!away && weeklyCount !== undefined ? (
           <>
-            <span className="cc-student-card__count" aria-label={t('card.weeklyCount', { count: weeklyCount })}>
+            <span className="cc-student-card__count" role="img" aria-label={countLabel ?? t('card.weeklyCount', { count: weeklyCount })} data-testid="student-count">
               {weeklyCount}
             </span>
             <span className="cc-muted cc-student-card__week" aria-hidden="true">
-              {t('card.thisWeek')}
+              {periodLabel ?? t('card.thisWeek')}
             </span>
             {level !== undefined ? <LevelChip level={level} /> : null}
           </>
         ) : null}
+        {notice ? (
+          <span className="cc-student-card__notice" role="status">
+            {notice}
+          </span>
+        ) : null}
       </div>
       {onAdd && !away ? (
-        <Button variant="primary" className="cc-student-card__add" aria-label={t('card.add', { name: student.fullName })} onPress={onAdd} isDisabled={disabled}>
+        <Button variant="primary" className="cc-student-card__add" aria-label={addLabel ?? t('card.add', { name: student.fullName })} onPress={onAdd} isDisabled={disabled}>
           <IconPlus />
         </Button>
       ) : null}
@@ -138,11 +160,25 @@ export function StudentGrid({ children, count, label }: { children: React.ReactN
   );
 }
 
-/** N segments + a numeric "x / N" label (CNT-1/2). Values above N stay readable (e.g. 12 / 10). */
-export function CounterBar({ value, max, label }: { value: number; max: number; label: string }) {
+/**
+ * N segments + a numeric "x / N" label (CNT-1/2). Values above N stay readable (e.g. 12 / 10).
+ * `colour` is a counter colour key mapped to semantic tokens in the stylesheet (never raw colours);
+ * `reached` adds a heavier outline (pattern, not colour alone).
+ */
+export function CounterBar({ value, max, label, colour = 'accent', reached = false }: { value: number; max: number; label: string; colour?: string; reached?: boolean }) {
   const segs = Array.from({ length: Math.max(1, max) }, (_, i) => i < value);
   return (
-    <div className="cc-counterbar" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-valuetext={`${value} / ${max}`}>
+    <div
+      className="cc-counterbar"
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={Math.min(value, max)}
+      aria-valuetext={`${value} / ${max}`}
+      data-colour={colour}
+      data-reached={reached ? '' : undefined}
+    >
       <div className="cc-counterbar__segments" aria-hidden="true">
         {segs.map((on, i) => (
           <span key={i} className="cc-counterbar__seg" data-on={on ? '' : undefined} />

@@ -13,6 +13,7 @@ import { homeFor, requireSession, type RouterContext } from './routes/guards.ts'
 import { NotFoundPage, RootLayout } from './routes/Root.tsx';
 import { AttendancePage } from './routes/teacher/Attendance.tsx';
 import { ClassSettingsPage, TeacherStudentsPage } from './routes/teacher/Classes.tsx';
+import { CounterHistoryPage, CountersPage } from './routes/teacher/Counters.tsx';
 import { RoutinesPage } from './routes/teacher/Routines.tsx';
 import { ProfilePage, TeacherLayout, TeacherMenu } from './routes/teacher/Teacher.tsx';
 
@@ -78,6 +79,16 @@ const teacherClasses = createRoute({ getParentRoute: () => teacherRoute, path: '
 const teacherStudents = createRoute({ getParentRoute: () => teacherRoute, path: 'students', component: TeacherStudentsPage });
 const teacherAttendance = createRoute({ getParentRoute: () => teacherRoute, path: 'attendance', component: AttendancePage });
 const teacherRoutines = createRoute({ getParentRoute: () => teacherRoute, path: 'routines', component: RoutinesPage });
+const teacherCounters = createRoute({ getParentRoute: () => teacherRoute, path: 'counters', component: CountersPage });
+const teacherCounterHistory = createRoute({
+  getParentRoute: () => teacherRoute,
+  path: 'counter-history',
+  validateSearch: (s: Record<string, unknown>): { counterId?: string | undefined } => ({ counterId: typeof s.counterId === 'string' ? s.counterId : undefined }),
+  component: function CounterHistoryRoute() {
+    const { counterId } = teacherCounterHistory.useSearch();
+    return <CounterHistoryPage key={counterId ?? 'none'} initialCounterId={counterId} />;
+  },
+});
 
 const adminRoute = createRoute({ getParentRoute: () => rootRoute, path: '/admin', beforeLoad: requireSession, component: AdminLayout });
 const adminIndex = createRoute({ getParentRoute: () => adminRoute, path: '/', component: AdminHome });
@@ -101,7 +112,7 @@ const routeTree = rootRoute.addChildren([
   resetRoute,
   changePasswordRoute,
   classroomRoute,
-  teacherRoute.addChildren([teacherIndex, teacherProfile, teacherClasses, teacherStudents, teacherAttendance, teacherRoutines]),
+  teacherRoute.addChildren([teacherIndex, teacherProfile, teacherClasses, teacherStudents, teacherAttendance, teacherRoutines, teacherCounters, teacherCounterHistory]),
   adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminAudit, adminProfile]),
   catalogRoute,
 ]);

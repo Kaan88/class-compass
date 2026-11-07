@@ -18,7 +18,7 @@ import { StudentCard, StudentGrid } from '../../ui/Students.tsx';
 import { AttendanceCountsLine, AttendanceList } from './AttendanceList.tsx';
 import { LessonTimer } from './LessonTimer.tsx';
 import { patchLesson, patchRoster, sendLessonCommand, useLessonRoster, type RosterStudent } from './lessonClient.ts';
-import { dashboardSlotsFor, type ClassroomContext } from './registry.ts';
+import { dashboardSlotsFor, useStudentCardAddons, type ClassroomContext, type StudentCardExtras } from './registry.ts';
 
 export const classLabel = (c: { className: string; subjectName: ClassroomContext['subjectName'] }, locale: 'en' | 'tr') => `${c.className} · ${pickText(c.subjectName, locale)}`;
 
@@ -158,6 +158,8 @@ export function LessonDashboard({ context, lesson, onEnd }: { context: Classroom
   const routinesOn = context.modules.routines === true && lesson.routine.stages.length > 0;
   const students = roster.data?.students ?? [];
   const slots = dashboardSlotsFor(context);
+  const addons = useStudentCardAddons(context, lesson);
+  const extrasFor = (id: string, name: string): StudentCardExtras => Object.assign({}, ...addons.map((a) => a.cardProps(id, name))) as StudentCardExtras;
 
   const toggleGrid = () => {
     const next = !gridOpen;
@@ -206,10 +208,11 @@ export function LessonDashboard({ context, lesson, onEnd }: { context: Classroom
           {attendanceOn ? <AttendanceCountsLine statuses={students.map((s) => s.effective)} /> : null}
         </div>
         {gridOpen ? (
-          <div id="cc-student-grid">
+          <div id="cc-student-grid" className="cc-stack">
+            {addons.map((a) => (a.header ? <div key={a.key}>{a.header}</div> : null))}
             <StudentGrid count={students.length} label={t('lesson.studentCards')}>
               {students.map((s) => (
-                <StudentCard key={s.id} student={s} {...(attendanceOn ? { attendance: s.effective } : {})} />
+                <StudentCard key={s.id} student={s} {...extrasFor(s.id, s.fullName)} {...(attendanceOn ? { attendance: s.effective } : {})} />
               ))}
             </StudentGrid>
           </div>

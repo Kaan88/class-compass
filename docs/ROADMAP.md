@@ -61,15 +61,21 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Routine templates (built-in default RTN-1, own templates with add/remove/reorder/rename stages, per-class default), snapshot at lesson start, stepper with current stage; server-timed classroom timer with one soft tone — D-047, D-048
 - [x] End Lesson: step registry (core reflection step; module steps plug in later), works with every optional module off; lesson summary — D-051
 - [x] Dashboard: live local date/day in the class timezone, collapsible student grid with attendance chips, module slot registry (only enabled modules that contribute a slot are shown) — D-052
-- [~] Dashboard slots for assistant (DSH-3), main counter (DSH-5), Secret Students (DSH-6), groups/homework (DSH-8) and the assistant start step are not built yet: the registries exist and nothing is registered, so they are omitted (S6–S8)
+- [~] Dashboard slots for assistant (DSH-3), Secret Students (DSH-6), groups/homework (DSH-8) and the assistant start step are not built yet: the registries exist and nothing is registered, so they are omitted (S7–S8). The main counter slot (DSH-5) is registered by S6
 - [~] ATT-1 "shown alongside homework": attendance is stored separately; the homework view and the cross-test (`it.todo`) come with S8
 - [x] Tests: new vs resumed, start replay, switching with queued ops (WRONG_LESSON / LESSON_ENDED), ETag 304, shared attendance + audit actor, exception precedence, template edits vs snapshot, end with all modules off, Istanbul midnight boundary, overnight auto-abandon; e2e: 19-student start on 1920×1080 touch, refresh resume, class switch and back, offline attendance tap synced once (`e2e/lessons.spec.ts`)
 - [x] Review fixes (D-053…D-056): start-screen attendance applied on the resume path and guarded against overwriting a colleague's newer record (`expected` + `othersPresent`, warning toast for kept entries); Start/End Lesson drafts kept per class and keyed by class/lesson; finished timer restarts on Start (server + device) and its tone never replays after reload/remount; teacher attendance page shows times in the class timezone; classroom summary limited to held contexts with older reflection notes withheld; teacher-area exception edits need the context still assigned (tests: second start with attendance, stale start screen vs colleague, finished-timer restart, ended assignment, summary note next day; e2e: End Lesson drafts per class)
 - [ ] D-006 offline cold start: starting a lesson while offline waits in the outbox until the connection returns (no service worker yet)
 
 ## S6 Counters
-- [ ] English reminder preset; custom counters; void/undo; thresholds & responses
-- [ ] Tests: week boundary (property), lesson vs weekly totals, undo below threshold, double-tap
+- [x] English reminder preset, created automatically for English classes ("Our English Time", "3 / 10 Turkish reminders", levels 2/4/6, four responses with "Back to English" as the default) — D-060
+- [x] Custom counters: labels in both languages, class bar / each student / both, limit, reset period (week / term→school year / never), colour, up to 3 levels, up to 8 responses; archive and use again; PIN-gated settings page with a live preview — CNT-6, CRD-3
+- [x] Taps as outbox commands (event id = opId) with optimistic update, an undo toast naming the class and the student, offline queue synced once, a 700 ms double-tap guard, absent students refused — D-057, CNT-3/4/5, UX-9/10/11
+- [x] Class bar on the dashboard (DSH-5 slot) and counts on student cards with number + pattern + word levels (never colour alone); student-card add-on registry; several student counters selectable — CRD-1/2, THM-5
+- [x] Thresholds: one crossing per upward pass, undo below the limit clears it, counting continues past the limit; calm overlay once per crossing per device (mascot once, reduced motion respected, never names a student), then a banner; class reset with markers — D-058, D-059, CNT-9/10/11
+- [x] Weekly history in the teacher area with explicit week ranges in the class timezone (Monday start), class-only / total / undone taps, lessons per week and labels used; counts only, never scores — CNT-7, CNT-12, RPT-5
+- [x] Tests: week boundary (property, Istanbul), crossings (property), lesson vs weekly totals, undo below threshold, replay, absent student, archive, reset, history; client guard and optimistic updates; e2e: taps, undo, double tap, offline sync once, overlay once without names, settings and history (`e2e/counters.spec.ts`)
+- [ ] Undo for a class reset; threshold sound; per-attended-lesson rates in reports (S11)
 
 ## S7 Secret Students, assistant, End Lesson
 - [ ] Sealed draw, reveal, outcomes, silent absent replacement, history

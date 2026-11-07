@@ -55,4 +55,5 @@ export function sampleStudents(n: number): SampleStudent[] {
   }));
 }
 
-export const levelFor = (count: number): 0 | 1 | 2 => (count >= 5 ? 2 : count >= 3 ? 1 : 0);
+/** English default levels (CNT-6): ≥2 amber, ≥4 deeper amber, ≥6 red. */
+export const levelFor = (count: number): 0 | 1 | 2 | 3 => (count >= 6 ? 3 : count >= 4 ? 2 : count >= 2 ? 1 : 0);

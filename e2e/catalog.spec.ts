@@ -23,7 +23,7 @@ test('catalog: every theme × language, grids for 20 and 34 students, 200 % text
     for (const loc of ['en', 'tr']) {
       const panel = page.getByTestId(`catalog-${theme}-${loc}`);
       await expect(panel).toBeVisible();
-      await expect(panel.locator('.cc-student-card')).toHaveCount(4);
+      await expect(panel.locator('.cc-student-card')).toHaveCount(5);
     }
   }
   await expect(page.getByTestId('catalog-animals-tr')).toContainText('Sınıra ulaştı');

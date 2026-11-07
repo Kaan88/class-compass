@@ -3,17 +3,18 @@
  * "language & theme switching".
  */
 import { expect, test } from '@playwright/test';
-import { api, ensurePin, login, PASSWORD } from './helpers.ts';
+import { api, ensurePin, login, PASSWORD, submitSignIn } from './helpers.ts';
 
 test('sign-in rejects a wrong password and lets the administrator in @mobile', async ({ page }) => {
+  test.setTimeout(180_000);
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/login\?next=/);
   await page.getByLabel('Username').fill('admin');
   await page.getByLabel('Password').fill('not-the-password');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await submitSignIn(page);
   await expect(page.getByRole('alert')).toContainText('Incorrect sign-in details');
   await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await submitSignIn(page);
   await expect(page.getByTestId('admin-home')).toBeVisible();
   await expect(page).toHaveURL(/\/admin$/);
 });

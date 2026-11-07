@@ -11,6 +11,7 @@ import type { z } from 'zod';
 import { localDate, weekdayOf } from '../../../domain/dates.ts';
 import { clampStage } from '../../../domain/routines.ts';
 import { idleTimer, type TimerState } from '../../../domain/timer.ts';
+import type { CountersLessonState } from '../../../shared/contracts/counters.ts';
 import type { LessonCommands, LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
 import { lessons, subjects, teachingContexts } from '../../db/schema.ts';
 import type { Db } from '../../db/client.ts';
@@ -93,6 +94,22 @@ export function updateLesson(ctx: RequestContext, lesson: LessonRow, patch: Part
   return { ...lesson, ...next };
 }
 
+// ---------------------------------------------------------------- lesson state contributors
+/**
+ * Modules that add classroom-safe data to the polled lesson state (S6 counters). `stamp` must change
+ * whenever `body` would change for reasons that do not bump the lesson version (settings edits);
+ * changes made by lesson commands bump the version through `updateLesson` already.
+ */
+export interface LessonStateContributor {
+  key: 'counters';
+  stamp: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => string;
+  body: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => unknown;
+}
+const contributors: LessonStateContributor[] = [];
+export function registerLessonStateContributor(c: LessonStateContributor) {
+  if (!contributors.some((x) => x.key === c.key)) contributors.push(c);
+}
+
 // ---------------------------------------------------------------- reads
 export function lessonState(ctx: RequestContext, contextId: string) {
   const context = assertOwnsContext(ctx, contextId);
@@ -103,10 +120,18 @@ export function lessonState(ctx: RequestContext, contextId: string) {
   const active = getActiveLesson(ctx.db, context.id);
   const lesson = active && active.localDate >= today ? active : null;
   const stamp = isModuleEnabled(ctx.db, context.id, 'attendance') ? attendanceStamp(ctx.db, cls.id, lesson?.localDate ?? today, lesson?.id ?? null) : 'off';
-  const etag = `"${lesson ? `${lesson.id}.${lesson.version}` : 'none'}.${today}.${stamp}"`;
+  const extra = contributors.map((c) => c.stamp(ctx, context, lesson)).join('.');
+  const etag = `"${lesson ? `${lesson.id}.${lesson.version}` : 'none'}.${today}.${stamp}.${extra}"`;
+  const bodies = Object.fromEntries(contributors.map((c) => [c.key, c.body(ctx, context, lesson)]));
   return {
     etag,
-    body: { lesson: lesson ? lessonDto(ctx.db, lesson) : null, today: { localDate: today, weekday: weekdayOf(today), timezone: tz }, serverNow: now, attendanceStamp: stamp },
+    body: {
+      lesson: lesson ? lessonDto(ctx.db, lesson) : null,
+      today: { localDate: today, weekday: weekdayOf(today), timezone: tz },
+      serverNow: now,
+      attendanceStamp: stamp,
+      counters: (bodies.counters ?? null) as CountersLessonState | null,
+    },
   };
 }
 

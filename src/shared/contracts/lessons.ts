@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import { ATTENDANCE_STATUSES, MAX_STAGES, MAX_TIMER_MS } from '../lessons.ts';
 import { LocalizedText, Ok, endpoint } from './define.ts';
+import { CountersLessonState } from './counters.ts';
 import { Id, IsoDate, RequiredLocalizedText } from './school.ts';
 
 export const AttendanceStatus = z.enum(ATTENDANCE_STATUSES);
@@ -48,7 +49,14 @@ export const getLessonState = endpoint({
   path: '/api/classroom/contexts/:contextId/lesson',
   access: 'classroom',
   input: z.object({ contextId: Id }),
-  output: z.object({ lesson: LessonState.nullable(), today: Today, serverNow: z.number(), attendanceStamp: z.string() }),
+  output: z.object({
+    lesson: LessonState.nullable(),
+    today: Today,
+    serverNow: z.number(),
+    attendanceStamp: z.string(),
+    /** Counter bars and weekly counts for the running lesson; null without a lesson or with Counters off (S6). */
+    counters: CountersLessonState.nullable(),
+  }),
 });
 
 /** Which of my contexts have a lesson in progress (class switcher indicator, LES-4). */
