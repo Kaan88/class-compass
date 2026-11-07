@@ -3,7 +3,8 @@
  * optimistic tap/undo/reset effects mirror the server rules.
  */
 import { describe, expect, it } from 'vitest';
-import { applyDelta, applyReset, createTapGuard } from '../../src/client/modules/counters/countersClient.ts';
+import { applyDelta, applyReset, createTapGuard, opensCrossing, tapToastText } from '../../src/client/modules/counters/countersClient.ts';
+import { translate } from '../../src/shared/i18n/index.ts';
 import type { CounterLessonState } from '../../src/shared/contracts/counters.ts';
 
 describe('double-tap guard (CNT-5)', () => {
@@ -67,5 +68,26 @@ describe('optimistic counter updates (D-004)', () => {
     expect(st).toMatchObject({ barValue: 0, reached: false, lessonTotal: 2 });
     const full = applyReset({ ...base, barValue: 5, lessonTotal: 5, reached: true, crossingSeq: 1 });
     expect(full).toMatchObject({ barValue: 0, lessonTotal: 5, reached: false, crossingSeq: null });
+  });
+});
+
+describe('undo toast after a tap (UX-9, CNT-9, D-059)', () => {
+  const t = (key: Parameters<typeof translate>[1], vars: Record<string, string>) => translate('en', key, vars);
+  it('names class and student normally, but not for the tap that fills the class bar while the overlay opens', () => {
+    const args = { cls: '3-A · English', label: 'Turkish reminders', studentName: 'Ece Deniz Kaya' };
+    expect(tapToastText(t, { ...args, crossed: false })).toBe('3-A · English: +1 Turkish reminders – Ece Deniz Kaya');
+    const hidden = tapToastText(t, { ...args, crossed: true });
+    expect(hidden).toBe('3-A · English: +1 Turkish reminders');
+    expect(hidden).not.toContain('Ece');
+    expect(translate('tr', 'counter.toast.addedHidden', { cls: '3-A · İngilizce', counter: 'Türkçe hatırlatma' })).not.toContain('{name}');
+    expect(tapToastText(t, { ...args, studentName: null, crossed: true })).toBe('3-A · English: +1 Turkish reminders – whole class');
+  });
+
+  it('knows which tap opens a crossing: the one that brings the bar to the limit, not later ones (CNT-10)', () => {
+    expect(opensCrossing({ ...base, barValue: 1 })).toBe(false);
+    expect(opensCrossing({ ...base, barValue: 2 })).toBe(true);
+    const reached = applyDelta({ ...base, barValue: 2 }, 'a', 1);
+    expect(opensCrossing(reached)).toBe(false);
+    expect(opensCrossing({ ...base, scope: 'student', barValue: 2 })).toBe(false);
   });
 });

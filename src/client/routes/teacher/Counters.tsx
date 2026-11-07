@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { historyCell } from '../../../domain/counters.ts';
 import * as Cn from '../../../shared/contracts/counters.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import * as School from '../../../shared/contracts/school.ts';
@@ -23,7 +24,7 @@ import { Button, buttonClass } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconCalendar, IconPlus, IconX } from '../../ui/icons.tsx';
-import { Avatar, CounterBar } from '../../ui/Students.tsx';
+import { Avatar, CounterBar, MetricCell } from '../../ui/Students.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const countersKey = (contextId: string) => [SENSITIVE, 'teacher', 'counters', contextId] as const;
@@ -363,6 +364,19 @@ export function CountersPage() {
 // ---------------------------------------------------------------- history
 const WEEK_CHOICES = [4, 8, 13, 26];
 
+/** One student × week cell: a count, "not recorded" (no lesson that week) or "not in the class" (RPT-5). */
+function HistoryCellView({ week, studentId }: { week: Parameters<typeof historyCell>[0]; studentId: string }) {
+  const { t } = useI18n();
+  const cell = historyCell(week, studentId);
+  if (cell.kind === 'count') return <MetricCell value={cell.value} />;
+  if (cell.kind === 'not_recorded') return <MetricCell value={null} />;
+  return (
+    <span className="cc-metric" data-state="not-enrolled">
+      — {t('counterHistory.notEnrolled')}
+    </span>
+  );
+}
+
 export function CounterHistoryPage({ initialCounterId }: { initialCounterId?: string | undefined }) {
   const { t, locale } = useI18n();
   const { items } = useContexts();
@@ -418,7 +432,9 @@ export function CounterHistoryPage({ initialCounterId }: { initialCounterId?: st
                     </span>
                   </th>
                   {h.weeks.map((w) => (
-                    <td key={w.weekStart}>{w.counts[s.id] ?? 0}</td>
+                    <td key={w.weekStart}>
+                      <HistoryCellView week={w} studentId={s.id} />
+                    </td>
                   ))}
                 </tr>
               ))}

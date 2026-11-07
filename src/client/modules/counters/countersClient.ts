@@ -76,6 +76,23 @@ export function applyDelta(c: CounterLessonState, studentId: string | null, delt
   return { ...c, lessonTotal, barValue, reached, crossingSeq, crossingCount, crossedAt, students };
 }
 
+/** Would one more tap on the class bar open a new threshold crossing? (scope lesson/both only) */
+export const opensCrossing = (c: CounterLessonState) => c.scope !== 'student' && !c.reached && c.barValue + 1 >= c.barSegments;
+
+/**
+ * Text of the undo toast after a tap. It names the class and the student (UX-9), except for the tap
+ * that fills the class bar: the threshold overlay opens at that moment on the shared display, so the
+ * toast must not show who triggered it (CNT-9, D-059) and says "+1" for the class instead.
+ */
+export function tapToastText(
+  t: (key: 'counter.toast.added' | 'counter.toast.addedHidden' | 'counter.toast.addedClass', vars: Record<string, string>) => string,
+  a: { cls: string; label: string; studentName: string | null; crossed: boolean },
+): string {
+  if (a.studentName === null) return t('counter.toast.addedClass', { cls: a.cls, counter: a.label });
+  if (a.crossed) return t('counter.toast.addedHidden', { cls: a.cls, counter: a.label });
+  return t('counter.toast.added', { cls: a.cls, counter: a.label, name: a.studentName });
+}
+
 /** Optimistic class reset: the bar starts again from 0, the lesson total and weekly counts stay. */
 export const applyReset = (c: CounterLessonState): CounterLessonState => ({ ...c, barValue: 0, reached: false, crossingSeq: null, crossedAt: null });
 

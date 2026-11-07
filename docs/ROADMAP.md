@@ -75,7 +75,8 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Thresholds: one crossing per upward pass, undo below the limit clears it, counting continues past the limit; calm overlay once per crossing per device (mascot once, reduced motion respected, never names a student), then a banner; class reset with markers — D-058, D-059, CNT-9/10/11
 - [x] Weekly history in the teacher area with explicit week ranges in the class timezone (Monday start), class-only / total / undone taps, lessons per week and labels used; counts only, never scores — CNT-7, CNT-12, RPT-5
 - [x] Tests: week boundary (property, Istanbul), crossings (property), lesson vs weekly totals, undo below threshold, replay, absent student, archive, reset, history; client guard and optimistic updates; e2e: taps, undo, double tap, offline sync once, overlay once without names, settings and history (`e2e/counters.spec.ts`)
-- [ ] Undo for a class reset; threshold sound; per-attended-lesson rates in reports (S11)
+- [x] Review fixes (D-061): the toast of the tap that fills the bar no longer names the student; class reset asks for confirmation; weekly history shows "not recorded" (no lesson) and "not in the class" (per-week enrolment) instead of 0; neutral card level words; no preset created in an archived school year (tests: toast text and crossing detection, history cells, per-week enrolment, archived-year poll; e2e: no student name in any toast while the overlay is open)
+- [ ] Undo for a class reset (a confirmation dialog guards it for now; not covered by e2e); threshold sound; per-attended-lesson rates in reports (S11)
 
 ## S7 Secret Students, assistant, End Lesson
 - [ ] Sealed draw, reveal, outcomes, silent absent replacement, history

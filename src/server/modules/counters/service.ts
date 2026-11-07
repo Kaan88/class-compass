@@ -27,6 +27,7 @@ import {
   counterEvents,
   counterLessonResets,
   counters,
+  enrolments,
   lessons,
   students,
   subjects,
@@ -140,14 +141,16 @@ function englishPresetRow(contextId: string, uid: string, now: number, sortOrder
  * First use of the Counters module in an English class+subject creates the English reminder preset
  * (CNT-1). It happens once: as soon as the context has any counter row (even archived), nothing is
  * created again, so archiving the preset is respected. Other subjects start without counters and
- * can add the preset on request (createEnglishPreset).
+ * can add the preset on request (createEnglishPreset). Nothing is created in an archived class or
+ * school year, so polling a read-only year never writes (assertClassWritable rule, DAT-1).
  */
 export function ensureDefaultCounters(ctx: RequestContext, context: ContextRow, cls: ClassRow): void {
   if (!isModuleEnabled(ctx.db, context.id, 'counters')) return;
   const any = ctx.db.select({ id: counters.id }).from(counters).where(eq(counters.contextId, context.id)).limit(1).get();
   if (any) return;
   if (!isEnglishSubject(subjectName(ctx.db, context))) return;
-  if (cls.archivedAt) return;
+  // Archived classes and archived school years are read-only (DAT-1): reads never create the preset there.
+  if (cls.archivedAt || getYear(ctx.db, cls.schoolYearId).archivedAt) return;
   tx(ctx.db, () => {
     if (ctx.db.select({ id: counters.id }).from(counters).where(eq(counters.contextId, context.id)).limit(1).get()) return;
     const now = ctx.now();
@@ -571,7 +574,19 @@ export function counterHistory(ctx: RequestContext, input: In<typeof C.counterHi
     .where(and(eq(lessons.contextId, context.id), sql`${lessons.localDate} between ${first} and ${weekEndOf(last)}`))
     .all();
 
+  // Who was in the class during each week (date-aware enrolments, D-027): a student outside the class
+  // that week is "not enrolled", not 0 (RPT-5). Students enrolled in any listed week are shown.
+  const classEnrolments = ctx.db
+    .select({ studentId: enrolments.studentId, fromDate: enrolments.fromDate, toDate: enrolments.toDate })
+    .from(enrolments)
+    .where(and(eq(enrolments.classId, cls.id), sql`${enrolments.fromDate} <= ${weekEndOf(last)}`, sql`(${enrolments.toDate} is null or ${enrolments.toDate} > ${first})`))
+    .all();
+  const enrolledIn = (ws: string) => {
+    const we = weekEndOf(ws);
+    return [...new Set(classEnrolments.filter((r) => r.fromDate <= we && (r.toDate === null || r.toDate > ws)).map((r) => r.studentId))];
+  };
   const ids = new Set(rosterRowsOn(ctx.db, cls.id, until).map((r) => r.student.id));
+  for (const r of classEnrolments) ids.add(r.studentId);
   for (const e of events) if (e.studentId) ids.add(e.studentId);
   const people = ids.size ? ctx.db.select().from(students).where(inArray(students.id, [...ids])).all() : [];
 
@@ -591,6 +606,7 @@ export function counterHistory(ctx: RequestContext, input: In<typeof C.counterHi
       classOnly: live.filter((e) => e.studentId === null).length,
       voided: inWeek.length - live.length,
       counts,
+      enrolled: enrolledIn(ws),
       labelsUsed: [...labels.values()],
     };
   });

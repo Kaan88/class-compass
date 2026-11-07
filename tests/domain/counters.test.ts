@@ -4,7 +4,7 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { crossingTransition, lessonCounts, levelFor, weekEndOf, weekStartOf, weekStartOfDate } from '../../src/domain/counters.ts';
+import { crossingTransition, historyCell, lessonCounts, levelFor, weekEndOf, weekStartOf, weekStartOfDate } from '../../src/domain/counters.ts';
 import { addDays, localDate, weekdayOf } from '../../src/domain/dates.ts';
 import { fillCounterText, isEnglishSubject, validThresholds } from '../../src/shared/counters.ts';
 
@@ -136,5 +136,19 @@ describe('labels', () => {
     expect(isEnglishSubject({ en: 'English', tr: 'İngilizce' })).toBe(true);
     expect(isEnglishSubject({ tr: 'İngilizce' })).toBe(true);
     expect(isEnglishSubject({ en: 'Mathematics' })).toBe(false);
+  });
+});
+
+describe('weekly history cells (RPT-5, CNT-7)', () => {
+  it('tells a real zero apart from "not enrolled" and "not recorded" (no lesson that week)', () => {
+    const week = { lessons: 2, counts: { a: 3 }, enrolled: ['a', 'b'] };
+    expect(historyCell(week, 'a')).toEqual({ kind: 'count', value: 3 });
+    expect(historyCell(week, 'b')).toEqual({ kind: 'count', value: 0 });
+    expect(historyCell(week, 'c')).toEqual({ kind: 'not_enrolled' });
+    const noLesson = { lessons: 0, counts: {}, enrolled: ['a', 'b'] };
+    expect(historyCell(noLesson, 'a')).toEqual({ kind: 'not_recorded' });
+    expect(historyCell(noLesson, 'c')).toEqual({ kind: 'not_enrolled' });
+    // Taps that were recorded are always shown, even for a student who left the class that week.
+    expect(historyCell({ lessons: 1, counts: { c: 1 }, enrolled: [] }, 'c')).toEqual({ kind: 'count', value: 1 });
   });
 });

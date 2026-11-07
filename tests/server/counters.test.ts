@@ -98,6 +98,18 @@ describe('English preset (CNT-1, CNT-12)', () => {
     expect(hist.weeks[0].total).toBe(1);
     expect(hist.counter.archived).toBe(true);
   });
+
+  it('is not created by reads in an archived school year (DAT-1: read-only, no counter or audit rows)', async () => {
+    await ok(s.admin.post(`/api/admin/years/${s.year.id}/archive`));
+    await state(s.teacherA, s.ctxA.id);
+    const list = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/counters`));
+    expect(list.counters).toHaveLength(0);
+    expect(env.db.$client.prepare('select count(*) n from counters').get()).toEqual({ n: 0 });
+    expect(env.db.$client.prepare("select count(*) n from audit_events where action = 'counter.create'").get()).toEqual({ n: 0 });
+    // Unarchived again, first use creates the preset as usual.
+    await ok(s.admin.post(`/api/admin/years/${s.year.id}/unarchive`));
+    expect((await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/counters`))).counters).toHaveLength(1);
+  });
 });
 
 describe('lesson bar vs weekly counts (CNT-2, CNT-3, CNT-8)', () => {
@@ -434,5 +446,24 @@ describe('custom counters and settings (CNT-12, CNT-1, DAT-6)', () => {
     expect(hist.weeks[1]).toMatchObject({ total: 0, lessons: 0 });
     expect(hist.students.map((x: any) => x.fullName)).toEqual(['Arda Yıldız', 'Ece Deniz Kaya', 'Işıl Çınar', 'Oliver Clarke']);
     expect(JSON.stringify(hist)).not.toMatch(/score|rank/i);
+  });
+
+  it('history returns who was enrolled each week, so "not enrolled" and "no lesson" are not shown as 0 (RPT-5)', async () => {
+    const l = await start(s.teacherA, s.ctxA.id);
+    const c = await english(s.teacherA, s.ctxA.id);
+    await tap(s.teacherA, s.ctxA.id, l, c.id, kids[0]!.id);
+    await end(s.teacherA, s.ctxA.id, l);
+    // Next week a new student joins the class (enrolled from Monday 16 November).
+    await travel({ by: 7 * D });
+    const late = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Zeynep Aksoy' });
+    const hist = await ok(s.teacherA.get(`/api/teacher/counters/${c.id}/history?weeks=3`));
+    expect(hist.weeks.map((w: any) => w.weekStart)).toEqual(['2026-11-16', '2026-11-09', '2026-11-02']);
+    const all = kids.map((k) => k.id);
+    expect(new Set(hist.weeks[0].enrolled)).toEqual(new Set([...all, late.id]));
+    expect(hist.weeks[0].lessons).toBe(0); // no lesson yet this week: "not recorded" for everybody
+    expect(new Set(hist.weeks[1].enrolled)).toEqual(new Set(all)); // the new student was not in the class yet
+    expect(hist.weeks[1]).toMatchObject({ lessons: 1, counts: { [kids[0]!.id]: 1 } });
+    expect(hist.weeks[2].enrolled).toEqual([]); // before anyone was enrolled
+    expect(hist.students.map((x: any) => x.id)).toContain(late.id);
   });
 });

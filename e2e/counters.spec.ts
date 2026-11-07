@@ -110,6 +110,10 @@ test('tap + on students, bar and weekly counts, undo, double tap guard, offline 
     const overlayText = await overlay.innerText();
     const everyone = await addButtons.evaluateAll((els) => els.map((e) => (e.getAttribute('aria-label') ?? '').replace('Add one (Turkish reminders) for ', '')));
     for (const n of everyone) expect(overlayText).not.toContain(n);
+    // The undo toast of the tap that filled the bar does not name that student either (CNT-9, D-059).
+    await expect(page.getByTestId('toast').filter({ hasText: '3-A · English: +1 Turkish reminders' })).toBeVisible();
+    const toastTexts = await page.getByTestId('toast').allInnerTexts();
+    for (const n of everyone) for (const text of toastTexts) expect(text).not.toContain(n);
     await overlay.getByRole('button', { name: 'Back to the lesson' }).click();
     await expect(overlay).toHaveCount(0);
     await expect(page.getByTestId('threshold-banner')).toContainText('Back to English');

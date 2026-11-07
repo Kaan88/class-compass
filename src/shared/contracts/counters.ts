@@ -200,6 +200,8 @@ export const counterHistory = endpoint({
         classOnly: z.number().int(),
         voided: z.number().int(),
         counts: z.record(z.string(), z.number().int()),
+        /** Students enrolled in the class on at least one day of this week (RPT-5: "not enrolled" is not 0). */
+        enrolled: z.array(z.string()),
         /** Individual labels the taps of this week were recorded under (DAT-6). */
         labelsUsed: z.array(LocalizedText),
       }),

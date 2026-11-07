@@ -23,7 +23,7 @@ import { CounterBar } from '../../ui/Students.tsx';
 import { classLabel } from '../lessons/Dashboard.tsx';
 import { serverNow, useLessonState } from '../lessons/lessonClient.ts';
 import { registerDashboardSlot, registerStudentCardAddon, type ClassroomContext } from '../lessons/registry.ts';
-import { applyDelta, applyReset, crossingKey, FRESH_CROSSING_MS, markShown, patchCounters, sendCounterCommand, tapGuard, wasShown } from './countersClient.ts';
+import { applyDelta, applyReset, crossingKey, FRESH_CROSSING_MS, markShown, opensCrossing, patchCounters, sendCounterCommand, tapGuard, tapToastText, wasShown } from './countersClient.ts';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -33,13 +33,22 @@ let lastUndo: number | null = null;
 function recordTap(context: ClassroomContext, lesson: LessonState, counter: CounterLessonState, student: { id: string; fullName: string } | null, t: Translate, locale: 'en' | 'tr'): boolean {
   const key = `${counter.id}:${student?.id ?? 'class'}`;
   if (!tapGuard.accept(key)) return false;
-  patchCounters(context.id, (c) => applyDelta(c, student?.id ?? null, 1), counter.id);
+  let crossed = opensCrossing(counter);
+  patchCounters(
+    context.id,
+    (c) => {
+      const next = applyDelta(c, student?.id ?? null, 1);
+      crossed = next.reached && !c.reached;
+      return next;
+    },
+    counter.id,
+  );
   const sent = sendCounterCommand('counter.tap', { contextId: context.id, lessonId: lesson.id, counterId: counter.id, ...(student ? { studentId: student.id } : {}) });
   const cls = classLabel(context, locale);
   const label = pickText(student ? counter.labels.individual : counter.labels.main, locale);
   if (lastUndo !== null) dismissToast(lastUndo);
   lastUndo = showUndoToast(
-    student ? t('counter.toast.added', { cls, counter: label, name: student.fullName }) : t('counter.toast.addedClass', { cls, counter: label }),
+    tapToastText(t, { cls, label, studentName: student?.fullName ?? null, crossed }),
     async () => {
       const eventId = await sent;
       tapGuard.forget(key);
@@ -59,7 +68,7 @@ function resetBar(context: ClassroomContext, lesson: LessonState, counter: Count
 const responseText = (c: CounterLessonState, locale: 'en' | 'tr') => (c.activeResponse ? fillCounterText(pickText(c.activeResponse.message, locale), { count: c.barValue, limit: c.barSegments }) : '');
 
 /** The calm response overlay: shown once per crossing on this device, only while the crossing is fresh (D-059). */
-function ThresholdOverlay({ context, lesson, counter }: { context: ClassroomContext; lesson: LessonState; counter: CounterLessonState }) {
+function ThresholdOverlay({ lesson, counter, onReset }: { lesson: LessonState; counter: CounterLessonState; onReset: () => void }) {
   const { t, locale } = useI18n();
   const key = counter.crossingSeq !== null ? crossingKey(lesson.id, counter.id, counter.crossingSeq) : null;
   const fresh = counter.crossedAt !== null && serverNow() - counter.crossedAt < FRESH_CROSSING_MS;
@@ -83,8 +92,8 @@ function ThresholdOverlay({ context, lesson, counter }: { context: ClassroomCont
         {response?.kind === 'class_reset' ? (
           <Button
             onPress={() => {
-              resetBar(context, lesson, counter);
               setOpenKey(null);
+              onReset();
             }}
           >
             <IconUndo />
@@ -99,9 +108,38 @@ function ThresholdOverlay({ context, lesson, counter }: { context: ClassroomCont
   );
 }
 
+/**
+ * A class reset cannot be undone (D-058), so it always asks first (UX-10, DAT-5). It is a classroom
+ * action: the dialog names only the class and the counter.
+ */
+function ConfirmReset({ isOpen, onOpenChange, context, counter, onConfirm }: { isOpen: boolean; onOpenChange: (v: boolean) => void; context: ClassroomContext; counter: CounterLessonState; onConfirm: () => void }) {
+  const { t, locale } = useI18n();
+  return (
+    <Modal isOpen={isOpen} onOpenChange={onOpenChange} title={t('counter.resetConfirmTitle')} role="alertdialog">
+      <p>{t('counter.resetConfirmBody', { cls: classLabel(context, locale), label: pickText(counter.labels.main, locale) })}</p>
+      <DialogActions>
+        <Button variant="primary" onPress={() => onOpenChange(false)}>
+          {t('counter.resetKeep')}
+        </Button>
+        <Button
+          variant="danger"
+          onPress={() => {
+            onOpenChange(false);
+            onConfirm();
+          }}
+        >
+          <IconUndo />
+          {t('counter.resetConfirm')}
+        </Button>
+      </DialogActions>
+    </Modal>
+  );
+}
+
 function CounterCard({ context, lesson, counter }: { context: ClassroomContext; lesson: LessonState; counter: CounterLessonState }) {
   const { t, locale } = useI18n();
   const [notice, setNotice] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => (timer.current ? clearTimeout(timer.current) : undefined), []);
   const main = pickText(counter.labels.main, locale);
@@ -147,14 +185,15 @@ function CounterCard({ context, lesson, counter }: { context: ClassroomContext; 
             {counter.activeResponse ? `${pickText(counter.activeResponse.label, locale)}: ${responseText(counter, locale)}` : t('counter.limitReachedBody', { label: main })}
           </span>
           {counter.activeResponse?.kind === 'class_reset' ? (
-            <Button className="cc-push-right" onPress={() => resetBar(context, lesson, counter)}>
+            <Button className="cc-push-right" onPress={() => setConfirming(true)}>
               <IconUndo />
               {t('counter.reset')}
             </Button>
           ) : null}
         </div>
       ) : null}
-      <ThresholdOverlay context={context} lesson={lesson} counter={counter} />
+      <ThresholdOverlay lesson={lesson} counter={counter} onReset={() => setConfirming(true)} />
+      <ConfirmReset isOpen={confirming && counter.reached} onOpenChange={setConfirming} context={context} counter={counter} onConfirm={() => resetBar(context, lesson, counter)} />
     </section>
   );
 }

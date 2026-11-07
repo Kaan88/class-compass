@@ -67,3 +67,17 @@ export function lessonCounts(events: readonly BarEvent[], resetAfterSeq: number 
   }
   return { lessonTotal, barValue };
 }
+
+/**
+ * What one student's cell in the weekly history shows (RPT-5: zero ≠ not enrolled ≠ not recorded).
+ * Recorded taps are always shown; otherwise a student outside the class that week is "not enrolled",
+ * a week without any lesson of this class+subject is "not recorded", and only then is the count a real 0.
+ */
+export type HistoryCell = { kind: 'count'; value: number } | { kind: 'not_enrolled' } | { kind: 'not_recorded' };
+export function historyCell(week: { lessons: number; counts: Readonly<Record<string, number>>; enrolled: readonly string[] }, studentId: string): HistoryCell {
+  const n = week.counts[studentId] ?? 0;
+  if (n > 0) return { kind: 'count', value: n };
+  if (!week.enrolled.includes(studentId)) return { kind: 'not_enrolled' };
+  if (week.lessons === 0) return { kind: 'not_recorded' };
+  return { kind: 'count', value: 0 };
+}

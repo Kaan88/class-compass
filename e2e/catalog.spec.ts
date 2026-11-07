@@ -26,8 +26,8 @@ test('catalog: every theme × language, grids for 20 and 34 students, 200 % text
       await expect(panel.locator('.cc-student-card')).toHaveCount(5);
     }
   }
-  await expect(page.getByTestId('catalog-animals-tr')).toContainText('Sınıra ulaştı');
-  await expect(page.getByTestId('catalog-animals-en')).toContainText('Limit reached');
+  await expect(page.getByTestId('catalog-animals-tr')).toContainText('Çok sayıda');
+  await expect(page.getByTestId('catalog-animals-en')).toContainText('Many');
 
   await page.getByLabel('Themes').selectOption('classroom');
   const g20 = page.getByTestId('catalog-grid-20');
