@@ -49,6 +49,29 @@ export function attendanceStamp(db: Db, classId: string, date: string, lessonId:
   return sha256(`${daily.join(',')}|${exc.join(',')}`).slice(0, 16);
 }
 
+/**
+ * Modules that must react to attendance changes inside the same transaction (S7: a Secret Student
+ * marked absent is silently replaced, D-007; today's absent assistant gets a replacement, AST-4).
+ * Listeners run synchronously after the row is written; they must not change anything the caller's
+ * response depends on (SEC-3).
+ */
+export interface AttendanceChange {
+  classId: string;
+  date: string;
+  studentId: string;
+  /** Set for a lesson-only exception, null for daily attendance. */
+  lessonId: string | null;
+  status: AttendanceStatus | null;
+}
+type AttendanceListener = (ctx: RequestContext, change: AttendanceChange) => void;
+const attendanceListeners: AttendanceListener[] = [];
+export function registerAttendanceListener(fn: AttendanceListener) {
+  if (!attendanceListeners.includes(fn)) attendanceListeners.push(fn);
+}
+function notifyAttendance(ctx: RequestContext, change: AttendanceChange) {
+  for (const fn of attendanceListeners) fn(ctx, change);
+}
+
 function assertOnRoster(db: Db, classId: string, date: string, studentId: string) {
   if (!rosterRowsOn(db, classId, date).some((r) => r.student.id === studentId)) {
     throw new AppError('CONFLICT', 'This student is not in the class on this day', { reason: 'STUDENT_NOT_IN_CLASS' });
@@ -81,6 +104,7 @@ export function setDailyCore(
     if (!existing) return null;
     ctx.db.delete(attendanceDaily).where(eq(attendanceDaily.id, existing.id)).run();
     audit(ctx.db, ctx.actor, { action: 'attendance.clear_daily', entity: 'attendance_daily', entityId: existing.id, before: snap(existing), after: snap(null), opId }, now);
+    notifyAttendance(ctx, { classId: cls.id, date, studentId, lessonId: null, status: null });
     return null;
   }
   const nextNote = note === undefined ? (existing?.note ?? null) : note?.trim() ? note.trim() : null;
@@ -94,6 +118,7 @@ export function setDailyCore(
     ctx.db.insert(attendanceDaily).values(row).run();
   }
   audit(ctx.db, ctx.actor, { action: 'attendance.set_daily', entity: 'attendance_daily', entityId: row.id, before: snap(existing), after: snap(row), opId }, now);
+  notifyAttendance(ctx, { classId: cls.id, date, studentId, lessonId: null, status });
   return row;
 }
 
@@ -116,6 +141,7 @@ export function setExceptionCore(
     if (!existing) return false;
     ctx.db.delete(attendanceLessonExceptions).where(key).run();
     audit(ctx.db, ctx.actor, { action: 'attendance.clear_exception', entity: 'attendance_lesson_exception', entityId, before: { ...base, status: existing.status }, after: { ...base, status: null }, opId }, now);
+    notifyAttendance(ctx, { classId: lesson.classId, date: lesson.localDate, studentId, lessonId: lesson.id, status: null });
     return true;
   }
   const nextNote = note === undefined ? (existing?.note ?? null) : note?.trim() ? note.trim() : null;
@@ -127,6 +153,7 @@ export function setExceptionCore(
     .onConflictDoUpdate({ target: [attendanceLessonExceptions.lessonId, attendanceLessonExceptions.studentId], set: { status, note: nextNote, recordedBy: values.recordedBy, updatedAt: now } })
     .run();
   audit(ctx.db, ctx.actor, { action: 'attendance.set_exception', entity: 'attendance_lesson_exception', entityId, before: { ...base, status: existing?.status ?? null }, after: { ...base, status }, opId }, now);
+  notifyAttendance(ctx, { classId: lesson.classId, date: lesson.localDate, studentId, lessonId: lesson.id, status });
   return true;
 }
 

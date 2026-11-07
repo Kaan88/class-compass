@@ -1,11 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppDeps } from '../lib/context.ts';
 import { registerAdminRoutes } from './admin/routes.ts';
+import { registerAssistantRoutes } from './assistant/routes.ts';
 import { registerAttendanceRoutes } from './attendance/routes.ts';
 import { registerAuthRoutes } from './auth/routes.ts';
 import { registerCounterRoutes } from './counters/routes.ts';
 import { registerLessonRoutes } from './lessons/routes.ts';
 import { registerSchoolRoutes } from './school/routes.ts';
+import { registerSecretRoutes } from './secret/routes.ts';
 import { registerStudentRoutes } from './students/routes.ts';
 
 /**
@@ -20,4 +22,6 @@ export function registerModules(app: FastifyInstance, deps: AppDeps) {
   registerLessonRoutes(app, deps);
   registerAttendanceRoutes(app, deps);
   registerCounterRoutes(app, deps);
+  registerSecretRoutes(app, deps);
+  registerAssistantRoutes(app, deps);
 }

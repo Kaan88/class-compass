@@ -36,7 +36,7 @@ export class FakeMailer implements Mailer {
   }
 }
 
-export async function makeEnv(overrides: Partial<Config> = {}, extra: { mailer?: Mailer | null } = {}): Promise<TestEnv> {
+export async function makeEnv(overrides: Partial<Config> = {}, extra: { mailer?: Mailer | null; logStream?: { write: (line: string) => void } } = {}): Promise<TestEnv> {
   const config = loadConfig(
     { NODE_ENV: 'test', SECRET_PEPPER: 'test-pepper-0123456789abcdef', PUBLIC_ORIGIN: TEST_ORIGIN, DATA_DIR: './data-test' },
     overrides,
@@ -45,7 +45,7 @@ export async function makeEnv(overrides: Partial<Config> = {}, extra: { mailer?:
   runMigrations(db);
   const clock = new Clock();
   const deps: AppDeps = { db, config, now: clock.now, mailer: extra.mailer ?? null };
-  const app = await buildApp(deps);
+  const app = await buildApp(deps, extra.logStream ? { logStream: extra.logStream } : {});
   await app.ready();
   return { app, db, clock, config, deps };
 }

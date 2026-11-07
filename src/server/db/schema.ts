@@ -487,4 +487,124 @@ export const counterLessonResets = sqliteTable(
   (t) => [index('counter_lesson_resets_idx').on(t.counterId, t.lessonId)],
 );
 
+// ---------------------------------------------------------------- secret students (S7)
+export const SECRET_SELECTION_STATUSES = ['sealed', 'withdrawn_absent', 'withdrawn_redraw', 'revealed', 'unrevealed_abandoned'] as const;
+export const SECRET_OUTCOMES = ['goal_met', 'still_practising', 'not_assessed'] as const;
+
+/**
+ * One Secret Student draw per lesson (SEC-1..7). id = the opId of the 'secret.draw' (or
+ * 'secret.redraw') command. At most one LIVE round per lesson (DB-enforced); a redraw marks the old
+ * round 'withdrawn'. `selectedCount` is the number chosen at draw time and never changes afterwards,
+ * so a silent replacement or withdrawal can never show up in the classroom state (SEC-3, D-064).
+ * `schoolYearId` scopes the fair rotation (D-062).
+ */
+export const secretRounds = sqliteTable(
+  'secret_rounds',
+  {
+    id: text('id').primaryKey(),
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    lessonId: text('lesson_id').notNull().references(() => lessons.id),
+    schoolYearId: text('school_year_id').notNull().references(() => schoolYears.id),
+    localDate: text('local_date').notNull(),
+    status: text('status', { enum: ['live', 'withdrawn'] }).notNull(),
+    requestedCount: integer('requested_count').notNull(),
+    selectedCount: integer('selected_count').notNull(),
+    shortfallReason: text('shortfall_reason', { enum: ['NOT_ENOUGH_ELIGIBLE', 'NO_ELIGIBLE'] }),
+    drawnAt: integer('drawn_at').notNull(),
+    drawnBy: text('drawn_by').notNull().references(() => users.id),
+    revealedAt: integer('revealed_at'),
+    withdrawnAt: integer('withdrawn_at'),
+    opId: text('op_id').notNull(),
+  },
+  (t) => [
+    uniqueIndex('secret_rounds_live_uq').on(t.lessonId).where(sql`status = 'live'`),
+    index('secret_rounds_context_idx').on(t.contextId, t.schoolYearId),
+  ],
+);
+
+/**
+ * The students of a round. SECRET: `studentId` of a round that is not revealed may only be read by
+ * src/server/modules/secret (enforced by tests/server/secret-boundary.test.ts). `replacedSelectionId`
+ * on a replacement points at the withdrawn selection it replaced (D-007).
+ */
+export const secretSelections = sqliteTable(
+  'secret_selections',
+  {
+    id: text('id').primaryKey(),
+    roundId: text('round_id').notNull().references(() => secretRounds.id),
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    studentId: text('student_id').notNull().references(() => students.id),
+    status: text('status', { enum: SECRET_SELECTION_STATUSES }).notNull(),
+    replacedSelectionId: text('replaced_selection_id'),
+    outcome: text('outcome', { enum: SECRET_OUTCOMES }),
+    note: text('note'),
+    celebration: integer('celebration', { mode: 'boolean' }).notNull().default(false),
+    selectedAt: integer('selected_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    outcomeBy: text('outcome_by').references(() => users.id),
+  },
+  (t) => [
+    uniqueIndex('secret_selections_round_student_uq').on(t.roundId, t.studentId),
+    index('secret_selections_context_student_idx').on(t.contextId, t.studentId),
+  ],
+);
+
+// ---------------------------------------------------------------- daily assistant (S7)
+export const ASSISTANT_STATUSES = ['planned', 'confirmed', 'replaced_absent', 'swapped', 'override'] as const;
+
+/** A materialised weekly plan (AST-2): generated once, never regenerated silently, announceable. */
+export const assistantPlans = sqliteTable(
+  'assistant_plans',
+  {
+    id: text('id').primaryKey(),
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    weekStart: text('week_start').notNull(),
+    generatedAt: integer('generated_at').notNull(),
+    generatedBy: text('generated_by').references(() => users.id),
+    announcedAt: integer('announced_at'),
+    announcedBy: text('announced_by').references(() => users.id),
+  },
+  (t) => [uniqueIndex('assistant_plans_context_week_uq').on(t.contextId, t.weekStart)],
+);
+
+/**
+ * One assistant per context and local day (AST-1, DB-enforced). `plannedStudentId` is what the plan
+ * said; `actualStudentId` is set when someone else did/does the job (absence, swap, override), so
+ * planned vs actual is kept (AST-5). The effective assistant is actual ?? planned.
+ */
+export const assistantAssignments = sqliteTable(
+  'assistant_assignments',
+  {
+    id: text('id').primaryKey(),
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    planId: text('plan_id').references(() => assistantPlans.id),
+    schoolYearId: text('school_year_id').notNull().references(() => schoolYears.id),
+    localDate: text('local_date').notNull(),
+    plannedStudentId: text('planned_student_id').references(() => students.id),
+    actualStudentId: text('actual_student_id').references(() => students.id),
+    status: text('status', { enum: ASSISTANT_STATUSES }).notNull(),
+    reason: text('reason'),
+    thankedAt: integer('thanked_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    updatedBy: text('updated_by').references(() => users.id),
+  },
+  (t) => [uniqueIndex('assistant_assignments_context_date_uq').on(t.contextId, t.localDate), index('assistant_assignments_year_idx').on(t.contextId, t.schoolYearId)],
+);
+
+/** Editable responsibilities of the assistant per context (AST-6); archived instead of deleted. */
+export const assistantResponsibilities = sqliteTable(
+  'assistant_responsibilities',
+  {
+    id: text('id').primaryKey(),
+    contextId: text('context_id').notNull().references(() => teachingContexts.id),
+    labelJson: text('label_json', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    sortOrder: integer('sort_order').notNull(),
+    archivedAt: integer('archived_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('assistant_responsibilities_context_idx').on(t.contextId)],
+);
+
 export const _sqlHelper = sql; // re-export for raw fragments in repos

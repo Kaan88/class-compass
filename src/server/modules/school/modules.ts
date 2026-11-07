@@ -95,3 +95,33 @@ export function contextModuleStates(db: Db, contextId: string): ContextModuleSta
     };
   });
 }
+
+/** The teacher's stored config of a context module (null when none was saved). */
+export function getModuleConfig(db: Db, contextId: string, module: ContextModule): Record<string, unknown> | null {
+  const row = db
+    .select({ configJson: contextModules.configJson })
+    .from(contextModules)
+    .where(and(eq(contextModules.contextId, contextId), eq(contextModules.module, module)))
+    .get();
+  if (!row?.configJson) return null;
+  try {
+    return JSON.parse(row.configJson) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merge `patch` into a context module's config, keeping the teacher's on/off switch (no row = on).
+ * Callers check ownership and audit; must run inside a transaction.
+ */
+export function mergeModuleConfig(db: Db, contextId: string, module: ContextModule, patch: Record<string, unknown>, userId: string, now: number): Record<string, unknown> {
+  const row = db.select().from(contextModules).where(and(eq(contextModules.contextId, contextId), eq(contextModules.module, module))).get();
+  const next = { ...(getModuleConfig(db, contextId, module) ?? {}), ...patch };
+  const configJson = JSON.stringify(next);
+  db.insert(contextModules)
+    .values({ contextId, module, enabled: row?.enabled ?? true, configJson, updatedAt: now, updatedBy: userId })
+    .onConflictDoUpdate({ target: [contextModules.contextId, contextModules.module], set: { configJson, updatedAt: now, updatedBy: userId } })
+    .run();
+  return next;
+}

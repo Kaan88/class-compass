@@ -11,7 +11,9 @@ import type { z } from 'zod';
 import { localDate, weekdayOf } from '../../../domain/dates.ts';
 import { clampStage } from '../../../domain/routines.ts';
 import { idleTimer, type TimerState } from '../../../domain/timer.ts';
+import type { AssistantToday } from '../../../shared/contracts/assistant.ts';
 import type { CountersLessonState } from '../../../shared/contracts/counters.ts';
+import type { SecretLessonState } from '../../../shared/contracts/secret.ts';
 import type { LessonCommands, LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
 import { lessons, subjects, teachingContexts } from '../../db/schema.ts';
 import type { Db } from '../../db/client.ts';
@@ -101,7 +103,7 @@ export function updateLesson(ctx: RequestContext, lesson: LessonRow, patch: Part
  * changes made by lesson commands bump the version through `updateLesson` already.
  */
 export interface LessonStateContributor {
-  key: 'counters';
+  key: 'counters' | 'secret' | 'assistant';
   stamp: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => string;
   body: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => unknown;
 }
@@ -109,6 +111,19 @@ const contributors: LessonStateContributor[] = [];
 export function registerLessonStateContributor(c: LessonStateContributor) {
   if (!contributors.some((x) => x.key === c.key)) contributors.push(c);
 }
+
+// ---------------------------------------------------------------- lesson close hooks
+/**
+ * Modules that must react when a lesson closes, whether or not they are enabled for the context
+ * (S7: an unrevealed Secret Student round of an abandoned lesson becomes `unrevealed_abandoned`,
+ * D-010). Runs inside the closing transaction, after the End Lesson steps.
+ */
+export type LessonCloseHook = (ctx: RequestContext, lesson: LessonRow, outcome: 'ended' | 'abandoned') => void;
+const closeHooks: LessonCloseHook[] = [];
+export function registerLessonCloseHook(fn: LessonCloseHook) {
+  if (!closeHooks.includes(fn)) closeHooks.push(fn);
+}
+const runCloseHooks = (ctx: RequestContext, lesson: LessonRow, outcome: 'ended' | 'abandoned') => closeHooks.forEach((h) => h(ctx, lesson, outcome));
 
 // ---------------------------------------------------------------- reads
 export function lessonState(ctx: RequestContext, contextId: string) {
@@ -131,6 +146,8 @@ export function lessonState(ctx: RequestContext, contextId: string) {
       serverNow: now,
       attendanceStamp: stamp,
       counters: (bodies.counters ?? null) as CountersLessonState | null,
+      secret: (bodies.secret ?? null) as SecretLessonState | null,
+      assistant: (bodies.assistant ?? null) as AssistantToday | null,
     },
   };
 }
@@ -220,7 +237,8 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
       return { started: false, reason: 'LESSON_ALREADY_ACTIVE' as const, lessonId: existing.id, attendanceKept };
     }
     // Left running past the end of its day: abandon it (keep its data) and start fresh.
-    updateLesson(ctx, existing, { status: 'abandoned', timerJson: { ...existing.timerJson, running: false, startedAt: null } });
+    const abandoned = updateLesson(ctx, existing, { status: 'abandoned', timerJson: { ...existing.timerJson, running: false, startedAt: null } });
+    runCloseHooks(ctx, abandoned, 'abandoned');
     audit(ctx.db, ctx.actor, { action: 'lesson.abandon', entity: 'lesson', entityId: existing.id, after: { localDate: existing.localDate, reason: 'next_day' }, opId: meta.opId }, now);
   }
   const tid = requireUser(ctx).id;
@@ -297,7 +315,7 @@ export function changeTimer(ctx: RequestContext, p: { contextId: string; lessonI
 
 export function endLesson(ctx: RequestContext, p: P<'lesson.end'>, meta: CommandMeta) {
   const { lesson } = lessonForCommand(ctx, p, meta);
-  // Module steps first (S7: Secret Student reveal and outcomes), then the core reflection (LES-3).
+  // Module steps first (S7: Secret Student reveal/outcomes, assistant thanks), then the core reflection (LES-3).
   for (const step of endStepsFor(ctx.db, lesson.contextId)) {
     const parsed = step.input.safeParse(p.steps[step.key] ?? {});
     if (!parsed.success) throw new AppError('VALIDATION', `Invalid input for step ${step.key}`, { reason: 'END_STEP_INVALID', step: step.key });
@@ -310,6 +328,7 @@ export function endLesson(ctx: RequestContext, p: P<'lesson.end'>, meta: Command
     endedAt: now,
     timerJson: { ...fresh.timerJson, running: false, startedAt: null, remainingMs: fresh.timerJson.running ? Math.max(0, fresh.timerJson.remainingMs - (now - (fresh.timerJson.startedAt ?? now))) : fresh.timerJson.remainingMs },
   });
+  runCloseHooks(ctx, ended, 'ended');
   audit(ctx.db, ctx.actor, { action: 'lesson.end', entity: 'lesson', entityId: lesson.id, after: { stageReached: ended.stageIndex, reflection: ended.reflectionJson?.rating ?? null }, opId: meta.opId }, now);
   return summaryOf(ctx.db, ended);
 }

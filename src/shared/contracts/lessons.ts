@@ -6,7 +6,9 @@
 import { z } from 'zod';
 import { ATTENDANCE_STATUSES, MAX_STAGES, MAX_TIMER_MS } from '../lessons.ts';
 import { LocalizedText, Ok, endpoint } from './define.ts';
+import { AssistantToday } from './assistant.ts';
 import { CountersLessonState } from './counters.ts';
+import { SecretLessonState } from './secret.ts';
 import { Id, IsoDate, RequiredLocalizedText } from './school.ts';
 
 export const AttendanceStatus = z.enum(ATTENDANCE_STATUSES);
@@ -56,6 +58,10 @@ export const getLessonState = endpoint({
     attendanceStamp: z.string(),
     /** Counter bars and weekly counts for the running lesson; null without a lesson or with Counters off (S6). */
     counters: CountersLessonState.nullable(),
+    /** Secret Students of the running lesson: counts only, never who (SEC-3); null when off or no lesson. */
+    secret: SecretLessonState.nullable(),
+    /** Today's assistant (AST-1, DSH-3); null when the Assistant module is off. */
+    assistant: AssistantToday.nullable(),
   }),
 });
 

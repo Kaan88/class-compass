@@ -26,10 +26,18 @@ const REDACT = [
   '*.token',
 ];
 
-export async function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
+/**
+ * `logStream` (tests): log at debug level into this stream instead of stdout, so a test can scan
+ * everything the server logs (SEC-3 leak scan).
+ */
+export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStream?: { write: (line: string) => void } } = {}): Promise<FastifyInstance> {
   ensureSchoolDefaults(deps);
   const app = Fastify({
-    logger: opts.logger ? { level: deps.config.isProd ? 'info' : 'debug', redact: REDACT } : false,
+    logger: opts.logStream
+      ? { level: 'debug', redact: REDACT, stream: opts.logStream }
+      : opts.logger
+        ? { level: deps.config.isProd ? 'info' : 'debug', redact: REDACT }
+        : false,
     bodyLimit: 1024 * 1024,
     trustProxy: deps.config.TRUST_PROXY,
     // Student link paths (/s/...) must never be logged with their URL (tokens live in the fragment,
