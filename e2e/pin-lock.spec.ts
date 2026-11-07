@@ -91,7 +91,8 @@ test('Lock button and a 423 swap straight to the lock screen', async ({ page }) 
   await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByTestId('teacher-menu')).toBeVisible();
   await page.getByRole('link', { name: 'Class settings' }).first().click();
-  const toggle = page.getByText('Homework', { exact: true });
+  // The module switch (the teacher menu also has a Homework link since S8).
+  const toggle = page.locator('.cc-switch', { has: page.getByRole('switch', { name: 'Homework', exact: true }) });
   await expect(toggle).toBeVisible();
 
   // Toasts from the teacher area do not survive the lock (PIN-3). Toggle twice to leave the demo data as it was.

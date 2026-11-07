@@ -8,6 +8,7 @@ import { ATTENDANCE_STATUSES, MAX_STAGES, MAX_TIMER_MS } from '../lessons.ts';
 import { LocalizedText, Ok, endpoint } from './define.ts';
 import { AssistantToday } from './assistant.ts';
 import { CountersLessonState } from './counters.ts';
+import { GroupingLessonState } from './grouping.ts';
 import { SecretLessonState } from './secret.ts';
 import { Id, IsoDate, RequiredLocalizedText } from './school.ts';
 
@@ -62,6 +63,8 @@ export const getLessonState = endpoint({
     secret: SecretLessonState.nullable(),
     /** Today's assistant (AST-1, DSH-3); null when the Assistant module is off. */
     assistant: AssistantToday.nullable(),
+    /** The groups in use in the running lesson (DSH-8): names, members, roles; never levels or rules (GRP-7). Null when off or no lesson. */
+    grouping: GroupingLessonState.nullable(),
   }),
 });
 

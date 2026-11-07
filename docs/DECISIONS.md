@@ -138,3 +138,30 @@ Format: `D-NNN — date — decision — rationale — status`.
   - **(4) Bundle split.** zod and dexie get their own `vendor-data` chunk, keeping every chunk under Vite's 500 kB warning.
   - Note: a local `.env` with `NODE_ENV=development` (as in `.env.example`) makes `vite build` bundle React's development build. Build releases without it, or with `NODE_ENV=production`.
   - Decided by Claude.
+- **D-072** — **Grouping solver and default arrangements** (S8, GRP-1..4, GRP-6, GRP-8).
+  - **Pure and deterministic.** `src/domain/grouping.ts` takes the students, mode, sizing, pair rules and a seed; the same input gives the same groups. A seeded draft (level order for level groups, a serpentine over levels for mixed groups) is improved by pair swaps with weighted costs (apart rule ≫ together rule ≫ spread of students without a level ≫ level quality), with a few deterministic restarts.
+  - **Sizes.** "Number of groups" uses min(groups, students); "group size" uses floor(students / size) groups, so an odd class in pairs gets one group of three. Group sizes never differ by more than one.
+  - **Levels** are free text per subject and are ranked in natural order (`A1 < A2 < B1`, `2 < 10`). A student without a level is "not assessed" and is spread evenly over the groups in both modes.
+  - **Unsatisfied rules** are stored with the arrangement and listed in the teacher area with a reason: ONE_GROUP, GROUP_TOO_SMALL, CONFLICTS_WITH_APART, NOT_POSSIBLE_WITH_OTHER_RULES, or ARRANGED_BY_HAND after a manual edit.
+  - **Defaults.** The five default arrangements (two level-based, three mixed) are created once per class+subject, the first time grouping is used while the class is writable (audited). Archiving a default never brings it back. Generating again keeps the group names and icons by position, so a teacher's renames survive.
+  - **Edits.** Teachers can change type and size (the groups are generated again), move students, rename groups, set optional roles and save the result as a new arrangement ("custom" mode). Every write carries `expectedVersion` (409 VERSION_CONFLICT) and is audited. Pair rules are archived, never deleted; their private note is never written to the audit log (only `hasNote`).
+  - Decided by Claude.
+- **D-073** — **Groups in the lesson and the GRP-7 classroom boundary** (S8, GRP-5, GRP-7, DSH-8).
+  - **Applying** an arrangement is the outbox command `grouping.apply` (two taps: Choose groups → arrangement). It saves a lesson grouping: the arrangement fitted to the students present, with students marked absent or excused in effective attendance left out. "Not recorded" counts as present, so nobody vanishes because attendance was not taken. The saved arrangement is never changed (GRP-5). `grouping.clear` hides the groups.
+  - **Fitting** keeps every present student in their saved group and moves as few as needed to keep sizes within one. Students new to the class join the smallest groups. Rules that cannot be met only increase the count shown.
+  - **Live absences.** A student marked absent after the groups were shown is hidden from the display at once. The groups are not rebalanced until the teacher chooses them again.
+  - **Classroom responses** (lesson state, arrangement picker) carry arrangement names, group names, icons, members (classroom-safe student fields) and roles, plus two counts: students left out, rules not met. They never carry a level, a mode, a rule, a note or a reason. `tests/server/grouping.test.ts` scans every classroom GET for them after levels and notes with marker strings were set.
+  - Decided by Claude.
+- **D-074** — **Homework model** (S8, HW-1..4, ATT-1, RPT-5).
+  - **No mark = not checked.** A student has a mark row only once checked; choosing "Not checked" again deletes the row. Reports and the outstanding list therefore can never count an unchecked student as missing.
+  - **Statuses.** The class+subject status list (module config: six defaults, editable labels, custom statuses with a "counts as" kind, the first one always "not checked") is copied onto each assignment when it is created, so later list changes never relabel old work.
+  - **History and undo.** Every change goes to `homework_mark_changes` with the before and after values and a batch id, and is audited (statuses only, never note text). Undo restores a batch, skipping students changed again since (reported as `skipped`). A repeated client `batchId` is replayed, not applied twice.
+  - **Views.** Day, week and month windows by due or assigned date use the class timezone and the school's week start. Dates outside the school year and a due date before the assigned date are refused.
+  - **Attendance.** The checking grid shows daily attendance on the due date (when the Attendance module is on), read through the attendance service. Homework never writes attendance; the cross-test in `tests/server/lessons.test.ts` compares both tables before and after.
+  - **Module off (CFG-2).** Teacher-area reads keep working; creating, checking and the classroom panel are refused, and nothing is deleted.
+  - Decided by Claude.
+- **D-075** — **Where homework is checked** (S8, HW-4, PIN, UX-8).
+  - **Default: the teacher area** (PIN-gated in classroom mode), because the grid shows private notes.
+  - **Optional classroom checking.** A class+subject may switch on "Allow checking on the classroom screen" (`checkingInClassroom`). The classroom then gets a grid without notes, and its writes cannot set notes. Otherwise the classroom endpoints answer 403 CHECKING_TEACHER_ONLY.
+  - **REST, not the outbox.** Classroom checking uses REST endpoints with a client `batchId` (idempotent retries) instead of outbox commands. Homework marks are not lesson-scoped, and the checker needs the server's answer (counts, undo) at once. Offline checking is therefore not queued. This is listed as a known gap, and the outbox can take it over later without changing the data model.
+  - Decided by Claude.

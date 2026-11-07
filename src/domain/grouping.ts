@@ -1,0 +1,320 @@
+/**
+ * Grouping solver (S8: GRP-1..8, D-072). Pure, no I/O, deterministic for a seed.
+ *
+ * - `groupSizes`: k groups whose sizes differ by at most 1 (count mode: k = min(count, n); size
+ *   mode: k = max(1, floor(n / target)), so 17 students in pairs make 7 pairs and one trio rather
+ *   than a lonely "pair" of one).
+ * - Level mode puts similar levels together: assessed students fill the groups in level order;
+ *   students without a level (the explicit "unassessed" bucket) are spread evenly over the groups.
+ * - Mixed mode balances levels across groups with a serpentine draft (highest levels first), with
+ *   the unassessed bucket drafted last so it is also spread evenly.
+ * - Pair constraints: 'apart' is a hard rule where possible, 'together' a soft one. A swap search
+ *   (sizes never change) removes violations, then improves the level objective. Whatever cannot be
+ *   met is reported with a reason (GRP-8); nothing is dropped silently.
+ * - Ties are broken with `seededRank(seed, id)`, so the same seed always gives the same groups.
+ */
+import { seededRank } from './rotation.ts';
+
+export type GroupingMode = 'level' | 'mixed';
+export type Sizing = { groupCount: number } | { targetSize: number };
+export type ConstraintKind = 'together' | 'apart';
+
+export interface GroupStudent {
+  id: string;
+  /** 0 = lowest level; null = not assessed (the "unassessed" bucket). */
+  levelRank: number | null;
+}
+
+export interface PairRule {
+  id: string;
+  a: string;
+  b: string;
+  kind: ConstraintKind;
+}
+
+export type UnsatisfiedReason =
+  /** Only one group: two students cannot be kept apart. */
+  | 'ONE_GROUP'
+  /** Students linked by 'together' rules are more than fit in one group. */
+  | 'GROUP_TOO_SMALL'
+  /** A 'together' rule contradicts an 'apart' rule (directly or through other 'together' rules). */
+  | 'CONFLICTS_WITH_APART'
+  /** No arrangement with these group sizes meets every rule; the 'apart' rules were preferred. */
+  | 'NOT_POSSIBLE_WITH_OTHER_RULES'
+  /** The groups were arranged by hand and break this rule. */
+  | 'ARRANGED_BY_HAND';
+
+export interface Unsatisfied {
+  ruleId: string;
+  a: string;
+  b: string;
+  kind: ConstraintKind;
+  reason: UnsatisfiedReason;
+}
+
+export interface SolveInput {
+  students: readonly GroupStudent[];
+  mode: GroupingMode;
+  sizing: Sizing;
+  rules: readonly PairRule[];
+  seed: string;
+}
+
+export interface SolveResult {
+  groups: string[][];
+  unsatisfied: Unsatisfied[];
+}
+
+/** Sizes of the groups for n students: they differ by at most one, larger groups first. */
+export function groupSizes(n: number, sizing: Sizing): number[] {
+  if (n <= 0) return [];
+  const k = 'groupCount' in sizing ? Math.min(Math.max(1, Math.trunc(sizing.groupCount)), n) : Math.max(1, Math.floor(n / Math.max(1, Math.trunc(sizing.targetSize))));
+  const base = Math.floor(n / k);
+  const extra = n % k;
+  return Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
+/**
+ * Ranks of teacher-entered level labels (free text, e.g. "1".."4", "A1", "B1"): distinct labels in
+ * natural order (numbers compare as numbers), lowest first. Empty / missing labels are unassessed.
+ */
+export function levelRanks(levels: ReadonlyMap<string, string | null>): Map<string, number | null> {
+  const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+  const distinct = [...new Set([...levels.values()].filter((l): l is string => Boolean(l?.trim())).map((l) => l.trim()))].sort(collator.compare);
+  const rank = new Map(distinct.map((l, i) => [l, i]));
+  return new Map([...levels].map(([id, l]) => [id, l?.trim() ? (rank.get(l.trim()) ?? null) : null]));
+}
+
+// ---------------------------------------------------------------- cost
+const W_APART = 1_000_000;
+const W_TOGETHER = 10_000;
+const W_UNASSESSED = 1_000;
+
+function groupIndex(groups: readonly (readonly string[])[]): Map<string, number> {
+  const m = new Map<string, number>();
+  groups.forEach((g, i) => g.forEach((id) => m.set(id, i)));
+  return m;
+}
+
+/** Rules whose two students are both placed (rules about absent / other students do not apply). */
+const applicable = (rules: readonly PairRule[], where: ReadonlyMap<string, number>) => rules.filter((r) => r.a !== r.b && where.has(r.a) && where.has(r.b));
+
+function violated(r: PairRule, where: ReadonlyMap<string, number>): boolean {
+  const same = where.get(r.a) === where.get(r.b);
+  return r.kind === 'apart' ? same : !same;
+}
+
+/** Level objective: spread inside groups (level mode) or distance of group means from the class mean (mixed). */
+function qualityCost(groups: readonly (readonly string[])[], rank: ReadonlyMap<string, number | null>, mode: GroupingMode): number {
+  // The unassessed bucket stays spread evenly (at most one apart per group) in both modes.
+  const unassessed = groups.map((g) => g.filter((id) => (rank.get(id) ?? null) === null).length);
+  let cost = unassessed.length ? Math.max(0, Math.max(...unassessed) - Math.min(...unassessed) - 1) * W_UNASSESSED : 0;
+  const all = [...rank.values()].filter((r): r is number => r !== null);
+  const mean = all.length ? all.reduce((a, b) => a + b, 0) / all.length : 0;
+  for (const g of groups) {
+    const rs = g.map((id) => rank.get(id) ?? null).filter((r): r is number => r !== null);
+    if (!rs.length) continue;
+    if (mode === 'level') cost += Math.max(...rs) - Math.min(...rs);
+    else cost += Math.abs(rs.reduce((a, b) => a + b, 0) / rs.length - mean) * rs.length;
+  }
+  return cost;
+}
+
+function cost(groups: readonly (readonly string[])[], rules: readonly PairRule[], rank: ReadonlyMap<string, number | null>, mode: GroupingMode): number {
+  const where = groupIndex(groups);
+  let c = qualityCost(groups, rank, mode);
+  for (const r of applicable(rules, where)) if (violated(r, where)) c += r.kind === 'apart' ? W_APART : W_TOGETHER;
+  return c;
+}
+
+// ---------------------------------------------------------------- initial placement
+function initialGroups(students: readonly GroupStudent[], sizes: readonly number[], mode: GroupingMode, seed: string): string[][] {
+  const k = sizes.length;
+  const tie = (a: GroupStudent, b: GroupStudent) => seededRank(seed, a.id) - seededRank(seed, b.id) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const assessed = students.filter((s) => s.levelRank !== null).sort((a, b) => a.levelRank! - b.levelRank! || tie(a, b));
+  const unassessed = students.filter((s) => s.levelRank === null).sort(tie);
+  const groups: string[][] = sizes.map(() => []);
+  if (mode === 'level') {
+    // Spread the unassessed bucket evenly first (quota per group), then fill groups in level order.
+    const quota = sizes.map(() => 0);
+    for (let i = 0; i < unassessed.length; i++) {
+      // The group with the fewest unassessed so far (then the most free room) that can take one more.
+      let best = -1;
+      for (let g = 0; g < k; g++) {
+        if (quota[g]! >= sizes[g]!) continue;
+        if (best < 0 || quota[g]! < quota[best]! || (quota[g] === quota[best] && sizes[g]! - quota[g]! > sizes[best]! - quota[best]!)) best = g;
+      }
+      quota[best]! += 1;
+    }
+    let g = 0;
+    for (const s of assessed) {
+      while (groups[g]!.length >= sizes[g]! - quota[g]!) g++;
+      groups[g]!.push(s.id);
+    }
+    let u = 0;
+    for (let gi = 0; gi < k; gi++) for (let q = 0; q < quota[gi]!; q++) groups[gi]!.push(unassessed[u++]!.id);
+    return groups;
+  }
+  // Mixed: serpentine draft from the highest level down, then the unassessed bucket.
+  const order = [...[...assessed].reverse(), ...unassessed];
+  let dir = 1;
+  let g = 0;
+  for (const s of order) {
+    let guard = 0;
+    while (groups[g]!.length >= sizes[g]! && guard++ < 2 * k) {
+      g += dir;
+      if (g >= k || g < 0) {
+        dir = -dir;
+        g += dir;
+      }
+    }
+    groups[g]!.push(s.id);
+    g += dir;
+    if (g >= k || g < 0) {
+      dir = -dir;
+      g += dir;
+    }
+  }
+  return groups;
+}
+
+// ---------------------------------------------------------------- improvement (swaps keep sizes)
+function improve(start: string[][], rules: readonly PairRule[], rank: ReadonlyMap<string, number | null>, mode: GroupingMode): string[][] {
+  const groups = start.map((g) => [...g]);
+  let current = cost(groups, rules, rank, mode);
+  for (let round = 0; round < 400; round++) {
+    let best: { gi: number; i: number; gj: number; j: number; c: number } | null = null;
+    for (let gi = 0; gi < groups.length; gi++)
+      for (let gj = gi + 1; gj < groups.length; gj++)
+        for (let i = 0; i < groups[gi]!.length; i++)
+          for (let j = 0; j < groups[gj]!.length; j++) {
+            const a = groups[gi]![i]!;
+            const b = groups[gj]![j]!;
+            groups[gi]![i] = b;
+            groups[gj]![j] = a;
+            const c = cost(groups, rules, rank, mode);
+            groups[gi]![i] = a;
+            groups[gj]![j] = b;
+            if (c < current - 1e-9 && (!best || c < best.c - 1e-9)) best = { gi, i, gj, j, c };
+          }
+    if (!best) break;
+    const a = groups[best.gi]![best.i]!;
+    groups[best.gi]![best.i] = groups[best.gj]![best.j]!;
+    groups[best.gj]![best.j] = a;
+    current = best.c;
+  }
+  return groups;
+}
+
+// ---------------------------------------------------------------- reasons (GRP-8)
+function components(ids: readonly string[], edges: readonly PairRule[]): Map<string, string> {
+  const parent = new Map(ids.map((id) => [id, id]));
+  const find = (x: string): string => {
+    let r = x;
+    while (parent.get(r) !== r) r = parent.get(r)!;
+    parent.set(x, r);
+    return r;
+  };
+  for (const e of edges) if (parent.has(e.a) && parent.has(e.b)) parent.set(find(e.a), find(e.b));
+  return new Map(ids.map((id) => [id, find(id)]));
+}
+
+/**
+ * The rules the arrangement breaks, each with the reason it could not be met. `byHand` = the groups
+ * were edited or kept by hand, so a broken rule is reported as such.
+ */
+export function evaluateRules(groups: readonly (readonly string[])[], rules: readonly PairRule[], opts: { byHand?: boolean } = {}): Unsatisfied[] {
+  const where = groupIndex(groups);
+  const live = applicable(rules, where);
+  const ids = [...where.keys()];
+  const together = live.filter((r) => r.kind === 'together');
+  const comp = components(ids, together);
+  const compSize = new Map<string, number>();
+  for (const c of comp.values()) compSize.set(c, (compSize.get(c) ?? 0) + 1);
+  const maxSize = Math.max(0, ...groups.map((g) => g.length));
+  const apartInside = new Set(live.filter((r) => r.kind === 'apart' && comp.get(r.a) === comp.get(r.b)).map((r) => comp.get(r.a)!));
+  const out: Unsatisfied[] = [];
+  for (const r of live) {
+    if (!violated(r, where)) continue;
+    let reason: UnsatisfiedReason;
+    if (opts.byHand) reason = 'ARRANGED_BY_HAND';
+    else if (r.kind === 'apart') reason = groups.filter((g) => g.length > 0).length <= 1 ? 'ONE_GROUP' : comp.get(r.a) === comp.get(r.b) ? 'CONFLICTS_WITH_APART' : 'NOT_POSSIBLE_WITH_OTHER_RULES';
+    else if (apartInside.has(comp.get(r.a)!)) reason = 'CONFLICTS_WITH_APART';
+    else if ((compSize.get(comp.get(r.a)!) ?? 0) > maxSize) reason = 'GROUP_TOO_SMALL';
+    else reason = 'NOT_POSSIBLE_WITH_OTHER_RULES';
+    out.push({ ruleId: r.id, a: r.a, b: r.b, kind: r.kind, reason });
+  }
+  return out;
+}
+
+const violationCost = (groups: readonly (readonly string[])[], rules: readonly PairRule[]) => {
+  const where = groupIndex(groups);
+  return applicable(rules, where).reduce((c, r) => c + (violated(r, where) ? (r.kind === 'apart' ? W_APART : W_TOGETHER) : 0), 0);
+};
+
+/** Partition the (present) students into groups. Every student is placed exactly once. */
+export function solveGroups(input: SolveInput): SolveResult {
+  const seen = new Set<string>();
+  const students = input.students.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
+  const sizes = groupSizes(students.length, input.sizing);
+  if (!sizes.length) return { groups: [], unsatisfied: [] };
+  const rank = new Map(students.map((s) => [s.id, s.levelRank]));
+  let best: string[][] | null = null;
+  let bestCost = Infinity;
+  // A few deterministic restarts help the swap search out of a local optimum when rules remain broken.
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const seed = attempt === 0 ? input.seed : `${input.seed}#${attempt}`;
+    const start = attempt === 0 ? initialGroups(students, sizes, input.mode, seed) : initialGroups(students, sizes, input.mode === 'level' ? 'mixed' : 'level', seed);
+    const groups = improve(start, input.rules, rank, input.mode);
+    const c = cost(groups, input.rules, rank, input.mode);
+    if (c < bestCost - 1e-9) {
+      best = groups;
+      bestCost = c;
+    }
+    if (violationCost(best!, input.rules) === 0) break;
+  }
+  return { groups: best!, unsatisfied: evaluateRules(best!, input.rules) };
+}
+
+/**
+ * Fit a saved arrangement to the students present in a lesson (GRP-5), without changing the saved
+ * arrangement: absent students and students no longer in the class are left out, present students
+ * the arrangement does not know are added to the smallest groups, and groups are evened out (moving
+ * as few students as possible, never into a group with an 'apart' partner when avoidable) so sizes
+ * differ by at most one (among the groups that keep students).
+ */
+export function fitToPresent(saved: readonly (readonly string[])[], present: readonly string[], rules: readonly PairRule[], seed: string): { groups: string[][]; moved: string[] } {
+  const here = new Set(present);
+  const groups = saved.map((g) => g.filter((id) => here.has(id)));
+  const placed = new Set(groups.flat());
+  const moved: string[] = [];
+  const order = (ids: readonly string[]) => [...ids].sort((a, b) => seededRank(seed, a) - seededRank(seed, b) || (a < b ? -1 : 1));
+  const apartOf = (id: string) => new Set(rules.filter((r) => r.kind === 'apart' && (r.a === id || r.b === id)).map((r) => (r.a === id ? r.b : r.a)));
+  const conflicts = (id: string, g: readonly string[]) => {
+    const ap = apartOf(id);
+    return g.some((x) => ap.has(x));
+  };
+  if (!groups.length && present.length) groups.push([]);
+  for (const id of order(present.filter((x) => !placed.has(x)))) {
+    const smallest = Math.min(...groups.map((g) => g.length));
+    const candidates = groups.map((g, i) => ({ g, i })).filter(({ g }) => g.length === smallest);
+    const target = candidates.find(({ g }) => !conflicts(id, g)) ?? candidates[0]!;
+    target.g.push(id);
+    moved.push(id);
+  }
+  for (let guard = 0; guard < 1000; guard++) {
+    const sizes = groups.map((g) => g.length);
+    const max = Math.max(...sizes);
+    const min = Math.min(...sizes);
+    if (max - min <= 1) break;
+    const from = sizes.indexOf(max);
+    const to = sizes.indexOf(min);
+    const pick = order(groups[from]!).find((id) => !conflicts(id, groups[to]!)) ?? order(groups[from]!)[0]!;
+    groups[from] = groups[from]!.filter((x) => x !== pick);
+    groups[to]!.push(pick);
+    moved.push(pick);
+  }
+  // Aligned with `saved` (index i = saved group i; one extra group when nothing was saved), so callers
+  // keep each group's name and roles; callers drop the empty ones.
+  return { groups, moved };
+}

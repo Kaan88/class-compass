@@ -272,7 +272,28 @@ describe('attendance (ACC-8, ACC-9, ATT-2)', () => {
     const changed = Object.keys(after).filter((k) => after[k] !== before[k]).sort();
     expect(changed).toEqual(['attendance_daily', 'audit_events', 'command_log']);
   });
-  it.todo('S8: homework marks and attendance stay independent of each other (ATT-1, ENG-3 cross-test)');
+  it('homework marks and attendance stay independent of each other (ATT-1, ENG-3 cross-test, S8)', async () => {
+    const { lessonId } = await start(s.teacherA, s.ctxA.id);
+    const hw = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/homework`, { title: 'Word list', dueOn: '2026-11-09' }));
+    const [away, here] = studentsA;
+    const snapshot = () => Object.fromEntries((env.db.$client.prepare("select name from sqlite_master where type='table' and name not like '\\_\\_%' escape '\\'").all() as any[]).map((t) => [t.name, JSON.stringify(env.db.$client.prepare(`select * from "${t.name}"`).all())]));
+    const diff = (a: Record<string, string>, b: Record<string, string>) => Object.keys(b).filter((k) => a[k] !== b[k]).sort();
+    // Absent in the lesson, but the homework was completed; present, but the homework is missing.
+    let before = snapshot();
+    await cmd(s.teacherA, 'attendance.setDaily', { contextId: s.ctxA.id, lessonId, studentId: away!.id, status: 'absent' });
+    expect(diff(before, snapshot())).toEqual(['attendance_daily', 'audit_events', 'command_log']);
+    before = snapshot();
+    await ok(s.teacherA.post(`/api/teacher/homework/${hw.id}/marks`, { changes: [{ studentId: away!.id, status: 'completed' }, { studentId: here!.id, status: 'missing' }] }));
+    expect(diff(before, snapshot())).toEqual(['audit_events', 'homework_mark_changes', 'homework_marks']);
+    const grid = await ok(s.teacherA.get(`/api/teacher/homework/${hw.id}/check`));
+    const row = (id: string) => grid.rows.find((r: any) => r.student.id === id);
+    expect(row(away!.id)).toMatchObject({ status: 'completed', attendance: 'absent' });
+    expect(row(here!.id)).toMatchObject({ status: 'missing', attendance: 'not_recorded' });
+    // Correcting attendance does not touch the marks.
+    before = snapshot();
+    await cmd(s.teacherA, 'attendance.setDaily', { contextId: s.ctxA.id, lessonId, studentId: away!.id, status: 'present' });
+    expect(diff(before, snapshot())).not.toContain('homework_marks');
+  });
 });
 
 describe('routines (RTN-1..3)', () => {

@@ -67,6 +67,8 @@ const COMMAND_TEXT: Record<string, MessageKey> = {
   'secret.redraw': 'command.secret.redraw',
   'secret.reveal': 'command.secret.reveal',
   'secret.recordOutcome': 'command.secret.outcome',
+  'grouping.apply': 'command.grouping.apply',
+  'grouping.clear': 'command.grouping.clear',
 };
 
 /**

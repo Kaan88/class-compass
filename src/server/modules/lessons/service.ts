@@ -13,6 +13,7 @@ import { clampStage } from '../../../domain/routines.ts';
 import { idleTimer, type TimerState } from '../../../domain/timer.ts';
 import type { AssistantToday } from '../../../shared/contracts/assistant.ts';
 import type { CountersLessonState } from '../../../shared/contracts/counters.ts';
+import type { GroupingLessonState } from '../../../shared/contracts/grouping.ts';
 import type { SecretLessonState } from '../../../shared/contracts/secret.ts';
 import type { LessonCommands, LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
 import { lessons, subjects, teachingContexts } from '../../db/schema.ts';
@@ -103,7 +104,7 @@ export function updateLesson(ctx: RequestContext, lesson: LessonRow, patch: Part
  * changes made by lesson commands bump the version through `updateLesson` already.
  */
 export interface LessonStateContributor {
-  key: 'counters' | 'secret' | 'assistant';
+  key: 'counters' | 'secret' | 'assistant' | 'grouping';
   stamp: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => string;
   body: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => unknown;
 }
@@ -148,6 +149,7 @@ export function lessonState(ctx: RequestContext, contextId: string) {
       counters: (bodies.counters ?? null) as CountersLessonState | null,
       secret: (bodies.secret ?? null) as SecretLessonState | null,
       assistant: (bodies.assistant ?? null) as AssistantToday | null,
+      grouping: (bodies.grouping ?? null) as GroupingLessonState | null,
     },
   };
 }
