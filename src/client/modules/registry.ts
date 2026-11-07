@@ -1,0 +1,52 @@
+/**
+ * Read side of the client module manifests (SX, D-069). Screens ask here for the pieces of enabled
+ * modules instead of importing modules directly. Everything is computed lazily from
+ * `CLIENT_MODULES`, so manifests may import screens that import this file.
+ */
+import { registerInvalidation } from '../lib/outbox-client.ts';
+import { CLIENT_MODULES } from './index.ts';
+import type { ClassroomContext, ClientModuleManifest, DashboardSlot, EndStepUi, StartStep, StudentCardAddon, TeacherPage } from './types.ts';
+
+export type { ClassroomContext, StudentCardExtras } from './types.ts';
+
+/** Deterministic order: `order`, then key (test-enforced: no two pieces share an order). */
+export const byOrder = <T extends { order: number; key: string }>(xs: readonly T[]): T[] => [...xs].sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
+
+const all = <T,>(pick: (m: ClientModuleManifest) => readonly T[] | undefined): T[] => CLIENT_MODULES.flatMap((m) => [...(pick(m) ?? [])]);
+
+const enabled = (ctx: ClassroomContext, m: ClientModuleManifest['policyKey']) => m === null || ctx.modules[m] === true;
+
+export const allDashboardSlots = (): DashboardSlot[] => byOrder(all((m) => m.dashboardSlots));
+export const allStartSteps = (): StartStep[] => byOrder(all((m) => m.startSteps));
+export const allTeacherPages = (): TeacherPage[] => byOrder(all((m) => m.teacherPages));
+const cardAddons = (): StudentCardAddon[] => all((m) => m.studentCardAddons);
+
+export const dashboardSlotsFor = (ctx: ClassroomContext) => allDashboardSlots().filter((s) => enabled(ctx, s.module));
+export const startStepsFor = (ctx: ClassroomContext) => allStartSteps().filter((s) => enabled(ctx, s.module));
+
+/** Screens for the server's step list (the server decides which steps run); a step without a screen runs with its defaults. */
+export function endStepUis(keys: readonly string[]): EndStepUi[] {
+  const byKey = new Map(all((m) => m.endSteps).map((s) => [s.key, s]));
+  return keys.map((k) => byKey.get(k)).filter((s): s is EndStepUi => Boolean(s));
+}
+
+/** Settings panels of the modules that have one, by policy key. */
+export const settingsPanelFor = (policyKey: string) => CLIENT_MODULES.find((m) => m.policyKey === policyKey)?.settingsPanel ?? null;
+
+/** Calls every registered student-card addon hook (stable order and count) and keeps the active ones. */
+export function useStudentCardAddons(ctx: ClassroomContext, lesson: Parameters<StudentCardAddon['useAddon']>[1]) {
+  const out: Array<NonNullable<ReturnType<StudentCardAddon['useAddon']>> & { key: string }> = [];
+  for (const a of cardAddons()) {
+    const r = a.useAddon(ctx, lesson, enabled(ctx, a.module));
+    if (r) out.push({ ...r, key: a.key });
+  }
+  return out;
+}
+
+let installed = false;
+/** Registers the manifests' outbox invalidations once (main.tsx, before the outbox starts). */
+export function installClientModules(): void {
+  if (installed) return;
+  installed = true;
+  for (const inv of all((m) => m.invalidations)) registerInvalidation(inv.prefix, inv.keys);
+}

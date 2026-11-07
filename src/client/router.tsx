@@ -11,12 +11,8 @@ import { ChangePasswordPage, LoginPage, ResetPasswordPage } from './routes/Auth.
 import { ClassroomPage } from './routes/Classroom.tsx';
 import { homeFor, requireSession, type RouterContext } from './routes/guards.ts';
 import { NotFoundPage, RootLayout } from './routes/Root.tsx';
-import { AssistantPage } from './routes/teacher/Assistant.tsx';
-import { AttendancePage } from './routes/teacher/Attendance.tsx';
-import { ClassSettingsPage, TeacherStudentsPage } from './routes/teacher/Classes.tsx';
-import { CounterHistoryPage, CountersPage } from './routes/teacher/Counters.tsx';
-import { RoutinesPage } from './routes/teacher/Routines.tsx';
-import { SecretPage } from './routes/teacher/Secret.tsx';
+import { allTeacherPages } from './modules/registry.ts';
+import { CounterHistoryPage } from './routes/teacher/Counters.tsx';
 import { ProfilePage, TeacherLayout, TeacherMenu } from './routes/teacher/Teacher.tsx';
 
 /*
@@ -76,14 +72,22 @@ const classroomRoute = createRoute({
 
 const teacherRoute = createRoute({ getParentRoute: () => rootRoute, path: '/teacher', beforeLoad: requireSession, component: TeacherLayout });
 const teacherIndex = createRoute({ getParentRoute: () => teacherRoute, path: '/', component: TeacherMenu });
-const teacherProfile = createRoute({ getParentRoute: () => teacherRoute, path: 'profile', component: ProfilePage });
-const teacherClasses = createRoute({ getParentRoute: () => teacherRoute, path: 'classes', component: ClassSettingsPage });
-const teacherStudents = createRoute({ getParentRoute: () => teacherRoute, path: 'students', component: TeacherStudentsPage });
-const teacherAttendance = createRoute({ getParentRoute: () => teacherRoute, path: 'attendance', component: AttendancePage });
-const teacherRoutines = createRoute({ getParentRoute: () => teacherRoute, path: 'routines', component: RoutinesPage });
-const teacherAssistant = createRoute({ getParentRoute: () => teacherRoute, path: 'assistant', component: AssistantPage });
-const teacherSecret = createRoute({ getParentRoute: () => teacherRoute, path: 'secret', component: SecretPage });
-const teacherCounters = createRoute({ getParentRoute: () => teacherRoute, path: 'counters', component: CountersPage });
+/**
+ * Teacher-area pages come from the client module manifests (D-069): `/teacher/$page` renders the
+ * manifest page with that path (inside TeacherLayout, so behind the PIN gate) or "not found".
+ * Link to one with `<Link to="/teacher/$page" params={{ page: 'counters' }}>`.
+ */
+const teacherPage = createRoute({
+  getParentRoute: () => teacherRoute,
+  path: '$page',
+  component: function TeacherPageRoute() {
+    const { page } = teacherPage.useParams();
+    const found = allTeacherPages().find((p) => p.path === page);
+    if (!found) return <NotFoundPage />;
+    const Page = found.Component;
+    return <Page key={page} />;
+  },
+});
 const teacherCounterHistory = createRoute({
   getParentRoute: () => teacherRoute,
   path: 'counter-history',
@@ -116,7 +120,7 @@ const routeTree = rootRoute.addChildren([
   resetRoute,
   changePasswordRoute,
   classroomRoute,
-  teacherRoute.addChildren([teacherIndex, teacherProfile, teacherClasses, teacherStudents, teacherAttendance, teacherRoutines, teacherCounters, teacherCounterHistory, teacherAssistant, teacherSecret]),
+  teacherRoute.addChildren([teacherIndex, teacherPage, teacherCounterHistory]),
   adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminAudit, adminProfile]),
   catalogRoute,
 ]);

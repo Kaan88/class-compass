@@ -13,7 +13,7 @@ import type { z } from 'zod';
 import * as L from '../../../shared/contracts/lessons.ts';
 import type { LessonCommandPayload, LessonCommandType, LessonState } from '../../../shared/contracts/lessons.ts';
 import { call, callConditional } from '../../lib/api.ts';
-import { getOutbox, registerInvalidation } from '../../lib/outbox-client.ts';
+import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts';
 import { queryClient } from '../../lib/queryClient.ts';
 
 export type LessonStateData = z.infer<typeof L.getLessonState.output>;
@@ -108,8 +108,9 @@ export function useRoutines(contextId: string | null) {
 /** Refresh what a lesson command touches once the server accepted it. */
 const refreshFor = (contextId: string | undefined): QueryKey[] =>
   contextId ? [lessonKey(contextId), ['classroom', 'roster', contextId], activeLessonsKey] : [['classroom', 'lesson'], ['classroom', 'roster'], activeLessonsKey];
-registerInvalidation('lesson.', (op) => refreshFor(op.contextId));
-registerInvalidation('attendance.', (op) => refreshFor(op.contextId));
+/** Listed in the lessons and attendance manifests. */
+export const lessonInvalidation: CommandInvalidation = { prefix: 'lesson.', keys: (op) => refreshFor(op.contextId) };
+export const attendanceInvalidation: CommandInvalidation = { prefix: 'attendance.', keys: (op) => refreshFor(op.contextId) };
 
 /** Change the cached lesson state right away (optimistic). The ETag is dropped so the next poll is a full read. */
 export function patchLesson(contextId: string, fn: (l: LessonState) => LessonState) {

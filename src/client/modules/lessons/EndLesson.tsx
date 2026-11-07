@@ -13,41 +13,14 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { showToast } from '../../lib/toast.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
-import { TextField } from '../../ui/Fields.tsx';
 import { IconFace, IconFlag, IconPrev } from '../../ui/icons.tsx';
 import { MetricCell } from '../../ui/Students.tsx';
-import { classLabel } from './Dashboard.tsx';
+import { classLabel } from './labels.ts';
+import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { awaitCommand, sendLessonCommand } from './lessonClient.ts';
-import { endStepUis, registerEndStepUi, type ClassroomContext } from './registry.ts';
+import { endStepUis, type ClassroomContext } from '../registry.ts';
+import type { ReflectionValue } from './ReflectionStep.tsx';
 
-type ReflectionValue = { rating: number | null; note: string };
-const RATINGS = [1, 2, 3, 4] as const;
-
-function ReflectionStep({ value, onChange }: { lesson: LessonState; value: ReflectionValue; onChange: (v: ReflectionValue) => void }) {
-  const { t } = useI18n();
-  return (
-    <div className="cc-stack">
-      <div className="cc-reflect" role="radiogroup" aria-label={t('reflection.question')}>
-        {RATINGS.map((r) => (
-          <button
-            key={r}
-            type="button"
-            role="radio"
-            aria-checked={value.rating === r}
-            className="cc-reflect__option"
-            onClick={() => onChange({ ...value, rating: value.rating === r ? null : r })}
-          >
-            <IconFace level={r} />
-            <span>{t(`reflection.rating.${r}`)}</span>
-          </button>
-        ))}
-      </div>
-      <TextField label={t('reflection.note')} description={t('reflection.noteHint')} value={value.note} onChange={(note) => onChange({ ...value, note })} maxLength={500} />
-    </div>
-  );
-}
-
-registerEndStepUi<ReflectionValue>({ key: 'reflection', title: 'reflection.title', initial: () => ({ rating: null, note: '' }), Component: ReflectionStep });
 
 /** Values typed into the End Lesson steps so far; kept by the classroom page per class and lesson (LES-4). */
 export type EndDraft = Record<string, unknown>;
@@ -96,9 +69,12 @@ export function EndLessonFlow({
 
   return (
     <section className="cc-card cc-stack" aria-labelledby="cc-end-title" data-testid="end-lesson">
-      <h2 id="cc-end-title" className="cc-h1">
-        {t('lesson.endTitle', { cls: label })}
-      </h2>
+      <div className="cc-flow-head">
+        <ThemeIllustration name="endLesson" width={150} />
+        <h2 id="cc-end-title" className="cc-h1">
+          {t('lesson.endTitle', { cls: label })}
+        </h2>
+      </div>
       {uis.map(({ key, title, Component }) => (
         <section key={key} className="cc-stack" aria-label={t(title)}>
           <h3 className="cc-h2">{t(title)}</h3>

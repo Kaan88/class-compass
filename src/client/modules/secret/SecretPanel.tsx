@@ -14,7 +14,7 @@ import * as S from '../../../shared/contracts/secret.ts';
 import type { RevealedSelection, SecretCommandPayload, SecretCommandType, SecretReveal } from '../../../shared/contracts/secret.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
-import { getOutbox, registerInvalidation } from '../../lib/outbox-client.ts';
+import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts';
 import { queryClient } from '../../lib/queryClient.ts';
 import { commandErrorText } from '../../lib/errors.ts';
 import { BigButton, Button } from '../../ui/Button.tsx';
@@ -22,14 +22,19 @@ import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconCheck, IconSync, IconUndo } from '../../ui/icons.tsx';
-import { Mascot } from '../../ui/Mascot.tsx';
+import { useThemeSound } from '../../themes/index.tsx';
+import { Mascot, ThemeIllustration } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { awaitCommand, lessonKey, useLessonState } from '../lessons/lessonClient.ts';
-import { registerDashboardSlot, registerEndStepUi, type ClassroomContext } from '../lessons/registry.ts';
+import { endStepUi, type ClassroomContext, type DashboardSlot } from '../types.ts';
 
 export const secretKey = (lessonId: string) => ['classroom', 'secret', lessonId] as const;
 
-registerInvalidation('secret.', (op) => [...(op.contextId ? [lessonKey(op.contextId)] : [['classroom', 'lesson']]), ...(op.lessonId ? [secretKey(op.lessonId)] : [])]);
+/** Listed in the Secret Students manifest. */
+export const secretInvalidation: CommandInvalidation = {
+  prefix: 'secret.',
+  keys: (op) => [...(op.contextId ? [lessonKey(op.contextId)] : [['classroom', 'lesson']]), ...(op.lessonId ? [secretKey(op.lessonId)] : [])],
+};
 
 export async function sendSecretCommand<T extends SecretCommandType>(type: T, payload: SecretCommandPayload<T>): Promise<string> {
   const p = payload as { contextId: string; lessonId: string };
@@ -116,7 +121,7 @@ function SecretSlot({ context, lesson }: { context: ClassroomContext; lesson: Le
   );
 }
 
-registerDashboardSlot({ key: 'secret', module: 'secretStudents', order: 30, Component: SecretSlot });
+export const secretDashboardSlot: DashboardSlot = { key: 'secret', module: 'secretStudents', order: 30, Component: SecretSlot };
 
 // ---------------------------------------------------------------- End Lesson: reveal + outcomes (SEC-5)
 type SecretStepValue = Record<string, never>;
@@ -126,6 +131,7 @@ function SelectionCard({ lesson, sel, index }: { lesson: LessonState; sel: Revea
   const qc = useQueryClient();
   const [note, setNote] = useState(sel.note ?? '');
   const [celebrate, setCelebrate] = useState(0);
+  const playSound = useThemeSound();
   const send = (patch: { outcome?: S.RevealedSelection['outcome']; note?: string | null; celebration?: boolean }) => {
     const outcome = patch.outcome ?? sel.outcome ?? 'not_assessed';
     // Optimistic: show the choice right away; the outbox sends it once (UX-10/11).
@@ -163,12 +169,15 @@ function SelectionCard({ lesson, sel, index }: { lesson: LessonState; sel: Revea
         isSelected={sel.celebration}
         onChange={(v) => {
           send({ celebration: v });
-          if (v) setCelebrate((n) => n + 1);
+          if (v) {
+            setCelebrate((n) => n + 1);
+            playSound('celebrate'); // only when the class and this device allow sounds (THM-5)
+          }
         }}
       />
       {sel.celebration ? (
         <div className="cc-reveal__celebration" role="status">
-          <Mascot key={celebrate} size={64} animate={celebrate > 0} />
+          <ThemeIllustration key={celebrate} name="celebration" width={110} motion={celebrate > 0 ? 'celebrate' : undefined} />
           <span>{t('secret.wellDone', { name: sel.student.fullName })}</span>
         </div>
       ) : null}
@@ -238,4 +247,4 @@ function SecretRevealStep({ lesson }: { lesson: LessonState; value: SecretStepVa
   );
 }
 
-registerEndStepUi<SecretStepValue>({ key: 'secretStudents', title: 'secret.endTitle', initial: () => ({}) as SecretStepValue, Component: SecretRevealStep });
+export const secretEndStepUi = endStepUi<SecretStepValue>({ key: 'secretStudents', title: 'secret.endTitle', initial: () => ({}) as SecretStepValue, Component: SecretRevealStep });

@@ -20,7 +20,7 @@ import { IconCalendar, IconCheck } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { useLessonState } from '../lessons/lessonClient.ts';
-import { registerDashboardSlot, registerEndStepUi, registerStartStep, type ClassroomContext } from '../lessons/registry.ts';
+import { endStepUi, type ClassroomContext, type DashboardSlot, type StartStep } from '../types.ts';
 
 /** A local calendar date ('YYYY-MM-DD') as a weekday + day label. */
 export const dayLabel = (date: string, locale: 'en' | 'tr', opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }) =>
@@ -112,7 +112,7 @@ function AssistantSlot({ context }: { context: ClassroomContext; lesson: LessonS
   );
 }
 
-registerDashboardSlot({ key: 'assistant', module: 'assistant', order: 20, Component: AssistantSlot });
+export const assistantDashboardSlot: DashboardSlot = { key: 'assistant', module: 'assistant', order: 20, Component: AssistantSlot };
 
 /** Start Lesson step (LES-1): show today's assistant. */
 function AssistantStartStep({ context }: { context: ClassroomContext }) {
@@ -127,7 +127,7 @@ function AssistantStartStep({ context }: { context: ClassroomContext }) {
   );
 }
 
-registerStartStep({ key: 'assistant', module: 'assistant', order: 10, title: 'assistant.startTitle', Component: AssistantStartStep });
+export const assistantStartStep: StartStep = { key: 'assistant', module: 'assistant', order: 10, title: 'assistant.startTitle', Component: AssistantStartStep };
 
 /** End Lesson step (optional): thank today's assistant. */
 type ThanksValue = { thanked: boolean };
@@ -148,4 +148,4 @@ function AssistantThanksStep({ lesson, value, onChange }: { lesson: LessonState;
   );
 }
 
-registerEndStepUi<ThanksValue>({ key: 'assistantThanks', title: 'assistant.thanksTitle', initial: () => ({ thanked: false }), Component: AssistantThanksStep });
+export const assistantEndStepUi = endStepUi<ThanksValue>({ key: 'assistantThanks', title: 'assistant.thanksTitle', initial: () => ({ thanked: false }), Component: AssistantThanksStep });

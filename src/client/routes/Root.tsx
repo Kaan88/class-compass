@@ -5,6 +5,7 @@ import { setDisplay } from '../lib/display.ts';
 import { useMe } from '../lib/session.ts';
 import { buttonClass } from '../ui/Button.tsx';
 import { EmptyState, Toaster } from '../ui/Feedback.tsx';
+import { ThemeBackdrop } from '../ui/Mascot.tsx';
 
 /**
  * Root layout: language and text size come from the signed-in teacher's own preferences (UX-4,
@@ -19,6 +20,7 @@ export function RootLayout() {
   }, [locale, textScale]);
   return (
     <I18nProvider locale={locale}>
+      <ThemeBackdrop />
       <Outlet />
       <Toaster />
     </I18nProvider>

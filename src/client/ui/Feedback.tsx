@@ -11,7 +11,7 @@ import { getOutbox, useOutboxStatus } from '../lib/outbox-client.ts';
 import { dismissToast, useToasts, type Toast } from '../lib/toast.ts';
 import { Button } from './Button.tsx';
 import { IconAlert, IconCheck, IconCloudOff, IconSync, IconUndo, IconX } from './icons.tsx';
-import { Mascot } from './Mascot.tsx';
+import { ThemeIllustration } from './Mascot.tsx';
 
 function ToastView({ toast }: { toast: Toast }) {
   const { t } = useI18n();
@@ -151,7 +151,7 @@ export function OutboxAttentionTray() {
 export function EmptyState({ title, body, action, mascot = true }: { title: string; body?: ReactNode; action?: ReactNode; mascot?: boolean }) {
   return (
     <div className="cc-card cc-stack" style={{ alignItems: 'center', textAlign: 'center' }}>
-      {mascot ? <Mascot size={96} /> : null}
+      {mascot ? <ThemeIllustration name="emptyState" width={180} /> : null}
       <h2 className="cc-h2">{title}</h2>
       {body ? <div className="cc-muted">{body}</div> : null}
       {action}

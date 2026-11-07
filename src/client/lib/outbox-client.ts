@@ -12,7 +12,12 @@ import { ME_KEY, type Me } from './session.ts';
  *   registerInvalidation('counter.', (op) => [['classroom', 'lesson', op.lessonId]])
  */
 let instance: Outbox | null = null;
-const invalidations: Array<{ prefix: string; keys: (op: OutboxOp) => QueryKey[] }> = [];
+/** Which queries to refresh after a command of type `prefix…` succeeds (listed in client module manifests). */
+export interface CommandInvalidation {
+  prefix: string;
+  keys: (op: OutboxOp) => QueryKey[];
+}
+const invalidations: CommandInvalidation[] = [];
 
 export function registerInvalidation(prefix: string, keys: (op: OutboxOp) => QueryKey[]) {
   invalidations.push({ prefix, keys });

@@ -12,7 +12,8 @@ import * as St from '../../../shared/contracts/students.ts';
 import { pickText } from '../../../shared/i18n/index.ts';
 import { compareNames } from '../../../shared/text/turkish.ts';
 import { call } from '../../lib/api.ts';
-import type { ThemeName } from '../../lib/display.ts';
+import type { ThemeKey as ThemeName } from '../../../shared/themes.ts';
+import { DEFAULT_THEME } from '../../../shared/themes.ts';
 import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { showToast } from '../../lib/toast.ts';
@@ -417,7 +418,7 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
   const [d, setD] = useState<ClassDraft>({
     name: cls?.name ?? '',
     grade: cls?.grade === null || cls?.grade === undefined ? '' : String(cls.grade),
-    theme: cls?.theme ?? 'classroom',
+    theme: cls?.theme ?? DEFAULT_THEME,
     timezone: cls?.timezone ?? '',
     soundsEnabled: cls?.soundsEnabled ?? true,
     animationsEnabled: cls?.animationsEnabled ?? true,

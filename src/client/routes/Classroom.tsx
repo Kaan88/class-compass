@@ -11,15 +11,13 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LessonSummary } from '../../shared/contracts/lessons.ts';
 import * as School from '../../shared/contracts/school.ts';
+import { DEFAULT_THEME } from '../../shared/themes.ts';
 import { formatDate, type MessageKey } from '../../shared/i18n/index.ts';
 import { call } from '../lib/api.ts';
 import { setDisplay, useDisplay } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useOutboxStatus } from '../lib/outbox-client.ts';
 import { useMe } from '../lib/session.ts';
-import '../modules/assistant/AssistantPanel.tsx';
-import '../modules/counters/CounterPanel.tsx';
-import '../modules/secret/SecretPanel.tsx';
 import { classLabel, LessonDashboard } from '../modules/lessons/Dashboard.tsx';
 import { EndLessonFlow, LessonSummaryView, type EndDraft } from '../modules/lessons/EndLesson.tsx';
 import { serverNow, useActiveLessons, useLessonState, useServerOffset } from '../modules/lessons/lessonClient.ts';
@@ -111,7 +109,7 @@ export function ClassroomPage() {
     if (!active) return;
     setDisplay({ theme: active.theme, classAnimations: active.animationsEnabled, classSounds: active.soundsEnabled });
   }, [active]);
-  useEffect(() => () => setDisplay({ theme: 'classroom', classAnimations: true, classSounds: true }), []);
+  useEffect(() => () => setDisplay({ theme: DEFAULT_THEME, classAnimations: true, classSounds: true }), []);
 
   // The needs-attention tray names the class of every refused command (LES-4).
   useEffect(() => {
@@ -144,7 +142,7 @@ export function ClassroomPage() {
           title={t('classroom.needPin.title')}
           body={t('classroom.needPin.body')}
           action={
-            <Link to="/teacher/profile" className={buttonClass('primary', 'big')}>
+            <Link to="/teacher/$page" params={{ page: 'profile' }} className={buttonClass('primary', 'big')}>
               {t('classroom.needPin.action')}
             </Link>
           }

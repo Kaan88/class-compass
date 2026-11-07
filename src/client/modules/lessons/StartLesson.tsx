@@ -16,9 +16,10 @@ import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { IconCheck, IconNext, IconPlay, IconPrev } from '../../ui/icons.tsx';
 import { AttendanceCountsLine, AttendanceList } from './AttendanceList.tsx';
-import { classLabel } from './Dashboard.tsx';
+import { classLabel } from './labels.ts';
+import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { awaitCommand, sendLessonCommand, useLessonRoster, useRoutines } from './lessonClient.ts';
-import { startStepsFor, type ClassroomContext } from './registry.ts';
+import { startStepsFor, type ClassroomContext } from '../registry.ts';
 
 type Step = { key: 'attendance' } | { key: 'module'; index: number } | { key: 'routine' };
 
@@ -104,9 +105,12 @@ export function StartLessonFlow({
 
   return (
     <section className="cc-card cc-stack" aria-labelledby="cc-start-title" data-testid="start-lesson">
-      <h2 id="cc-start-title" className="cc-h1">
-        {t('lesson.startTitle', { cls: label })}
-      </h2>
+      <div className="cc-flow-head">
+        <ThemeIllustration name="startLesson" width={150} />
+        <h2 id="cc-start-title" className="cc-h1">
+          {t('lesson.startTitle', { cls: label })}
+        </h2>
+      </div>
       {steps.length > 1 ? (
         <ol className="cc-steps" aria-label={t('lesson.startSteps')}>
           {steps.map((s, i) => (

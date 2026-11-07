@@ -22,7 +22,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "node --run typecheck && node --run lint && node --run test"
+    "check": "node --run typecheck && node --run lint && node --run test",
+    "new:module": "node scripts/new-module.ts",
+    "new:theme": "node scripts/new-theme.ts"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",
@@ -52,6 +54,8 @@
     "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.65.0",
     "@tailwindcss/vite": "4.3.5",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
@@ -62,6 +66,7 @@
     "eslint-plugin-boundaries": "7.4.2",
     "fake-indexeddb": "6.2.7",
     "fast-check": "4.10.2",
+    "jsdom": "30.1.3",
     "tailwindcss": "4.3.5",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",

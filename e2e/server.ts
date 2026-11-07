@@ -24,6 +24,8 @@ Object.assign(process.env, {
   TRUST_PROXY: 'false',
   SMTP_HOST: '',
   CC_DEMO_PASSWORD: process.env.E2E_PASSWORD ?? 'e2e-only-Passw0rd!',
+  // The suite signs in many times; the override is honoured only under NODE_ENV=test (config.ts).
+  CC_TEST_LOGIN_RATE_LIMIT: '1000',
 });
 
 const cleanup = () => {

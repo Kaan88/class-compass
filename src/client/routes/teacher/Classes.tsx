@@ -1,5 +1,5 @@
 /** Teacher class settings (ACC-5, CFG-1/2) and class roster (ACC-4/7). */
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as School from '../../../shared/contracts/school.ts';
 import * as Students from '../../../shared/contracts/students.ts';
@@ -17,6 +17,7 @@ import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { ThemePreview } from '../../ui/ThemePreview.tsx';
+import { settingsPanelFor } from '../../modules/registry.ts';
 
 export const moduleLabelKey = (m: string) => `module.${m}` as MessageKey;
 
@@ -60,16 +61,22 @@ export function ClassSettingsPage() {
           <section className="cc-card cc-stack">
             <h2 className="cc-h2">{t('teacher.modules')}</h2>
             <p className="cc-muted">{t('teacher.modulesHint')}</p>
-            {modules.data?.modules.map((m) => (
-              <Toggle
-                key={m.module}
-                label={t(moduleLabelKey(m.module))}
-                isSelected={m.effective}
-                isDisabled={!m.available || set.isPending}
-                description={m.available ? undefined : t('teacher.moduleOffByAdmin')}
-                onChange={(v) => set.mutate({ module: m.module, enabled: v })}
-              />
-            ))}
+            {modules.data?.modules.map((m) => {
+              // A module's own settings panel (client manifest) appears under its switch while it is on.
+              const Panel = m.effective ? settingsPanelFor(m.module)?.Component : undefined;
+              return (
+                <Fragment key={m.module}>
+                  <Toggle
+                    label={t(moduleLabelKey(m.module))}
+                    isSelected={m.effective}
+                    isDisabled={!m.available || set.isPending}
+                    description={m.available ? undefined : t('teacher.moduleOffByAdmin')}
+                    onChange={(v) => set.mutate({ module: m.module, enabled: v })}
+                  />
+                  {Panel ? <Panel key={`${ctx.id}-${m.module}`} contextId={ctx.id} /> : null}
+                </Fragment>
+              );
+            })}
           </section>
           <section className="cc-card cc-stack">
             <h2 className="cc-h2">{t('teacher.themePreview')}</h2>

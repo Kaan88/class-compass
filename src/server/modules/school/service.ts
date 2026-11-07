@@ -28,7 +28,8 @@ import { requireUser } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
-import { contextModuleStates, getAvailability, mediaRecord, type ContextModuleState } from './modules.ts';
+import { contextModuleStates, getAvailability, mediaRecord, validateModuleConfig, type ContextModuleState } from './modules.ts';
+import { DEFAULT_THEME } from '../../../shared/themes.ts';
 import {
   assertClassWritable,
   assertOwnsContext,
@@ -311,7 +312,7 @@ export function createClass(ctx: RequestContext, input: In<typeof C.createClass>
       schoolYearId: input.schoolYearId,
       name,
       grade: input.grade ?? null,
-      theme: input.theme ?? 'classroom',
+      theme: input.theme ?? DEFAULT_THEME,
       timezone: input.timezone ?? null,
       soundsEnabled: input.soundsEnabled ?? true,
       animationsEnabled: input.animationsEnabled ?? true,
@@ -505,7 +506,7 @@ export function setContextModule(ctx: RequestContext, input: In<typeof C.setCont
       .get();
     let configJson = existing?.configJson ?? null;
     if (input.config !== undefined) {
-      configJson = input.config === null ? null : JSON.stringify(input.config);
+      configJson = input.config === null ? null : JSON.stringify(validateModuleConfig(input.module, input.config));
       if (configJson && Buffer.byteLength(configJson) > MAX_CONFIG_BYTES) throw invalid('Module settings are too large');
     }
     const now = ctx.now();

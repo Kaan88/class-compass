@@ -7,7 +7,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatTimer, remainingAt } from '../../../domain/timer.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
-import { soundsAllowed, useDisplay } from '../../lib/display.ts';
+import { useDisplay } from '../../lib/display.ts';
+import { playThemeSound, useTheme } from '../../themes/index.tsx';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { IconBack, IconClock, IconPause, IconPlay } from '../../ui/icons.tsx';
@@ -18,30 +19,10 @@ const PRESETS_MIN = [1, 3, 5, 10, 15];
 /** A run that ended at most this long ago still gets its tone when the screen first shows it. */
 const RECENT_END_MS = 3_000;
 
-function playSoftTone() {
-  try {
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return;
-    const ctx = new Ctor();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 660;
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.9);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 1);
-    osc.onended = () => void ctx.close();
-  } catch {
-    /* audio unavailable: the visual signal is enough */
-  }
-}
-
 export function LessonTimer({ lesson }: { lesson: LessonState }) {
   const { t } = useI18n();
   const display = useDisplay();
+  const theme = useTheme();
   const timer = lesson.timer;
   const [now, setNow] = useState(serverNow);
   useEffect(() => {
@@ -63,8 +44,9 @@ export function LessonTimer({ lesson }: { lesson: LessonState }) {
     if (!finished || signalled.current === runKey) return;
     signalled.current = runKey;
     const endedAt = (timer.startedAt ?? 0) + timer.remainingMs;
-    if ((watched.current === runKey || serverNow() - endedAt <= RECENT_END_MS) && soundsAllowed(display)) playSoftTone();
-  }, [finished, runKey, timer.running, timer.startedAt, timer.remainingMs, display]);
+    // One soft tone of the class theme, only if the class and this device allow sounds (D-048, THM-5).
+    if (watched.current === runKey || serverNow() - endedAt <= RECENT_END_MS) playThemeSound(display, theme, 'timerEnd');
+  }, [finished, runKey, timer.running, timer.startedAt, timer.remainingMs, display, theme]);
 
   const ref = { contextId: lesson.contextId, lessonId: lesson.id };
   const apply = (fn: (tm: LessonState['timer']) => LessonState['timer']) => patchLesson(lesson.contextId, (l) => ({ ...l, timer: fn(l.timer) }));

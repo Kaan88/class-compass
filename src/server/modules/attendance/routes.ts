@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import * as C from '../../../shared/contracts/lessons.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
-import './commands.ts';
 import * as svc from './service.ts';
 
 export function registerAttendanceRoutes(app: FastifyInstance, deps: AppDeps) {

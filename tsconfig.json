@@ -18,5 +18,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src", "tests", "e2e", "*.ts"]
+  "include": ["src", "tests", "e2e", "scripts", "*.ts"]
 }

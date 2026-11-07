@@ -18,9 +18,10 @@ import { StudentCard, StudentGrid } from '../../ui/Students.tsx';
 import { AttendanceCountsLine, AttendanceList } from './AttendanceList.tsx';
 import { LessonTimer } from './LessonTimer.tsx';
 import { patchLesson, patchRoster, sendLessonCommand, useLessonRoster, type RosterStudent } from './lessonClient.ts';
-import { dashboardSlotsFor, useStudentCardAddons, type ClassroomContext, type StudentCardExtras } from './registry.ts';
+import { dashboardSlotsFor, useStudentCardAddons, type ClassroomContext, type StudentCardExtras } from '../registry.ts';
 
-export const classLabel = (c: { className: string; subjectName: ClassroomContext['subjectName'] }, locale: 'en' | 'tr') => `${c.className} · ${pickText(c.subjectName, locale)}`;
+export { classLabel } from './labels.ts';
+import { classLabel } from './labels.ts';
 
 const GRID_KEY = 'cc.studentGridOpen';
 const readGridOpen = () => {

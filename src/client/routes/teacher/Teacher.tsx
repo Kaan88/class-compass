@@ -11,7 +11,8 @@ import { freshMe, ME_KEY, signOut, useMe, type Me } from '../../lib/session.ts';
 import { Button, BigButton } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
-import { IconBoard, IconCalendar, IconFlag, IconList, IconPlus, IconSettings, IconUser, IconUsers } from '../../ui/icons.tsx';
+import { allTeacherPages } from '../../modules/registry.ts';
+import { IconBoard } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
 import { SensitiveGate } from '../Lock.tsx';
@@ -40,14 +41,11 @@ export function TeacherLayout() {
               <Link to="/teacher" activeOptions={{ exact: true }}>
                 {t('teacher.menu')}
               </Link>
-              <Link to="/teacher/profile">{t('teacher.profile')}</Link>
-              <Link to="/teacher/classes">{t('teacher.classSettings')}</Link>
-              <Link to="/teacher/students">{t('teacher.students')}</Link>
-              <Link to="/teacher/attendance">{t('teacher.attendance')}</Link>
-              <Link to="/teacher/routines">{t('teacher.routines')}</Link>
-              <Link to="/teacher/counters">{t('teacher.counters')}</Link>
-              <Link to="/teacher/assistant">{t('teacher.assistant')}</Link>
-              <Link to="/teacher/secret">{t('teacher.secret')}</Link>
+              {allTeacherPages().map((p) => (
+                <Link key={p.key} to="/teacher/$page" params={{ page: p.path }}>
+                  {t(p.labelKey)}
+                </Link>
+              ))}
             </div>
           </nav>
           <Outlet />
@@ -81,38 +79,12 @@ export function TeacherMenu() {
         {me.classroomMode ? t('teacher.backToClassroom') : t('teacher.openClassroom')}
       </BigButton>
       <div className="cc-menu-grid">
-        <Link to="/teacher/profile" className="cc-menu-tile">
-          <IconUser />
-          {t('teacher.profile')}
-        </Link>
-        <Link to="/teacher/classes" className="cc-menu-tile">
-          <IconSettings />
-          {t('teacher.classSettings')}
-        </Link>
-        <Link to="/teacher/students" className="cc-menu-tile">
-          <IconUsers />
-          {t('teacher.students')}
-        </Link>
-        <Link to="/teacher/attendance" className="cc-menu-tile">
-          <IconCalendar />
-          {t('teacher.attendance')}
-        </Link>
-        <Link to="/teacher/routines" className="cc-menu-tile">
-          <IconList />
-          {t('teacher.routines')}
-        </Link>
-        <Link to="/teacher/counters" className="cc-menu-tile">
-          <IconPlus />
-          {t('teacher.counters')}
-        </Link>
-        <Link to="/teacher/assistant" className="cc-menu-tile">
-          <IconCalendar />
-          {t('teacher.assistant')}
-        </Link>
-        <Link to="/teacher/secret" className="cc-menu-tile">
-          <IconFlag />
-          {t('teacher.secret')}
-        </Link>
+        {allTeacherPages().map((p) => (
+          <Link key={p.key} to="/teacher/$page" params={{ page: p.path }} className="cc-menu-tile">
+            <p.Icon />
+            {t(p.labelKey)}
+          </Link>
+        ))}
       </div>
       <div className="cc-row">
         {me.classroomMode ? (

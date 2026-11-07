@@ -37,7 +37,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
       setSessionCookie(deps, reply, token, svc.SESSION_ABSOLUTE_MS);
       return svc.toMe(user, session, ctx.now());
     },
-    { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    { rateLimit: { max: deps.config.loginRateLimit, timeWindow: '1 minute' } },
   );
 
   route(app, deps, C.logout, (ctx, _i, { reply }) => {

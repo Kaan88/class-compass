@@ -5,7 +5,9 @@
  */
 import { useEffect, useState } from 'react';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
-import { setDisplay, THEMES, useDisplay, type ThemeName } from '../lib/display.ts';
+import { setDisplay, useDisplay, type ThemeName } from '../lib/display.ts';
+import { ILLUSTRATIONS, MASCOT_POSES } from '../themes/types.ts';
+import { THEME_LIST, ThemeScope, useTheme, useThemeSound } from '../themes/index.tsx';
 import { showToast, showUndoToast } from '../lib/toast.ts';
 import { useMe } from '../lib/session.ts';
 import { Button, BigButton, IconButton } from '../ui/Button.tsx';
@@ -14,7 +16,7 @@ import { Alert, EmptyState, NeedsAttentionTray, SaveStateBadge } from '../ui/Fee
 import { Select, TextField, Toggle } from '../ui/Fields.tsx';
 import { IconLock, IconPlus, IconSettings, IconUndo } from '../ui/icons.tsx';
 import { ClassBanner, ClassSwitcher, DataTable, DisplayBanner } from '../ui/Layout.tsx';
-import { Mascot, ThemeDecoration, ThemeScope } from '../ui/Mascot.tsx';
+import { Mascot, ThemeBackdrop, ThemeDecoration, ThemeIllustration } from '../ui/Mascot.tsx';
 import { PinPad } from '../ui/PinPad.tsx';
 import { AttendanceChip, Avatar, CounterBar, MetricCell, StudentCard, StudentGrid } from '../ui/Students.tsx';
 import { Tabs } from '../ui/Tabs.tsx';
@@ -181,9 +183,10 @@ function Everything() {
         />
       </Section>
       <Section title={t('catalog.mascot')}>
+        <ThemeSlots anim={anim} />
         <div className="cc-row">
-          <Mascot size={100} animate key={anim} />
           <Button onPress={() => setAnim((a) => a + 1)}>{t('catalog.playAnimation')}</Button>
+          <SoundButtons />
         </div>
         <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} />
       </Section>
@@ -204,7 +207,7 @@ export function CatalogPage() {
     setDisplay({ textScale: Number(scale) });
   }, [scale]);
   useEffect(() => () => setDisplay({ textScale: me?.textScale ?? 100 }), [me?.textScale]);
-  const shown = themes === 'all' ? THEMES : [themes];
+  const shown = themes === 'all' ? THEME_LIST.map((d) => d.key) : [themes];
   const grid20 = sampleStudents(20);
   const grid34 = sampleStudents(34);
   return (
@@ -216,7 +219,7 @@ export function CatalogPage() {
           label={t('catalog.theme')}
           value={themes}
           onChange={(v) => setThemes(v === 'all' ? 'all' : (v as ThemeName))}
-          items={[{ id: 'all', label: t('catalog.allThemes') }, ...THEMES.map((th) => ({ id: th, label: t(themeLabelKey(th)) }))]}
+          items={[{ id: 'all', label: t('catalog.allThemes') }, ...THEME_LIST.map((d) => ({ id: d.key, label: t(d.labelKey) }))]}
         />
         <Select label={t('profile.textSize')} value={scale} onChange={setScale} items={TEXT_SCALES.map((s) => ({ id: String(s), label: `${s}%` }))} />
         <Toggle label={t('classes.animations')} isSelected={display.classAnimations} onChange={(v) => setDisplay({ classAnimations: v })} />
@@ -227,6 +230,7 @@ export function CatalogPage() {
             <ThemeScope.Provider value={th}>
               <PanelTitle theme={th} />
               <div className="cc-catalog-panel" data-theme={th} data-testid={`catalog-${th}-${loc}`} lang={loc}>
+                <ThemeBackdrop />
                 <ThemeDecoration size={200} />
                 <Everything />
               </div>
@@ -251,6 +255,52 @@ export function CatalogPage() {
         </StudentGrid>
       </div>
     </main>
+  );
+}
+
+/** Every slot of the active theme: mascot poses and illustrations (THM-2), with the one-shot motions. */
+function ThemeSlots({ anim }: { anim: number }) {
+  const { t } = useI18n();
+  const def = useTheme();
+  return (
+    <div className="cc-stack" data-testid={`theme-slots-${def.key}`}>
+      <p className="cc-muted" style={{ margin: 0 }}>
+        {t(def.descriptionKey)} · {t(def.mascotNameKey)}
+      </p>
+      <div className="cc-row">
+        {MASCOT_POSES.map((pose) => (
+          <figure key={pose} className="cc-catalog-figure">
+            <Mascot key={`${pose}-${anim}`} size={84} pose={pose} motion={anim > 0 && pose === 'celebrate' ? 'celebrate' : undefined} />
+            <figcaption>{t(`catalog.pose.${pose}`)}</figcaption>
+          </figure>
+        ))}
+      </div>
+      <div className="cc-row">
+        {ILLUSTRATIONS.map((name) => (
+          <figure key={name} className="cc-catalog-figure">
+            <ThemeIllustration
+              key={`${name}-${anim}`}
+              name={name}
+              width={170}
+              motion={anim > 0 ? (name === 'threshold' ? 'threshold' : name === 'celebration' ? 'celebrate' : undefined) : undefined}
+            />
+            <figcaption>{t(`catalog.illustration.${name}`)}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Plays the theme sounds; silent when the class or device has sounds off (THM-5). */
+function SoundButtons() {
+  const { t } = useI18n();
+  const play = useThemeSound();
+  return (
+    <>
+      <Button onPress={() => play('timerEnd')}>{t('catalog.sound.timerEnd')}</Button>
+      <Button onPress={() => play('celebrate')}>{t('catalog.sound.celebrate')}</Button>
+    </>
   );
 }
 

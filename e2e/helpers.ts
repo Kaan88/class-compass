@@ -16,17 +16,14 @@ export async function api(page: Page, method: string, path: string, body?: unkno
 }
 
 /**
- * Click "Sign in" on the filled form. The whole suite shares one server and the login limit
- * (20 per minute per address), so when the server answers "Too many attempts" this waits for the
- * next window and submits again instead of failing an unrelated test.
+ * Click "Sign in" on the filled form. The e2e server raises the sign-in rate limit through the
+ * test-only CC_TEST_LOGIN_RATE_LIMIT (ignored outside NODE_ENV=test), so no test waits for a new
+ * rate-limit window any more.
  */
 export async function submitSignIn(page: Page) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const answered = page.waitForResponse((r) => r.url().endsWith('/api/auth/login'));
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    if ((await answered).status() !== 429) return;
-    await page.waitForTimeout(61_000);
-  }
+  const answered = page.waitForResponse((r) => r.url().endsWith('/api/auth/login'));
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  expect((await answered).status()).not.toBe(429);
 }
 
 export async function login(page: Page, user: string, password = PASSWORD) {

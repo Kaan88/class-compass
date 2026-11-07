@@ -90,3 +90,49 @@ Format: `D-NNN — date — decision — rationale — status`.
 - **D-066** — **The weekly assistant schedule is classroom-safe** *(narrowed by D-068: only an announced week, this week or next)*. It contains days and names only, so the dashboard can show "This week" on the display. Planning, swaps, overrides, responsibilities and history are in the teacher area (PIN-gated), with a print view of the week to announce it. The thank-you step at End Lesson is optional and marks the day confirmed. — Decided by Claude.
 - **D-067** — **New module hooks** (refines D-051/D-052). `registerLessonCloseHook(fn(ctx, lesson, 'ended' | 'abandoned'))` runs inside the transaction that ends a lesson (after the steps) or abandons it the next day. `registerAttendanceListener(fn(ctx, change))` runs after every daily or lesson attendance write, inside the same transaction. `getModuleConfig` / `mergeModuleConfig` keep small per-context module settings next to the enabled flag. The Start Lesson flow gains the Assistant step (between attendance and routine) whenever that module is on. — Decided by Claude.
 - **D-068** — **S7 review fixes for Secret Students and the Daily Assistant** (SEC-2, SEC-3, AST-1, AST-2, AST-4, AST-5, PIN-8; refines D-062, D-065, D-066). (1) **Unpredictable draws:** the Secret Student tie-break seed is 16 bytes of server randomness made for each draw or replacement and never stored, logged or returned. The round id stays the client opId (idempotency, D-042), but nothing a client knows (round id, roster, revealed history) can reproduce or steer who is chosen; replays still return the stored result and a lesson keeps one live round. (2) **Missed turns are recorded, not inferred:** an assistant day keeps `absentStudentIds`, every student who was that day's assistant and missed it because they were away (a swapped-in or override assistant, or a replacement who is also absent). Swaps and overrides never clear it, and the history counts "missed" from it instead of from planned vs actual. (3) **Same-day correction:** when the absent assistant is marked present again (or "not recorded") on the same day, the latest replacement and its carry-forward day are restored, as long as neither day was changed since (swap, override, thank-you, another replacement); otherwise the replacement stays and the teacher can set the assistant by hand. (4) **Roster changes:** a planned or actual assistant who is no longer enrolled on that day (left, moved, deactivated) is replaced by the next fair student in class (reason `not_in_class`, not a missed turn and no carry-forward); later days are checked the same way, still-`planned` days are planned again and changed days record the new student as actual. A day planned while the class had no students is filled once it has some; carry-forward only gives the absent student a later day on which they are still enrolled. (5) **Classroom week:** the classroom endpoint serves only this week or next week (`WEEK_NOT_IN_CLASSROOM` otherwise) and returns names only for an **announced** week; a draft shows "not announced yet". Earlier weeks, drafts and history stay in the PIN-gated teacher area. — Decided by Claude.
+
+## SX Extensibility — 2026-11-07
+- **D-069** — **Module manifests** (owner request 2026-11-07: "make it easy to add modules"; refines D-051, D-052, D-067). Each module has one manifest per side. One list file per side holds them: `SERVER_MODULES` in `src/server/modules/index.ts` and `CLIENT_MODULES` in `src/client/modules/index.ts`. Module policy keys come from one shared catalogue (`src/shared/modules.ts`).
+  - **Server.** `defineServerModule({ key, policyKey | null, routes, commands, lessonState, endSteps, lessonCloseHooks, attendanceListeners, reports, studentPage, config })`. Commands are declared with `command()` and registered only from manifests (explicit imports, no registration side effects). `installModules()` runs once and rejects:
+    - duplicate keys;
+    - an End Lesson step of another module;
+    - a config without a policy key.
+  - **Module config.** Defaults plus a Zod schema. Teacher patches are validated with `schema.partial().strict()` (400 `INVALID_MODULE_CONFIG`). `moduleConfig()` returns the defaults overlaid with valid stored values.
+  - **Client.** `defineClientModule({ key, policyKey, i18nNamespace, dashboardSlots, startSteps, endSteps, studentCardAddons, teacherPages, settingsPanel, invalidations })`. Pieces are sorted by `order`, then `key`; orders are unique per list.
+  - **Teacher pages.** Served by one `/teacher/$page` route, because typed per-module routes cannot be generated from a list without losing link typing.
+  - **Class settings.** The settings page now shows a module's `settingsPanel` under its switch. Secret Students' count setting moved there and also remains on its page.
+  - **Retrofit.** Lessons, routines, attendance, counters, Secret Students and the assistant were moved onto manifests with no behaviour change. The End Lesson order (Secret Students → assistant thanks → reflection), the attendance-listener order and all endpoints are unchanged (the full server suite is unchanged and green).
+  - **Report and student-page hooks.** Declared and collected (`reportContributions()`, `studentPageContributions()`). Nothing serves them until S10/S11.
+  - **Tests.** Every manifest key is a known policy key, every manifest string exists in en and tr, ordering is deterministic, and the client and server agree.
+  - **Scaffold.** `npm run new:module -- <key>`. New modules start disabled.
+  - Decided by Claude on the owner's request.
+- **D-070** — **Theme registry: a theme is a complete definition, not a palette** (owner request 2026-11-07: "themes must be comprehensive"; refines D-034, THM-1..6). Each theme lives in `src/client/themes/<key>/` (`tokens.ts`, `art.tsx`, `index.ts`) and fills every slot of `ThemeDefinition`:
+  - colour tokens: surfaces, text, status, focus, display banner, counter levels and colours, avatar text, icon accent, decoration, pattern, mascot and art;
+  - typography: font stacks, weights, letter-spacing;
+  - shape: radii, border widths, shadows;
+  - avatar saturation and lightness;
+  - icon stroke style;
+  - decoration and background pattern;
+  - six illustrations: lock screen, empty state, threshold, start lesson, end lesson, celebration;
+  - five mascot poses: idle, cheer, thinking, celebrate, sleepy;
+  - two one-shot motions: celebrate and threshold;
+  - optional WebAudio sounds: timer end and celebrate.
+
+  How it is wired, and what changed:
+  - **Shared keys.** The key list is `THEME_KEYS` (`src/shared/themes.ts`); `classes.theme` validates against it, and `Record<ThemeKey, …>` forces the client registry to match.
+  - **CSS.** Tokens are TypeScript and are emitted as CSS at start-up (`installThemeStyles()`), one complete block per theme (the default theme also on `:root`). Colour literals are allowed only in `themes/base.ts` and the `tokens.ts` files. `app.css` now holds component rules and layout variables only, using semantic tokens.
+  - **Theme lint.** No theme-key branching outside `src/client/themes`, only known `--cc-*` names, identical token sets in every theme.
+  - **Reduced motion.** It previously stopped every animation. It now plays each motion's **opacity-only reduced variant once** (no movement, no flashing; exempted from the global stop via `.cc-motion-reduced`). The class animation switch still stops everything.
+  - **Sounds.** Theme sounds follow the class and device switches. The timer end now uses the theme's `timerEnd` tone. The counter threshold overlay stays silent (D-059).
+  - **Contrast.** A WCAG unit test iterates the registry: AA for body text, AAA for classroom text on page and cards, 3:1 for UI, focus and icons, plus an avatar hue sweep. To pass it, the focus ring changed from the light amber `#ffb000` (about 1.9:1 on white) to a darker amber or orange per theme (≥ 3:1).
+  - **THM-3 holds.** Themes change appearance only, never controls, labels or meanings.
+  - **Tests.** The catalogue, the e2e axe loop (now with a screenshot per theme attached to the report; no pixel baseline is kept) and the slot, motion and sound tests all iterate `THEME_LIST`.
+  - **Scaffold.** `npm run new:theme -- <key>` copies the default theme. See `docs/EXTENDING.md`.
+  - Decided by Claude on the owner's request.
+- **D-071** — **Tooling fixes with SX.**
+  - **(1) React component tests.** Vitest + Testing Library + jsdom, per file via `// @vitest-environment jsdom`, so server tests stay on Node.
+  - **(2) e2e login rate limit.** Overridable with `CC_TEST_LOGIN_RATE_LIMIT` (1–10000). `config.ts` validates it and honours it **only when `NODE_ENV=test`**; production always uses 20/min. The e2e helper no longer waits a minute after hitting the limit; it asserts the sign-in was not rate limited.
+  - **(3) FSTDEP023 removed.** Fastify request logging is switched off through a `LogController` instead of the deprecated `disableRequestLogging` option. Behaviour is unchanged: automatic request logging stays off (student link URLs are never logged), and errors are still logged with redaction.
+  - **(4) Bundle split.** zod and dexie get their own `vendor-data` chunk, keeping every chunk under Vite's 500 kB warning.
+  - Note: a local `.env` with `NODE_ENV=development` (as in `.env.example`) makes `vite build` bundle React's development build. Build releases without it, or with `NODE_ENV=production`.
+  - Decided by Claude.

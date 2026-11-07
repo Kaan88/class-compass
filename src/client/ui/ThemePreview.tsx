@@ -1,27 +1,34 @@
+import { themeLabelKey as sharedThemeLabelKey, type ThemeKey } from '../../shared/themes.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
-import { THEMES, type ThemeName } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { THEME_LIST, THEMES, ThemeProvider } from '../themes/index.tsx';
 import { Button } from './Button.tsx';
-import { Mascot, ThemeDecoration } from './Mascot.tsx';
+import { Mascot, ThemeDecoration, ThemeIllustration } from './Mascot.tsx';
 import { CounterBar, StudentCard } from './Students.tsx';
 
-export const themeLabelKey = (th: ThemeName): MessageKey => (th === 'explorer' ? 'theme.explorer' : th === 'animals' ? 'theme.animals' : 'theme.classroom');
+/** i18n key of a theme's name (every registered theme has one, test-enforced). */
+export const themeLabelKey = (th: ThemeKey): MessageKey => sharedThemeLabelKey(th);
 
 /** Fictional sample student used only in previews. */
 const SAMPLE = { id: 'sample-student-1', fullName: 'Ada Yıldız' };
 
 /** Live preview of a class theme: same controls and meanings in every theme (THM-3). */
-export function ThemePreview({ theme, compact = false }: { theme: ThemeName; compact?: boolean }) {
+export function ThemePreview({ theme, compact = false }: { theme: ThemeKey; compact?: boolean }) {
   const { t } = useI18n();
+  const def = THEMES[theme];
   return (
-    <div className="cc-preview" data-theme={theme} data-testid={`theme-preview-${theme}`}>
-      <ThemeDecoration theme={theme} size={compact ? 90 : 140} />
+    <ThemeProvider theme={theme} className="cc-preview" testId={`theme-preview-${theme}`}>
+      <ThemeDecoration size={compact ? 90 : 140} />
       <div className="cc-row">
-        <Mascot theme={theme} size={compact ? 48 : 72} />
-        <strong>{t(themeLabelKey(theme))}</strong>
+        <Mascot size={compact ? 48 : 72} pose={compact ? 'idle' : 'cheer'} />
+        <div>
+          <strong>{t(def.labelKey)}</strong>
+          {compact ? null : <p className="cc-muted" style={{ margin: 0 }}>{t(def.descriptionKey)}</p>}
+        </div>
       </div>
       {compact ? null : (
         <div className="cc-stack" style={{ marginTop: '0.75rem' }}>
+          <ThemeIllustration name="startLesson" width={200} />
           <CounterBar value={3} max={10} label={t('catalog.sampleCounter')} />
           <StudentCard student={SAMPLE} weeklyCount={2} level={1} onAdd={() => undefined} />
           <div className="cc-row">
@@ -30,12 +37,12 @@ export function ThemePreview({ theme, compact = false }: { theme: ThemeName; com
           </div>
         </div>
       )}
-    </div>
+    </ThemeProvider>
   );
 }
 
-/** Theme choice as a radio group; each option shows a small live preview. */
-export function ThemePicker({ value, onChange, label }: { value: ThemeName; onChange: (t: ThemeName) => void; label: string }) {
+/** Theme choice as a radio group; each option shows a small live preview. Lists every registered theme. */
+export function ThemePicker({ value, onChange, label }: { value: ThemeKey; onChange: (t: ThemeKey) => void; label: string }) {
   const { t } = useI18n();
   return (
     <div className="cc-field">
@@ -43,20 +50,20 @@ export function ThemePicker({ value, onChange, label }: { value: ThemeName; onCh
         {label}
       </span>
       <div role="radiogroup" aria-labelledby="theme-picker-label" className="cc-swatch-row">
-        {THEMES.map((th) => (
+        {THEME_LIST.map((def) => (
           <button
-            key={th}
+            key={def.key}
             type="button"
             role="radio"
-            aria-checked={value === th}
+            aria-checked={value === def.key}
             className="cc-theme-option"
-            onClick={() => onChange(th)}
-            data-testid={`theme-option-${th}`}
+            onClick={() => onChange(def.key)}
+            data-testid={`theme-option-${def.key}`}
           >
-            <ThemePreview theme={th} compact />
+            <ThemePreview theme={def.key} compact />
             <span>
-              {value === th ? '✓ ' : ''}
-              {t(themeLabelKey(th))}
+              {value === def.key ? '✓ ' : ''}
+              {t(def.labelKey)}
             </span>
           </button>
         ))}

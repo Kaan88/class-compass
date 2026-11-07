@@ -89,6 +89,22 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Review fixes (D-068): Secret Student tie-break seeded with server-only randomness (draws no longer derivable from the round id/opId); assistant absences recorded per day (`absentStudentIds`) so swaps, overrides and chained replacements keep who missed the turn; same-day attendance correction restores the day and its carry-forward; students who leave or move are replaced today and on later days, empty-roster plans are filled; the classroom week shows only an announced week (this or next week) (tests: unpredictable draw, swap/override/chain + absence, correction and thanked-day guard, leaving mid-week, empty-roster plan, classroom week drafts/past weeks)
 - [ ] Not yet: mobile-viewport check of the new teacher pages and an axe pass of the Secret Students teacher page (the panels, the reveal and the assistant page are axe-checked; small avatars were darkened for 4.5:1 contrast); the print view is CSS only, with no print e2e; fairness and outcome reports over the kept history come with S11
 
+## SX Extensibility (owner request 2026-11-07)
+- [x] Module manifests, one per side (`src/server/modules/<m>/manifest.ts`, `src/client/modules/<m>/manifest.tsx`), one list file per side, policy keys from one shared catalogue (`src/shared/modules.ts`); commands imported explicitly and registered only from manifests — D-069
+- [x] Retrofit of lessons, routines, attendance, counters, Secret Students and the assistant onto manifests without behaviour change (server suite unchanged and green; End Lesson order and hook order kept)
+- [x] Module config: defaults + Zod schema per manifest, validated on write (`INVALID_MODULE_CONFIG`), read with `moduleConfig()`; client `settingsPanel` shown under the module switch (used by Secret Students)
+- [x] Client pieces from manifests: dashboard slots, Start/End Lesson steps, student-card add-ons, teacher menu pages (`/teacher/$page`), outbox invalidations, i18n namespace
+- [~] Reports (S11) and student-page (S10) hooks are declared and collected (`reportContributions()`, `studentPageContributions()`) but nothing serves them until those stages
+- [x] Theme registry: each theme in `src/client/themes/<t>/` fills colour tokens, typography, shape, avatar, icon accent, decoration + background pattern, 6 illustrations, 5 mascot poses, 2 one-shot motions with reduced-motion variants, optional WebAudio sounds; `classes.theme` validates against the shared key list; explorer, animals and classroom enriched (THM-3 kept) — D-070
+- [x] Illustrations and motions in use: lock screen, empty states, counter threshold overlay, Start/End Lesson headers, Secret Student celebration; theme timer-end sound; background pattern
+- [x] Tests: manifest registries (policy keys, en+tr strings, deterministic order, client/server agreement, config defaults), theme slots/motion/sound limits, WCAG contrast per theme (AA text, AAA classroom text, 3:1 UI, avatar hue sweep), theme lint, React component tests (theme provider tokens, StudentCard number + text, lock screen renders no children)
+- [x] e2e catalogue iterates the registry: every theme × language with all slots, axe per theme, a screenshot per theme attached to the report
+- [ ] Pixel-diff screenshot baseline (screenshots are attachments for review only)
+- [x] `docs/EXTENDING.md` ("Add a module", "Add a theme", notes for "Add a language"), referenced from CONVENTIONS.md and README.md
+- [x] Scaffolds `npm run new:module -- <key>` / `npm run new:theme -- <key>` (`--dry-run`, `--root`), tested by generating into a temporary project copy, typechecking and deleting it
+- [ ] "Add a language" is documentation only (no scaffold; teacher-editable labels are `{en, tr}` and would need a migration)
+- [x] Tooling: React component test setup (Vitest + Testing Library + jsdom), test-only e2e login rate-limit override validated in `config.ts`, Fastify FSTDEP023 warning removed, vendor chunk split — D-071
+
 ## S8 Grouping & homework
 - [ ] Solver, 5 default arrangements, subject levels, pair constraints, unsatisfied report
 - [ ] Homework, statuses, bulk checking, daily/weekly/monthly views

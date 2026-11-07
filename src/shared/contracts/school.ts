@@ -11,34 +11,15 @@ export const IsoDate = z.string().refine(isIsoDate, 'Expected a date YYYY-MM-DD'
 export const TimeZone = z.string().refine(isValidTimeZone, 'Unknown timezone');
 export const RequiredLocalizedText = LocalizedText.refine((t) => Boolean(t.en?.trim() || t.tr?.trim()), 'Name required (English or Turkish)');
 
-/** Teacher-configurable modules (CFG-1): enabled per context by teachers, within admin policy. */
-export const CONTEXT_MODULES = ['routines', 'attendance', 'counters', 'secretStudents', 'assistant', 'grouping', 'homework', 'goals'] as const;
-/** Admin-only global media flags (D-014). */
-export const MEDIA_MODULES = ['media.studentPhotos', 'media.evidencePhotos', 'media.evidenceAudio', 'media.evidenceDocuments'] as const;
-export const MODULE_KEYS = [...CONTEXT_MODULES, ...MEDIA_MODULES] as const;
-export type ContextModule = (typeof CONTEXT_MODULES)[number];
-export type MediaModule = (typeof MEDIA_MODULES)[number];
-export type ModuleKey = (typeof MODULE_KEYS)[number];
+import { CONTEXT_MODULES, MEDIA_MODULES, MODULE_KEYS } from '../modules.ts';
+import { THEME_KEYS } from '../themes.ts';
+// Module and theme keys live in the shared catalogues (D-069, D-070); re-exported for existing imports.
+export { CONTEXT_MODULES, DEFAULT_AVAILABILITY, MEDIA_MODULES, MODULE_KEYS, type ContextModule, type MediaModule, type ModuleKey } from '../modules.ts';
 export const ContextModuleKey = z.enum(CONTEXT_MODULES);
 export const ModuleKeySchema = z.enum(MODULE_KEYS);
 
-/** Defaults when no policy row exists: everything on except photos and audio (D-014). */
-export const DEFAULT_AVAILABILITY: Record<ModuleKey, 'enabled' | 'disabled'> = {
-  routines: 'enabled',
-  attendance: 'enabled',
-  counters: 'enabled',
-  secretStudents: 'enabled',
-  assistant: 'enabled',
-  grouping: 'enabled',
-  homework: 'enabled',
-  goals: 'enabled',
-  'media.studentPhotos': 'disabled',
-  'media.evidencePhotos': 'disabled',
-  'media.evidenceAudio': 'disabled',
-  'media.evidenceDocuments': 'enabled',
-};
-
-export const Theme = z.enum(['explorer', 'animals', 'classroom']);
+/** A class theme: any key of the shared theme registry (D-070). */
+export const Theme = z.enum(THEME_KEYS);
 export const Locale = z.enum(['en', 'tr']);
 
 /** Query-string boolean ('true'/'false') or JSON boolean. */

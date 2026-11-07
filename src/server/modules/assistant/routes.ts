@@ -2,19 +2,16 @@ import type { FastifyInstance } from 'fastify';
 import * as C from '../../../shared/contracts/assistant.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
-import { registerAttendanceListener } from '../attendance/service.ts';
-import { registerLessonStateContributor } from '../lessons/service.ts';
+import type { LessonStateContributor } from '../lessons/service.ts';
 import { isModuleEnabled } from '../school/modules.ts';
-import './commands.ts';
 import * as svc from './service.ts';
 
 // Today's assistant rides on the polled lesson state (DSH-3); first use creates this week's plan (AST-2).
-registerLessonStateContributor({
+export const assistantLessonState: LessonStateContributor = {
   key: 'assistant',
   stamp: (ctx, context) => (isModuleEnabled(ctx.db, context.id, 'assistant') ? svc.assistantStamp(ctx, context) : 'off'),
   body: (ctx, context) => (isModuleEnabled(ctx.db, context.id, 'assistant') ? svc.todayDto(ctx, context) : null),
-});
-registerAttendanceListener(svc.onAttendanceChange);
+};
 
 export function registerAssistantRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.todayAssistant, (ctx, input) => svc.todayAssistant(ctx, input.contextId));

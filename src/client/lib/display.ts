@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from 'react';
+import { DEFAULT_THEME, THEME_KEYS, type ThemeKey } from '../../shared/themes.ts';
 
-export type ThemeName = 'explorer' | 'animals' | 'classroom';
-export const THEMES: readonly ThemeName[] = ['explorer', 'animals', 'classroom'];
+/** Theme keys come from the shared registry list (D-070); definitions live in src/client/themes. */
+export type ThemeName = ThemeKey;
+export const THEMES: readonly ThemeName[] = THEME_KEYS;
 
 /**
  * Display settings applied to <html> (THM-2..6):
- * - theme: the active class's theme in the classroom; the neutral "classroom" theme elsewhere
+ * - theme: the active class's theme in the classroom; the default theme (DEFAULT_THEME) elsewhere
  * - animations / sounds: the class switches (admin/teacher) AND this device's own switch
  * - textScale: the signed-in teacher's preference (percent)
  */
@@ -27,7 +29,7 @@ function readDeviceSounds(): boolean {
   }
 }
 
-let state: DisplayState = { theme: 'classroom', classAnimations: true, classSounds: true, deviceSounds: true, textScale: 100, locale: 'en' };
+let state: DisplayState = { theme: DEFAULT_THEME, classAnimations: true, classSounds: true, deviceSounds: true, textScale: 100, locale: 'en' };
 let initialised = false;
 const listeners = new Set<() => void>();
 

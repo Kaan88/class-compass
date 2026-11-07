@@ -4,14 +4,17 @@
  * counts only (SEC-3).
  */
 import { SecretCommands, SecretEndStepInput } from '../../../shared/contracts/secret.ts';
-import { defineCommand } from '../../lib/commands.ts';
-import { registerEndLessonStep } from '../lessons/endSteps.ts';
+import { command } from '../../lib/commands.ts';
+import { endLessonStep } from '../lessons/endSteps.ts';
 import { draw, endStep, recordOutcome, redraw, reveal } from './service.ts';
 
-defineCommand({ type: 'secret.draw', payload: SecretCommands['secret.draw'], handle: (ctx, p, meta) => draw(ctx, p, meta) });
-defineCommand({ type: 'secret.redraw', payload: SecretCommands['secret.redraw'], handle: (ctx, p, meta) => redraw(ctx, p, meta) });
-defineCommand({ type: 'secret.reveal', payload: SecretCommands['secret.reveal'], handle: (ctx, p, meta) => reveal(ctx, p, meta) });
-defineCommand({ type: 'secret.recordOutcome', payload: SecretCommands['secret.recordOutcome'], handle: (ctx, p, meta) => recordOutcome(ctx, p, meta) });
+/** Listed in the manifest; registered once by installModules() (D-069). */
+export const secretCommands = [
+  command({ type: 'secret.draw', payload: SecretCommands['secret.draw'], handle: (ctx, p, meta) => draw(ctx, p, meta) }),
+  command({ type: 'secret.redraw', payload: SecretCommands['secret.redraw'], handle: (ctx, p, meta) => redraw(ctx, p, meta) }),
+  command({ type: 'secret.reveal', payload: SecretCommands['secret.reveal'], handle: (ctx, p, meta) => reveal(ctx, p, meta) }),
+  command({ type: 'secret.recordOutcome', payload: SecretCommands['secret.recordOutcome'], handle: (ctx, p, meta) => recordOutcome(ctx, p, meta) })
+];
 
-// Before the core reflection (order 100): reveal + outcomes (SEC-5).
-registerEndLessonStep({ key: 'secretStudents', module: 'secretStudents', order: 40, input: SecretEndStepInput, apply: endStep });
+/** Before the core reflection (order 100): reveal + outcomes (SEC-5). */
+export const secretEndStep = endLessonStep({ key: 'secretStudents', module: 'secretStudents', order: 40, input: SecretEndStepInput, apply: endStep });

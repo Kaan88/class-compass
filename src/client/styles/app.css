@@ -1,187 +1,22 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens (ARCHITECTURE §5, THM-1..6). Three layers:
- *   1. primitives (raw palette) – defined and referenced ONLY in this file
- *   2. semantic tokens (--cc-*) – the ONLY colours components may use (lint test: tests/client/lint-rules.test.ts)
- *   3. themes ([data-theme=…]) override semantic tokens + decoration/mascot tokens
- * Meanings (icons, labels, positions) are identical in every theme (THM-3); themes only change tokens.
- * Text scale: --cc-text-scale set on <html> from the teacher's preference (THM-6).
- * Motion: data-motion="off" on <html> (class animation switch) and prefers-reduced-motion stop all
- * animation (THM-5). No animation in this file repeats more than once.
+ * Design tokens (ARCHITECTURE §5, THM-1..6; SX D-070). Two layers:
+ *   1. theme tokens – generated at start-up from the theme registry (src/client/themes/<theme>/), one
+ *      complete `[data-theme='<key>']` block per theme: colours (--cc-*), typography, shape, avatar,
+ *      icon style and opacities. Colour values are written ONLY in src/client/themes/base.ts and
+ *      src/client/themes/<theme>/tokens.ts (lint test: tests/client/lint-rules.test.ts).
+ *   2. this file – layout tokens and component rules that use only semantic tokens (var(--cc-*)).
+ * Meanings (icons, labels, positions) are identical in every theme (THM-3); themes only change tokens,
+ * art, motion and sounds. Text scale: --cc-text-scale set on <html> from the teacher's preference (THM-6).
+ * Motion: data-motion="off" on <html> (class animation switch) stops all animation; prefers-reduced-motion
+ * stops movement, leaving only the themes' single fade-ins (.cc-motion-reduced) (THM-5). Nothing repeats.
  */
 :root {
-  /* primitives */
-  --p-ink-900: #14182b;
-  --p-ink-700: #333a57;
-  --p-ink-600: #4a5170;
-  --p-ink-300: #c9cfe0;
-  --p-ink-100: #eef1f8;
-  --p-ink-50: #f7f8fc;
-  --p-white: #ffffff;
-  --p-blue-700: #2448ad;
-  --p-blue-600: #2f5bd3;
-  --p-blue-100: #dfe7fb;
-  --p-amber-500: #ffb000;
-  --p-amber-700: #8a5100;
-  --p-amber-100: #fff1d1;
-  --p-amber-300: #ffd27a;
-  --p-amber-800: #6e3f00;
-  --p-green-700: #17733f;
-  --p-green-100: #dcf3e5;
-  --p-red-700: #b3261e;
-  --p-red-800: #8c1d17;
-  --p-red-100: #fde3e1;
-  --p-sand-50: #fffaf0;
-  --p-sand-100: #f4efe3;
-  --p-sand-200: #efe4cc;
-  --p-sand-400: #cdbf9f;
-  --p-teal-700: #1f6f5c;
-  --p-teal-800: #175646;
-  --p-teal-100: #d7ece5;
-  --p-rust-500: #c8642c;
-  --p-leaf-50: #f2f7ef;
-  --p-leaf-100: #e3f0dc;
-  --p-leaf-300: #c4d8b8;
-  --p-leaf-500: #5f9b45;
-  --p-plum-700: #7a35a6;
-  --p-plum-800: #642b88;
-  --p-plum-100: #efe2f7;
-  --p-fox-400: #ef8a3c;
-  --p-fox-100: #ffe6d1;
-  --p-sky-300: #8fc3ef;
-  --p-sun-300: #ffd166;
-  --p-berry-400: #e2557a;
-  --p-grape-400: #8b6fd6;
-
-  /* layout */
+  /* layout (theme-independent) */
   --cc-text-scale: 1;
-  --cc-radius: 1rem;
-  --cc-radius-sm: 0.6rem;
   --cc-touch: 3.5rem; /* minimum touch target (UX-6) */
   --cc-touch-big: 5rem;
-  --cc-font: system-ui, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
-  --cc-font-display: var(--cc-font);
-
-  /* semantic */
-  --cc-bg: var(--p-ink-50);
-  --cc-surface: var(--p-white);
-  --cc-surface-2: var(--p-ink-100);
-  --cc-text: var(--p-ink-900);
-  --cc-text-muted: var(--p-ink-600);
-  --cc-border: var(--p-ink-300);
-  --cc-border-strong: var(--p-ink-600);
-  --cc-accent: var(--p-blue-600);
-  --cc-accent-strong: var(--p-blue-700);
-  --cc-accent-soft: var(--p-blue-100);
-  --cc-accent-text: var(--p-white);
-  --cc-focus: var(--p-amber-500);
-  --cc-success: var(--p-green-700);
-  --cc-success-soft: var(--p-green-100);
-  --cc-warning: var(--p-amber-700);
-  --cc-warning-soft: var(--p-amber-100);
-  --cc-danger: var(--p-red-700);
-  --cc-danger-strong: var(--p-red-800);
-  --cc-danger-soft: var(--p-red-100);
-  --cc-on-strong: var(--p-white);
-  --cc-overlay: color-mix(in srgb, var(--p-ink-900) 55%, transparent);
-  --cc-shadow: 0 2px 10px color-mix(in srgb, var(--p-ink-900) 12%, transparent);
-  /* "visible on the classroom display" banner (PIN-5) */
-  --cc-display-banner-bg: var(--p-amber-100);
-  --cc-display-banner-text: var(--p-ink-900);
-  --cc-display-banner-border: var(--p-amber-700);
-  /* counter depth levels: neutral → amber → deeper amber → red (CNT-6); always paired with numbers + icons */
-  --cc-level-0: var(--p-ink-100);
-  --cc-level-1: var(--p-amber-100);
-  --cc-level-2: var(--p-amber-300);
-  --cc-level-3: var(--p-red-100);
-  --cc-level-edge-0: var(--p-ink-300);
-  --cc-level-edge-1: var(--p-amber-700);
-  --cc-level-edge-2: var(--p-amber-800);
-  --cc-level-edge-3: var(--p-red-700);
-  /* counter colour keys (CNT-12): teachers pick a name, never a raw colour */
-  --cc-counter-accent: var(--cc-accent);
-  --cc-counter-accent-edge: var(--cc-accent-strong);
-  --cc-counter-teal: var(--p-teal-700);
-  --cc-counter-teal-edge: var(--p-teal-800);
-  --cc-counter-plum: var(--p-plum-700);
-  --cc-counter-plum-edge: var(--p-plum-800);
-  --cc-counter-rust: var(--p-rust-500);
-  --cc-counter-rust-edge: var(--p-amber-800);
-  --cc-counter-leaf: var(--p-leaf-500);
-  --cc-counter-leaf-edge: var(--p-green-700);
-  --cc-counter-berry: var(--p-berry-400);
-  --cc-counter-berry-edge: var(--p-red-800);
-  --cc-segment-on: var(--cc-accent);
-  --cc-segment-off: var(--cc-surface-2);
-  /* avatars: hue comes from the student id (avatarHue), saturation/lightness from the theme */
-  --cc-avatar-s: 55%;
-  --cc-avatar-l: 38%;
-  /* Small avatars have small initials (not "large text"), so they need 4.5:1 against white: darker. */
-  --cc-avatar-l-small: 28%;
-  --cc-avatar-text: var(--p-white);
-  /* decorations + mascot (theme-specific, always subtle) */
-  --cc-deco-1: var(--p-sky-300);
-  --cc-deco-2: var(--p-sun-300);
-  --cc-deco-3: var(--p-berry-400);
-  --cc-deco-opacity: 0.35;
-  --cc-mascot-body: var(--p-blue-600);
-  --cc-mascot-belly: var(--p-blue-100);
-  --cc-mascot-accent: var(--p-sun-300);
-  --cc-mascot-ink: var(--p-ink-900);
-  --cc-mascot-cheek: var(--p-berry-400);
-}
-
-/* Theme 1: explorer / adventure — maps, compass, warm paper */
-[data-theme='explorer'] {
-  --cc-bg: var(--p-sand-100);
-  --cc-surface: var(--p-sand-50);
-  --cc-surface-2: var(--p-sand-200);
-  --cc-border: var(--p-sand-400);
-  --cc-accent: var(--p-teal-700);
-  --cc-accent-strong: var(--p-teal-800);
-  --cc-accent-soft: var(--p-teal-100);
-  --cc-font-display: 'Trebuchet MS', var(--cc-font);
-  --cc-deco-1: var(--p-teal-700);
-  --cc-deco-2: var(--p-rust-500);
-  --cc-deco-3: var(--p-sand-400);
-  --cc-deco-opacity: 0.22;
-  --cc-mascot-body: var(--p-teal-700);
-  --cc-mascot-belly: var(--p-sand-50);
-  --cc-mascot-accent: var(--p-rust-500);
-  --cc-avatar-s: 50%;
-  --cc-avatar-l: 36%;
-}
-/* Theme 2: friendly animal mascots — leaves, paws, soft greens */
-[data-theme='animals'] {
-  --cc-bg: var(--p-leaf-50);
-  --cc-surface: var(--p-white);
-  --cc-surface-2: var(--p-leaf-100);
-  --cc-border: var(--p-leaf-300);
-  --cc-accent: var(--p-plum-700);
-  --cc-accent-strong: var(--p-plum-800);
-  --cc-accent-soft: var(--p-plum-100);
-  --cc-radius: 1.35rem;
-  --cc-font-display: 'Comic Sans MS', 'Chalkboard SE', var(--cc-font);
-  --cc-deco-1: var(--p-leaf-500);
-  --cc-deco-2: var(--p-fox-400);
-  --cc-deco-3: var(--p-plum-700);
-  --cc-deco-opacity: 0.2;
-  --cc-mascot-body: var(--p-fox-400);
-  --cc-mascot-belly: var(--p-fox-100);
-  --cc-mascot-accent: var(--p-leaf-500);
-}
-/* Theme 3: clean colourful classroom — crisp, bright accents */
-[data-theme='classroom'] {
-  --cc-bg: var(--p-ink-50);
-  --cc-accent: var(--p-blue-600);
-  --cc-deco-1: var(--p-sky-300);
-  --cc-deco-2: var(--p-sun-300);
-  --cc-deco-3: var(--p-grape-400);
-  --cc-deco-opacity: 0.4;
-  --cc-mascot-body: var(--p-grape-400);
-  --cc-mascot-belly: var(--p-blue-100);
-  --cc-mascot-accent: var(--p-sun-300);
 }
 
 html {
@@ -189,17 +24,22 @@ html {
   background: var(--cc-bg);
   color: var(--cc-text);
   font-family: var(--cc-font);
+  font-weight: var(--cc-weight-body);
+  letter-spacing: var(--cc-tracking-body);
   -webkit-text-size-adjust: 100%;
 }
 body {
   margin: 0;
-  background: var(--cc-bg);
+  /* transparent so the theme's background pattern (.cc-backdrop) shows between cards */
+  background: transparent;
   color: var(--cc-text);
 }
 h1,
 h2,
 h3 {
   font-family: var(--cc-font-display);
+  font-weight: var(--cc-weight-heading);
+  letter-spacing: var(--cc-tracking-display);
 }
 :focus-visible,
 [data-focus-visible] {
@@ -221,7 +61,8 @@ a {
 
 /* ------------------------------------------------------------------ motion (THM-5) */
 @media (prefers-reduced-motion: reduce) {
-  *,
+  /* .cc-motion-reduced = a theme's reduced variant: one opacity fade, no movement */
+  *:not(.cc-motion-reduced),
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
@@ -234,17 +75,6 @@ a {
 [data-motion='off'] *::after {
   animation: none !important;
   transition: none !important;
-}
-@keyframes cc-hop {
-  0% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-10%);
-  }
-  100% {
-    transform: translateY(0);
-  }
 }
 @keyframes cc-fade-in {
   from {
@@ -276,7 +106,7 @@ a {
 }
 .cc-card {
   background: var(--cc-surface);
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   border-radius: var(--cc-radius);
   padding: 1.25rem;
   box-shadow: var(--cc-shadow);
@@ -286,7 +116,7 @@ a {
 }
 .cc-h1 {
   font-size: 2rem;
-  font-weight: 800;
+  font-weight: var(--cc-weight-display);
   margin: 0;
 }
 .cc-h2 {
@@ -301,7 +131,7 @@ a {
   gap: 0.75rem;
   padding: 0.6rem 1rem;
   background: var(--cc-surface);
-  border-bottom: 2px solid var(--cc-border);
+  border-bottom: var(--cc-border-width) solid var(--cc-border);
 }
 .cc-topbar__title {
   font-weight: 800;
@@ -319,7 +149,7 @@ a {
   min-height: var(--cc-touch);
   padding: 0 1rem;
   border-radius: var(--cc-radius-sm);
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   background: var(--cc-surface);
   color: var(--cc-text);
   font-weight: 650;
@@ -343,7 +173,7 @@ a {
   min-height: 6rem;
   padding: 1rem 1.25rem;
   border-radius: var(--cc-radius);
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   background: var(--cc-surface);
   color: var(--cc-text);
   font-size: 1.15rem;
@@ -368,7 +198,7 @@ a {
   min-width: var(--cc-touch);
   padding: 0 1.1rem;
   border-radius: var(--cc-radius-sm);
-  border: 2px solid var(--cc-border-strong);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
   background: var(--cc-surface);
   color: var(--cc-text);
   font: inherit;
@@ -443,7 +273,7 @@ a {
   min-height: var(--cc-touch);
   padding: 0 0.8rem;
   border-radius: var(--cc-radius-sm);
-  border: 2px solid var(--cc-border-strong);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
   background: var(--cc-surface);
   color: var(--cc-text);
   font: inherit;
@@ -467,7 +297,7 @@ a {
   width: 3.4rem;
   height: 2rem;
   border-radius: 999px;
-  border: 2px solid var(--cc-border-strong);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
   background: var(--cc-surface-2);
 }
 .cc-switch__thumb {
@@ -497,7 +327,7 @@ a {
   font-weight: 800;
   padding: 0.1rem 0.5rem;
   border-radius: 999px;
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
 }
 
 /* ------------------------------------------------------------------ chips & badges */
@@ -507,7 +337,7 @@ a {
   gap: 0.35rem;
   padding: 0.2rem 0.65rem;
   border-radius: 999px;
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   background: var(--cc-surface-2);
   font-size: 0.9rem;
   font-weight: 700;
@@ -542,7 +372,7 @@ a {
   align-items: flex-start;
   padding: 0.8rem 1rem;
   border-radius: var(--cc-radius-sm);
-  border: 2px solid var(--cc-border-strong);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
   background: var(--cc-surface-2);
   font-weight: 650;
 }
@@ -584,8 +414,8 @@ a {
   overflow: auto;
   background: var(--cc-surface);
   border-radius: var(--cc-radius);
-  border: 2px solid var(--cc-border-strong);
-  box-shadow: var(--cc-shadow);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+  box-shadow: var(--cc-shadow-raised);
   animation: cc-fade-in 160ms ease-out 1;
 }
 .cc-dialog {
@@ -607,7 +437,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  border-bottom: 2px solid var(--cc-border);
+  border-bottom: var(--cc-border-width) solid var(--cc-border);
 }
 .cc-tab {
   display: inline-flex;
@@ -617,7 +447,7 @@ a {
   font-weight: 700;
   cursor: pointer;
   border-radius: var(--cc-radius-sm) var(--cc-radius-sm) 0 0;
-  border: 2px solid transparent;
+  border: var(--cc-border-width) solid transparent;
   border-bottom: none;
   outline: none;
 }
@@ -681,7 +511,7 @@ a {
   min-height: 2.5rem;
   padding: 0.2rem 0.8rem;
   border-radius: 999px;
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   background: var(--cc-surface);
   font-weight: 700;
   font-size: 0.95rem;
@@ -721,7 +551,7 @@ a {
   font-size: calc(var(--cc-avatar-size) * 0.4);
   letter-spacing: 0.02em;
   overflow: hidden;
-  border: 3px solid var(--cc-surface);
+  border: var(--cc-border-width-strong) solid var(--cc-surface);
   box-shadow: 0 0 0 2px hsl(var(--cc-avatar-hue, 220) var(--cc-avatar-s) var(--cc-avatar-l));
 }
 .cc-avatar img {
@@ -756,7 +586,7 @@ a {
   row-gap: 0.25rem;
   padding: 0.7rem 0.8rem;
   border-radius: var(--cc-radius);
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   background: var(--cc-surface);
   min-height: 5.5rem;
 }
@@ -830,7 +660,7 @@ a {
   gap: 0.3rem;
   padding: 0.1rem 0.55rem;
   border-radius: 999px;
-  border: 2px solid var(--cc-level-edge-0);
+  border: var(--cc-border-width) solid var(--cc-level-edge-0);
   background: var(--cc-level-0);
   font-size: 0.8rem;
   font-weight: 800;
@@ -874,7 +704,7 @@ a {
   flex: 1;
   height: 2rem;
   border-radius: 0.4rem;
-  border: 2px solid var(--cc-border-strong);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
   background: var(--cc-segment-off);
 }
 .cc-counterbar__seg[data-on] {
@@ -932,7 +762,7 @@ a {
   gap: 0.5rem;
 }
 .cc-counter-picker [aria-pressed='true'] {
-  outline: 3px solid var(--cc-accent-strong);
+  outline: var(--cc-border-width-strong) solid var(--cc-accent-strong);
   outline-offset: 2px;
 }
 .cc-threshold {
@@ -971,7 +801,7 @@ a {
   list-style: none;
 }
 .cc-response-list > li {
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   border-radius: var(--cc-radius-sm);
   padding: 0.75rem;
 }
@@ -1002,7 +832,7 @@ a {
 /* ------------------------------------------------------------------ tables */
 .cc-table-wrap {
   overflow-x: auto;
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   border-radius: var(--cc-radius);
   background: var(--cc-surface);
 }
@@ -1050,7 +880,7 @@ a {
   padding: 1rem 1.25rem;
   border-radius: var(--cc-radius);
   background: var(--cc-surface);
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   box-shadow: var(--cc-shadow);
   overflow: hidden;
 }
@@ -1164,7 +994,7 @@ a {
   width: 1.2rem;
   height: 1.2rem;
   border-radius: 999px;
-  border: 3px solid var(--cc-border-strong);
+  border: var(--cc-border-width-strong) solid var(--cc-border-strong);
 }
 .cc-pinpad__dot[data-filled] {
   background: var(--cc-text);
@@ -1193,8 +1023,48 @@ a {
   display: inline-block;
   flex: none;
 }
-.cc-mascot[data-animate='true'] {
-  animation: cc-hop 900ms ease-in-out 1;
+/* Theme motions are applied inline (useThemeMotion) and always play once. */
+.cc-illustration {
+  display: block;
+  flex: none;
+  max-width: 100%;
+  height: auto;
+}
+.cc-icon {
+  stroke-width: var(--cc-icon-stroke);
+  stroke-linecap: var(--cc-icon-linecap);
+  stroke-linejoin: var(--cc-icon-linejoin);
+}
+.cc-menu-tile .cc-icon {
+  color: var(--cc-icon-accent);
+}
+/* Faint repeating pattern of the theme, behind every page (never over text). */
+.cc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: var(--cc-pattern-opacity);
+}
+.cc-catalog-panel > .cc-backdrop {
+  position: absolute;
+}
+.cc-flow-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.cc-catalog-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--cc-text-muted);
 }
 .cc-swatch-row {
   display: flex;
@@ -1208,7 +1078,7 @@ a {
   padding: 0.75rem;
   min-width: 11rem;
   border-radius: var(--cc-radius);
-  border: 3px solid var(--cc-border);
+  border: var(--cc-border-width-strong) solid var(--cc-border);
   background: var(--cc-surface);
   color: var(--cc-text);
   font: inherit;
@@ -1218,20 +1088,21 @@ a {
 }
 .cc-theme-option[aria-checked='true'] {
   border-color: var(--cc-accent);
-  outline: 3px solid var(--cc-accent);
+  outline: var(--cc-border-width-strong) solid var(--cc-accent);
 }
 .cc-preview {
   position: relative;
   overflow: hidden;
   border-radius: var(--cc-radius);
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   background: var(--cc-bg);
   color: var(--cc-text);
   padding: 1rem;
 }
 .cc-catalog-panel {
   position: relative;
-  border: 3px solid var(--cc-border-strong);
+  isolation: isolate;
+  border: var(--cc-border-width-strong) solid var(--cc-border-strong);
   border-radius: var(--cc-radius);
   background: var(--cc-bg);
   color: var(--cc-text);
@@ -1283,7 +1154,7 @@ a {
   gap: 0.3rem;
   padding: 0.15rem 0.55rem;
   border-radius: 999px;
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   background: var(--cc-surface-2);
   color: var(--cc-text);
   font-size: 0.9rem;
@@ -1322,7 +1193,7 @@ a {
   font-weight: 600;
   font-size: 0.8em;
   padding-inline-start: 0.3rem;
-  border-inline-start: 2px solid currentColor;
+  border-inline-start: var(--cc-border-width) solid currentColor;
 }
 .cc-att-grid {
   display: grid;
@@ -1399,7 +1270,7 @@ a {
   gap: 0.2rem;
   padding: 0.75rem 1rem;
   border-radius: var(--cc-radius);
-  border: 3px solid var(--cc-accent);
+  border: var(--cc-border-width-strong) solid var(--cc-accent);
   background: var(--cc-accent-soft);
 }
 .cc-routine__now-label {
@@ -1430,7 +1301,7 @@ a {
   min-width: 1.8rem;
   height: 1.8rem;
   border-radius: 999px;
-  border: 2px solid currentColor;
+  border: var(--cc-border-width) solid currentColor;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -1464,7 +1335,7 @@ a {
   gap: 0.4rem;
   padding: 0.35rem 0.8rem;
   border-radius: 999px;
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   font-weight: 650;
 }
 .cc-steps li[data-state='current'] {
@@ -1490,7 +1361,7 @@ a {
   align-items: center;
   min-height: var(--cc-touch);
   padding: 0.75rem 1rem;
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   border-radius: var(--cc-radius);
   background: var(--cc-surface);
   cursor: pointer;
@@ -1507,7 +1378,7 @@ a {
   background: var(--cc-accent-soft);
 }
 .cc-choice:focus-within {
-  outline: 3px solid var(--cc-focus);
+  outline: var(--cc-border-width-strong) solid var(--cc-focus);
   outline-offset: 2px;
 }
 .cc-choice__title {
@@ -1526,7 +1397,7 @@ a {
   gap: 0.4rem;
   min-height: var(--cc-touch-big);
   padding: 0.75rem;
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   border-radius: var(--cc-radius);
   background: var(--cc-surface);
   color: var(--cc-text);
@@ -1546,7 +1417,7 @@ a {
   text-underline-offset: 0.2em;
 }
 .cc-reflect__option:focus-visible {
-  outline: 3px solid var(--cc-focus);
+  outline: var(--cc-border-width-strong) solid var(--cc-focus);
   outline-offset: 2px;
 }
 .cc-summary {
@@ -1643,7 +1514,7 @@ a {
   gap: 0.75rem;
   padding: 1rem;
   border-radius: var(--cc-radius);
-  border: 2px solid var(--cc-border);
+  border: var(--cc-border-width) solid var(--cc-border);
   background: var(--cc-surface);
   box-shadow: var(--cc-shadow);
   animation: cc-fade-in 400ms ease-out 1 both;
@@ -1656,7 +1527,7 @@ a {
   min-height: var(--cc-touch);
   padding: 0.5rem 1rem;
   border-radius: var(--cc-radius-sm);
-  border: 2px solid var(--cc-border-strong);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
   background: var(--cc-surface);
   color: var(--cc-text);
   font: inherit;
@@ -1672,7 +1543,7 @@ a {
   background: var(--cc-success-soft);
 }
 .cc-reveal__outcome:focus-visible {
-  outline: 3px solid var(--cc-focus);
+  outline: var(--cc-border-width-strong) solid var(--cc-focus);
   outline-offset: 2px;
 }
 .cc-reveal__outcome svg {

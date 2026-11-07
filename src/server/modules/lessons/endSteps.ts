@@ -2,7 +2,9 @@
  * End Lesson step registry (LES-3, ARCHITECTURE §2 module manifests). End Lesson is assembled from
  * steps contributed by modules: a step with `module: null` is core (always runs), any other step
  * runs only while its module is enabled for the context, so ending a lesson works with every
- * optional module switched off. S7 registers Secret Student reveal/outcomes here (order < 100).
+ * optional module switched off. Steps are declared in module manifests (`endSteps`, D-069) and
+ * registered once by `installModules()`; Secret Students (40) and the assistant (60) run before the
+ * core reflection (100).
  *
  * Steps run synchronously inside the 'lesson.end' command transaction, in `order`, BEFORE the lesson
  * is marked ended. Their input arrives as `payload.steps[key]` and is validated by `input`.
@@ -42,8 +44,11 @@ export function endStepsFor(db: Db, contextId: string): EndLessonStep[] {
   return steps.filter((s) => s.module === null || isModuleEnabled(db, contextId, s.module));
 }
 
-// Core step: a short reflection (how did the lesson go? + optional note).
-registerEndLessonStep({
+/** Declare a step for a manifest's `endSteps` (typed input, stored untyped). */
+export const endLessonStep = <S extends z.ZodType>(step: EndLessonStep<S>): EndLessonStep => step as unknown as EndLessonStep;
+
+/** Core step: a short reflection (how did the lesson go? + optional note). Listed by the lessons manifest. */
+export const reflectionStep = endLessonStep({
   key: 'reflection',
   module: null,
   order: 100,
@@ -57,3 +62,6 @@ registerEndLessonStep({
       .run();
   },
 });
+
+/** Every registered step in run order (core and module steps). */
+export const allEndSteps = (): readonly EndLessonStep[] => [...steps];

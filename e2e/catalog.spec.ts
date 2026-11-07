@@ -5,6 +5,7 @@
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { THEME_KEYS } from '../src/shared/themes.ts';
 import { login } from './helpers.ts';
 
 const seriousViolations = async (page: Page, include?: string[]) => {
@@ -19,11 +20,15 @@ const seriousViolations = async (page: Page, include?: string[]) => {
 test('catalog: every theme × language, grids for 20 and 34 students, 200 % text', async ({ page }) => {
   await login(page, 'english');
   await page.goto('/dev/catalog');
-  for (const theme of ['explorer', 'animals', 'classroom']) {
+  // Iterates the theme registry: a new theme is covered without editing this test (SX, D-070).
+  for (const theme of THEME_KEYS) {
     for (const loc of ['en', 'tr']) {
       const panel = page.getByTestId(`catalog-${theme}-${loc}`);
       await expect(panel).toBeVisible();
       await expect(panel.locator('.cc-student-card')).toHaveCount(5);
+      // Every slot is filled: 5 mascot poses and 6 illustrations.
+      await expect(panel.getByTestId(`theme-slots-${theme}`).locator('[data-pose]')).toHaveCount(5);
+      await expect(panel.getByTestId(`theme-slots-${theme}`).locator('[data-illustration]')).toHaveCount(6);
     }
   }
   await expect(page.getByTestId('catalog-animals-tr')).toContainText('Çok sayıda');
@@ -50,10 +55,14 @@ test('catalog: every theme × language, grids for 20 and 34 students, 200 % text
   await page.getByLabel('Text size').selectOption('100');
 
   // axe (WCAG incl. colour contrast) on each theme in both languages.
-  for (const theme of ['explorer', 'animals', 'classroom'] as const) {
+  // Screenshots per theme are attached as artifacts for visual review (no pixel baseline is kept).
+  for (const theme of THEME_KEYS) {
     await page.getByLabel('Themes').selectOption(theme);
     await expect(page.getByTestId(`catalog-${theme}-en`)).toBeVisible();
     expect(await seriousViolations(page, [`[data-testid="catalog-${theme}-en"]`, `[data-testid="catalog-${theme}-tr"]`])).toEqual([]);
+    const shot = test.info().outputPath(`theme-${theme}.png`);
+    await page.getByTestId(`catalog-${theme}-en`).screenshot({ path: shot });
+    await test.info().attach(`theme-${theme}`, { path: shot, contentType: 'image/png' });
   }
 });
 

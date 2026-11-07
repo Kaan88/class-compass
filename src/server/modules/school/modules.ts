@@ -4,6 +4,7 @@
  * Later stages call `isModuleEnabled` before serving or accepting module data.
  */
 import { and, eq } from 'drizzle-orm';
+import type { z } from 'zod';
 import {
   CONTEXT_MODULES,
   DEFAULT_AVAILABILITY,
@@ -124,4 +125,52 @@ export function mergeModuleConfig(db: Db, contextId: string, module: ContextModu
     .onConflictDoUpdate({ target: [contextModules.contextId, contextModules.module], set: { configJson, updatedAt: now, updatedBy: userId } })
     .run();
   return next;
+}
+
+// ---------------------------------------------------------------- module config schemas (SX, D-069)
+/**
+ * Default config + Zod schema of a context module's `configJson`, declared in its server manifest
+ * (`config`). The schema describes the full config object; teacher patches are validated against its
+ * partial form, so a module never stores keys it does not know.
+ */
+export interface ModuleConfigSpec<S extends z.ZodObject = z.ZodObject> {
+  schema: S;
+  defaults: z.infer<S>;
+}
+
+const configSpecs = new Map<ContextModule, ModuleConfigSpec>();
+
+export function registerModuleConfig(module: ContextModule, spec: ModuleConfigSpec): void {
+  if (configSpecs.has(module) && configSpecs.get(module) !== spec) throw new Error(`Duplicate config schema for module ${module}`);
+  const ok = spec.schema.safeParse(spec.defaults);
+  if (!ok.success) throw new Error(`Default config of module ${module} does not match its schema`);
+  configSpecs.set(module, spec);
+}
+
+export const moduleConfigSpec = (module: ContextModule): ModuleConfigSpec | undefined => configSpecs.get(module);
+
+/** Validate a (partial) config patch for `module`; modules without a schema accept any object. */
+export function validateModuleConfig(module: ContextModule, config: Record<string, unknown>): Record<string, unknown> {
+  const spec = configSpecs.get(module);
+  if (!spec) return config;
+  const parsed = spec.schema.partial().strict().safeParse(config);
+  if (!parsed.success) throw new AppError('VALIDATION', parsed.error.issues[0]?.message ?? 'Invalid module settings', { module, reason: 'INVALID_MODULE_CONFIG' });
+  return parsed.data as Record<string, unknown>;
+}
+
+/**
+ * Effective config: the manifest defaults overlaid with the stored values that still match the schema
+ * (a stored value that no longer validates falls back to its default).
+ */
+export function moduleConfig(db: Db, contextId: string, module: ContextModule): Record<string, unknown> {
+  const spec = configSpecs.get(module);
+  const stored = getModuleConfig(db, contextId, module) ?? {};
+  if (!spec) return stored;
+  const out: Record<string, unknown> = { ...(spec.defaults as Record<string, unknown>) };
+  const shape = spec.schema.shape as Record<string, z.ZodType>;
+  for (const [k, v] of Object.entries(stored)) {
+    const field = shape[k];
+    if (field && field.safeParse(v).success) out[k] = v;
+  }
+  return out;
 }

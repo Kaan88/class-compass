@@ -33,7 +33,8 @@ function Name({ s }: { s: Who }) {
   );
 }
 
-function Settings({ contextId }: { contextId: string }) {
+/** Draw size setting; also the Secret Students settings panel on the class settings page (manifest). */
+export function SecretSettingsPanel({ contextId }: { contextId: string }) {
   const { t } = useI18n();
   const run = useRun();
   const q = useQuery({ queryKey: [...ALL, 'settings', contextId], queryFn: () => call(S.getSecretSettings, { contextId }) });
@@ -137,7 +138,7 @@ export function SecretPage() {
         <>
           <Select label={t('teacher.chooseClass')} items={list.map((c) => ({ id: c.id, label: `${c.className} · ${pickText(c.subjectName, locale)}` }))} value={ctx.id} onChange={setPicked} />
           {ctx.modules.secretStudents === false ? <Alert kind="warning">{t('secret.moduleOff')}</Alert> : null}
-          <Settings key={`s${ctx.id}`} contextId={ctx.id} />
+          <SecretSettingsPanel key={`s${ctx.id}`} contextId={ctx.id} />
           <History key={`h${ctx.id}`} contextId={ctx.id} />
         </>
       ) : null}

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -41,8 +41,9 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
     bodyLimit: 1024 * 1024,
     trustProxy: deps.config.TRUST_PROXY,
     // Student link paths (/s/...) must never be logged with their URL (tokens live in the fragment,
-    // which browsers never send, but be defensive anyway).
-    disableRequestLogging: true,
+    // which browsers never send, but be defensive anyway). The log controller replaces the deprecated
+    // top-level `disableRequestLogging` option (FSTDEP023).
+    logController: new LogController({ disableRequestLogging: true }),
   });
 
   await app.register(cookie);

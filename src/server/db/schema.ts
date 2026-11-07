@@ -9,6 +9,7 @@
  */
 import { sql } from 'drizzle-orm';
 import { integer, primaryKey, sqliteTable, text, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { THEME_KEYS } from '../../shared/themes.ts';
 
 export type LocalizedText = { en?: string; tr?: string };
 
@@ -55,7 +56,8 @@ export const subjects = sqliteTable('subjects', {
   updatedAt: integer('updated_at').notNull(),
 });
 
-export const CLASS_THEMES = ['explorer', 'animals', 'classroom'] as const;
+/** Theme keys come from the shared theme registry (D-070); stored as plain text, so adding a theme needs no migration. */
+export const CLASS_THEMES = THEME_KEYS;
 
 export const classes = sqliteTable(
   'classes',

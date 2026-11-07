@@ -18,11 +18,11 @@ import { dismissToast, showUndoToast } from '../../lib/toast.ts';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { IconFlag, IconPlus, IconUndo } from '../../ui/icons.tsx';
-import { Mascot } from '../../ui/Mascot.tsx';
+import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { CounterBar } from '../../ui/Students.tsx';
-import { classLabel } from '../lessons/Dashboard.tsx';
+import { classLabel } from '../lessons/labels.ts';
 import { serverNow, useLessonState } from '../lessons/lessonClient.ts';
-import { registerDashboardSlot, registerStudentCardAddon, type ClassroomContext } from '../lessons/registry.ts';
+import type { ClassroomContext, DashboardSlot, StudentCardAddon } from '../types.ts';
 import { applyDelta, applyReset, crossingKey, FRESH_CROSSING_MS, markShown, opensCrossing, patchCounters, sendCounterCommand, tapGuard, tapToastText, wasShown } from './countersClient.ts';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -85,7 +85,7 @@ function ThresholdOverlay({ lesson, counter, onReset }: { lesson: LessonState; c
   return (
     <Modal isOpen={open} onOpenChange={(v) => (v ? null : setOpenKey(null))} title={title}>
       <div className="cc-threshold__overlay" data-testid="threshold-overlay">
-        {response?.mascot ? <Mascot size={150} animate /> : null}
+        {response?.mascot ? <ThemeIllustration name="threshold" width={220} motion="threshold" /> : null}
         <p className="cc-threshold__message">{response ? responseText(counter, locale) : t('counter.limitReachedBody', { label: pickText(counter.labels.main, locale) })}</p>
       </div>
       <DialogActions>
@@ -212,7 +212,7 @@ function CountersSlot({ context, lesson }: { context: ClassroomContext; lesson: 
   );
 }
 
-registerDashboardSlot({ key: 'counters', module: 'counters', order: 10, Component: CountersSlot });
+export const countersDashboardSlot: DashboardSlot = { key: 'counters', module: 'counters', order: 10, Component: CountersSlot };
 
 // ---------------------------------------------------------------- student cards
 const PICK_KEY = 'cc.cardCounter.';
@@ -292,4 +292,4 @@ function useCounterCards(context: ClassroomContext, lesson: LessonState, enabled
   };
 }
 
-registerStudentCardAddon({ key: 'counters', module: 'counters', useAddon: useCounterCards });
+export const countersCardAddon: StudentCardAddon = { key: 'counters', module: 'counters', useAddon: useCounterCards };

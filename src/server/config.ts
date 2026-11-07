@@ -18,7 +18,24 @@ const EnvSchema = z.object({
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASS: z.string().optional().default(''),
   SMTP_FROM: z.string().optional().default(''),
+  /**
+   * Test-only override of the sign-in rate limit (requests per minute per address) for the e2e
+   * server, which signs in many times. Honoured only when NODE_ENV=test; ignored in development and
+   * always ignored in production (see `loginRateLimitMax`).
+   */
+  CC_TEST_LOGIN_RATE_LIMIT: z.coerce.number().int().min(1).max(10_000).optional(),
 });
+
+/** Sign-in attempts per minute per address (production value). */
+export const LOGIN_RATE_LIMIT_MAX = 20;
+
+/**
+ * The sign-in rate limit to use. The e2e override applies only under NODE_ENV=test, so a stray
+ * variable on a production (or development) server can never weaken the limit.
+ */
+export function loginRateLimitMax(e: { NODE_ENV: string; CC_TEST_LOGIN_RATE_LIMIT?: number | undefined }): number {
+  return e.NODE_ENV === 'test' && e.CC_TEST_LOGIN_RATE_LIMIT !== undefined ? e.CC_TEST_LOGIN_RATE_LIMIT : LOGIN_RATE_LIMIT_MAX;
+}
 
 export type Config = z.infer<typeof EnvSchema> & {
   dbPath: string;
@@ -26,6 +43,8 @@ export type Config = z.infer<typeof EnvSchema> & {
   backupsDir: string;
   isProd: boolean;
   smtpEnabled: boolean;
+  /** Effective sign-in attempts per minute per address (20 except under NODE_ENV=test with the override). */
+  loginRateLimit: number;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Partial<Config> = {}): Config {
@@ -46,6 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
     backupsDir: path.join(dataDir, 'backups'),
     isProd: e.NODE_ENV === 'production',
     smtpEnabled: e.SMTP_HOST.length > 0,
+    loginRateLimit: loginRateLimitMax(e),
     ...overrides,
   };
 }

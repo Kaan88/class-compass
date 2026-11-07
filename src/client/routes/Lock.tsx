@@ -19,6 +19,7 @@ import { isLocked, lockNow, useMe } from '../lib/session.ts';
 import { clearSensitiveToasts } from '../lib/toast.ts';
 import { Button } from '../ui/Button.tsx';
 import { DisplayBanner } from '../ui/Layout.tsx';
+import { ThemeIllustration } from '../ui/Mascot.tsx';
 import { PinPad } from '../ui/PinPad.tsx';
 
 function useCountdown(until: number | null): number {
@@ -87,6 +88,7 @@ export function LockScreen() {
 
   return (
     <main className="cc-lock" data-testid="lock-screen">
+      <ThemeIllustration name="lockScreen" width={220} />
       <svg className="cc-lock__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
         <rect x="4" y="10" width="16" height="11" rx="2" />
         <path d="M8 10V7a4 4 0 0 1 8 0v3" />

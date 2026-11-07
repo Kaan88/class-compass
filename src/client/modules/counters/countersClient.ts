@@ -7,11 +7,12 @@
 import { levelFor } from '../../../domain/counters.ts';
 import type { CounterCommandPayload, CounterCommandType, CounterLessonState, CountersLessonState } from '../../../shared/contracts/counters.ts';
 import { DOUBLE_TAP_MS } from '../../../shared/counters.ts';
-import { getOutbox, registerInvalidation } from '../../lib/outbox-client.ts';
+import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts';
 import { queryClient } from '../../lib/queryClient.ts';
 import { activeLessonsKey, lessonKey, serverNow, type LessonQueryData } from '../lessons/lessonClient.ts';
 
-registerInvalidation('counter.', (op) => (op.contextId ? [lessonKey(op.contextId), activeLessonsKey] : [['classroom', 'lesson']]));
+/** Listed in the counters manifest. */
+export const counterInvalidation: CommandInvalidation = { prefix: 'counter.', keys: (op) => (op.contextId ? [lessonKey(op.contextId), activeLessonsKey] : [['classroom', 'lesson']]) };
 
 /**
  * Double-tap guard (P3): a second tap on the same student and counter within `windowMs` of the last

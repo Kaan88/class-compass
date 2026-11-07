@@ -293,7 +293,7 @@ export function CountersPage() {
       <Alert kind="warning">{t('counters.liveHint')}</Alert>
       {list.data && !list.data.enabled ? (
         <Alert kind="warning">
-          {t('counters.moduleOff')} <Link to="/teacher/classes">{t('teacher.classSettings')}</Link>
+          {t('counters.moduleOff')} <Link to="/teacher/$page" params={{ page: 'classes' }}>{t('teacher.classSettings')}</Link>
         </Alert>
       ) : null}
       <div className="cc-row">

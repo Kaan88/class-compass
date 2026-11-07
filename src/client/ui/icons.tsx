@@ -6,7 +6,7 @@ import type { ReactNode, SVGProps } from 'react';
 
 function Icon({ children, ...p }: SVGProps<SVGSVGElement> & { children: ReactNode }) {
   return (
-    <svg width="1.25em" height="1.25em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" {...p}>
+    <svg className="cc-icon" width="1.25em" height="1.25em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" {...p}>
       {children}
     </svg>
   );

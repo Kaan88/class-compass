@@ -5,13 +5,17 @@ import { RouterProvider } from '@tanstack/react-router';
 import { onAuthProblem } from './lib/api.ts';
 import { setDisplay } from './lib/display.ts';
 import { getOutbox } from './lib/outbox-client.ts';
+import { installClientModules } from './modules/registry.ts';
 import { purgeSensitive, queryClient } from './lib/queryClient.ts';
 import { markLocked, ME_KEY } from './lib/session.ts';
 import { clearAllToasts } from './lib/toast.ts';
 import { router } from './router.tsx';
 import { PUBLIC_PATHS } from './routes/guards.ts';
 import './styles/app.css';
+import { installThemeStyles } from './themes/index.tsx';
 
+// Theme tokens are generated from the theme registry (D-070) before anything renders.
+installThemeStyles();
 setDisplay({});
 
 // Any 423 from the API swaps sensitive areas to the lock screen and purges sensitive data (PIN-3);
@@ -43,7 +47,9 @@ window.addEventListener('pageshow', (e) => {
   }
 });
 
-// Start the command outbox so commands queued before a reload are sent (UX-11).
+// Module manifests: register their outbox refreshes, then start the outbox so commands queued
+// before a reload are sent (UX-11).
+installClientModules();
 getOutbox();
 
 createRoot(document.getElementById('root')!).render(

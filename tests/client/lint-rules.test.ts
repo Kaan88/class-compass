@@ -1,32 +1,43 @@
 /**
  * Project lint rules that ESLint does not cover (THM-5, UX-9, I18N):
- *  - client code uses semantic CSS tokens only, no raw colour literals outside the token sheet;
+ *  - client code uses semantic CSS tokens only, no raw colour literals outside the theme token sheets;
+ *  - components never branch on a theme key and only use known tokens (theme lint, SX);
  *  - en.ts and tr.ts have exactly the same keys at runtime (the type checker only checks one way);
  *  - JSX contains no hard-coded user-visible text: every label goes through t().
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
+import { DEFAULT_THEME, THEME_KEYS, type ThemeKey } from '../../src/shared/themes.ts';
+import { themeTokens } from '../../src/client/themes/css.ts';
+import { THEMES } from '../../src/client/themes/registry.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const CLIENT = join(ROOT, 'src', 'client');
-/** The only place where colour values may be written: primitive tokens mapped to semantic ones. */
-const TOKEN_SHEET = join(CLIENT, 'styles', 'app.css');
+const THEMES_DIR = join(CLIENT, 'themes');
+const APP_CSS = join(CLIENT, 'styles', 'app.css');
+/**
+ * The only places where colour values may be written (SX, D-070): the shared theme base and each
+ * theme's token file. Everything else uses semantic tokens (`var(--cc-*)` / `tok()` in theme art).
+ */
+const isTokenSheet = (f: string) => f === join(THEMES_DIR, 'base.ts') || (rel(f).startsWith('src/client/themes/') && f.endsWith(`${sep}tokens.ts`));
 
 function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
 }
-const rel = (f: string) => relative(ROOT, f).replace(/\\/g, '/');
+function rel(f: string) {
+  return relative(ROOT, f).replace(/\\/g, '/');
+}
 
-describe('no raw colours outside the token sheet', () => {
+describe('no raw colours outside the theme token sheets', () => {
   const RAW = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(/;
   it('src/client code and styles only reference var(--cc-*) tokens', () => {
     const offenders: string[] = [];
     for (const f of walk(CLIENT)) {
-      if (f === TOKEN_SHEET || !/\.(tsx?|css)$/.test(f)) continue;
+      if (isTokenSheet(f) || f === APP_CSS || !/\.(tsx?|css)$/.test(f)) continue;
       readFileSync(f, 'utf8')
         .split('\n')
         .forEach((line, i) => {
@@ -36,19 +47,54 @@ describe('no raw colours outside the token sheet', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('component rules in the token sheet use semantic tokens, not primitives or literals', () => {
-    // Literal colours are allowed only in custom-property declarations (`--p-*: #…` / `--cc-*: …`).
+  it('app.css has component rules only: no colour literals and no primitive tokens', () => {
     const offenders: string[] = [];
-    readFileSync(TOKEN_SHEET, 'utf8')
+    readFileSync(APP_CSS, 'utf8')
       .split('\n')
       .forEach((line, i) => {
         const t = line.trim();
-        if (t.startsWith('--') || t.startsWith('/*') || t.startsWith('*')) return;
+        if (t.startsWith('/*') || t.startsWith('*')) return;
         // A colour function whose every argument is a token (e.g. the avatar hue) is still token-only.
         const literalPart = t.replace(/var\(--[\w-]+(?:,\s*[^()]*)?\)/g, '').replace(/\b(?:rgba?|hsla?)\(\s*\)/g, '');
-        if (RAW.test(literalPart) || /var\(--p-/.test(t)) offenders.push(`app.css:${i + 1}: ${t}`);
+        if (RAW.test(literalPart) || /--p-/.test(t)) offenders.push(`app.css:${i + 1}: ${t}`);
       });
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('theme lint (THM-3, THM-4)', () => {
+  const sources = () => walk(CLIENT).filter((f) => /\.(tsx?|css)$/.test(f));
+
+  it('components never branch on a theme key (a theme key literal next to "theme"): theme differences live in src/client/themes only', () => {
+    const keyLiteral = new RegExp(`['"\`](?:${THEME_KEYS.join('|')})['"\`]`);
+    const offenders: string[] = [];
+    for (const f of sources()) {
+      if (rel(f).startsWith('src/client/themes/') || !/\.tsx?$/.test(f)) continue;
+      readFileSync(f, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          const code = line.replace(/\/\/.*$/, '');
+          if (keyLiteral.test(code) && /theme/i.test(code)) offenders.push(`${rel(f)}:${i + 1}: ${line.trim()}`);
+        });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('every var(--cc-*) used by a component is a theme token or a layout/component variable declared in app.css', () => {
+    const known = new Set(themeTokens(THEMES[DEFAULT_THEME]).map(([k]) => k));
+    for (const m of readFileSync(APP_CSS, 'utf8').matchAll(/(--cc-[\w-]+)\s*:/g)) known.add(m[1]!);
+    // Variables components set inline (avatar hue from the student id; the text scale on <html>).
+    for (const f of sources()) for (const m of readFileSync(f, 'utf8').matchAll(/['"](--cc-[\w-]+)['"]/g)) known.add(m[1]!);
+    const unknown: string[] = [];
+    for (const f of sources()) {
+      for (const m of readFileSync(f, 'utf8').matchAll(/var\((--cc-[\w-]+)/g)) if (!known.has(m[1]!)) unknown.push(`${rel(f)}: ${m[1]}`);
+    }
+    expect([...new Set(unknown)]).toEqual([]);
+  });
+
+  it('every theme emits the same complete set of tokens (no theme can miss a slot)', () => {
+    const names = (k: ThemeKey) => themeTokens(THEMES[k]).map(([n]) => n);
+    for (const k of THEME_KEYS) expect(names(k)).toEqual(names(DEFAULT_THEME));
   });
 });
 

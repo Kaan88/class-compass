@@ -63,7 +63,7 @@ export interface AttendanceChange {
   lessonId: string | null;
   status: AttendanceStatus | null;
 }
-type AttendanceListener = (ctx: RequestContext, change: AttendanceChange) => void;
+export type AttendanceListener = (ctx: RequestContext, change: AttendanceChange) => void;
 const attendanceListeners: AttendanceListener[] = [];
 export function registerAttendanceListener(fn: AttendanceListener) {
   if (!attendanceListeners.includes(fn)) attendanceListeners.push(fn);

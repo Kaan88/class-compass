@@ -24,6 +24,18 @@ export interface CommandDef<S extends z.ZodType> {
   handle: (ctx: RequestContext, payload: z.infer<S>, meta: CommandMeta) => unknown;
 }
 
+/** A command definition of any payload type, as listed in a module manifest. */
+export type AnyCommandDef = CommandDef<z.ZodType>;
+
+/**
+ * Declare a command without registering it (SX, D-069). Modules list their commands in their
+ * manifest (`commands: [...]`); `installModules()` registers them once with `defineCommand`, so no
+ * command depends on an import side effect.
+ */
+export function command<S extends z.ZodType>(def: CommandDef<S>): AnyCommandDef {
+  return def as unknown as AnyCommandDef;
+}
+
 const registry = new Map<string, CommandDef<z.ZodType>>();
 
 export function defineCommand<S extends z.ZodType>(def: CommandDef<S>): CommandDef<S> {
