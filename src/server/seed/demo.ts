@@ -101,8 +101,21 @@ export class SeedRefused extends Error {}
 const count = (deps: AppDeps, table: typeof users | typeof students | typeof classes | typeof schoolYears | typeof subjects) =>
   deps.db.select({ n: sql<number>`count(*)` }).from(table).get()?.n ?? 0;
 
-export async function seedDemo(deps: AppDeps, opts: { force?: boolean } = {}): Promise<DemoResult> {
+export interface SeedOptions {
+  force?: boolean;
+  /**
+   * Fixed password for every demo account. Only for automated tests (Playwright, D-033): refused
+   * unless NODE_ENV=test, so real or demo installs always get random passwords.
+   */
+  fixedPassword?: string;
+}
+
+export async function seedDemo(deps: AppDeps, opts: SeedOptions = {}): Promise<DemoResult> {
   if (deps.config.isProd) throw new SeedRefused('Refusing to seed demo data when NODE_ENV=production.');
+  if (opts.fixedPassword !== undefined) {
+    if (deps.config.NODE_ENV !== 'test') throw new SeedRefused('A fixed demo password is only allowed when NODE_ENV=test.');
+    if (opts.fixedPassword.length < 10) throw new SeedRefused('The fixed demo password must be at least 10 characters.');
+  }
   ensureSchoolDefaults(deps);
   const schoolData = count(deps, students) + count(deps, classes) + count(deps, schoolYears) + count(deps, subjects);
   const accounts = count(deps, users);
@@ -126,7 +139,7 @@ export async function seedDemo(deps: AppDeps, opts: { force?: boolean } = {}): P
   const now = deps.now();
   const prepared: Array<(typeof demoAccounts)[number] & { password: string; passwordHash: string }> = [];
   for (const a of demoAccounts) {
-    const password = randomToken(12);
+    const password = opts.fixedPassword ?? randomToken(12);
     prepared.push({ ...a, password, passwordHash: await hashPassword(password) });
   }
 

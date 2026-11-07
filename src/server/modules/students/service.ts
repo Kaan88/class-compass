@@ -453,7 +453,7 @@ export function promoteClass(ctx: RequestContext, input: In<typeof C.promoteClas
   return tx(ctx.db, () => {
     const from = getClass(ctx.db, input.classId);
     const to = getClass(ctx.db, input.toClassId);
-    if (from.schoolYearId === to.schoolYearId) throw invalid('Promotion moves a class into a different school year; use move within the same year');
+    if (from.schoolYearId === to.schoolYearId) throw invalid('Promotion moves a class into a different school year; use move within the same year', { reason: 'PROMOTE_SAME_YEAR' });
     assertClassWritable(ctx.db, from);
     const ids = ctx.db
       .select({ id: enrolments.studentId })

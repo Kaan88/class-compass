@@ -4,6 +4,7 @@
  *   node src/server/cli.ts admin:create --login <login> --name "<Display Name>" [--email x]   (password via stdin)
  *   node src/server/cli.ts admin:reset-password --login <login>                                (password via stdin)
  *   node src/server/cli.ts seed:demo [--force-demo]      fictional demo school (never in production)
+ *     CC_DEMO_PASSWORD=<pw> (NODE_ENV=test only) gives every demo account that password — for E2E tests
  * Initial administrator setup (ACC-3): there is no web registration and no default password.
  */
 import { parseArgs } from 'node:util';
@@ -63,7 +64,8 @@ switch (cmd) {
   case 'seed:demo': {
     runMigrations(db);
     try {
-      const r = await seedDemo({ db, config, now: Date.now }, { force: values['force-demo'] === true });
+      const fixed = process.env.CC_DEMO_PASSWORD;
+      const r = await seedDemo({ db, config, now: Date.now }, { force: values['force-demo'] === true, ...(fixed ? { fixedPassword: fixed } : {}) });
       console.log(`Demo school created (fictional data). School year ${r.schoolYear}.`);
       for (const c of r.classes) console.log(`  class ${c.name}: ${c.students} students`);
       console.log('');

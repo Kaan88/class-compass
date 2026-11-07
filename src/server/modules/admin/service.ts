@@ -92,8 +92,8 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
   return tx(ctx.db, () => {
     const u = getUser(ctx.db, userId);
     if (!active) {
-      if (u.id === requireUser(ctx).id) throw invalid('You cannot deactivate your own account');
-      if (u.role === 'admin' && activeAdminCount(ctx.db, u.id) === 0) throw conflict('At least one active administrator is required');
+      if (u.id === requireUser(ctx).id) throw invalid('You cannot deactivate your own account', { reason: 'SELF_DEACTIVATE' });
+      if (u.role === 'admin' && activeAdminCount(ctx.db, u.id) === 0) throw conflict('At least one active administrator is required', { reason: 'LAST_ADMIN' });
     }
     if ((u.disabledAt === null) !== active) {
       const now = ctx.now();
@@ -110,7 +110,7 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
 
 export async function resetPasswordByAdmin(ctx: RequestContext, userId: string) {
   const u = getUser(ctx.db, userId);
-  if (u.id === requireUser(ctx).id) throw invalid('Use “change password” for your own account');
+  if (u.id === requireUser(ctx).id) throw invalid('Use “change password” for your own account', { reason: 'OWN_PASSWORD' });
   const password = temporaryPassword();
   const passwordHash = await hashPassword(password);
   tx(ctx.db, () => {

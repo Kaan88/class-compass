@@ -46,7 +46,9 @@ export async function call<I extends z.ZodType, O extends z.ZodType>(ep: Endpoin
   const body = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
     const code: string = body?.error?.code ?? 'INTERNAL';
-    if (code === 'PIN_REQUIRED' || (code === 'UNAUTHENTICATED' && ep.access !== 'public')) {
+    // A 401 with a business reason (WRONG_PIN, WRONG_PASSWORD) is a form error, not a sign-out.
+    const hasReason = typeof body?.error?.details?.reason === 'string';
+    if (code === 'PIN_REQUIRED' || (code === 'UNAUTHENTICATED' && ep.access !== 'public' && !hasReason)) {
       authListeners.forEach((l) => l(code as 'PIN_REQUIRED' | 'UNAUTHENTICATED'));
     }
     throw new ApiError(res.status, code, body?.error?.message ?? res.statusText, body?.error?.details);

@@ -16,7 +16,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Verify native deps on Windows (better-sqlite3, sharp, argon2) — Node 26 chosen (D-019)
 - [ ] Verify native deps inside Docker on the VPS; tesseract.js `tur` + SheetJS (S9)
 - [x] Repo skeleton, boundaries lint, Vitest, GitHub Actions (Ubuntu + Windows), CONVENTIONS.md
-- [ ] Playwright setup; i18n/a11y/raw-colour lint rules (S3)
+- [x] Playwright setup; i18n/a11y/raw-colour lint rules — done in S3 (`tests/client/lint-rules.test.ts`, axe in e2e)
 - [x] Baseline migration, `/healthz`, redacted logging, CSP/security headers, robots/noindex
 - [x] Synthetic Turkish/English name generator (fictional students only) — `demoNames` in `src/server/seed/demo.ts` (S2)
 
@@ -37,21 +37,25 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] `seed:demo` fictional school (3-A 19, 3-B 20, 4-C 34, 2-D 3; random passwords printed once) — D-024
 - [x] Tests: permission matrix over all endpoints, unassigned-class/other-context denial, archived year read-only, promotion history, deactivated teacher + audit retained, media defaults, module disable keeps data, locale isolation, email reset, seed
 - [x] Review fixes (D-027…D-030): date-aware rosters (future-dated moves/promotions keep the current class until the date), move dates validated against the target year and old enrolments capped at the old year's end, no moves out of archived classes, year overlap / term / enrolment range checks on year edits, duplicate warning on rename and for deactivated students, reset links voided on email/password/state changes, SMTP STARTTLS required, atomic demo seed, missing `error.*` i18n keys (75 tests total)
-- [ ] Admin UI and teacher roster/module screens — moved to S3 (this stage is backend only)
+- [x] Admin UI and teacher roster/module screens — done in S3
 - [ ] Paste entry of student lists — moved to S9 (it is the importer's paste input, IMP-1)
 
 ## S3 UI kit & themes
-- [ ] Tokens + 3 themes; StudentCard, CounterBar, SaveStateBadge, UndoToast, LockScreen, ClassBanner, ConfirmDestructive…
-- [ ] Text scale, reduced motion, sounds/animation switches; `/dev/catalog`
-- [ ] Admin screens on the S2 APIs (users, settings, years/terms, subjects, classes, assignments, module policies, students incl. move/promote, audit log) and teacher roster / module settings screens; password-reset page
-- [ ] Tests: screenshot matrix, axe, contrast, 20- and 40-student grids
+- [x] Tokens (primitive → semantic → theme) + 3 themes (explorer, animals, classroom) with mascots; UI kit in `src/client/ui`: buttons, fields, native select, switches, dialogs, ConfirmDestructive, tabs, toasts + undo toast, SaveStateBadge, NeedsAttentionTray, StudentCard/Grid (compact > 24), CounterBar, MetricCell (not recorded ≠ 0), ClassBanner, DisplayBanner, ClassSwitcher, DataTable, PinPad, ThemePicker/preview — D-036
+- [x] Text scale (80–200 %, per teacher), reduced motion + per-class animation switch, per-class sounds + per-device sound switch; `/dev/catalog` — D-034
+- [x] App shell: TanStack Router routes and guards, sign-in, forgot/reset password, forced password change, teacher menu, profile (language, text size, PIN, password), class settings (modules, theme preview), teacher roster with duplicate confirmation
+- [x] Admin screens on the S2 APIs (users with one-time temporary password, settings, years/terms, subjects, classes with theme preview + promotion, assignments, module/media policies, students incl. search/move/history, audit log)
+- [x] Offline outbox client (Dexie/IndexedDB, ordered, single-flight, backoff, needs-attention retry/dismiss) with unit tests — D-035 (used by lesson commands from S5)
+- [x] Lint tests: no raw colours, en/tr key + placeholder parity, no untranslated JSX text
+- [~] Tests: axe per theme (incl. contrast), 20- and 34-student grids on 1920×1080, 200 % text, admin/PIN/preferences flows on desktop + mobile (11 e2e) — a pixel-diff screenshot baseline and a 40-student grid are not done yet (D-037)
+- [ ] Verify the e2e CI job on Ubuntu stays reliable over several runs
 
 ## S4 Classroom mode & PIN
-- [ ] Lock screen, teacher menu, display banner, auto-lock, lockout, server 423 enforcement
-- [ ] Tests: direct URL / back / refresh / bfcache / raw API bypass attempts
+- [~] Lock screen, teacher menu (menu first after unlock), display banner, client idle relock, lockout countdown, server 423 enforcement — client side done in S3 (D-031, D-032); classroom-mode entry from a started lesson comes with S5
+- [~] Tests: direct URL / back / refresh / raw API bypass and 423 swap covered in `e2e/pin-lock.spec.ts`; bfcache restore and inactivity relock not yet covered by e2e
 
 ## S5 Lessons, outbox, attendance, routines
-- [ ] Start / resume / end lesson; class switching; outbox + needs-attention tray; polling
+- [ ] Start / resume / end lesson; class switching; outbox + needs-attention tray; polling — outbox client, tray, save badge and class switcher exist (S3); lesson flows, polling and dashboard slot contents do not
 - [ ] Daily attendance + lesson exceptions; routine templates, stages, timer; dashboard date/timezone
 - [ ] Tests: new vs resumed, switching with queued ops, offline/abort-after-commit, attendance independence
 

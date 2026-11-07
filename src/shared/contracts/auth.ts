@@ -15,6 +15,12 @@ export const Me = z.object({
   hasPin: z.boolean(),
   classroomMode: z.boolean(),
   pinUnlockedUntil: z.number().nullable(),
+  /**
+   * Server-computed: true when sensitive (teacher/admin/account) endpoints are currently usable on
+   * this session — not in classroom mode, or PIN-unlocked. The client uses it instead of comparing
+   * `pinUnlockedUntil` with its own (possibly skewed) clock.
+   */
+  pinUnlocked: z.boolean(),
 });
 export type Me = z.infer<typeof Me>;
 

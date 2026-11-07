@@ -1,0 +1,236 @@
+/** Teacher class settings (ACC-5, CFG-1/2) and class roster (ACC-4/7). */
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as School from '../../../shared/contracts/school.ts';
+import * as Students from '../../../shared/contracts/students.ts';
+import { pickText, type MessageKey } from '../../../shared/i18n/index.ts';
+import { sortByName } from '../../../shared/text/turkish.ts';
+import { call } from '../../lib/api.ts';
+import { errorText, reasonOf } from '../../lib/errors.ts';
+import { useI18n } from '../../lib/i18n.tsx';
+import { SENSITIVE } from '../../lib/queryClient.ts';
+import { showToast } from '../../lib/toast.ts';
+import { Button } from '../../ui/Button.tsx';
+import { Modal, DialogActions } from '../../ui/Dialog.tsx';
+import { Alert, EmptyState } from '../../ui/Feedback.tsx';
+import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
+import { DataTable } from '../../ui/Layout.tsx';
+import { Avatar } from '../../ui/Students.tsx';
+import { ThemePreview } from '../../ui/ThemePreview.tsx';
+
+export const moduleLabelKey = (m: string) => `module.${m}` as MessageKey;
+
+function useMyContexts() {
+  return useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
+}
+
+export function ClassSettingsPage() {
+  const { t, locale } = useI18n();
+  const qc = useQueryClient();
+  const contexts = useMyContexts();
+  const list = contexts.data?.contexts ?? [];
+  const [selected, setSelected] = useState<string>('');
+  const ctx = list.find((c) => c.id === selected) ?? list[0];
+  const modules = useQuery({
+    queryKey: [SENSITIVE, 'teacher', 'modules', ctx?.id],
+    queryFn: () => call(School.getContextModules, { contextId: ctx!.id }),
+    enabled: Boolean(ctx),
+  });
+  const set = useMutation({
+    mutationFn: (v: { module: School.ContextModule; enabled: boolean }) => call(School.setContextModule, { contextId: ctx!.id, module: v.module, enabled: v.enabled }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: [SENSITIVE, 'teacher', 'modules', ctx?.id] });
+      void qc.invalidateQueries({ queryKey: ['classroom', 'contexts'] });
+      showToast({ message: t('save.saved'), kind: 'success' });
+    },
+    onError: (err) => showToast({ message: errorText(t, err), kind: 'error' }),
+  });
+  if (contexts.isSuccess && list.length === 0) return <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} />;
+  return (
+    <main className="cc-page cc-stack">
+      <h1 className="cc-h1">{t('teacher.classSettings')}</h1>
+      {ctx ? (
+        <>
+          <Select
+            label={t('teacher.chooseClass')}
+            value={ctx.id}
+            onChange={setSelected}
+            items={list.map((c) => ({ id: c.id, label: `${c.className} · ${pickText(c.subjectName, locale)}` }))}
+          />
+          <section className="cc-card cc-stack">
+            <h2 className="cc-h2">{t('teacher.modules')}</h2>
+            <p className="cc-muted">{t('teacher.modulesHint')}</p>
+            {modules.data?.modules.map((m) => (
+              <Toggle
+                key={m.module}
+                label={t(moduleLabelKey(m.module))}
+                isSelected={m.effective}
+                isDisabled={!m.available || set.isPending}
+                description={m.available ? undefined : t('teacher.moduleOffByAdmin')}
+                onChange={(v) => set.mutate({ module: m.module, enabled: v })}
+              />
+            ))}
+          </section>
+          <section className="cc-card cc-stack">
+            <h2 className="cc-h2">{t('teacher.themePreview')}</h2>
+            <p className="cc-muted">{t('teacher.themeByAdmin')}</p>
+            <ThemePreview theme={ctx.theme} />
+            <p>
+              {t('teacher.soundsState', { state: ctx.soundsEnabled ? t('common.on') : t('common.off') })} ·{' '}
+              {t('teacher.animationsState', { state: ctx.animationsEnabled ? t('common.on') : t('common.off') })}
+            </p>
+          </section>
+        </>
+      ) : null}
+    </main>
+  );
+}
+
+export function TeacherStudentsPage() {
+  const { t } = useI18n();
+  const qc = useQueryClient();
+  const contexts = useMyContexts();
+  const classes = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of contexts.data?.contexts ?? []) seen.set(c.classId, c.className);
+    return sortByName([...seen].map(([id, name]) => ({ id, name })), (c) => c.name);
+  }, [contexts.data]);
+  const [classId, setClassId] = useState('');
+  const cid = classId || classes[0]?.id || '';
+  const roster = useQuery({ queryKey: [SENSITIVE, 'teacher', 'roster', cid], queryFn: () => call(Students.teacherRoster, { classId: cid }), enabled: Boolean(cid) });
+  const [adding, setAdding] = useState(false);
+  if (contexts.isSuccess && classes.length === 0) return <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} />;
+  return (
+    <main className="cc-page cc-stack">
+      <h1 className="cc-h1">{t('teacher.students')}</h1>
+      <div className="cc-row" style={{ alignItems: 'flex-end' }}>
+        <Select label={t('teacher.chooseClass')} value={cid} onChange={setClassId} items={classes.map((c) => ({ id: c.id, label: c.name }))} />
+        <Button variant="primary" onPress={() => setAdding(true)} isDisabled={!cid}>
+          {t('students.add')}
+        </Button>
+      </div>
+      {roster.data ? (
+        <DataTable
+          caption={t('students.rosterCaption', { className: roster.data.className, count: roster.data.students.length })}
+          rows={roster.data.students}
+          rowKey={(s) => s.id}
+          emptyText={t('students.none')}
+          columns={[
+            {
+              key: 'name',
+              header: t('students.name'),
+              sortValue: (s) => s.fullName,
+              render: (s) => (
+                <span className="cc-row">
+                  <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
+                  {s.fullName}
+                </span>
+              ),
+            },
+            { key: 'number', header: t('students.number'), sortValue: (s) => s.studentNumber ?? '', render: (s) => s.studentNumber ?? '—' },
+            { key: 'since', header: t('students.since'), render: (s) => s.enrolledFrom ?? '—' },
+          ]}
+        />
+      ) : null}
+      <AddStudentDialog
+        isOpen={adding}
+        onOpenChange={setAdding}
+        onAdd={(input) => call(Students.addStudentToClass, { classId: cid, ...input })}
+        onDone={() => void qc.invalidateQueries({ queryKey: [SENSITIVE, 'teacher', 'roster', cid] })}
+      />
+    </main>
+  );
+}
+
+export interface NewStudentInput {
+  fullName: string;
+  givenNames: string | null;
+  familyName: string | null;
+  studentNumber: string | null;
+  allowDuplicateName?: boolean;
+}
+
+/**
+ * Add a student; a possible duplicate (same name) asks for confirmation that it is a different
+ * child (D-022) — never merged automatically.
+ */
+export function AddStudentDialog({
+  isOpen,
+  onOpenChange,
+  onAdd,
+  onDone,
+  extra,
+}: {
+  isOpen: boolean;
+  onOpenChange: (v: boolean) => void;
+  onAdd: (input: NewStudentInput) => Promise<unknown>;
+  onDone: () => void;
+  extra?: React.ReactNode;
+}) {
+  const { t } = useI18n();
+  const [given, setGiven] = useState('');
+  const [family, setFamily] = useState('');
+  const [number, setNumber] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [dupWarning, setDupWarning] = useState(false);
+  const reset = () => {
+    setGiven('');
+    setFamily('');
+    setNumber('');
+    setError(null);
+    setDupWarning(false);
+  };
+  const submit = async (allowDuplicateName: boolean) => {
+    setError(null);
+    const fullName = `${given.trim()} ${family.trim()}`.trim();
+    if (!fullName) return setError(t('students.nameRequired'));
+    try {
+      await onAdd({ fullName, givenNames: given.trim() || null, familyName: family.trim() || null, studentNumber: number.trim() || null, allowDuplicateName });
+      showToast({ message: t('students.added', { name: fullName }), kind: 'success' });
+      reset();
+      onOpenChange(false);
+      onDone();
+    } catch (err) {
+      if (reasonOf(err) === 'POSSIBLE_DUPLICATE') setDupWarning(true);
+      else setError(errorText(t, err));
+    }
+  };
+  return (
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
+      title={t('students.add')}
+    >
+      <form
+        className="cc-stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit(false);
+        }}
+      >
+        {extra}
+        <TextField label={t('students.givenNames')} value={given} onChange={setGiven} isRequired autoFocus />
+        <TextField label={t('students.familyName')} value={family} onChange={setFamily} />
+        <TextField label={t('students.numberOptional')} value={number} onChange={setNumber} />
+        {error ? <Alert>{error}</Alert> : null}
+        {dupWarning ? (
+          <Alert kind="warning">
+            <p style={{ margin: 0 }}>{t('error.POSSIBLE_DUPLICATE')}</p>
+            <Button variant="primary" size="small" onPress={() => void submit(true)}>
+              {t('students.addAnyway')}
+            </Button>
+          </Alert>
+        ) : null}
+        <DialogActions>
+          <Button onPress={() => onOpenChange(false)}>{t('common.cancel')}</Button>
+          <Button type="submit" variant="primary">
+            {t('students.add')}
+          </Button>
+        </DialogActions>
+      </form>
+    </Modal>
+  );
+}

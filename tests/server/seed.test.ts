@@ -64,4 +64,16 @@ describe('seed:demo', () => {
     await seedDemo(env.deps, { force: true }); // only accounts existed: allowed with the flag
     await expect(seedDemo(env.deps, { force: true })).rejects.toThrow(/school data/);
   });
+  it('accepts a fixed password only under NODE_ENV=test (Playwright), never in development', async () => {
+    env = await makeEnv({ NODE_ENV: 'development' });
+    await expect(seedDemo(env.deps, { fixedPassword: 'e2e-password-123' })).rejects.toThrow(/NODE_ENV=test/);
+    expect(env.db.select().from(users).all()).toEqual([]);
+    await env.app.close();
+
+    env = await makeEnv();
+    await expect(seedDemo(env.deps, { fixedPassword: 'short' })).rejects.toBeInstanceOf(SeedRefused);
+    const r = await seedDemo(env.deps, { fixedPassword: 'e2e-password-123' });
+    expect(r.accounts.every((a) => a.password === 'e2e-password-123')).toBe(true);
+    expect((await new Client(env).login('english', 'e2e-password-123')).status).toBe(200);
+  });
 });

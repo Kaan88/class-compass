@@ -10,7 +10,7 @@ import { audit } from '../../lib/audit.ts';
 import type { AppDeps, Actor, SessionRow, UserRow } from '../../lib/context.ts';
 import { hashPassword, hashPin, newId, randomToken, tokenHash, verifyPassword, verifyPin } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
-import { PIN_UNLOCK_MS } from '../../lib/http.ts';
+import { isPinUnlocked, PIN_UNLOCK_MS } from '../../lib/http.ts';
 
 export const SESSION_ABSOLUTE_MS = 14 * 24 * 60 * 60 * 1000;
 const LOGIN_FREE_FAILURES = 5;
@@ -21,7 +21,7 @@ const PIN_LOCKOUT_MS = 5 * 60 * 1000;
 
 export const normaliseLogin = (login: string) => foldForSearch(login.trim());
 
-export function toMe(user: UserRow, session: SessionRow): Me {
+export function toMe(user: UserRow, session: SessionRow, now: number): Me {
   return {
     kind: 'user',
     id: user.id,
@@ -33,6 +33,7 @@ export function toMe(user: UserRow, session: SessionRow): Me {
     hasPin: user.pinHash !== null,
     classroomMode: session.classroomMode,
     pinUnlockedUntil: session.pinUnlockedUntil,
+    pinUnlocked: isPinUnlocked(session, now),
   };
 }
 
@@ -144,7 +145,7 @@ export function invalidateResetTokens(db: Db, userId: string, now: number) {
 }
 
 export async function changePassword(deps: AppDeps, user: UserRow, session: SessionRow, current: string, next: string) {
-  if (!(await verifyPassword(user.passwordHash, current))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect');
+  if (!(await verifyPassword(user.passwordHash, current))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
   const passwordHash = await hashPassword(next);
   const now = deps.now();
   tx(deps.db, () => {
@@ -156,7 +157,7 @@ export async function changePassword(deps: AppDeps, user: UserRow, session: Sess
 }
 
 export async function setPin(deps: AppDeps, user: UserRow, currentPassword: string, pin: string) {
-  if (!(await verifyPassword(user.passwordHash, currentPassword))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect');
+  if (!(await verifyPassword(user.passwordHash, currentPassword))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
   const pinHash = await hashPin(deps.config.SECRET_PEPPER, pin);
   const now = deps.now();
   deps.db.update(users).set({ pinHash, updatedAt: now }).where(eq(users.id, user.id)).run();
@@ -219,7 +220,7 @@ function assertNewUserValid(db: Db, input: NewUserInput, password: string | null
   const login = normaliseLogin(input.login);
   if (!/^[\p{L}\p{N}._@-]{3,64}$/u.test(login)) throw new AppError('VALIDATION', 'Login must be 3–64 letters, digits or . _ @ -');
   if (password !== null && password.length < 10) throw new AppError('VALIDATION', 'Password must be at least 10 characters');
-  if (db.select({ id: users.id }).from(users).where(eq(users.login, login)).get()) throw new AppError('CONFLICT', 'Login already in use');
+  if (db.select({ id: users.id }).from(users).where(eq(users.login, login)).get()) throw new AppError('CONFLICT', 'Login already in use', { reason: 'LOGIN_TAKEN' });
   return login;
 }
 

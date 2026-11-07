@@ -4,6 +4,9 @@ dist/
 build/
 .next/
 coverage/
+playwright-report/
+test-results/
+blob-report/
 *.tsbuildinfo
 
 # Secrets & local config — never commit

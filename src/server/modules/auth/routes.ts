@@ -23,7 +23,7 @@ function setSessionCookie(deps: AppDeps, reply: FastifyReply, token: string, max
 function freshMe(ctx: RequestContext) {
   const user = ctx.db.select().from(users).where(eq(users.id, requireUser(ctx).id)).get()!;
   const session = ctx.db.select().from(sessions).where(eq(sessions.id, ctx.session!.id)).get()!;
-  return svc.toMe(user, session);
+  return svc.toMe(user, session, ctx.now());
 }
 
 export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
@@ -34,7 +34,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     async (ctx, input, { reply }) => {
       const { user, session, token } = await svc.login(ctx, ctx.ip, input.login, input.password);
       setSessionCookie(deps, reply, token, svc.SESSION_ABSOLUTE_MS);
-      return svc.toMe(user, session);
+      return svc.toMe(user, session, ctx.now());
     },
     { rateLimit: { max: 20, timeWindow: '1 minute' } },
   );
@@ -45,7 +45,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     return { ok: true as const };
   });
 
-  route(app, deps, C.me, (ctx) => svc.toMe(requireUser(ctx), ctx.session!));
+  route(app, deps, C.me, (ctx) => svc.toMe(requireUser(ctx), ctx.session!, ctx.now()));
 
   route(app, deps, C.changePassword, async (ctx, input) => {
     await svc.changePassword(ctx, requireUser(ctx), ctx.session!, input.currentPassword, input.newPassword);

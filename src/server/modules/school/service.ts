@@ -52,7 +52,7 @@ const cleanText = (t: LocalizedTextValue): LocalizedTextValue => {
 };
 
 function assertRange(from: string, to: string) {
-  if (from > to) throw invalid('Start date must be on or before the end date');
+  if (from > to) throw invalid('Start date must be on or before the end date', { reason: 'DATES_REVERSED' });
 }
 
 // ---------------------------------------------------------------- settings
@@ -161,7 +161,7 @@ export function setYearArchived(ctx: RequestContext, yearId: string, archived: b
 
 function assertTermInYear(y: { startsOn: string; endsOn: string }, startsOn: string, endsOn: string) {
   assertRange(startsOn, endsOn);
-  if (startsOn < y.startsOn || endsOn > y.endsOn) throw invalid('Term dates must fall inside the school year');
+  if (startsOn < y.startsOn || endsOn > y.endsOn) throw invalid('Term dates must fall inside the school year', { reason: 'TERM_OUTSIDE_YEAR' });
 }
 
 export function createTerm(ctx: RequestContext, input: In<typeof C.createTerm>) {
@@ -393,7 +393,7 @@ export function assignTeachingContext(ctx: RequestContext, input: In<typeof C.as
   return tx(ctx.db, () => {
     const teacher = ctx.db.select().from(users).where(eq(users.id, input.teacherId)).get();
     if (!teacher) throw notFound('Teacher');
-    if (teacher.role !== 'teacher') throw invalid('Only teacher accounts can be assigned to classes');
+    if (teacher.role !== 'teacher') throw invalid('Only teacher accounts can be assigned to classes', { reason: 'NOT_A_TEACHER' });
     if (teacher.disabledAt) throw invalid('This account is deactivated');
     const c = getClass(ctx.db, input.classId);
     assertClassWritable(ctx.db, c);
@@ -404,7 +404,7 @@ export function assignTeachingContext(ctx: RequestContext, input: In<typeof C.as
       .from(teachingContexts)
       .where(and(eq(teachingContexts.teacherId, teacher.id), eq(teachingContexts.classId, c.id), eq(teachingContexts.subjectId, s.id), isNull(teachingContexts.endedAt)))
       .get();
-    if (existing) throw conflict('This teacher already teaches this subject in this class', { contextId: existing.id });
+    if (existing) throw conflict('This teacher already teaches this subject in this class', { reason: 'ALREADY_ASSIGNED', contextId: existing.id });
     const now = ctx.now();
     const row: ContextRow = { id: newId(), teacherId: teacher.id, classId: c.id, subjectId: s.id, activeFrom: now, endedAt: null, createdAt: now };
     ctx.db.insert(teachingContexts).values(row).run();
