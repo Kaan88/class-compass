@@ -226,7 +226,7 @@ On the **Achievements** page, choose the class and subject.
 
 **Badges**: all badges with their level (Bronze, Silver, Gold). **Make your own badge**: a name, what it is for, a picture, a level and **How it is given** (**Given by the teacher**, or **Automatic** with a rule such as "adds evidence, 5 times"). **Hide for my classes** hides a built-in badge for your classes; **Show again** brings it back.
 
-Badges reward effort: none depends on attendance, speed or comparing students, and students never see each other's badges.
+Badges reward effort: none depends on attendance, speed or comparing students, and a student's page shows only their own badges and level. Badges appear on the classroom screen only when you celebrate one or the class shows **Well done!**.
 
 ![Avatars in the teacher area](../img/en/avatars.png)
 

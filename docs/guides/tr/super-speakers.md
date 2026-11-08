@@ -49,7 +49,7 @@ Listede her bağlantının en son ne zaman kullanıldığı ve puanlayıcılar i
 
 ## Puan kaydı
 
-**Puan kaydı** sekmesi puanları en yeniden eskiye doğru listeler; dönem, sınıf ve puanlayıcıya göre süzgeçler ile **Kaldırılan puanları göster** seçeneği vardır. **Kaldır** yanlış verilmiş bir puanı geri alır: bir neden yazın. Puan bundan sonra panoda ve raporlarda sayılmaz; kaldırma işlemi ve nedeni kayda geçer. Kazanılmış rozetler korunur. Puanlar hiçbir zaman silinmez.
+**Puan kaydı** sekmesi puanları en yeniden eskiye doğru listeler; dönem, sınıf ve puanlayıcıya göre süzgeçler ile **Kaldırılan puanları göster** seçeneği vardır. **Kaldır** yanlış verilmiş bir puanı geri alır: bir neden yazın. Puan bundan sonra panoda ve raporlarda sayılmaz; kaldırma işlemi ve nedeni kayda geçer. Kazanılmış rozetler korunur. Kaldırmak bir puanı hiçbir zaman silmez; bir öğrencinin puanlarını yalnızca öğrenciyi kalıcı olarak silmek (yönetim alanı) siler.
 
 Puanlayıcı yalnızca kendi puanlarını ve yalnızca geri alma süresi içinde geri alabilir. Bu süreden sonra puanı yönetici buradan kaldırır.
 

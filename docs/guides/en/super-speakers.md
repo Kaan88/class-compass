@@ -49,7 +49,7 @@ For each link the list shows when it was last used and, for scorers, the points 
 
 ## Award log
 
-The **Award log** tab lists the points, newest first, with filters for the period, class and scorer, and **Show removed points**. **Remove** takes back a wrong point: give a reason. The point then no longer counts on the board or in reports; the removal and its reason are recorded. Badges already earned stay. Points are never deleted.
+The **Award log** tab lists the points, newest first, with filters for the period, class and scorer, and **Show removed points**. **Remove** takes back a wrong point: give a reason. The point then no longer counts on the board or in reports; the removal and its reason are recorded. Badges already earned stay. Removing a point never deletes it; only permanently deleting a student (administration area) deletes that student's points.
 
 A scorer can undo only their own points, and only within the undo window. After that, an administrator removes them here.
 

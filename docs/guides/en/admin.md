@@ -12,7 +12,7 @@ In a hurry? See the [quick start for administrators](quick-start-admin.md).
 
 After you sign in you land on **Administration**. **Add classroom** and **Add a teacher account** are the two most common jobs; the tiles and the menu bar open every section. **Help** (top bar) opens these guides.
 
-Administrator accounts always sign in with a **password** (never with email links). The administration area is behind the same PIN lock as the teacher area when a device is in classroom mode.
+Administrator accounts always sign in with a **password** (never with email links). Classroom mode and its PIN lock are for teacher accounts only, so an administrator account is never PIN-locked: do not sign in as an administrator on the classroom device.
 
 ## First setup
 
@@ -35,7 +35,7 @@ The very first administrator account is created on the server by the IT person (
 
 **New account**: **Username** (3–64 letters, digits or . _ @ -), **Name**, **Email (optional)**, **Role** (Teacher or Administrator) and **Interface language** (the language the person sees after signing in; they can change it in their profile). Then choose the **First sign-in**:
 
-- **Invite link (recommended)**: a single-use link valid for 7 days. The person chooses a password or email sign-in links (administrators always a password) and then sets their classroom PIN. When the account has an email address and the school has set up email, the invite is emailed in the account's language; you can always **Copy link** or show the QR code.
+- **Invite link (recommended)**: a single-use link valid for 7 days. The person chooses a password or email sign-in links (administrators always a password); teachers then set their classroom PIN. When the account has an email address and the school has set up email, the invite is emailed in the account's language; you can always **Copy link** or show the QR code.
 - **Temporary password**: shown to you **once**. Give it to the person safely; they must change it at their first sign-in.
 
 The list shows each account's status (**Active** / **Deactivated**), whether a PIN is set, **Must change password**, **Invite pending** and the sign-in method. Actions:
@@ -100,7 +100,7 @@ Single classes can also be moved with **Classes** → **Promote class**.
 - **Move students**: tick students and **Move selected**, choose the class and an optional **Date of the move** (empty = today; a future date keeps them in their class until then). Their history moves with them.
 - **History**: which classes the student was in and why (added, imported, moved, promoted).
 - **Deactivate**: the student disappears from class lists; all records stay and they can be reactivated. Their personal link stops working.
-- **Delete permanently**: only for a deactivated student. Class Compass shows what will be deleted (records, files and photos, history entries naming the student). This cannot be undone, and backups made before today still contain the student until they expire. Class totals stay correct without the name; only a note "a student was deleted" (without a name) stays in the audit log.
+- **Delete permanently**: only for a deactivated student. Class Compass shows what will be deleted (records, files and photos, history entries naming the student). This cannot be undone, and backups made before today still contain the student until they expire. Class counter and assistant totals stay correct without the name, but the student's attendance, homework marks and Super Speakers points are removed, so reports and the points history no longer count them. Free text that teachers typed elsewhere and that names the student (for example a lesson reflection) is not changed. Only a note "a student was deleted" (without a name) stays in the audit log.
 - **Link**: the student's personal link (copy, print) and the **Emergency** revoke or replace (see the Teacher guide, "Student links"). For a deactivated student the link does not work and only revoke is offered.
 
 ## Reports and audit log

@@ -65,7 +65,7 @@ Badges celebrate your effort: setting goals, adding evidence, writing reflection
 
 - **My badges** shows your badges, when you earned them and who gave them.
 - **Next badges** shows badges you can still earn, with how far you are.
-- Your teacher may also show your own **level**. Only you see your badges and your level. Nobody is compared with anybody else.
+- Your teacher may also show your own **level**. Only you see your level on your page, and nobody is ranked. Your teachers can see your badges, and your teacher may choose to celebrate a badge on the classroom screen with your name and avatar.
 
 When you get a new badge, your page celebrates it once.
 
@@ -85,7 +85,7 @@ Some parts say **earn "…" to unlock**: earn that badge first. If you see **You
 
 Your teachers of that subject can see everything on your page for that subject: your goals, reflections, evidence and how sure you feel. They can add goals, evidence and feedback. They can also **hide** something from your page (for example if it was added by mistake). Your teacher may also keep short private notes for themselves; those are never shown on your page.
 
-Your classmates cannot see your page. Only your avatar and your name appear on the classroom screen.
+Your classmates cannot see your page. On the classroom screen they see your avatar and your name, and, if your teacher switches them on, your counts on your student card and badge celebrations.
 
 ## For parents: privacy
 
@@ -95,6 +95,7 @@ What Class Compass does with your child's page, in plain words:
 - **The link is a key.** Anyone who has the link or card can open the page and add to it, until the school stops the link. Keep the card at home, do not post it online, and tell the teacher at once if it is lost. The teacher or the administrator can then stop the old link immediately and make a new card. When a student leaves the school and is deactivated, the link stops working.
 - **Who sees what.** The child's teachers in that subject and the school's Class Compass administrators. Other students and other parents do not. Teachers may write private notes for themselves; these are not shown to the student, and the school's full data export (made by administrators) includes them.
 - **Pictures and voice.** Photos and voice recordings are off until the school has confirmed consent (KVKK). When pictures are allowed, location and camera details are removed from them on the server. Documents (PDF, Word…) are kept as they are, so a document may still contain, for example, the name of the person who created it.
+- **What others may see.** The class sees your child's name and avatar on the classroom screen. If the teacher switches them on, the class also sees counts on the student cards and short badge celebrations with names and avatars. If the school uses Super Speakers, the top students' full names, classes and avatars are shown on a school screen, and the people scoring points can search the students of the classes taking part by name, class and student number.
 - **Kind words check.** When a word is refused, the text is not stored; only the number of attempts is counted. A teacher can choose to see that number.
 - **Your rights.** You can ask the school for a copy of the data about your child or for its deletion (KVKK). The school's administrator can prepare an export of one student's data and can delete a student's records permanently once the student is deactivated; backups made before that keep the data until they expire.
 - **The page is not public.** It is not shown to search engines, and the page does not send its address to other websites.

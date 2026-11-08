@@ -65,7 +65,7 @@ Rozetler çabanı kutlar: hedef koymak, kanıt eklemek, değerlendirme yazmak, �
 
 - **Rozetlerim** rozetlerini, ne zaman kazandığını ve kimin verdiğini gösterir.
 - **Sıradaki rozetler** henüz kazanabileceğin rozetleri ve ne kadar yaklaştığını gösterir.
-- Öğretmenin kendi **seviyeni** de gösterebilir. Rozetlerini ve seviyeni yalnızca sen görürsün. Kimse kimseyle karşılaştırılmaz.
+- Öğretmenin kendi **seviyeni** de gösterebilir. Sayfandaki seviyeni yalnızca sen görürsün ve kimse sıralanmaz. Rozetlerini öğretmenlerin görebilir; öğretmenin bir rozeti sınıf ekranında adın ve avatarınla kutlamayı da seçebilir.
 
 Yeni bir rozet kazandığında sayfan bunu bir kez kutlar.
 
@@ -85,7 +85,7 @@ Bazı parçalarda **açmak için "…" rozetini kazan** yazar: önce o rozeti ka
 
 O dersin öğretmenleri sayfandaki o derse ait her şeyi görür: hedeflerini, değerlendirmelerini, kanıtlarını ve ne kadar emin olduğunu. Hedef, kanıt ve geri bildirim ekleyebilirler. Sayfandaki bir şeyi **gizleyebilirler** de (örneğin yanlışlıkla eklendiyse). Öğretmenin kendisi için kısa özel notlar da tutabilir; bunlar senin sayfanda hiçbir zaman görünmez.
 
-Sınıf arkadaşların senin sayfanı göremez. Sınıf ekranında yalnızca avatarın ve adın görünür.
+Sınıf arkadaşların senin sayfanı göremez. Sınıf ekranında avatarını ve adını görürler; öğretmenin açarsa öğrenci kartındaki sayılarını ve rozet kutlamalarını da görürler.
 
 ## Veliler için: gizlilik
 
@@ -95,6 +95,7 @@ Sınıf Pusulası'nın çocuğunuzun sayfasıyla ne yaptığı, sade bir dille:
 - **Bağlantı bir anahtardır.** Bağlantıya ya da karta sahip olan herkes, okul bağlantıyı durdurana kadar sayfayı açabilir ve sayfaya ekleme yapabilir. Kartı evde saklayın, internette paylaşmayın ve kaybolursa hemen öğretmene haber verin. Öğretmen ya da yönetici eski bağlantıyı hemen durdurup yeni bir kart hazırlayabilir. Öğrenci okuldan ayrılıp pasifleştirildiğinde bağlantı çalışmaz olur.
 - **Kim neyi görür?** Çocuğunuzun o dersteki öğretmenleri ve okulun Sınıf Pusulası yöneticileri. Diğer öğrenciler ve veliler göremez. Öğretmenler kendileri için özel notlar yazabilir; bu notlar öğrenciye gösterilmez, ancak yöneticilerin aldığı tüm okul verisi dışa aktarımında yer alır.
 - **Resim ve ses.** Okul KVKK kapsamındaki izinleri doğrulayana kadar fotoğraf ve ses kaydı kapalıdır. Resimlere izin verildiğinde konum ve kamera bilgileri sunucuda resimlerden silinir. Belgeler (PDF, Word…) olduğu gibi saklanır; yani bir belgede örneğin onu oluşturan kişinin adı kalabilir.
+- **Başkaları neyi görebilir?** Sınıf, çocuğunuzun adını ve avatarını sınıf ekranında görür. Öğretmen açarsa sınıf, öğrenci kartlarındaki sayıları ve ad ile avatarla yapılan kısa rozet kutlamalarını da görür. Okul Süper Konuşmacılar'ı kullanıyorsa en iyi öğrencilerin tam adları, sınıfları ve avatarları bir okul ekranında gösterilir; puan verenler de katılan sınıflardaki öğrencileri ada, sınıfa ve öğrenci numarasına göre arayabilir.
 - **Nazik sözcük denetimi.** Bir sözcük reddedildiğinde metin saklanmaz; yalnızca deneme sayısı sayılır. Öğretmen isterse bu sayıyı görebilir.
 - **Haklarınız.** Okuldan çocuğunuzla ilgili verilerin bir kopyasını ya da silinmesini isteyebilirsiniz (KVKK). Okulun yöneticisi tek bir öğrencinin verisini dışa aktarabilir ve öğrenci pasifleştirildikten sonra kayıtlarını kalıcı olarak silebilir; bundan önce alınmış yedekler süreleri dolana kadar veriyi içermeye devam eder.
 - **Sayfa herkese açık değildir.** Arama motorlarında gösterilmez ve sayfa kendi adresini başka web sitelerine göndermez.

@@ -15,7 +15,7 @@ Sınıf Pusulası'nı ilk kez mi kullanıyorsunuz? [Öğretmenler için hızlı 
 Hesabınızı okul yöneticiniz açar. Genellikle size bir **davet bağlantısı** gelir (e-postayla ya da bağlantı veya QR kod olarak). Bağlantıyı 7 gün içinde açın ve nasıl giriş yapmak istediğinizi seçin:
 
 - **Şifreyle**: kullanıcı adınızı ve kendi belirlediğiniz şifreyi (en az 10 karakter) yazarsınız.
-- **E-posta giriş bağlantılarıyla**: şifreniz olmaz. Her girişte giriş sayfasında **Email me a sign-in link** düğmesine basıp e-posta adresinizi yazarsınız. Bir dakika içinde bir bağlantı ve 6 haneli bir kod gelir. Bağlantıyı açıp **Giriş yap**'a basın ya da kodu e-postayı istediğiniz cihaza yazın. İkisi de yalnızca bir kez ve 15 dakika boyunca çalışır. Bu seçenek yalnızca okulda e-posta gönderimi ayarlanmışsa görünür.
+- **E-posta giriş bağlantılarıyla**: şifreniz olmaz. Her girişte giriş sayfasında **Email me a sign-in link** düğmesine basıp e-posta adresinizi yazarsınız. Bir dakika içinde bir bağlantı ve 6 haneli bir kod gelir. Bağlantıyı açıp **Sign in**'e basın ya da kodu e-postayı istediğiniz cihaza yazın. İkisi de yalnızca bir kez ve 15 dakika boyunca çalışır. Bu seçenek yalnızca okulda e-posta gönderimi ayarlanmışsa görünür.
 
 Yöneticiniz size davet yerine **geçici şifre** verdiyse ilk girişte kendi şifrenizi belirlemeniz gerekir.
 
@@ -226,7 +226,7 @@ Eski bağlantı ve basılmış bütün kartlar hemen çalışmaz olur. Listede a
 
 **Rozetler**: bütün rozetler seviyeleriyle (Bronz, Gümüş, Altın). **Kendi rozetinizi yapın**: bir ad, ne için verildiği, bir resim, bir seviye ve **Nasıl verilir** (**Öğretmen verir** ya da "5 kez kanıt ekler" gibi bir kuralla **Otomatik**). **Sınıflarımda gizle** hazır bir rozeti sizin sınıflarınızda gizler; **Yeniden göster** geri getirir.
 
-Rozetler çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri karşılaştırmaya bağlı değildir ve öğrenciler birbirlerinin rozetlerini görmez.
+Rozetler çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri karşılaştırmaya bağlı değildir ve öğrenci sayfası yalnızca öğrencinin kendi rozetlerini ve seviyesini gösterir. Rozetler sınıf ekranında yalnızca siz birini kutladığınızda ya da sınıf **Aferin!** adımını gösterdiğinde görünür.
 
 ![Öğretmen alanında Avatarlar](../img/tr/avatars.png)
 

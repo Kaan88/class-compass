@@ -12,7 +12,7 @@ Aceleniz mi var? [Yöneticiler için hızlı başlangıç](quick-start-admin.md)
 
 Giriş yaptıktan sonra **Yönetim** sayfası açılır. En sık yapılan iki iş **Sınıf ekle** ve **Öğretmen hesabı ekle**'dir; kutucuklar ve menü çubuğu bütün bölümleri açar. Üst çubuktaki **Yardım** bu kılavuzları açar.
 
-Yönetici hesapları her zaman **şifreyle** giriş yapar (hiçbir zaman e-posta bağlantısıyla değil). Bir cihaz sınıf modundayken yönetim alanı da öğretmen alanıyla aynı PIN kilidinin arkasındadır.
+Yönetici hesapları her zaman **şifreyle** giriş yapar (hiçbir zaman e-posta bağlantısıyla değil). Sınıf modu ve PIN kilidi yalnızca öğretmen hesapları içindir; yönetici hesabı hiçbir zaman PIN ile kilitlenmez. Bu yüzden sınıf cihazında yönetici olarak giriş yapmayın.
 
 ## İlk kurulum
 
@@ -35,7 +35,7 @@ Yönetici hesapları her zaman **şifreyle** giriş yapar (hiçbir zaman e-posta
 
 **Yeni hesap**: **Kullanıcı adı** (3–64 harf, rakam ya da . _ @ -), **Ad**, **E-posta (isteğe bağlı)**, **Rol** (Öğretmen ya da Yönetici) ve **Arayüz dili** (kişinin giriş yaptıktan sonra gördüğü dil; profilinden değiştirebilir). Sonra **İlk giriş** yöntemini seçin:
 
-- **Davet bağlantısı (önerilen)**: 7 gün geçerli, tek kullanımlık bir bağlantı. Kişi şifre ya da e-posta giriş bağlantıları arasından seçim yapar (yöneticiler her zaman şifre kullanır) ve ardından sınıf PIN'ini belirler. Hesabın e-posta adresi varsa ve okulda e-posta ayarlanmışsa davet, hesabın dilinde e-postayla gönderilir; her zaman **Bağlantıyı kopyala** diyebilir ya da QR kodu gösterebilirsiniz.
+- **Davet bağlantısı (önerilen)**: 7 gün geçerli, tek kullanımlık bir bağlantı. Kişi şifre ya da e-posta giriş bağlantıları arasından seçim yapar (yöneticiler her zaman şifre kullanır); öğretmenler ardından sınıf PIN'ini belirler. Hesabın e-posta adresi varsa ve okulda e-posta ayarlanmışsa davet, hesabın dilinde e-postayla gönderilir; her zaman **Bağlantıyı kopyala** diyebilir ya da QR kodu gösterebilirsiniz.
 - **Geçici şifre**: size yalnızca **bir kez** gösterilir. Kişiye güvenli bir yolla iletin; ilk girişte değiştirmesi gerekir.
 
 Listede her hesabın durumu (**Etkin** / **Pasif**), PIN belirlenip belirlenmediği, **Şifresini değiştirmeli**, **Davet bekliyor** ve giriş yöntemi görünür. İşlemler:
@@ -100,7 +100,7 @@ Tek tek sınıflar **Sınıflar** → **Sınıfı üst sınıfa taşı** ile de 
 - **Öğrencileri taşı**: öğrencileri işaretleyip **Seçilenleri taşı**'ya basın, sınıfı ve isteğe bağlı bir **Taşıma tarihi** seçin (boş = bugün; ileri bir tarih öğrencileri o güne kadar kendi sınıflarında tutar). Geçmişleri onlarla birlikte taşınır.
 - **Geçmiş**: öğrencinin hangi sınıflarda bulunduğu ve neden (eklendi, aktarıldı, taşındı, üst sınıfa geçti).
 - **Pasifleştir**: öğrenci sınıf listelerinden kalkar; bütün kayıtları korunur ve yeniden etkinleştirilebilir. Kişisel bağlantısı çalışmaz olur.
-- **Kalıcı olarak sil**: yalnızca pasif bir öğrenci için. Sınıf Pusulası nelerin silineceğini gösterir (kayıtlar, dosyalar ve fotoğraflar, öğrencinin adının geçtiği geçmiş kayıtları). Bu işlem geri alınamaz ve bugünden önce alınmış yedekler süreleri dolana kadar öğrenciyi içermeye devam eder. Sınıf toplamları ad olmadan doğru kalır; denetim kaydında yalnızca adsız bir "bir öğrenci silindi" notu kalır.
+- **Kalıcı olarak sil**: yalnızca pasif bir öğrenci için. Sınıf Pusulası nelerin silineceğini gösterir (kayıtlar, dosyalar ve fotoğraflar, öğrencinin adının geçtiği geçmiş kayıtları). Bu işlem geri alınamaz ve bugünden önce alınmış yedekler süreleri dolana kadar öğrenciyi içermeye devam eder. Sınıf sayaçları ve yardımcı toplamları ad olmadan doğru kalır, ancak öğrencinin devam, ödev işaretleri ve Süper Konuşmacılar puanları silinir; bu yüzden raporlar ve puan geçmişi onları artık saymaz. Öğretmenlerin başka yerlere yazdığı ve öğrencinin adını içeren serbest metinler (örneğin bir ders değerlendirmesi) değiştirilmez. Denetim kaydında yalnızca adsız bir "bir öğrenci silindi" notu kalır.
 - **Bağlantı**: öğrencinin kişisel bağlantısı (kopyala, yazdır) ile **Acil durum** iptali ya da yenilemesi (bkz. Öğretmen kılavuzu, "Öğrenci bağlantıları"). Pasif bir öğrencinin bağlantısı çalışmaz ve yalnızca iptal sunulur.
 
 ## Raporlar ve denetim kaydı
