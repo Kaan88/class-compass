@@ -15,6 +15,7 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { IconBook, IconCheck } from '../../ui/icons.tsx';
+import { PanelHead } from '../../ui/Layout.tsx';
 import type { ClassroomContext, DashboardSlot } from '../types.ts';
 import { CheckGrid, type CheckActions } from './CheckGrid.tsx';
 
@@ -34,7 +35,7 @@ function CheckDialog({ assignmentId, contextId, onClose }: { assignmentId: strin
     undo: (batchId) => call(H.classroomUndoHomeworkMarks, { assignmentId, batchId }),
   };
   return (
-    <Modal isOpen onOpenChange={(o) => !o && onClose()} size="wide" title={q.data ? t('homework.checkTitle', { title: q.data.assignment.title }) : t('homework.check')}>
+    <Modal isOpen onOpenChange={(o) => !o && onClose()} size="wide" closeButton title={q.data ? t('homework.checkTitle', { title: q.data.assignment.title }) : t('homework.check')}>
       {q.data ? (
         <CheckGrid
           check={q.data}
@@ -64,9 +65,7 @@ function HomeworkSlot({ context }: { context: ClassroomContext }) {
   const { assignments, checkingInClassroom, today } = q.data;
   return (
     <section className="cc-card cc-stack" aria-labelledby="cc-homework-title" data-testid="homework-panel">
-      <h2 id="cc-homework-title" className="cc-h2">
-        <IconBook /> {t('homework.title')}
-      </h2>
+      <PanelHead id="cc-homework-title" title={t('homework.title')} icon={<IconBook />} />
       {assignments.length ? (
         <ul className="cc-stack">
           {assignments.map((a) => (
@@ -77,7 +76,9 @@ function HomeworkSlot({ context }: { context: ClassroomContext }) {
                 {checkingInClassroom ? (
                   <Button className="cc-push-right" onPress={() => setChecking(a.id)}>
                     <IconCheck />
-                    {t('homework.checkThis', { title: a.title })}
+                    {/* Short on screen (the title is on the line already); the full name for screen readers. */}
+                    <span aria-hidden="true">{t('homework.checkShort')}</span>
+                    <span className="cc-visually-hidden">{t('homework.checkThis', { title: a.title })}</span>
                   </Button>
                 ) : null}
               </div>

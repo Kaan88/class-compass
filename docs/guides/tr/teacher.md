@@ -90,13 +90,18 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
 
 **Üst çubukta** sınıf ve ders, **günün sözü** (açıksa), gün, tarih ve saat ile hava durumu (yönetici açtıysa ve sunucu hava durumu hizmetine ulaşabiliyorsa) görünür. Sağ tarafta:
 
-- **Sınıf dili**: yalnızca sınıf iki dil kullanıyorsa; ekranı iki dil arasında değiştirir.
-- **Boyut**: **Sıkı**, **Normal** ya da **Büyük**. Sınıfın arkasından okunabilen boyutu seçin; ekran ayrıca kendini görüntü alanına uydurur. Seçim bu cihazda hatırlanır.
-- Kayıt durumu, **Bu cihazda sesler** ve **Öğretmen alanı** (PIN'inizi sorar).
+- Kayıt durumu.
+- **Ekran** bu ekranın ayarlarını açar:
+  - **Sınıf dili**: yalnızca sınıf iki dil kullanıyorsa; ekranı iki dil arasında değiştirir.
+  - **Boyut**: **Küçük**, **Normal** ya da **Büyük**. Sınıfın arkasından okunabilen boyutu seçin; ekran ayrıca kendini görüntü alanına uydurur. Seçim bu cihazda hatırlanır.
+  - **Bu cihazda sesler**.
+- **Öğretmen alanı** (PIN'inizi sorar).
 
-**Ana sütunda** **Bugünün odağı** (dersin konusu, **Değiştir** ile) ve **öğrenci kartları** bulunur. **Öğrencileri göster** / **Öğrencileri gizle** kartları açıp kapatır.
+**Ana sütunda** **Bugünün odağı** (dersin konusu, **Değiştir** ile), **öğrenci kartları** ve onların altında modül panelleri (sayaçlar, yardımcı, gizli öğrenciler, gruplar, ödev, rozetler) bulunur. **Öğrencileri göster** / **Öğrencileri gizle** kartları açıp kapatır.
 
-**Sağ sütunda** rutin, zamanlayıcı, işlem düğmeleri ve modül panelleri yer alır.
+**Sağ sütunda** rutin ve zamanlayıcı yer alır. **Yoklama** ve **Dersi bitir** her zaman bu sütunun altında kalır; sütun ekrandan uzunsa kendi içinde kayar.
+
+Kısa mesajlar (örneğin **Ders başladı**) sol altta kısa bir süre görünür. **Geri al** içeren mesajlar biraz daha uzun kalır.
 
 ### Rutin ve zamanlayıcı
 
@@ -122,7 +127,8 @@ Bir sayaç bütün sınıf için (**sınıf çubuğu**) ve/veya her öğrenci i�
 - Bir seçeneğe dokunarak o gün sınıfta olan öğrenciler için gruplar oluşturun. Gelmeyen öğrenciler yalnızca bu derste dışarıda kalır.
 - **Karıştır** yeni gruplar oluşturur; **Karıştırmayı geri al** öncekileri geri getirir.
 - Bir öğrenciyi taşımak için adına, sonra yeni grubuna dokunun ya da adı bir gruba sürükleyin.
-- **Seçeneğe kaydet** bu grupları bir dahaki sefer için o seçeneğe kaydeder.
+- **Gelecek sefer için kaydet** bu grupları bir dahaki sefer için o seçeneğe kaydeder.
+- Taşımak için dokunduğunuz öğrenci renkli gösterilir; mesajın yanındaki **Vazgeç** seçimi bırakır.
 - Zamanlayıcı grup ekranında da vardır.
 
 Seviyeler, eşleşme kuralları ("birlikte çalışmalı / çalışmamalı") ve notları sınıf ekranında **hiçbir zaman** gösterilmez. Bunları **Gruplar** sayfasında (**Düzenler**, **Seviyeler**, **Eşleşme kuralları** sekmeleri) yönetirsiniz. Sınıf ayarlarında grup ekranında öğrenci adlarının büyük harfle gösterilmesini seçebilirsiniz.
@@ -135,7 +141,7 @@ Yardımcı paneli bugünün yardımcısını ve görevlerini işaret kutularıyl
 
 1. Ders sırasında **Gizli öğrencileri seç**'e basın. Sınıf Pusulası derste olan öğrencilerden seçer (varsayılan 2; **Gizli Öğrenciler** sayfasında 1 ile 10 arası). Dersin sonuna kadar kimse, siz bile, kimin seçildiğini göremez. **Yeniden seç** onları geri koyar ve yenilerini seçer.
 2. **Dersi bitir** sırasında **Gizli öğrencileri açıkla**'ya basın. Davul sesli kısa bir geri sayım çalar (**Hemen göster** bunu atlar).
-3. Her biri için bir sonuç kaydedin: **Hedefe ulaştı**, **Çalışmaya devam** ya da **Değerlendirilmedi**; isterseniz bir not ekleyin.
+3. **Sizin kaydınız** altında her biri için bir sonuç kaydedin: **Hedefe ulaştı**, **Çalışmaya devam** ya da **Değerlendirilmedi**; isterseniz bir not ekleyin.
 4. **{name} için kutlama** o öğrenci için kutlamayı oynatır.
 
 Seçilen öğrenci derste yoksa yerine başkası seçilir; gelmeyen öğrencinin sırası daha sonraki bir tura kalır.
@@ -147,17 +153,17 @@ Seçilen öğrenci derste yoksa yerine başkası seçilir; gelmeyen öğrencinin
 3. **Bir rozet seçin**. Rozet, adlar ve avatarlarla kısa bir kutlama için **Ekranda kutla**'yı işaretleyin.
 4. **N öğrenciye ver**'e basın.
 
-Bu derste verdiğiniz bir rozeti 10 dakika içinde geri alabilirsiniz (**Bu derste verilen rozetler** → **Geri al**). Daha sonra yanlışlıkla verilmiş bir rozeti öğretmen alanından kaldırırsınız (bkz. [Başarılar ve avatarlar](#başarılar-ve-avatarlar)). Otomatik rozetler ekranda hiçbir zaman duyurulmaz; sınıf bunları Dersi bitir'deki **Aferin!** adımında topluca görebilir.
+Rozeti verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Geri al** sunar. Sonrasında da bu derste verdiğiniz bir rozeti 10 dakika içinde geri alabilirsiniz (**Bu derste verilen rozetler** → **Geri al**). Daha sonra yanlışlıkla verilmiş bir rozeti öğretmen alanından kaldırırsınız (bkz. [Başarılar ve avatarlar](#başarılar-ve-avatarlar)). Otomatik rozetler ekranda hiçbir zaman duyurulmaz; sınıf bunları Dersi bitir'deki **Aferin!** adımında topluca görebilir.
 
 ### Derste ödev
 
-**Sınıf ekranında kontrole izin ver** açıksa (Ödevler → Ayarlar; varsayılan olarak kapalı) ödev paneli bu hafta teslim edilecek ödevleri ve **Ödev kontrolü** düğmesini gösterir. Özel notlar sınıf ekranında hiçbir zaman görünmez.
+**Sınıf ekranında kontrole izin ver** açıksa (Ödevler → Ayarlar; varsayılan olarak kapalı) ödev paneli bu hafta teslim edilecek ödevleri, her biri için bir **Kontrol et** düğmesiyle gösterir. **Kapat** kontrol listesinin başlığının yanındadır. Özel notlar sınıf ekranında hiçbir zaman görünmez.
 
 ### Sesler ve kutlamalar
 
 - **Sınıf ayarları** → **Sınıf ekranı**: **Tema**, **Ses düzeyi** ve **Dene** ile **Sesler**, **Animasyonlar**, **Günün sözü** ve **Süre bittiğinde**: **“Time’s up!” de** (bilgisayar İngilizce söyler; bilgisayarda İngilizce ses yoksa zil çalar), **Kendi kaydım**, **Zil** ya da **Sessiz**.
 - **Kendi kaydım**: **Profil ve PIN** → **Süre doldu kaydım** bölümünde en fazla 5 saniyelik bir kayıt yapın ya da bir ses dosyası seçin.
-- **Bu cihazda sesler** (sınıf ekranının üst çubuğu) yalnızca bu cihazın sesini kapatır.
+- **Bu cihazda sesler** (sınıf ekranının üst çubuğu → **Ekran**) yalnızca bu cihazın sesini kapatır.
 - Kutlamalar yalnızca siz ekranda bir şey yaptığınızda çalar (açıklanan bir Gizli Öğrenci, **Ekranda kutla**), kendiliğinden asla. Hareketin azaltılmasını isteyen bir cihazda hareketsiz, sakin bir sürüm gösterilir.
 
 ## Ödev kontrolü

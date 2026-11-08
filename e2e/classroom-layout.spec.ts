@@ -10,6 +10,8 @@
  *    student cards of 3-A are on screen without scrolling. Compact/Normal/Large is kept per device.
  * 3. The timer keypad (mm:ss), the assistant panel hide/show, and the class language mode
  *    (Turkish-only and English-only show no switch; two languages show it).
+ * 4. Usability pass (D-139): End lesson and the class counter are on screen without scrolling at
+ *    1920x1080 and 1280x720; size, language and sounds are in the top bar's Display popover.
  */
 import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -74,7 +76,8 @@ async function layoutFacts(page: Page) {
     const rail = document.querySelector('[data-testid="lesson-rail"]')!.getBoundingClientRect();
     const main = document.querySelector('.cc-lesson-layout__main')!.getBoundingClientRect();
     const apart = rail.right <= main.left + 1 || main.right <= rail.left + 1 || rail.bottom <= main.top + 1 || main.bottom <= rail.top + 1;
-    const blocks = [...document.querySelectorAll('[data-testid="lesson-rail"] > *, .cc-lesson-layout__main > *')] as HTMLElement[];
+    // The module panels sit in their own grid under the student cards (D-139): each panel is a block.
+    const blocks = [...document.querySelectorAll('[data-testid="lesson-rail"] > *, .cc-lesson-layout__main > :not(.cc-lesson-panels), .cc-lesson-panels > *')] as HTMLElement[];
     const empty = blocks.filter((e) => e.getBoundingClientRect().height < 4 || !e.innerText.trim()).map((e) => e.className || e.tagName);
     const overflowing = blocks.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.className || e.tagName);
     return { hScroll: se.scrollWidth > se.clientWidth + 1, overlap: !apart, empty, overflowing };
@@ -193,16 +196,22 @@ test('density and auto-fit: no horizontal scroll on common displays; 19 students
       const size = () => p.locator('.cc-student-card').first().evaluate((e) => e.getBoundingClientRect().height);
       const normal = await size();
       const control = p.getByTestId('density-control');
+      const openSettings = async () => {
+        if (!(await control.isVisible())) await p.getByTestId('classroom-settings').click();
+      };
+      await openSettings();
       await control.getByRole('button', { name: 'Large' }).click();
       await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'large');
       await expect.poll(size).toBeGreaterThan(normal);
       await p.screenshot({ path: 'test-results/fit/1440x900-large.png' });
       await p.reload();
       await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'large');
+      await openSettings();
       await control.getByRole('button', { name: 'Compact' }).click();
       await expect.poll(size).toBeLessThan(normal);
       expect((await layoutFacts(p)).hScroll).toBe(false);
       await p.screenshot({ path: 'test-results/fit/1440x900-compact.png' });
+      await openSettings();
       await control.getByRole('button', { name: 'Normal' }).click();
       await expect(control.getByRole('button', { name: 'Normal' })).toHaveAttribute('aria-pressed', 'true');
     } finally {
@@ -271,15 +280,55 @@ test('timer keypad, assistant panel hide/show, and the class language mode on th
     // Two languages: the switch is there and changes the screen language.
     await setLanguage('en', true);
     await openClassroom(d);
+    await expect(d.getByTestId('class-language-switch')).toHaveCount(0);
+    await d.getByTestId('classroom-settings').click();
     const sw = d.getByTestId('class-language-switch');
     await expect(sw).toBeVisible();
     await sw.getByRole('button', { name: 'Türkçe' }).click();
     await expect(d.locator('[data-testid="classroom-shell"]')).toHaveAttribute('lang', 'tr');
+    if (!(await sw.isVisible())) await d.getByTestId('classroom-settings').click();
     await sw.getByRole('button', { name: 'English' }).click();
     await expect(d.locator('[data-testid="classroom-shell"]')).toHaveAttribute('lang', 'en');
   } finally {
     await endActiveLessons(page);
     await setLanguage('en', false);
     await displayCtx.close();
+  }
+});
+
+test('usability pass (D-139): End lesson and the class counter are on screen at 1920x1080 and 1280x720 without scrolling', async ({ page, browser }) => {
+  test.setTimeout(180_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  await endActiveLessons(page);
+  const ctx = await context3A(page);
+  const original = await modulesOf(page, ctx.id);
+  try {
+    await setModules(page, ctx.id, MODULES, original);
+    await startLesson(page, ctx.id);
+    for (const vp of [
+      { name: '1920x1080', width: 1920, height: 1080, scale: 1 },
+      { name: '1280x720', width: 1280, height: 720, scale: 1 },
+    ]) {
+      const { ctx: c, p } = await onDevice(browser, page, vp);
+      try {
+        await openClassroom(p);
+        await expect(p.getByTestId('counter-bar').first()).toBeVisible();
+        const end = p.getByTestId('lesson-rail').getByRole('button', { name: 'End lesson' });
+        await expect(end, vp.name).toBeInViewport({ ratio: 1 });
+        await expect(p.getByRole('button', { name: 'Attendance' }), vp.name).toBeInViewport({ ratio: 1 });
+        await expect(p.getByTestId('counter-bar').first(), vp.name).toBeInViewport();
+        // The top bar is one row (plus the quote of the day on narrower displays), not three.
+        const bar = await p.locator('.cc-classroom-bar').evaluate((e) => e.getBoundingClientRect().height);
+        expect(bar, `${vp.name}: top bar height`).toBeLessThan(vp.height * 0.15);
+        expect((await layoutFacts(p)).hScroll, vp.name).toBe(false);
+        await p.screenshot({ path: `test-results/fit/${vp.name}-usability.png` });
+      } finally {
+        await c.close();
+      }
+    }
+  } finally {
+    await endActiveLessons(page);
+    for (const m of original) await api(page, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
   }
 });

@@ -92,3 +92,28 @@ confusing or needs more than two taps, or something is cut off / colour-only / h
 | School settings | Free-text timezone; plain weather heading; e-mail status pill above Save | minor | Timezone list; bold legend; its own "Password reset by email" row |
 | Super Speakers settings | Badge subject option in English quotes; "… within (minutes)" label; other week-start wording | minor | "Automatic: the English subject"; one limit row with a sentence; the school-settings label |
 | New class dialog | Theme names twice, uneven theme grid, big preview pushing the buttons away, no grade hint | minor | Name once, equal tiles, the large preview folded, grade hint |
+
+## Fixed after the November screenshot crawl (classroom area, D-139)
+
+| Screen | Issue | Severity | Fix |
+| --- | --- | --- | --- |
+| Classroom dashboard (1920×1080, 1366×768, 1280×720, 4K) | Rail cut off: timer presets, Attendance, End lesson, counter and panels out of sight while the main column was half empty | major | Panels in a grid under the student cards (counter full width); rail ends at the screen bottom with Attendance + End lesson pinned; stages one sideways row on short displays; Playwright check at 1920×1080 and 1280×720 |
+| Give a badge | Ticked recipients struck through ("removed") | major | Strikethrough only for done assistant duties; recipients get the accent background |
+| Toasts | "Lesson started" covered dialog buttons (timer keypad), cards and End lesson | major | Classroom notes at the bottom left, 2.5 s; hidden while a classroom dialog is open (errors and Undo stay); room under the page |
+| Badge Undo | Undo only in the clipped Badges panel | major | Undo note after the celebration (or at once when given quietly); panel list kept |
+| Celebration overlay | Mascot over the badge, avatar and name; no name in the banner | major | Mascot and message in the bottom-left corner; "Well done, {names}! New badge: …" for up to three students |
+| Attendance tiles, group screen, homework rows | Small avatar art shrunk to a dot by `.cc-btn svg` | major | Avatar art always fills its circle |
+| End Lesson | Save 650px below the fold; outcomes as prominent as the celebration | major | Back / Save pinned at the bottom; result and note smaller under "For your records" (split into a teacher-only step left to the owner) |
+| Top bar (Turkish, 1280 wide) | Two or three rows of controls (~165px) | major | Size, class language and sounds in a Display popover; one row |
+| Secret Students panel | Count and Choose again squeezed and wrapping | minor | Text takes the row, the button goes under it, never wraps |
+| Groups panel | Bare count ("Group 1 4"), half-drawn border | minor | "4 students", full coloured border |
+| Group screen | Group titles wrapping; picked student only outlined; no scroll cue | minor | Names never break, count wraps under; picked student filled, Cancel by the hint; scroll shadow on wide and full dialogs |
+| Homework check | ISO date; label line doubling every row; Close only at the end | minor | Date in words; label for screen readers only; Close beside the title; short "Check" button |
+| Turkish wording | "Sıkı", "19 Var", "Seçeneğe kaydet" | minor | "Küçük", "Bugün: 19 Var", "Gelecek sefer için kaydet" |
+| Panel headers | Lone icon line, actions on a row of their own, mixed button sizes | minor | One `PanelHead` for the classroom panels; Give a badge as large as the others |
+| Student cards | Name below the avatar's centre; names broken mid-word in Compact | minor | Name centred, broken only between words; Compact cards a little wider |
+
+Not changed: the modal backdrop already covers the whole screen (the crawl's full-page shots were taken
+with the page scrolled, so the top bar looked undimmed), and the empty "Today's focus" stays a small
+"Choose a topic" action as the owner asked (feedback round 1, item 7). Still open: badges and group
+numbers on the student cards, Compact using free height, and the End Lesson split (ROADMAP).

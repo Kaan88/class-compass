@@ -87,7 +87,8 @@ export function EndLessonFlow({
           {t('lesson.ending')}
         </p>
       ) : null}
-      <div className="cc-row">
+      {/* Pinned to the bottom of the screen: Save is in reach however long the steps are (D-139). */}
+      <div className="cc-row cc-end-actions" data-testid="end-lesson-actions">
         <Button size="big" onPress={onCancel} isDisabled={busy}>
           <IconPrev />
           {t('lesson.backToLesson')}

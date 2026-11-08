@@ -651,12 +651,18 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
     await S('dashboard', 'density-normal');
 
     await step(`classroom density ${where}`, async () => {
+      // Size is in the top bar's Display popover (D-139); the popover closes on a click outside.
       const control = d.getByTestId('density-control');
-      await control.getByRole('button', { name: nm('Compact') }).click();
+      const pick = async (name: string) => {
+        if (!(await control.isVisible())) await d.getByTestId('classroom-settings').click();
+        await control.getByRole('button', { name: nm(name) }).click();
+        await d.keyboard.press('Escape');
+      };
+      await pick('Compact');
       await S('dashboard', 'density-compact');
-      await control.getByRole('button', { name: nm('Large') }).click();
+      await pick('Large');
       await S('dashboard', 'density-large');
-      await control.getByRole('button', { name: nm('Normal') }).click();
+      await pick('Normal');
     });
 
     await step(`classroom routine next stage ${where}`, async () => {

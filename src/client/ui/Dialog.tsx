@@ -5,7 +5,7 @@ import { errorText } from '../lib/errors.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
 import { TextField } from './Fields.tsx';
-import { IconAlert } from './icons.tsx';
+import { IconAlert, IconX } from './icons.tsx';
 
 /** Accessible modal dialog (focus trap; Escape / outside press close unless `dismissable` is false). */
 export function Modal({
@@ -17,6 +17,7 @@ export function Modal({
   role = 'dialog',
   size = 'normal',
   testId,
+  closeButton = false,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,14 +28,30 @@ export function Modal({
   /** 'wide' for grids (homework checking), 'full' for full-screen classroom screens (groups, S13a). */
   size?: 'normal' | 'wide' | 'full';
   testId?: string;
+  /** A Close button next to the title, for long dialogs whose own buttons are at the end (D-139). */
+  closeButton?: boolean;
 }) {
+  const { t } = useI18n();
+  const heading = (
+    <Heading slot="title" className="cc-h2">
+      {title}
+    </Heading>
+  );
   return (
     <ModalOverlay isOpen={isOpen} onOpenChange={onOpenChange} isDismissable={dismissable} isKeyboardDismissDisabled={!dismissable} className={`cc-modal-overlay cc-modal-overlay--${size}`}>
       <RACModal className={`cc-modal cc-modal--${size}`} data-testid={testId}>
         <Dialog className="cc-dialog" role={role}>
-          <Heading slot="title" className="cc-h2">
-            {title}
-          </Heading>
+          {closeButton ? (
+            <div className="cc-dialog__head">
+              {heading}
+              <Button size="small" onPress={() => onOpenChange(false)} data-testid="dialog-close">
+                <IconX />
+                {t('common.close')}
+              </Button>
+            </div>
+          ) : (
+            heading
+          )}
           {children}
         </Dialog>
       </RACModal>

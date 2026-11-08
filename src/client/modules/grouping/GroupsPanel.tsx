@@ -23,6 +23,7 @@ import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts'
 import { queryClient } from '../../lib/queryClient.ts';
 import { BigButton, Button } from '../../ui/Button.tsx';
 import { Modal } from '../../ui/Dialog.tsx';
+import { PanelHead } from '../../ui/Layout.tsx';
 import { IconCheck, IconSwap, IconUndo, IconUsers, IconX } from '../../ui/icons.tsx';
 import { GroupPicto, OptionPicto } from '../../ui/pictos.tsx';
 import { Avatar } from '../../ui/Students.tsx';
@@ -180,9 +181,17 @@ function GroupScreen({ context, lesson, st, isOpen, onOpenChange }: { context: C
           <div className="cc-stack cc-group-screen__groups">
             {st.applied ? (
               <>
-                <p className="cc-muted" role="status" data-testid="group-move-hint">
-                  {pickedName ? t('grouping.tapGroupFor', { name: pickedName }) : (notice ?? t('grouping.moveHint'))}
-                </p>
+                <div className="cc-group-screen__hint" data-picked={pickedName ? '' : undefined}>
+                  <p className={pickedName ? 'cc-group-screen__picked' : 'cc-muted'} role="status" data-testid="group-move-hint">
+                    {pickedName ? t('grouping.tapGroupFor', { name: pickedName }) : (notice ?? t('grouping.moveHint'))}
+                  </p>
+                  {pickedName ? (
+                    <Button size="small" onPress={() => setPicked(null)} data-testid="group-cancel-move">
+                      <IconX />
+                      {t('common.cancel')}
+                    </Button>
+                  ) : null}
+                </div>
                 <ul className="cc-groups cc-groups--screen" aria-label={t('grouping.title')}>
                   {st.groups.map((g, i) => (
                     <li
@@ -249,7 +258,7 @@ function GroupChip({ group, colour }: { group: DisplayGroup; colour: string }) {
     <li className="cc-group-chip" data-colour={colour} aria-label={t('grouping.groupLabel', { name, count: group.members.length })}>
       <GroupPicto icon={group.icon} size="1.6em" />
       <span>{name}</span>
-      <span className="cc-muted">{group.members.length}</span>
+      <span className="cc-group-chip__count">{t('grouping.memberCount', { count: group.members.length })}</span>
     </li>
   );
 }
@@ -261,15 +270,12 @@ function GroupsSlot({ context, lesson }: { context: ClassroomContext; lesson: Le
   if (!st) return null;
   return (
     <section className="cc-card cc-stack cc-groups-panel" aria-labelledby="cc-groups-title" data-testid="groups-panel">
-      <div className="cc-row">
-        <h2 id="cc-groups-title" className="cc-h2">
-          {t('grouping.title')}
-        </h2>
-        <BigButton variant={st.applied ? 'secondary' : 'primary'} className="cc-push-right" onPress={() => setOpen(true)}>
+      <PanelHead id="cc-groups-title" title={t('grouping.title')}>
+        <BigButton variant={st.applied ? 'secondary' : 'primary'} onPress={() => setOpen(true)}>
           <IconUsers />
           {st.applied ? t('grouping.open') : t('grouping.choose')}
         </BigButton>
-      </div>
+      </PanelHead>
       {st.applied ? (
         <ul className="cc-group-chips" aria-label={t('grouping.title')}>
           {st.groups.map((g, i) => (

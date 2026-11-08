@@ -22,7 +22,7 @@ function ToastView({ toast }: { toast: Toast }) {
     return () => clearInterval(h);
   }, [toast]);
   return (
-    <div className="cc-toast" data-kind={toast.kind} data-testid="toast">
+    <div className="cc-toast" data-kind={toast.kind} data-undo={toast.undo ? '' : undefined} data-testid="toast">
       {toast.kind === 'error' ? <IconAlert /> : toast.kind === 'success' ? <IconCheck /> : null}
       <span className="cc-toast__msg">{toast.message}</span>
       {toast.undo ? (

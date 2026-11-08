@@ -31,6 +31,7 @@ import { motionMode, useThemeSound } from '../../themes/index.tsx';
 import { celebrate as startCelebration } from '../../themes/Celebration.tsx';
 import { revealCue, type RevealStep } from '../../themes/sequences.ts';
 import { useDisplay } from '../../lib/display.ts';
+import { PanelHead } from '../../ui/Layout.tsx';
 import { Mascot, ThemeIllustration } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { awaitCommand, lessonKey, useLessonState } from '../lessons/lessonClient.ts';
@@ -80,9 +81,7 @@ function SecretSlot({ context, lesson }: { context: ClassroomContext; lesson: Le
 
   return (
     <section className="cc-card cc-stack cc-secret" aria-labelledby="cc-secret-title" data-testid="secret-panel">
-      <h2 id="cc-secret-title" className="cc-h2">
-        {t('secret.title')}
-      </h2>
+      <PanelHead id="cc-secret-title" title={t('secret.title')} />
       {!st.roundExists ? (
         <>
           <p className="cc-muted">{t('secret.intro', { count: st.configuredCount })}</p>
@@ -164,15 +163,19 @@ function SelectionCard({ lesson, sel, index }: { lesson: LessonState; sel: Revea
         <span className="cc-reveal__name">{sel.student.fullName}</span>
         {sel.replacedSelectionId ? <span className="cc-muted">{t('secret.replacement')}</span> : null}
       </div>
-      <div className="cc-row" role="radiogroup" aria-label={t('secret.outcomeFor', { name: sel.student.fullName })}>
-        {outcomes.map((o) => (
-          <button key={o} type="button" role="radio" aria-checked={sel.outcome === o} className="cc-reveal__outcome" onClick={() => send({ outcome: o })}>
-            {sel.outcome === o ? <IconCheck /> : null}
-            <span>{t(`secret.outcome.${o}`)}</span>
-          </button>
-        ))}
+      {/* The result and the note are the teacher's record: kept small and quiet under the celebration (D-139). */}
+      <div className="cc-stack cc-reveal__record">
+        <span className="cc-reveal__record-label">{t('secret.yourRecord')}</span>
+        <div className="cc-row" role="radiogroup" aria-label={t('secret.outcomeFor', { name: sel.student.fullName })}>
+          {outcomes.map((o) => (
+            <button key={o} type="button" role="radio" aria-checked={sel.outcome === o} className="cc-reveal__outcome" onClick={() => send({ outcome: o })}>
+              {sel.outcome === o ? <IconCheck /> : null}
+              <span>{t(`secret.outcome.${o}`)}</span>
+            </button>
+          ))}
+        </div>
+        <TextField label={t('secret.note')} value={note} onChange={setNote} onBlur={() => note !== (sel.note ?? '') && send({ note: note.trim() ? note.trim() : null })} maxLength={300} />
       </div>
-      <TextField label={t('secret.note')} value={note} onChange={setNote} onBlur={() => note !== (sel.note ?? '') && send({ note: note.trim() ? note.trim() : null })} maxLength={300} />
       <Toggle
         label={t('secret.celebrate', { name: sel.student.fullName })}
         isSelected={sel.celebration}

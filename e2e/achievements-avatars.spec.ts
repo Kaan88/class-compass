@@ -42,7 +42,10 @@ test('a badge given in class shows the moment on the display and a celebration o
     await expect(panel).toBeVisible();
     await panel.getByTestId('achievements-give').click();
     const dialog = page.getByTestId('achievements-dialog');
-    await dialog.locator('label', { hasText: student.fullName }).getByTestId('achievements-student').check();
+    const pick = dialog.locator('label', { hasText: student.fullName });
+    await pick.getByTestId('achievements-student').check();
+    // A chosen student is marked as chosen, never struck through (usability pass, D-139).
+    expect(await pick.locator('span').last().evaluate((e) => getComputedStyle(e).textDecorationLine)).not.toContain('line-through');
     const badge = dialog.getByTestId('achievements-badge').first();
     const badgeName = (await badge.locator('strong').innerText()).trim();
     await badge.click();
@@ -51,7 +54,10 @@ test('a badge given in class shows the moment on the display and a celebration o
     await expect(moment).toBeVisible();
     await expect(moment.getByTestId('achievements-moment-names')).toContainText(student.fullName);
     await moment.getByTestId('achievements-moment-close').click();
-    // Undo stays offered for 10 minutes on the panel.
+    // Undo is offered at once in a note that is always on screen (D-139) ...
+    const note = page.getByTestId('toast').filter({ hasText: badgeName });
+    await expect(note.getByRole('button', { name: 'Undo' })).toBeInViewport();
+    // ... and stays offered for 10 minutes on the panel.
     await expect(panel.getByTestId('achievements-undo')).toBeVisible();
 
     const phone = await phoneOf(browser);

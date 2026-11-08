@@ -46,7 +46,7 @@ export function AttendanceCountsLine({ statuses }: { statuses: EffectiveAttendan
   const parts = (['present', 'absent', 'late', 'excused', 'not_recorded'] as const).filter((k) => c[k] > 0).map((k) => `${c[k]} ${t(`attendance.status.${k}`)}`);
   return (
     <p className="cc-att-counts" role="status" aria-live="polite" data-testid="attendance-counts">
-      {parts.join(' · ')}
+      {parts.length ? t('attendance.countsLine', { parts: parts.join(' · ') }) : null}
     </p>
   );
 }

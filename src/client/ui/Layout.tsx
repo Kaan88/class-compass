@@ -7,6 +7,22 @@ import { Button } from './Button.tsx';
 import { IconBoard, IconCheck, IconLock, IconPlay } from './icons.tsx';
 import { Mascot, ThemeDecoration } from './Mascot.tsx';
 
+/**
+ * Header of a classroom panel (usability pass, D-139): an optional icon and the title on one line, the
+ * actions on the right; the actions wrap under the title only when the panel is too narrow.
+ */
+export function PanelHead({ id, title, icon, children }: { id: string; title: ReactNode; icon?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="cc-panel-head">
+      <h2 id={id} className="cc-h2 cc-panel-head__title">
+        {icon}
+        <span>{title}</span>
+      </h2>
+      {children ? <div className="cc-panel-head__actions">{children}</div> : null}
+    </div>
+  );
+}
+
 /** Always names the active class AND subject, so nothing is recorded against the wrong class (LES-4). */
 export function ClassBanner({
   className,

@@ -90,13 +90,18 @@ Press **Save and end lesson**. The summary **Lesson saved** shows the time, the 
 
 **The top bar** shows the class and subject, the **quote of the day** (if switched on), the day, date and time, and the weather (if the administrator switched it on and the server can reach the weather service). On the right:
 
-- **Class language**: only when the class uses two languages, to switch the screen between them.
-- **Size**: **Compact**, **Normal** or **Large**. Pick what is readable from the back of the room; the screen also fits itself to the display. The choice is remembered on this device.
-- The save state, **Sounds on this device**, and **Teacher area** (asks for your PIN).
+- The save state.
+- **Display** opens the settings of this screen:
+  - **Class language**: only when the class uses two languages, to switch the screen between them.
+  - **Size**: **Compact**, **Normal** or **Large**. Pick what is readable from the back of the room; the screen also fits itself to the display. The choice is remembered on this device.
+  - **Sounds on this device**.
+- **Teacher area** (asks for your PIN).
 
-**The main column** shows **Today's focus** (the lesson topic, with **Change**) and the **student cards**. **Show students** / **Hide students** folds the cards away.
+**The main column** shows **Today's focus** (the lesson topic, with **Change**), the **student cards** and, under them, the module panels (counters, assistant, Secret Students, groups, homework, badges). **Show students** / **Hide students** folds the cards away.
 
-**The right-hand column** holds the routine, the timer, the action buttons and the module panels.
+**The right-hand column** holds the routine and the timer. **Attendance** and **End lesson** always stay at the bottom of this column; if the column is longer than the screen, it scrolls on its own.
+
+Short messages (for example **Lesson started**) appear for a moment at the bottom left. Messages with **Undo** stay a little longer.
 
 ### Routine and timer
 
@@ -123,6 +128,7 @@ Press **Choose groups** (or **Open groups** when groups are already shown). The 
 - **Shuffle** makes new groups; **Undo shuffle** brings the previous ones back.
 - To move a student, tap the name and then the new group, or drag the name onto a group.
 - **Save to option** keeps these groups in the option for next time.
+- A student you tapped to move is highlighted, and **Cancel** next to the message puts them back.
 - The timer is on the group screen too.
 
 Levels, pair rules ("should / should not work together") and their notes are **never** shown on the classroom screen. You manage them on the **Grouping** page (tabs **Arrangements**, **Levels**, **Pair rules**). In Class settings you can show student names in capital letters on the group screen.
@@ -135,7 +141,7 @@ The assistant panel shows today's assistant and their responsibilities with tick
 
 1. During the lesson press **Choose secret students**. Class Compass picks students who are present (2 by default; 1 to 10 on the **Secret Students** page). Nobody, not even you, sees who until the end of the lesson. **Choose again** puts them back and picks new ones.
 2. At **End lesson**, press **Reveal the secret students**. A short countdown with a drum roll plays (**Show at once** skips it).
-3. Record a result for each: **Goal met**, **Still practising** or **Not assessed**, with an optional note.
+3. Under **For your records**, record a result for each: **Goal met**, **Still practising** or **Not assessed**, with an optional note.
 4. **Celebrate {name}** plays the celebration for that student.
 
 A chosen student who is absent is replaced; a student who was away keeps their turn for a later round.
@@ -147,17 +153,17 @@ A chosen student who is absent is replaced; a student who was away keeps their t
 3. **Choose a badge**. Tick **Celebrate on the display** for a short celebration with the badge, the names and the avatars.
 4. Press **Give to N**.
 
-You can undo a badge given in this lesson for 10 minutes (**Badges given this lesson** → **Undo**). Later, remove a badge given by mistake in the teacher area (see [Achievements and avatars](#achievements-and-avatars)). Automatic badges are never announced on the display; a class can collect them in the End Lesson step **Well done!**.
+Right after you give a badge, a message at the bottom of the screen offers **Undo** for a few seconds. After that you can still undo a badge given in this lesson for 10 minutes (**Badges given this lesson** → **Undo**). Later, remove a badge given by mistake in the teacher area (see [Achievements and avatars](#achievements-and-avatars)). Automatic badges are never announced on the display; a class can collect them in the End Lesson step **Well done!**.
 
 ### Homework in class
 
-If **Allow checking on the classroom screen** is on (Homework → Settings; off by default), the homework panel shows the homework due this week and **Check homework**. Private notes are never shown on the classroom screen.
+If **Allow checking on the classroom screen** is on (Homework → Settings; off by default), the homework panel shows the homework due this week with a **Check** button for each. **Close** is next to the title of the checking list. Private notes are never shown on the classroom screen.
 
 ### Sounds and celebrations
 
 - **Class settings** → **Classroom display**: **Theme**, **Sounds** with **Volume** and **Try**, **Animations**, **Quote of the day** and **When the timer ends**: **Say "Time's up!"** (spoken in English by the computer; the chime plays if it has no English voice), **My own recording**, **Chime** or **Silent**.
 - **My own recording**: in **Profile and PIN** → **My time's-up recording**, record up to 5 seconds or choose a sound file.
-- **Sounds on this device** (classroom top bar) mutes this device only.
+- **Sounds on this device** (classroom top bar → **Display**) mutes this device only.
 - Celebrations play only after you do something on the screen (a revealed Secret Student, **Celebrate on the display**), never by themselves. A device that asks for reduced motion gets a calm version without movement.
 
 ## Homework checking

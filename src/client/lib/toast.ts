@@ -22,6 +22,9 @@ export interface Toast {
 }
 
 export const UNDO_MS = 8000;
+/** How long a plain note stays: shorter on the classroom display, where it covers what the class sees. */
+export const NOTE_MS = 4000;
+export const CLASSROOM_NOTE_MS = 2500;
 export const MAX_VISIBLE = 3;
 let toasts: Toast[] = [];
 let nextId = 1;
@@ -60,7 +63,7 @@ export function showToast(t: { message: string; kind?: Toast['kind']; durationMs
     id,
     message: t.message,
     kind: t.kind ?? 'info',
-    durationMs: t.durationMs ?? (t.undo ? UNDO_MS : 4000),
+    durationMs: t.durationMs ?? (t.undo ? UNDO_MS : t.scope === 'classroom' && t.kind !== 'error' ? CLASSROOM_NOTE_MS : NOTE_MS),
     undo: t.undo,
     scope: t.scope ?? 'sensitive',
     createdAt: Date.now(),

@@ -22,6 +22,7 @@ import { queryClient } from '../../lib/queryClient.ts';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { IconCalendar, IconCheck, IconChevronDown, IconChevronUp } from '../../ui/icons.tsx';
+import { PanelHead } from '../../ui/Layout.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { lessonKey, patchLesson, sendLessonCommand, useLessonState, type LessonQueryData } from '../lessons/lessonClient.ts';
@@ -149,21 +150,16 @@ function AssistantSlot({ context, lesson }: { context: ClassroomContext; lesson:
   }
   return (
     <section className="cc-card cc-stack cc-assistant" aria-labelledby="cc-assistant-title" data-testid="assistant-panel">
-      <div className="cc-row">
-        <h2 id="cc-assistant-title" className="cc-h2">
-          {t('assistant.title')}
-        </h2>
-        <div className="cc-row cc-push-right">
-          <Button size="small" onPress={() => setWeekOpen(true)}>
-            <IconCalendar />
-            {t('assistant.thisWeek')}
-          </Button>
-          <Button size="small" onPress={() => setPanelVisible(lesson, false)} data-testid="assistant-hide">
-            <IconChevronUp />
-            {t('assistant.hidePanel')}
-          </Button>
-        </div>
-      </div>
+      <PanelHead id="cc-assistant-title" title={t('assistant.title')}>
+        <Button size="small" onPress={() => setWeekOpen(true)}>
+          <IconCalendar />
+          {t('assistant.thisWeek')}
+        </Button>
+        <Button size="small" onPress={() => setPanelVisible(lesson, false)} data-testid="assistant-hide">
+          <IconChevronUp />
+          {t('assistant.hidePanel')}
+        </Button>
+      </PanelHead>
       <TodayCard today={today} lesson={lesson} />
       <WeekDialog context={context} isOpen={weekOpen} onOpenChange={setWeekOpen} />
     </section>

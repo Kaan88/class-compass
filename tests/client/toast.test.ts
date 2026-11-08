@@ -2,7 +2,7 @@
  * Toast store (UX-9 undo window, PIN-3 nothing sensitive left on the classroom display).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearAllToasts, clearSensitiveToasts, currentToasts, MAX_VISIBLE, showToast, showUndoToast, UNDO_MS } from '../../src/client/lib/toast.ts';
+import { CLASSROOM_NOTE_MS, clearAllToasts, clearSensitiveToasts, currentToasts, MAX_VISIBLE, NOTE_MS, showToast, showUndoToast, UNDO_MS } from '../../src/client/lib/toast.ts';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -16,6 +16,18 @@ afterEach(() => {
 const messages = () => currentToasts().map((t) => t.message);
 
 describe('toast store', () => {
+  it('keeps plain notes on the classroom display shorter than elsewhere; errors and undo keep their time (usability pass D-139)', () => {
+    showToast({ message: 'lesson started', kind: 'success', scope: 'classroom' });
+    showToast({ message: 'saved', kind: 'success' });
+    showToast({ message: 'failed', kind: 'error', scope: 'classroom' });
+    expect(currentToasts().map((t) => t.durationMs)).toEqual([CLASSROOM_NOTE_MS, NOTE_MS, NOTE_MS]);
+    vi.advanceTimersByTime(CLASSROOM_NOTE_MS);
+    expect(messages()).toEqual(['saved', 'failed']);
+    clearAllToasts();
+    showUndoToast('undo', () => undefined, { scope: 'classroom' });
+    expect(currentToasts()[0]!.durationMs).toBe(UNDO_MS);
+  });
+
   it('keeps an undo toast for its full 8 s even when more toasts arrive (UX-9)', () => {
     showUndoToast('undo me', () => undefined);
     for (let i = 1; i <= 5; i++) showToast({ message: `info ${i}` });

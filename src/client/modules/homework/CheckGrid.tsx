@@ -14,7 +14,7 @@
 import { useState } from 'react';
 import type { ClassroomHomeworkCheck, HomeworkCheck, HomeworkStatusDef } from '../../../shared/contracts/homework.ts';
 import { NOT_CHECKED } from '../../../shared/contracts/homework.ts';
-import { pickText, type Locale } from '../../../shared/i18n/index.ts';
+import { formatDate, pickText, type Locale } from '../../../shared/i18n/index.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { showToast, showUndoToast } from '../../lib/toast.ts';
 import { useRun } from '../../lib/useRun.ts';
@@ -34,6 +34,9 @@ export interface CheckActions {
 }
 
 export const statusLabel = (statuses: readonly HomeworkStatusDef[], key: string, locale: Locale) => pickText(statuses.find((s) => s.key === key)?.label, locale) || key;
+
+/** 'YYYY-MM-DD' as "Sunday 8 November" / "8 Kasım Pazar" (never the ISO form on screen). */
+export const longDay = (date: string, locale: Locale) => formatDate(Date.parse(`${date}T12:00:00Z`), locale, 'UTC', { weekday: 'long', day: 'numeric', month: 'long' });
 
 const newBatchId = () => crypto.randomUUID();
 
@@ -151,7 +154,7 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
         </Button>
       </div>
       </div>
-      {check.attendanceEnabled ? <p className="cc-muted">{t('homework.attendanceOn', { date: check.attendanceDate })}</p> : null}
+      {check.attendanceEnabled ? <p className="cc-muted">{t('homework.attendanceOn', { date: longDay(check.attendanceDate, locale) })}</p> : null}
       <ul className="cc-hw-grid" aria-label={t('homework.gridLabel', { title: check.assignment.title })}>
         {rows.map((r) => (
           <li key={r.student.id} className="cc-hw-row" data-testid="homework-row" data-reviewed={r.reviewed ? 'yes' : 'no'} data-selected={selected.has(r.student.id) ? '' : undefined}>
@@ -167,6 +170,7 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
               <Select
                 className="cc-push-right"
                 label={t('homework.statusFor', { name: r.student.fullName })}
+                hideLabel
                 items={items}
                 value={r.status}
                 onChange={(status) => setMarks([{ studentId: r.student.id, status }])}

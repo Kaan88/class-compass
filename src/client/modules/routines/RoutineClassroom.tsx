@@ -99,7 +99,7 @@ function RoutineStepper({ lesson }: { context: ClassroomContext; lesson: LessonS
           );
         })}
       </ol>
-      <div className="cc-row">
+      <div className="cc-row cc-routine__nav">
         <Button size="big" onPress={() => go(idx - 1)} isDisabled={idx === 0}>
           <IconPrev />
           {t('routine.prev')}

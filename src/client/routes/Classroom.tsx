@@ -252,7 +252,6 @@ function ClassroomScreen({
   const tools = (
     <>
       <OutboxSaveBadge />
-      <Toggle label={t('classroom.sounds')} isSelected={display.deviceSounds} onChange={(v) => setDisplay({ deviceSounds: v })} />
       <Button onPress={() => void navigate({ to: '/teacher' })}>
         <IconLock />
         {t('classroom.teacherArea')}
@@ -270,6 +269,7 @@ function ClassroomScreen({
         density={density}
         onDensity={setDensity}
         onLocale={onLocale}
+        settings={<Toggle label={t('classroom.sounds')} isSelected={display.deviceSounds} onChange={(v) => setDisplay({ deviceSounds: v })} />}
         tools={tools}
       />
       <main className="cc-page cc-page--wide cc-stack cc-classroom__main">

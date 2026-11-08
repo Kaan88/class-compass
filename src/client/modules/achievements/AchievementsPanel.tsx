@@ -20,9 +20,11 @@ import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts';
 import { queryClient } from '../../lib/queryClient.ts';
-import { showToast } from '../../lib/toast.ts';
+import { showToast, showUndoToast } from '../../lib/toast.ts';
 import { celebrate } from '../../themes/Celebration.tsx';
-import { Button } from '../../ui/Button.tsx';
+import { BigButton, Button } from '../../ui/Button.tsx';
+import { IconStar } from '../../ui/icons.tsx';
+import { PanelHead } from '../../ui/Layout.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { awaitCommand, useLessonRoster } from '../lessons/lessonClient.ts';
@@ -47,7 +49,10 @@ function useClassroomAchievements(contextId: string, lessonId?: string) {
   return useQuery({ queryKey: achievementsKey(contextId, lessonId), queryFn: () => call(classroomAchievements, { contextId, ...(lessonId ? { lessonId } : {}) }), refetchInterval: 30_000 });
 }
 
-type Moment = { badgeId: string; studentIds: string[]; names: string[] };
+type Moment = { badgeId: string; studentIds: string[]; names: string[]; awardIds: string[] };
+
+/** Up to three names are said in the celebration and the undo note; more are counted. */
+const NAMED_MAX = 3;
 
 /** How long the moment waits for the server's list of awarded students before showing the chosen ones. */
 const MOMENT_WAIT_MS = 2500;
@@ -74,28 +79,53 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
     const opId = await getOutbox().enqueue('achievements.award', { contextId: context.id, lessonId: lesson.id, achievementId: badgeId, studentIds }, { contextId: context.id, lessonId: lesson.id });
     setOpen(false);
     setPicked([]);
-    const b = badgeOf(badgeId);
     const saved = awaitCommand(opId).then((r) => {
       void queryClient.invalidateQueries({ queryKey: ['classroom', 'achievements', context.id] });
-      return r as { studentIds?: string[] } | undefined;
+      return r as { studentIds?: string[]; awardIds?: string[] } | undefined;
     });
     saved.catch(() => showToast({ message: t('achievements.awardFailed'), kind: 'error', scope: 'classroom' }));
-    if (!withMoment) {
-      // A quiet award (item 7: the moment is optional): a small note only.
-      showToast({ message: t('achievements.givenQuietly', { count: studentIds.length }), kind: 'success', scope: 'classroom' });
-      return;
-    }
     // The moment names only the students who were actually awarded (not those who already had the
     // badge). While offline the server's answer may not come quickly: then the chosen students are shown.
     const answer = await Promise.race([saved.catch(() => null), new Promise<'later'>((res) => setTimeout(() => res('later'), MOMENT_WAIT_MS))]);
     if (answer === null) return;
     const awarded = answer !== 'later' && answer?.studentIds ? answer.studentIds : studentIds;
+    const awardIds = answer !== 'later' && answer?.awardIds ? answer.awardIds : [];
     if (!awarded.length) {
       showToast({ message: t('achievements.alreadyHad'), kind: 'info', scope: 'classroom' });
       return;
     }
-    setMoment({ badgeId, studentIds: awarded, names: awarded.map(nameOf) });
-    celebrate(b ? t('achievements.celebrateMessage', { name: pickText(b.name, locale) }) : null);
+    if (!withMoment) {
+      // A quiet award (item 7: the moment is optional): a small note, with Undo once the server has it.
+      offerUndo(badgeId, awarded, awardIds);
+      return;
+    }
+    setMoment({ badgeId, studentIds: awarded, names: awarded.map(nameOf), awardIds });
+    celebrate(celebrationText(badgeId, awarded.map(nameOf)));
+  };
+
+  /** "Well done, Ilgın Çetin! New badge: Kind helper" (names only for a few students). */
+  const celebrationText = (id: string, names: string[]) => {
+    const b = badgeOf(id);
+    if (!b) return null;
+    const name = pickText(b.name, locale);
+    return names.length && names.length <= NAMED_MAX ? t('achievements.celebrateNamed', { names: names.join(', '), name }) : t('achievements.celebrateMessage', { name });
+  };
+
+  /**
+   * The Undo of a badge just given is offered in a note at the bottom of the screen (always in view),
+   * besides the list on the panel (10 minutes).
+   */
+  const offerUndo = (id: string, studentIds: string[], awardIds: string[]) => {
+    const b = badgeOf(id);
+    const who = studentIds.length <= NAMED_MAX ? studentIds.map(nameOf).join(', ') : t('achievements.studentCount', { count: studentIds.length });
+    const message = t('achievements.givenTo', { badge: b ? pickText(b.name, locale) : '', who });
+    if (awardIds.length) showUndoToast(message, () => undo(awardIds), { scope: 'classroom' });
+    else showToast({ message, kind: 'success', scope: 'classroom' });
+  };
+
+  const closeMoment = () => {
+    if (moment) offerUndo(moment.badgeId, moment.studentIds, moment.awardIds);
+    setMoment(null);
   };
 
   const undo = (awardIds: string[]) => {
@@ -113,14 +143,12 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
   const mBadge = moment ? badgeOf(moment.badgeId) : undefined;
   return (
     <section className="cc-card cc-stack" aria-labelledby="cc-achievements-title" data-testid="achievements-panel">
-      <div className="cc-row">
-        <h2 id="cc-achievements-title" className="cc-h2">
-          {t('achievements.title')}
-        </h2>
-        <Button variant="primary" className="cc-push-right" onPress={() => setOpen(true)} isDisabled={!data.badges.length} data-testid="achievements-give">
+      <PanelHead id="cc-achievements-title" title={t('achievements.title')}>
+        <BigButton variant="primary" onPress={() => setOpen(true)} isDisabled={!data.badges.length} data-testid="achievements-give">
+          <IconStar />
           {t('achievements.give')}
-        </Button>
-      </div>
+        </BigButton>
+      </PanelHead>
       {undoable.length ? (
         <ul className="cc-stack" aria-label={t('achievements.thisLesson')}>
           {undoable.map((a) => {
@@ -141,13 +169,13 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
       <Modal isOpen={open} onOpenChange={setOpen} title={t('achievements.give')} size="wide" testId="achievements-dialog">
         <fieldset className="cc-stack">
           <legend className="cc-h3">{t('achievements.chooseStudents')}</legend>
-          <label className="cc-tick">
+          <label className="cc-tick cc-tick--choice">
             <input type="checkbox" checked={allPicked} onChange={(e) => setPicked(e.target.checked ? roster.map((s) => s.id) : [])} data-testid="achievements-whole-class" />
             <span>{t('achievements.wholeClass')}</span>
           </label>
           <div className="cc-achievements-students">
             {roster.map((s) => (
-              <label key={s.id} className="cc-tick">
+              <label key={s.id} className="cc-tick cc-tick--choice">
                 <input type="checkbox" checked={picked.includes(s.id)} onChange={(e) => setPicked((p) => (e.target.checked ? [...p, s.id] : p.filter((x) => x !== s.id)))} data-testid="achievements-student" />
                 <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
                 <span>{s.fullName}</span>
@@ -180,7 +208,7 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
           </Button>
         </DialogActions>
       </Modal>
-      <Modal isOpen={moment !== null} onOpenChange={(v) => (v ? null : setMoment(null))} title={t('achievements.celebrateTitle')} size="full" testId="achievements-moment">
+      <Modal isOpen={moment !== null} onOpenChange={(v) => (v ? null : closeMoment())} title={t('achievements.celebrateTitle')} size="full" testId="achievements-moment">
         {moment && mBadge ? (
           <div className="cc-stack cc-achievement-moment">
             <BadgeArt icon={mBadge.icon} tier={mBadge.tier} size={200} />
@@ -200,8 +228,8 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
           </div>
         ) : null}
         <DialogActions>
-          <Button onPress={() => celebrate(mBadge ? t('achievements.celebrateMessage', { name: pickText(mBadge.name, locale) }) : null)}>{t('achievements.celebrateAgain')}</Button>
-          <Button variant="primary" onPress={() => setMoment(null)} data-testid="achievements-moment-close">
+          <Button onPress={() => (moment ? celebrate(celebrationText(moment.badgeId, moment.names)) : undefined)}>{t('achievements.celebrateAgain')}</Button>
+          <Button variant="primary" onPress={closeMoment} data-testid="achievements-moment-close">
             {t('common.close')}
           </Button>
         </DialogActions>

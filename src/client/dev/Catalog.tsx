@@ -16,8 +16,8 @@ import { Button, BigButton, IconButton } from '../ui/Button.tsx';
 import { ConfirmDestructive, DialogActions, Modal } from '../ui/Dialog.tsx';
 import { Alert, EmptyState, NeedsAttentionTray, SaveStateBadge } from '../ui/Feedback.tsx';
 import { Select, TextArea, TextField, Toggle } from '../ui/Fields.tsx';
-import { IconLock, IconPlus, IconSettings, IconUndo } from '../ui/icons.tsx';
-import { ClassBanner, ClassSwitcher, DataTable, DisplayBanner } from '../ui/Layout.tsx';
+import { IconBook, IconLock, IconPlus, IconSettings, IconUndo } from '../ui/icons.tsx';
+import { ClassBanner, ClassSwitcher, DataTable, DisplayBanner, PanelHead } from '../ui/Layout.tsx';
 import { Mascot, ThemeBackdrop, ThemeDecoration, ThemeIllustration } from '../ui/Mascot.tsx';
 import { PinPad } from '../ui/PinPad.tsx';
 import { AttendanceChip, Avatar, CounterBar, MetricCell, StudentCard, StudentGrid } from '../ui/Students.tsx';
@@ -64,6 +64,11 @@ function Everything() {
         <ClassSwitcher contexts={SWITCH} activeId={active} onSwitch={setActive} />
         <ClassBanner className="3-A" subjectName={SUBJECT} dayLabel={t('weekday.1')} dateLabel="9.11.2026" />
         <DisplayBanner onLock={() => undefined} onClassroom={() => undefined} />
+        <section className="cc-card cc-stack" aria-labelledby="cc-catalog-panel" style={{ maxWidth: '22rem' }}>
+          <PanelHead id="cc-catalog-panel" title={t('homework.title')} icon={<IconBook />}>
+            <Button size="small">{t('homework.checkShort')}</Button>
+          </PanelHead>
+        </section>
       </Section>
       <Section title={t('catalog.buttons')}>
         <div className="cc-row">
