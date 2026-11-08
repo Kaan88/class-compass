@@ -526,7 +526,8 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
       }}
     >
       {cls ? null : <Select label={t('classes.year')} value={yearId} onChange={setYearId} items={writableYears.map((y) => ({ id: y.id, label: y.name }))} />}
-      <div className="cc-row">
+      {/* Top-aligned, so the Grade hint under its field does not push the two fields out of line. */}
+      <div className="cc-row" style={{ alignItems: 'flex-start' }}>
         <TextField label={t('classes.name')} value={d.name} onChange={(v) => set({ name: v })} isRequired placeholder="3-A" />
         <TextField label={t('classes.grade')} description={t('classes.gradeHint')} placeholder="3" value={d.grade} onChange={(v) => set({ grade: v.replace(/\D/g, '') })} inputMode="numeric" />
       </div>

@@ -318,6 +318,8 @@ test('usability pass (D-139): End lesson and the class counter are on screen at 
         await expect(end, vp.name).toBeInViewport({ ratio: 1 });
         await expect(p.getByRole('button', { name: 'Attendance' }), vp.name).toBeInViewport({ ratio: 1 });
         await expect(p.getByTestId('counter-bar').first(), vp.name).toBeInViewport();
+        // On a 1080p display the timer's Start is also visible without scrolling the rail.
+        if (vp.height >= 1080) await expect(p.getByTestId('lesson-rail').getByRole('button', { name: 'Start', exact: true }), vp.name).toBeInViewport({ ratio: 1 });
         // The top bar is one row (plus the quote of the day on narrower displays), not three.
         const bar = await p.locator('.cc-classroom-bar').evaluate((e) => e.getBoundingClientRect().height);
         expect(bar, `${vp.name}: top bar height`).toBeLessThan(vp.height * 0.15);

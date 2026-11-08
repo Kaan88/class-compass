@@ -418,11 +418,15 @@ export function CounterHistoryPage({ initialCounterId }: { initialCounterId?: st
                 <th scope="col" className="cc-history__name">
                   {t('counterHistory.student')}
                 </th>
-                {h.weeks.map((w) => (
-                  <th key={w.weekStart} scope="col" className="cc-week-range">
-                    {formatWeekRange(w.weekStart, w.weekEnd, locale)}
-                  </th>
-                ))}
+                {h.weeks.map((w) => {
+                  // Each date stays whole; the header may break after the dash so eight weeks fit at 1920 wide.
+                  const [from, to] = formatWeekRange(w.weekStart, w.weekEnd, locale).split(' – ');
+                  return (
+                    <th key={w.weekStart} scope="col" className="cc-week-range">
+                      <span className="cc-nowrap">{from} –</span> <span className="cc-nowrap">{to}</span>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>

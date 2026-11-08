@@ -451,6 +451,11 @@ a {
   border: var(--cc-border-width) solid var(--cc-border-strong);
   background: var(--cc-surface-2);
   font-weight: 650;
+  /* Long unbroken text (an email address, a code) wraps inside the box instead of overflowing it. */
+  overflow-wrap: anywhere;
+}
+.cc-alert > div {
+  min-width: 0;
 }
 .cc-alert svg {
   width: 1.4rem;
@@ -966,8 +971,8 @@ html:has(.cc-classroom) .cc-toaster {
   padding: 0.75rem;
 }
 .cc-week-range {
-  white-space: nowrap;
   font-weight: 700;
+  min-width: 6.5rem;
 }
 /* Counter history: names stay on one or two lines, never three. */
 .cc-history__name {
@@ -1632,9 +1637,9 @@ html:has(.cc-classroom) {
   font-size: 1.05rem;
   white-space: normal;
 }
-/* Short displays (1366×768, 1280×720): the stages are one row that scrolls sideways, so the timer
-   is not pushed out of the rail. */
-@media (max-height: 900px) {
+/* Displays up to 1080 px high (1920×1080, 1366×768, 1280×720): the stages are one row that scrolls
+   sideways, so the timer's Start/Reset is not pushed out of the rail. */
+@media (max-height: 1100px) {
   .cc-lesson-layout__rail .cc-stepper {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -2463,7 +2468,32 @@ html:has(.cc-classroom) {
   min-height: var(--cc-touch);
   display: flex;
   align-items: center;
+  gap: 0.6rem;
   font-weight: 700;
+  list-style: none;
+}
+.cc-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+/* A chevron shows the fold opens and closes (display:flex drops the native marker). */
+.cc-disclosure > summary::before {
+  content: '';
+  flex: none;
+  width: 0.55em;
+  height: 0.55em;
+  margin-inline: 0.15em;
+  border-inline-end: 0.18em solid currentColor;
+  border-bottom: 0.18em solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 150ms ease-out;
+}
+.cc-disclosure[open] > summary::before {
+  transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-disclosure > summary::before {
+    transition: none;
+  }
 }
 .cc-group-chips {
   list-style: none;
@@ -2811,8 +2841,9 @@ html:has(.cc-classroom) {
 /* S13b2 (D-119): add-evidence buttons, files waiting to upload, pictures and the in-page camera. */
 .cc-evidence-modes {
   display: grid;
-  /* Two columns on a phone (S13 usability), so the chosen mode's field stays near the buttons. */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
+  /* Two columns on a phone (S13 usability), so the chosen mode's field stays near the buttons; 7rem
+     still gives two columns in a 290px card with the student page's 18px root size. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 7rem), 1fr));
   gap: 0.5rem;
 }
 @media (max-width: 30rem) {
@@ -2919,12 +2950,15 @@ html:has(.cc-classroom) {
 /* One line from 1 (not sure) to 5 (very sure), also on a phone (S13 usability). */
 .cc-confidence-picker > .cc-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(var(--cc-touch), 1fr));
+  /* Five equal columns that may get narrower than --cc-touch in a phone card (the buttons keep their
+     full height), so the row never makes the page scroll sideways. */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.4rem;
   max-width: 24rem;
 }
 .cc-confidence-picker > .cc-row > .cc-btn {
   min-width: 0;
+  padding-inline: 0;
   justify-content: center;
 }
 .cc-private {

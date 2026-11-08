@@ -47,6 +47,8 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
     expect(p.url()).not.toContain('#');
     expect(new URL(p.url()).pathname).toBe('/s');
     await expect(p.getByRole('heading', { name: `Hello, ${student.fullName}!` })).toBeVisible();
+    // Nothing on the page (the 1-5 confidence row included) makes a phone scroll sideways.
+    expect(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 'horizontal scroll').toBeLessThanOrEqual(0);
 
     const english = p.getByRole('region', { name: 'English', exact: true });
     // Add a preset goal (GOL-2).
