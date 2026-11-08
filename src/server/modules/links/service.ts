@@ -1,37 +1,46 @@
 /**
- * Personal student links (S10: STU-1..7, D-084).
+ * Personal student links (S10: STU-1..7, D-084; permanent since S13b2, D-115, D-118).
  *
- * - A link holds a 256-bit random token; only HMAC(pepper, token) is stored. At most one active link
- *   per student (partial unique index); making a new one revokes the old one and bumps `generation`.
+ * - Every active student has exactly one link, made automatically (on creation and import through
+ *   `onStudentCreated`, at start-up for students without one, and lazily when a links page is shown).
+ *   A link holds a 256-bit random token; `HMAC(pepper, token)` is the lookup key and the token itself
+ *   is stored encrypted (AES-256-GCM, key derived from the pepper by HKDF, bound to the row id), so
+ *   teachers can show and print the same link again. The token is never logged or audited.
  * - The token travels in the URL fragment (`/s#<token>`) and is posted once to the public exchange
- *   endpoint, which answers with a strict student session cookie. The token is never logged, audited
- *   or returned again.
- * - The student resolver (`setStudentResolver`) re-checks the link on EVERY request: a revoked or
- *   replaced link, or a deactivated student, ends the session at once (STU-3).
- * - Teachers manage links for students in classes they teach (teacher area, PIN-gated).
+ *   endpoint, which answers with a strict student session cookie.
+ * - The student resolver re-checks the link on EVERY request: a revoked or replaced link, or a
+ *   deactivated or erased student, ends the session at once (STU-3). Deactivating a student is not a
+ *   revoke: the link works again after reactivation.
+ * - There is no routine revoke or regenerate. In an emergency an administrator or one of the student's
+ *   current teachers revokes the link or replaces it (typed full name, reason, audit, D-118).
  */
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
+import { studentPageLanguage } from '../../../shared/classLanguage.ts';
 import type * as C from '../../../shared/contracts/links.ts';
-import { studentLinkUrl, type NewLink } from '../../../shared/contracts/links.ts';
-import { initials } from '../../../shared/text/turkish.ts';
+import { studentLinkUrl, type LinkStatus, type StudentLinkState } from '../../../shared/contracts/links.ts';
+import { initials, lowerTr, normaliseName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { authAttempts, sessions, studentLinks, students } from '../../db/schema.ts';
+import { authAttempts, classes, sessions, studentLinks, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
-import type { AppDeps, RequestContext, SessionRow, StudentPrincipal } from '../../lib/context.ts';
+import type { Actor, AppDeps, RequestContext, SessionRow, StudentPrincipal } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
-import { newId, randomToken, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
-import { AppError, notFound } from '../../lib/errors.ts';
+import { newId, openSecret, randomToken, sealSecret, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
+import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { STUDENT_SESSION_ABSOLUTE_MS } from '../../lib/http.ts';
 import { createSession } from '../auth/service.ts';
-import { assertClassWritable, assertTeachesClass, getClass } from '../school/policy.ts';
+import { assertTeachesClass, getClass, type ClassRow } from '../school/policy.ts';
 import { taughtClassIds } from '../school/service.ts';
 import { liveClassIdsOf, rosterRows } from '../students/service.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 type LinkRow = typeof studentLinks.$inferSelect;
+type LinkDeps = Pick<AppDeps, 'db' | 'now' | 'config'>;
 
 const LAST_USED_INTERVAL_MS = 60_000;
+/** HKDF purpose of the token encryption key (separate from the HMAC lookup key). */
+const SEAL_PURPOSE = 'student-link-token';
+const SYSTEM: Actor = { type: 'system', id: null };
 
 // ---------------------------------------------------------------- session resolution (every request)
 /** Registered with `setStudentResolver`: the session's link must still be active and the student active. */
@@ -72,9 +81,9 @@ function recordExchangeFailure(deps: AppDeps, ip: string, now: number): number {
 }
 
 /**
- * The token from the fragment → a new student session. Unknown, revoked and replaced tokens get the
- * same answer (401 LINK_INVALID), so the endpoint reveals nothing about which links existed; too many
- * of them from one address answer 429 instead.
+ * The token from the fragment → a new student session. Unknown, revoked and replaced tokens and
+ * deactivated students get the same answer (401 LINK_INVALID), so the endpoint reveals nothing about
+ * which links existed; too many of them from one address answer 429 instead.
  */
 export function exchangeToken(deps: AppDeps, ip: string, token: string): { token: string } {
   const hash = tokenHash(deps.config.SECRET_PEPPER, token);
@@ -99,102 +108,198 @@ export function endStudentSession(ctx: RequestContext): void {
   if (ctx.session) ctx.db.update(sessions).set({ revokedAt: ctx.now() }).where(eq(sessions.id, ctx.session.id)).run();
 }
 
-// ---------------------------------------------------------------- teacher area
-/** The student is (or will be) in a class the signed-in teacher teaches; returns that class id. */
-function assertTeachesStudent(ctx: RequestContext, studentId: string): string {
-  const s = ctx.db.select({ id: students.id }).from(students).where(eq(students.id, studentId)).get();
-  if (!s) throw notFound('Student');
-  const taught = taughtClassIds(ctx.db, requireUser(ctx).id);
-  const classId = liveClassIdsOf(ctx, studentId).find((c) => taught.includes(c));
-  if (!classId) throw new AppError('FORBIDDEN', 'This student is not in a class you teach');
-  return classId;
-}
-
+// ---------------------------------------------------------------- permanent links (D-115)
 const activeLink = (db: Db, studentId: string): LinkRow | undefined =>
   db.select().from(studentLinks).where(and(eq(studentLinks.studentId, studentId), isNull(studentLinks.revokedAt))).get();
 
-/** Revoke a link and end every session opened with it (STU-3). Inside a transaction. */
-function revokeLinkRow(ctx: RequestContext, link: LinkRow, reason: 'revoke' | 'regenerate'): void {
-  const now = ctx.now();
-  ctx.db.update(studentLinks).set({ revokedAt: now, revokedBy: requireUser(ctx).id }).where(eq(studentLinks.id, link.id)).run();
-  ctx.db.update(sessions).set({ revokedAt: now }).where(and(eq(sessions.studentLinkId, link.id), isNull(sessions.revokedAt))).run();
-  audit(ctx.db, ctx.actor, { action: reason === 'revoke' ? 'student_link.revoke' : 'student_link.replace', entity: 'student_link', entityId: link.id, before: { studentId: link.studentId, generation: link.generation } }, now);
+const latestLink = (db: Db, studentId: string): LinkRow | undefined =>
+  db.select().from(studentLinks).where(eq(studentLinks.studentId, studentId)).orderBy(desc(studentLinks.generation)).get();
+
+/** The student has no link because it was revoked in an emergency (and no new one was made since). */
+function emergencyRevoked(db: Db, studentId: string): LinkRow | null {
+  const last = latestLink(db, studentId);
+  return last && last.revokedAt !== null && last.revokeKind === 'emergency_revoke' ? last : null;
 }
 
-/** New link for one student (revoking the active one). Inside a transaction. The token is returned once. */
-function makeLink(ctx: RequestContext, studentId: string, fullName: string): NewLink {
-  const now = ctx.now();
-  const old = activeLink(ctx.db, studentId);
-  if (old) revokeLinkRow(ctx, old, 'regenerate');
-  const last = ctx.db.select({ g: studentLinks.generation }).from(studentLinks).where(eq(studentLinks.studentId, studentId)).all();
-  const generation = last.reduce((m, r) => Math.max(m, r.g), 0) + 1;
+/** New link row (inside a transaction). The token is only kept encrypted; it leaves the server only as the card URL. */
+function insertLink(deps: LinkDeps, actor: Actor, studentId: string, origin: LinkRow['origin']): LinkRow {
+  const now = deps.now();
+  const generation = (latestLink(deps.db, studentId)?.generation ?? 0) + 1;
   const token = randomToken(32); // 256 bits (STU-4)
   const id = newId();
-  ctx.db.insert(studentLinks).values({ id, studentId, tokenHash: tokenHash(ctx.config.SECRET_PEPPER, token), generation, createdBy: requireUser(ctx).id, createdAt: now, revokedAt: null, revokedBy: null, lastUsedAt: null }).run();
-  audit(ctx.db, ctx.actor, { action: 'student_link.create', entity: 'student_link', entityId: id, after: { studentId, generation } }, now);
-  return { studentId, fullName, url: studentLinkUrl(ctx.config.PUBLIC_ORIGIN, token), generation };
+  const row: LinkRow = {
+    id,
+    studentId,
+    tokenHash: tokenHash(deps.config.SECRET_PEPPER, token),
+    tokenCipher: sealSecret(deps.config.SECRET_PEPPER, SEAL_PURPOSE, id, token),
+    generation,
+    origin,
+    createdBy: actor.type === 'user' ? actor.id : null,
+    createdAt: now,
+    revokedAt: null,
+    revokedBy: null,
+    revokeKind: null,
+    revokeReason: null,
+    lastUsedAt: null,
+  };
+  deps.db.insert(studentLinks).values(row).run();
+  audit(deps.db, actor, { action: 'student_link.create', entity: 'student_link', entityId: id, after: { studentId, generation, origin } }, now);
+  return row;
 }
 
+/**
+ * The student's active link, made now when an active student has none (inside a transaction). A
+ * student whose link was revoked in an emergency stays without one until someone makes a new link;
+ * deactivated students get none (an existing link keeps its row and works again on reactivation).
+ */
+export function ensureLinkFor(deps: LinkDeps, studentId: string): LinkRow | null {
+  const current = activeLink(deps.db, studentId);
+  if (current) return current;
+  const st = deps.db.select({ deactivatedAt: students.deactivatedAt }).from(students).where(eq(students.id, studentId)).get();
+  if (!st || st.deactivatedAt !== null || emergencyRevoked(deps.db, studentId)) return null;
+  return insertLink(deps, SYSTEM, studentId, 'auto');
+}
+
+/** `onStudentCreated` listener: a new student (teacher, admin, importer, seed) gets a link at once. */
+export function linkForNewStudent(deps: LinkDeps, studentId: string): void {
+  ensureLinkFor(deps, studentId);
+}
+
+/** Start-up backfill: every active student without a link (and not revoked in an emergency) gets one. */
+export function backfillLinks(deps: LinkDeps): number {
+  return tx(deps.db, () => {
+    const active = deps.db.select({ id: students.id }).from(students).where(isNull(students.deactivatedAt)).all();
+    const linked = new Set(deps.db.select({ s: studentLinks.studentId }).from(studentLinks).where(isNull(studentLinks.revokedAt)).all().map((r) => r.s));
+    let made = 0;
+    for (const s of active) if (!linked.has(s.id) && ensureLinkFor(deps, s.id)) made++;
+    return made;
+  });
+}
+
+/**
+ * Importer revert (IMP-5): links made automatically and never opened are not history. Removes them so
+ * a student the batch created can still be deleted; false (nothing removed) when the student has any
+ * other link or opened theirs.
+ */
+export function discardUnusedAutoLinks(db: Db, studentId: string): boolean {
+  const rows = db.select().from(studentLinks).where(eq(studentLinks.studentId, studentId)).all();
+  if (rows.some((r) => r.origin !== 'auto' || r.lastUsedAt !== null)) return false;
+  if (rows.length) db.delete(studentLinks).where(eq(studentLinks.studentId, studentId)).run();
+  return true;
+}
+
+function linkStatus(deps: LinkDeps, l: LinkRow): LinkStatus {
+  const token = openSecret(deps.config.SECRET_PEPPER, SEAL_PURPOSE, l.id, l.tokenCipher);
+  return {
+    url: token ? studentLinkUrl(deps.config.PUBLIC_ORIGIN, token) : null,
+    generation: l.generation,
+    createdAt: l.createdAt,
+    lastUsedAt: l.lastUsedAt,
+    replacedAt: l.origin === 'emergency' ? l.createdAt : null,
+  };
+}
+
+const cardLanguageOf = (cls: ClassRow | null) => (cls ? studentPageLanguage(cls).mainLanguage : 'en');
+
+// ---------------------------------------------------------------- teacher area
+/** The student is in a class the signed-in teacher teaches now (active context, live enrolment); returns that class. */
+function assertTeachesStudent(ctx: RequestContext, studentId: string): ClassRow {
+  const taught = taughtClassIds(ctx.db, requireUser(ctx).id);
+  const classId = liveClassIdsOf(ctx, studentId).find((c) => taught.includes(c));
+  if (!classId) throw new AppError('FORBIDDEN', 'This student is not in a class you teach');
+  return getClass(ctx.db, classId);
+}
+
+/** Show and print (D-115): every student of the class with their permanent link. */
 export function classLinks(ctx: RequestContext, classId: string) {
   const cls = assertTeachesClass(ctx, classId);
   const roster = rosterRows(ctx, cls).map((r) => r.student);
-  const ids = roster.map((s) => s.id);
-  const links = ids.length ? ctx.db.select().from(studentLinks).where(and(inArray(studentLinks.studentId, ids), isNull(studentLinks.revokedAt))).all() : [];
-  const byStudent = new Map(links.map((l) => [l.studentId, l]));
+  const links = tx(ctx.db, () => new Map(roster.map((s) => [s.id, ensureLinkFor(ctx, s.id)])));
   return {
     classId: cls.id,
     className: cls.name,
     archived: cls.archivedAt !== null,
+    cardLanguage: cardLanguageOf(cls),
     students: roster.map((s) => {
-      const l = byStudent.get(s.id);
-      return { id: s.id, fullName: s.fullName, initials: initials(s.fullName), avatarHue: s.avatarHue, link: l ? { generation: l.generation, createdAt: l.createdAt, lastUsedAt: l.lastUsedAt } : null };
+      const l = links.get(s.id) ?? null;
+      return {
+        id: s.id,
+        fullName: s.fullName,
+        initials: initials(s.fullName),
+        avatarHue: s.avatarHue,
+        link: l ? linkStatus(ctx, l) : null,
+        revokedAt: l ? null : (emergencyRevoked(ctx.db, s.id)?.revokedAt ?? null),
+      };
     }),
   };
 }
 
-export function generateForStudent(ctx: RequestContext, studentId: string): NewLink {
-  return tx(ctx.db, () => {
-    const classId = assertTeachesStudent(ctx, studentId);
-    assertClassWritable(ctx.db, getClass(ctx.db, classId));
-    const s = ctx.db.select().from(students).where(eq(students.id, studentId)).get()!;
-    if (s.deactivatedAt !== null) throw new AppError('CONFLICT', 'This student is deactivated', { reason: 'STUDENT_INACTIVE' });
-    return makeLink(ctx, s.id, s.fullName);
-  });
+function stateOf(ctx: RequestContext, studentId: string, cls: ClassRow | null): StudentLinkState {
+  const st = ctx.db.select().from(students).where(eq(students.id, studentId)).get();
+  if (!st) throw notFound('Student');
+  const l = activeLink(ctx.db, studentId) ?? null;
+  return {
+    studentId,
+    fullName: st.fullName,
+    className: cls?.name ?? null,
+    cardLanguage: cardLanguageOf(cls),
+    link: l ? linkStatus(ctx, l) : null,
+    revokedAt: l ? null : (emergencyRevoked(ctx.db, studentId)?.revokedAt ?? null),
+  };
 }
 
-export function generateForClass(ctx: RequestContext, input: In<typeof C.generateClassLinks>): { links: NewLink[] } {
+/** The class an administrator sees the student in (the first live enrolment), or null. */
+function adminClassOf(ctx: RequestContext, studentId: string): ClassRow | null {
+  const id = liveClassIdsOf(ctx, studentId)[0];
+  return id ? (ctx.db.select().from(classes).where(eq(classes.id, id)).get() ?? null) : null;
+}
+
+export function adminLink(ctx: RequestContext, studentId: string): StudentLinkState {
+  if (!ctx.db.select({ id: students.id }).from(students).where(eq(students.id, studentId)).get()) throw notFound('Student');
+  tx(ctx.db, () => ensureLinkFor(ctx, studentId));
+  return stateOf(ctx, studentId, adminClassOf(ctx, studentId));
+}
+
+/** Typed confirmation: the student's full name (NFC, Turkish lower case, surrounding and repeated spaces ignored), like ConfirmDestructive. */
+const nameKey = (n: string) => lowerTr(normaliseName(n.normalize('NFC')));
+const sameName = (typed: string, fullName: string) => nameKey(typed) === nameKey(fullName);
+
+/**
+ * Emergency revoke or replacement (D-118): administrators, and teachers who teach the student now
+ * (other teachers and ended assignments get 403). The full name must be typed and a reason given;
+ * the old link and every session opened with it stop at once; audited with the reason (never a token).
+ */
+export function emergencyLink(ctx: RequestContext, input: In<typeof C.teacherEmergencyLink>): StudentLinkState {
   return tx(ctx.db, () => {
-    const cls = assertTeachesClass(ctx, input.classId);
-    assertClassWritable(ctx.db, cls);
-    const out: NewLink[] = [];
-    for (const { student } of rosterRows(ctx, cls)) {
-      if (input.scope === 'missing' && activeLink(ctx.db, student.id)) continue;
-      out.push(makeLink(ctx, student.id, student.fullName));
+    const st = ctx.db.select().from(students).where(eq(students.id, input.studentId)).get();
+    if (!st) throw notFound('Student');
+    const cls = ctx.user?.role === 'admin' ? adminClassOf(ctx, st.id) : assertTeachesStudent(ctx, st.id);
+    if (!sameName(input.confirmName, st.fullName)) throw invalid('Type the student’s full name to confirm', { reason: 'CONFIRMATION_MISMATCH' });
+    const now = ctx.now();
+    const old = activeLink(ctx.db, st.id);
+    if (input.action === 'revoke' && !old) throw new AppError('CONFLICT', 'This student has no link to revoke', { reason: 'NO_ACTIVE_LINK' });
+    if (input.action === 'replace' && st.deactivatedAt !== null) throw new AppError('CONFLICT', 'This student is deactivated', { reason: 'STUDENT_INACTIVE' });
+    if (old) {
+      ctx.db
+        .update(studentLinks)
+        .set({ revokedAt: now, revokedBy: requireUser(ctx).id, revokeKind: input.action === 'revoke' ? 'emergency_revoke' : 'emergency_replace', revokeReason: input.reason })
+        .where(eq(studentLinks.id, old.id))
+        .run();
+      ctx.db.update(sessions).set({ revokedAt: now }).where(and(eq(sessions.studentLinkId, old.id), isNull(sessions.revokedAt))).run();
     }
-    return { links: out };
-  });
-}
-
-/** Revoking is always allowed (also in an archived year): it only ever reduces access. */
-export function revokeForStudent(ctx: RequestContext, studentId: string): void {
-  tx(ctx.db, () => {
-    assertTeachesStudent(ctx, studentId);
-    const link = activeLink(ctx.db, studentId);
-    if (link) revokeLinkRow(ctx, link, 'revoke');
-  });
-}
-
-export function revokeForClass(ctx: RequestContext, classId: string): { revoked: number } {
-  return tx(ctx.db, () => {
-    const cls = assertTeachesClass(ctx, classId);
-    let revoked = 0;
-    for (const { student } of rosterRows(ctx, cls)) {
-      const link = activeLink(ctx.db, student.id);
-      if (link) {
-        revokeLinkRow(ctx, link, 'revoke');
-        revoked++;
-      }
-    }
-    return { revoked };
+    const fresh = input.action === 'replace' ? insertLink(ctx, ctx.actor, st.id, 'emergency') : null;
+    audit(
+      ctx.db,
+      ctx.actor,
+      {
+        action: input.action === 'revoke' ? 'student_link.emergency_revoke' : 'student_link.emergency_replace',
+        entity: 'student',
+        entityId: st.id,
+        before: old ? { linkId: old.id, generation: old.generation } : null,
+        after: { linkId: fresh?.id ?? null, generation: fresh?.generation ?? null, reason: input.reason },
+      },
+      now,
+    );
+    return stateOf(ctx, st.id, cls);
   });
 }

@@ -4,25 +4,28 @@
  * - Student: set goals (preset or own words, practice choices, review date), progress updates,
  *   outcomes, feedback the student sees, evidence, and PRIVATE notes (lock icon, never shown to the
  *   student or anyone else, GOL-6).
- * - Library: the default categories and presets plus this teacher's own (rename/archive own).
+ * - Library: the default categories and presets plus this teacher's own; own items are archived for
+ *   everyone, defaults only for this teacher's classes (S13b2, D-116).
  * - Settings: outcome labels (also the module's panel on the class settings page).
  * S13a: goal categories are also the lesson topics (D-101); a student's goals and evidence can be
  * filtered by topic.
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import * as Files from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
 import type { Goal, GoalLibrary, OutcomeDef, TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
 import * as School from '../../../shared/contracts/school.ts';
 import { pickText, type MessageKey } from '../../../shared/i18n/index.ts';
-import { call } from '../../lib/api.ts';
+import { call, upload } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
 import { useRun } from '../../lib/useRun.ts';
+import { EvidenceAdder } from '../../modules/goals/EvidenceAdder.tsx';
 import { ConfidenceChip, EntryLine, EvidenceView, FeedbackLine, GoalSummary, whenText } from '../../modules/goals/shared.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
-import { Select, TextArea, TextField } from '../../ui/Fields.tsx';
+import { Select, TextArea, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconBack, IconLock, IconPlus, IconTrash, IconUndo } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
@@ -260,10 +263,33 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
         <h3 id="goals-evidence" className="cc-h2">
           {t('goals.evidence')}
         </h3>
+        <p className="cc-muted">{t('goals.teacherEvidenceHint')}</p>
+        <EvidenceAdder
+          idPrefix={`teacher-evidence-${studentId}`}
+          goals={d.goals.map((g) => ({ id: g.id, label: g.text }))}
+          media={d.media}
+          upload={(kind, file, name) => upload(Files.uploadFile, { kind, ownerStudentId: studentId }, file, name)}
+          add={(input) => call(G.teacherAddEvidence, { contextId, studentId, ...input })}
+          run={(fn, success) => run(fn, { success, invalidate: [ALL] })}
+        />
         {evidence.length === 0 ? <p className="cc-muted">{t('goals.noEvidence')}</p> : null}
         <ul className="cc-stack">
           {evidence.map((e) => (
-            <EvidenceView key={e.id} item={e} fileUrl={G.teacherFileUrl} />
+            <EvidenceView
+              key={e.id}
+              item={e}
+              fileUrl={G.teacherFileUrl}
+              actions={
+                e.authorType === 'teacher' ? (
+                  <div>
+                    <Button size="small" variant="ghost" onPress={() => window.confirm(t('goals.confirmDeleteEvidence')) && void run(() => call(G.teacherDeleteEvidence, { evidenceId: e.id }), { invalidate: [ALL] })}>
+                      <IconTrash />
+                      {t('goals.deleteEvidence')}
+                    </Button>
+                  </div>
+                ) : null
+              }
+            />
           ))}
         </ul>
       </section>
@@ -312,45 +338,57 @@ function LibraryTab({ contextId }: { contextId: string }) {
   const [presetCat, setPresetCat] = useState('');
   const [presetEn, setPresetEn] = useState('');
   const [presetTr, setPresetTr] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const lib = q.data;
   const opts = { invalidate: [ALL] };
   const liveCats = lib.categories.filter((c) => !c.archived);
   const pc = presetCat || liveCats[0]?.id || '';
+  const archivedCount = lib.categories.filter((c) => c.archived).length + lib.presets.filter((p) => p.archived).length;
+  const cats = showArchived ? lib.categories : liveCats;
+  // Archive / restore: own items through their own row; defaults hide only for this teacher (D-116).
+  // A default the school archived can be restored only by an administrator.
+  const archiveButton = (item: { archived: boolean; schoolArchived: boolean }, label: string, act: () => Promise<unknown>) =>
+    item.schoolArchived ? (
+      <span className="cc-chip">{t('goals.schoolArchived')}</span>
+    ) : (
+      <Button size="small" variant="ghost" aria-label={`${item.archived ? t('goals.restore') : t('goals.archive')}: ${label}`} onPress={() => void run(act, opts)}>
+        {item.archived ? <IconUndo /> : <IconArchive />}
+        {item.archived ? t('goals.restore') : t('goals.archive')}
+      </Button>
+    );
   return (
-    <div className="cc-stack">
+    <div className="cc-stack" data-testid="goals-library">
       <p className="cc-muted">{t('goals.libraryHint')}</p>
+      <Toggle label={t('goals.showArchived', { count: archivedCount })} isSelected={showArchived} onChange={setShowArchived} />
       <ul className="cc-stack">
-        {lib.categories.map((c) => (
-          <li key={c.id} className="cc-card cc-stack">
-            <div className="cc-row">
-              <h3 className="cc-h2">{pickText(c.name, locale)}</h3>
-              {c.custom ? <span className="cc-chip">{t('goals.custom')}</span> : <span className="cc-chip">{t('goals.default')}</span>}
-              {c.archived ? <span className="cc-chip">{t('goals.archived')}</span> : null}
-              {c.custom ? (
-                <Button size="small" className="cc-push-right" onPress={() => void run(() => call(G.updateCategory, { categoryId: c.id, archived: !c.archived }), opts)}>
-                  {c.archived ? <IconUndo /> : <IconArchive />}
-                  {c.archived ? t('goals.restore') : t('goals.archive')}
-                </Button>
-              ) : null}
-            </div>
-            <ul className="cc-stack">
-              {lib.presets
-                .filter((p) => p.categoryId === c.id)
-                .map((p) => (
-                  <li key={p.id} className="cc-row">
-                    <span>{pickText(p.text, locale)}</span>
-                    {p.archived ? <span className="cc-chip">{t('goals.archived')}</span> : null}
-                    {p.custom ? (
-                      <Button size="small" variant="ghost" onPress={() => void run(() => call(G.updatePreset, { presetId: p.id, archived: !p.archived }), opts)}>
-                        {p.archived ? t('goals.restore') : t('goals.archive')}
-                      </Button>
-                    ) : null}
-                  </li>
-                ))}
-            </ul>
-          </li>
-        ))}
+        {cats.map((c) => {
+          const name = pickText(c.name, locale);
+          return (
+            <li key={c.id} className="cc-card cc-stack" data-testid="library-category">
+              <div className="cc-row">
+                <h3 className="cc-h2">{name}</h3>
+                {c.custom ? <span className="cc-chip">{t('goals.custom')}</span> : <span className="cc-chip">{t('goals.default')}</span>}
+                {c.archived && !c.schoolArchived ? <span className="cc-chip">{t('goals.archived')}</span> : null}
+                <span className="cc-push-right">{archiveButton(c, name, () => call(G.updateCategory, { categoryId: c.id, archived: !c.archived }))}</span>
+              </div>
+              <ul className="cc-stack">
+                {lib.presets
+                  .filter((p) => p.categoryId === c.id && (showArchived || !p.archived))
+                  .map((p) => {
+                    const text = pickText(p.text, locale);
+                    return (
+                      <li key={p.id} className="cc-row" data-testid="library-preset">
+                        <span>{text}</span>
+                        {p.archived && !p.schoolArchived ? <span className="cc-chip">{t('goals.archived')}</span> : null}
+                        {archiveButton(p, text, () => call(G.updatePreset, { presetId: p.id, archived: !p.archived }))}
+                      </li>
+                    );
+                  })}
+              </ul>
+            </li>
+          );
+        })}
       </ul>
       <section className="cc-card cc-stack" aria-labelledby="goals-new-cat">
         <h3 id="goals-new-cat" className="cc-h2">

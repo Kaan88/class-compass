@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from '@tanstack/react-router';
 import type { z } from 'zod';
 import * as AdminC from '../../../shared/contracts/admin.ts';
+import * as G from '../../../shared/contracts/goals.ts';
 import * as S from '../../../shared/contracts/school.ts';
 import * as St from '../../../shared/contracts/students.ts';
 import { pickText } from '../../../shared/i18n/index.ts';
@@ -25,7 +26,8 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconCheck } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
-import { ClassLanguageSelect } from '../../ui/ClassLanguageSelect.tsx';
+import { ClassLanguageSelect, StudentPageLanguageSelect, studentPageOverride } from '../../ui/ClassLanguageSelect.tsx';
+import type { ClassLanguage } from '../../../shared/classLanguage.ts';
 import { ThemePicker, ThemePreview, themeLabelKey } from '../../ui/ThemePreview.tsx';
 import { moduleLabelKey } from '../teacher/Classes.tsx';
 import { ADMIN } from './Admin.tsx';
@@ -38,6 +40,7 @@ const K = {
   contexts: [...ADMIN, 'contexts'],
   policies: [...ADMIN, 'policies'],
   users: [...ADMIN, 'users'],
+  goalDefaults: [...ADMIN, 'goal-defaults'],
 };
 
 type Year = z.infer<typeof S.SchoolYear>;
@@ -440,6 +443,7 @@ interface ClassDraft {
   animationsEnabled: boolean;
   mainLanguage: 'en' | 'tr';
   secondLanguageEnabled: boolean;
+  studentPage: ClassLanguage | null;
 }
 
 function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; onDone: () => void }) {
@@ -456,6 +460,7 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
     animationsEnabled: cls?.animationsEnabled ?? true,
     mainLanguage: cls?.mainLanguage ?? 'en',
     secondLanguageEnabled: cls?.secondLanguageEnabled ?? false,
+    studentPage: cls ? studentPageOverride(cls) : null,
   });
   const [error, setError] = useState<string | null>(null);
   const set = (p: Partial<ClassDraft>) => setD((x) => ({ ...x, ...p }));
@@ -475,6 +480,7 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
           animationsEnabled: d.animationsEnabled,
           mainLanguage: d.mainLanguage,
           secondLanguageEnabled: d.secondLanguageEnabled,
+          studentPage: d.studentPage,
         };
         try {
           if (cls) await call(S.updateClass, { classId: cls.id, ...body });
@@ -496,6 +502,7 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
       <ThemePreview theme={d.theme} />
       <TextField label={t('classes.timezone')} description={t('classes.timezoneHint')} value={d.timezone} onChange={(v) => set({ timezone: v })} placeholder="Europe/Istanbul" />
       <ClassLanguageSelect value={d} onChange={(v) => set(v)} />
+      <StudentPageLanguageSelect value={d.studentPage} onChange={(v) => set({ studentPage: v })} />
       <Toggle label={t('classes.sounds')} isSelected={d.soundsEnabled} onChange={(v) => set({ soundsEnabled: v })} />
       <Toggle label={t('classes.animations')} description={t('classes.animationsHint')} isSelected={d.animationsEnabled} onChange={(v) => set({ animationsEnabled: v })} />
       {error ? <Alert>{error}</Alert> : null}
@@ -763,6 +770,62 @@ export function AssignmentsPage() {
 }
 
 // ---------------------------------------------------------------- module & media policies
+/**
+ * The school's default goal categories and goals (D-116): an administrator archives one for every
+ * class or restores it. Teachers can additionally hide a default for their own classes only.
+ */
+function GoalDefaultsSection() {
+  const { t, locale } = useI18n();
+  const run = useRun();
+  const q = useQuery({ queryKey: K.goalDefaults, queryFn: () => call(G.adminGoalDefaults, {}) });
+  const qc = useQueryClient();
+  const d = q.data;
+  const toggle = (kind: 'category' | 'preset', itemId: string, archived: boolean) =>
+    void run(() => call(G.adminArchiveGoalDefault, { kind, itemId, archived }), { success: t('save.saved') }).then((r) => r && qc.setQueryData(K.goalDefaults, r));
+  const button = (kind: 'category' | 'preset', item: { id: string; archived: boolean }, label: string) => (
+    <Button size="small" variant="ghost" aria-label={`${item.archived ? t('goals.restore') : t('goals.archive')}: ${label}`} onPress={() => toggle(kind, item.id, !item.archived)}>
+      {item.archived ? t('goals.restore') : t('goals.archive')}
+    </Button>
+  );
+  return (
+    <section className="cc-card cc-stack" aria-labelledby="goal-defaults-title" data-testid="admin-goal-defaults">
+      <h2 id="goal-defaults-title" className="cc-h2">
+        {t('goals.adminDefaultsTitle')}
+      </h2>
+      <p className="cc-muted">{t('goals.adminDefaultsHint')}</p>
+      {!d ? <p className="cc-muted">{t('common.loading')}</p> : null}
+      <ul className="cc-stack">
+        {(d?.categories ?? []).map((c) => {
+          const name = pickText(c.name, locale);
+          return (
+            <li key={c.id} className="cc-stack">
+              <div className="cc-row">
+                <h3 className="cc-h3">{name}</h3>
+                {c.archived ? <span className="cc-chip">{t('goals.schoolArchived')}</span> : null}
+                <span className="cc-push-right">{button('category', c, name)}</span>
+              </div>
+              <ul className="cc-stack">
+                {(d?.presets ?? [])
+                  .filter((p) => p.categoryId === c.id)
+                  .map((p) => {
+                    const text = pickText(p.text, locale);
+                    return (
+                      <li key={p.id} className="cc-row">
+                        <span>{text}</span>
+                        {p.archived ? <span className="cc-chip">{t('goals.schoolArchived')}</span> : null}
+                        {button('preset', p, text)}
+                      </li>
+                    );
+                  })}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export function ModulesPage() {
   const { t } = useI18n();
   const run = useRun();
@@ -797,6 +860,7 @@ export function ModulesPage() {
           />
         ))}
       </section>
+      <GoalDefaultsSection />
       <p className="cc-muted">
         <IconCheck /> {t('modules.keepsData')}
       </p>

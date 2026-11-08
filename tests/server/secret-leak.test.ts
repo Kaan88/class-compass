@@ -51,7 +51,8 @@ async function snapshot(clients: Array<[string, Client]>, params: Record<string,
     const url = e.path.replace(/:([A-Za-z0-9_]+)/g, (_m, k: string) => params[k] ?? '0190f0f0-0000-7000-8000-000000000000');
     for (const [who, c] of clients) {
       const r = await c.get(url);
-      out.set(`${who} GET ${url}`, `${r.status} ${String(r.headers.etag ?? '')} ${JSON.stringify(r.body)}`);
+      // The host disk's free space (maintenance page) changes with anything else running on the machine.
+      out.set(`${who} GET ${url}`, `${r.status} ${String(r.headers.etag ?? '')} ${JSON.stringify(r.body).replace(/"freeBytes":\d+/gu, '"freeBytes":0')}`);
     }
   }
   return out;

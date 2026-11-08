@@ -296,7 +296,7 @@ describe('per-class language (S13a, D-099)', () => {
     const c3a = (await ok(s.admin.get('/api/admin/classes'))).classes?.find?.((c: any) => c.id === s.c3a.id) ?? s.c3a;
     expect(c3a).toMatchObject({ mainLanguage: 'en', secondLanguageEnabled: false });
     const r = await ok(s.teacherA.put(`/api/teacher/classes/${s.c3a.id}/language`, { mainLanguage: 'tr', secondLanguageEnabled: true }));
-    expect(r).toEqual({ classId: s.c3a.id, mainLanguage: 'tr', secondLanguageEnabled: true });
+    expect(r).toEqual({ classId: s.c3a.id, mainLanguage: 'tr', secondLanguageEnabled: true, studentPageMainLanguage: null, studentPageSecondLanguageEnabled: null });
     expect((await s.teacherB.put(`/api/teacher/classes/${s.c3a.id}/language`, { mainLanguage: 'en', secondLanguageEnabled: false })).status).toBe(403);
     expect((await s.teacherA.put(`/api/teacher/classes/${s.c3b.id}/language`, { mainLanguage: 'tr', secondLanguageEnabled: false })).status).toBe(403);
     const mine = await ok(s.teacherA.get('/api/teacher/contexts'));

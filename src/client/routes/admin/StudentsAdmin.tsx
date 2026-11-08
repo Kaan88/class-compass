@@ -2,10 +2,11 @@
  * School-wide students (ACC-7, DAT-2/3, D-021/D-022/D-027): search, add, move, history, deactivate;
  * permanent deletion of a deactivated student with a dry-run summary and typed confirmation (S13b, D-109).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import * as S from '../../../shared/contracts/school.ts';
+import * as L from '../../../shared/contracts/links.ts';
 import * as St from '../../../shared/contracts/students.ts';
 import { call } from '../../lib/api.ts';
 import { errorText } from '../../lib/errors.ts';
@@ -16,10 +17,12 @@ import { Button } from '../../ui/Button.tsx';
 import { ConfirmDestructive, DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
-import { IconCheck, IconUserOff } from '../../ui/icons.tsx';
+import { IconAlert, IconCheck, IconCopy, IconPrint, IconUserOff } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { whenText } from '../../modules/goals/shared.tsx';
 import { AddStudentDialog } from '../teacher/Classes.tsx';
+import { copyLink, EmergencyLinkDialog, LinkCardSheets, QrCode } from '../teacher/StudentLinks.tsx';
 import { ADMIN } from './Admin.tsx';
 
 type AdminStudent = z.infer<typeof St.AdminStudent>;
@@ -49,6 +52,74 @@ function HistoryDialog({ studentId, onClose }: { studentId: string | null; onClo
           {t('common.close')}
         </Button>
       </DialogActions>
+    </Modal>
+  );
+}
+
+/**
+ * The student's permanent link (D-115) with the emergency actions (D-118): show, copy and print the
+ * card; revoke it or make a new one only in an emergency (typed name, reason, audited).
+ */
+function LinkDialog({ student, onClose }: { student: AdminStudent | null; onClose: () => void }) {
+  const { t, locale } = useI18n();
+  const qc = useQueryClient();
+  const key = [...STUDENTS, 'link', student?.id];
+  const q = useQuery({ queryKey: key, queryFn: () => call(L.adminStudentLink, { studentId: student!.id }), enabled: Boolean(student), staleTime: 0 });
+  const [emergency, setEmergency] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  useEffect(() => {
+    if (!printing) return;
+    const done = () => setPrinting(false);
+    window.addEventListener('afterprint', done, { once: true });
+    const timer = window.setTimeout(() => window.print(), 50);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('afterprint', done);
+    };
+  }, [printing]);
+  if (!student) return null;
+  const d = q.data;
+  const url = d?.link?.url ?? null;
+  return (
+    <Modal isOpen onOpenChange={(o) => !o && onClose()} title={t('links.adminTitle', { name: student.fullName })}>
+      {!d ? <p className="cc-muted">{t('common.loading')}</p> : null}
+      {d && url ? (
+        <div className="cc-stack" data-testid="admin-link">
+          <QrCode text={url} label={t('links.qrFor', { name: student.fullName })} />
+          <code className="cc-link-url">{url}</code>
+          {d.link?.replacedAt ? <Alert kind="warning">{t('links.replacedOn', { date: whenText(d.link.replacedAt, locale) })}</Alert> : null}
+          <div className="cc-row">
+            <Button onPress={() => copyLink(t, url)}>
+              <IconCopy />
+              {t('links.copy')}
+            </Button>
+            <Button onPress={() => setPrinting(true)}>
+              <IconPrint />
+              {t('links.printOne')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {d && !url ? <Alert kind="warning">{d.revokedAt ? t('links.revokedOn', { date: whenText(d.revokedAt, locale) }) : student.active ? t('links.none') : t('links.inactive')}</Alert> : null}
+      <p className="cc-muted">{t('links.warning')}</p>
+      <DialogActions>
+        <Button variant="ghost" isDisabled={!student.active} onPress={() => setEmergency(true)}>
+          <IconAlert />
+          {t('links.emergency.open')}
+        </Button>
+        <Button variant="primary" onPress={onClose}>
+          {t('common.close')}
+        </Button>
+      </DialogActions>
+      {emergency ? (
+        <EmergencyLinkDialog
+          student={{ id: student.id, fullName: student.fullName, hasLink: Boolean(d?.link) }}
+          onClose={() => setEmergency(false)}
+          endpoint={L.adminEmergencyLink}
+          onDone={(state) => qc.setQueryData(key, state)}
+        />
+      ) : null}
+      {printing && url && d ? <LinkCardSheets cards={[{ id: student.id, fullName: student.fullName, className: d.className ?? '', url }]} size="small" cardLanguage={d.cardLanguage} mode="print" /> : null}
     </Modal>
   );
 }
@@ -122,6 +193,7 @@ export function AdminStudentsPage() {
   const [adding, setAdding] = useState(false);
   const [addClass, setAddClass] = useState('');
   const [history, setHistory] = useState<string | null>(null);
+  const [linkFor, setLinkFor] = useState<AdminStudent | null>(null);
   const [deactivating, setDeactivating] = useState<AdminStudent | null>(null);
   const [erasing, setErasing] = useState<AdminStudent | null>(null);
   const classes = useQuery({ queryKey: [...ADMIN, 'classes', 'all'], queryFn: () => call(S.listClasses, { includeArchived: true }) });
@@ -231,6 +303,9 @@ export function AdminStudentsPage() {
                 <Button size="small" onPress={() => setHistory(s.id)}>
                   {t('students.history')}
                 </Button>
+                <Button size="small" onPress={() => setLinkFor(s)}>
+                  {t('links.adminButton')}
+                </Button>
                 {s.active ? (
                   <Button size="small" variant="danger" onPress={() => setDeactivating(s)}>
                     {t('users.deactivate')}
@@ -279,6 +354,7 @@ export function AdminStudentsPage() {
         onDone={() => void qc.invalidateQueries({ queryKey: ADMIN })}
       />
       <HistoryDialog studentId={history} onClose={() => setHistory(null)} />
+      <LinkDialog key={linkFor?.id ?? 'none'} student={linkFor} onClose={() => setLinkFor(null)} />
       <ConfirmDestructive
         isOpen={deactivating !== null}
         onOpenChange={(o) => !o && setDeactivating(null)}

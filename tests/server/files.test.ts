@@ -107,7 +107,7 @@ describe('uploads (STU-8, D-014)', () => {
     expect(files.some((f) => String(f).includes('x.jpg'))).toBe(false);
   });
 
-  it('strips EXIF including GPS and caps the size at 2560 px', async () => {
+  it('strips EXIF including GPS and caps evidence pictures at 2048 px (D-119)', async () => {
     const big = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#3366aa' } })
       .withExif({ IFD0: { Copyright: 'Fictional', ImageDescription: 'class trip' }, IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '41/1 0/1 0/1', GPSLongitudeRef: 'E', GPSLongitude: '29/1 0/1 0/1' } })
       .jpeg()
@@ -118,7 +118,7 @@ describe('uploads (STU-8, D-014)', () => {
     const got = await raw(env, s.teacherA, `/api/files/${r.body.id}`);
     const meta = await sharp(got.rawPayload).metadata();
     expect(meta.exif).toBeUndefined();
-    expect(meta.width).toBe(2560);
+    expect(meta.width).toBe(2048);
     expect(got.rawPayload.includes(Buffer.from('GPS'))).toBe(false);
     const thumb = await raw(env, s.teacherA, `/api/files/${r.body.id}?thumb=true`);
     expect(thumb.headers['content-type']).toBe('image/webp');

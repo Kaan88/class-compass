@@ -3,11 +3,14 @@
  * Labels are teacher-editable data (pickText); everything else goes through t().
  * Links open in a new tab with rel="noopener noreferrer" and are never fetched for a preview.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Evidence, Feedback, Goal, GoalEntry, OutcomeDef } from '../../../shared/contracts/goals.ts';
 import { formatDate, pickText, type Locale, type MessageKey } from '../../../shared/i18n/index.ts';
 import { useI18n } from '../../lib/i18n.tsx';
-import { IconFile, IconLink, IconMic, IconNote } from '../../ui/icons.tsx';
+import { formatBytes } from '../../lib/images.ts';
+import { Button } from '../../ui/Button.tsx';
+import { DialogActions, Modal } from '../../ui/Dialog.tsx';
+import { IconFile, IconImage, IconLink, IconMic, IconNote } from '../../ui/icons.tsx';
 
 export const CONFIDENCE_LEVELS = [1, 2, 3, 4, 5] as const;
 
@@ -95,15 +98,21 @@ export function GoalSummary({ goal, outcomes }: { goal: Goal; outcomes: readonly
   );
 }
 
-/** Evidence item: text, a safe external link, a protected file (image preview) or an audio player. */
+/**
+ * Evidence item (S13b2, D-119): text, a safe external link, a picture (thumbnail; tap to see it
+ * large), a document (icon, name and size; opens as a download) or a voice recording (player).
+ */
 export function EvidenceView({ item, fileUrl, actions }: { item: Evidence; fileUrl: (fileId: string, thumb?: boolean) => string; actions?: ReactNode }) {
   const { t, locale } = useI18n();
+  const [large, setLarge] = useState(false);
   const f = item.file;
+  const picture = f !== null && item.kind === 'file' && f.mime.startsWith('image/');
+  const label = picture ? t('goals.evidenceKind.picture') : item.kind === 'file' ? t('goals.evidenceKind.document') : t(`goals.evidenceKind.${item.kind}` as MessageKey);
   return (
-    <li className="cc-card cc-stack cc-evidence" data-kind={item.kind}>
+    <li className="cc-card cc-stack cc-evidence" data-kind={picture ? 'picture' : item.kind}>
       <div className="cc-row">
-        {item.kind === 'link' ? <IconLink /> : item.kind === 'audio' ? <IconMic /> : item.kind === 'file' ? <IconFile /> : <IconNote />}
-        <strong>{t(`goals.evidenceKind.${item.kind}` as MessageKey)}</strong>
+        {item.kind === 'link' ? <IconLink /> : item.kind === 'audio' ? <IconMic /> : picture ? <IconImage /> : item.kind === 'file' ? <IconFile /> : <IconNote />}
+        <strong>{label}</strong>
         <span className="cc-muted">{whenText(item.createdAt, locale)}</span>
         {item.authorType === 'teacher' ? <span className="cc-chip">{t('goals.byTeacher')}</span> : null}
       </div>
@@ -114,14 +123,30 @@ export function EvidenceView({ item, fileUrl, actions }: { item: Evidence; fileU
         </a>
       ) : null}
       {f && item.kind === 'audio' ? <audio controls preload="none" src={fileUrl(f.id)} aria-label={t('goals.recording')} /> : null}
-      {f && item.kind === 'file' ? (
-        <a href={fileUrl(f.id)} target="_blank" rel="noopener noreferrer" className="cc-row">
-          {f.hasThumbnail ? <img src={fileUrl(f.id, true)} alt={t('goals.photoOf', { name: f.name ?? '' })} className="cc-evidence__thumb" /> : null}
+      {f && picture ? (
+        <button type="button" className="cc-evidence__picture" onClick={() => setLarge(true)} aria-label={t('goals.viewLarge', { name: f.name ?? '' })}>
+          <img src={fileUrl(f.id, f.hasThumbnail)} alt={t('goals.photoOf', { name: f.name ?? '' })} className="cc-evidence__thumb" loading="lazy" />
+        </button>
+      ) : null}
+      {f && item.kind === 'file' && !picture ? (
+        <a href={fileUrl(f.id)} target="_blank" rel="noopener noreferrer" className="cc-row cc-evidence__doc">
+          <IconFile />
           <span>{f.name ?? t('goals.openFile')}</span>
+          <span className="cc-muted">{formatBytes(f.size, locale)}</span>
         </a>
       ) : null}
       {item.kind !== 'text' && item.kind !== 'link' && !f ? <p className="cc-muted">{t('goals.fileRemoved')}</p> : null}
       {actions}
+      {large && f ? (
+        <Modal isOpen onOpenChange={(o) => !o && setLarge(false)} title={f.name ?? t('goals.evidenceKind.picture')}>
+          <img src={fileUrl(f.id)} alt={t('goals.photoOf', { name: f.name ?? '' })} className="cc-evidence__large" />
+          <DialogActions>
+            <Button variant="primary" onPress={() => setLarge(false)}>
+              {t('common.close')}
+            </Button>
+          </DialogActions>
+        </Modal>
+      ) : null}
     </li>
   );
 }

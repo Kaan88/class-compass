@@ -69,6 +69,8 @@ export const baseColors: ThemeColors = {
   'art-sky': '#dcecfb',
   'art-ground': '#cfe6c4',
   'art-light': '#fff7d6',
+  'print-ink': '#000000',
+  'print-paper': '#ffffff',
 };
 
 /**
@@ -85,6 +87,9 @@ export function themeColors(overrides: Partial<ThemeColors>): ThemeColors {
     'segment-off': overrides['segment-off'] ?? c['surface-2'],
     'icon-accent': overrides['icon-accent'] ?? c.accent,
     pattern: overrides.pattern ?? c.accent,
+    // Printed QR codes scan best as pure black on white: no theme may change them (D-120).
+    'print-ink': baseColors['print-ink'],
+    'print-paper': baseColors['print-paper'],
   };
 }
 

@@ -3,11 +3,12 @@
  * A teacher makes a link for a 3-A student and writes feedback; on a 375×812 phone the student opens
  * the link (token in the fragment, removed from the address bar), adds a preset goal, a reflection
  * with confidence and text evidence, reads the feedback and switches language (kept on the device).
- * After the teacher revokes the link the page shows "This link no longer works". axe at 375×812.
+ * Links are permanent (S13b2, D-115): the link is read from the class links list. After an emergency
+ * revoke (D-118) the page shows "This link no longer works". axe at 375×812.
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { api, ensurePin, login } from './helpers.ts';
+import { api, ensurePin, login, studentLinkUrl } from './helpers.ts';
 
 async function context3A(page: Page) {
   const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; classId: string; className: string; subjectName: { en: string } }>;
@@ -15,6 +16,8 @@ async function context3A(page: Page) {
 }
 
 async function seriousViolations(page: Page) {
+  // Let short entrance animations (a toast fading in) finish, so axe measures the final colours.
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
   const r = await new AxeBuilder({ page }).analyze();
   return r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(' | ')}`);
 }
@@ -30,9 +33,7 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
   const roster = (await api(page, 'GET', `/api/classroom/contexts/${contextId}/roster`)).body.students as Array<{ id: string; fullName: string }>;
   // One student per project: both projects run against the same demo database.
   const student = roster[test.info().project.name === 'mobile' ? 4 : 3]!;
-  const link = await api(page, 'POST', `/api/teacher/students/${student.id}/link`);
-  expect(link.status).toBe(200);
-  const url = link.body.url as string;
+  const url = await studentLinkUrl(page, ctx3A.classId, student.id);
   expect(url).toMatch(/\/s#[A-Za-z0-9_-]{43}$/u);
   const feedback = `Lovely reading this week (${Date.now()})`;
   expect((await api(page, 'POST', `/api/teacher/contexts/${contextId}/students/${student.id}/feedback`, { body: feedback })).status).toBe(200);
@@ -68,9 +69,9 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
     await expect(form.getByLabel('My words')).toHaveValue('');
     await expect(reflections.getByText('Confidence 4 of 5')).toBeVisible();
 
-    // Text evidence (GOL-4); photo and audio are not offered while the media flags are off (D-014).
+    // Text evidence (GOL-4); pictures and voice are not offered while the media flags are off (D-014).
     const evidence = english.getByTestId('evidence-form');
-    await expect(evidence.getByLabel('What kind of evidence?').locator('option')).toHaveText(['Writing', 'Web link', 'Document']);
+    await expect(evidence.getByRole('group', { name: 'What kind of evidence?' }).getByRole('button')).toHaveText(['Write', 'Add a link', 'Add a document']);
     await evidence.getByLabel('Write your evidence').fill('Book list: The Little Fox, Tom and Pip');
     await evidence.getByRole('button', { name: 'Add evidence' }).click();
     await expect(english.getByRole('region', { name: 'My evidence' }).getByRole('listitem').filter({ hasText: 'Book list: The Little Fox, Tom and Pip' })).toBeVisible();
@@ -106,8 +107,8 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
     const detail = await api(page, 'GET', `/api/teacher/contexts/${contextId}/students/${student.id}/goals`);
     expect(detail.body.goals.some((g: { presetText: { en?: string } | null }) => g.presetText?.en === 'I will read a short book every week.')).toBe(true);
 
-    // Revocation takes effect at once (STU-3): the open page and the old link both show the friendly page.
-    expect((await api(page, 'DELETE', `/api/teacher/students/${student.id}/link`, {})).status).toBe(200);
+    // An emergency revoke takes effect at once (STU-3, D-118): the open page and the old link both show the friendly page.
+    expect((await api(page, 'POST', `/api/teacher/students/${student.id}/link/emergency`, { action: 'revoke', confirmName: student.fullName, reason: 'Link shared in a group chat (test)' })).status).toBe(200);
     await p.reload();
     await expect(p.getByTestId('student-link-gone')).toBeVisible();
     await expect(p.getByRole('heading', { name: 'This link no longer works' })).toBeVisible();
@@ -132,10 +133,10 @@ test('a busy server (429) offers "Try again" instead of "this link no longer wor
   test.setTimeout(120_000);
   await login(page, 'english');
   await ensurePin(page);
-  const contextId = (await context3A(page)).id;
-  const roster = (await api(page, 'GET', `/api/classroom/contexts/${contextId}/roster`)).body.students as Array<{ id: string; fullName: string }>;
+  const ctx = await context3A(page);
+  const roster = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/roster`)).body.students as Array<{ id: string; fullName: string }>;
   const student = roster[test.info().project.name === 'mobile' ? 6 : 5]!;
-  const url = (await api(page, 'POST', `/api/teacher/students/${student.id}/link`)).body.url as string;
+  const url = await studentLinkUrl(page, ctx.classId, student.id);
 
   const phone = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true, locale: 'en-GB' });
   const p = await phone.newPage();
@@ -156,6 +157,5 @@ test('a busy server (429) offers "Try again" instead of "this link no longer wor
     await expect(p.getByRole('heading', { name: `Hello, ${student.fullName}!` })).toBeVisible();
   } finally {
     await phone.close();
-    await api(page, 'DELETE', `/api/teacher/students/${student.id}/link`, {});
   }
 });

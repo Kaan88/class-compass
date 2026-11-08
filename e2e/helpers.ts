@@ -42,3 +42,13 @@ export async function ensurePin(page: Page) {
 
 /** Visible text of the whole document (what a pupil could read on the display). */
 export const bodyText = (page: Page) => page.evaluate(() => document.body.innerText);
+
+/** A student's permanent link (S13b2, D-115), read from the teacher's class links list. */
+export async function studentLinkUrl(page: Page, classId: string, studentId: string): Promise<string> {
+  const r = await api(page, 'GET', `/api/teacher/classes/${classId}/student-links`);
+  expect(r.status).toBe(200);
+  const row = (r.body.students as Array<{ id: string; link: { url: string | null } | null }>).find((s) => s.id === studentId);
+  const url = row?.link?.url;
+  expect(url, 'the student has a working link').toBeTruthy();
+  return url!;
+}

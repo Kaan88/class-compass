@@ -16,7 +16,7 @@ import { Client, FakeMailer, makeEnv, type TestEnv } from '../helpers.ts';
 import { multipart } from '../import-fixtures.ts';
 import { cmd, startLesson } from '../lesson-helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
-import { openLink } from '../student-helpers.ts';
+import { linkUrl, openLink } from '../student-helpers.ts';
 
 let env: TestEnv;
 afterEach(async () => env?.app.close());
@@ -373,8 +373,7 @@ describe('deleting students (S13b item 7, D-109)', () => {
     await cmd(s.teacherA, 'attendance.setDaily', { contextId: s.ctxA.id, lessonId, studentId: ada.id, status: 'late' });
     const arr = await ok(s.teacherA.get(`/api/classroom/contexts/${s.ctxA.id}/grouping/arrangements`));
     await cmd(s.teacherA, 'grouping.apply', { contextId: s.ctxA.id, lessonId, templateId: arr.arrangements[2].id });
-    const link = await ok(s.teacherA.post(`/api/teacher/students/${ada.id}/link`));
-    const phone = await openLink(env, link.url);
+    const phone = await openLink(env, await linkUrl(s.teacherA, s.c3a.id, ada.id));
     const page = await ok(phone.get('/api/student/page'));
     void page;
     const goal = await ok(phone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read one book every week.' }));

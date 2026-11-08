@@ -14,6 +14,22 @@ export interface ClassLanguage {
 }
 
 export const DEFAULT_CLASS_LANGUAGE: ClassLanguage = { mainLanguage: 'en', secondLanguageEnabled: false };
+
+/**
+ * Student-page override (S13b2, D-117): a class may give its students' personal pages their own mode
+ * (e.g. the display English only, the student pages Turkish only). `studentPageMainLanguage` null =
+ * the student pages follow the class mode.
+ */
+export interface StudentPageLanguageSetting {
+  studentPageMainLanguage: ClassLocale | null;
+  studentPageSecondLanguageEnabled: boolean | null;
+}
+
+/** The language mode of the class's student pages. */
+export function studentPageLanguage(c: ClassLanguage & Partial<StudentPageLanguageSetting>): ClassLanguage {
+  if (!c.studentPageMainLanguage) return { mainLanguage: c.mainLanguage, secondLanguageEnabled: c.secondLanguageEnabled };
+  return { mainLanguage: c.studentPageMainLanguage, secondLanguageEnabled: c.studentPageSecondLanguageEnabled ?? false };
+}
 export const CLASS_LANGUAGE_MODES = ['en', 'tr', 'en+tr', 'tr+en'] as const;
 export type ClassLanguageMode = (typeof CLASS_LANGUAGE_MODES)[number];
 

@@ -23,6 +23,11 @@ export const UPLOAD_LIMITS: Record<FileKind, number> = {
   teacher_sound: 2 * MB,
 };
 
+/** Longest voice recording on the student page and the teacher Goals page (S13b2, D-119). */
+export const MAX_VOICE_RECORDING_MS = 5 * 60 * 1000;
+/** Pictures are scaled down on the device to this long edge before upload (S13b2, D-119); the server caps evidence pictures at the same size. */
+export const EVIDENCE_IMAGE_EDGE = 2048;
+
 /**
  * Allow-list of sniffed types per kind. Never SVG, HTML, XML or scripts. `text/plain` covers CSV and
  * TXT (checked to be text without markup); `application/x-cfb` is accepted only when it is an
@@ -33,11 +38,13 @@ export const ALLOWED_MIME: Record<FileKind, readonly string[]> = {
   document: [
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.oasis.opendocument.text',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/vnd.ms-excel',
     'text/plain',
   ],
-  audio: ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg'],
+  audio: ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'],
   import_source: [
     'text/plain',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -54,8 +61,8 @@ export const ALLOWED_MIME: Record<FileKind, readonly string[]> = {
 /** `accept` attribute for file inputs (a hint for the picker only; the server sniffs the content). */
 export const ACCEPT_HINT: Record<FileKind, string> = {
   image: 'image/jpeg,image/png,image/webp',
-  document: '.pdf,.docx,.xlsx,.xls,.csv,.txt',
-  audio: 'audio/webm,audio/ogg,audio/mp4,audio/mpeg,.m4a,.mp3',
+  document: '.pdf,.docx,.pptx,.odt,.xlsx,.xls,.csv,.txt',
+  audio: 'audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,.m4a,.mp3,.ogg,.webm,.wav',
   import_source: '.csv,.txt,.xlsx,.xls,.docx,.pdf,image/jpeg,image/png,image/webp',
   teacher_sound: 'audio/webm,audio/ogg,audio/mp4,audio/mpeg,.m4a,.mp3',
 };

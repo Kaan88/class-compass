@@ -2214,6 +2214,82 @@ html:has(.cc-classroom) {
 .cc-evidence audio {
   width: 100%;
 }
+/* S13b2 (D-119): add-evidence buttons, files waiting to upload, pictures and the in-page camera. */
+.cc-evidence-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.5rem;
+}
+.cc-evidence-mode {
+  justify-content: flex-start;
+  min-height: var(--cc-touch-big);
+  text-align: start;
+}
+.cc-evidence-pending {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.cc-evidence-pending__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface-2);
+}
+.cc-evidence-pending__item .cc-evidence__thumb {
+  max-width: 4rem;
+  max-height: 4rem;
+}
+.cc-evidence-pending__name {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-evidence__picture {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  align-self: flex-start;
+  border-radius: var(--cc-radius-sm);
+}
+.cc-evidence__picture:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-evidence__large {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin-inline: auto;
+  border-radius: var(--cc-radius-sm);
+}
+.cc-evidence__doc {
+  overflow-wrap: anywhere;
+}
+.cc-camera__view {
+  width: 100%;
+  max-width: 32rem;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--cc-surface-2);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+}
+.cc-voice__timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.cc-link-url {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
 .cc-confidence-picker {
   border: 0;
   padding: 0;
@@ -2230,53 +2306,106 @@ html:has(.cc-classroom) {
 .cc-private .cc-h2 {
   gap: 0.5rem;
 }
-/* Printable link cards (STU-1): 2 per row on A4, each with a locally drawn QR code. */
-.cc-link-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+/* Printable link cards (STU-1, S13b2 D-120): A4 portrait, 3 x 5 cards of 63 x 52 mm (or 2 x 4 of
+   95 x 69 mm), dashed cut lines, QR >= 28 mm with its quiet zone, always black on white. Each page is
+   its own grid, so a page break never cuts a card. The print copy is a child of <body>; when it is
+   there, printing shows nothing else. */
+.cc-link-sheets {
+  color: var(--cc-print-ink);
+  background: var(--cc-print-paper);
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.cc-link-sheets--print {
+  display: none;
+}
+.cc-link-sheets--preview {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
+  padding: 1rem;
+  overflow-x: auto;
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+}
+.cc-link-page {
+  display: grid;
+  grid-template-columns: repeat(3, 63mm);
+  grid-auto-rows: 52mm;
+  width: 189mm;
+  margin: 0;
   padding: 0;
   list-style: none;
+  break-after: page;
+}
+.cc-link-page:last-child {
+  break-after: auto;
+}
+.cc-link-sheets[data-size='large'] .cc-link-page {
+  grid-template-columns: repeat(2, 95mm);
+  grid-auto-rows: 69mm;
+  width: 190mm;
 }
 .cc-link-card {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  background: var(--cc-surface);
-  border: var(--cc-border-width-strong) dashed var(--cc-border-strong);
-  border-radius: var(--cc-radius);
+  justify-content: center;
+  gap: 0.5mm;
+  padding: 1.5mm;
+  overflow: hidden;
+  border: 0.3mm dashed var(--cc-print-ink);
+  color: var(--cc-print-ink);
+  background: var(--cc-print-paper);
+  font-family: var(--cc-font);
   text-align: center;
   break-inside: avoid;
 }
 .cc-link-card__name {
-  font-size: 1.3rem;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 9.5pt;
+  line-height: 1.1;
 }
-.cc-link-card__url {
-  font-size: 0.7rem;
-  overflow-wrap: anywhere;
-}
+.cc-link-card__class,
 .cc-link-card__note {
-  margin: 0;
-  font-size: 0.85rem;
+  font-size: 7pt;
+  line-height: 1.1;
+}
+.cc-link-sheets[data-size='large'] .cc-link-card__name {
+  font-size: 14pt;
+}
+.cc-link-sheets[data-size='large'] .cc-link-card__class,
+.cc-link-sheets[data-size='large'] .cc-link-card__note {
+  font-size: 10pt;
 }
 .cc-qr {
   width: 11rem;
   height: 11rem;
+  flex: none;
 }
 .cc-qr__bg {
-  fill: var(--cc-surface);
+  fill: var(--cc-print-paper);
 }
 .cc-qr__fg {
-  fill: var(--cc-text);
+  fill: var(--cc-print-ink);
+}
+@page cards {
+  size: A4 portrait;
+  margin: 10mm;
 }
 @media print {
-  .cc-link-cards {
-    grid-template-columns: repeat(2, 1fr);
+  body:has(> .cc-link-sheets--print) {
+    background: var(--cc-print-paper) !important;
   }
-  .cc-print-sheet .cc-alert {
-    display: none;
+  body:has(> .cc-link-sheets--print) > :not(.cc-link-sheets--print) {
+    display: none !important;
+  }
+  .cc-link-sheets--print {
+    display: block;
+    page: cards;
   }
 }
 

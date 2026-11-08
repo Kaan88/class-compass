@@ -196,6 +196,8 @@ export async function seedDemo(deps: AppDeps, opts: SeedOptions = {}): Promise<D
         timezone: null,
         mainLanguage: 'en',
         secondLanguageEnabled: false,
+        studentPageMainLanguage: null,
+        studentPageSecondLanguageEnabled: null,
         soundVolume: DEFAULT_SOUND_VOLUME,
         quoteEnabled: true,
         timeUpSound: 'voice',

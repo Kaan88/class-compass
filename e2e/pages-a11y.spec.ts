@@ -30,16 +30,18 @@ test('teacher pages: Goals, Student links with print cards, Reports pass axe', a
   await expect(links).toBeVisible();
   await links.getByLabel('Class', { exact: true }).selectOption({ label: '2-D' });
   await expect(links.getByTestId('link-row').first()).toBeVisible();
-  const make = links.getByRole('button', { name: /^Make (links|a link) for/ });
-  if (await make.isEnabled()) await make.click();
-  // The printable cards for the links just made (QR + address), shown on screen and printed.
-  await expect(links.getByTestId('link-cards')).toBeVisible();
-  await expect(links.getByTestId('link-card').first()).toBeVisible();
+  // Links are permanent and made automatically (D-115): every active student has Copy and Print.
+  await expect(links.getByTestId('link-row').first().getByRole('button', { name: 'Copy link' })).toBeVisible();
+  // The card preview (QR + name + class), shown on screen; the print copy appears only in print.
+  await links.getByRole('button', { name: 'Preview cards' }).click();
+  await expect(links.getByTestId('link-sheets-preview')).toBeVisible();
+  await expect(links.getByTestId('link-sheets-preview').getByTestId('link-card').first()).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);
   await page.emulateMedia({ media: 'print' });
-  await expect(links.getByTestId('link-cards')).toBeVisible();
+  await expect(page.getByTestId('link-sheets-print')).toBeVisible();
   await expect(links.getByTestId('link-list')).toBeHidden();
   await page.emulateMedia({ media: 'screen' });
+  await expect(page.getByTestId('link-sheets-print')).toBeHidden();
 
   await page.goto('/teacher/reports');
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();

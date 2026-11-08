@@ -268,6 +268,19 @@ export const IconFile = () => (
     <path d="M14 3v4h4" />
   </Icon>
 );
+export const IconImage = () => (
+  <Icon>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="9" cy="10" r="2" />
+    <path d="m21 17-5-5-9 8" />
+  </Icon>
+);
+export const IconCamera = () => (
+  <Icon>
+    <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </Icon>
+);
 export const IconPrint = () => (
   <Icon>
     <path d="M7 9V3h10v6" />

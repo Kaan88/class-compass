@@ -1,10 +1,15 @@
 /**
- * Personal student links (S10: STU-1..7). A link is `https://<host>/s#<token>`: the 256-bit token is in
- * the URL fragment, which browsers never send to the server, put in a Referer header or show to
- * proxies. The `/s` page posts it once to `exchangeStudentLink`, which sets a separate strict student
- * session cookie; the page then removes the fragment. Only an HMAC of the token is stored, so a link
- * can be shown only when it is made: to print it again the teacher makes a new one (the old one stops
- * working at once).
+ * Personal student links (S10: STU-1..7; permanent since S13b2, D-115). A link is
+ * `https://<host>/s#<token>`: the 256-bit token is in the URL fragment, which browsers never send to
+ * the server, put in a Referer header or show to proxies. The `/s` page posts it once to
+ * `exchangeStudentLink`, which sets a separate strict student session cookie; the page then removes
+ * the fragment.
+ *
+ * Every active student has exactly one link, made automatically; the token is stored encrypted, so the
+ * teacher can show and print the SAME link at any time. There is no routine revoke or regenerate. A
+ * link works while the student is active. In an emergency (a leaked link) an administrator or one of
+ * the student's current teachers can revoke it or make a new one: the student's full name must be
+ * typed, a reason given, and the action is audited.
  */
 import { z } from 'zod';
 import { Ok, endpoint } from './define.ts';
@@ -25,7 +30,32 @@ export const exchangeStudentLink = endpoint({
 /** Forget the link on this device (clears the student session cookie). */
 export const leaveStudentSession = endpoint({ method: 'POST', path: '/api/student/session/end', access: 'student', input: z.object({}), output: Ok });
 
-export const LinkStatus = z.object({ generation: z.number().int(), createdAt: z.number(), lastUsedAt: z.number().nullable() });
+/** Student-page language of the class (S13b2, D-117), for the "Scan to open your page" line on the cards. */
+export const CardLanguage = z.enum(['en', 'tr']);
+
+export const LinkStatus = z.object({
+  /** The link to show, copy and print; null only when it cannot be decrypted (the server pepper changed). */
+  url: z.string().nullable(),
+  generation: z.number().int(),
+  createdAt: z.number(),
+  lastUsedAt: z.number().nullable(),
+  /** When this link replaced an earlier one in an emergency ("print the new card"); null otherwise. */
+  replacedAt: z.number().nullable(),
+});
+export type LinkStatus = z.infer<typeof LinkStatus>;
+
+export const StudentLinkRow = z.object({
+  id: z.string(),
+  fullName: z.string(),
+  initials: z.string(),
+  avatarHue: z.number().int(),
+  /** null = no link: revoked in an emergency (`revokedAt`) or the student is not active. */
+  link: LinkStatus.nullable(),
+  /** The link was revoked in an emergency and no new one was made yet. */
+  revokedAt: z.number().nullable(),
+});
+export type StudentLinkRow = z.infer<typeof StudentLinkRow>;
+
 export const classLinks = endpoint({
   method: 'GET',
   path: '/api/teacher/classes/:classId/student-links',
@@ -35,35 +65,37 @@ export const classLinks = endpoint({
     classId: z.string(),
     className: z.string(),
     archived: z.boolean(),
-    students: z.array(z.object({ id: z.string(), fullName: z.string(), initials: z.string(), avatarHue: z.number().int(), link: LinkStatus.nullable() })),
+    cardLanguage: CardLanguage,
+    students: z.array(StudentLinkRow),
   }),
 });
 
-/** A freshly made link: shown once (only its hash is stored). */
-export const NewLink = z.object({ studentId: z.string(), fullName: z.string(), url: z.string(), generation: z.number().int() });
-export type NewLink = z.infer<typeof NewLink>;
+// ---------------------------------------------------------------- emergency actions (D-118)
+export const EMERGENCY_LINK_ACTIONS = ['revoke', 'replace'] as const;
+export const EmergencyLinkInput = z.object({
+  studentId: Id,
+  action: z.enum(EMERGENCY_LINK_ACTIONS),
+  /** The student's full name, typed (checked on the server). */
+  confirmName: z.string().trim().min(1).max(200),
+  reason: z.string().trim().min(3).max(500),
+});
+export const StudentLinkState = z.object({ studentId: z.string(), fullName: z.string(), className: z.string().nullable(), cardLanguage: CardLanguage, link: LinkStatus.nullable(), revokedAt: z.number().nullable() });
+export type StudentLinkState = z.infer<typeof StudentLinkState>;
 
-/** Make a link for one student; an existing link is revoked first (regenerate, STU-3). */
-export const generateStudentLink = endpoint({
+/** A current teacher of the student (teacher area, PIN-gated): revoke the link or make a new one. */
+export const teacherEmergencyLink = endpoint({
   method: 'POST',
-  path: '/api/teacher/students/:studentId/link',
+  path: '/api/teacher/students/:studentId/link/emergency',
   access: 'teacher',
-  input: z.object({ studentId: Id }),
-  output: NewLink,
+  input: EmergencyLinkInput,
+  output: StudentLinkState,
 });
-/** Make links for a whole class: only students without one (`missing`) or everyone again (`all`). */
-export const generateClassLinks = endpoint({
+/** An administrator: the student's link (admin student page) and the same emergency actions. */
+export const adminStudentLink = endpoint({ method: 'GET', path: '/api/admin/students/:studentId/link', access: 'admin', input: z.object({ studentId: Id }), output: StudentLinkState });
+export const adminEmergencyLink = endpoint({
   method: 'POST',
-  path: '/api/teacher/classes/:classId/student-links',
-  access: 'teacher',
-  input: z.object({ classId: Id, scope: z.enum(['missing', 'all']) }),
-  output: z.object({ links: z.array(NewLink) }),
-});
-export const revokeStudentLink = endpoint({ method: 'DELETE', path: '/api/teacher/students/:studentId/link', access: 'teacher', input: z.object({ studentId: Id }), output: Ok });
-export const revokeClassLinks = endpoint({
-  method: 'POST',
-  path: '/api/teacher/classes/:classId/student-links/revoke',
-  access: 'teacher',
-  input: z.object({ classId: Id }),
-  output: z.object({ revoked: z.number().int() }),
+  path: '/api/admin/students/:studentId/link/emergency',
+  access: 'admin',
+  input: EmergencyLinkInput,
+  output: StudentLinkState,
 });

@@ -91,6 +91,12 @@ export const classes = sqliteTable(
     soundVolume: integer('sound_volume').notNull().default(DEFAULT_SOUND_VOLUME),
     quoteEnabled: integer('quote_enabled', { mode: 'boolean' }).notNull().default(true),
     timeUpSound: text('time_up_sound', { enum: TIME_UP_SOUNDS }).notNull().default('voice'),
+    /**
+     * Student-page language override (S13b2, D-117): null = the student pages follow the class mode
+     * above; otherwise they use their own main language / second-language switch.
+     */
+    studentPageMainLanguage: text('student_page_main_language', { enum: ['en', 'tr'] }),
+    studentPageSecondLanguageEnabled: integer('student_page_second_language_enabled', { mode: 'boolean' }),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -1118,11 +1124,17 @@ export const evidence = sqliteTable(
   (t) => [index('evidence_student_subject_idx').on(t.studentId, t.subjectId), index('evidence_file_idx').on(t.fileId)],
 );
 
-// ---------------------------------------------------------------- personal student links (S10)
+// ---------------------------------------------------------------- personal student links (S10, S13b2)
+export const STUDENT_LINK_ORIGINS = ['auto', 'teacher', 'emergency'] as const;
+export const STUDENT_LINK_REVOKE_KINDS = ['replaced', 'teacher', 'emergency_revoke', 'emergency_replace', 'legacy'] as const;
 /**
- * Personal links (STU-1..6). Only an HMAC of the 256-bit token is stored (`tokenHash`, server
- * pepper). At most one active (not revoked) link per student; regenerating revokes the old one and
- * bumps `generation`. Student sessions point at the link, and every request re-checks it (STU-3).
+ * Personal links (STU-1..6). An HMAC of the 256-bit token is the lookup key (`tokenHash`, server
+ * pepper). Since S13b2 (D-115) links are permanent and made automatically for every active student
+ * (`origin` 'auto', no creator); the token is also stored ENCRYPTED (`tokenCipher`, AES-256-GCM with
+ * a key derived from the pepper by HKDF, bound to the row id) so the same card can be printed again.
+ * At most one active (not revoked) link per student. Revoking is an emergency action only
+ * (`revokeKind`, with the typed reason); student sessions point at the link and every request
+ * re-checks it (STU-3).
  */
 export const studentLinks = sqliteTable(
   'student_links',
@@ -1130,17 +1142,40 @@ export const studentLinks = sqliteTable(
     id: text('id').primaryKey(),
     studentId: text('student_id').notNull().references(() => students.id),
     tokenHash: text('token_hash').notNull(),
+    /** `v1.<base64url(iv | ciphertext | tag)>`; null for links made before S13b2 (revoked by the migration). */
+    tokenCipher: text('token_cipher'),
     generation: integer('generation').notNull(),
-    createdBy: text('created_by').notNull().references(() => users.id),
+    origin: text('origin', { enum: STUDENT_LINK_ORIGINS }).notNull().default('teacher'),
+    /** null = made automatically. */
+    createdBy: text('created_by').references(() => users.id),
     createdAt: integer('created_at').notNull(),
     revokedAt: integer('revoked_at'),
     revokedBy: text('revoked_by').references(() => users.id),
+    revokeKind: text('revoke_kind', { enum: STUDENT_LINK_REVOKE_KINDS }),
+    /** The reason typed for an emergency revoke or replacement. */
+    revokeReason: text('revoke_reason'),
     lastUsedAt: integer('last_used_at'),
   },
   (t) => [
     uniqueIndex('student_links_token_uq').on(t.tokenHash),
     uniqueIndex('student_links_active_uq').on(t.studentId).where(sql`revoked_at IS NULL`),
   ],
+);
+
+export const DEFAULT_ITEM_KINDS = ['preset', 'category'] as const;
+/**
+ * Default goal presets and skill categories a teacher archived for their own classes (S13b2, D-116).
+ * A default archived school-wide by an administrator uses the row's own `archivedAt` instead.
+ */
+export const defaultItemArchives = sqliteTable(
+  'default_item_archives',
+  {
+    userId: text('user_id').notNull().references(() => users.id),
+    kind: text('kind', { enum: DEFAULT_ITEM_KINDS }).notNull(),
+    itemId: text('item_id').notNull(),
+    archivedAt: integer('archived_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.kind, t.itemId] })],
 );
 
 // ---------------------------------------------------------------- operations (S11)

@@ -287,6 +287,8 @@ export function classDto(deps: Pick<AppDeps, 'db' | 'now'>, c: ClassRow) {
     animationsEnabled: c.animationsEnabled,
     mainLanguage: c.mainLanguage,
     secondLanguageEnabled: c.secondLanguageEnabled,
+    studentPageMainLanguage: c.studentPageMainLanguage,
+    studentPageSecondLanguageEnabled: c.studentPageSecondLanguageEnabled,
     soundVolume: c.soundVolume,
     quoteEnabled: c.quoteEnabled,
     timeUpSound: c.timeUpSound,
@@ -333,6 +335,8 @@ export function createClass(ctx: RequestContext, input: In<typeof C.createClass>
       animationsEnabled: input.animationsEnabled ?? true,
       mainLanguage: input.mainLanguage ?? 'en',
       secondLanguageEnabled: input.secondLanguageEnabled ?? false,
+      studentPageMainLanguage: input.studentPage?.mainLanguage ?? null,
+      studentPageSecondLanguageEnabled: input.studentPage ? input.studentPage.secondLanguageEnabled : null,
       soundVolume: input.soundVolume ?? DEFAULT_SOUND_VOLUME,
       quoteEnabled: input.quoteEnabled ?? true,
       timeUpSound: input.timeUpSound ?? 'voice',
@@ -363,6 +367,7 @@ export function updateClass(ctx: RequestContext, input: In<typeof C.updateClass>
     if (input.animationsEnabled !== undefined) patch.animationsEnabled = input.animationsEnabled;
     if (input.mainLanguage !== undefined) patch.mainLanguage = input.mainLanguage;
     if (input.secondLanguageEnabled !== undefined) patch.secondLanguageEnabled = input.secondLanguageEnabled;
+    if (input.studentPage !== undefined) Object.assign(patch, studentPagePatch(input.studentPage));
     if (input.soundVolume !== undefined) patch.soundVolume = input.soundVolume;
     if (input.quoteEnabled !== undefined) patch.quoteEnabled = input.quoteEnabled;
     if (input.timeUpSound !== undefined) patch.timeUpSound = input.timeUpSound;
@@ -504,6 +509,8 @@ export function myContexts(ctx: RequestContext) {
         animationsEnabled: cls.animationsEnabled,
         mainLanguage: cls.mainLanguage,
         secondLanguageEnabled: cls.secondLanguageEnabled,
+        studentPageMainLanguage: cls.studentPageMainLanguage,
+        studentPageSecondLanguageEnabled: cls.studentPageSecondLanguageEnabled,
         soundVolume: cls.soundVolume,
         quoteEnabled: cls.quoteEnabled,
         timeUpSound: cls.timeUpSound,
@@ -538,15 +545,28 @@ export function setClassDisplay(ctx: RequestContext, input: In<typeof C.setClass
   });
 }
 
-/** Class language mode by a teacher of the class (S13a, D-099). Never touches label data. */
+/** Student-page override columns (S13b2, D-117): null = same as the class. */
+const studentPagePatch = (v: { mainLanguage: 'en' | 'tr'; secondLanguageEnabled: boolean } | null) => ({
+  studentPageMainLanguage: v?.mainLanguage ?? null,
+  studentPageSecondLanguageEnabled: v ? v.secondLanguageEnabled : null,
+});
+
+/**
+ * Class language mode by a teacher of the class (S13a, D-099), with the optional student-page override
+ * (S13b2, D-117; left unchanged when `studentPage` is not sent). Never touches label data.
+ */
 export function setClassLanguage(ctx: RequestContext, input: In<typeof C.setClassLanguage>) {
   return tx(ctx.db, () => {
     const c = getClass(ctx.db, input.classId);
     if (ctx.user?.role !== 'admin') assertTeachesClass(ctx, c.id);
     assertClassWritable(ctx.db, c);
-    const before = { mainLanguage: c.mainLanguage, secondLanguageEnabled: c.secondLanguageEnabled };
-    const after = { mainLanguage: input.mainLanguage, secondLanguageEnabled: input.secondLanguageEnabled };
-    if (before.mainLanguage !== after.mainLanguage || before.secondLanguageEnabled !== after.secondLanguageEnabled) {
+    const before = { mainLanguage: c.mainLanguage, secondLanguageEnabled: c.secondLanguageEnabled, studentPageMainLanguage: c.studentPageMainLanguage, studentPageSecondLanguageEnabled: c.studentPageSecondLanguageEnabled };
+    const after = {
+      mainLanguage: input.mainLanguage,
+      secondLanguageEnabled: input.secondLanguageEnabled,
+      ...(input.studentPage !== undefined ? studentPagePatch(input.studentPage) : { studentPageMainLanguage: c.studentPageMainLanguage, studentPageSecondLanguageEnabled: c.studentPageSecondLanguageEnabled }),
+    };
+    if ((Object.keys(after) as Array<keyof typeof after>).some((k) => before[k] !== after[k])) {
       ctx.db.update(classes).set({ ...after, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
       audit(ctx.db, ctx.actor, { action: 'class.language', entity: 'class', entityId: c.id, before, after }, ctx.now());
     }

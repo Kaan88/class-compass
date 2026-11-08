@@ -6,6 +6,7 @@
  * the first section of each key wins (D-085).
  */
 import type { StudentPage, StudentPageSection } from '../../../shared/contracts/goals.ts';
+import { DEFAULT_CLASS_LANGUAGE, studentPageLanguage } from '../../../shared/classLanguage.ts';
 import { DEFAULT_THEME } from '../../../shared/themes.ts';
 import { initials } from '../../../shared/text/turkish.ts';
 import { requireStudent, type RequestContext } from '../../lib/context.ts';
@@ -34,7 +35,8 @@ export function studentPage(ctx: RequestContext): StudentPage {
     student: { fullName: scope.student.fullName, initials: initials(scope.student.fullName), avatarHue: scope.student.avatarHue },
     className: scope.classes.length ? scope.classes.map((c) => c.name).join(', ') : null,
     theme: scope.classes[0]?.theme ?? DEFAULT_THEME,
-    language: { mainLanguage: scope.classes[0]?.mainLanguage ?? 'en', secondLanguageEnabled: scope.classes[0]?.secondLanguageEnabled ?? false },
+    // The student-page language of the class (S13b2, D-117): the class mode unless the class gives its student pages their own.
+    language: scope.classes[0] ? studentPageLanguage(scope.classes[0]) : DEFAULT_CLASS_LANGUAGE,
     media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments },
     subjects: subjects.filter((s) => s.sections.length > 0),
   };

@@ -1,7 +1,8 @@
 /**
  * End-to-end tests (ENG-3, ENG-4, D-012): builds the client, starts the real server on a free port
  * with a temporary DATA_DIR and the fictional demo school (e2e/server.ts), then runs Chromium as a
- * 1920×1080 touch-enabled classroom display and a mobile viewport.
+ * 1920×1080 touch-enabled classroom display and a mobile viewport. Chromium uses a fake camera and
+ * microphone (S13b2 evidence tests), so no real device or permission prompt is involved.
  * Tests share one server/database, so they run serially (workers: 1).
  */
 import net from 'node:net';
@@ -24,6 +25,7 @@ process.env.E2E_PORT ??= String(await freePort());
 process.env.E2E_PASSWORD ??= 'e2e-only-Passw0rd!';
 const port = Number(process.env.E2E_PORT);
 const baseURL = `http://127.0.0.1:${port}`;
+const launchOptions = { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] };
 
 export default defineConfig({
   testDir: './e2e',
@@ -44,11 +46,11 @@ export default defineConfig({
   projects: [
     {
       name: 'classroom-display',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1920, height: 1080 }, hasTouch: true },
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1920, height: 1080 }, hasTouch: true, launchOptions },
     },
     {
       name: 'mobile',
-      use: { ...devices['Pixel 7'] },
+      use: { ...devices['Pixel 7'], launchOptions },
       grep: /@mobile/,
     },
   ],

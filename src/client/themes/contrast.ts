@@ -52,6 +52,7 @@ export interface ContrastPair {
  * and focus rings, AAA (7:1) for the big classroom text on the page and card backgrounds.
  */
 export const CONTRAST_PAIRS: readonly ContrastPair[] = [
+  { fg: 'print-ink', bg: 'print-paper', min: AAA, why: 'printed link cards and QR codes' },
   { fg: 'text', bg: 'bg', min: AAA, why: 'classroom text on the page (AAA)' },
   { fg: 'text', bg: 'surface', min: AAA, why: 'classroom text on cards (AAA)' },
   { fg: 'text', bg: 'surface-2', min: AA, why: 'text on secondary surfaces' },

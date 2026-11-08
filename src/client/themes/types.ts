@@ -78,6 +78,9 @@ export const COLOR_TOKENS = [
   'art-sky',
   'art-ground',
   'art-light',
+  // printed QR cards (S13b2, D-120): always pure black on white, the same in every theme
+  'print-ink',
+  'print-paper',
 ] as const;
 export type ColorToken = (typeof COLOR_TOKENS)[number];
 export type ThemeColors = Record<ColorToken, string>;

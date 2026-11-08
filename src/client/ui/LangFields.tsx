@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { needsTranslation, unionLocales, type ClassLanguage, type ClassLocale } from '../../shared/classLanguage.ts';
+import { needsTranslation, studentPageLanguage, unionLocales, type ClassLanguage, type ClassLocale } from '../../shared/classLanguage.ts';
 import type { LocalizedTextValue } from '../../shared/contracts/define.ts';
 import * as School from '../../shared/contracts/school.ts';
 import { call } from '../lib/api.ts';
@@ -23,7 +23,8 @@ export function useEditorLocales(contextIds?: readonly (string | null | undefine
     const wanted = (contextIds ?? []).filter(Boolean) as string[];
     const picked = wanted.length ? all.filter((c) => wanted.includes(c.id)) : all;
     if (!picked.length) return ['en', 'tr'];
-    return unionLocales(picked as ClassLanguage[]);
+    // Labels a class's student pages show (S13b2, D-117) need their languages too, even when the class itself has that language off.
+    return unionLocales([...(picked as ClassLanguage[]), ...picked.map((c) => studentPageLanguage(c))]);
   }, [q.data, key]);
 }
 

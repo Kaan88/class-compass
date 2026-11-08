@@ -6,13 +6,16 @@
  * - Teachers add custom categories and presets for one subject; they see the defaults plus their own,
  *   and their students see the defaults plus the custom ones of their teachers in that subject.
  * - Archived categories and presets are kept (goals refer to them), only hidden from choosing.
+ * - Defaults can be archived too (S13b2, D-116): by a teacher for their own classes only (a row in
+ *   `default_item_archives`), or school-wide by an administrator (the row's own `archivedAt`). A
+ *   student sees what the teacher of that class+subject sees; goals keep their label snapshot (DAT-6).
  */
-import { and, eq, isNull, or, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, type SQL } from 'drizzle-orm';
 import { DEFAULT_GOAL_OUTCOMES, OutcomeSet, type Category, type GoalLibrary, type OutcomeDef, type Preset } from '../../../shared/contracts/goals.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import type { TopicIcon } from '../../../shared/lessons.ts';
 import type { Db } from '../../db/client.ts';
-import { goalPresets, skillCategories } from '../../db/schema.ts';
+import { defaultItemArchives, goalPresets, skillCategories } from '../../db/schema.ts';
 import { moduleConfig } from '../school/modules.ts';
 
 export type CategoryRow = typeof skillCategories.$inferSelect;
@@ -85,8 +88,44 @@ export function ensureGoalDefaults(db: Db, now: number): void {
   });
 }
 
-export const categoryDto = (c: CategoryRow): Category => ({ id: c.id, name: c.name, icon: (c.icon as Category['icon']) ?? null, subjectId: c.subjectId, custom: c.createdBy !== null, archived: c.archivedAt !== null });
-export const presetDto = (p: PresetRow): Preset => ({ id: p.id, categoryId: p.categoryId, text: p.text, custom: p.createdBy !== null, archived: p.archivedAt !== null });
+/** Defaults hidden by these teachers for their own classes (D-116). */
+export interface HiddenDefaults {
+  categories: ReadonlySet<string>;
+  presets: ReadonlySet<string>;
+}
+export const NOTHING_HIDDEN: HiddenDefaults = { categories: new Set(), presets: new Set() };
+
+export function hiddenDefaultsOf(db: Db, teacherIds: readonly string[]): HiddenDefaults {
+  if (!teacherIds.length) return NOTHING_HIDDEN;
+  const rows = db.select().from(defaultItemArchives).where(inArray(defaultItemArchives.userId, [...teacherIds])).all();
+  return { categories: new Set(rows.filter((r) => r.kind === 'category').map((r) => r.itemId)), presets: new Set(rows.filter((r) => r.kind === 'preset').map((r) => r.itemId)) };
+}
+
+/**
+ * `archived` = hidden from choosing for this viewer: archived by its owner, by the school (a default),
+ * or a default this teacher archived for their classes. `schoolArchived`: only an administrator can restore it.
+ */
+export const categoryDto = (c: CategoryRow, hidden: HiddenDefaults = NOTHING_HIDDEN): Category => ({
+  id: c.id,
+  name: c.name,
+  icon: (c.icon as Category['icon']) ?? null,
+  subjectId: c.subjectId,
+  custom: c.createdBy !== null,
+  archived: c.archivedAt !== null || (c.createdBy === null && hidden.categories.has(c.id)),
+  schoolArchived: c.createdBy === null && c.archivedAt !== null,
+});
+export const presetDto = (p: PresetRow, hidden: HiddenDefaults = NOTHING_HIDDEN): Preset => ({
+  id: p.id,
+  categoryId: p.categoryId,
+  text: p.text,
+  custom: p.createdBy !== null,
+  archived: p.archivedAt !== null || (p.createdBy === null && hidden.presets.has(p.id)),
+  schoolArchived: p.createdBy === null && p.archivedAt !== null,
+});
+
+/** Usable for choosing here: not archived, not a default hidden by the class's teacher. */
+export const categoryUsable = (c: CategoryRow, hidden: HiddenDefaults) => c.archivedAt === null && !(c.createdBy === null && hidden.categories.has(c.id));
+export const presetUsable = (p: PresetRow, hidden: HiddenDefaults) => p.archivedAt === null && !(p.createdBy === null && hidden.presets.has(p.id));
 
 /** Defaults, plus the custom rows of these teachers for this subject. */
 function scopeWhere(table: typeof skillCategories | typeof goalPresets, subjectId: string, teacherIds: readonly string[]): SQL {
@@ -118,10 +157,32 @@ export function outcomesOf(db: Db, contextId: string): OutcomeDef[] {
 }
 
 export function libraryFor(db: Db, contextId: string, subjectId: string, teacherIds: readonly string[], includeArchived: boolean): GoalLibrary {
+  const hidden = hiddenDefaultsOf(db, teacherIds);
   return {
-    categories: categoriesFor(db, subjectId, teacherIds, includeArchived).map(categoryDto),
-    presets: presetsFor(db, subjectId, teacherIds, includeArchived).map(presetDto),
+    categories: categoriesFor(db, subjectId, teacherIds, includeArchived).map((c) => categoryDto(c, hidden)),
+    presets: presetsFor(db, subjectId, teacherIds, includeArchived).map((p) => presetDto(p, hidden)),
     outcomes: outcomesOf(db, contextId),
+  };
+}
+
+/** What students of this class+subject may choose (D-116): usable categories and their usable presets. */
+export function studentChoices(db: Db, subjectId: string, teacherIds: readonly string[], contextTeacherId: string): { categories: Category[]; presets: Preset[] } {
+  const hidden = hiddenDefaultsOf(db, [contextTeacherId]);
+  const cats = categoriesFor(db, subjectId, teacherIds, false).filter((c) => categoryUsable(c, hidden));
+  const catIds = new Set(cats.map((c) => c.id));
+  return {
+    categories: cats.map((c) => categoryDto(c, hidden)),
+    presets: presetsFor(db, subjectId, teacherIds, false)
+      .filter((p) => presetUsable(p, hidden) && catIds.has(p.categoryId))
+      .map((p) => presetDto(p, hidden)),
+  };
+}
+
+/** Every default category and preset with its school-wide state (admin, D-116). */
+export function defaultLibrary(db: Db): { categories: Category[]; presets: Preset[] } {
+  return {
+    categories: db.select().from(skillCategories).where(isNull(skillCategories.createdBy)).all().sort((a, b) => a.sortOrder - b.sortOrder).map((c) => categoryDto(c)),
+    presets: db.select().from(goalPresets).where(isNull(goalPresets.createdBy)).all().sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)).map((p) => presetDto(p)),
   };
 }
 

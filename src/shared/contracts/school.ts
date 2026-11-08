@@ -124,6 +124,8 @@ export const archiveSubject = endpoint({ method: 'POST', path: '/api/admin/subje
 export const unarchiveSubject = endpoint({ method: 'POST', path: '/api/admin/subjects/:subjectId/unarchive', access: 'admin', input: z.object({ subjectId: Id }), output: Subject });
 
 // ---------------------------------------------------------------- classes
+/** Student-page language (S13b2, D-117): null = the same as the class, otherwise its own mode. */
+export const StudentPageLanguageInput = z.object({ mainLanguage: Locale, secondLanguageEnabled: z.boolean() }).nullable();
 export const SchoolClass = z.object({
   id: z.string(),
   schoolYearId: z.string(),
@@ -136,6 +138,9 @@ export const SchoolClass = z.object({
   /** Class language mode (S13a, D-099). */
   mainLanguage: Locale,
   secondLanguageEnabled: z.boolean(),
+  /** Student-page override (S13b2, D-117): null = the student pages follow the class mode. */
+  studentPageMainLanguage: Locale.nullable(),
+  studentPageSecondLanguageEnabled: z.boolean().nullable(),
   /** S13b (D-105, D-107): sound volume 0–100, quote of the day, time's-up announcement. */
   soundVolume: z.number().int(),
   quoteEnabled: z.boolean(),
@@ -173,6 +178,7 @@ export const createClass = endpoint({
     animationsEnabled: z.boolean().optional(),
     mainLanguage: Locale.optional(),
     secondLanguageEnabled: z.boolean().optional(),
+    studentPage: StudentPageLanguageInput.optional(),
     soundVolume: SoundVolume.optional(),
     quoteEnabled: z.boolean().optional(),
     timeUpSound: TimeUpSound.optional(),
@@ -193,6 +199,7 @@ export const updateClass = endpoint({
     animationsEnabled: z.boolean().optional(),
     mainLanguage: Locale.optional(),
     secondLanguageEnabled: z.boolean().optional(),
+    studentPage: StudentPageLanguageInput.optional(),
     soundVolume: SoundVolume.optional(),
     quoteEnabled: z.boolean().optional(),
     timeUpSound: TimeUpSound.optional(),
@@ -268,6 +275,9 @@ export const MyContext = z.object({
   /** Class language mode (S13a, D-099): what the classroom display and the label editors use. */
   mainLanguage: Locale,
   secondLanguageEnabled: z.boolean(),
+  /** Student-page override (S13b2, D-117); null = same as the class. Label editors also offer its languages. */
+  studentPageMainLanguage: Locale.nullable(),
+  studentPageSecondLanguageEnabled: z.boolean().nullable(),
   /** S13b: sound volume, quote of the day, time's-up announcement (D-105, D-107). */
   soundVolume: z.number().int(),
   quoteEnabled: z.boolean(),
@@ -323,8 +333,14 @@ export const setClassLanguage = endpoint({
   method: 'PUT',
   path: '/api/teacher/classes/:classId/language',
   access: 'teacher',
-  input: z.object({ classId: Id, mainLanguage: Locale, secondLanguageEnabled: z.boolean() }),
-  output: z.object({ classId: z.string(), mainLanguage: Locale, secondLanguageEnabled: z.boolean() }),
+  input: z.object({ classId: Id, mainLanguage: Locale, secondLanguageEnabled: z.boolean(), studentPage: StudentPageLanguageInput.optional() }),
+  output: z.object({
+    classId: z.string(),
+    mainLanguage: Locale,
+    secondLanguageEnabled: z.boolean(),
+    studentPageMainLanguage: Locale.nullable(),
+    studentPageSecondLanguageEnabled: z.boolean().nullable(),
+  }),
 });
 
 export const ContextModuleSetting = z.object({

@@ -13,6 +13,8 @@ export const MIME = {
   webp: 'image/webp',
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  odt: 'application/vnd.oasis.opendocument.text',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   xls: 'application/vnd.ms-excel',
   text: 'text/plain',
@@ -20,6 +22,7 @@ export const MIME = {
   ogg: 'audio/ogg',
   mp4: 'audio/mp4',
   mp3: 'audio/mpeg',
+  wav: 'audio/wav',
 } as const;
 
 export type SniffResult = { ok: true; mime: string } | { ok: false; reason: 'FILE_TYPE_NOT_ALLOWED' | 'FILE_EMPTY'; detected: string | null };
@@ -31,6 +34,8 @@ const BY_EXT: Record<string, string> = {
   webp: MIME.webp,
   pdf: MIME.pdf,
   docx: MIME.docx,
+  pptx: MIME.pptx,
+  odt: MIME.odt,
   xlsx: MIME.xlsx,
   webm: MIME.webm,
   ogg: MIME.ogg,
@@ -39,6 +44,7 @@ const BY_EXT: Record<string, string> = {
   m4a: MIME.mp4,
   mp4: MIME.mp4,
   mp3: MIME.mp3,
+  wav: MIME.wav,
 };
 
 /** Markup or script markers that make a "text" upload unacceptable (served text must never render). */

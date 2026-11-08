@@ -205,10 +205,20 @@ export interface CreateOptions {
 }
 
 /**
+ * Runs inside the transaction that creates a student (S13b2, D-115): the links module gives every new
+ * student a personal link at once. Registered by module manifests (`routes`), never by import side effects.
+ */
+export type StudentCreatedListener = (deps: Pick<AppDeps, 'db' | 'now' | 'config'>, studentId: string) => void;
+const createdListeners: StudentCreatedListener[] = [];
+export function onStudentCreated(fn: StudentCreatedListener): void {
+  if (!createdListeners.includes(fn)) createdListeners.push(fn);
+}
+
+/**
  * Create a student and enrol them in `cls` (ACC-7). Runs inside the caller's transaction.
  * Shared by the teacher and admin endpoints, the demo seed and (later) the importer.
  */
-export function createStudentInClass(deps: Pick<AppDeps, 'db' | 'now'>, actor: Actor, cls: ClassRow, input: NewStudentInput, opts: CreateOptions): StudentRow {
+export function createStudentInClass(deps: Pick<AppDeps, 'db' | 'now' | 'config'>, actor: Actor, cls: ClassRow, input: NewStudentInput, opts: CreateOptions): StudentRow {
   const { db } = deps;
   assertClassWritable(db, cls);
   const fullName = cleanName(input.fullName);
@@ -243,6 +253,7 @@ export function createStudentInClass(deps: Pick<AppDeps, 'db' | 'now'>, actor: A
     .values({ id: newId(), studentId: id, classId: cls.id, schoolYearId: cls.schoolYearId, fromDate, toDate: null, reason: opts.reason ?? 'added', importBatchId: opts.importBatchId ?? null, createdAt: now, createdBy: actorId })
     .run();
   audit(db, actor, { action: 'student.create', entity: 'student', entityId: id, after: { fullName, studentNumber, classId: cls.id, fromDate } }, now);
+  for (const fn of createdListeners) fn(deps, id);
   return row;
 }
 

@@ -3,7 +3,8 @@
  *
  * Upload: access check → media policy (before reading the body) → stream to a temp file with the
  * kind's hard size limit → sniff the bytes against the kind's allow-list (client type and name are
- * ignored) → re-encode images (EXIF/GPS stripped, ≤ 2560 px, thumbnail) → move into place under a
+ * ignored) → re-encode images (EXIF/GPS stripped, evidence ≤ 2048 px, others ≤ 2560 px, thumbnail),
+ * strip audio tags (D-119) → move into place under a
  * random key → quotas checked in the SAME transaction that inserts the files row.
  *
  * Access: a file is only ever served by `sendFile` after `assertCanReadFile` (owner scope): admins
@@ -17,7 +18,7 @@ import fsp from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { ALLOWED_MIME, UPLOAD_LIMITS, type FileKind, type FileMeta } from '../../../shared/contracts/files.ts';
+import { ALLOWED_MIME, EVIDENCE_IMAGE_EDGE, UPLOAD_LIMITS, type FileKind, type FileMeta } from '../../../shared/contracts/files.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { evidence, files, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
@@ -26,7 +27,8 @@ import { newId } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { getMediaPolicy } from '../school/modules.ts';
 import { teacherSeesStudent } from '../students/service.ts';
-import { reencodeImage } from './image.ts';
+import { AudioMetaError, stripAudioMetadata } from './audioMeta.ts';
+import { MAX_IMAGE_EDGE, reencodeImage } from './image.ts';
 import { sniffFile } from './sniff.ts';
 import { newStorageKey, newTempPath, removeKey, removeQuietly, sha256File, storeBuffer, storeTemp, storagePath } from './storage.ts';
 
@@ -124,7 +126,10 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
   const keys: string[] = [];
   try {
     const sniff = await sniffFile(tmp, ALLOWED_MIME[opts.kind]);
-    if (!sniff.ok) throw invalid(sniff.reason === 'FILE_EMPTY' ? 'The file is empty' : 'This type of file is not accepted', { reason: sniff.reason });
+    if (!sniff.ok) {
+      if (sniff.detected === 'image/heic' || sniff.detected === 'image/heif') throw invalid('HEIC pictures cannot be read here', { reason: 'IMAGE_HEIC' });
+      throw invalid(sniff.reason === 'FILE_EMPTY' ? 'The file is empty' : 'This type of file is not accepted', { reason: sniff.reason });
+    }
     const key = newStorageKey();
     let mime = sniff.mime;
     let size: number;
@@ -134,7 +139,7 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
     if (mime.startsWith('image/')) {
       let img;
       try {
-        img = await reencodeImage(await fsp.readFile(tmp), mime);
+        img = await reencodeImage(await fsp.readFile(tmp), mime, opts.kind === 'image' ? EVIDENCE_IMAGE_EDGE : MAX_IMAGE_EDGE);
       } catch {
         throw invalid('The image could not be read', { reason: 'IMAGE_UNREADABLE' });
       }
@@ -149,6 +154,18 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
       sha = crypto.createHash('sha256').update(img.main).digest('hex');
       await removeQuietly(tmp);
     } else {
+      if (mime.startsWith('audio/')) {
+        // Voice files lose their tags (names, places, cover pictures) before they are stored (D-119).
+        let clean: Buffer;
+        const raw = await fsp.readFile(tmp);
+        try {
+          clean = stripAudioMetadata(raw, mime);
+        } catch (err) {
+          if (err instanceof AudioMetaError) throw invalid('The sound file could not be read', { reason: 'AUDIO_UNREADABLE' });
+          throw err;
+        }
+        if (clean !== raw) await fsp.writeFile(tmp, clean);
+      }
       size = (await fsp.stat(tmp)).size;
       sha = await sha256File(tmp);
       await storeTemp(ctx.config, key, tmp);
@@ -233,6 +250,9 @@ const EXT: Record<string, string> = {
   'application/vnd.ms-excel': '.xls',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+  'application/vnd.oasis.opendocument.text': '.odt',
+  'audio/wav': '.wav',
 };
 
 /**

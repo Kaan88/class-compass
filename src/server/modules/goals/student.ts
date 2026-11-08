@@ -25,7 +25,7 @@ import type { StudentPageInput } from '../manifest.ts';
 import { isModuleEnabled } from '../school/modules.ts';
 import { getYear } from '../school/policy.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type EvidenceRow, type GoalRow } from './dto.ts';
-import { categoriesFor, categoryDto, getCategory, getPreset, inScope, outcomesOf, presetDto, presetsFor } from './library.ts';
+import { categoryUsable, getCategory, getPreset, hiddenDefaultsOf, inScope, outcomesOf, presetUsable, studentChoices } from './library.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
@@ -40,12 +40,14 @@ export function goalsSection(ctx: RequestContext, input: StudentPageInput): Stud
   const subjectId = context.subjectId;
   const teacherIds = teacherIdsFor(scope, subjectId);
   const sc = scope.contexts.find((c) => c.context.id === context.id);
+  // The class's teacher may have archived some defaults for their classes (D-116).
+  const choices = studentChoices(ctx.db, subjectId, teacherIds, context.teacherId);
   return {
     goals: goalDtos(ctx.db, goalsOf(ctx.db, studentId, subjectId)),
     evidence: evidenceDtos(ctx.db, evidenceOf(ctx.db, studentId, subjectId)),
     feedback: feedbackDtos(ctx.db, feedbackOf(ctx.db, studentId, subjectId)),
-    categories: categoriesFor(ctx.db, subjectId, teacherIds, false).map(categoryDto),
-    presets: presetsFor(ctx.db, subjectId, teacherIds, false).map(presetDto),
+    categories: choices.categories,
+    presets: choices.presets,
     outcomes: outcomesOf(ctx.db, context.id),
     canWrite: sc ? canWriteIn(ctx, sc) : false,
   };
@@ -81,10 +83,11 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.studentCreate
     const scope = studentScope(ctx, studentId);
     const sc = writableSubject(ctx, scope, input.subjectId);
     const teacherIds = teacherIdsFor(scope, input.subjectId);
+    const hidden = hiddenDefaultsOf(ctx.db, [sc.context.teacherId]);
     const preset = input.presetId ? getPreset(ctx.db, input.presetId) : undefined;
-    if (input.presetId && (!preset || preset.archivedAt !== null || !inScope(preset, input.subjectId, teacherIds))) throw notFound('Preset goal');
+    if (input.presetId && (!preset || !presetUsable(preset, hidden) || !inScope(preset, input.subjectId, teacherIds))) throw notFound('Preset goal');
     const category = getCategory(ctx.db, preset?.categoryId ?? input.categoryId ?? '');
-    if (!category || category.archivedAt !== null || !inScope(category, input.subjectId, teacherIds)) throw notFound('Category');
+    if (!category || !categoryUsable(category, hidden) || !inScope(category, input.subjectId, teacherIds)) throw notFound('Category');
     const own = input.text?.trim();
     if (!preset && !own) throw invalid('Write your goal or choose one', { reason: 'GOAL_TEXT_REQUIRED' });
     const now = ctx.now();

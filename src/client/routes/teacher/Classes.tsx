@@ -19,7 +19,7 @@ import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { ClassDisplaySection } from './ClassDisplay.tsx';
 import { settingsPanelFor } from '../../modules/registry.ts';
-import { ClassLanguageSelect } from '../../ui/ClassLanguageSelect.tsx';
+import { ClassLanguageSelect, StudentPageLanguageSelect, studentPageOverride } from '../../ui/ClassLanguageSelect.tsx';
 
 export const moduleLabelKey = (m: string) => `module.${m}` as MessageKey;
 
@@ -48,6 +48,14 @@ export function ClassSettingsPage() {
     },
     onError: (err) => showToast({ message: errorText(t, err), kind: 'error' }),
   });
+  // Class language and the student pages' own language (S13a D-099, S13b2 D-117).
+  const saveLanguage = (v: { mainLanguage: 'en' | 'tr'; secondLanguageEnabled: boolean; studentPage?: { mainLanguage: 'en' | 'tr'; secondLanguageEnabled: boolean } | null }) =>
+    void call(School.setClassLanguage, { classId: ctx!.classId, ...v })
+      .then(() => {
+        void qc.invalidateQueries({ queryKey: ['classroom', 'contexts'] });
+        showToast({ message: t('save.saved'), kind: 'success' });
+      })
+      .catch((err: unknown) => showToast({ message: errorText(t, err), kind: 'error' }));
   if (contexts.isSuccess && list.length === 0) return <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} />;
   return (
     <main className="cc-page cc-stack">
@@ -65,16 +73,10 @@ export function ClassSettingsPage() {
               {t('classLanguage.title')}
             </h2>
             <p className="cc-muted">{t('classLanguage.teacherHint', { cls: ctx.className })}</p>
-            <ClassLanguageSelect
-              value={ctx}
-              onChange={(v) =>
-                void call(School.setClassLanguage, { classId: ctx.classId, ...v })
-                  .then(() => {
-                    void qc.invalidateQueries({ queryKey: ['classroom', 'contexts'] });
-                    showToast({ message: t('save.saved'), kind: 'success' });
-                  })
-                  .catch((err: unknown) => showToast({ message: errorText(t, err), kind: 'error' }))
-              }
+            <ClassLanguageSelect value={ctx} onChange={(v) => saveLanguage({ ...v })} />
+            <StudentPageLanguageSelect
+              value={studentPageOverride(ctx)}
+              onChange={(v) => saveLanguage({ mainLanguage: ctx.mainLanguage, secondLanguageEnabled: ctx.secondLanguageEnabled, studentPage: v })}
             />
           </section>
           <section className="cc-card cc-stack">

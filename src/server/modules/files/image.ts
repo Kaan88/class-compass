@@ -2,7 +2,7 @@
  * Image re-encoding (S9, STU-8). Every accepted image is decoded and encoded again with sharp, so
  * what we store is pixels only: EXIF (including GPS), XMP, ICC comments and anything appended to
  * the file (polyglots such as HTML hidden in a JPEG) are dropped. The orientation from EXIF is
- * applied first, the size is capped at 2560 px and a small thumbnail is made.
+ * applied first, the size is capped at 2560 px (evidence pictures at 2048 px, D-119) and a small thumbnail is made.
  */
 import sharp from 'sharp';
 import { MIME } from './sniff.ts';
@@ -21,9 +21,9 @@ export interface ReencodedImage {
   height: number;
 }
 
-export async function reencodeImage(input: Buffer | string, mime: string): Promise<ReencodedImage> {
+export async function reencodeImage(input: Buffer | string, mime: string, maxEdge = MAX_IMAGE_EDGE): Promise<ReencodedImage> {
   const base = () => sharp(input, { limitInputPixels: LIMIT_INPUT_PIXELS, failOn: 'error', animated: false }).rotate();
-  const resized = base().resize({ width: MAX_IMAGE_EDGE, height: MAX_IMAGE_EDGE, fit: 'inside', withoutEnlargement: true });
+  const resized = base().resize({ width: maxEdge, height: maxEdge, fit: 'inside', withoutEnlargement: true });
   // sharp writes no metadata unless asked to (no keepMetadata/withMetadata here).
   const encoded =
     mime === MIME.png ? resized.png({ compressionLevel: 9 }) : mime === MIME.webp ? resized.webp({ quality: 85 }) : resized.jpeg({ quality: 85, mozjpeg: true });

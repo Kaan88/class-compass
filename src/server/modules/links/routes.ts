@@ -3,6 +3,7 @@ import { studentPage } from '../../../shared/contracts/goals.ts';
 import * as C from '../../../shared/contracts/links.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route, STUDENT_SESSION_ABSOLUTE_MS, studentCookieName } from '../../lib/http.ts';
+import { onStudentCreated } from '../students/service.ts';
 import { studentPage as buildStudentPage } from './page.ts';
 import * as svc from './service.ts';
 
@@ -14,6 +15,10 @@ import * as svc from './service.ts';
 const EXCHANGE_RATE = { max: 300, timeWindow: '1 minute' };
 
 export function registerLinkRoutes(app: FastifyInstance, deps: AppDeps) {
+  // Permanent links (D-115): every new student gets one at once; active students without one get it now.
+  onStudentCreated(svc.linkForNewStudent);
+  svc.backfillLinks(deps);
+
   route(
     app,
     deps,
@@ -39,13 +44,10 @@ export function registerLinkRoutes(app: FastifyInstance, deps: AppDeps) {
   });
   route(app, deps, studentPage, (ctx) => buildStudentPage(ctx));
 
-  // Teacher area (PIN-gated in classroom mode).
+  // Teacher area (PIN-gated in classroom mode): show and print; emergency actions only (D-118).
   route(app, deps, C.classLinks, (ctx, input) => svc.classLinks(ctx, input.classId));
-  route(app, deps, C.generateStudentLink, (ctx, input) => svc.generateForStudent(ctx, input.studentId));
-  route(app, deps, C.generateClassLinks, (ctx, input) => svc.generateForClass(ctx, input));
-  route(app, deps, C.revokeStudentLink, (ctx, input) => {
-    svc.revokeForStudent(ctx, input.studentId);
-    return { ok: true as const };
-  });
-  route(app, deps, C.revokeClassLinks, (ctx, input) => svc.revokeForClass(ctx, input.classId));
+  route(app, deps, C.teacherEmergencyLink, (ctx, input) => svc.emergencyLink(ctx, input));
+  // Administrators: the student's link on the admin student page, and the same emergency actions.
+  route(app, deps, C.adminStudentLink, (ctx, input) => svc.adminLink(ctx, input.studentId));
+  route(app, deps, C.adminEmergencyLink, (ctx, input) => svc.emergencyLink(ctx, input));
 }

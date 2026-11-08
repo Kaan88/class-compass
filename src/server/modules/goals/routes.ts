@@ -28,6 +28,11 @@ export function registerGoalRoutes(app: FastifyInstance, deps: AppDeps) {
     teacher.deleteFeedback(ctx, input.feedbackId);
     return ok;
   });
+  route(app, deps, C.teacherAddEvidence, (ctx, input) => teacher.addEvidence(ctx, input));
+  route(app, deps, C.teacherDeleteEvidence, async (ctx, input) => {
+    await teacher.deleteEvidence(ctx, input.evidenceId);
+    return ok;
+  });
   route(app, deps, C.teacherAddPrivateNote, (ctx, input) => teacher.privateNote(ctx, input));
   route(app, deps, C.teacherDeletePrivateNote, (ctx, input) => {
     teacher.removePrivateNote(ctx, input.noteId);
@@ -38,6 +43,8 @@ export function registerGoalRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.updateCategory, (ctx, input) => teacher.updateCategory(ctx, input));
   route(app, deps, C.createPreset, (ctx, input) => teacher.createPreset(ctx, input));
   route(app, deps, C.updatePreset, (ctx, input) => teacher.updatePreset(ctx, input));
+  route(app, deps, C.adminGoalDefaults, (ctx) => teacher.adminDefaults(ctx));
+  route(app, deps, C.adminArchiveGoalDefault, (ctx, input) => teacher.adminArchiveDefault(ctx, input));
   route(app, deps, C.goalSettings, (ctx, input) => teacher.getSettings(ctx, input.contextId));
   route(app, deps, C.setGoalSettings, (ctx, input) => teacher.setSettings(ctx, input));
 

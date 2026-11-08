@@ -13,7 +13,7 @@ import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { multipart } from '../import-fixtures.ts';
 import { cmd, startLesson } from '../lesson-helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
-import { openLink } from '../student-helpers.ts';
+import { linkUrl, openLink } from '../student-helpers.ts';
 
 const READING = '00000000-0000-7000-8000-00000000c001';
 const READ_WEEKLY = '00000000-0000-7000-8000-00000000d011';
@@ -45,8 +45,8 @@ async function setup() {
   s = await buildSchool(env);
   ada = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Ada Kurgu' });
   bora = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Bora Kurgu' });
-  adaPhone = await openLink(env, (await ok(s.teacherA.post(`/api/teacher/students/${ada.id}/link`))).url);
-  boraPhone = await openLink(env, (await ok(s.teacherA.post(`/api/teacher/students/${bora.id}/link`))).url);
+  adaPhone = await openLink(env, await linkUrl(s.teacherA, s.c3a.id, ada.id));
+  boraPhone = await openLink(env, await linkUrl(s.teacherA, s.c3a.id, bora.id));
 }
 async function teardown() {
   await env.app.close();
@@ -269,7 +269,7 @@ describe('private notes and Secret Student data never reach a student (GOL-6, SE
     const more = [];
     for (const fullName of ['Cem Kurgu', 'Dila Kurgu', 'Efe Kurgu']) more.push(await addStudent(s.teacherA, s.c3a.id, { fullName }));
     const phones = [adaPhone, boraPhone];
-    for (const m of more) phones.push(await openLink(env, (await ok(s.teacherA.post(`/api/teacher/students/${m.id}/link`))).url));
+    for (const m of more) phones.push(await openLink(env, await linkUrl(s.teacherA, s.c3a.id, m.id)));
     const lessonId = await startLesson(s.teacherA, s.ctxA.id, { othersPresent: true });
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/secret/settings`, { count: 2 }));
     await cmd(s.teacherA, 'secret.draw', { contextId: s.ctxA.id, lessonId });

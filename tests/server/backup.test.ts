@@ -273,7 +273,9 @@ describe('maintenance page and exports (OPS-3, DAT-4, DAT-5)', () => {
     expect(names).toContain('manifest.json');
     expect(names).toContain('tables/students.csv');
     expect(names).toContain('tables/users.csv');
-    expect(names.some((n) => /sessions|auth_attempts|one_time_tokens|command_log|private_teacher_notes/u.test(n))).toBe(false);
+    expect(names.some((n) => /sessions|auth_attempts|one_time_tokens|command_log/u.test(n))).toBe(false);
+    // Private teacher notes are in the full export since S13b2 (owner decision, D-114).
+    expect(names).toContain('tables/private_teacher_notes.csv');
     const studentsCsv = entries['tables/students.csv']!.toString('utf8');
     expect(studentsCsv.startsWith('﻿')).toBe(true);
     expect(studentsCsv).toContain("'=Işıl Çınar");
@@ -281,7 +283,7 @@ describe('maintenance page and exports (OPS-3, DAT-4, DAT-5)', () => {
     expect(usersCsv).not.toContain('$argon2');
     const manifest = JSON.parse(entries['manifest.json']!.toString('utf8'));
     expect(manifest.tables.students).toBe(1);
-    expect(manifest.privateNotesNotIncluded).toBe(0);
+    expect(manifest.privateNotesIncluded).toBe(0);
     expect(manifest.files.find((f: any) => f.name === 'tables/students.csv').sha256).toBe(crypto.createHash('sha256').update(entries['tables/students.csv']!).digest('hex'));
     // Once only.
     expect((await s.admin.get(`/api/admin/exports/${ready.token}`)).status).toBe(404);

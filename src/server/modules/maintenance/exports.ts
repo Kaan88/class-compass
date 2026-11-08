@@ -11,10 +11,11 @@
  *   goals, the audit events about them, the files they own, the files on their evidence and their
  *   photo. Other students' ids in those rows are blanked and JSON lists are cut down to this student.
  * Never exported: sign-in secrets (sessions, sign-in attempts, one-time tokens, password/PIN/token
- * hashes are blanked), the command log, Secret Student choices of rounds that were not revealed
- * (SEC-3: hidden from everyone, administrators included) and private teacher notes (GOL-6, D-086:
- * readable only by their author; both manifests give their count). Leaving the notes out of the
- * full export deviates from the S11 brief ("excludes nothing") and waits for the owner's decision.
+ * hashes are blanked), the command log and Secret Student choices of rounds that were not revealed
+ * (SEC-3: hidden from everyone, administrators included). Private teacher notes (GOL-6, D-086) are in
+ * the FULL export since S13b2 (owner decision, D-114: one CSV for the notes table with author,
+ * student and subject names), and stay out of the per-student export, whose manifest gives their count.
+ * Student link tokens are never exported: `token_cipher` is blanked like the hashes.
  * Prepared files are removed after one download, when they expire (start-up + a timer in main.ts,
  * and before each new export), and only the administrator who prepared one can download it. CSV cells are formula-escaped and UTF-8 with BOM like report CSVs (RPT-4).
  */
@@ -36,7 +37,7 @@ import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { appVersion, levelText, migrationLevel } from '../../ops/version.ts';
 import { ZipWriter } from '../../ops/zip.ts';
 import { storagePath } from '../files/storage.ts';
-import { PRIVATE_NOTES_TABLE, privateNotesCount } from '../goals/history.ts';
+import { exportablePrivateNotes, PRIVATE_NOTES_EXPORT_COLUMNS, PRIVATE_NOTES_TABLE, privateNotesCount } from '../goals/history.ts';
 import { exportableSelections, SELECTIONS_TABLE_NAME } from '../secret/service.ts';
 
 /** How long a prepared export can be downloaded. */
@@ -44,7 +45,7 @@ export const EXPORT_TTL_MS = 60 * 60_000;
 /** Tables that hold sign-in secrets or request logs, never exported. */
 export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'command_log', '__drizzle_migrations'] as const;
 /** Columns blanked in every export. */
-const SECRET_COLUMN = /(^|_)(password|pin|token|request)_hash$/u;
+const SECRET_COLUMN = /(^|_)(password|pin|token|request)_hash$|^token_cipher$/u;
 const STUDENT_COLUMNS = new Set(['student_id', 'owner_student_id', 'student_a', 'student_b', 'planned_student_id', 'actual_student_id', 'matched_student_id', 'created_student_id']);
 
 /** Where prepared exports wait for their download. */
@@ -159,7 +160,7 @@ async function removeExport(dir: string, token: string) {
 }
 
 /** Writes a ZIP through `fill`, then registers it for one download. */
-async function prepare(ctx: RequestContext, fileName: string, fill: (b: Builder) => Promise<Record<string, unknown>>): Promise<ExportReady> {
+async function prepare(ctx: RequestContext, fileName: string, neverExported: readonly string[], fill: (b: Builder) => Promise<Record<string, unknown>>): Promise<ExportReady> {
   const dir = exportsDir(ctx);
   await fsp.mkdir(dir, { recursive: true });
   await cleanupExpired(dir, ctx.now());
@@ -175,7 +176,7 @@ async function prepare(ctx: RequestContext, fileName: string, fill: (b: Builder)
       appVersion: appVersion(),
       migrationLevel: levelText(migrationLevel(ctx.db.$client)),
       csv: 'UTF-8 with BOM, comma separated, CRLF; cells starting with = + - @ tab or CR are prefixed with an apostrophe',
-      neverExported: [...NEVER_EXPORTED, 'private teacher notes', 'Secret Student choices of rounds not revealed', 'password, PIN and token hashes (blank)'],
+      neverExported: [...NEVER_EXPORTED, ...neverExported, 'Secret Student choices of rounds not revealed', 'password, PIN and token hashes and encrypted link tokens (blank)'],
       tables: b.tables,
       ...extra,
       files: b.files,
@@ -198,9 +199,12 @@ const stamp = (ms: number) => new Date(ms).toISOString().slice(0, 16).replace(/[
 export async function fullExport(ctx: RequestContext, input: { confirm: string; includeUploads?: boolean | undefined }): Promise<ExportReady> {
   if (input.confirm.trim() !== FULL_EXPORT_CONFIRM) throw invalid(`Type ${FULL_EXPORT_CONFIRM} to confirm`, { reason: 'CONFIRMATION_MISMATCH' });
   const includeUploads = input.includeUploads ?? true;
-  const ready = await prepare(ctx, `class-compass-export-${stamp(ctx.now())}.zip`, async (b) => {
+  const ready = await prepare(ctx, `class-compass-export-${stamp(ctx.now())}.zip`, [], async (b) => {
     let uploads = { count: 0, missing: 0 };
     let hiddenSelections = 0;
+    // Private teacher notes (owner decision, D-114): included, through the goals module's helper.
+    const notes = exportablePrivateNotes(ctx.db);
+    await addTable(b, PRIVATE_NOTES_TABLE, [...PRIVATE_NOTES_EXPORT_COLUMNS], notes);
     for (const t of tableNames(ctx.db)) {
       const columns = columnsOf(ctx.db, t);
       let rows: Array<Record<string, unknown>>;
@@ -214,9 +218,9 @@ export async function fullExport(ctx: RequestContext, input: { confirm: string; 
       await addTable(b, t, columns, rows);
       if (t === 'files' && includeUploads) uploads = await addUploads(ctx, b, rows.filter((r) => r.deleted_at === null));
     }
-    return { kind: 'full', uploadsIncluded: includeUploads, uploads, secretStudentChoicesNotRevealed: hiddenSelections, privateNotesNotIncluded: privateNotesCount(ctx.db) };
+    return { kind: 'full', uploadsIncluded: includeUploads, uploads, secretStudentChoicesNotRevealed: hiddenSelections, privateNotesIncluded: notes.length };
   });
-  audit(ctx.db, ctx.actor, { action: 'export.full', entity: 'export', entityId: null, after: { fileName: ready.fileName, sizeBytes: ready.sizeBytes, includeUploads } }, ctx.now());
+  audit(ctx.db, ctx.actor, { action: 'export.full', entity: 'export', entityId: null, after: { fileName: ready.fileName, sizeBytes: ready.sizeBytes, includeUploads, privateNotesIncluded: true } }, ctx.now());
   return ready;
 }
 
@@ -298,7 +302,7 @@ function jsonAwareRows(db: Db, table: string, sid: string): Row[] | null {
 export async function studentExport(ctx: RequestContext, studentId: string): Promise<ExportReady> {
   const st = ctx.db.select().from(students).where(eq(students.id, studentId)).get();
   if (!st) throw notFound('Student');
-  const ready = await prepare(ctx, `student-export-${studentId.slice(0, 8)}-${stamp(ctx.now())}.zip`, async (b) => {
+  const ready = await prepare(ctx, `student-export-${studentId.slice(0, 8)}-${stamp(ctx.now())}.zip`, ['private teacher notes (count only, D-114)'], async (b) => {
     let hiddenSelections = 0;
     const goalIds: string[] = [];
     // Files about the student: their own uploads, the files on their evidence (also ones a teacher

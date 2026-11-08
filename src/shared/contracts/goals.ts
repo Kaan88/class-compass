@@ -77,11 +77,14 @@ export const Category = z.object({
   subjectId: z.string().nullable(),
   /** Made by a teacher (editable by that teacher). */
   custom: z.boolean(),
+  /** Hidden from choosing for this viewer (own archive, a default archived by the school or by this teacher, D-116). */
   archived: z.boolean(),
+  /** A default archived school-wide by an administrator: only an administrator can restore it. */
+  schoolArchived: z.boolean(),
 });
 export type Category = z.infer<typeof Category>;
 
-export const Preset = z.object({ id: z.string(), categoryId: z.string(), text: LocalizedText, custom: z.boolean(), archived: z.boolean() });
+export const Preset = z.object({ id: z.string(), categoryId: z.string(), text: LocalizedText, custom: z.boolean(), archived: z.boolean(), schoolArchived: z.boolean() });
 export type Preset = z.infer<typeof Preset>;
 
 export const GoalEntry = z.object({
@@ -188,6 +191,22 @@ export const teacherStudentGoals = endpoint({
   output: TeacherStudentGoals,
 });
 
+/**
+ * Evidence added by a teacher for a student (S13b2, D-119; closes the S10 gap D-087): the same kinds
+ * as on the student page. A file is uploaded first with `uploadFile` (owner = the student, media flags
+ * apply) and then attached here; only the teacher's own uploads can be attached. Students see it
+ * marked "by your teacher" and cannot change it.
+ */
+export const teacherAddEvidence = endpoint({
+  method: 'POST',
+  path: '/api/teacher/contexts/:contextId/students/:studentId/evidence',
+  access: 'teacher',
+  input: z.object({ contextId: Id, studentId: Id, goalId: Id.optional(), kind: EvidenceKind, body: z.string().trim().max(2000).optional(), url: SafeUrl.optional(), fileId: Id.optional() }),
+  output: Evidence,
+});
+/** The teacher deletes evidence they added themselves (students' evidence stays the student's, GOL-5). */
+export const teacherDeleteEvidence = endpoint({ method: 'DELETE', path: '/api/teacher/evidence/:evidenceId', access: 'teacher', input: z.object({ evidenceId: Id }), output: Ok });
+
 export const teacherCreateGoal = endpoint({
   method: 'POST',
   path: '/api/teacher/contexts/:contextId/students/:studentId/goals',
@@ -268,6 +287,27 @@ export const updatePreset = endpoint({
   input: z.object({ presetId: Id, text: RequiredLocalizedText.optional(), archived: z.boolean().optional() }),
   output: Preset,
 });
+/**
+ * Default categories and presets school-wide (S13b2, D-116): an administrator archives a default for
+ * every class or restores it. (Teachers archive a default for their own classes with updateCategory /
+ * updatePreset, like their own items.)
+ */
+export const DEFAULT_ITEM_KINDS = ['category', 'preset'] as const;
+export const adminGoalDefaults = endpoint({
+  method: 'GET',
+  path: '/api/admin/goal-defaults',
+  access: 'admin',
+  input: z.object({}),
+  output: z.object({ categories: z.array(Category), presets: z.array(Preset) }),
+});
+export const adminArchiveGoalDefault = endpoint({
+  method: 'PUT',
+  path: '/api/admin/goal-defaults/:kind/:itemId',
+  access: 'admin',
+  input: z.object({ kind: z.enum(DEFAULT_ITEM_KINDS), itemId: Id, archived: z.boolean() }),
+  output: z.object({ categories: z.array(Category), presets: z.array(Preset) }),
+});
+
 export const goalSettings = endpoint({
   method: 'GET',
   path: '/api/teacher/contexts/:contextId/goals/settings',

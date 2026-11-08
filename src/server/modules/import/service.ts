@@ -66,6 +66,7 @@ import { taughtClassIds } from '../school/service.ts';
 import { GOALS_HISTORY_TABLES, goalsHistorySince } from '../goals/history.ts';
 import { SELECTIONS_TABLE_NAME, studentInContextSelections } from '../secret/service.ts';
 import { createStudentInClass, liveClassIdsOf, liveEnrolmentsOf } from '../students/service.ts';
+import { discardUnusedAutoLinks } from '../links/service.ts';
 import { extractFile, extractPaste, listSheets as listWorkbookSheets, type Extracted } from './parsers/index.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -774,6 +775,8 @@ function removeCreatedStudent(db: Db, studentId: string, enrolmentId: string | n
     if (enrolmentId) db.delete(enrolments).where(eq(enrolments.id, enrolmentId)).run();
     const other = db.select({ id: enrolments.id }).from(enrolments).where(eq(enrolments.studentId, studentId)).get();
     if (other || referencedInJson(db, studentId)) throw new HasHistory();
+    // The permanent link made automatically (D-115) is not history while it was never opened.
+    if (!discardUnusedAutoLinks(db, studentId)) throw new HasHistory();
     try {
       db.delete(students).where(eq(students.id, studentId)).run();
     } catch (err) {

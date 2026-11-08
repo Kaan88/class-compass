@@ -7,20 +7,21 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/goals.ts';
-import { OutcomeSet, type Category, type Feedback, type Goal, type GoalLibrary, type Preset, type PrivateNote, type TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
+import { OutcomeSet, type Category, type Evidence, type Feedback, type Goal, type GoalLibrary, type Preset, type PrivateNote, type TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
 import { initials, normaliseName } from '../../../shared/text/turkish.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { tx } from '../../db/client.ts';
-import { evidence, goalEntries, goalPresets, goals, skillCategories, students, subjects, teacherAssessments, teacherFeedback, teachingContexts } from '../../db/schema.ts';
+import { defaultItemArchives, evidence, files, goalEntries, goalPresets, goals, skillCategories, students, subjects, teacherAssessments, teacherFeedback, teachingContexts } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { assertModuleEnabled, getMediaPolicy, isModuleEnabled, mergeModuleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, getClass, type ClassRow, type ContextRow } from '../school/policy.ts';
+import { assertMediaAllowed, deleteFileRow } from '../files/service.ts';
 import { liveClassIdsOf, rosterRows } from '../students/service.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type GoalRow } from './dto.ts';
-import { categoryDto, getCategory, getPreset, inScope, libraryFor, outcomesOf, presetDto } from './library.ts';
+import { categoryDto, defaultLibrary, getCategory, getPreset, hiddenDefaultsOf, inScope, libraryFor, outcomesOf, presetDto, type HiddenDefaults } from './library.ts';
 import { addPrivateNote, deletePrivateNote, myPrivateNotes } from './private.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -322,10 +323,31 @@ export function createCategory(ctx: RequestContext, input: In<typeof C.createCat
   });
 }
 
+/**
+ * A teacher archives or restores a DEFAULT category or preset for their own classes only (S13b2,
+ * D-116): a row in `default_item_archives`; the default itself and other teachers are unaffected.
+ * Defaults cannot be renamed by teachers. Returns the viewer's state of the item.
+ */
+function setDefaultHidden(ctx: RequestContext, kind: 'category' | 'preset', itemId: string, archived: boolean | undefined, renamed: boolean): HiddenDefaults {
+  const userId = requireUser(ctx).id;
+  if (renamed) throw new AppError('FORBIDDEN', 'Default items belong to the school and cannot be renamed', { reason: 'DEFAULT_ITEM_READ_ONLY' });
+  if (archived !== undefined) {
+    const where = and(eq(defaultItemArchives.userId, userId), eq(defaultItemArchives.kind, kind), eq(defaultItemArchives.itemId, itemId));
+    const had = Boolean(ctx.db.select().from(defaultItemArchives).where(where).get());
+    if (archived && !had) ctx.db.insert(defaultItemArchives).values({ userId, kind, itemId, archivedAt: ctx.now() }).run();
+    if (!archived && had) ctx.db.delete(defaultItemArchives).where(where).run();
+    if (archived !== had) {
+      audit(ctx.db, ctx.actor, { action: archived ? 'goal_default.hide' : 'goal_default.show', entity: kind === 'category' ? 'skill_category' : 'goal_preset', entityId: itemId, after: { scope: 'teacher' } }, ctx.now());
+    }
+  }
+  return hiddenDefaultsOf(ctx.db, [userId]);
+}
+
 export function updateCategory(ctx: RequestContext, input: In<typeof C.updateCategory>): Category {
   return tx(ctx.db, () => {
     const c = getCategory(ctx.db, input.categoryId);
-    // Default categories belong to the school; teachers edit only their own.
+    if (c && c.createdBy === null) return categoryDto(c, setDefaultHidden(ctx, 'category', c.id, input.archived, Boolean(input.name) || input.icon !== undefined));
+    // Custom categories: teachers edit only their own.
     if (!c || c.createdBy !== requireUser(ctx).id) throw notFound('Category');
     assertLibraryWritable(ctx, c.subjectId, 'Category');
     const patch: Partial<typeof skillCategories.$inferInsert> = { updatedAt: ctx.now() };
@@ -355,6 +377,7 @@ export function createPreset(ctx: RequestContext, input: In<typeof C.createPrese
 export function updatePreset(ctx: RequestContext, input: In<typeof C.updatePreset>): Preset {
   return tx(ctx.db, () => {
     const p = getPreset(ctx.db, input.presetId);
+    if (p && p.createdBy === null) return presetDto(p, setDefaultHidden(ctx, 'preset', p.id, input.archived, Boolean(input.text)));
     if (!p || p.createdBy !== requireUser(ctx).id) throw notFound('Preset goal');
     assertLibraryWritable(ctx, p.subjectId, 'Preset goal');
     const patch: Partial<typeof goalPresets.$inferInsert> = { updatedAt: ctx.now() };
@@ -382,5 +405,81 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setGoalSetti
     mergeModuleConfig(ctx.db, s.context.id, 'goals', { outcomes: ok.data }, requireUser(ctx).id, ctx.now());
     audit(ctx.db, ctx.actor, { action: 'goals.settings', entity: 'teaching_context', entityId: s.context.id, before: { outcomes: before }, after: { outcomes: ok.data } }, ctx.now());
     return { outcomes: outcomesOf(ctx.db, s.context.id) };
+  });
+}
+
+// ---------------------------------------------------------------- evidence by the teacher (S13b2, D-119)
+/**
+ * Evidence for a student from the teacher Goals page: text, a safe link, or a file the teacher
+ * uploaded for this student (`uploadFile` with the student as owner). The media flags are checked
+ * again here (an admin may have switched photos or audio off since the upload, D-014).
+ */
+export function addEvidence(ctx: RequestContext, input: In<typeof C.teacherAddEvidence>): Evidence {
+  return tx(ctx.db, () => {
+    const s = scopeOf(ctx, input.contextId);
+    assertWritable(ctx, s);
+    assertStudentInClass(ctx, s, input.studentId);
+    const subjectId = s.context.subjectId;
+    if (input.goalId) {
+      const g = ctx.db.select().from(goals).where(eq(goals.id, input.goalId)).get();
+      if (!g || g.deletedAt !== null || g.studentId !== input.studentId || g.subjectId !== subjectId) throw notFound('Goal');
+    }
+    const body = input.body?.trim() || null;
+    let url: string | null = null;
+    let fileId: string | null = null;
+    if (input.kind === 'text') {
+      if (!body) throw invalid('Write something first', { reason: 'EVIDENCE_TEXT_REQUIRED' });
+    } else if (input.kind === 'link') {
+      if (!input.url) throw invalid('Add the web address', { reason: 'EVIDENCE_URL_REQUIRED' });
+      url = new URL(input.url).href;
+    } else {
+      if (!input.fileId) throw invalid('Upload the file first', { reason: 'EVIDENCE_FILE_REQUIRED' });
+      const f = ctx.db.select().from(files).where(eq(files.id, input.fileId)).get();
+      const me = requireUser(ctx).id;
+      if (!f || f.deletedAt !== null || f.ownerStudentId !== input.studentId || f.uploadedByType !== 'user' || f.uploadedById !== me) throw notFound('File');
+      const okKind = input.kind === 'audio' ? f.kind === 'audio' : f.kind === 'document' || f.kind === 'image';
+      if (!okKind) throw invalid('This file does not match the kind of evidence', { reason: 'EVIDENCE_FILE_KIND' });
+      assertMediaAllowed(ctx.db, f.kind, 'evidence');
+      fileId = f.id;
+    }
+    const now = ctx.now();
+    const row = { id: newId(), studentId: input.studentId, subjectId, goalId: input.goalId ?? null, kind: input.kind, body, url, fileId, authorType: 'teacher' as const, authorId: requireUser(ctx).id, createdAt: now, updatedAt: now, deletedAt: null };
+    ctx.db.insert(evidence).values(row).run();
+    audit(ctx.db, ctx.actor, { action: 'evidence.create', entity: 'evidence', entityId: row.id, after: { studentId: row.studentId, subjectId, goalId: row.goalId, kind: row.kind, fileId } }, now);
+    return evidenceDtos(ctx.db, [row])[0]!;
+  });
+}
+
+/** The author (a teacher who still teaches the student in that subject) deletes their evidence; its file goes too. */
+export async function deleteEvidence(ctx: RequestContext, evidenceId: string): Promise<void> {
+  const file = tx(ctx.db, () => {
+    const e = ctx.db.select().from(evidence).where(eq(evidence.id, evidenceId)).get();
+    if (!e || e.deletedAt !== null) throw notFound('Evidence');
+    const s = scopeForStudent(ctx, e.studentId, e.subjectId, 'Evidence');
+    if (e.authorType !== 'teacher' || e.authorId !== requireUser(ctx).id) throw new AppError('FORBIDDEN', 'Only evidence you added yourself can be deleted here', { reason: 'STUDENT_CONTRIBUTION' });
+    assertWritable(ctx, s);
+    ctx.db.update(evidence).set({ deletedAt: ctx.now(), updatedAt: ctx.now() }).where(eq(evidence.id, e.id)).run();
+    audit(ctx.db, ctx.actor, { action: 'evidence.delete', entity: 'evidence', entityId: e.id, before: { kind: e.kind, fileId: e.fileId } }, ctx.now());
+    const f = e.fileId ? ctx.db.select().from(files).where(eq(files.id, e.fileId)).get() : undefined;
+    const stillShown = f ? ctx.db.select({ id: evidence.id }).from(evidence).where(and(eq(evidence.fileId, f.id), isNull(evidence.deletedAt))).get() : undefined;
+    return f && f.deletedAt === null && !stillShown && f.uploadedByType === 'user' && f.uploadedById === requireUser(ctx).id ? f : null;
+  });
+  if (file) await deleteFileRow(ctx, file);
+}
+
+// ---------------------------------------------------------------- school-wide defaults (admin, D-116)
+export const adminDefaults = (ctx: RequestContext) => defaultLibrary(ctx.db);
+
+/** An administrator archives a default category or preset for every class, or restores it. */
+export function adminArchiveDefault(ctx: RequestContext, input: In<typeof C.adminArchiveGoalDefault>) {
+  return tx(ctx.db, () => {
+    const table = input.kind === 'category' ? skillCategories : goalPresets;
+    const row = ctx.db.select().from(table).where(eq(table.id, input.itemId)).get();
+    if (!row || row.createdBy !== null) throw notFound(input.kind === 'category' ? 'Category' : 'Preset goal');
+    if ((row.archivedAt !== null) !== input.archived) {
+      ctx.db.update(table).set({ archivedAt: input.archived ? ctx.now() : null, updatedAt: ctx.now() }).where(eq(table.id, row.id)).run();
+      audit(ctx.db, ctx.actor, { action: input.archived ? 'goal_default.archive' : 'goal_default.restore', entity: input.kind === 'category' ? 'skill_category' : 'goal_preset', entityId: row.id, after: { scope: 'school' } }, ctx.now());
+    }
+    return defaultLibrary(ctx.db);
   });
 }

@@ -1,187 +1,297 @@
 /**
- * Personal student links in the teacher area (S10: STU-1..7; PIN-gated in classroom mode).
- * - Per class: who has a link, when it was made and last used; make, make again (the old link stops
- *   working at once) or revoke, for one student or the whole class.
- * - A new link is shown ONCE (only its hash is stored): print the cards (QR made locally on this
- *   device, no outside service) or copy the address now; to print again, make new links.
+ * Personal student links in the teacher area (S10: STU-1..7; permanent since S13b2: D-115, D-118,
+ * D-120; PIN-gated in classroom mode).
+ * - Every student of the class has a permanent link (made automatically). The page shows it, copies
+ *   it and prints cards with a QR code drawn on this device (no outside service). There is no routine
+ *   revoke or "make new link".
+ * - Cards: A4 portrait, 3 × 5 = 15 per page (about 63 × 52 mm) or "Larger" 2 × 4 = 8, dashed cut
+ *   lines, QR ≥ 28 mm with a 4-module quiet zone, error correction M, always black on white; the
+ *   short line on the card is in the class's student-page language. Print all, or one card.
+ * - Emergency (a leaked link): revoke it, or make a new one; typed full name + reason, audited. The
+ *   row then says when the link was replaced, so the teacher prints the new card.
  * - STU-7: anyone who has a student's link can see that student's page and add to it.
  */
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import qrcode from 'qrcode-generator';
 import * as L from '../../../shared/contracts/links.ts';
-import type { NewLink } from '../../../shared/contracts/links.ts';
+import type { StudentLinkRow } from '../../../shared/contracts/links.ts';
 import * as School from '../../../shared/contracts/school.ts';
+import { translate, type Locale } from '../../../shared/i18n/index.ts';
+import { lowerTr, normaliseName } from '../../../shared/text/turkish.ts';
 import { call } from '../../lib/api.ts';
+import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
 import { showToast } from '../../lib/toast.ts';
-import { useRun } from '../../lib/useRun.ts';
 import { whenText } from '../../modules/goals/shared.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
-import { Select } from '../../ui/Fields.tsx';
-import { IconCopy, IconKey, IconPrint, IconUserOff, IconX } from '../../ui/icons.tsx';
+import { Select, TextArea, TextField } from '../../ui/Fields.tsx';
+import { IconAlert, IconCopy, IconPrint, IconX } from '../../ui/icons.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'links'] as const;
 
-/** QR code drawn as one SVG path from the local generator (error correction M). */
-export function QrCode({ text, label }: { text: string; label: string }) {
+/** Smallest printed width of the QR symbol itself (without the quiet zone), in millimetres (D-120). */
+export const QR_MIN_MM = 28;
+export const QR_QUIET_MODULES = 4;
+
+/** The QR matrix for a text (error correction M, smallest version that fits). */
+export function qrMatrix(text: string): boolean[][] {
   const qr = qrcode(0, 'M');
   qr.addData(text);
   qr.make();
   const n = qr.getModuleCount();
+  return Array.from({ length: n }, (_, r) => Array.from({ length: n }, (_, c) => qr.isDark(r, c)));
+}
+
+/**
+ * QR code as one crisp SVG path with a 4-module quiet zone, always black on white (print tokens).
+ * `minMm` sets the printed size so the symbol itself is at least that wide.
+ */
+export function QrCode({ text, label, minMm }: { text: string; label: string; minMm?: number }) {
+  const m = qrMatrix(text);
+  const n = m.length;
+  const q = QR_QUIET_MODULES;
   let d = '';
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c + 4} ${r + 4}h1v1h-1z`;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (m[r]![c]) d += `M${c + q} ${r + q}h1v1h-1z`;
+  const size = minMm ? { width: `${((minMm * (n + 2 * q)) / n).toFixed(2)}mm`, height: `${((minMm * (n + 2 * q)) / n).toFixed(2)}mm` } : undefined;
   return (
-    <svg className="cc-qr" viewBox={`0 0 ${n + 8} ${n + 8}`} role="img" aria-label={label} shapeRendering="crispEdges">
-      <rect className="cc-qr__bg" width={n + 8} height={n + 8} />
+    <svg className="cc-qr" viewBox={`0 0 ${n + 2 * q} ${n + 2 * q}`} role="img" aria-label={label} shapeRendering="crispEdges" style={size} data-modules={n}>
+      <rect className="cc-qr__bg" width={n + 2 * q} height={n + 2 * q} />
       <path className="cc-qr__fg" d={d} />
     </svg>
   );
 }
 
-function Cards({ links, className, onClose }: { links: NewLink[]; className: string; onClose: () => void }) {
+export type CardSize = 'small' | 'large';
+export const CARDS_PER_PAGE: Record<CardSize, number> = { small: 15, large: 8 };
+
+export interface CardData {
+  id: string;
+  fullName: string;
+  className: string;
+  url: string;
+}
+
+/** One printable card: name, class, the short line in the student-page language and the QR code. */
+function LinkCard({ card, size, cardLanguage }: { card: CardData; size: CardSize; cardLanguage: Locale }) {
   const { t } = useI18n();
-  const copy = (url: string) =>
-    void navigator.clipboard?.writeText(url).then(
-      () => showToast({ message: t('links.copied'), kind: 'success' }),
-      () => showToast({ message: t('links.copyFailed'), kind: 'error' }),
-    );
   return (
-    <section className="cc-stack cc-print-sheet" aria-labelledby="links-cards" data-testid="link-cards">
-      <div className="cc-row cc-noprint">
-        <h2 id="links-cards" className="cc-h2">
-          {t('links.newLinks', { count: links.length })}
-        </h2>
-        <Button variant="primary" onPress={() => window.print()}>
-          <IconPrint />
-          {t('links.print')}
-        </Button>
-        <Button onPress={onClose}>
-          <IconX />
-          {t('links.hideCards')}
-        </Button>
-      </div>
-      <Alert kind="warning">{t('links.shownOnce')}</Alert>
-      <ul className="cc-link-cards">
-        {links.map((l) => (
-          <li key={l.studentId} className="cc-link-card" data-testid="link-card">
-            <strong className="cc-link-card__name">{l.fullName}</strong>
-            <span className="cc-muted">{className}</span>
-            <QrCode text={l.url} label={t('links.qrFor', { name: l.fullName })} />
-            <code className="cc-link-card__url">{l.url}</code>
-            <p className="cc-link-card__note">{t('links.cardNote')}</p>
-            <Button size="small" className="cc-noprint" onPress={() => copy(l.url)}>
-              <IconCopy />
-              {t('links.copy')}
-            </Button>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <li className="cc-link-card" data-testid="link-card" data-student={card.id}>
+      <strong className="cc-link-card__name">{card.fullName}</strong>
+      <span className="cc-link-card__class">{card.className}</span>
+      <span className="cc-link-card__note" lang={cardLanguage}>
+        {translate(cardLanguage, 'links.cardScan')}
+      </span>
+      <QrCode text={card.url} label={t('links.qrFor', { name: card.fullName })} minMm={size === 'small' ? QR_MIN_MM : 42} />
+    </li>
   );
 }
 
-type Confirm = { kind: 'regenerate'; studentId: string; name: string } | { kind: 'revoke'; studentId: string; name: string } | { kind: 'allAgain' } | { kind: 'revokeAll' };
+/**
+ * The A4 sheets (D-120): pages of 15 (or 8) cards, each page its own grid so a page break never cuts
+ * a card. The print copy is hidden on screen; the preview copy is shown in the page.
+ */
+export function LinkCardSheets({ cards, size, cardLanguage, mode }: { cards: CardData[]; size: CardSize; cardLanguage: Locale; mode: 'print' | 'preview' }) {
+  const { t } = useI18n();
+  const per = CARDS_PER_PAGE[size];
+  const pages: CardData[][] = [];
+  for (let i = 0; i < cards.length; i += per) pages.push(cards.slice(i, i + per));
+  const sheets = (
+    <section className={`cc-link-sheets cc-link-sheets--${mode}`} data-size={size} aria-label={t('links.cardsPreview')} data-testid={`link-sheets-${mode}`}>
+      {pages.map((page, i) => (
+        <ul key={i} className="cc-link-page" data-testid="link-page">
+          {page.map((c) => (
+            <LinkCard key={c.id} card={c} size={size} cardLanguage={cardLanguage} />
+          ))}
+        </ul>
+      ))}
+    </section>
+  );
+  // The print copy lives directly in <body>, so the print style can hide everything else.
+  return mode === 'print' ? createPortal(sheets, document.body) : sheets;
+}
+
+/** Print only these cards: the sheets are filled, the print dialog opens, and the page restores after printing. */
+function usePrint() {
+  const [only, setOnly] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (only === undefined) return;
+    const done = () => setOnly(undefined);
+    window.addEventListener('afterprint', done, { once: true });
+    const timer = window.setTimeout(() => window.print(), 50);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('afterprint', done);
+    };
+  }, [only]);
+  return { printing: only, print: (studentId: string | null) => setOnly(studentId) };
+}
+
+const nameKey = (n: string) => lowerTr(normaliseName(n));
+
+/**
+ * Emergency revoke / replace (D-118) for admins and the student's current teachers: clearly an
+ * emergency, the student's full name typed, a reason required. Calls the endpoint for the area.
+ */
+export function EmergencyLinkDialog({
+  student,
+  onClose,
+  endpoint,
+  onDone,
+}: {
+  student: { id: string; fullName: string; hasLink: boolean } | null;
+  onClose: () => void;
+  endpoint: typeof L.teacherEmergencyLink | typeof L.adminEmergencyLink;
+  onDone: (state: L.StudentLinkState) => void;
+}) {
+  const { t } = useI18n();
+  const [action, setAction] = useState<'replace' | 'revoke'>('replace');
+  const [typed, setTyped] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setAction('replace');
+    setTyped('');
+    setReason('');
+    setError(null);
+  }, [student?.id]);
+  if (!student) return null;
+  const valid = nameKey(typed) === nameKey(student.fullName) && reason.trim().length >= 3;
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await call(endpoint, { studentId: student.id, action, confirmName: typed, reason: reason.trim() });
+      showToast({ message: action === 'revoke' ? t('links.emergency.revokedToast', { name: student.fullName }) : t('links.emergency.replacedToast', { name: student.fullName }), kind: 'success' });
+      onDone(r);
+      onClose();
+    } catch (err) {
+      setError(errorText(t, err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal isOpen onOpenChange={(o) => !o && onClose()} title={t('links.emergency.title', { name: student.fullName })} role="alertdialog">
+      <div className="cc-alert cc-alert--warning">
+        <IconAlert />
+        <div>{t('links.emergency.explain')}</div>
+      </div>
+      <Select
+        label={t('links.emergency.action')}
+        value={action}
+        onChange={(v) => setAction(v as 'replace' | 'revoke')}
+        items={[
+          { id: 'replace', label: t('links.emergency.replace') },
+          ...(student.hasLink ? [{ id: 'revoke', label: t('links.emergency.revoke') }] : []),
+        ]}
+      />
+      <p className="cc-muted">{action === 'revoke' ? t('links.emergency.revokeHint') : t('links.emergency.replaceHint')}</p>
+      <TextArea label={t('links.emergency.reason')} rows={2} value={reason} onChange={setReason} maxLength={500} isRequired />
+      <TextField label={t('confirm.typeToConfirm', { text: student.fullName })} value={typed} onChange={setTyped} autoComplete="off" />
+      {error ? (
+        <p role="alert" className="cc-field__error">
+          {error}
+        </p>
+      ) : null}
+      <DialogActions>
+        <Button onPress={onClose}>{t('common.cancel')}</Button>
+        <Button variant="danger" isDisabled={!valid || busy} onPress={() => void submit()}>
+          {action === 'revoke' ? t('links.emergency.revokeButton') : t('links.emergency.replaceButton')}
+        </Button>
+      </DialogActions>
+    </Modal>
+  );
+}
+
+export function copyLink(t: ReturnType<typeof useI18n>['t'], url: string) {
+  void navigator.clipboard?.writeText(url).then(
+    () => showToast({ message: t('links.copied'), kind: 'success' }),
+    () => showToast({ message: t('links.copyFailed'), kind: 'error' }),
+  );
+}
+
+function LinkStatusLine({ s }: { s: StudentLinkRow }) {
+  const { t, locale } = useI18n();
+  if (!s.link) return <span className="cc-chip" data-testid="link-status">{s.revokedAt ? t('links.revokedOn', { date: whenText(s.revokedAt, locale) }) : t('links.none')}</span>;
+  return (
+    <span className="cc-chip" data-testid="link-status">
+      {s.link.lastUsedAt ? t('links.lastUsed', { date: whenText(s.link.lastUsedAt, locale) }) : t('links.notUsed')}
+    </span>
+  );
+}
 
 function ClassLinks({ classId }: { classId: string }) {
   const { t, locale } = useI18n();
-  const run = useRun();
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: [...ALL, classId], queryFn: () => call(L.classLinks, { classId }) });
-  const [fresh, setFresh] = useState<NewLink[]>([]);
-  const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [size, setSize] = useState<CardSize>('small');
+  const [preview, setPreview] = useState(false);
+  const [emergency, setEmergency] = useState<{ id: string; fullName: string; hasLink: boolean } | null>(null);
+  const { printing, print } = usePrint();
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const data = q.data;
-  const opts = { invalidate: [ALL] };
-  const add = (links: NewLink[]) => setFresh((prev) => [...prev.filter((p) => !links.some((l) => l.studentId === p.studentId)), ...links]);
-  const one = (studentId: string) => void run(() => call(L.generateStudentLink, { studentId }), opts).then((r) => r && add([r]));
-  const doConfirm = async () => {
-    const c = confirm;
-    setConfirm(null);
-    if (!c) return;
-    if (c.kind === 'regenerate') one(c.studentId);
-    if (c.kind === 'revoke') {
-      await run(() => call(L.revokeStudentLink, { studentId: c.studentId }), { ...opts, success: t('links.revoked') });
-      setFresh((prev) => prev.filter((p) => p.studentId !== c.studentId));
-    }
-    if (c.kind === 'allAgain') {
-      const r = await run(() => call(L.generateClassLinks, { classId, scope: 'all' }), opts);
-      if (r) setFresh(r.links);
-    }
-    if (c.kind === 'revokeAll') {
-      const r = await run(() => call(L.revokeClassLinks, { classId }), opts);
-      if (r) {
-        setFresh([]);
-        showToast({ message: t('links.revokedCount', { count: r.revoked }), kind: 'success' });
-      }
-    }
-  };
-  const missing = data.students.filter((s) => !s.link).length;
+  const cards: CardData[] = data.students.flatMap((s) => (s.link?.url ? [{ id: s.id, fullName: s.fullName, className: data.className, url: s.link.url }] : []));
+  const printed = printing ? cards.filter((c) => c.id === printing) : cards;
   return (
     <div className="cc-stack">
-      {data.archived ? <Alert kind="warning">{t('links.archived')}</Alert> : null}
       <div className="cc-row cc-noprint">
-        <Button variant="primary" isDisabled={data.archived || missing === 0} onPress={() => void run(() => call(L.generateClassLinks, { classId, scope: 'missing' }), opts).then((r) => r && add(r.links))}>
-          <IconKey />
-          {t('links.makeMissing', { count: missing })}
+        <Select label={t('links.cardSize')} value={size} onChange={(v) => setSize(v as CardSize)} items={[{ id: 'small', label: t('links.size.small') }, { id: 'large', label: t('links.size.large') }]} />
+        <Button variant="primary" isDisabled={cards.length === 0} onPress={() => print(null)}>
+          <IconPrint />
+          {t('links.printAll', { count: cards.length })}
         </Button>
-        <Button isDisabled={data.archived || data.students.length === 0} onPress={() => setConfirm({ kind: 'allAgain' })}>
-          {t('links.makeAllAgain')}
-        </Button>
-        <Button variant="danger" isDisabled={data.students.every((s) => !s.link)} onPress={() => setConfirm({ kind: 'revokeAll' })}>
-          <IconUserOff />
-          {t('links.revokeAll')}
+        <Button isDisabled={cards.length === 0} aria-pressed={preview} onPress={() => setPreview((p) => !p)}>
+          {preview ? <IconX /> : <IconPrint />}
+          {preview ? t('links.hidePreview') : t('links.preview')}
         </Button>
       </div>
-      {fresh.length ? <Cards links={fresh} className={data.className} onClose={() => setFresh([])} /> : null}
       {data.students.length === 0 ? <p className="cc-muted">{t('links.noStudents')}</p> : null}
       <ul className="cc-stack cc-noprint" data-testid="link-list">
         {data.students.map((s) => (
-          <li key={s.id} className="cc-card cc-row" data-testid="link-row">
-            <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
-            <strong>{s.fullName}</strong>
-            {s.link ? (
-              <span className="cc-chip">
-                {s.link.lastUsedAt ? t('links.lastUsed', { date: whenText(s.link.lastUsedAt, locale) }) : t('links.notUsed')} · {t('links.madeOn', { date: whenText(s.link.createdAt, locale) })}
-              </span>
-            ) : (
-              <span className="cc-chip">{t('links.none')}</span>
-            )}
-            <span className="cc-push-right cc-row">
-              <Button size="small" isDisabled={data.archived} onPress={() => (s.link ? setConfirm({ kind: 'regenerate', studentId: s.id, name: s.fullName }) : one(s.id))}>
-                <IconKey />
-                {s.link ? t('links.makeAgain') : t('links.make')}
-              </Button>
-              {s.link ? (
-                <Button size="small" variant="ghost" onPress={() => setConfirm({ kind: 'revoke', studentId: s.id, name: s.fullName })}>
-                  {t('links.revoke')}
+          <li key={s.id} className="cc-card cc-stack" data-testid="link-row">
+            <div className="cc-row">
+              <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
+              <strong>{s.fullName}</strong>
+              <LinkStatusLine s={s} />
+              <span className="cc-push-right cc-row">
+                {s.link?.url ? (
+                  <>
+                    <Button size="small" onPress={() => copyLink(t, s.link!.url!)}>
+                      <IconCopy />
+                      {t('links.copy')}
+                    </Button>
+                    <Button size="small" onPress={() => print(s.id)}>
+                      <IconPrint />
+                      {t('links.printOne')}
+                    </Button>
+                  </>
+                ) : null}
+                <Button size="small" variant="ghost" onPress={() => setEmergency({ id: s.id, fullName: s.fullName, hasLink: Boolean(s.link) })}>
+                  <IconAlert />
+                  {t('links.emergency.open')}
                 </Button>
-              ) : null}
-            </span>
+              </span>
+            </div>
+            {s.link?.replacedAt ? <Alert kind="warning">{t('links.replacedOn', { date: whenText(s.link.replacedAt, locale) })}</Alert> : null}
           </li>
         ))}
       </ul>
-      <Modal isOpen={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)} title={t('links.confirmTitle')} role="alertdialog">
-        <p>
-          {confirm?.kind === 'regenerate'
-            ? t('links.confirmRegenerate', { name: confirm.name })
-            : confirm?.kind === 'revoke'
-              ? t('links.confirmRevoke', { name: confirm.name })
-              : confirm?.kind === 'allAgain'
-                ? t('links.confirmAllAgain', { className: data.className })
-                : t('links.confirmRevokeAll', { className: data.className })}
-        </p>
-        <DialogActions>
-          <Button onPress={() => setConfirm(null)}>{t('common.cancel')}</Button>
-          <Button variant="danger" onPress={() => void doConfirm()}>
-            {t('links.confirm')}
-          </Button>
-        </DialogActions>
-      </Modal>
+      {preview ? <LinkCardSheets cards={cards} size={size} cardLanguage={data.cardLanguage} mode="preview" /> : null}
+      <LinkCardSheets cards={printed} size={size} cardLanguage={data.cardLanguage} mode="print" />
+      <EmergencyLinkDialog
+        student={emergency}
+        onClose={() => setEmergency(null)}
+        endpoint={L.teacherEmergencyLink}
+        onDone={() => void qc.invalidateQueries({ queryKey: ALL })}
+      />
     </div>
   );
 }

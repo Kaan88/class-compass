@@ -2,11 +2,11 @@
  * Goals on the personal student page (S10: GOL-1..5, STU-2, D-014), one subject:
  * My goals · Add a goal · My reflections · My evidence · Teacher feedback (read-only).
  * A student edits or deletes only what they wrote; teacher goals, progress, outcomes and feedback are
- * shown read-only. Photo and audio evidence appear only when the admin media flags allow them.
+ * shown read-only. Evidence uses the shared EvidenceAdder (S13b2, D-119); picture and voice choices
+ * appear only when the admin media flags allow them.
  */
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ACCEPT_HINT } from '../../shared/contracts/files.ts';
 import * as G from '../../shared/contracts/goals.ts';
 import type { Goal, StudentGoalsSection, StudentPage } from '../../shared/contracts/goals.ts';
 import { pickText, type MessageKey } from '../../shared/i18n/index.ts';
@@ -17,7 +17,7 @@ import { CONFIDENCE_LEVELS, EntryLine, EvidenceView, FeedbackLine, GoalSummary, 
 import { Button } from '../ui/Button.tsx';
 import { Select, TextArea, TextField } from '../ui/Fields.tsx';
 import { IconCheck, IconPlus, IconTrash } from '../ui/icons.tsx';
-import { AudioRecorder } from './AudioRecorder.tsx';
+import { EvidenceAdder } from '../modules/goals/EvidenceAdder.tsx';
 import { STUDENT_PAGE_KEY } from './keys.ts';
 
 type Media = StudentPage['media'];
@@ -222,97 +222,8 @@ function Reflections({ data, canWrite, subjectId }: { data: StudentGoalsSection;
   );
 }
 
-type EvidenceChoice = 'text' | 'link' | 'document' | 'photo' | 'audio';
-
-function EvidenceForm({ data, subjectId, media }: { data: StudentGoalsSection; subjectId: string; media: Media }) {
-  const { t, locale } = useI18n();
-  const run = useStudentRun();
-  const [kind, setKind] = useState<EvidenceChoice>('text');
-  const [goalId, setGoalId] = useState('');
-  const [body, setBody] = useState('');
-  const [url, setUrl] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [recording, setRecording] = useState<Blob | null>(null);
-  const [inputKey, setInputKey] = useState(0);
-  const kinds: Array<{ id: EvidenceChoice; label: string }> = [
-    { id: 'text', label: t('goals.evidenceKind.text') },
-    { id: 'link', label: t('goals.evidenceKind.link') },
-    ...(media.documents ? [{ id: 'document' as const, label: t('student.evidenceDocument') }] : []),
-    ...(media.photos ? [{ id: 'photo' as const, label: t('student.evidencePhoto') }] : []),
-    ...(media.audio ? [{ id: 'audio' as const, label: t('goals.evidenceKind.audio') }] : []),
-  ];
-  const urlOk = !url.trim() || G.isSafeHttpUrl(url);
-  const valid =
-    kind === 'text' ? Boolean(body.trim()) : kind === 'link' ? Boolean(url.trim()) && urlOk : kind === 'audio' ? recording !== null : file !== null;
-  const reset = () => {
-    setBody('');
-    setUrl('');
-    setFile(null);
-    setRecording(null);
-    setInputKey((k) => k + 1);
-  };
-  const save = async () => {
-    const common = { subjectId, ...(goalId ? { goalId } : {}), ...(body.trim() ? { body: body.trim() } : {}) };
-    const r = await run(async () => {
-      if (kind === 'text') return call(G.studentAddEvidence, { ...common, kind: 'text' });
-      if (kind === 'link') return call(G.studentAddEvidence, { ...common, kind: 'link', url: url.trim() });
-      if (kind === 'audio') {
-        const up = await upload(G.studentUploadFile, { kind: 'audio' }, recording!, 'recording.webm');
-        return call(G.studentAddEvidence, { ...common, kind: 'audio', fileId: up.id });
-      }
-      const up = await upload(G.studentUploadFile, { kind: kind === 'photo' ? 'image' : 'document' }, file!);
-      return call(G.studentAddEvidence, { ...common, kind: 'file', fileId: up.id });
-    }, t('student.toast.evidenceAdded'));
-    if (r) reset();
-  };
-  return (
-    <div className="cc-card cc-stack" data-testid="evidence-form">
-      <Select
-        label={t('student.evidenceKind')}
-        items={kinds}
-        value={kind}
-        onChange={(v) => {
-          setKind(v as EvidenceChoice);
-          setFile(null);
-          setRecording(null);
-        }}
-      />
-      <Select
-        label={t('student.evidenceGoal')}
-        items={[{ id: '', label: t('student.noGoalLink') }, ...data.goals.map((g) => ({ id: g.id, label: goalText(g, locale) }))]}
-        value={goalId}
-        onChange={setGoalId}
-      />
-      {kind === 'link' ? <TextField label={t('student.linkUrl')} description={t('student.linkHint')} type="url" value={url} onChange={setUrl} errorMessage={urlOk ? null : t('student.linkInvalid')} /> : null}
-      {kind === 'document' || kind === 'photo' ? (
-        <div className="cc-field">
-          <label className="cc-field__label" htmlFor={`evidence-file-${subjectId}`}>
-            {kind === 'photo' ? t('student.choosePhoto') : t('student.chooseFile')}
-          </label>
-          <input
-            key={inputKey}
-            id={`evidence-file-${subjectId}`}
-            className="cc-input"
-            type="file"
-            accept={kind === 'photo' ? ACCEPT_HINT.image : ACCEPT_HINT.document}
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-        </div>
-      ) : null}
-      {kind === 'audio' ? <AudioRecorder value={recording} onChange={setRecording} /> : null}
-      <TextArea label={kind === 'text' ? t('student.evidenceWords') : t('student.evidenceCaption')} rows={3} value={body} onChange={setBody} maxLength={2000} />
-      <div>
-        <Button variant="primary" isDisabled={!valid} onPress={() => void save()}>
-          <IconPlus />
-          {t('student.addEvidence')}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export function GoalsSection({ data, subjectId, media }: { data: StudentGoalsSection; subjectId: string; media: Media }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const run = useStudentRun();
   return (
     <div className="cc-stack" data-testid="student-goals">
@@ -324,7 +235,16 @@ export function GoalsSection({ data, subjectId, media }: { data: StudentGoalsSec
         <h3 id={`my-evidence-${subjectId}`} className="cc-h2">
           {t('student.myEvidence')}
         </h3>
-        {data.canWrite ? <EvidenceForm data={data} subjectId={subjectId} media={media} /> : null}
+        {data.canWrite ? (
+          <EvidenceAdder
+            idPrefix={`evidence-${subjectId}`}
+            goals={data.goals.map((g) => ({ id: g.id, label: goalText(g, locale) }))}
+            media={media}
+            upload={(kind, file, name) => upload(G.studentUploadFile, { kind }, file, name)}
+            add={(input) => call(G.studentAddEvidence, { subjectId, ...input })}
+            run={(fn, success) => run(fn, success)}
+          />
+        ) : null}
         {data.evidence.length === 0 ? <p className="cc-muted">{t('student.noEvidence')}</p> : null}
         <ul className="cc-stack">
           {data.evidence.map((e) => (
