@@ -1,6 +1,6 @@
 /** Grouping: groups panel on the classroom display + arrangements / levels / pair rules page (GRP-1..8, DSH-8). */
 import { GroupingPage } from '../../routes/teacher/Grouping.tsx';
-import { IconUsers } from '../../ui/icons.tsx';
+import { IconGroups } from '../../ui/icons.tsx';
 import { useI18n } from '../../lib/i18n.tsx';
 import { ModuleConfigToggle } from '../../ui/ModuleConfigToggle.tsx';
 import { defineClientModule } from '../types.ts';
@@ -17,7 +17,7 @@ export const groupingClientManifest = defineClientModule({
   policyKey: 'grouping',
   i18nNamespace: 'grouping',
   dashboardSlots: [groupsDashboardSlot],
-  teacherPages: [{ key: 'grouping', path: 'grouping', labelKey: 'teacher.grouping', Icon: IconUsers, order: 90, Component: GroupingPage }],
+  teacherPages: [{ key: 'grouping', path: 'grouping', labelKey: 'teacher.grouping', Icon: IconGroups, order: 90, Component: GroupingPage }],
   invalidations: [groupingInvalidation],
   settingsPanel: { Component: GroupingSettingsPanel },
 });

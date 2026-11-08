@@ -177,7 +177,7 @@ function LinkActions({ url, label, onRegenerate, onRevoke, revoked, testId }: { 
     <div className="cc-row" data-testid={testId}>
       {url ? (
         <>
-          <Button size="small" onPress={() => copyLink(t, url)}>
+          <Button size="small" onPress={() => void copyLink(t, url, label)}>
             <IconCopy />
             {t('links.copy')}
           </Button>

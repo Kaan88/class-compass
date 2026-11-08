@@ -101,7 +101,7 @@ function LinkDialog({ student, onClose, onReactivate }: { student: AdminStudent 
           {d.link?.replacedAt ? <Alert kind="warning">{t('links.replacedOn', { date: whenText(d.link.replacedAt, locale) })}</Alert> : null}
           {student.active ? (
             <div className="cc-row">
-              <Button onPress={() => copyLink(t, url)}>
+              <Button onPress={() => void copyLink(t, url, student.fullName)}>
                 <IconCopy />
                 {t('links.copy')}
               </Button>

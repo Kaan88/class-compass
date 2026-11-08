@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import * as Admin from '../../../shared/contracts/admin.ts';
 import { call } from '../../lib/api.ts';
+import { copyText } from '../../lib/clipboard.ts';
 import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { showToast } from '../../lib/toast.ts';
@@ -48,12 +49,9 @@ function TempPasswordDialog({ value, onClose }: { value: { login: string; passwo
       <DialogActions>
         <Button
           onPress={async () => {
-            try {
-              await navigator.clipboard.writeText(value?.password ?? '');
-              setCopied(true);
-            } catch {
-              showToast({ message: t('users.copyFailed'), kind: 'error' });
-            }
+            // The password is shown above, so a failed copy can be done by hand.
+            if (await copyText(value?.password ?? '')) setCopied(true);
+            else showToast({ message: t('users.copyFailed'), kind: 'error' });
           }}
         >
           {copied ? <IconCheck /> : <IconCopy />}
@@ -92,12 +90,8 @@ function InviteDialog({ value, onClose }: { value: Invite | null; onClose: () =>
       <DialogActions>
         <Button
           onPress={async () => {
-            try {
-              await navigator.clipboard.writeText(value?.link ?? '');
-              showToast({ message: t('users.copied'), kind: 'success' });
-            } catch {
-              showToast({ message: t('users.copyLinkFailed'), kind: 'error' });
-            }
+            if (await copyText(value?.link ?? '')) showToast({ message: t('users.copied'), kind: 'success' });
+            else showToast({ message: t('users.copyLinkFailed'), kind: 'error' });
           }}
         >
           <IconCopy />

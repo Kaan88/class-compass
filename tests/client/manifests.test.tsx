@@ -81,6 +81,11 @@ describe('client module manifests', () => {
     expect(pages.slice(0, 3).map((p) => p.key)).toEqual(['profile', 'classes', 'students']);
   });
 
+  it('every teacher menu tile has its own icon, so the tiles can be scanned by icon (usability audit 2026-11)', () => {
+    const tiles = menuTeacherPages();
+    expect(unique(tiles.map((p) => p.Icon)), tiles.map((p) => `${p.key}: ${p.Icon.name}`).join(', ')).toBe(true);
+  });
+
   it('client and server agree: every server End Lesson step has a screen; optional modules exist on both sides', () => {
     const serverSteps = SERVER_MODULES.flatMap((m) => (m.endSteps ?? []).map((s) => s.key));
     expect(serverSteps.length).toBeGreaterThan(0);

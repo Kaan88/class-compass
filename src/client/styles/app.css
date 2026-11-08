@@ -164,6 +164,24 @@ a {
   border-color: var(--cc-accent);
   text-decoration: underline;
 }
+/* Teacher navigation: a row of links on wide screens, one "Page" select below 52rem (20 links took
+   the whole first screen of a phone). The menu page shows only the title (its tiles navigate). */
+.cc-teacher-nav__select {
+  display: none;
+}
+@media (max-width: 52rem) {
+  .cc-teacher-nav__links {
+    display: none;
+  }
+  .cc-teacher-nav__select {
+    display: block;
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+  .cc-teacher-nav__select .cc-select {
+    width: 100%;
+  }
+}
 /* Admin section navigation: pills on wide screens, a select on phones and tablets. */
 .cc-admin-nav {
   padding-bottom: 0;
@@ -951,6 +969,10 @@ html:has(.cc-classroom) .cc-toaster {
   white-space: nowrap;
   font-weight: 700;
 }
+/* Counter history: names stay on one or two lines, never three. */
+.cc-history__name {
+  min-width: 11rem;
+}
 .cc-counterbar__label {
   font-size: 1.4rem;
   font-weight: 850;
@@ -1073,6 +1095,34 @@ html:has(.cc-classroom) .cc-toaster {
   }
   .cc-table--stack tbody td.cc-table__actions {
     padding-top: 0.5rem;
+  }
+  /* The card's heading line (a student's name): no label, the full width. */
+  .cc-table--stack tbody td.cc-table__title {
+    display: block;
+    font-weight: 700;
+  }
+  .cc-table--stack tbody td.cc-table__title::before {
+    content: none;
+  }
+  .cc-table--stack .cc-table__wide-only {
+    display: none;
+  }
+  /* Compact cards: the counts flow side by side ("Present 17  Absent 0 …") under the heading. */
+  .cc-table--compact tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1rem;
+    padding-inline: 0.8rem;
+  }
+  .cc-table--compact tbody td {
+    display: inline-flex;
+    gap: 0.35rem;
+    padding-inline: 0;
+  }
+  .cc-table--compact tbody td.cc-table__title,
+  .cc-table--compact tbody td[colspan] {
+    display: block;
+    flex-basis: 100%;
   }
 }
 
@@ -1999,6 +2049,46 @@ html:has(.cc-classroom) {
 .cc-segmented {
   gap: 0.35rem;
 }
+/* Attendance in the teacher area: the four statuses as one control, then Clear and Note. In the
+   stacked card (below 52rem) the statuses share the card width in four columns, Clear and Note on
+   the line under them at the right. */
+.cc-att-set {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+.cc-att-set__statuses {
+  display: flex;
+  flex-wrap: nowrap;
+}
+.cc-att-set__more {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+@media (max-width: 52rem) {
+  .cc-att-set {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cc-att-set__statuses {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .cc-att-set__statuses .cc-btn {
+    min-width: 0;
+    padding-inline: 0.15rem;
+    justify-content: center;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: keep-all;
+  }
+  .cc-att-set__more {
+    justify-content: flex-end;
+  }
+}
 .cc-segmented .cc-btn[aria-pressed='true'] {
   background: var(--cc-segment-on);
   color: var(--cc-accent-text);
@@ -2291,6 +2381,69 @@ html:has(.cc-classroom) {
 .cc-group__here {
   align-self: stretch;
 }
+/* Group editor in the teacher area (usability audit 2026-11): groups side by side, compact name
+   chips, a sticky "Move <name> to: [Group 1] [Group 2]…" bar, names and roles behind a disclosure. */
+.cc-groups--editor {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  align-items: start;
+}
+.cc-group-editor__bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+  min-height: var(--cc-touch);
+  padding: 0.5rem 0;
+  background: var(--cc-surface);
+  border-bottom: 1px solid var(--cc-border);
+}
+.cc-group-editor__picked {
+  font-weight: 800;
+}
+.cc-group-editor__members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.cc-group-editor__member {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.cc-group-editor__chip {
+  border-radius: 999px;
+  max-width: 100%;
+  white-space: nowrap;
+  text-align: start;
+}
+.cc-group-editor__chip[aria-pressed='true'] {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+  background: var(--cc-accent);
+  border-color: var(--cc-accent-strong);
+  color: var(--cc-accent-text);
+  font-weight: 800;
+}
+.cc-group-editor__role {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cc-disclosure > summary {
+  cursor: pointer;
+  min-height: var(--cc-touch);
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+}
 .cc-group-chips {
   list-style: none;
   margin: 0;
@@ -2436,6 +2589,19 @@ html:has(.cc-classroom) {
 .cc-langfields__one > .cc-chip {
   align-self: flex-start;
 }
+/* A list row with language fields and a small button (assistant duties): the fields take the width,
+   so a duty is not cut off mid-word in a 235px box (usability audit 2026-11). */
+.cc-resp-row {
+  flex-wrap: nowrap;
+}
+.cc-resp-row > .cc-langfields {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cc-langfields__one > .cc-field,
+.cc-langfields__one .cc-input {
+  width: 100%;
+}
 /* Homework checking grid (S8, HW-3/4). S13a: the bulk bar stays in view; the name area selects. */
 .cc-hw-bulk {
   position: sticky;
@@ -2445,6 +2611,9 @@ html:has(.cc-classroom) {
   padding: 0.5rem 0;
   background: var(--cc-surface);
   border-bottom: var(--cc-border-width) solid var(--cc-border);
+}
+.cc-hw-bulk__head > p {
+  margin: 0;
 }
 .cc-hw-pick {
   display: inline-flex;
@@ -2992,6 +3161,8 @@ li > .cc-admin-list {
   }
   .cc-chart__svg {
     max-width: 100%;
+    max-height: 60mm;
+    width: auto;
   }
 }
 /* "Today's focus" on the routine's Learning goal stage, and the quiet action when no topic is set (S13a 7). */
@@ -3306,6 +3477,61 @@ li > .cc-admin-list {
 .cc-badge__text {
   gap: 0.1rem;
   min-width: 0;
+  flex: 1 1 10rem;
+}
+/* The art never shrinks (a shrunk icon looked half the size of its neighbours). */
+.cc-badge > .cc-badge-art {
+  flex-shrink: 0;
+}
+.cc-badge__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+/* Badge catalogue (teacher area): wider cards, the button on its own full-width line. */
+.cc-badge-group {
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  padding: 0 0.75rem;
+}
+.cc-badge-group[open] {
+  padding-bottom: 0.75rem;
+}
+.cc-badge-group > summary .cc-h2 {
+  margin: 0;
+}
+.cc-badge-list--catalogue {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+}
+.cc-badge--catalogue {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.cc-badge--catalogue > .cc-badge__action {
+  flex: 1 0 100%;
+  justify-content: center;
+  text-align: center;
+}
+.cc-tier-chip::before {
+  content: '';
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-inline-end: 0.3em;
+  border-radius: 50%;
+  border: 1px solid var(--cc-badge-ink);
+  background: var(--cc-badge-plain);
+}
+.cc-tier-chip[data-tier='bronze']::before {
+  background: var(--cc-badge-bronze);
+}
+.cc-tier-chip[data-tier='silver']::before {
+  background: var(--cc-badge-silver);
+}
+.cc-tier-chip[data-tier='gold']::before {
+  background: var(--cc-badge-gold);
 }
 .cc-badge--locked,
 .cc-badge[data-archived],

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ACCEPT_HINT, removeStudentPhoto, uploadStudentPhoto } from '../../../shared/contracts/files.ts';
 import * as School from '../../../shared/contracts/school.ts';
 import * as Students from '../../../shared/contracts/students.ts';
-import { pickText, type MessageKey } from '../../../shared/i18n/index.ts';
+import { formatDay, pickText, type MessageKey } from '../../../shared/i18n/index.ts';
 import { sortByName } from '../../../shared/text/turkish.ts';
 import { call, upload } from '../../lib/api.ts';
 import { errorText, reasonOf } from '../../lib/errors.ts';
@@ -107,7 +107,7 @@ export function ClassSettingsPage() {
 }
 
 export function TeacherStudentsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const qc = useQueryClient();
   const contexts = useMyContexts();
   const classes = useMemo(() => {
@@ -139,11 +139,13 @@ export function TeacherStudentsPage() {
           rows={roster.data.students}
           rowKey={(s) => s.id}
           emptyText={t('students.none')}
+          stack
           columns={[
             {
               key: 'name',
               header: t('students.name'),
               sortValue: (s) => s.fullName,
+              stackRole: 'title',
               render: (s) => (
                 <span className="cc-row">
                   <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} photoUrl={s.photoUrl} photoAllowed={photosOn && Boolean(s.photoUrl)} size="sm" />
@@ -152,7 +154,7 @@ export function TeacherStudentsPage() {
               ),
             },
             { key: 'number', header: t('students.number'), sortValue: (s) => s.studentNumber ?? '', render: (s) => s.studentNumber ?? '—' },
-            { key: 'since', header: t('students.since'), render: (s) => s.enrolledFrom ?? '—' },
+            { key: 'since', header: t('students.since'), stackRole: 'hidden', render: (s) => (s.enrolledFrom ? formatDay(s.enrolledFrom, locale) : '—') },
             ...(photosOn
               ? [
                   {
@@ -167,10 +169,12 @@ export function TeacherStudentsPage() {
                 ]
               : []),
             {
-              key: 'remove',
+              key: 'actions',
               header: t('common.actions'),
+              // Outline: a column of solid red buttons was the loudest thing on the page; the solid
+              // danger button is kept for the confirmation.
               render: (s) => (
-                <Button size="small" variant="danger" onPress={() => setRemoving({ id: s.id, fullName: s.fullName })}>
+                <Button size="small" variant="danger-outline" onPress={() => setRemoving({ id: s.id, fullName: s.fullName })}>
                   {t('students.removeFromClass')}
                 </Button>
               ),

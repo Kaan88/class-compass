@@ -241,7 +241,7 @@ function SettingsTab({ contextId }: { contextId: string }) {
         <p className="cc-muted">{t('assistant.responsibilitiesHint')}</p>
         <ol className="cc-stack">
           {curResp.map((r, i) => (
-            <li key={r.key} className="cc-row" style={{ alignItems: 'flex-end' }}>
+            <li key={r.key} className="cc-row cc-resp-row" style={{ alignItems: 'flex-end' }}>
               <LangFields label={t('assistant.respN', { n: i + 1 })} value={{ en: r.en, tr: r.tr }} onChange={(v) => setRow(i, { en: v.en ?? '', tr: v.tr ?? '' })} locales={locales} />
               <Button aria-label={t('assistant.respRemove', { n: i + 1 })} onPress={() => setResp(curResp.filter((_, j) => j !== i))}>
                 <IconX />

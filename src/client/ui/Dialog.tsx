@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react';
 import { Dialog, Heading, Modal as RACModal, ModalOverlay } from 'react-aria-components';
 import { lowerTr } from '../../shared/text/turkish.ts';
+import { clearManualCopy, copyText, useManualCopy } from '../lib/clipboard.ts';
 import { errorText } from '../lib/errors.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
 import { TextField } from './Fields.tsx';
-import { IconAlert, IconX } from './icons.tsx';
+import { IconAlert, IconCheck, IconCopy, IconX } from './icons.tsx';
 
 /** Accessible modal dialog (focus trap; Escape / outside press close unless `dismissable` is false). */
 export function Modal({
@@ -132,6 +133,48 @@ export function ConfirmDestructive({
           </Button>
         </DialogActions>
       </div>
+    </Modal>
+  );
+}
+
+/**
+ * Shown when the browser could not copy a text (a plain-HTTP school network has no Clipboard API):
+ * the text in a read-only field that is selected at once, so the teacher copies it by hand. Mount
+ * once at the root; open it with `showManualCopy` (`lib/clipboard.ts`).
+ */
+export function ManualCopyDialog() {
+  const { t } = useI18n();
+  const m = useManualCopy();
+  const [copied, setCopied] = useState(false);
+  const close = () => {
+    setCopied(false);
+    clearManualCopy();
+  };
+  if (!m) return null;
+  return (
+    <Modal isOpen onOpenChange={(o) => !o && close()} title={m.title} testId="manual-copy">
+      <p>{t('copy.manualHint')}</p>
+      <TextField
+        label={m.label}
+        value={m.text}
+        isReadOnly
+        autoFocus
+        onFocus={(e) => (e.target as HTMLInputElement).select()}
+        inputClassName="cc-manual-copy__input"
+      />
+      <DialogActions>
+        <Button
+          onPress={async () => {
+            setCopied(await copyText(m.text));
+          }}
+        >
+          {copied ? <IconCheck /> : <IconCopy />}
+          {copied ? t('copy.done') : t('copy.tryAgain')}
+        </Button>
+        <Button variant="primary" onPress={close}>
+          {t('common.close')}
+        </Button>
+      </DialogActions>
     </Modal>
   );
 }

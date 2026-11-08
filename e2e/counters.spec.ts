@@ -156,5 +156,7 @@ test('tap + on students, bar and weekly counts, undo, double tap guard, offline 
   await page.getByRole('button', { name: 'Weekly history' }).first().click();
   const history = page.getByTestId('counter-history');
   await expect(history).toBeVisible();
-  await expect(history.getByRole('columnheader').nth(1)).toHaveText(/^Mon \d{1,2} \w{3} – Sun \d{1,2} \w{3} \d{4}, Europe\/Istanbul$/);
+  // Short week headers; the class timezone is stated once, in the caption (usability audit 2026-11).
+  await expect(history.getByRole('columnheader').nth(1)).toHaveText(/^Mon \d{1,2} \w{3,4} – Sun \d{1,2} \w{3,4}$/);
+  await expect(history.locator('caption')).toContainText('Europe/Istanbul');
 });

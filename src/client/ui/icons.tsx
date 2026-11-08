@@ -311,3 +311,64 @@ export const IconStar = () => (
     <path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1-4.5-4.2 6.1-.8z" />
   </Icon>
 );
+/* Teacher menu tiles (usability audit 2026-11): one icon per page, never shared by two tiles. */
+export const IconTrophy = () => (
+  <Icon>
+    <path d="M8 4h8v5a4 4 0 0 1-8 0z" />
+    <path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4" />
+    <path d="M12 13v4M8 21h8M9.5 17h5v4h-5z" />
+  </Icon>
+);
+export const IconTarget = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1.2" />
+  </Icon>
+);
+export const IconClipboardCheck = () => (
+  <Icon>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M9 4V3h6v1M9 4v2h6V4" />
+    <path d="M8.5 13.5l2.5 2.5 4.5-5" />
+  </Icon>
+);
+export const IconUpload = () => (
+  <Icon>
+    <path d="M12 16V4M7 9l5-5 5 5" />
+    <path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+  </Icon>
+);
+export const IconTally = () => (
+  <Icon>
+    <path d="M6 5v14M10 5v14M14 5v14M18 5v14" />
+    <path d="M3 16L21 8" />
+  </Icon>
+);
+export const IconMask = () => (
+  <Icon>
+    <path d="M3 8c3-1.5 6-1.5 9 0 3-1.5 6-1.5 9 0v3c0 4-3 7-6 7-1.5 0-2.3-1-3-2-.7 1-1.5 2-3 2-3 0-6-3-6-7z" />
+    <path d="M7 11.5h2.5M14.5 11.5H17" />
+  </Icon>
+);
+export const IconPencil = () => (
+  <Icon>
+    <path d="M4 20l1-4L16 5l3 3L8 19z" />
+    <path d="M14 7l3 3" />
+  </Icon>
+);
+export const IconGroups = () => (
+  <Icon>
+    <circle cx="6" cy="7" r="2.5" />
+    <circle cx="18" cy="7" r="2.5" />
+    <circle cx="12" cy="15" r="2.5" />
+    <path d="M2.5 13a3.5 3.5 0 0 1 7 0M14.5 13a3.5 3.5 0 0 1 7 0M8.5 21a3.5 3.5 0 0 1 7 0" />
+  </Icon>
+);
+export const IconAvatar = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9 10h.01M15 10h.01" />
+    <path d="M8.5 14.5c2 2 5 2 7 0" />
+  </Icon>
+);

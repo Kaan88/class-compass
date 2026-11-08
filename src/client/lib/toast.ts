@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { clearManualCopy } from './clipboard.ts';
 
 /**
  * Toast queue (UX-9). Undo toasts stay 8 seconds by default.
@@ -94,6 +95,7 @@ export function showUndoToast(message: string, undo: () => void | Promise<void>,
 
 /** Lock / return to the classroom: drop every toast that is not classroom-safe (PIN-3). */
 export function clearSensitiveToasts() {
+  clearManualCopy(); // a student link shown for copying is sensitive too
   const keep = toasts.filter((t) => t.scope === 'classroom');
   if (keep.length === toasts.length) return;
   for (const t of toasts) if (t.scope !== 'classroom') forget(t.id);
@@ -103,6 +105,7 @@ export function clearSensitiveToasts() {
 
 /** Sign-out: drop everything. */
 export function clearAllToasts() {
+  clearManualCopy();
   if (toasts.length === 0) return;
   for (const t of toasts) forget(t.id);
   toasts = [];

@@ -1,6 +1,6 @@
 /** Teacher area (PIN-gated in classroom mode): menu first (PIN-4), profile, class settings, roster. */
 import { useEffect, useState } from 'react';
-import { Link, Outlet, useNavigate } from '@tanstack/react-router';
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Auth from '../../../shared/contracts/auth.ts';
 import { call } from '../../lib/api.ts';
@@ -38,26 +38,61 @@ export function TeacherLayout() {
         </main>
       ) : (
         <>
-          <nav className="cc-topbar" aria-label={t('teacher.nav')}>
-            <span className="cc-topbar__title">{t('app.name')}</span>
-            <div className="cc-nav">
-              <Link to="/teacher" activeOptions={{ exact: true }}>
-                {t('teacher.menu')}
-              </Link>
-              {menuTeacherPages().map((p) => (
-                <Link key={p.key} to="/teacher/$page" params={{ page: p.path }}>
-                  {t(p.labelKey)}
-                </Link>
-              ))}
-              <Link to="/help" search={{ guide: 'teacher', lang: me?.locale }} data-testid="help-link">
-                {t('help.link')}
-              </Link>
-            </div>
-          </nav>
+          <TeacherNav />
           <Outlet />
         </>
       )}
     </SensitiveGate>
+  );
+}
+
+/**
+ * Teacher navigation (usability audit 2026-11): a row of links on wide screens and one "Page" list
+ * below 52rem, where 20 links took the whole first screen of a phone. The menu page shows only the
+ * title bar, because its tiles are the navigation.
+ */
+function TeacherNav() {
+  const { t } = useI18n();
+  const me = useMe();
+  const navigate = useNavigate();
+  const path = useRouterState({ select: (s) => s.location.pathname }).replace(/\/+$/u, '');
+  const pages = menuTeacherPages();
+  const onMenu = path === '/teacher';
+  const current = path.startsWith('/teacher/') ? path.slice('/teacher/'.length).split('/')[0]! : '';
+  const items = [{ id: '', label: t('teacher.menu') }, ...pages.map((p) => ({ id: p.path, label: t(p.labelKey) })), { id: '#help', label: t('help.link') }];
+  return (
+    <nav className="cc-topbar cc-teacher-nav" aria-label={t('teacher.nav')}>
+      <span className="cc-topbar__title">{t('app.name')}</span>
+      {onMenu ? null : (
+        <>
+          <div className="cc-nav cc-teacher-nav__links">
+            <Link to="/teacher" activeOptions={{ exact: true }}>
+              {t('teacher.menu')}
+            </Link>
+            {pages.map((p) => (
+              <Link key={p.key} to="/teacher/$page" params={{ page: p.path }}>
+                {t(p.labelKey)}
+              </Link>
+            ))}
+            <Link to="/help" search={{ guide: 'teacher', lang: me?.locale }} data-testid="help-link">
+              {t('help.link')}
+            </Link>
+          </div>
+          <div className="cc-teacher-nav__select">
+            <Select
+              label={t('teacher.page')}
+              value={pages.some((p) => p.path === current) ? current : ''}
+              onChange={(id) => {
+                if (id === '#help') void navigate({ to: '/help', search: { guide: 'teacher', lang: me?.locale } });
+                else if (id === '') void navigate({ to: '/teacher' });
+                else void navigate({ to: '/teacher/$page', params: { page: id } });
+              }}
+              items={items}
+            />
+          </div>
+        </>
+      )}
+    </nav>
   );
 }
 

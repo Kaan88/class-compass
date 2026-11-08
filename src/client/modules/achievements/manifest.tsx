@@ -4,7 +4,7 @@
  * screen lives in src/client/student (separate bundle, D-085).
  */
 import { AchievementsPage } from '../../routes/teacher/Achievements.tsx';
-import { IconFlag } from '../../ui/icons.tsx';
+import { IconTrophy } from '../../ui/icons.tsx';
 import { defineClientModule } from '../types.ts';
 import { achievementsDashboardSlot, achievementsEndStepUi, achievementsInvalidation } from './AchievementsPanel.tsx';
 
@@ -15,5 +15,5 @@ export const achievementsClientManifest = defineClientModule({
   dashboardSlots: [achievementsDashboardSlot],
   endSteps: [achievementsEndStepUi],
   invalidations: [achievementsInvalidation],
-  teacherPages: [{ key: 'achievements', path: 'achievements', labelKey: 'teacher.achievements', Icon: IconFlag, order: 115, Component: AchievementsPage }],
+  teacherPages: [{ key: 'achievements', path: 'achievements', labelKey: 'teacher.achievements', Icon: IconTrophy, order: 115, Component: AchievementsPage }],
 });

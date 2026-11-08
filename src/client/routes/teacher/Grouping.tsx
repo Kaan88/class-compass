@@ -129,66 +129,90 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
     const level = byId.get(id)?.level;
     return level ? <span className="cc-chip" data-testid="editor-level">{t('grouping.levelChip', { level })}</span> : null;
   };
-  const pickButton = (id: string, name: string) => (
-    <Button className="cc-group-member" aria-pressed={picked === id} data-testid="editor-member" onPress={() => setPicked(picked === id ? null : id)}>
-      {name}
-    </Button>
+  /** A compact, tappable name chip (not a full-width bar that looks like an empty field). */
+  const memberChip = (id: string, name: string) => (
+    <li key={id} className="cc-group-editor__member">
+      <Button size="small" className="cc-group-editor__chip" aria-pressed={picked === id} data-testid="editor-member" onPress={() => setPicked(picked === id ? null : id)}>
+        {name}
+      </Button>
+      {levelChip(id)}
+    </li>
   );
   const patch = (i: number, fn: (g: Draft) => Draft) => setGroups((gs) => gs.map((g, j) => (j === i ? fn(g) : g)));
   const valid = groups.every((g) => g.name.en.trim() || g.name.tr.trim());
   const groupItems = groups.map((g, i) => ({ id: String(i), label: pickText(g.name, locale) || t('grouping.groupN', { n: i + 1 }) }));
+  const pickedName = picked ? (byId.get(picked)?.fullName ?? t('grouping.leftClass')) : '';
+  const pickedGroup = picked ? groups.findIndex((g) => g.memberIds.includes(picked)) : -1;
   return (
     <div className="cc-stack" data-testid="grouping-editor">
       {leftCount ? <Alert kind="warning">{t('grouping.leftRemoved', { count: leftCount })}</Alert> : null}
-      <p className="cc-muted" role="status">
-        {picked ? t('grouping.tapGroupFor', { name: byId.get(picked)?.fullName ?? '' }) : t('grouping.editorTapHint')}
-      </p>
+      {/* Sticky: after tapping a name, every group is one tap away, wherever the page is scrolled (D-098). */}
+      <div className="cc-group-editor__bar" role="status" data-testid="editor-move-bar">
+        {picked ? (
+          <>
+            <span className="cc-group-editor__picked">{t('grouping.moveNameTo', { name: pickedName })}</span>
+            {groups.map((g, i) =>
+              i === pickedGroup ? null : (
+                <Button key={g.id} size="small" variant="primary" data-testid="editor-move-here" onPress={() => move(picked, i)}>
+                  {groupItems[i]!.label}
+                </Button>
+              ),
+            )}
+            <Button size="small" variant="ghost" onPress={() => setPicked(null)}>
+              <IconX />
+              {t('grouping.cancelMove')}
+            </Button>
+          </>
+        ) : (
+          <span className="cc-muted">{t('grouping.editorTapHint')}</span>
+        )}
+      </div>
       {unplaced.length ? (
         <fieldset className="cc-fieldset cc-stack" data-testid="grouping-unplaced">
           <legend>{t('grouping.unplaced')}</legend>
           <p className="cc-muted">{t('grouping.unplacedHint')}</p>
-          <ul className="cc-stack">
-            {unplaced.map((s) => (
-              <li key={s.id} className="cc-row">
-                {pickButton(s.id, s.fullName)}
-                {levelChip(s.id)}
-                <Select label={t('grouping.moveTo', { name: s.fullName })} items={groupItems} value="" placeholder={t('grouping.chooseGroup')} onChange={(v) => v !== '' && move(s.id, Number(v))} />
-              </li>
-            ))}
-          </ul>
+          <ul className="cc-group-editor__members">{unplaced.map((s) => memberChip(s.id, s.fullName))}</ul>
         </fieldset>
       ) : null}
-      {groups.map((g, i) => (
-        <fieldset key={g.id} className="cc-fieldset cc-stack">
-          <legend>
-            <GroupPicto icon={g.icon} /> {groupItems[i]!.label} ({t('grouping.memberCount', { count: g.memberIds.length })})
-          </legend>
-          {picked && !g.memberIds.includes(picked) ? (
-            <Button variant="primary" data-testid="editor-move-here" onPress={() => move(picked, i)}>
-              {t('grouping.moveHere', { group: groupItems[i]!.label })}
-            </Button>
-          ) : null}
-          <div className="cc-row">
-            <TextField label={t('grouping.groupNameEn')} value={g.name.en} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, en: v } }))} />
-            <TextField label={t('grouping.groupNameTr')} value={g.name.tr} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, tr: v } }))} />
-          </div>
-          <ul className="cc-stack">
-            {g.memberIds.map((id) => {
-              const name = byId.get(id)?.fullName ?? t('grouping.leftClass');
-              const role = g.roles[id] ?? { en: '', tr: '' };
-              return (
-                <li key={id} className="cc-row">
-                  {pickButton(id, name)}
-                  {levelChip(id)}
-                  <Select label={t('grouping.moveTo', { name })} items={groupItems} value={String(i)} onChange={(v) => move(id, Number(v))} />
-                  <TextField label={t('grouping.roleEn', { name })} value={role.en} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, en: v } } }))} />
-                  <TextField label={t('grouping.roleTr', { name })} value={role.tr} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, tr: v } } }))} />
-                </li>
-              );
-            })}
-          </ul>
-        </fieldset>
-      ))}
+      {/* Side by side like the arrangements (cc-groups), not one long form. */}
+      <ul className="cc-groups cc-groups--editor">
+        {groups.map((g, i) => (
+          <li key={g.id} className="cc-group cc-group-editor" aria-label={groupItems[i]!.label}>
+            <div className="cc-group__head">
+              <span className="cc-group__icon" aria-hidden="true">
+                <GroupPicto icon={g.icon} />
+              </span>
+              <span className="cc-group__name">{groupItems[i]!.label}</span>
+              <span className="cc-chip">{t('grouping.memberCount', { count: g.memberIds.length })}</span>
+            </div>
+            <ul className="cc-group-editor__members">{g.memberIds.map((id) => memberChip(id, byId.get(id)?.fullName ?? t('grouping.leftClass')))}</ul>
+            {picked && i !== pickedGroup ? (
+              <Button size="small" className="cc-group__here" onPress={() => move(picked, i)}>
+                {t('grouping.moveHere', { group: groupItems[i]!.label })}
+              </Button>
+            ) : null}
+            <details className="cc-disclosure">
+              <summary>{t('grouping.nameAndRoles')}</summary>
+              <div className="cc-stack">
+                <TextField label={t('grouping.groupNameEn')} value={g.name.en} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, en: v } }))} />
+                <TextField label={t('grouping.groupNameTr')} value={g.name.tr} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, tr: v } }))} />
+                {g.memberIds.map((id) => {
+                  const name = byId.get(id)?.fullName ?? t('grouping.leftClass');
+                  const role = g.roles[id] ?? { en: '', tr: '' };
+                  return (
+                    <fieldset key={id} className="cc-fieldset cc-group-editor__role">
+                      <legend>{name}</legend>
+                      <TextField label={t('grouping.roleEn', { name })} value={role.en} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, en: v } } }))} />
+                      <TextField label={t('grouping.roleTr', { name })} value={role.tr} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, tr: v } } }))} />
+                    </fieldset>
+                  );
+                })}
+              </div>
+            </details>
+            {!(g.name.en.trim() || g.name.tr.trim()) ? <p className="cc-field__error">{t('grouping.nameNeeded')}</p> : null}
+          </li>
+        ))}
+      </ul>
       <p className="cc-muted">{t('grouping.roleHint')}</p>
       <div className="cc-row">
         <Button

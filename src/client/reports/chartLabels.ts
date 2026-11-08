@@ -11,6 +11,9 @@ import { reportCellText } from '../../shared/reportText.ts';
 export function axisLabel(c: ReportCell, locale: Locale): string {
   if (c.t === 'range') return formatDay(c.from, locale, { year: false });
   if (c.t === 'date') return formatDay(c.v, locale, { year: false });
+  // A self-assessment step ("4 of 5" / "5 üzerinden 4") is its number on the axis; the axis title
+  // and the table say what it is out of.
+  if (c.t === 'label' && 'k' in c.v && c.v.k === 'report.goals.confidenceValue' && c.v.p?.value !== undefined) return String(c.v.p.value);
   return reportCellText(c, locale);
 }
 

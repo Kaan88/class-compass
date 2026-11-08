@@ -52,7 +52,7 @@ PIN'inizi mi unuttunuz? **Profil ve PIN**'de şifrenizle yeni bir PIN belirleyin
 
 ![Öğretmen menüsü](../img/tr/teacher-menu.png)
 
-Öğretmen menüsü, öğretmen alanının başlangıç sayfasıdır. **Sınıf ekranını aç** (ya da **Sınıf ekranına dön**) sizi ders ekranına götürür. Kutucuklar öğretmen alanının sayfalarını açar; burada yalnızca en az bir sınıfınızda açık olan modüllerin sayfaları görünür. **Yardım** bu kılavuzları açar.
+Öğretmen menüsü, öğretmen alanının başlangıç sayfasıdır. **Sınıf ekranını aç** (ya da **Sınıf ekranına dön**) sizi ders ekranına götürür. Kutucuklar öğretmen alanının sayfalarını açar; burada yalnızca en az bir sınıfınızda açık olan modüllerin sayfaları görünür. **Yardım** bu kılavuzları açar. Öğretmen alanının diğer sayfalarında üstteki bağlantı satırı bütün sayfaları açar; telefonda ya da tablette bu tek bir **Sayfa** listesidir.
 
 ## Dersi başlatmak ve bitirmek
 
@@ -133,6 +133,8 @@ Bir sayaç bütün sınıf için (**sınıf çubuğu**) ve/veya her öğrenci i�
 
 Seviyeler, eşleşme kuralları ("birlikte çalışmalı / çalışmamalı") ve notları sınıf ekranında **hiçbir zaman** gösterilmez. Bunları **Gruplar** sayfasında (**Düzenler**, **Seviyeler**, **Eşleşme kuralları** sekmeleri) yönetirsiniz. Sınıf ayarlarında grup ekranında öğrenci adlarının büyük harfle gösterilmesini seçebilirsiniz.
 
+**Grupları düzenle** (Düzenler sekmesi) grupları yan yana gösterir. Bir ada, sonra üstteki **… şuraya taşınsın:** çubuğunda bir gruba (sayfayı kaydırsanız da görünür kalır) ya da gruptaki **Buraya taşı** düğmesine dokunun. Her grubun altındaki **Grup adı ve görevler** grubun İngilizce ve Türkçe adını ve isteğe bağlı görevleri içerir.
+
 ### Günün Yardımcısı
 
 Yardımcı paneli bugünün yardımcısını ve görevlerini işaret kutularıyla gösterir. Yardımcı "Yok" olarak işaretlenirse sıradaki öğrenci kendiliğinden görevi alır. **Gizle** / **Asistanı göster** paneli bu ders için gizler; varsayılanı **Günün Yardımcısı** sayfasında belirlersiniz (**Ayarlar**: okul günleri, görevler, **Derslerde asistan panelini göster**). **Hafta** sekmesinde **Bu haftayı planla**, planı **Duyur**, iki günü yer değiştir ya da bir gün için **Yardımcıyı ata**; **Geçmiş** sıraları gösterir.
@@ -185,7 +187,7 @@ Rozeti verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Geri al*
 
 **Hedefler** sayfasında sınıfı ve dersi seçin. **Öğrenciler** sekmesi her öğrenciyi etkin hedefleri, ulaşılan hedefleri, kanıtları, son "ne kadar eminim" değeri ve son etkinliğiyle listeler. Öğrenciyi açmak için adına dokunun:
 
-- **Yeni hedef**: bir **Kategori** ve hazır bir **Hedef** seçin ya da **Kendi sözlerimle yazacağım**'ı işaretleyin; **Çalışma yolları** (en fazla 6, virgülle ayrılmış) ve bir **Gözden geçirme tarihi** ekleyin.
+- **Yeni hedef**: bir **Kategori** ve bir **Hazır hedef** seçin ya da **Kendim yazacağım (aşağıya)**'yı seçip hedefi **Hedef metni**'ne yazın; **Çalışma yolları** (en fazla 6, virgülle ayrılmış) ve bir **Gözden geçirme tarihi** ekleyin.
 - Her hedefte: **İlerleme notu**, **Sonucu kaydet** (dört sonuç adınız) ve öğrencinin kendi değerlendirmeleri ve öz değerlendirmeleri ("Ne kadar eminsin?", 1–5). Öğrencinin öz değerlendirmesi ile sizin değerlendirmeniz her zaman ayrı tutulur.
 - **Kanıtlar**: siz de kanıt ekleyebilirsiniz (öğrencinin sayfasında "Öğretmen" diye işaretlenir ve öğrenci değiştiremez): **Yaz**, **Bağlantı ekle**, **Belge ekle** ve yalnızca yöneticiniz izin verdiyse **Resim ekle**, **Fotoğraf çek**, **Sesimi kaydet** ve **Ses dosyası ekle**. **Kanıtı sil** kendi eklediğiniz kanıtı ve dosyasını siler.
 - **Öğrenciye geri bildirim**: bir hedef ya da **Bu dersteki tüm hedefler**'i seçin, yazın ve **Geri bildirimi kaydet**'e basın. Öğrenci bunu kendi sayfasında okur.
@@ -206,7 +208,7 @@ Bir öğrencinin hedef sayfasındaki **Özel notlar** yalnızca sizin içindir. 
 
 Her öğrencinin kendi sayfasına (hedefleri, değerlendirmeleri, kanıtları, sizin geri bildiriminiz, ödevleri, rozetleri ve avatarı) giden **kalıcı, kişisel bir bağlantısı** vardır. Bağlantılar öğrenci eklendiğinde kendiliğinden oluşur.
 
-**Öğrenci bağlantıları** sayfasında sınıfı seçin. Her öğrenci için **Bağlantıyı kopyala**, QR kodu göster ya da **Kartı yazdır**. **Tüm kartları yazdır** bütün sınıfı A4'e basar: **Küçük (A4 sayfada 15)** ya da **Büyük (A4 sayfada 8)**; **Kartları önizle** önce gösterir. QR kodlar her temada beyaz üzerine siyahtır.
+**Öğrenci bağlantıları** sayfasında sınıfı seçin. Her öğrenci için **Bağlantıyı kopyala**, QR kodu göster ya da **Kartı yazdır**. Tarayıcı kendisi kopyalayamadığında (örneğin https olmayan bir okul ağında) bağlantı küçük bir pencerede seçili olarak açılır; elle kopyalayabilirsiniz. **Tüm kartları yazdır** bütün sınıfı A4'e basar: **Küçük (A4 sayfada 15)** ya da **Büyük (A4 sayfada 8)**; **Kartları önizle** önce gösterir. QR kodlar her temada beyaz üzerine siyahtır.
 
 > **Bağlantıları gizli tutun.** Bir öğrencinin bağlantısına sahip olan herkes o öğrencinin sayfasını görebilir, sayfaya hedef, değerlendirme ve kanıt ekleyebilir. Bağlantılar kendiliğinden değişmez.
 
@@ -230,7 +232,7 @@ Eski bağlantı ve basılmış bütün kartlar hemen çalışmaz olur. Listede a
 - **Otomatik rozetler**, **Öğrenci sayfalarında kişisel seviyeler** (her öğrenci yalnızca kendi seviyesini görür; hiçbir sıralama yoktur) ve **Ders sonunda "Aferin!" göster**.
 - Bir öğrenciye rozet verin ya da yanlışlıkla verilmiş bir rozeti bir nedenle **Kaldır**ın (geçmişte saklanır). Otomatik rozetler öğrencinin yaptıklarına göre gelir ve elle kaldırılamaz.
 
-**Rozetler**: bütün rozetler seviyeleriyle (Bronz, Gümüş, Altın). **Kendi rozetinizi yapın**: bir ad, ne için verildiği, bir resim, bir seviye ve **Nasıl verilir** (**Öğretmen verir** ya da "5 kez kanıt ekler" gibi bir kuralla **Otomatik**). **Sınıflarımda gizle** hazır bir rozeti sizin sınıflarınızda gizler; **Yeniden göster** geri getirir.
+**Rozetler**: bütün rozetler türlerine göre gruplanmış (hedefler, kanıtlar, ödev…; açmak için bir gruba dokunun), her birinin seviyesi (Bronz, Gümüş, Altın) adının yanında. **Kendi rozetinizi yapın**: bir ad, ne için verildiği, bir resim, bir seviye ve **Nasıl verilir** (**Öğretmen verir** ya da "5 kez kanıt ekler" gibi bir kuralla **Otomatik**). **Sınıflarımda gizle** hazır bir rozeti sizin sınıflarınızda gizler; **Yeniden göster** geri getirir.
 
 Rozetler çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri karşılaştırmaya bağlı değildir ve öğrenci sayfası yalnızca öğrencinin kendi rozetlerini ve seviyesini gösterir. Rozetler sınıf ekranında yalnızca siz birini kutladığınızda ya da sınıf **Aferin!** adımını gösterdiğinde görünür.
 
@@ -268,7 +270,7 @@ Rozetler çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri kar
 
 ## Öğrenciler ve öğrenci listesi aktarma
 
-**Öğrenciler** sayfasında sınıfınıza öğrenci ekleyebilir, fotoğraf ekleyebilir (yalnızca yönetici öğrenci fotoğraflarına izin verdiyse; izin alındığını siz onaylarsınız) ve **Bu sınıftan çıkar** diyebilirsiniz. Öğrencileri pasifleştirmek ve silmek yöneticinin işidir.
+**Öğrenciler** sayfasında sınıfınıza öğrenci ekleyebilir, fotoğraf ekleyebilir (yalnızca yönetici öğrenci fotoğraflarına izin verdiyse; izin alındığını siz onaylarsınız) ve **Bu sınıftan çıkar** diyebilirsiniz. Telefonda her öğrenci, düğmesi altta olan bir karttır. Öğrencileri pasifleştirmek ve silmek yöneticinin işidir.
 
 ![Öğrenci listesi aktar](../img/tr/import.png)
 

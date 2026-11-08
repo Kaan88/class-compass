@@ -51,6 +51,15 @@ export function CellView({ cell }: { cell: ReportCell }) {
           {reportCellText(cell, locale)}
         </span>
       );
+    // Dates in words on screen ("6 Nov 2026"), like the rest of the teacher area; the CSV keeps ISO.
+    case 'date':
+      return <span className="cc-nowrap">{formatDay(cell.v, locale)}</span>;
+    case 'range':
+      return (
+        <>
+          <span className="cc-nowrap">{formatDay(cell.from, locale, { year: false })}</span> – <span className="cc-nowrap">{formatDay(cell.to, locale)}</span>
+        </>
+      );
     default:
       return <>{reportCellText(cell, locale)}</>;
   }
@@ -98,6 +107,8 @@ export function ChartView({ table, chart }: { table: ReportTable; chart: ReportC
   const rows = table.rows.slice(0, 60);
   if (labelIdx < 0 || !valueIdx.length || !rows.length) return null;
   const values = rows.map((r) => valueIdx.map((i) => chartValue(r.cells[i])));
+  // Nothing to draw (every value 0 or not recorded): the table below says it; no empty frame.
+  if (values.flat().every((v) => !v)) return null;
   const max = Math.max(1, ...values.flat().map((v) => v ?? 0));
   const W = Math.max(280, Math.min(measured, 768));
   const axis = rowLabels(table, rows, labelIdx, locale);

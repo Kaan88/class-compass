@@ -410,14 +410,17 @@ export function CounterHistoryPage({ initialCounterId }: { initialCounterId?: st
         <div className="cc-table-wrap">
           <table className="cc-table">
             <caption>
-              {t('counterHistory.caption', { label: pickText(h.counter.labels.individual, locale) || pickText(h.counter.labels.main, locale), timezone: h.timezone })}
+              {/* The counter's own name, as in the counter list above (not its per-student label). */}
+              {t('counterHistory.caption', { label: pickText(h.counter.labels.main, locale), timezone: h.timezone })}
             </caption>
             <thead>
               <tr>
-                <th scope="col">{t('counterHistory.student')}</th>
+                <th scope="col" className="cc-history__name">
+                  {t('counterHistory.student')}
+                </th>
                 {h.weeks.map((w) => (
                   <th key={w.weekStart} scope="col" className="cc-week-range">
-                    {formatWeekRange(w.weekStart, w.weekEnd, locale, h.timezone)}
+                    {formatWeekRange(w.weekStart, w.weekEnd, locale)}
                   </th>
                 ))}
               </tr>
@@ -425,7 +428,7 @@ export function CounterHistoryPage({ initialCounterId }: { initialCounterId?: st
             <tbody>
               {h.students.map((s) => (
                 <tr key={s.id}>
-                  <th scope="row">
+                  <th scope="row" className="cc-history__name">
                     <span className="cc-row" style={{ gap: '0.5rem', flexWrap: 'nowrap' }}>
                       <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
                       {s.fullName}

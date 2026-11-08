@@ -33,15 +33,16 @@ export function formatDate(ms: number, locale: Locale, timeZone: string, opts: I
 }
 
 /**
- * Explicit week range for counter history (CNT-7): "Mon 9 Nov – Sun 15 Nov 2026, Europe/Istanbul".
- * `start` / `end` are local calendar dates of the class timezone `timeZone`.
+ * Explicit week range for counter history (CNT-7): "Mon 9 Nov – Sun 15 Nov". `start` / `end` are
+ * local calendar dates of the class timezone, which the table states once in its caption (not in
+ * every column header, usability audit 2026-11). `year: true` adds the year to the end date.
  */
-export function formatWeekRange(start: string, end: string, locale: Locale, timeZone: string): string {
+export function formatWeekRange(start: string, end: string, locale: Locale, opts: { year?: boolean } = {}): string {
   const at = (d: string) => Date.parse(`${d}T12:00:00Z`);
   const tag = locale === 'tr' ? 'tr-TR' : 'en-GB';
   const part = (d: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...o }).format(at(d));
   const day = (d: string) => `${part(d, { weekday: 'short' })} ${part(d, { day: 'numeric', month: 'short' })}`;
-  return `${day(start)} – ${day(end)} ${part(end, { year: 'numeric' })}, ${timeZone}`;
+  return `${day(start)} – ${day(end)}${opts.year ? ` ${part(end, { year: 'numeric' })}` : ''}`;
 }
 
 /** A local calendar date ('YYYY-MM-DD') in words: "1 Sept 2026" / "1 Eyl 2026"; `year: false` leaves the year out. */

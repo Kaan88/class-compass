@@ -120,11 +120,14 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
   return (
     <div className="cc-stack" data-testid="homework-check">
       <div className="cc-hw-bulk cc-stack" data-testid="homework-bulk">
-      <StatusSummary statuses={statuses} byStatus={check.assignment.counts.byStatus} />
-      <div className="cc-row" style={{ alignItems: 'flex-end' }}>
-        <span className="cc-chip" role="status" data-testid="homework-selected">
+      {/* The counts and how many are selected on one line, above the controls they belong to. */}
+      <div className="cc-row cc-hw-bulk__head">
+        <StatusSummary statuses={statuses} byStatus={check.assignment.counts.byStatus} />
+        <span className="cc-chip cc-push-right" role="status" data-testid="homework-selected">
           {t('homework.selectedCount', { count: selected.size })}
         </span>
+      </div>
+      <div className="cc-row" style={{ alignItems: 'flex-end' }}>
         <Select label={t('homework.markSelectedAs')} items={items} value={bulkStatus} onChange={setBulkStatus} />
         <Button
           variant="primary"
@@ -154,7 +157,7 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
         </Button>
       </div>
       </div>
-      {check.attendanceEnabled ? <p className="cc-muted">{t('homework.attendanceOn', { date: longDay(check.attendanceDate, locale) })}</p> : null}
+      {check.attendanceEnabled && rows.some((r) => r.attendance && r.attendance !== 'not_recorded') ? <p className="cc-muted">{t('homework.attendanceOn', { date: longDay(check.attendanceDate, locale) })}</p> : null}
       <ul className="cc-hw-grid" aria-label={t('homework.gridLabel', { title: check.assignment.title })}>
         {rows.map((r) => (
           <li key={r.student.id} className="cc-hw-row" data-testid="homework-row" data-reviewed={r.reviewed ? 'yes' : 'no'} data-selected={selected.has(r.student.id) ? '' : undefined}>
@@ -165,7 +168,8 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
                 <Avatar name={r.student.fullName} id={r.student.id} hue={r.student.avatarHue} initials={r.student.initials} size="sm" />
                 <strong>{r.student.fullName}</strong>
               </label>
-              {r.attendance ? <AttendanceChip status={r.attendance} /> : null}
+              {/* Only when attendance was taken, and named, so "Not recorded" is never read as "not handed in". */}
+              {r.attendance && r.attendance !== 'not_recorded' ? <AttendanceChip status={r.attendance} prefix={t('homework.attendanceChipPrefix')} /> : null}
               {!r.enrolled ? <span className="cc-chip">{t('homework.leftClass')}</span> : null}
               <Select
                 className="cc-push-right"

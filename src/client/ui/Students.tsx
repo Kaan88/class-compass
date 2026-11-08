@@ -88,13 +88,15 @@ export interface StudentCardData {
  * Attendance status as icon + text + border pattern, never colour alone (UX-7, ATT-2).
  * `lessonOnly` marks a lesson exception ("this lesson").
  */
-export function AttendanceChip({ status, lessonOnly = false }: { status: EffectiveAttendance; lessonOnly?: boolean }) {
+/** `prefix` names what the chip is about where it sits next to other statuses ("Attendance: Absent"). */
+export function AttendanceChip({ status, lessonOnly = false, prefix }: { status: EffectiveAttendance; lessonOnly?: boolean; prefix?: string }) {
   const { t } = useI18n();
   const icon = status === 'present' ? <IconCheck /> : status === 'absent' ? <IconUserOff /> : status === 'late' ? <IconClock /> : status === 'excused' ? <IconNote /> : <IconMinus />;
+  const word = t(`attendance.status.${status}`);
   return (
     <span className="cc-att-chip" data-status={status}>
       {icon}
-      {t(`attendance.status.${status}`)}
+      {prefix ? t('attendance.chipPrefixed', { prefix, status: word }) : word}
       {lessonOnly ? <span className="cc-att-chip__scope">{t('attendance.thisLesson')}</span> : null}
     </span>
   );

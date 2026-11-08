@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ACHIEVEMENT_TIERS, BADGE_ICONS, RULE_EVENTS, INACTIVE_EVENTS, type AchievementTier, type BadgeIcon, type RuleEvent } from '../../../shared/achievements.ts';
+import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_TIERS, BADGE_ICONS, RULE_EVENTS, INACTIVE_EVENTS, type AchievementTier, type BadgeIcon, type RuleEvent } from '../../../shared/achievements.ts';
 import * as A from '../../../shared/contracts/achievements.ts';
 import * as School from '../../../shared/contracts/school.ts';
 import { pickText, type MessageKey } from '../../../shared/i18n/index.ts';
@@ -18,7 +18,7 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { Button } from '../../ui/Button.tsx';
-import { DialogActions, Modal } from '../../ui/Dialog.tsx';
+import { Modal } from '../../ui/Dialog.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
@@ -80,7 +80,7 @@ function StudentDialog({ contextId, studentId, onClose, manual }: { contextId: s
   const [revoking, setRevoking] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   return (
-    <Modal isOpen onOpenChange={(v) => (v ? null : onClose())} title={q.data ? q.data.student.fullName : t('common.loading')} size="wide" testId="achievements-student-dialog">
+    <Modal isOpen onOpenChange={(v) => (v ? null : onClose())} title={q.data ? q.data.student.fullName : t('common.loading')} size="wide" testId="achievements-student-dialog" closeButton>
       <div className="cc-row">
         <Select label={t('achievements.giveBadge')} items={manual.map((d) => ({ id: d.id, label: pickText(d.name, locale) }))} value={give} onChange={setGive} placeholder={t('achievements.chooseBadge')} />
         <Button
@@ -96,9 +96,12 @@ function StudentDialog({ contextId, studentId, onClose, manual }: { contextId: s
           <li key={a.id} className="cc-badge" data-revoked={a.revokedAt ? true : undefined}>
             <BadgeArt icon={a.icon} tier={a.tier} size={44} locked={a.revokedAt !== null} />
             <span className="cc-stack cc-badge__text">
-              <strong>{pickText(a.name, locale)}</strong>
+              <span className="cc-badge__title">
+                <strong>{pickText(a.name, locale)}</strong>
+                <TierChip tier={a.tier} />
+              </span>
               <span className="cc-muted">
-                {t(tierKey(a.tier))} · {a.awardedBy ? t('achievements.givenBy', { name: a.awardedBy }) : t(a.source === 'backfill' ? 'achievements.sourceBackfill' : 'achievements.sourceAuto')}
+                {a.awardedBy ? t('achievements.givenBy', { name: a.awardedBy }) : t(a.source === 'backfill' ? 'achievements.sourceBackfill' : 'achievements.sourceAuto')}
               </span>
               {a.revokedAt ? <span className="cc-muted">{t('achievements.removedBecause', { reason: a.revokeReason === 'undo' ? t('achievements.undo') : (a.revokeReason ?? '') })}</span> : null}
             </span>
@@ -130,17 +133,12 @@ function StudentDialog({ contextId, studentId, onClose, manual }: { contextId: s
           </div>
         </div>
       ) : null}
-      <DialogActions>
-        <Button variant="primary" onPress={onClose}>
-          {t('common.close')}
-        </Button>
-      </DialogActions>
     </Modal>
   );
 }
 
 function NewBadge({ contextId }: { contextId: string }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const run = useRun();
   const locales = useEditorLocales([contextId]);
   const [name, setName] = useState<LocalizedTextValue>({});
@@ -151,6 +149,8 @@ function NewBadge({ contextId }: { contextId: string }) {
   const [event, setEvent] = useState<RuleEvent>('goal_set');
   const [threshold, setThreshold] = useState('3');
   const n = Number.parseInt(threshold, 10);
+  // The picture names in the teacher's language, in alphabetical order (not the internal keys).
+  const iconItems = BADGE_ICONS.map((i) => ({ id: i, label: t(`achievements.iconName.${i}` as MessageKey) })).sort((a, b) => a.label.localeCompare(b.label, locale === 'tr' ? 'tr' : 'en'));
   const valid = Boolean(name.en?.trim() || name.tr?.trim()) && (kind === 'manual' || (Number.isInteger(n) && n >= 1 && n <= 500));
   const save = () =>
     void run(
@@ -174,7 +174,7 @@ function NewBadge({ contextId }: { contextId: string }) {
       <LangFields label={t('achievements.badgeName')} value={name} onChange={setName} locales={locales} testId="achievements-new-name" />
       <LangFields label={t('achievements.badgeDescription')} value={description} onChange={setDescription} locales={locales} />
       <div className="cc-row">
-        <Select label={t('achievements.icon')} items={BADGE_ICONS.map((i) => ({ id: i, label: i }))} value={icon} onChange={(v) => setIcon(v as BadgeIcon)} />
+        <Select label={t('achievements.icon')} items={iconItems} value={icon} onChange={(v) => setIcon(v as BadgeIcon)} />
         <BadgeArt icon={icon} tier={tier} size={56} />
         <Select label={t('achievements.tierLabel')} items={ACHIEVEMENT_TIERS.map((x) => ({ id: x, label: t(tierKey(x)) }))} value={tier} onChange={(v) => setTier(v as AchievementTier)} />
       </div>
@@ -202,36 +202,67 @@ function NewBadge({ contextId }: { contextId: string }) {
   );
 }
 
+/** The tier as a word with a small coloured mark (never colour alone, D-125). */
+export function TierChip({ tier }: { tier: AchievementTier }) {
+  const { t } = useI18n();
+  return (
+    <span className="cc-chip cc-tier-chip" data-tier={tier}>
+      {t(tierKey(tier))}
+    </span>
+  );
+}
+
+/**
+ * The badge catalogue (usability audit 2026-11): grouped by category under headings, the tier as a
+ * chip next to the name (badges that share a name differ by tier), and wider cards whose button
+ * sits on its own line, so names and descriptions no longer wrap one word per line.
+ */
 function BadgesTab({ contextId, defs }: { contextId: string; defs: A.AchievementDef[] }) {
   const { t, locale } = useI18n();
   const run = useRun();
   const toggle = (d: A.AchievementDef) => void run(() => call(A.updateAchievement, { contextId, achievementId: d.id, archived: !d.archived }), { invalidate: [ALL] });
+  const groups = ACHIEVEMENT_CATEGORIES.map((c) => ({ category: c, items: defs.filter((d) => d.category === c) })).filter((g) => g.items.length > 0);
   return (
     <div className="cc-stack">
       <NewBadge contextId={contextId} />
-      <ul className="cc-badge-list" aria-label={t('achievements.allBadges')}>
-        {defs.map((d) => (
-          <li key={d.id} className="cc-badge" data-archived={d.archived || undefined} data-testid="achievements-def">
-            <BadgeArt icon={d.icon} tier={d.tier} size={44} locked={d.archived} />
-            <span className="cc-stack cc-badge__text">
-              <strong>{pickText(d.name, locale)}</strong>
-              <span className="cc-muted">
-                {t(tierKey(d.tier))} · {d.kind === 'manual' ? t('achievements.kindManual') : t('achievements.kindAuto')}
-                {d.inactive ? ` · ${t('achievements.inactive')}` : ''}
-                {d.custom ? ` · ${t('achievements.custom')}` : ''}
-              </span>
-              <span className="cc-muted">{pickText(d.description, locale)}</span>
-            </span>
-            {d.schoolArchived ? (
-              <span className="cc-chip cc-push-right">{t('achievements.schoolArchived')}</span>
-            ) : (
-              <Button size="small" className="cc-push-right" onPress={() => toggle(d)}>
-                {d.archived ? t('achievements.show') : t('achievements.hide')}
-              </Button>
-            )}
-          </li>
+      <section className="cc-stack" aria-label={t('achievements.allBadges')}>
+        {groups.map((g) => (
+          // One folded group per category, so about 60 badges are a short list of headings to open.
+          <details key={g.category} className="cc-disclosure cc-badge-group" data-testid="achievements-category">
+            <summary>
+              <h2 className="cc-h2">
+                {t(`report.achievements.category.${g.category}` as MessageKey)} <span className="cc-muted">({g.items.length})</span>
+              </h2>
+            </summary>
+            <ul className="cc-badge-list cc-badge-list--catalogue">
+              {g.items.map((d) => (
+                <li key={d.id} className="cc-badge cc-badge--catalogue" data-archived={d.archived || undefined} data-testid="achievements-def">
+                  <BadgeArt icon={d.icon} tier={d.tier} size={44} locked={d.archived} />
+                  <span className="cc-stack cc-badge__text">
+                    <span className="cc-badge__title">
+                      <strong>{pickText(d.name, locale)}</strong>
+                      <TierChip tier={d.tier} />
+                    </span>
+                    <span className="cc-muted">{pickText(d.description, locale)}</span>
+                    <span className="cc-muted cc-badge__meta">
+                      {d.kind === 'manual' ? t('achievements.kindManual') : t('achievements.kindAuto')}
+                      {d.inactive ? ` · ${t('achievements.inactive')}` : ''}
+                      {d.custom ? ` · ${t('achievements.custom')}` : ''}
+                    </span>
+                  </span>
+                  {d.schoolArchived ? (
+                    <span className="cc-chip cc-badge__action">{t('achievements.schoolArchived')}</span>
+                  ) : (
+                    <Button size="small" className="cc-badge__action" onPress={() => toggle(d)}>
+                      {d.archived ? t('achievements.show') : t('achievements.hide')}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
         ))}
-      </ul>
+      </section>
     </div>
   );
 }

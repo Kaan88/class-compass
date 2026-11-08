@@ -52,7 +52,7 @@ In **Profile and PIN** you also choose your **Language** and **Text size** (they
 
 ![The teacher menu](../img/en/teacher-menu.png)
 
-The teacher menu is the start page of the teacher area. **Open the classroom screen** (or **Back to the classroom**) takes you to the lesson screen. The tiles open the pages of the teacher area. Only modules that are switched on for at least one of your classes have pages here. **Help** opens these guides.
+The teacher menu is the start page of the teacher area. **Open the classroom screen** (or **Back to the classroom**) takes you to the lesson screen. The tiles open the pages of the teacher area. Only modules that are switched on for at least one of your classes have pages here. **Help** opens these guides. On the other pages of the teacher area, the row of links at the top opens every page; on a phone or tablet it is one **Page** list.
 
 ## Starting and ending a lesson
 
@@ -133,6 +133,8 @@ Press **Choose groups** (or **Open groups** when groups are already shown). The 
 
 Levels, pair rules ("should / should not work together") and their notes are **never** shown on the classroom screen. You manage them on the **Grouping** page (tabs **Arrangements**, **Levels**, **Pair rules**). In Class settings you can show student names in capital letters on the group screen.
 
+**Edit groups** (Arrangements tab) shows the groups side by side. Tap a name, then a group in the bar **Move … to:** at the top (it stays in view while you scroll), or **Move here** on the group. **Group name and roles** under each group holds its English and Turkish name and the optional roles.
+
 ### Daily assistant
 
 The assistant panel shows today's assistant and their responsibilities with tick boxes. If the assistant is marked absent, the next student takes over automatically. **Hide** / **Show the assistant** hides the panel for this lesson; the default is set on the **Daily Assistant** page (**Settings**: school days, responsibilities, **Show the assistant panel in lessons**). On the **Week** tab you **Plan this week**, **Announce** the plan, swap two days or **Set assistant** for a day; **History** shows the turns.
@@ -185,7 +187,7 @@ A student without a mark is **Not checked**, never "Missing".
 
 On the **Goals** page, choose the class and subject. The **Students** tab lists every student with active goals, achieved goals, evidence, their latest confidence and last activity. Tap a name to open the student:
 
-- **New goal**: pick a **Category** and a preset **Goal**, or **Write it in my own words**; add **Ways to practise** (up to 6, separated by commas) and a **Review date**.
+- **New goal**: pick a **Category** and a **Ready-made goal**, or **Write my own (below)** and type it in **Goal text**; add **Ways to practise** (up to 6, separated by commas) and a **Review date**.
 - On each goal: **Progress update**, **Record outcome** (your four outcome labels) and the student's own reflections and self-assessments ("How sure do you feel?", 1 to 5). The student's self-assessment and your assessment are always kept apart.
 - **Evidence**: you can add evidence too (it is marked "Teacher" on the student's page and the student cannot change it): **Write**, **Add a link**, **Add a document**, and, only if your administrator allowed them, **Add a picture**, **Take a picture**, **Record my voice** and **Add a voice file**. **Delete evidence** removes your own evidence and its file.
 - **Feedback for the student**: choose a goal or **All goals in this subject**, write and **Save feedback**. The student reads it on their page.
@@ -206,7 +208,7 @@ On a student's goals page, **Private notes** are for you only. They are never sh
 
 Every student has one **permanent personal link** to their own page (goals, reflections, evidence, your feedback, homework, badges and avatar). Links are made automatically when a student is added.
 
-On the **Student links** page, choose the class. For each student you can **Copy link**, show the QR code, or **Print card**. **Print all cards** prints the whole class on A4: **Small (15 per A4 page)** or **Large (8 per A4 page)**; **Preview cards** shows them first. The QR codes are black on white in every theme.
+On the **Student links** page, choose the class. For each student you can **Copy link**, show the QR code, or **Print card**. When the browser cannot copy by itself (for example on a school network without https), the link opens in a small window, already selected, so you can copy it by hand. **Print all cards** prints the whole class on A4: **Small (15 per A4 page)** or **Large (8 per A4 page)**; **Preview cards** shows them first. The QR codes are black on white in every theme.
 
 > **Keep links private.** Anyone who has a student's link can see that student's page and add goals, reflections and evidence to it. Links do not change on their own.
 
@@ -230,7 +232,7 @@ On the **Achievements** page, choose the class and subject.
 - **Automatic badges**, **Private levels on student pages** (each student sees only their own level; nothing is ranked) and **Show "Well done!" at the end of the lesson**.
 - Give a badge to a student, or **Remove** a badge given by mistake with a reason (kept in the history). Automatic badges follow what the student did and cannot be removed by hand.
 
-**Badges**: all badges with their level (Bronze, Silver, Gold). **Make your own badge**: a name, what it is for, a picture, a level and **How it is given** (**Given by the teacher**, or **Automatic** with a rule such as "adds evidence, 5 times"). **Hide for my classes** hides a built-in badge for your classes; **Show again** brings it back.
+**Badges**: all badges, grouped by kind (goals, evidence, homework…; tap a group to open it), each with its level (Bronze, Silver, Gold) next to the name. **Make your own badge**: a name, what it is for, a picture, a level and **How it is given** (**Given by the teacher**, or **Automatic** with a rule such as "adds evidence, 5 times"). **Hide for my classes** hides a built-in badge for your classes; **Show again** brings it back.
 
 Badges reward effort: none depends on attendance, speed or comparing students, and a student's page shows only their own badges and level. Badges appear on the classroom screen only when you celebrate one or the class shows **Well done!**.
 
@@ -268,7 +270,7 @@ On the **Reports** page, choose the **Class and subject**, the **Period** (**Day
 
 ## Students and importing a student list
 
-On the **Students** page you can add a student to your class, add a photo (only when the administrator allowed student photos; you confirm that consent was given) and **Remove from this class**. Deactivating and deleting students is done by the administrator.
+On the **Students** page you can add a student to your class, add a photo (only when the administrator allowed student photos; you confirm that consent was given) and **Remove from this class**. On a phone each student is a card with the button at the bottom. Deactivating and deleting students is done by the administrator.
 
 ![Import a student list](../img/en/import.png)
 

@@ -21,6 +21,7 @@ import * as School from '../../../shared/contracts/school.ts';
 import { translate, type Locale } from '../../../shared/i18n/index.ts';
 import { lowerTr, normaliseName } from '../../../shared/text/turkish.ts';
 import { call } from '../../lib/api.ts';
+import { copyText, showManualCopy } from '../../lib/clipboard.ts';
 import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
@@ -215,11 +216,16 @@ export function EmergencyLinkDialog({
   );
 }
 
-export function copyLink(t: ReturnType<typeof useI18n>['t'], url: string) {
-  void navigator.clipboard?.writeText(url).then(
-    () => showToast({ message: t('links.copied'), kind: 'success' }),
-    () => showToast({ message: t('links.copyFailed'), kind: 'error' }),
-  );
+/**
+ * Copies a student link. Without the Clipboard API (plain-HTTP school network) or when the browser
+ * refuses, the address opens in a dialog, selected, so the teacher can copy it by hand.
+ */
+export async function copyLink(t: ReturnType<typeof useI18n>['t'], url: string, name?: string) {
+  if (await copyText(url)) {
+    showToast({ message: t('links.copied'), kind: 'success' });
+    return;
+  }
+  showManualCopy({ title: t('links.copyManualTitle'), label: name ? t('links.addressOf', { name }) : t('links.address'), text: url });
 }
 
 function LinkStatusLine({ s }: { s: StudentLinkRow }) {
@@ -268,7 +274,7 @@ function ClassLinks({ classId }: { classId: string }) {
               <span className="cc-push-right cc-row">
                 {s.link?.url ? (
                   <>
-                    <Button size="small" onPress={() => copyLink(t, s.link!.url!)}>
+                    <Button size="small" onPress={() => void copyLink(t, s.link!.url!, s.fullName)}>
                       <IconCopy />
                       {t('links.copy')}
                     </Button>

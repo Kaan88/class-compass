@@ -10,7 +10,7 @@ import { ATTENDANCE_STATUSES, type AttendanceStatus } from '../../../domain/atte
 import { isIsoDate } from '../../../shared/dates.ts';
 import * as L from '../../../shared/contracts/lessons.ts';
 import * as School from '../../../shared/contracts/school.ts';
-import { formatDate, pickText } from '../../../shared/i18n/index.ts';
+import { formatDate, formatDay, pickText, type Locale } from '../../../shared/i18n/index.ts';
 import { sortByName } from '../../../shared/text/turkish.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
@@ -26,18 +26,34 @@ import { IconNote } from '../../ui/icons.tsx';
 
 const key = (...rest: unknown[]) => [SENSITIVE, 'teacher', 'attendance', ...rest];
 
-function StatusButtons({ value, onSet, name }: { value: AttendanceStatus | null; onSet: (s: AttendanceStatus | null) => void; name: string }) {
+/** A school day in the history list: "Fri 6 Nov" / "6 Kas Cum" (never the ISO form on screen). */
+const shortDay = (date: string, locale: Locale) => formatDate(Date.parse(`${date}T12:00:00Z`), locale, 'UTC', { weekday: 'short', day: 'numeric', month: 'short' });
+const longDay = (date: string, locale: Locale) => formatDate(Date.parse(`${date}T12:00:00Z`), locale, 'UTC', { weekday: 'long', day: 'numeric', month: 'long' });
+
+/**
+ * The four statuses as one segmented control, then Clear and Note. Below 52rem the statuses fill
+ * the card's width in four equal columns and Clear / Note sit on the line under them (usability
+ * audit 2026-11: they used to stack one per line, about 590px per student).
+ */
+function StatusButtons({ value, onSet, name, onNote, noteDisabled }: { value: AttendanceStatus | null; onSet: (s: AttendanceStatus | null) => void; name: string; onNote: () => void; noteDisabled: boolean }) {
   const { t } = useI18n();
   return (
-    <div className="cc-row cc-segmented" role="group" aria-label={t('attendance.statusFor', { name })}>
-      {ATTENDANCE_STATUSES.map((s) => (
-        <Button key={s} size="small" aria-pressed={value === s} onPress={() => onSet(s)}>
-          {t(`attendance.status.${s}`)}
+    <div className="cc-att-set">
+      <div className="cc-segmented cc-att-set__statuses" role="group" aria-label={t('attendance.statusFor', { name })}>
+        {ATTENDANCE_STATUSES.map((s) => (
+          <Button key={s} size="small" aria-pressed={value === s} onPress={() => onSet(s)}>
+            {t(`attendance.status.${s}`)}
+          </Button>
+        ))}
+      </div>
+      <div className="cc-att-set__more">
+        <Button size="small" variant="ghost" isDisabled={value === null} onPress={() => onSet(null)}>
+          {t('attendance.clear')}
         </Button>
-      ))}
-      <Button size="small" variant="ghost" isDisabled={value === null} onPress={() => onSet(null)}>
-        {t('attendance.clear')}
-      </Button>
+        <Button size="small" isDisabled={noteDisabled} aria-label={t('attendance.noteFor', { name })} onPress={onNote}>
+          <IconNote />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -98,15 +114,17 @@ export function AttendancePage() {
 
       {day.data ? (
         <DataTable
-          caption={t('attendance.dayCaption', { className: day.data.className, date: day.data.date })}
+          caption={t('attendance.dayCaption', { className: day.data.className, date: longDay(day.data.date, locale) })}
           rows={day.data.students}
           rowKey={(s) => s.studentId}
           emptyText={t('students.none')}
+          stack
           columns={[
             {
               key: 'name',
               header: t('students.name'),
               sortValue: (s) => s.fullName,
+              stackRole: 'title',
               render: (s) => (
                 <span className="cc-row">
                   <Avatar name={s.fullName} id={s.studentId} hue={s.avatarHue} initials={s.initials} size="sm" />
@@ -115,20 +133,22 @@ export function AttendancePage() {
               ),
             },
             { key: 'status', header: t('attendance.statusCol'), render: (s) => <AttendanceChip status={s.status ?? 'not_recorded'} /> },
-            { key: 'set', header: t('common.actions'), render: (s) => <StatusButtons name={s.fullName} value={s.status} onSet={(v) => void setDaily(s.studentId, v)} /> },
             {
-              key: 'note',
-              header: t('attendance.note'),
+              key: 'actions',
+              header: t('common.actions'),
               render: (s) => (
-                <span className="cc-row">
-                  {s.note ? <span>{s.note}</span> : null}
-                  <Button size="small" isDisabled={!s.status} aria-label={t('attendance.noteFor', { name: s.fullName })} onPress={() => setNoteFor({ studentId: s.studentId, name: s.fullName, note: s.note ?? '' })}>
-                    <IconNote />
-                  </Button>
-                </span>
+                <StatusButtons
+                  name={s.fullName}
+                  value={s.status}
+                  onSet={(v) => void setDaily(s.studentId, v)}
+                  noteDisabled={!s.status}
+                  onNote={() => setNoteFor({ studentId: s.studentId, name: s.fullName, note: s.note ?? '' })}
+                />
               ),
             },
-            { key: 'by', header: t('attendance.recordedBy'), render: (s) => (s.recordedByName ? `${s.recordedByName} · ${fmtTime(s.updatedAt!)}` : '—') },
+            { key: 'note', header: t('attendance.note'), render: (s) => s.note ?? '—' },
+            // Who recorded it is in the change list below; on a phone the card leaves it out.
+            { key: 'by', header: t('attendance.recordedBy'), stackRole: 'hidden', render: (s) => (s.recordedByName ? `${s.recordedByName} · ${fmtTime(s.updatedAt!)}` : '—') },
           ]}
         />
       ) : null}
@@ -189,20 +209,23 @@ export function AttendancePage() {
       {history.data ? (
         <>
           <DataTable
-            caption={t('attendance.historyCaption', { from: history.data.from, to: history.data.to })}
+            caption={t('attendance.historyCaption', { from: formatDay(history.data.from, locale), to: formatDay(history.data.to, locale) })}
             rows={history.data.days}
             rowKey={(d) => d.date}
             emptyText={t('attendance.noHistory')}
+            stack
+            compact
             columns={[
-              { key: 'date', header: t('attendance.date'), sortValue: (d) => d.date, render: (d) => <Button size="small" variant="ghost" onPress={() => setDateInput(d.date)}>{d.date}</Button> },
+              { key: 'date', header: t('attendance.date'), sortValue: (d) => d.date, stackRole: 'title', render: (d) => <Button size="small" variant="ghost" onPress={() => setDateInput(d.date)}>{shortDay(d.date, locale)}</Button> },
               ...(['present', 'absent', 'late', 'excused', 'not_recorded'] as const).map((k) => ({ key: k, header: t(`attendance.status.${k}`), render: (d: (typeof history.data.days)[number]) => <MetricCell value={d[k]} /> })),
             ]}
           />
           <DataTable
-            caption={t('attendance.changesCaption', { date: shownDate ?? '' })}
+            caption={t('attendance.changesCaption', { date: shownDate ? longDay(shownDate, locale) : '' })}
             rows={history.data.changes.map((c, i) => ({ ...c, i }))}
             rowKey={(c) => String(c.i)}
             emptyText={t('attendance.noChanges')}
+            stack
             columns={[
               { key: 'at', header: t('audit.when'), render: (c) => fmtTime(c.at) },
               { key: 'who', header: t('audit.who'), render: (c) => c.actorName ?? t('audit.unknown') },

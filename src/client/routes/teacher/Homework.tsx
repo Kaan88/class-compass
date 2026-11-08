@@ -115,7 +115,8 @@ function AssignmentCard({ a, contextId, today }: { a: HomeworkAssignment; contex
       </div>
       {a.details ? <p>{a.details}</p> : null}
       {a.notes ? <p className="cc-muted">{t('homework.privateNote', { note: a.notes })}</p> : null}
-      <StatusSummary statuses={a.statuses} byStatus={a.counts.byStatus} />
+      {/* While checking, the grid shows the same counts at the top of its bar (no second copy). */}
+      {mode === 'check' ? null : <StatusSummary statuses={a.statuses} byStatus={a.counts.byStatus} />}
       {mode === 'edit' ? <AssignmentForm contextId={contextId} initial={a} onDone={() => setMode('view')} /> : null}
       {mode === 'check' ? <CheckSection assignmentId={a.id} /> : null}
       <div className="cc-row">
@@ -138,7 +139,7 @@ function AssignmentCard({ a, contextId, today }: { a: HomeworkAssignment; contex
 }
 
 function AssignmentsTab({ contextId }: { contextId: string }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [view, setView] = useState<View>('week');
   const [by, setBy] = useState<'due' | 'assigned'>('due');
   const [date, setDate] = useState<string | undefined>(undefined);
@@ -166,7 +167,7 @@ function AssignmentsTab({ contextId }: { contextId: string }) {
       </div>
       {q.data ? (
         <p className="cc-muted" data-testid="homework-range">
-          {q.data.range.from === q.data.range.to ? t('homework.rangeDay', { date: q.data.range.from, tz: q.data.timezone }) : t('homework.range', { from: q.data.range.from, to: q.data.range.to, tz: q.data.timezone })}
+          {q.data.range.from === q.data.range.to ? t('homework.rangeDay', { date: dayText(q.data.range.from, locale) }) : t('homework.range', { from: dayText(q.data.range.from, locale), to: dayText(q.data.range.to, locale) })}
         </p>
       ) : null}
       {adding ? (

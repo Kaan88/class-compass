@@ -129,6 +129,11 @@ export interface Column<R> {
   render: (row: R) => ReactNode;
   /** When given, the header becomes a sort button. */
   sortValue?: (row: R) => string | number;
+  /**
+   * Only for `stack` tables, below 52rem: 'title' shows the cell as the card's heading line (no
+   * label), 'hidden' leaves a column out of the card (a detail that only fits on a wide screen).
+   */
+  stackRole?: 'title' | 'hidden';
 }
 
 /**
@@ -143,6 +148,7 @@ export function DataTable<R>({
   caption,
   emptyText,
   stack = false,
+  compact = false,
 }: {
   columns: Column<R>[];
   rows: R[];
@@ -150,6 +156,8 @@ export function DataTable<R>({
   caption: string;
   emptyText: string;
   stack?: boolean;
+  /** With `stack`: short "label value" pairs flow side by side in the card (rows of small counts). */
+  compact?: boolean;
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const sorted = useMemo(() => {
@@ -165,12 +173,12 @@ export function DataTable<R>({
   }, [rows, columns, sort]);
   return (
     <div className={stack ? 'cc-table-wrap cc-table-wrap--stack' : 'cc-table-wrap'}>
-      <table className={stack ? 'cc-table cc-table--stack' : 'cc-table'}>
+      <table className={stack ? `cc-table cc-table--stack${compact ? ' cc-table--compact' : ''}` : 'cc-table'}>
         <caption>{caption}</caption>
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" className={c.sortValue ? undefined : 'cc-table__th--plain'} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
+              <th key={c.key} scope="col" className={[c.sortValue ? null : 'cc-table__th--plain', c.stackRole === 'hidden' ? 'cc-table__wide-only' : null].filter(Boolean).join(' ') || undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
                 {c.sortValue ? (
                   <button type="button" className="cc-table__sort" onClick={() => setSort((s) => ({ key: c.key, dir: s?.key === c.key && s.dir === 1 ? -1 : 1 }))}>
                     {c.header}
@@ -194,7 +202,7 @@ export function DataTable<R>({
             sorted.map((r) => (
               <tr key={rowKey(r)}>
                 {columns.map((c) => (
-                  <td key={c.key} data-label={c.header} className={c.key === 'actions' ? 'cc-table__actions' : undefined}>
+                  <td key={c.key} data-label={c.header} className={c.key === 'actions' ? 'cc-table__actions' : c.stackRole === 'title' ? 'cc-table__title' : c.stackRole === 'hidden' ? 'cc-table__wide-only' : undefined}>
                     {c.render(r)}
                   </td>
                 ))}

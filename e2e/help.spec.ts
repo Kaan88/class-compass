@@ -22,11 +22,13 @@ async function expectImageLoaded(guide: Locator) {
   expect(await img.getAttribute('src')).not.toMatch(/^https?:/u);
 }
 
-test('teachers open Help from the teacher menu in English and Turkish', async ({ page }) => {
+test('teachers open Help from the teacher navigation in English and Turkish', async ({ page }) => {
   test.setTimeout(120_000);
   await login(page, 'english');
   await ensurePin(page);
+  // The menu page has no link row (its tiles are the navigation); every other teacher page has Help.
   await page.goto('/teacher');
+  await page.getByTestId('teacher-menu').getByRole('link', { name: 'Profile and PIN' }).click();
   await page.getByTestId('help-link').first().click();
   await expect(page).toHaveURL(/\/help\?guide=teacher/u);
   const guide = page.getByTestId('guide');

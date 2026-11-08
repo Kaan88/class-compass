@@ -8,7 +8,7 @@ import { useId, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PERIOD_PRESETS, presetRange, type PeriodPreset } from '../../domain/periods.ts';
 import * as R from '../../shared/contracts/reports.ts';
-import { pickText, type MessageKey } from '../../shared/i18n/index.ts';
+import { formatDay, pickText, type MessageKey } from '../../shared/i18n/index.ts';
 import { call, urlFor } from '../lib/api.ts';
 import { errorText } from '../lib/errors.ts';
 import { useI18n } from '../lib/i18n.tsx';
@@ -124,7 +124,7 @@ export function ReportsPage({ viewer, initialContextId }: { viewer: Viewer; init
               {data.student ? ` · ${data.student.fullName}` : ''}
             </h2>
             <p className="cc-muted">
-              {t('report.ui.header', { from: data.from, to: data.to, teacher: data.context.teacherName, year: data.context.year.name })}
+              {t('report.ui.header', { from: formatDay(data.from, locale), to: formatDay(data.to, locale), teacher: data.context.teacherName, year: data.context.year.name })}
             </p>
             <p className="cc-print-only cc-muted">{t('report.ui.generated', { at: new Date(data.generatedAt).toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-GB') })}</p>
             {data.context.classNames.some((n) => n !== data.context.className) ? <p className="cc-muted">{t('report.ui.renamedClass', { names: data.context.classNames.join(', '), now: data.context.className })}</p> : null}

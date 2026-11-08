@@ -117,3 +117,24 @@ Not changed: the modal backdrop already covers the whole screen (the crawl's ful
 with the page scrolled, so the top bar looked undimmed), and the empty "Today's focus" stays a small
 "Choose a topic" action as the owner asked (feedback round 1, item 7). Still open: badges and group
 numbers on the student cards, Compact using free height, and the End Lesson split (ROADMAP).
+
+## Fixed after the November screenshot crawl (teacher area, D-140)
+
+| Screen | Issue | Severity | Fix |
+| --- | --- | --- | --- |
+| Student links (plain-HTTP LAN) | Copy failed and told the teacher to select an address that is not on the page | critical | `copyText` with an `execCommand` fallback; otherwise the link opens selected in a read-only field |
+| Students (phone) | Actions column cut off, names on three lines | major | Stacked cards (name as heading, "Joined" left out); outline danger button |
+| Attendance (phone) | ~590px per student, columns off-screen | major | Stacked cards; four statuses in one row, Clear and Note under them; "Recorded by" only on wide screens |
+| Grouping editor | One long form; thousands of pixels between "pick" and "Move here"; names looked like empty fields | major | Groups side by side, name chips, sticky "Move … to:" bar, names and roles in a disclosure |
+| Reports charts | "5 üzerinden" cut labels; empty all-zero charts in print | major | Steps 1–5 on the axis (short dates were already fixed in D-138); no chart when all values are 0; print height capped |
+| Achievements, Badges | Cramped cards, one word per line, ~60 ungrouped badges, tier only in grey text | major | Wider cards with the button on its own line, folded groups per category, tier chip, art never shrinks |
+| Teacher navigation (phone) | 20 link chips filled the first screen; repeated on the menu page | major | One **Page** select below 52rem; no link row on the menu page |
+| Counter history | Week headers with ", Europe/Istanbul" overflowing at 1920px; two names for one counter | major | "Mon 2 Nov – Sun 8 Nov", timezone once in the caption, the counter's own name |
+| Achievements student dialog (phone) | Close only after the whole badge list; icons of different sizes | major | Close beside the title; art never shrinks |
+| Make your own badge | Picture list showed English keys ("star") | minor | Picture names in EN and TR |
+| Homework check | Counts twice; "2 selected" misaligned; "Not recorded" chip read as "not handed in" | minor | Counts once with the selection count on the same line; "Attendance: …" chip, hidden when attendance was not taken |
+| Assistant settings | Duty fields 235px wide, text cut off | minor | Fields take the row width |
+| Teacher dates | ISO dates and "Europe/Istanbul" in Turkish screens | minor | Dates in words; timezone removed from the homework week line |
+| Goals, New goal | Two fields called "Goal"; child's voice option | minor | "Ready-made goal" / "Goal text" / "Write my own (below)" (TR "Hazır hedef" / "Hedef metni" / "Kendim yazacağım (aşağıya)") |
+| Students | 19 solid red buttons | minor | `danger-outline`; solid red only in the confirmation (no edit menu: teachers cannot edit students, the administrator does) |
+| Teacher menu | Same icon on unrelated tiles | minor | One icon per tile (test-checked) |

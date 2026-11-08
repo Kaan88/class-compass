@@ -1,6 +1,6 @@
 /** Counters: class bar slot, student-card counts, settings page and its weekly history sub-page (CNT-1..12). */
 import { CounterHistoryPage, CountersPage } from '../../routes/teacher/Counters.tsx';
-import { IconCalendar, IconPlus } from '../../ui/icons.tsx';
+import { IconCalendar, IconTally } from '../../ui/icons.tsx';
 import { defineClientModule, type TeacherPageSearch } from '../types.ts';
 import { ModuleConfigToggle } from '../../ui/ModuleConfigToggle.tsx';
 import { useI18n } from '../../lib/i18n.tsx';
@@ -25,7 +25,7 @@ export const countersClientManifest = defineClientModule({
   dashboardSlots: [countersDashboardSlot],
   studentCardAddons: [countersCardAddon],
   teacherPages: [
-    { key: 'counters', path: 'counters', labelKey: 'teacher.counters', Icon: IconPlus, order: 60, Component: CountersPage },
+    { key: 'counters', path: 'counters', labelKey: 'teacher.counters', Icon: IconTally, order: 60, Component: CountersPage },
     // Reached from the counters page (`?counterId=` preselects a counter); no menu tile of its own.
     {
       key: 'counterHistory',
