@@ -90,6 +90,75 @@ Ordering is deterministic: lists are sorted by `order`, then by `key`. Orders mu
 - [ ] UI from `src/client/ui`, semantic tokens only, theme slots via `useTheme()`, `<ThemeIllustration>` and `<Mascot>`. Never branch on a theme key.
 - [ ] Tests: HTTP behaviour, permissions (`permissions.test.ts` covers new endpoints automatically), audit, replay. Name requirement IDs in the tests.
 - [ ] ROADMAP: add the boxes and tick only what is done. Add DECISIONS entries for new patterns.
+- [ ] A demo history generator (below), so the test VM shows the module with weeks of data.
+
+## Demo history generators
+
+`seed:demo-history` (OPERATIONS.md, test VM) fills the demo school with about nine past school weeks
+of fictional history. It is driven by `src/server/seed/history.ts` and one small generator per module
+in `src/server/seed/history/<module>.ts`, listed once in `HISTORY_GENERATORS`
+(`src/server/seed/history/generators.ts`). The run builds a weekly timetable for every class+subject,
+then walks the school days in order (Europe/Istanbul or the school timezone, weekends and a few fixed
+holidays skipped), starting and ending every lesson through the real commands on a backdated clock.
+
+A generator is `{ key, module, …hooks }` (`HistoryGenerator` in `history/types.ts`):
+
+| Field / hook | When it runs |
+|---|---|
+| `key` | Name in the printed summary (`h.count(key, 'what', n)`). |
+| `module` | The catalogue key (`src/shared/modules.ts`), or `null` for core. The generator is skipped for a class+subject where the module is off, and everywhere when the key is not in this build's catalogue, so a generator can be merged before or after its module. A school-wide module (`SCHOOL_MODULE_CATALOG`, off by default) is switched on by its own generator in `setupSchool` (Super Speakers). |
+| `setupSchool(h)` | Once for the whole school, before the class+subject setups: switch a school-wide module on, make its links (as `h.admin`). |
+| `setup(h, plan)` | Once per class+subject before the first lesson: settings, defaults, plans. |
+| `startOfWeek(h, plan, week)` | Monday morning, before the week's first lesson. |
+| `startInput(h, plan, date)` | Fields merged into the `lesson.start` payload. |
+| `duringLesson(h, lesson)` | While the lesson runs. Place events with `h.during(lesson, 0…1)`. `lesson.state` is the polled lesson state (counters, assistant, groups); `h.present(lesson)` lists who is in the room. |
+| `endSteps(h, lesson)` | End Lesson step inputs merged into `lesson.end` (`{ <stepKey>: input }`). |
+| `afterLesson(h, lesson)` | Teacher-area work after the lesson (also after an abandoned one). |
+| `endOfWeek(h, plan, week)` | After the week's lessons: evening and weekend work (set the time with `h.setTime(h.at(day, 'HH:MM'))`). |
+| `endOfSchoolWeek(h, week)` | Once per week for the whole school, after every class+subject's `endOfWeek` (school-wide work, e.g. the week's Super Speakers points). |
+| `finish(h)` | Once after the last week: work earlier today, before `h.realNow` (this week's board podium). |
+
+Rules:
+- **Write through the app.** Classroom actions go through `h.command(plan.ctx, type, payload)` (the real
+  `executeCommand`: audit, command log, `ctx.now()`); a refusal throws unless its `details.reason` is
+  in the `allow` list. Teacher-area and student-page actions call the module's service with
+  `h.call(endpoint, serviceFn, ctx, input)`, which validates `input` with the endpoint's own schema.
+  The student page context is `h.student(studentId)` (the student's permanent link) and the
+  administrator's is `h.admin`; a scorer context is `h.admin` with `user: null`, `scorer` set and a
+  `scorer` actor. Insert rows directly only where no service exists, and say so in the generator's
+  header.
+- **Respect the boundaries.** A generator never reads tables another module owns privately (Secret
+  Student selections, private notes): it uses what the commands and services return (the reveal
+  result, the private-note service), so the boundary tests stay green.
+- **Deterministic and fictional.** Use `h.rand/chance/int/pick/shuffle` (mulberry32), never
+  `Math.random`; text comes from `history/text.ts` (short child-like English and Turkish sentences,
+  links only on example.org / example.com / example.net). Student text must pass the S13c text checks
+  (D-123; the services refuse it otherwise, and a test checks every student string in `text.ts`). Keep
+  cross-hook state in `h.memo(key, init)`. Never print or log link tokens.
+- **The past only.** `h.setTime` refuses an instant at or after the real "now". Lessons never fall on a
+  weekend or a holiday.
+- Keep it cheap: the whole run (one transaction, about 20–30 s on a laptop) must stay under a minute
+  on the test VM. Every student activity re-evaluates the achievement rules once badges have started,
+  so the history starts them (quiet backfill) only in the last full week.
+- `tests/server/seed-history.test.ts` checks that every generator of a module that is in the catalogue and
+  switched on in the demo school (or school-wide) creates something, so a new generator is covered
+  automatically.
+
+Example (a points module):
+
+```ts
+export const pointsGenerator: HistoryGenerator = {
+  key: 'points',
+  module: 'points',
+  duringLesson(h, lesson) {
+    for (const studentId of h.present(lesson).filter(() => h.chance(0.2))) {
+      h.during(lesson, 0.3 + h.rand() * 0.6);
+      h.command(lesson.plan.ctx, 'points.award', { contextId: lesson.plan.context.id, lessonId: lesson.lessonId, studentId, points: 1 });
+      h.count('points', 'points awarded');
+    }
+  },
+};
+```
 
 ## Add a theme
 

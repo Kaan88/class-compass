@@ -151,6 +151,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Owner decision: should the full admin export include private teacher notes? Decided 2026-11-08: yes, the full export includes them (S13b2, D-114); unrevealed Secret Student choices stay out by SEC-3
 - [ ] Restic exercised against a real R2/B2 repository (only the command wrapper and redaction are tested, with a fake restic)
 - [x] Test install on the LAN test VM (D-096): image built and run, demo data, sign-in, restore drill passed (OPERATIONS → Test VM install)
+- [x] `seed:demo-history`: weeks of fictional history for the test VM through the real commands and services, incl. achievements, avatars and Super Speakers (D-136; OPERATIONS → Test VM install)
 - [ ] Isolated install on the Debian VM behind Cloudflare Tunnel (sareteacher.com subdomain still to be chosen), first restore drill, ENG-5 report
 - [ ] Not yet: e2e/axe for the Reports, Admin Reports and Maintenance pages, a print e2e; a school holiday calendar (coverage counts Monday–Friday)
 - [ ] Production go-live only with explicit owner authorisation

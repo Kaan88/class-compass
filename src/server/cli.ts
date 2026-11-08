@@ -5,6 +5,7 @@
  *   node src/server/cli.ts admin:reset-password --login <login>                                (password via stdin)
  *   node src/server/cli.ts seed:demo [--force-demo]      fictional demo school (never in production)
  *     CC_DEMO_PASSWORD=<pw> (NODE_ENV=test only) gives every demo account that password — for E2E tests
+ *   node src/server/cli.ts seed:demo-history [--weeks 9]   fictional past weeks for the demo school (after seed:demo; test VM only)
  *   node src/server/cli.ts backup:create [--trigger timer]   local backup (DB + uploads + manifest) + retention; never migrates
  *   node src/server/cli.ts backup:list
  *   node src/server/cli.ts backup:verify [<file>|latest]
@@ -27,6 +28,7 @@ import { backupNow, errorSummary, listBackups, migrateWithSnapshot, recordRun, r
 import { offsiteBackup, offsiteCheck, offsiteInit, offsiteProblems, offsiteSnapshots, tail } from './ops/restic.ts';
 import { appVersion, hasAppTables, levelText, migrationLevel } from './ops/version.ts';
 import { SeedRefused, seedDemo } from './seed/demo.ts';
+import { seedDemoHistory } from './seed/history.ts';
 
 async function readSecret(prompt: string): Promise<string> {
   if (process.env.CC_PASSWORD) return process.env.CC_PASSWORD;
@@ -47,6 +49,7 @@ const { values, positionals } = parseArgs({
     force: { type: 'boolean' },
     trigger: { type: 'string' },
     'read-data-subset': { type: 'string' },
+    weeks: { type: 'string' },
   },
   allowPositionals: true,
 });
@@ -104,6 +107,20 @@ switch (cmd) {
       console.log('');
       console.log('Demo accounts. These passwords are shown ONCE; store them now:');
       for (const a of r.accounts) console.log(`  ${a.role.padEnd(7)} ${a.login.padEnd(12)} ${a.password}`);
+    } catch (err) {
+      if (!(err instanceof SeedRefused)) throw err;
+      fail(err.message);
+    }
+    break;
+  }
+  case 'seed:demo-history': {
+    await migrate();
+    try {
+      const r = seedDemoHistory({ db: db(), config, now: Date.now }, values.weeks === undefined ? {} : { weeks: Number(values.weeks) });
+      console.log(`Demo history created (fictional data): ${r.from} to ${r.to}, ${r.weeks} weeks, ${r.schoolDays} school days, ${r.lessons} lessons in ${r.contexts} classes and subjects (${r.abandoned} left running and abandoned), in ${(r.elapsedMs / 1000).toFixed(1)} s.`);
+      for (const [key, what] of Object.entries(r.counts)) console.log(`  ${key}: ${Object.entries(what).map(([k, n]) => `${n} ${k}`).join(', ')}`);
+      // Link tokens are secrets (D-128): never printed; the administrator copies them in the app.
+      if (r.counts.superSpeakers) console.log('Super Speakers is on. Copy the scorer and board links in Admin → Super Speakers (they are not printed here).');
     } catch (err) {
       if (!(err instanceof SeedRefused)) throw err;
       fail(err.message);
@@ -224,7 +241,7 @@ switch (cmd) {
     break;
   default:
     fail(
-      'Commands: migrate | admin:create | admin:reset-password | seed:demo [--force-demo] | backup:create | backup:list | backup:verify [file] | backup:restore <file> [--force] | backup:offsite [file] | backup:offsite-init | backup:offsite-check [--read-data-subset 5%] | backup:offsite-snapshots | version',
+      'Commands: migrate | admin:create | admin:reset-password | seed:demo [--force-demo] | seed:demo-history [--weeks 9] | backup:create | backup:list | backup:verify [file] | backup:restore <file> [--force] | backup:offsite [file] | backup:offsite-init | backup:offsite-check [--read-data-subset 5%] | backup:offsite-snapshots | version',
     );
 }
 (opened as Db | null)?.$client.close();
