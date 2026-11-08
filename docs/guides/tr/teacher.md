@@ -12,16 +12,16 @@ Sınıf Pusulası'nı ilk kez mi kullanıyorsunuz? [Öğretmenler için hızlı 
 
 ![Giriş sayfası](../img/tr/sign-in.png)
 
-Hesabınızı okul yöneticiniz açar. Genellikle size bir **davet bağlantısı** gelir (e-postayla ya da bağlantı veya QR kod olarak). Bağlantıyı 7 gün içinde açın ve nasıl giriş yapmak istediğinizi seçin:
+Hesabınızı okul yöneticiniz açar. Genellikle size bir **davet bağlantısı** gelir (e-postayla ya da bağlantı veya QR kod olarak). Bağlantıyı 7 gün içinde açın. Davet sayfası **Kullanıcı adınız**'ı ayrı bir kutuda gösterir: not alın, şifreyle her girişte bunu yazarsınız. Sonra nasıl giriş yapmak istediğinizi seçin:
 
 - **Şifreyle**: kullanıcı adınızı ve kendi belirlediğiniz şifreyi (en az 10 karakter) yazarsınız.
-- **E-posta giriş bağlantılarıyla**: şifreniz olmaz. Her girişte giriş sayfasında **Email me a sign-in link** düğmesine basıp e-posta adresinizi yazarsınız. Bir dakika içinde bir bağlantı ve 6 haneli bir kod gelir. Bağlantıyı açıp **Sign in**'e basın ya da kodu e-postayı istediğiniz cihaza yazın. İkisi de yalnızca bir kez ve 15 dakika boyunca çalışır. Bu seçenek yalnızca okulda e-posta gönderimi ayarlanmışsa görünür.
+- **E-posta giriş bağlantılarıyla**: şifreniz olmaz. Her girişte giriş sayfasında **Bana e-postayla giriş bağlantısı gönder** düğmesine basıp e-posta adresinizi yazarsınız. Bir dakika içinde bir bağlantı ve 6 haneli bir kod gelir. Bağlantıyı açıp **Giriş yap**'a basın ya da kodu e-postayı istediğiniz cihaza yazın. İkisi de yalnızca bir kez ve 15 dakika boyunca çalışır. Sayfa yazdığınız adresi tekrar gösterir, böylece yazım hatasını görebilirsiniz; **Başka bir e-posta adresi kullan** ile adresi yeniden yazabilirsiniz. Bu seçenek yalnızca okulda e-posta gönderimi ayarlanmışsa görünür.
 
 Yöneticiniz size davet yerine **geçici şifre** verdiyse ilk girişte kendi şifrenizi belirlemeniz gerekir.
 
-Şifrenizi mi unuttunuz? Okulda e-posta ayarlanmışsa giriş sayfasındaki **Forgot your password?** bağlantısını kullanın; sıfırlama bağlantısı bir saat geçerlidir. Değilse yöneticinizden şifrenizi sıfırlamasını isteyin. Şifre ile e-posta bağlantısı arasında daha sonra **Profil ve PIN** → **Nasıl giriş yapıyorsunuz** bölümünden geçiş yapabilirsiniz.
+Şifrenizi mi unuttunuz? Okulda e-posta ayarlanmışsa giriş sayfasındaki **Şifrenizi mi unuttunuz?** bağlantısını kullanın; sıfırlama bağlantısı bir saat geçerlidir. Değilse yöneticinizden şifrenizi sıfırlamasını isteyin. Bir giriş ya da sıfırlama bağlantısının süresi dolduysa sayfası **Bana yeni bir giriş bağlantısı gönder** ya da **Yeni bir sıfırlama bağlantısı iste** ve **Giriş sayfasına dön** düğmelerini gösterir. Şifre ile e-posta bağlantısı arasında daha sonra **Profil ve PIN** → **Nasıl giriş yapıyorsunuz** bölümünden geçiş yapabilirsiniz.
 
-> Giriş sayfası İngilizce gösterilir (**Sign in**, **Username**, **Password**). Giriş yaptıktan sonra Sınıf Pusulası kendi arayüz dilinizle açılır (Profil ve PIN → **Dil**).
+> Giriş sayfasının üstünde **English | Türkçe** düğmeleri vardır; bu cihaz seçiminizi hatırlar. Seçim yapılmadıysa sayfa tarayıcının dilini ya da okulun yeni hesaplar için seçtiği dili kullanır. Giriş yaptıktan sonra Sınıf Pusulası kendi arayüz dilinizle açılır (Profil ve PIN → **Dil**).
 
 ## PIN ve sınıf kilidi
 
@@ -293,4 +293,4 @@ Dosyalar yalnızca okulun kendi sunucusunda okunur. Fotoğraflar metin tanıma i
 
 ## Yardım
 
-Öğretmen menüsündeki **Yardım** bu kılavuzları arayüz dilinizde açar. Yöneticinizin kendi [yönetici kılavuzu](admin.md) vardır; öğrenciler ve veliler için de ayrı bir [kılavuz](student.md) bulunur.
+Öğretmen menüsündeki **Yardım** bu kılavuzları arayüz dilinizde açar. Üstteki **English | Türkçe** kılavuzu ve kılavuz listesini diğer dile çevirir. Telefonda kılavuz listesi kılavuzun üstünde tek satıra katlanır (**Kılavuzlar: …**); başka bir kılavuz açmak için ona dokunun. Bir resmi tam boyutta açmak için resme dokunun. Yöneticinizin kendi [yönetici kılavuzu](admin.md) vardır; öğrenciler ve veliler için de ayrı bir [kılavuz](student.md) bulunur.

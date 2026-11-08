@@ -1,8 +1,12 @@
 import { useEffect } from 'react';
 import { Link, Outlet } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import * as Auth from '../../shared/contracts/auth.ts';
+import { call } from '../lib/api.ts';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
 import { setDisplay } from '../lib/display.ts';
 import { useMe } from '../lib/session.ts';
+import { signedOutLocale, useStoredSignedOutLocale } from '../lib/signedOutLocale.ts';
 import { buttonClass } from '../ui/Button.tsx';
 import { EmptyState, Toaster } from '../ui/Feedback.tsx';
 import { ManualCopyDialog } from '../ui/Dialog.tsx';
@@ -12,11 +16,15 @@ import { AvatarDirectoryProvider } from '../avatars/AvatarDirectory.tsx';
 
 /**
  * Root layout: language and text size come from the signed-in teacher's own preferences (UX-4,
- * THM-6) — never from a device-wide setting — so two teachers never affect each other.
+ * THM-6) — never from a device-wide setting — so two teachers never affect each other. Signed out
+ * (the sign-in pages), the language is this device's choice on the sign-in card, else a Turkish
+ * browser, else the school's default language for new accounts (D-025).
  */
 export function RootLayout() {
   const me = useMe();
-  const locale = me?.locale ?? 'en';
+  const stored = useStoredSignedOutLocale();
+  const signInInfo = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000, enabled: !me && !stored });
+  const locale = me?.locale ?? stored ?? signedOutLocale(signInInfo.data?.defaultLocale);
   const textScale = me?.textScale ?? 100;
   useEffect(() => {
     setDisplay({ locale, textScale });

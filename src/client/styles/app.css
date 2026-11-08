@@ -1270,6 +1270,25 @@ html:has(.cc-classroom) .cc-toaster {
   pointer-events: none;
   opacity: var(--cc-deco-opacity);
 }
+/* Sign-in pages: English | Türkçe at the top of the card, above the theme decoration. */
+.cc-auth__lang {
+  justify-content: flex-end;
+  position: relative;
+  z-index: 1;
+}
+/* The invite page shows the new username on its own, in a box that is easy to read and copy. */
+.cc-auth__username {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0;
+}
+.cc-auth__username dd {
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .cc-mascot {
   display: inline-block;
   flex: none;
@@ -1371,6 +1390,8 @@ html:has(.cc-classroom) .cc-toaster {
 .cc-catalog-panel {
   position: relative;
   isolation: isolate;
+  /* The theme decoration sits partly outside the corner; never let it widen the page. */
+  overflow: clip;
   border: var(--cc-border-width-strong) solid var(--cc-border-strong);
   border-radius: var(--cc-radius);
   background: var(--cc-bg);
@@ -4309,6 +4330,32 @@ html[data-cursor='off'] * {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* Below 52rem the guide list folds into one line above the guide, so the guide opens in view. */
+.cc-help__fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--cc-touch);
+  padding: 0.25rem 0.75rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  cursor: pointer;
+  font-weight: 700;
+}
+.cc-help__fold[open] > summary {
+  margin-bottom: 0.5rem;
+}
+.cc-help__fold-current {
+  font-weight: 400;
+}
+.cc-help__fold > summary svg {
+  margin-inline-start: auto;
+  flex: none;
+}
+.cc-help__fold[open] > summary svg {
+  transform: rotate(180deg);
+}
 .cc-help__toc ul {
   list-style: none;
   margin: 0;
@@ -4380,6 +4427,23 @@ html[data-cursor='off'] * {
 .cc-guide ol {
   padding-inline-start: 1.5rem;
 }
+/* Tailwind's preflight removes list markers; guides need their step numbers and bullets back. */
+.cc-guide ul {
+  list-style: disc;
+}
+.cc-guide ol {
+  list-style: decimal;
+}
+.cc-guide ul ul,
+.cc-guide ol ul {
+  list-style: circle;
+}
+.cc-guide ol ol {
+  list-style: lower-alpha;
+}
+.cc-guide li::marker {
+  font-weight: 700;
+}
 .cc-guide li + li {
   margin-top: 0.25em;
 }
@@ -4413,6 +4477,14 @@ html[data-cursor='off'] * {
 }
 .cc-guide__figure {
   margin: 1em 0;
+}
+/* Each screenshot opens full size in a new tab (labels are too small to read on a phone). */
+.cc-guide__figure a {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: var(--cc-radius-sm);
+  cursor: zoom-in;
 }
 .cc-guide__figure img {
   display: block;

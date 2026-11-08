@@ -58,10 +58,15 @@ export async function enterClassroom(qc: QueryClient = queryClient) {
  * itself is kept (only its data becomes null): `qc.clear()` would detach the root layout's `useMe`
  * observer from the cache, so the next sign-in would keep the previous language and text size until
  * a reload (found in the S13a review: a Turkish account saw its first sign-in in English).
+ * Queries keyed `['public', …]` (what the sign-in pages show to anybody) are kept too: the 401 of a
+ * signed-out page load arrives while they are loading, and cancelling them left the sign-in page
+ * without its "Email me a sign-in link" and "Forgot your password?" buttons.
  */
+const accountScoped = (key: readonly unknown[]) => key[0] !== ME_KEY[0] && key[0] !== 'public';
+
 export function resetSignedOut(qc: QueryClient = queryClient) {
-  void qc.cancelQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] });
-  qc.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] });
+  void qc.cancelQueries({ predicate: (q) => accountScoped(q.queryKey) });
+  qc.removeQueries({ predicate: (q) => accountScoped(q.queryKey) });
   qc.getMutationCache().clear();
   qc.setQueryData(ME_KEY, null);
 }

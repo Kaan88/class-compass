@@ -22,14 +22,15 @@ export async function api(page: Page, method: string, path: string, body?: unkno
  */
 export async function submitSignIn(page: Page) {
   const answered = page.waitForResponse((r) => r.url().endsWith('/api/auth/login'));
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  // The sign-in page follows the browser's language before sign-in (D-142): English or Turkish.
+  await page.getByRole('button', { name: /^(Sign in|Giriş yap)$/u }).click();
   expect((await answered).status()).not.toBe(429);
 }
 
 export async function login(page: Page, user: string, password = PASSWORD) {
   await page.goto('/login');
-  await page.getByLabel('Username').fill(user);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel(/^(Username|Kullanıcı adı)$/u).fill(user);
+  await page.getByLabel(/^(Password|Şifre)$/u).fill(password);
   await submitSignIn(page);
   await expect(page).not.toHaveURL(/\/login/);
 }

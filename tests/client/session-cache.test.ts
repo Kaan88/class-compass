@@ -42,4 +42,14 @@ describe('resetSignedOut (UX-4)', () => {
     expect(seen.at(-1)?.locale).toBe('tr');
     off();
   });
+
+  it('keeps public sign-in page data, so a signed-out page load (401) does not cancel it (D-142)', async () => {
+    const qc = new QueryClient();
+    let resolve: (v: { emailLinkEnabled: boolean }) => void = () => undefined;
+    const pending = qc.fetchQuery({ queryKey: ['public', 'reset-available'], queryFn: () => new Promise<{ emailLinkEnabled: boolean }>((r) => (resolve = r)) });
+    resetSignedOut(qc);
+    resolve({ emailLinkEnabled: true });
+    await pending;
+    expect(qc.getQueryData(['public', 'reset-available'])).toEqual({ emailLinkEnabled: true });
+  });
 });

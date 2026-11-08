@@ -82,12 +82,12 @@ for (const lang of ['en', 'tr'] as const) {
     const T = (key: MessageKey, vars?: Record<string, string | number>) => translate(lang, key, vars);
     const subject = (c: Ctx) => (lang === 'tr' ? c.subjectName.tr : c.subjectName.en);
 
-    // ---------------------------------------------------------------- sign-in page (always English before sign-in)
+    // ---------------------------------------------------------------- sign-in page (in the browser's language before sign-in)
     {
-      const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+      const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, locale: lang === 'tr' ? 'tr-TR' : 'en-GB' });
       const page = await context.newPage();
       await page.goto('/login');
-      await expect(page.getByLabel('Username')).toBeVisible();
+      await expect(page.getByLabel(T('auth.login'))).toBeVisible();
       await shot(page, lang, 'sign-in');
       await context.close();
     }

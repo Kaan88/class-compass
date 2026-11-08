@@ -1,7 +1,7 @@
 /**
  * Read-only view of one bundled user guide (docs/guides). The Markdown is parsed into a data tree
  * (markdown.ts) and rendered with React elements only, so nothing in a guide can run as HTML.
- * Images come only from the bundled screenshots; links to other guides open them here; a link to a
+ * Images come only from the bundled screenshots (each opens full size in a new tab); links to other guides open them here; a link to a
  * file outside the guides (e.g. docs/OPERATIONS.md) is shown as plain text.
  */
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -82,6 +82,7 @@ function InlineNodes({ nodes, links }: { nodes: Inline[]; links: GuideLinkHandle
 }
 
 function Blocks({ blocks, links }: { blocks: Block[]; links: GuideLinkHandler }): ReactNode {
+  const { t } = useI18n();
   return blocks.map((b, i) => {
     switch (b.kind) {
       case 'heading': {
@@ -144,7 +145,11 @@ function Blocks({ blocks, links }: { blocks: Block[]; links: GuideLinkHandler })
         const url = guideImageUrl(b.src);
         return url ? (
           <figure key={i} className="cc-guide__figure">
-            <img src={url} alt={b.alt} loading="lazy" />
+            {/* Full size in a new tab: on a phone the shrunk desktop screenshot cannot be read. */}
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <img src={url} alt={b.alt} loading="lazy" />
+              <span className="cc-visually-hidden">{t('help.imageFullSize')}</span>
+            </a>
           </figure>
         ) : (
           <p key={i} className="cc-muted">

@@ -47,12 +47,19 @@ test('teachers open Help from the teacher navigation in English and Turkish', as
   await expect(guide.getByRole('heading', { name: 'Öğretmenler için hızlı başlangıç', level: 1 })).toBeVisible();
   await expect(guide).toHaveAttribute('lang', 'tr');
 
+  // The whole page follows the guide language (D-142): guide list and top bar too.
+  await expect(page.getByRole('navigation', { name: 'Kılavuzlar' }).getByRole('link', { name: 'Hızlı başlangıç: öğretmenler' })).toBeVisible();
+  // Numbered steps keep their numbers (Tailwind's preflight removes list markers).
+  expect(await guide.locator('ol').first().evaluate((el) => getComputedStyle(el).listStyleType)).toBe('decimal');
+
   await page.goto('/help?guide=teacher&lang=tr');
   await expect(guide.getByRole('heading', { name: 'Öğretmen kılavuzu', level: 1 })).toBeVisible();
   await expectImageLoaded(guide);
+  // Each picture opens full size in a new tab.
+  await expect(guide.locator('.cc-guide__figure a').first()).toHaveAttribute('target', '_blank');
   expect(await seriousViolations(page)).toEqual([]);
 
-  await page.getByRole('link', { name: 'Back to Class Compass' }).click();
+  await page.getByRole('link', { name: 'Sınıf Pusulası’na dön' }).click();
   await expect(page).toHaveURL(/\/teacher/u);
 });
 
@@ -102,4 +109,24 @@ test('students open Help on their own page', async ({ page, browser }) => {
   } finally {
     await phone.close();
   }
+});
+
+test('on a phone the guide list folds into one line and the guide opens in view (D-142) @mobile', async ({ page }) => {
+  test.skip(test.info().project.name !== 'mobile', 'phone layout');
+  test.setTimeout(120_000);
+  await login(page, 'english');
+  await page.goto('/help?guide=teacher&lang=en');
+  const guide = page.getByTestId('guide');
+  const heading = guide.getByRole('heading', { name: 'Teacher guide', level: 1 });
+  await expect(heading).toBeVisible();
+  const fold = page.getByTestId('help-toc-fold');
+  await expect(fold).toBeVisible();
+  await expect(fold.getByRole('link', { name: 'Administrator guide' })).toBeHidden();
+  // The guide's heading is on the first screen.
+  const box = await heading.boundingBox();
+  expect(box!.y + box!.height).toBeLessThan(page.viewportSize()!.height);
+  await fold.locator('summary').click();
+  await fold.getByRole('link', { name: 'Quick start: teachers' }).click();
+  await expect(guide.getByRole('heading', { name: 'Quick start for teachers', level: 1 })).toBeVisible();
+  expect(await seriousViolations(page)).toEqual([]);
 });

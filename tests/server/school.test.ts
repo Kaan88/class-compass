@@ -22,6 +22,8 @@ describe('school settings', () => {
 
   it('keeps each teacher’s language separate from other teachers and from the school default (UX-4)', async () => {
     await ok(s.admin.patch('/api/admin/settings', { defaultLocale: 'tr' }));
+    // The signed-out sign-in pages start in the school default (UX-4 is unchanged for accounts).
+    expect((await new Client(env).get('/api/auth/password-reset')).body.defaultLocale).toBe('tr');
     expect((await s.teacherA.get('/api/auth/me')).body.locale).toBe('en');
     await ok(s.teacherA.patch('/api/auth/preferences', { locale: 'tr' }));
     expect((await s.teacherB.get('/api/auth/me')).body.locale).toBe('en');

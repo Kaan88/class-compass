@@ -310,6 +310,8 @@ test('auth and help pages', async ({ browser }) => {
           await page.goto(url);
           await expect(page.getByRole('radio').first()).toBeVisible();
           await S(page, 'auth', 'invite', 'welcome');
+          // Leave /invite first: a goto that changes only the fragment is a same-document navigation.
+          await page.goto('/login');
           await page.goto('/invite#token=ux-not-a-real-token-000000000000000000000');
           await page.waitForTimeout(1500);
           await S(page, 'auth', 'invite', 'invalid-link');

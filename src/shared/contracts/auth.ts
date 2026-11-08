@@ -107,8 +107,11 @@ export const passwordResetAvailable = endpoint({
   path: '/api/auth/password-reset',
   access: 'public',
   input: Empty,
-  /** `emailLinkEnabled`: email-link sign-in is offered (SMTP configured, S13b). */
-  output: z.object({ emailResetEnabled: z.boolean(), emailLinkEnabled: z.boolean() }),
+  /**
+   * `emailLinkEnabled`: email-link sign-in is offered (SMTP configured, S13b). `defaultLocale`: the
+   * school's language for new accounts (D-025), the sign-in pages' language until the device picks one.
+   */
+  output: z.object({ emailResetEnabled: z.boolean(), emailLinkEnabled: z.boolean(), defaultLocale: Locale }),
 });
 
 /** Always answers `{ ok: true }` so the response never reveals whether an account exists. */

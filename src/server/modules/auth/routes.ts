@@ -9,6 +9,7 @@ import { executeCommand } from '../../lib/commands.ts';
 import { AppError } from '../../lib/errors.ts';
 import { route, sessionCookieName } from '../../lib/http.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
+import { getSchoolSettings } from '../school/policy.ts';
 import * as svc from './service.ts';
 import * as email from './emailSignIn.ts';
 
@@ -91,7 +92,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     return freshMe(ctx);
   });
 
-  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx) }));
+  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx), defaultLocale: getSchoolSettings(ctx.db).defaultLocale }));
   route(
     app,
     deps,

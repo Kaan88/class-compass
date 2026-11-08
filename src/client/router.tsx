@@ -55,7 +55,11 @@ const indexRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  validateSearch: (s: Record<string, unknown>): { next?: string | undefined } => ({ next: typeof s.next === 'string' ? s.next : undefined }),
+  /** `mode`: open the "forgot password" or "email me a link" form at once (from an expired link's page). */
+  validateSearch: (s: Record<string, unknown>): { next?: string | undefined; mode?: 'forgot' | 'email-link' | undefined } => ({
+    next: typeof s.next === 'string' ? s.next : undefined,
+    mode: s.mode === 'forgot' || s.mode === 'email-link' ? s.mode : undefined,
+  }),
   component: LoginPage,
 });
 

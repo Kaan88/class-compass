@@ -118,7 +118,7 @@ describe('account invites (S13b item 9, D-108)', () => {
     const t2 = tokenFrom(noMail.invite.link);
     expect(await ok(new Client(env).post('/api/auth/invite/inspect', { token: t2 }))).toMatchObject({ emailLinkAllowed: true, emailLinkAvailable: false, emailLinkUnavailableReason: 'SMTP_NOT_CONFIGURED' });
     expect((await new Client(env).post('/api/auth/invite/accept', { token: t2, method: 'email_link' })).body.error.details.reason).toBe('SMTP_NOT_CONFIGURED');
-    expect(await ok(new Client(env).get('/api/auth/password-reset'))).toEqual({ emailResetEnabled: false, emailLinkEnabled: false });
+    expect(await ok(new Client(env).get('/api/auth/password-reset'))).toEqual({ emailResetEnabled: false, emailLinkEnabled: false, defaultLocale: 'en' });
   });
 
   it('changing the email revokes an invite (and sign-in links) mailed to the old address and clears the verified mark', async () => {

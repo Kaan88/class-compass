@@ -12,16 +12,16 @@ New to Class Compass? Start with the [quick start for teachers](quick-start-teac
 
 ![The sign-in page](../img/en/sign-in.png)
 
-Your administrator creates your account. Usually you receive an **invite link** (by email, or as a link or QR code). Open it within 7 days and choose how you want to sign in:
+Your administrator creates your account. Usually you receive an **invite link** (by email, or as a link or QR code). Open it within 7 days. The invite page shows **Your username** in a box on its own: note it down, you type it every time you sign in with a password. Then choose how you want to sign in:
 
 - **With a password**: you type your username and a password you choose (at least 10 characters).
-- **With email sign-in links**: you have no password. Each time, press **Email me a sign-in link** on the sign-in page and type your email address. A link and a 6-digit code arrive within a minute. Open the link and press **Sign in**, or type the code on the device where you asked for the email. Both work once, for 15 minutes. This choice is only offered when the school has set up email.
+- **With email sign-in links**: you have no password. Each time, press **Email me a sign-in link** on the sign-in page and type your email address. A link and a 6-digit code arrive within a minute. Open the link and press **Sign in**, or type the code on the device where you asked for the email. Both work once, for 15 minutes. The page repeats the address you typed, so you can spot a typo; **Use a different email** lets you type it again. This choice is only offered when the school has set up email.
 
 If your administrator gave you a **temporary password** instead, you must choose your own password the first time you sign in.
 
-Forgot your password? If the school has set up email, use **Forgot your password?** on the sign-in page; the reset link works for one hour. Otherwise ask your administrator to reset it. You can switch between password and email links later in **Profile and PIN** → **How you sign in**.
+Forgot your password? If the school has set up email, use **Forgot your password?** on the sign-in page; the reset link works for one hour. Otherwise ask your administrator to reset it. If a sign-in or reset link has expired, its page offers **Email me a new sign-in link** or **Ask for a new reset link**, and **Back to sign-in**. You can switch between password and email links later in **Profile and PIN** → **How you sign in**.
 
-> The sign-in page is shown in English. After you sign in, Class Compass uses your own interface language (Profile and PIN → **Language**).
+> The sign-in page has an **English | Türkçe** switch at the top; this device remembers your choice. Without a choice it follows the browser's language or the school's language for new accounts. After you sign in, Class Compass uses your own interface language (Profile and PIN → **Language**).
 
 ## PIN and classroom lock
 
@@ -293,4 +293,4 @@ Files are read on the school's own server only. Photos are read with text recogn
 
 ## Getting help
 
-**Help** in the teacher menu opens these guides in your interface language. Your administrator has the [administrator guide](admin.md); students and parents have their own [guide](student.md).
+**Help** in the teacher menu opens these guides in your interface language. **English | Türkçe** at the top switches the guide and the list of guides to the other language. On a phone the list of guides is folded into one line above the guide (**Guides: …**); tap it to open another guide. Tap a picture to open it full size. Your administrator has the [administrator guide](admin.md); students and parents have their own [guide](student.md).

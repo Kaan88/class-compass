@@ -138,3 +138,19 @@ numbers on the student cards, Compact using free height, and the End Lesson spli
 | Goals, New goal | Two fields called "Goal"; child's voice option | minor | "Ready-made goal" / "Goal text" / "Write my own (below)" (TR "Hazır hedef" / "Hedef metni" / "Kendim yazacağım (aşağıya)") |
 | Students | 19 solid red buttons | minor | `danger-outline`; solid red only in the confirmation (no edit menu: teachers cannot edit students, the administrator does) |
 | Teacher menu | Same icon on unrelated tiles | minor | One icon per tile (test-checked) |
+
+## Fixed after the November screenshot crawl (auth and help, D-142)
+
+| Screen | Issue | Severity | Fix |
+| --- | --- | --- | --- |
+| Help, every guide | Numbered steps and bullets showed no numbers or bullets (Tailwind preflight) | major | List markers restored inside `.cc-guide` (Help page and Help panel) |
+| Expired sign-in, reset and invite links | Dead end: only a red alert | major | **Email me a new sign-in link** / **Ask for a new reset link** and **Back to sign-in** |
+| Sign-in pages (TR) | English only, no language switch | major | **English \| Türkçe** on the card, per device; default: Turkish browser, then the school's language for new accounts |
+| Change password, reset, email link | Main action a small left-aligned button | minor | Big full-width main button like Sign in |
+| Invite | Username hidden mid-sentence | minor | "Your username" label and a monospace box |
+| Help (phone) | Guide list filled the first screen | minor | Folded into one "Guides: …" line below 52rem |
+| Help, language switch | Guide list and top bar stayed in the other language | minor | The whole Help page follows the guide language |
+| Help, pictures (phone) | Shrunk desktop screenshots unreadable, not tappable | minor | Each picture opens full size in a new tab (phone-width captures not made) |
+| Component catalog | Theme decoration widened the page | minor | `overflow: clip` on catalog panels |
+| Invite, second link in the same tab | Fragment read once: a stale invite stayed on screen (and the crawl never captured the invalid state) | minor | Token re-read on `hashchange`; the crawl leaves `/invite` first |
+| Email link sent | No address shown, no way to fix a typo | minor | The typed address in a shorter message, **Use a different email** |

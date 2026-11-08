@@ -9,7 +9,7 @@
  * Tokens live in the URL fragment and are removed from the address bar at once.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import * as Auth from '../../shared/contracts/auth.ts';
@@ -19,19 +19,53 @@ import { errorText, reasonOf } from '../lib/errors.ts';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
 import { getOutbox } from '../lib/outbox-client.ts';
 import { freshMe, ME_KEY, type Me } from '../lib/session.ts';
-import { Button } from '../ui/Button.tsx';
+import { Button, buttonClass } from '../ui/Button.tsx';
 import { Alert } from '../ui/Feedback.tsx';
 import { TextField } from '../ui/Fields.tsx';
 import { AuthCard } from './AuthCard.tsx';
 import { homeFor } from './guards.ts';
 
-/** Reads `#token=…` once and clears it from the address bar and history. */
-function useFragmentToken(): string {
-  const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') ?? '');
+const tokenInHash = () => new URLSearchParams(window.location.hash.slice(1)).get('token');
+
+/**
+ * Reads `#token=…` and clears it from the address bar and history. A second link opened in the same
+ * tab only changes the fragment (no reload), so a later `hashchange` with a token replaces it: the
+ * page never keeps showing the previous link's invite or sign-in.
+ */
+export function useFragmentToken(): string {
+  const [token, setToken] = useState(() => tokenInHash() ?? '');
   useEffect(() => {
-    if (window.location.hash) history.replaceState(null, '', window.location.pathname);
+    const clear = () => {
+      if (window.location.hash) history.replaceState(null, '', window.location.pathname + window.location.search);
+    };
+    clear();
+    const onHash = () => {
+      const next = tokenInHash();
+      if (next === null) return;
+      setToken(next);
+      clear();
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
   return token;
+}
+
+/** The way out of an expired or broken link: a big main action, and plain sign-in under it. */
+export function LinkDeadEnd({ to, label }: { to: 'email-link' | 'forgot' | null; label?: string }) {
+  const { t } = useI18n();
+  return (
+    <>
+      {to && label ? (
+        <Link to="/login" search={{ next: undefined, mode: to }} className={buttonClass('primary', 'big')}>
+          {label}
+        </Link>
+      ) : null}
+      <Link to="/login" search={{ next: undefined, mode: undefined }} className={buttonClass(to ? 'ghost' : 'primary', to ? 'md' : 'big')}>
+        {t('auth.backToSignIn')}
+      </Link>
+    </>
+  );
 }
 
 function useSignedIn() {
@@ -70,7 +104,7 @@ export function EmailCodeForm({ requestId }: { requestId: string }) {
     >
       <TextField label={t('signin.code')} description={t('signin.codeHint')} inputMode="numeric" autoComplete="one-time-code" maxLength={6} isRequired value={code} onChange={(v) => setCode(v.replace(/\D/gu, ''))} />
       {error ? <Alert>{error}</Alert> : null}
-      <Button type="submit" variant="primary" isDisabled={busy || code.length !== 6}>
+      <Button type="submit" variant="primary" size="big" isDisabled={busy || code.length !== 6}>
         {t('auth.signIn')}
       </Button>
     </form>
@@ -82,13 +116,23 @@ export function EmailLinkRequest({ onBack }: { onBack: () => void }) {
   const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [requestId, setRequestId] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState('');
   const [error, setError] = useState<string | null>(null);
   return (
     <AuthCard title={t('signin.emailTitle')}>
       {requestId ? (
         <>
-          <Alert kind="success">{t('signin.emailSent')}</Alert>
-          <EmailCodeForm requestId={requestId} />
+          {/* The typed address is shown so a typo can be spotted; the answer never says whether it is known. */}
+          <Alert kind="success">{t('signin.emailSent', { email: sentTo })}</Alert>
+          <EmailCodeForm key={requestId} requestId={requestId} />
+          <Button
+            onPress={() => {
+              setRequestId(null);
+              setError(null);
+            }}
+          >
+            {t('signin.otherEmail')}
+          </Button>
         </>
       ) : (
         <form
@@ -97,7 +141,9 @@ export function EmailLinkRequest({ onBack }: { onBack: () => void }) {
             e.preventDefault();
             setError(null);
             try {
-              setRequestId((await call(Auth.requestEmailLink, { email })).requestId);
+              const r = await call(Auth.requestEmailLink, { email });
+              setSentTo(email.trim());
+              setRequestId(r.requestId);
             } catch (err) {
               setError(err instanceof ApiError && err.code === 'RATE_LIMITED' ? t('auth.tooMany') : errorText(t, err));
             }
@@ -106,7 +152,7 @@ export function EmailLinkRequest({ onBack }: { onBack: () => void }) {
           <p className="cc-muted">{t('signin.emailExplain')}</p>
           <TextField label={t('auth.email')} type="email" autoComplete="email" isRequired value={email} onChange={setEmail} autoFocus />
           {error ? <Alert>{error}</Alert> : null}
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="primary" size="big">
             {t('signin.sendLink')}
           </Button>
         </form>
@@ -123,12 +169,17 @@ export function SignInLinkPage() {
   const { t } = useI18n();
   const token = useFragmentToken();
   const signedIn = useSignedIn();
-  const [error, setError] = useState<string | null>(token ? null : t('error.SIGNIN_LINK_INVALID'));
+  const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => setFailed(null), [token]);
+  const error = token ? failed : t('error.SIGNIN_LINK_INVALID');
   return (
     <AuthCard title={t('signin.linkTitle')}>
       {error ? (
-        <Alert>{error}</Alert>
+        <>
+          <Alert>{error}</Alert>
+          <LinkDeadEnd to="email-link" label={t('signin.newLink')} />
+        </>
       ) : (
         <>
           <p>{t('signin.linkExplain')}</p>
@@ -141,7 +192,7 @@ export function SignInLinkPage() {
               try {
                 await signedIn(await call(Auth.completeEmailLink, { token }));
               } catch (err) {
-                setError(err instanceof ApiError && err.status === 401 ? t('error.SIGNIN_LINK_INVALID') : errorText(t, err));
+                setFailed(err instanceof ApiError && err.status === 401 ? t('error.SIGNIN_LINK_INVALID') : errorText(t, err));
               } finally {
                 setBusy(false);
               }
@@ -173,7 +224,19 @@ export function InvitePage() {
 
 function InviteState({ loading }: { loading: boolean }) {
   const { t } = useI18n();
-  return <AuthCard title={t('invite.title')}>{loading ? <p className="cc-muted">{t('common.loading')}</p> : <Alert>{t('error.INVITE_INVALID')}</Alert>}</AuthCard>;
+  return (
+    <AuthCard title={t('invite.title')}>
+      {loading ? (
+        <p className="cc-muted">{t('common.loading')}</p>
+      ) : (
+        <>
+          <Alert>{t('error.INVITE_INVALID')}</Alert>
+          <p className="cc-muted">{t('invite.invalidHint')}</p>
+          <LinkDeadEnd to={null} />
+        </>
+      )}
+    </AuthCard>
+  );
 }
 
 function InviteForm({ token, info }: { token: string; info: z.infer<typeof Auth.inspectInvite.output> }) {
@@ -188,15 +251,22 @@ function InviteForm({ token, info }: { token: string; info: z.infer<typeof Auth.
   const unavailable = info.emailLinkUnavailableReason === 'NO_EMAIL' ? t('invite.noEmail') : t('invite.noSmtp');
   if (requestId) {
     return (
-      <AuthCard title={t('invite.title')}>
+      <AuthCard title={t('invite.title')} languageSwitch={false}>
         <Alert kind="success">{t('invite.checkEmail')}</Alert>
         <EmailCodeForm requestId={requestId} />
       </AuthCard>
     );
   }
   return (
-    <AuthCard title={t('invite.title')}>
-      <p>{t('invite.welcome', { name: info.displayName, login: info.login })}</p>
+    <AuthCard title={t('invite.title')} languageSwitch={false}>
+      <p>{t('invite.welcome', { name: info.displayName })}</p>
+      {/* The username stands on its own: this is where the new teacher learns what to type at sign-in. */}
+      <dl className="cc-auth__username">
+        <dt className="cc-field__label">{t('invite.username')}</dt>
+        <dd className="cc-temp-password" data-testid="invite-username">
+          {info.login}
+        </dd>
+      </dl>
       <form
         className="cc-stack"
         onSubmit={async (e) => {

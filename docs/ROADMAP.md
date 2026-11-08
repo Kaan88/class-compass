@@ -230,5 +230,5 @@ Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in t
 - [x] Tests: every guide in both languages, every guide link, anchor and image exists, every screenshot used and small (`tests/docs`); Help renders EN and TR for teacher, admin and student and passes axe (`e2e/help.spec.ts`)
 - [ ] Read through by the owner and a Turkish-speaking teacher (wording, anything unclear for colleagues)
 - [x] Administrators set their Maintenance PIN in Profile (asked by "Back up now" and "Verify the latest backup"); the admin guide is updated (D-138)
-- [ ] The sign-in page is English only (before sign-in the language is not known); the Turkish teacher guide quotes its English labels
+- [x] The sign-in pages have an English | Türkçe switch, remembered per device; without a choice they follow a Turkish browser, then the school's language for new accounts; the Turkish teacher guide quotes the Turkish labels (D-142)
 - [ ] Re-run `npm run docs:screenshots` after visible UI changes (no automatic check that the pictures are current)

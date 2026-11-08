@@ -1,5 +1,5 @@
 /** Sign-in (password, or an emailed link for email-link accounts, D-108), email password reset (D-015) and the (forced) password change screen. */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearch, Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Auth from '../../shared/contracts/auth.ts';
@@ -12,7 +12,7 @@ import { Button, buttonClass } from '../ui/Button.tsx';
 import { Alert } from '../ui/Feedback.tsx';
 import { TextField } from '../ui/Fields.tsx';
 import { AuthCard } from './AuthCard.tsx';
-import { EmailLinkRequest } from './SignIn.tsx';
+import { EmailLinkRequest, LinkDeadEnd, useFragmentToken } from './SignIn.tsx';
 import { homeFor, safeNext } from './guards.ts';
 import { SensitiveGate } from './Lock.tsx';
 
@@ -25,9 +25,14 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [forgot, setForgot] = useState(false);
-  const [byEmail, setByEmail] = useState(false);
+  // `?mode=forgot` / `?mode=email-link` (from an expired link's page) opens that form at once.
+  const [forgot, setForgot] = useState(search.mode === 'forgot');
+  const [byEmail, setByEmail] = useState(search.mode === 'email-link');
   const resetInfo = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000 });
+  const back = (close: () => void) => () => {
+    close();
+    if (search.mode) void navigate({ to: '/login', search: { next: search.next, mode: undefined }, replace: true });
+  };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,8 +51,8 @@ export function LoginPage() {
     }
   }
 
-  if (forgot) return <ForgotPassword onBack={() => setForgot(false)} />;
-  if (byEmail) return <EmailLinkRequest onBack={() => setByEmail(false)} />;
+  if (forgot && resetInfo.data?.emailResetEnabled !== false) return <ForgotPassword onBack={back(() => setForgot(false))} />;
+  if (byEmail && resetInfo.data?.emailLinkEnabled !== false) return <EmailLinkRequest onBack={back(() => setByEmail(false))} />;
   return (
     <AuthCard title={t('auth.signIn')}>
       <form onSubmit={submit} className="cc-stack">
@@ -99,7 +104,7 @@ function ForgotPassword({ onBack }: { onBack: () => void }) {
         >
           <TextField label={t('auth.email')} type="email" autoComplete="email" isRequired value={email} onChange={setEmail} autoFocus />
           {error ? <Alert>{error}</Alert> : null}
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="primary" size="big">
             {t('auth.sendResetLink')}
           </Button>
         </form>
@@ -114,26 +119,27 @@ function ForgotPassword({ onBack }: { onBack: () => void }) {
 /** Reset link target: the token is in the URL fragment (#token=…), so it never reaches server logs. */
 export function ResetPasswordPage() {
   const { t } = useI18n();
-  const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') ?? '');
+  // Removed from the address bar and history straight away.
+  const token = useFragmentToken();
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
   const [done, setDone] = useState(false);
-  useEffect(() => {
-    // Remove the token from the address bar and history straight away.
-    if (window.location.hash) history.replaceState(null, '', window.location.pathname);
-  }, []);
   return (
     <AuthCard title={t('auth.newPasswordTitle')}>
       {done ? (
         <>
           <Alert kind="success">{t('auth.resetDone')}</Alert>
-          <Link to="/login" search={{ next: undefined }} className={buttonClass('primary')}>
+          <Link to="/login" search={{ next: undefined, mode: undefined }} className={buttonClass('primary', 'big')}>
             {t('auth.signIn')}
           </Link>
         </>
-      ) : !token ? (
-        <Alert>{t('error.RESET_TOKEN_INVALID')}</Alert>
+      ) : !token || expired ? (
+        <>
+          <Alert>{t('error.RESET_TOKEN_INVALID')}</Alert>
+          <LinkDeadEnd to="forgot" label={t('auth.newResetLink')} />
+        </>
       ) : (
         <form
           className="cc-stack"
@@ -145,14 +151,15 @@ export function ResetPasswordPage() {
               await call(Auth.completePasswordReset, { token, newPassword: pw });
               setDone(true);
             } catch (err) {
-              setError(errorText(t, err));
+              if (reasonOf(err) === 'RESET_TOKEN_INVALID') setExpired(true);
+              else setError(errorText(t, err));
             }
           }}
         >
           <TextField label={t('password.new')} description={t('password.rules')} type="password" autoComplete="new-password" minLength={10} isRequired value={pw} onChange={setPw} />
           <TextField label={t('password.repeat')} type="password" autoComplete="new-password" isRequired value={pw2} onChange={setPw2} />
           {error ? <Alert>{error}</Alert> : null}
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="primary" size="big">
             {t('password.save')}
           </Button>
         </form>
@@ -161,8 +168,12 @@ export function ResetPasswordPage() {
   );
 }
 
-/** Change own password (current + new twice). Used on the profile and the forced-change screen. */
-export function ChangePasswordForm({ onDone }: { onDone?: () => void }) {
+/**
+ * Change own password (current + new twice). Used on the profile and the forced-change screen; on
+ * the forced-change card (`main`) the save button is the card's big full-width main action like
+ * every other sign-in card.
+ */
+export function ChangePasswordForm({ onDone, main = false }: { onDone?: () => void; main?: boolean }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const [current, setCurrent] = useState('');
@@ -197,11 +208,17 @@ export function ChangePasswordForm({ onDone }: { onDone?: () => void }) {
       <TextField label={t('password.repeat')} type="password" autoComplete="new-password" isRequired value={pw2} onChange={setPw2} />
       {error ? <Alert>{error}</Alert> : null}
       {ok ? <Alert kind="success">{t('password.changed')}</Alert> : null}
-      <div>
-        <Button type="submit" variant="primary">
+      {main ? (
+        <Button type="submit" variant="primary" size="big">
           {t('password.save')}
         </Button>
-      </div>
+      ) : (
+        <div>
+          <Button type="submit" variant="primary">
+            {t('password.save')}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }
@@ -217,6 +234,7 @@ export function ChangePasswordPage() {
       <AuthCard title={t('password.changeTitle')}>
         {me?.mustChangePassword ? <Alert kind="warning">{t('password.mustChange')}</Alert> : null}
         <ChangePasswordForm
+          main
           onDone={async () => {
             const fresh = await freshMe(qc);
             if (fresh) await navigate({ to: homeFor(fresh) });
@@ -226,7 +244,7 @@ export function ChangePasswordPage() {
           variant="ghost"
           onPress={async () => {
             await signOut(qc);
-            await navigate({ to: '/login', search: { next: undefined } });
+            await navigate({ to: '/login', search: { next: undefined, mode: undefined } });
           }}
         >
           {t('auth.signOut')}
