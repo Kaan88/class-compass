@@ -83,27 +83,32 @@ function LinkDialog({ student, onClose }: { student: AdminStudent | null; onClos
   return (
     <Modal isOpen onOpenChange={(o) => !o && onClose()} title={t('links.adminTitle', { name: student.fullName })}>
       {!d ? <p className="cc-muted">{t('common.loading')}</p> : null}
+      {d && url && !student.active ? <Alert kind="warning">{t('links.inactive')}</Alert> : null}
       {d && url ? (
         <div className="cc-stack" data-testid="admin-link">
           <QrCode text={url} label={t('links.qrFor', { name: student.fullName })} />
           <code className="cc-link-url">{url}</code>
           {d.link?.replacedAt ? <Alert kind="warning">{t('links.replacedOn', { date: whenText(d.link.replacedAt, locale) })}</Alert> : null}
-          <div className="cc-row">
-            <Button onPress={() => copyLink(t, url)}>
-              <IconCopy />
-              {t('links.copy')}
-            </Button>
-            <Button onPress={() => setPrinting(true)}>
-              <IconPrint />
-              {t('links.printOne')}
-            </Button>
-          </div>
+          {/* A deactivated student's link does not work (item 12): no copying or printing it. */}
+          {student.active ? (
+            <div className="cc-row">
+              <Button onPress={() => copyLink(t, url)}>
+                <IconCopy />
+                {t('links.copy')}
+              </Button>
+              <Button onPress={() => setPrinting(true)}>
+                <IconPrint />
+                {t('links.printOne')}
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {d && !url ? <Alert kind="warning">{d.revokedAt ? t('links.revokedOn', { date: whenText(d.revokedAt, locale) }) : student.active ? t('links.none') : t('links.inactive')}</Alert> : null}
       <p className="cc-muted">{t('links.warning')}</p>
       <DialogActions>
-        <Button variant="ghost" isDisabled={!student.active} onPress={() => setEmergency(true)}>
+        {/* A deactivated student's leaked link can still be revoked (not replaced) at once (item 14a). */}
+        <Button variant="ghost" isDisabled={!student.active && !d?.link} onPress={() => setEmergency(true)}>
           <IconAlert />
           {t('links.emergency.open')}
         </Button>
@@ -114,12 +119,13 @@ function LinkDialog({ student, onClose }: { student: AdminStudent | null; onClos
       {emergency ? (
         <EmergencyLinkDialog
           student={{ id: student.id, fullName: student.fullName, hasLink: Boolean(d?.link) }}
+          revokeOnly={!student.active}
           onClose={() => setEmergency(false)}
           endpoint={L.adminEmergencyLink}
           onDone={(state) => qc.setQueryData(key, state)}
         />
       ) : null}
-      {printing && url && d ? <LinkCardSheets cards={[{ id: student.id, fullName: student.fullName, className: d.className ?? '', url }]} size="small" cardLanguage={d.cardLanguage} mode="print" /> : null}
+      {printing && url && d && student.active ? <LinkCardSheets cards={[{ id: student.id, fullName: student.fullName, className: d.className ?? '', url }]} size="small" cardLanguage={d.cardLanguage} mode="print" /> : null}
     </Modal>
   );
 }

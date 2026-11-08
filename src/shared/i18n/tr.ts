@@ -1277,7 +1277,7 @@ export const tr = {
   'goals.evidence': 'Kanıtlar',
   'goals.noEvidence': 'Henüz kanıt yok.',
   'goals.privateNotes': 'Özel notlar',
-  'goals.privateHint': 'Özel: bu notları yalnızca siz görürsünüz. Öğrenciye, sınıf ekranında ya da başka öğretmenlere asla gösterilmez.',
+  'goals.privateHint': 'Özel: bu notlar öğrenciye, sınıf ekranında ya da başka öğretmenlere asla gösterilmez. Okulun tam veri dışa aktarımı (yöneticiler tarafından alınır) bunları içerir.',
   'goals.newPrivateNote': 'Yeni özel not',
   'goals.savePrivateNote': 'Özel notu kaydet',
   'goals.deleteNote': 'Notu sil',

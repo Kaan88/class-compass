@@ -6,12 +6,12 @@
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import jsQRImport from 'jsqr';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EVIDENCE_IMAGE_EDGE, MAX_VOICE_RECORDING_MS } from '../../src/shared/contracts/files.ts';
 import { studentPageLanguage } from '../../src/shared/classLanguage.ts';
 import { evidenceModes } from '../../src/client/modules/goals/EvidenceAdder.tsx';
 import { clockText } from '../../src/client/modules/goals/VoiceRecorder.tsx';
-import { fitWithin, formatBytes, isHeic, jpegName, looksLikeImage } from '../../src/client/lib/images.ts';
+import { fitWithin, formatBytes, isHeic, jpegName, looksLikeImage, preparePicture } from '../../src/client/lib/images.ts';
 import { CARDS_PER_PAGE, LinkCardSheets, QR_QUIET_MODULES, QrCode, qrMatrix } from '../../src/client/routes/teacher/StudentLinks.tsx';
 import { StudentPageLanguageSelect, studentPageOverride } from '../../src/client/ui/ClassLanguageSelect.tsx';
 
@@ -114,6 +114,32 @@ describe('evidence (S13b 13, 14c, D-119)', () => {
     expect(looksLikeImage({ type: 'application/pdf', name: 'essay.pdf' })).toBe(false);
     expect(jpegName('My poster.png', 'picture')).toBe('My poster.jpg');
     expect(jpegName(undefined, 'photo')).toBe('photo.jpg');
+  });
+
+  it('converts HEIC to JPEG where the browser can decode it, and reports it as not convertible otherwise', async () => {
+    const heic = new File([new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70])], 'IMG_0001.HEIC', { type: 'image/heic' });
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((() => ({ drawImage: () => undefined })) as never);
+    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (cb: BlobCallback) {
+      cb(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    });
+    try {
+      // Safari-like: the browser decodes HEIC.
+      vi.stubGlobal('createImageBitmap', async () => ({ width: 4032, height: 3024, close: () => undefined }));
+      const out = await preparePicture(heic);
+      expect(out?.type).toBe('image/jpeg');
+      // Chrome/Firefox-like: decoding fails, so the caller shows IMAGE_HEIC.
+      vi.stubGlobal('createImageBitmap', async () => {
+        throw new DOMException('cannot decode', 'InvalidStateError');
+      });
+      expect(await preparePicture(heic)).toBeNull();
+      // A normal picture the browser cannot decode is still sent (the server checks it).
+      const png = new File([new Uint8Array([1, 2, 3])], 'scan.png', { type: 'image/png' });
+      expect(await preparePicture(png)).toBe(png);
+    } finally {
+      vi.unstubAllGlobals();
+      getContext.mockRestore();
+      toBlob.mockRestore();
+    }
   });
 
   it('shows sizes and the recording timer', () => {

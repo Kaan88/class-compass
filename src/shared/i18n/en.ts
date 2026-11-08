@@ -1279,7 +1279,7 @@ export const en = {
   'goals.evidence': 'Evidence',
   'goals.noEvidence': 'No evidence yet.',
   'goals.privateNotes': 'Private notes',
-  'goals.privateHint': 'Private: only you can see these notes. They are never shown to the student, on the classroom screen or to other teachers.',
+  'goals.privateHint': 'Private: these notes are never shown to the student, on the classroom screen or to other teachers. The school’s full data export (made by administrators) includes them.',
   'goals.newPrivateNote': 'New private note',
   'goals.savePrivateNote': 'Save private note',
   'goals.deleteNote': 'Delete note',

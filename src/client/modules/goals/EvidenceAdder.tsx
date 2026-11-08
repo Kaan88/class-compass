@@ -13,7 +13,7 @@ import { ACCEPT_HINT } from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
 import type { EvidenceKind } from '../../../shared/contracts/goals.ts';
 import { useI18n } from '../../lib/i18n.tsx';
-import { formatBytes, isHeic, jpegName, looksLikeImage, prepareImage } from '../../lib/images.ts';
+import { formatBytes, jpegName, looksLikeImage, prepareImage, preparePicture } from '../../lib/images.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { Select, TextArea, TextField } from '../../ui/Fields.tsx';
@@ -127,11 +127,13 @@ export function EvidenceAdder({
           setNotice(t('evidence.photosOff'));
           continue;
         }
-        if (isHeic(f)) {
+        // HEIC is converted to JPEG where the browser can decode it; otherwise a friendly notice.
+        const blob = await preparePicture(f);
+        if (!blob) {
           setNotice(t('error.IMAGE_HEIC'));
           continue;
         }
-        out.push({ blob: await prepareImage(f), name: jpegName(f.name, 'picture'), kind: 'image' });
+        out.push({ blob, name: jpegName(f.name, 'picture'), kind: 'image' });
         continue;
       }
       out.push({ blob: f, name: f.name || 'document', kind: 'document' });

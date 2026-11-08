@@ -13,6 +13,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import jsQRImport from 'jsqr';
 import sharp from 'sharp';
+import { en } from '../src/shared/i18n/en.ts';
+import { tr } from '../src/shared/i18n/tr.ts';
 import { api, ensurePin, login, PASSWORD, studentLinkUrl } from './helpers.ts';
 
 // jsqr is a CommonJS bundle: its default export is the decoder at runtime, typed as a namespace under NodeNext.
@@ -74,6 +76,21 @@ async function setMedia(browser: Browser, on: boolean) {
         ).status,
       ).toBe(200);
   });
+}
+
+/**
+ * Fixed UI strings of one language that appear as a whole line of the page. Only strings that differ
+ * from the other language and never occur in it are counted, so names and data do not interfere.
+ */
+const otherValues = { en: new Set<string>(Object.values(tr)), tr: new Set<string>(Object.values(en)) };
+async function uiStringsOn(page: Page, lang: 'en' | 'tr'): Promise<string[]> {
+  const dict: Record<string, string> = lang === 'en' ? en : tr;
+  const other: Record<string, string> = lang === 'en' ? tr : en;
+  const lines = new Set((await page.locator('body').innerText()).split('\n').map((l) => l.trim()));
+  return Object.keys(dict)
+    .filter((k) => dict[k] !== other[k] && !dict[k]!.includes('{') && dict[k]!.length >= 6 && !otherValues[lang].has(dict[k]!))
+    .map((k) => dict[k]!)
+    .filter((v) => lines.has(v));
 }
 
 /** A short silent WAV (fictional recording). */
@@ -205,6 +222,37 @@ test('an emergency replace from the links page stops the old link and the new on
   }
 });
 
+test('admin link dialog for a deactivated student: says the link does not work, no copy or print, emergency revoke only', async ({ page, browser }) => {
+  test.skip(test.info().project.name === 'mobile', 'checked once, on the desktop project');
+  test.setTimeout(120_000);
+  await login(page, 'english');
+  const ctx = await englishContext(page, '3-B');
+  await withAdmin(browser, async (admin) => {
+    const name = 'Defne Kurgusal Örnek';
+    const added = await api(admin, 'POST', '/api/admin/students', { classId: ctx.classId, fullName: name, allowDuplicateName: true });
+    expect(added.status).toBe(200);
+    const id = added.body.id as string;
+    expect((await api(admin, 'POST', `/api/admin/students/${id}/deactivate`, {})).status).toBe(200);
+    await admin.goto('/admin/students');
+    await admin.getByLabel('Search by name or number').fill(name);
+    await admin.getByText('Include deactivated students').click();
+    const row = admin.getByRole('row').filter({ hasText: name });
+    await row.getByRole('button', { name: 'Link', exact: true }).click();
+    const dialog = admin.getByRole('dialog');
+    await expect(dialog.getByText('This student is deactivated, so the link does not work.')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Copy link' })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Print card' })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Emergency' }).click();
+    const alert = admin.getByRole('alertdialog');
+    await expect(alert.getByRole('button', { name: 'Revoke link' })).toBeVisible();
+    await expect(alert.getByRole('option', { name: 'Make a new link' })).toHaveCount(0);
+    await alert.getByLabel('Reason').fill('Card seen by a visitor (test)');
+    await alert.getByLabel(`To confirm, type: ${name}`).fill(name);
+    await alert.getByRole('button', { name: 'Revoke link' }).click();
+    await expect(admin.getByText(`${name}’s link was revoked`)).toBeVisible();
+  });
+});
+
 test('Turkish-only student pages for an English-only class @mobile', async ({ page, browser }) => {
   test.setTimeout(120_000);
   await login(page, 'english');
@@ -240,8 +288,25 @@ test('Turkish-only student pages for an English-only class @mobile', async ({ pa
     await expect(p.getByRole('heading', { name: `Merhaba, ${student.fullName}!` })).toBeVisible();
     await expect(p.locator('html')).toHaveAttribute('lang', 'tr');
     await expect(p.getByRole('button', { name: 'English' })).toHaveCount(0);
+    // Turkish UI strings are there; no English UI string is.
+    await expect.poll(async () => (await uiStringsOn(p, 'tr')).length).toBeGreaterThan(3);
+    expect(await uiStringsOn(p, 'en')).toEqual([]);
     // The cards of this class carry the Turkish short line.
     expect((await api(page, 'GET', `/api/teacher/classes/${ctx.classId}/student-links`)).body.cardLanguage).toBe('tr');
+    // The classroom display of the same class stays English only (its own session: classroom mode
+    // puts that session behind the PIN, and this page still has to restore the language).
+    const room = await browser.newContext({ locale: 'en-GB' });
+    try {
+      const d = await room.newPage();
+      await login(d, 'english');
+      await d.goto('/classroom');
+      await d.getByRole('button', { name: `${ctx.className} · English` }).first().click();
+      await expect(d.locator('html')).toHaveAttribute('lang', 'en');
+      await expect.poll(async () => (await uiStringsOn(d, 'en')).length).toBeGreaterThan(3);
+      expect(await uiStringsOn(d, 'tr')).toEqual([]);
+    } finally {
+      await room.close();
+    }
   } finally {
     await phone.close();
     await setLanguage(null);

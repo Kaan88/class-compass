@@ -13,9 +13,11 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { eq } from 'drizzle-orm';
 import JSZip from 'jszip';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { files, students } from '../../src/server/db/schema.ts';
 import { oggCrc, stripAudioMetadata } from '../../src/server/modules/files/audioMeta.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { multipart } from '../import-fixtures.ts';
@@ -41,6 +43,7 @@ const send = (c: Client, url: string, data: Buffer, filename: string, type: stri
   const m = multipart(data, filename, type);
   return c.req('POST', url, m.body, m.headers);
 };
+const photoOf = (id: string) => env.db.select().from(students).where(eq(students.id, id)).get()!.photoFileId;
 const goalsOf = (page: any) => page.subjects.find((x: any) => x.name.en === 'English')?.sections.find((x: any) => x.key === 'goals')?.data;
 
 function unzip(buf: Buffer): Record<string, Buffer> {
@@ -377,7 +380,7 @@ describe('evidence kinds and teacher evidence (items 13, 14c, D-119)', () => {
     expect(detail.evidence.map((e: any) => e.file.mime).sort()).toEqual(['audio/mpeg', 'audio/wav']);
   });
 
-  it('documents: PDF, DOCX, PPTX, ODT and TXT are accepted by content; markup and scripts are refused; always allowed', async () => {
+  it('documents: PDF, DOCX, PPTX, ODT and TXT are accepted by content; markup and scripts are refused; on by default behind the admin switch (D-014)', async () => {
     const pptx = new JSZip();
     pptx.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/></Types>');
     pptx.file('_rels/.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>');
@@ -396,6 +399,11 @@ describe('evidence kinds and teacher evidence (items 13, 14c, D-119)', () => {
     }
     const bad = await send(adaPhone, '/api/student/files?kind=document', Buffer.from('<html><script>alert(1)</script></html>'), 'story.txt', 'text/plain');
     expect(bad.body.error.details.reason).toBe('FILE_TYPE_NOT_ALLOWED');
+    // D-014 keeps documents admin-toggleable (on by default): off means refused on the server too.
+    await setMedia('media.evidenceDocuments', false);
+    const off = await send(adaPhone, '/api/student/files?kind=document', Buffer.from('My story.'), 'story.txt', 'text/plain');
+    expect(off.body.error.details.reason).toBe('MEDIA_DISABLED');
+    await setMedia('media.evidenceDocuments', true);
   });
 
   it('HEIC pictures get a clear reason; pictures follow the photo flag and are stored without EXIF at most 2048 px', async () => {
@@ -443,5 +451,22 @@ describe('evidence kinds and teacher evidence (items 13, 14c, D-119)', () => {
     await setMedia('media.evidencePhotos', false);
     const jpg = await sharp({ create: { width: 20, height: 20, channels: 3, background: '#ffffff' } }).jpeg().toBuffer();
     expect((await send(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, jpg, 'p.jpg', 'image/jpeg')).body.error.details.reason).toBe('MEDIA_DISABLED');
+  });
+
+  it('a student’s consent-gated profile photo can never be attached as evidence, so evidence actions cannot expose or delete it (STU-8)', async () => {
+    await setMedia('media.studentPhotos', true);
+    await setMedia('media.evidencePhotos', true);
+    const jpg = await sharp({ create: { width: 40, height: 40, channels: 3, background: '#88aa22' } }).jpeg().toBuffer();
+    await ok(send(s.teacherA, `/api/students/${ada.id}/photo?consent=true`, jpg, 'face.jpg', 'image/jpeg'));
+    const photoFileId = photoOf(ada.id);
+    expect(photoFileId).toBeTruthy();
+    expect((await s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/evidence`, { kind: 'file', fileId: photoFileId })).status).toBe(404);
+    expect((await adaPhone.get(`/api/student/files/${photoFileId}`)).status).toBe(404);
+    // A normal evidence picture by the same teacher still works; deleting it leaves the photo alone.
+    const pic = await ok(send(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, jpg, 'work.jpg', 'image/jpeg'));
+    const ev = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/evidence`, { kind: 'file', fileId: pic.id }));
+    await ok(s.teacherA.del(`/api/teacher/evidence/${ev.id}`));
+    expect(photoOf(ada.id)).toBe(photoFileId);
+    expect(env.db.select().from(files).where(eq(files.id, photoFileId!)).get()!.deletedAt).toBeNull();
   });
 });

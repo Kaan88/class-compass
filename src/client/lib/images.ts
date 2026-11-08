@@ -2,8 +2,9 @@
  * Pictures on the device before upload (S13b2, D-119): scale down to EVIDENCE_IMAGE_EDGE on the long
  * edge and re-encode as JPEG, so phone photos upload quickly. The canvas re-encode also drops the
  * EXIF block (GPS, camera); the server re-encodes again and is the real guarantee (D-014).
- * HEIC/HEIF cannot be read by most browsers or the server, so they are recognised early and the
- * student gets a friendly explanation instead of an upload error.
+ * HEIC/HEIF (iPhone default) is tried too: where the browser can decode it (Safari on iOS and macOS)
+ * it is converted to JPEG here; where it cannot, the student gets a friendly explanation instead of
+ * an upload error (the server cannot decode HEIC and refuses it with IMAGE_HEIC).
  */
 import { EVIDENCE_IMAGE_EDGE } from '../../shared/contracts/files.ts';
 
@@ -58,6 +59,16 @@ export async function prepareImage(blob: Blob, maxEdge = EVIDENCE_IMAGE_EDGE, qu
   } finally {
     bitmap.close();
   }
+}
+
+/**
+ * Prepare a chosen picture for upload. HEIC/HEIF is converted where the browser can decode it;
+ * `null` means it could not be converted here (show IMAGE_HEIC instead of uploading).
+ */
+export async function preparePicture(file: Blob & { name?: string }): Promise<Blob | null> {
+  const out = await prepareImage(file);
+  if (isHeic(file) && (out === file || out.type !== 'image/jpeg')) return null;
+  return out;
 }
 
 /** Grab one frame of a playing video element as a JPEG (the in-page camera). */

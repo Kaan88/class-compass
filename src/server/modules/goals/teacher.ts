@@ -414,6 +414,11 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setGoalSetti
  * uploaded for this student (`uploadFile` with the student as owner). The media flags are checked
  * again here (an admin may have switched photos or audio off since the upload, D-014).
  */
+/** True when the file is some student's current profile photo (never attachable or deletable as evidence). */
+function isStudentPhotoFile(ctx: RequestContext, fileId: string): boolean {
+  return ctx.db.select({ id: students.id }).from(students).where(eq(students.photoFileId, fileId)).get() !== undefined;
+}
+
 export function addEvidence(ctx: RequestContext, input: In<typeof C.teacherAddEvidence>): Evidence {
   return tx(ctx.db, () => {
     const s = scopeOf(ctx, input.contextId);
@@ -437,6 +442,9 @@ export function addEvidence(ctx: RequestContext, input: In<typeof C.teacherAddEv
       const f = ctx.db.select().from(files).where(eq(files.id, input.fileId)).get();
       const me = requireUser(ctx).id;
       if (!f || f.deletedAt !== null || f.ownerStudentId !== input.studentId || f.uploadedByType !== 'user' || f.uploadedById !== me) throw notFound('File');
+      // A student's consent-gated profile photo is never evidence (STU-8): it would become visible to the student
+      // and deleting the evidence would delete the photo.
+      if (isStudentPhotoFile(ctx, f.id)) throw notFound('File');
       const okKind = input.kind === 'audio' ? f.kind === 'audio' : f.kind === 'document' || f.kind === 'image';
       if (!okKind) throw invalid('This file does not match the kind of evidence', { reason: 'EVIDENCE_FILE_KIND' });
       assertMediaAllowed(ctx.db, f.kind, 'evidence');
@@ -462,7 +470,7 @@ export async function deleteEvidence(ctx: RequestContext, evidenceId: string): P
     audit(ctx.db, ctx.actor, { action: 'evidence.delete', entity: 'evidence', entityId: e.id, before: { kind: e.kind, fileId: e.fileId } }, ctx.now());
     const f = e.fileId ? ctx.db.select().from(files).where(eq(files.id, e.fileId)).get() : undefined;
     const stillShown = f ? ctx.db.select({ id: evidence.id }).from(evidence).where(and(eq(evidence.fileId, f.id), isNull(evidence.deletedAt))).get() : undefined;
-    return f && f.deletedAt === null && !stillShown && f.uploadedByType === 'user' && f.uploadedById === requireUser(ctx).id ? f : null;
+    return f && f.deletedAt === null && !stillShown && !isStudentPhotoFile(ctx, f.id) && f.uploadedByType === 'user' && f.uploadedById === requireUser(ctx).id ? f : null;
   });
   if (file) await deleteFileRow(ctx, file);
 }

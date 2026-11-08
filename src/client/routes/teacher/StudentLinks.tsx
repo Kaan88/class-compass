@@ -144,24 +144,28 @@ export function EmergencyLinkDialog({
   onClose,
   endpoint,
   onDone,
+  revokeOnly = false,
 }: {
   student: { id: string; fullName: string; hasLink: boolean } | null;
   onClose: () => void;
   endpoint: typeof L.teacherEmergencyLink | typeof L.adminEmergencyLink;
   onDone: (state: L.StudentLinkState) => void;
+  /** A deactivated student: the link can only be revoked; a new one is made on reactivation. */
+  revokeOnly?: boolean;
 }) {
   const { t } = useI18n();
-  const [action, setAction] = useState<'replace' | 'revoke'>('replace');
+  const first = revokeOnly ? 'revoke' : 'replace';
+  const [action, setAction] = useState<'replace' | 'revoke'>(first);
   const [typed, setTyped] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    setAction('replace');
+    setAction(first);
     setTyped('');
     setReason('');
     setError(null);
-  }, [student?.id]);
+  }, [student?.id, first]);
   if (!student) return null;
   const valid = nameKey(typed) === nameKey(student.fullName) && reason.trim().length >= 3;
   const submit = async () => {
@@ -189,7 +193,7 @@ export function EmergencyLinkDialog({
         value={action}
         onChange={(v) => setAction(v as 'replace' | 'revoke')}
         items={[
-          { id: 'replace', label: t('links.emergency.replace') },
+          ...(revokeOnly ? [] : [{ id: 'replace', label: t('links.emergency.replace') }]),
           ...(student.hasLink ? [{ id: 'revoke', label: t('links.emergency.revoke') }] : []),
         ]}
       />
