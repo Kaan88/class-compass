@@ -162,6 +162,7 @@ export const SOUND_EVENTS = [
   'clapping',
   'fireworks',
   'pointAwarded',
+  'softChime',
 ] as const;
 export type SoundEvent = (typeof SOUND_EVENTS)[number];
 /** @deprecated name kept for older call sites: a sound is named by its event. */

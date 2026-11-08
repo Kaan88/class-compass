@@ -112,6 +112,9 @@ test('secret students: draw, refresh, nothing leaks before the reveal, reveal an
     await cards.nth(1).getByRole('radio', { name: 'Still practising' }).click();
     await expect(cards.nth(1).getByRole('radio', { name: 'Still practising' })).toHaveAttribute('aria-checked', 'true');
     await cards.nth(1).getByText(`Celebrate ${revealedNames[1]}`).click();
+    // The full-screen celebration (S13b, D-110) is triggered by this classroom action, not only from the catalog.
+    await expect(page.getByTestId('celebration')).toBeVisible();
+    await expect(page.getByTestId('celebration')).toContainText(`Well done, ${revealedNames[1]}!`);
     await expect(cards.nth(1).getByText(`Well done, ${revealedNames[1]}!`)).toBeVisible();
 
     // The reveal and outcomes are on the server.

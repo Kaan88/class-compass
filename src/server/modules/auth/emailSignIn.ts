@@ -10,6 +10,12 @@
  *   link (15 minutes, single use, token in the URL fragment; the landing page POSTs, so a scanner that
  *   pre-fetches the link cannot use it) and a 6-digit code bound to the request id of the device that
  *   asked (5 tries). Rate limits: per address on the route, 3 emails per account per 15 minutes.
+ *   Wrong codes are also counted per account across all its codes: after 10 within 24 hours the code
+ *   path is closed for that account for 24 hours (only the emailed link works), so nobody can keep
+ *   asking for new codes and guessing them.
+ * - Changing an account's email, deactivating it or an admin password reset revokes its pending
+ *   invites and unused sign-in links (`revokeEmailLinks`), so a mail sent to an old or wrong address
+ *   cannot be used later (D-015); an email change also clears the "verified" mark.
  * - Switching method: to email-link needs the current password and a code emailed to the address;
  *   back to password needs a fresh email sign-in. Administrators always keep passwords.
  * Tokens and codes are stored as HMAC hashes with the server pepper; nothing secret is audited.
@@ -18,7 +24,7 @@ import crypto from 'node:crypto';
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { translate } from '../../../shared/i18n/index.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { oneTimeTokens, sessions, users } from '../../db/schema.ts';
+import { authAttempts, oneTimeTokens, sessions, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { Actor, AppDeps, SessionRow, UserRow } from '../../lib/context.ts';
 import { hashPassword, newId, randomToken, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
@@ -30,6 +36,9 @@ export const INVITE_MS = 7 * 24 * 60 * 60 * 1000;
 export const EMAIL_LINK_MS = 15 * 60 * 1000;
 export const CODE_MAX_ATTEMPTS = 5;
 const EMAILS_PER_ACCOUNT = 3;
+/** Wrong codes per account (across all its codes) before the code path closes, and for how long. */
+export const CODE_FAILURES_PER_ACCOUNT = 10;
+export const CODE_LOCK_MS = 24 * 60 * 60 * 1000;
 const SYSTEM: Actor = { type: 'system', id: null };
 
 /** Email-link sign-in (and emailed invites) need SMTP (D-015, D-108). */
@@ -45,12 +54,44 @@ function sendQuietly(deps: AppDeps, to: string, subject: string, text: string) {
   });
 }
 
-function activeToken(db: Db, kind: 'invite' | 'email_signin', where: ReturnType<typeof eq>, now: number) {
+function activeTokens(db: Db, kind: 'invite' | 'email_signin', where: ReturnType<typeof eq>, now: number) {
   return db
     .select()
     .from(oneTimeTokens)
-    .where(and(eq(oneTimeTokens.kind, kind), where, isNull(oneTimeTokens.usedAt), isNull(oneTimeTokens.revokedAt), gt(oneTimeTokens.expiresAt, now)))
-    .get();
+    .where(and(eq(oneTimeTokens.kind, kind), where, isNull(oneTimeTokens.usedAt), isNull(oneTimeTokens.revokedAt), gt(oneTimeTokens.expiresAt, now)));
+}
+function activeToken(db: Db, kind: 'invite' | 'email_signin', where: ReturnType<typeof eq>, now: number) {
+  return activeTokens(db, kind, where, now).get();
+}
+
+/**
+ * Pending invites and unused email sign-in links/codes of an account stop working. Called when an
+ * administrator changes the account's email, deactivates it or resets its password (D-015, D-108).
+ */
+export function revokeEmailLinks(db: Db, userId: string, now: number) {
+  revokePendingInvites(db, userId, now);
+  db.update(oneTimeTokens)
+    .set({ usedAt: now })
+    .where(and(eq(oneTimeTokens.userId, userId), eq(oneTimeTokens.kind, 'email_signin'), isNull(oneTimeTokens.usedAt)))
+    .run();
+}
+
+// ---------------------------------------------------------------- wrong codes per account
+const codeKey = (userId: string) => `emailcode:user:${userId}`;
+function codeLocked(db: Db, userId: string, now: number): boolean {
+  const s = db.select().from(authAttempts).where(eq(authAttempts.key, codeKey(userId))).get();
+  return Boolean(s?.lockedUntil && s.lockedUntil > now);
+}
+function recordCodeFailure(db: Db, userId: string, now: number) {
+  const key = codeKey(userId);
+  const cur = db.select().from(authAttempts).where(eq(authAttempts.key, key)).get();
+  // The window restarts after a quiet day; within it every wrong code counts, whichever code it was for.
+  const failures = cur && now - cur.updatedAt < CODE_LOCK_MS ? cur.failures + 1 : 1;
+  const lockedUntil = failures >= CODE_FAILURES_PER_ACCOUNT ? now + CODE_LOCK_MS : null;
+  db.insert(authAttempts)
+    .values({ key, failures, lockedUntil, updatedAt: now })
+    .onConflictDoUpdate({ target: authAttempts.key, set: { failures, lockedUntil, updatedAt: now } })
+    .run();
 }
 
 function getUser(db: Db, id: string): UserRow {
@@ -251,6 +292,8 @@ function finishEmailSignIn(deps: AppDeps, row: typeof oneTimeTokens.$inferSelect
   const user = getUser(deps.db, row.userId);
   if (user.disabledAt || user.signInMethod !== 'email_link') throw signInInvalid();
   deps.db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, row.id)).run();
+  // The owner proved the mailbox: the wrong-code count starts again.
+  deps.db.delete(authAttempts).where(eq(authAttempts.key, codeKey(user.id))).run();
   if (user.emailVerifiedAt === null) deps.db.update(users).set({ emailVerifiedAt: now, updatedAt: now }).where(eq(users.id, user.id)).run();
   const s = createSession(deps, { kind: 'user', userId: user.id }, now, SESSION_ABSOLUTE_MS, 'email_link');
   audit(deps.db, actorFor(user), { action: 'auth.login', entity: 'user', entityId: user.id, after: { method: 'email_link' } }, now);
@@ -265,19 +308,33 @@ export function completeEmailLink(deps: AppDeps, token: string) {
   });
 }
 
-/** Checks a code bound to `binding`; counts wrong tries (the code dies after 5). Returns the token row. */
+/**
+ * Checks a code bound to `binding`. Several accounts can share an address, so one request can have a
+ * code per account: the code is compared with every active row of the binding. A wrong code counts
+ * against each of those rows (a code dies after 5) and against each account (the code path closes
+ * after CODE_FAILURES_PER_ACCOUNT, see above). Returns the matching token row.
+ */
 function checkCode(deps: AppDeps, binding: string, code: string) {
   const now = deps.now();
-  const row = activeToken(deps.db, 'email_signin', eq(oneTimeTokens.bindingHash, hashOf(deps, 'bind', binding)), now);
-  if (!row || row.codeAttempts >= CODE_MAX_ATTEMPTS || !row.codeHash) return { row: null, wrong: false };
-  if (timingSafeEqualStr(row.codeHash, hashOf(deps, 'code', code))) return { row, wrong: false };
-  const attempts = row.codeAttempts + 1;
-  deps.db
-    .update(oneTimeTokens)
-    .set({ codeAttempts: attempts, ...(attempts >= CODE_MAX_ATTEMPTS ? { usedAt: now } : {}) })
-    .where(eq(oneTimeTokens.id, row.id))
-    .run();
-  return { row: null, wrong: true, attemptsLeft: Math.max(0, CODE_MAX_ATTEMPTS - attempts) };
+  const rows = activeTokens(deps.db, 'email_signin', eq(oneTimeTokens.bindingHash, hashOf(deps, 'bind', binding)), now)
+    .all()
+    .filter((r) => r.codeHash && r.codeAttempts < CODE_MAX_ATTEMPTS && !codeLocked(deps.db, r.userId, now));
+  if (!rows.length) return { row: null, wrong: false };
+  const given = hashOf(deps, 'code', code);
+  const match = rows.find((r) => timingSafeEqualStr(r.codeHash!, given));
+  if (match) return { row: match, wrong: false };
+  let left = 0;
+  for (const r of rows) {
+    const attempts = r.codeAttempts + 1;
+    deps.db
+      .update(oneTimeTokens)
+      .set({ codeAttempts: attempts, ...(attempts >= CODE_MAX_ATTEMPTS ? { usedAt: now } : {}) })
+      .where(eq(oneTimeTokens.id, r.id))
+      .run();
+    recordCodeFailure(deps.db, r.userId, now);
+    if (!codeLocked(deps.db, r.userId, now)) left = Math.max(left, CODE_MAX_ATTEMPTS - attempts);
+  }
+  return { row: null, wrong: true, attemptsLeft: left };
 }
 
 export function completeEmailCode(deps: AppDeps, requestId: string, code: string) {

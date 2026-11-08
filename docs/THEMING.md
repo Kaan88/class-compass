@@ -54,7 +54,8 @@ switches (animations, sounds), the device sound switch, the class volume and the
 | `thresholdReached` | a tap that fills the class bar | 3 |
 | `secretDrumroll`, `secretReveal` | Secret Student reveal show | 3 |
 | `timeUp` | the timer ends and the class chose "chime" (or as the fallback) | 4 |
-| `fanfare`, `clapping`, `fireworks` | the end of the reveal show, celebrations | 4 |
+| `softChime` | the end of a celebration or reveal show with reduced motion or animations off | 2 |
+| `fanfare`, `clapping`, `fireworks` | the end of the reveal show, celebrations (full motion only) | 4 |
 
 ### Making a pack
 
@@ -104,12 +105,16 @@ the root layout):
 | on | yes | mascot and still stars, opacity fade only (`cc-motion-reduced`) |
 | off | — | nothing on screen |
 
-Sounds (fanfare, then clapping and fireworks) follow the sound switches in every row. The overlay has
+Sounds come from `celebrationCues(mode)` in `src/client/themes/sequences.ts`: fanfare, then clapping
+and fireworks with full motion; one `softChime` with reduced motion or animations off. They follow the
+sound switches in every row. The overlay has
 `pointer-events: none` and `role="status"` with the message, so it never blocks the teacher.
 
 The Secret Student reveal (`modules/secret/SecretPanel.tsx`) is a sequence built the same way: a
 state machine (countdown 3-2-1 → drum roll → cards one by one → fanfare) driven by timeouts, with a
-"Show at once" button; with animations off it is skipped.
+"Show at once" button; with animations off it is skipped. Its cues come from `revealCue(mode, step)`:
+the full show with full motion, only a closing `softChime` otherwise. A new sequence should get its
+cues from a function in `sequences.ts` too, so reduced motion is handled in one place.
 
 ## Recipes for agents
 

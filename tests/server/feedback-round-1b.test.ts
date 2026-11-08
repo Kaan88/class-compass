@@ -121,6 +121,40 @@ describe('account invites (S13b item 9, D-108)', () => {
     expect(await ok(new Client(env).get('/api/auth/password-reset'))).toEqual({ emailResetEnabled: false, emailLinkEnabled: false });
   });
 
+  it('changing the email revokes an invite (and sign-in links) mailed to the old address and clears the verified mark', async () => {
+    const { mailer, s } = await smtpSchool();
+    // A typo: the invite goes to the wrong mailbox.
+    const made = await invite(s, { login: 'typo.teacher', email: 'wrong@school.example' });
+    const mailed = tokenFrom(mailer.sent[0]!.text);
+    expect(mailer.sent[0]!.to).toBe('wrong@school.example');
+    const fixed = await ok(s.admin.patch(`/api/admin/users/${made.user.id}`, { email: 'right@school.example' }));
+    expect(fixed).toMatchObject({ invitePending: false, emailVerified: false });
+    expect((await new Client(env).post('/api/auth/invite/accept', { token: mailed, method: 'password', password: 'taken-over-123' })).body.error.details.reason).toBe('INVITE_INVALID');
+    // A new invite to the right address works and proves that address.
+    const again = await ok(s.admin.post(`/api/admin/users/${made.user.id}/invite`));
+    expect(mailer.sent.at(-1)!.to).toBe('right@school.example');
+    await ok(new Client(env).post('/api/auth/invite/accept', { token: tokenFrom(again.invite.link), method: 'email_link' }));
+    expect(env.db.select().from(users).where(eq(users.id, made.user.id)).get()!.emailVerifiedAt).not.toBeNull();
+    // A sign-in link mailed before the next change stops working too, and the mark is cleared again.
+    await ok(new Client(env).post('/api/auth/email-link/request', { email: 'right@school.example' }));
+    const link = tokenFrom(mailer.sent.at(-1)!.text);
+    expect((await ok(s.admin.patch(`/api/admin/users/${made.user.id}`, { email: 'other@school.example' }))).emailVerified).toBe(false);
+    expect((await new Client(env).post('/api/auth/email-link/complete', { token: link })).body.error.details.reason).toBe('SIGNIN_LINK_INVALID');
+  });
+
+  it('deactivating an account or resetting its password revokes a pending invite; reactivation does not bring it back', async () => {
+    const { s } = await smtpSchool();
+    const made = await invite(s, { login: 'gone.teacher', email: 'gone@school.example' });
+    const token = tokenFrom(made.invite.link);
+    await ok(s.admin.post(`/api/admin/users/${made.user.id}/deactivate`));
+    await ok(s.admin.post(`/api/admin/users/${made.user.id}/reactivate`));
+    expect((await new Client(env).post('/api/auth/invite/accept', { token, method: 'password', password: 'back-again-123' })).body.error.details.reason).toBe('INVITE_INVALID');
+    const second = tokenFrom((await ok(s.admin.post(`/api/admin/users/${made.user.id}/invite`))).invite.link);
+    await ok(s.admin.post(`/api/admin/users/${made.user.id}/reset-password`));
+    expect((await new Client(env).post('/api/auth/invite/inspect', { token: second })).body.error.details.reason).toBe('INVITE_INVALID');
+    expect((await ok(s.admin.get('/api/admin/users'))).users.find((u: any) => u.id === made.user.id).invitePending).toBe(false);
+  });
+
   it('the temporary-password flow stays available as a fallback', async () => {
     env = await makeEnv();
     const s = await buildSchool(env);
@@ -185,6 +219,51 @@ describe('email-link sign-in (S13b item 9, D-108)', () => {
     const bad = good === '000000' ? '111111' : '000000';
     for (let i = 0; i < 5; i++) await new Client(env).post('/api/auth/email-link/code', { requestId: again.requestId, code: bad });
     expect((await new Client(env).post('/api/auth/email-link/code', { requestId: again.requestId, code: good })).status).toBe(401);
+  });
+
+  it('two accounts with the same address each get a code for the same request; each code signs in its own account', async () => {
+    const { mailer, s } = await emailTeacher();
+    const twin = await invite(s, { login: 'deniz.twin', displayName: 'Deniz İkiz', email: 'deniz@school.example' });
+    await ok(new Client(env).post('/api/auth/invite/accept', { token: tokenFrom(twin.invite.link), method: 'email_link' }));
+    mailer.sent.length = 0;
+    const pc = new Client(env);
+    const { requestId } = await ok(pc.post('/api/auth/email-link/request', { email: 'deniz@school.example' }));
+    expect(mailer.sent).toHaveLength(2);
+    const codes = mailer.sent.map((m) => codeFrom(m.text));
+    // Whichever row the database returns first, the second account's code works for the second account.
+    const me = await ok(pc.post('/api/auth/email-link/code', { requestId, code: codes[1]! }));
+    const names = mailer.sent.map((m) => (m.text.includes('Deniz İkiz') ? 'Deniz İkiz' : 'Zehra Öğretmen'));
+    expect(new Set(names).size).toBe(2);
+    expect(me.displayName).toBe(names[1]);
+    // The other account's code still works on its own.
+    const me2 = await ok(new Client(env).post('/api/auth/email-link/code', { requestId, code: codes[0]! }));
+    expect(me2.displayName).toBe(names[0]);
+  });
+
+  it('wrong codes are counted per account across codes: after 10 the code path closes, the emailed link still works', async () => {
+    const { mailer } = await emailTeacher();
+    const ask = async () => {
+      const r = await ok(new Client(env).post('/api/auth/email-link/request', { email: 'deniz@school.example' }));
+      const text = mailer.sent.at(-1)!.text;
+      return { requestId: r.requestId as string, code: codeFrom(text), token: tokenFrom(text) };
+    };
+    const guess = async (requestId: string, code: string) => new Client(env).post('/api/auth/email-link/code', { requestId, code });
+    const wrongFor = (code: string) => (code === '000000' ? '111111' : '000000');
+    // Two codes, five wrong guesses each = 10 failures for the account.
+    for (let round = 0; round < 2; round++) {
+      const a = await ask();
+      for (let i = 0; i < 5; i++) expect((await guess(a.requestId, wrongFor(a.code))).status).toBe(401);
+    }
+    // A fresh code is refused even when it is right; the last failure says no tries are left.
+    const third = await ask();
+    const refused = await guess(third.requestId, third.code);
+    expect(refused.status).toBe(401);
+    expect(refused.body.error.details).toMatchObject({ reason: 'SIGNIN_CODE_INVALID', attemptsLeft: 0 });
+    // A day later it would open again; the emailed link works right away and resets the count.
+    expect(await ok(new Client(env).post('/api/auth/email-link/complete', { token: third.token }))).toMatchObject({ signInMethod: 'email_link' });
+    env.clock.advance(16 * 60_000);
+    const fourth = await ask();
+    expect((await ok(new Client(env).post('/api/auth/email-link/code', { requestId: fourth.requestId, code: fourth.code }))).signInMethod).toBe('email_link');
   });
 
   it('answers the same for unknown, password and admin accounts (no enumeration) and limits emails per account', async () => {
@@ -278,8 +357,16 @@ describe('deleting students (S13b item 7, D-109)', () => {
     const uploadsDir = path.join(root, 'uploads');
     env = await makeEnv({ uploadsDir, ocrCacheDir: path.join(root, 'ocr') });
     const s = await buildSchool(env);
-    const ada = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Ada Zümrüt Yılmaz', studentNumber: '4711' });
-    const bora = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Bora Kurgu' });
+    // Ada and Bora come from an uploaded class list: the spreadsheet names them, so erasing Ada must remove it too.
+    const csv = multipart(Buffer.from(['Öğrenci No;Adı Soyadı', '4711;Ada Zümrüt Yılmaz', '4712;Bora Kurgu', ''].join('\n'), 'utf8'), 'sinif-3a.csv', 'text/csv');
+    const upload = await ok(s.teacherA.req('POST', '/api/files?kind=import_source', csv.body, csv.headers));
+    const batch = await ok(s.teacherA.post('/api/import/batches', { classId: s.c3a.id, fileId: upload.id }));
+    await ok(s.teacherA.post(`/api/import/batches/${batch.id}/commit`, {}));
+    const imported = (await ok(s.teacherA.get(`/api/teacher/classes/${s.c3a.id}/students`))).students as Array<{ id: string; fullName: string }>;
+    const ada = imported.find((x) => x.fullName === 'Ada Zümrüt Yılmaz')!;
+    const bora = imported.find((x) => x.fullName === 'Bora Kurgu')!;
+    expect(ada).toBeTruthy();
+    expect(count('select count(*) n from students where id = ? and student_number = ?', ada.id, '4711')).toBe(1);
     for (const n of ['Cem Demir', 'Deniz Şahin', 'Ece Çelik']) await addStudent(s.teacherA, s.c3a.id, { fullName: n });
     // A lesson with attendance and groups, a counter tap, a goal with evidence and a document file, a personal link.
     const lessonId = await startLesson(s.teacherA, s.ctxA.id, { othersPresent: true });
@@ -297,17 +384,28 @@ describe('deleting students (S13b item 7, D-109)', () => {
     const before = (await fsp.readdir(uploadsDir, { recursive: true })).length;
     expect(before).toBeGreaterThan(0);
 
+    // Only a deactivated student can be erased (D-109), also through the API.
+    expect((await s.admin.get(`/api/admin/students/${ada.id}/erase`)).body.error.details.reason).toBe('STUDENT_ACTIVE');
+    const refused = await s.admin.post(`/api/admin/students/${ada.id}/erase`, { confirm: 'Ada Zümrüt Yılmaz' });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.details.reason).toBe('STUDENT_ACTIVE');
+    expect(count('select count(*) n from students where id = ?', ada.id)).toBe(1);
+    await ok(s.admin.post(`/api/admin/students/${ada.id}/deactivate`));
+
     const preview = await ok(s.admin.get(`/api/admin/students/${ada.id}/erase`));
-    expect(preview).toMatchObject({ fullName: 'Ada Zümrüt Yılmaz', files: 1 });
+    expect(preview).toMatchObject({ fullName: 'Ada Zümrüt Yılmaz', files: 2 }); // the document and the class list
     expect(preview.tables.map((t: any) => t.table)).toEqual(expect.arrayContaining(['enrolments', 'attendance_daily', 'goals', 'evidence', 'student_links']));
     expect(JSON.stringify(preview)).not.toMatch(/secret/iu);
     expect((await s.teacherA.get(`/api/admin/students/${ada.id}/erase`)).status).toBe(403);
     expect((await s.teacherA.post(`/api/admin/students/${ada.id}/erase`, { confirm: 'Ada Zümrüt Yılmaz' })).status).toBe(403);
     expect((await s.admin.post(`/api/admin/students/${ada.id}/erase`, { confirm: 'Ada' })).body.error.details.reason).toBe('CONFIRMATION_MISMATCH');
-    expect(await ok(s.admin.post(`/api/admin/students/${ada.id}/erase`, { confirm: 'Ada Zümrüt Yılmaz' }))).toEqual({ ok: true, files: 1 });
+    expect(await ok(s.admin.post(`/api/admin/students/${ada.id}/erase`, { confirm: 'Ada Zümrüt Yılmaz' }))).toEqual({ ok: true, files: 2 });
 
     // Scan every table and text cell for the id, the name and the number.
     const needles = [ada.id, 'Ada Zümrüt Yılmaz', 'Zümrüt', '4711', file.id];
+    // The class list is gone from the database (the batch keeps its rows without it) and from disk.
+    expect(count('select count(*) n from files where id = ?', upload.id)).toBe(0);
+    expect(count('select count(*) n from import_batches where id = ? and file_id is null', batch.id)).toBe(1);
     const tables = (env.db.$client.prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%'").all() as Array<{ name: string }>).map((t) => t.name);
     const hits: string[] = [];
     for (const t of tables) {

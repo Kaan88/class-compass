@@ -17,6 +17,7 @@ export const SOUND_PRIORITY: Record<SoundEvent, number> = {
   tap: 1,
   pointAwarded: 1,
   undo: 1,
+  softChime: 2,
   assistantCheck: 2,
   groupShuffle: 2,
   stageChange: 2,

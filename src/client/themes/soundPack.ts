@@ -63,6 +63,8 @@ export function makeSoundPack(opts: SoundPackOptions, overrides: Partial<ThemeSo
     fanfare: [n(0, 0, 160), n(4, 150, 160), n(7, 300, 160), n(9, 450, 600), n(4, 450, 600, g * 0.6), n(7, 450, 600, g * 0.5)],
     clapping: claps,
     fireworks: pops,
+    // Reduced-motion stand-in for the loud sequences (celebration, reveal show): one quiet two-note chime.
+    softChime: [n(4, 0, 260, g * 0.5, 'sine'), n(7, 180, 420, g * 0.45, 'sine')],
   };
   return { ...pack, ...overrides };
 }

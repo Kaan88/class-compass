@@ -1,6 +1,7 @@
 /**
- * Permanent deletion of a student (S13b, D-109; KVKK erasure). Administrator only, typed confirmation
- * (the student's full name), with a dry-run summary first.
+ * Permanent deletion of a student (S13b, D-109; KVKK erasure). Administrator only, only for a
+ * deactivated student (an active one is refused with STUDENT_ACTIVE), typed confirmation (the student's
+ * full name), with a dry-run summary first.
  *
  * Everything about the student is removed, read from the live schema so new tables are covered:
  * - rows whose student column is NOT NULL (enrolments, attendance, levels, goals and their entries,
@@ -11,8 +12,10 @@
  * - importer rows about the student are anonymised (their cells and parsed name are emptied);
  * - Secret Student selections and private teacher notes are removed by their owning modules
  *   (`eraseStudentSelections`, `erasePrivateNotesOf`), so those boundaries stay intact;
- * - files they own or that are on their evidence, and their photo, are deleted from the database and
- *   from disk;
+ * - files they own or that are on their evidence, their photo, and the uploaded class lists
+ *   (`import_source`) of every import batch that had a row about them (the spreadsheet, PDF or photo
+ *   holds their name and number) are deleted from the database and from disk; those batches keep
+ *   their rows without the source file;
  * - audit events and command-log entries that mention the student are deleted.
  * The only trace is one audit event `student.erase` without any personal data: no id, no name, just
  * counts per table. Free text that teachers typed elsewhere (e.g. a lesson reflection that names the
@@ -24,7 +27,7 @@ import { students } from '../../db/schema.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { audit } from '../../lib/audit.ts';
 import type { RequestContext } from '../../lib/context.ts';
-import { invalid, notFound } from '../../lib/errors.ts';
+import { conflict, invalid, notFound } from '../../lib/errors.ts';
 import { removeKey } from '../files/storage.ts';
 import { erasePrivateNotesOf, privateNotesCount, PRIVATE_NOTES_TABLE } from '../goals/history.ts';
 import { eraseStudentSelections, SELECTIONS_TABLE_NAME } from '../secret/service.ts';
@@ -59,10 +62,20 @@ interface Plan {
   nulls: Map<string, number>;
 }
 
-function planFor(db: Db, sid: string, photoFileId: string | null): Plan {
+/** Import batches whose rows are about the student (matched, created, or the parsed name). */
+const IMPORT_ROWS_OF = 'matched_student_id = ? or created_student_id = ? or parsed_json like ?';
+const importArgs = (sid: string, fullName: string) => [sid, sid, `%${JSON.stringify(fullName).slice(1, -1)}%`];
+
+function planFor(db: Db, sid: string, fullName: string, photoFileId: string | null): Plan {
   const goalIds = (db.$client.prepare('select id from goals where student_id = ?').all(sid) as Array<{ id: string }>).map((r) => r.id);
   const fileIds = [
     ...new Set([
+      // The uploaded class list the student was imported from (or matched against) names them.
+      ...(
+        db.$client
+          .prepare(`select distinct b.file_id as id from import_batches b where b.file_id is not null and b.id in (select batch_id from import_rows where ${IMPORT_ROWS_OF})`)
+          .all(...importArgs(sid, fullName)) as Array<{ id: string }>
+      ).map((r) => r.id),
       ...(db.$client.prepare('select id from files where owner_student_id = ?').all(sid) as Array<{ id: string }>).map((r) => r.id),
       ...(db.$client.prepare('select file_id as id from evidence where student_id = ? and file_id is not null').all(sid) as Array<{ id: string }>).map((r) => r.id),
       ...(photoFileId ? [photoFileId] : []),
@@ -88,11 +101,18 @@ function planFor(db: Db, sid: string, photoFileId: string | null): Plan {
   return { goalIds, fileIds, deletes, nulls };
 }
 
-/** What a permanent deletion would remove (dry run): counts only. */
-export function erasePreview(ctx: RequestContext, studentId: string) {
+/** Only a deactivated student can be erased (D-109): an active one is refused, also through the API. */
+function erasable(ctx: RequestContext, studentId: string) {
   const st = ctx.db.select().from(students).where(eq(students.id, studentId)).get();
   if (!st) throw notFound('Student');
-  const plan = planFor(ctx.db, studentId, st.photoFileId);
+  if (st.deactivatedAt === null) throw conflict('Deactivate the student before deleting them permanently', { reason: 'STUDENT_ACTIVE' });
+  return st;
+}
+
+/** What a permanent deletion would remove (dry run): counts only. */
+export function erasePreview(ctx: RequestContext, studentId: string) {
+  const st = erasable(ctx, studentId);
+  const plan = planFor(ctx.db, studentId, st.fullName, st.photoFileId);
   const importRows = count(ctx.db, 'import_rows where matched_student_id = ? or created_student_id = ?', studentId, studentId);
   // Secret Student selections are erased too but never counted here: a per-student count would tell
   // whether the child is in a round that has not been revealed (SEC-3).
@@ -162,14 +182,13 @@ function scrubJson(db: Db, sid: string): number {
 }
 
 export async function eraseStudent(ctx: RequestContext, studentId: string, confirm: string) {
-  const st = ctx.db.select().from(students).where(eq(students.id, studentId)).get();
-  if (!st) throw notFound('Student');
+  const st = erasable(ctx, studentId);
   if (confirm.trim().normalize('NFC') !== st.fullName.normalize('NFC')) throw invalid('Type the student’s full name to confirm', { reason: 'CONFIRMATION_MISMATCH' });
   const db = ctx.db;
   const sid = st.id;
   const removedKeys: string[] = [];
   const counts = tx(db, () => {
-    const plan = planFor(db, sid, st.photoFileId);
+    const plan = planFor(db, sid, st.fullName, st.photoFileId);
     const tables: Record<string, number> = {};
     const del = (t: string, where: string, ...args: unknown[]) => {
       const n = db.$client.prepare(`delete from ${q(t)} where ${where}`).run(...args).changes;
@@ -202,7 +221,7 @@ export async function eraseStudent(ctx: RequestContext, studentId: string, confi
       .prepare(
         "update import_rows set raw_json = '[]', parsed_json = ?, candidates_json = '[]', matched_student_id = case when matched_student_id = ? then null else matched_student_id end, created_student_id = case when created_student_id = ? then null else created_student_id end where matched_student_id = ? or created_student_id = ? or parsed_json like ?",
       )
-      .run(empty, sid, sid, sid, sid, `%${JSON.stringify(st.fullName).slice(1, -1)}%`).changes;
+      .run(empty, sid, sid, ...importArgs(sid, st.fullName)).changes;
     db.$client.prepare("update import_rows set candidates_json = '[]' where candidates_json like ?").run(`%${sid}%`);
     // Student-link sessions, then files (rows + bytes after the commit).
     del('sessions', `kind = 'student' and student_link_id not in (select id from student_links)`);
@@ -211,7 +230,7 @@ export async function eraseStudent(ctx: RequestContext, studentId: string, confi
         removedKeys.push(String(f.storage_key));
         if (f.thumb_storage_key) removedKeys.push(String(f.thumb_storage_key));
       }
-      // Other rows that point at these files (e.g. import batches of a list the student uploaded: none in practice) keep working without them.
+      // Import batches whose class list named the student keep their rows, without the source file.
       db.$client.prepare(`update import_batches set file_id = null where file_id in (${plan.fileIds.map(() => '?').join(',')})`).run(...plan.fileIds);
       del('files', `id in (${plan.fileIds.map(() => '?').join(',')})`, ...plan.fileIds);
     }

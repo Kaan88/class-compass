@@ -14,7 +14,7 @@ import { requireUser } from '../../lib/context.ts';
 import { hashPassword, randomToken } from '../../lib/crypto.ts';
 import { conflict, invalid, notFound } from '../../lib/errors.ts';
 import { createUser, insertUser, invalidateResetTokens, revokeAllUserSessions } from '../auth/service.ts';
-import { inviteStatus, issueInvite, revokeInvite } from '../auth/emailSignIn.ts';
+import { inviteStatus, issueInvite, revokeEmailLinks, revokeInvite } from '../auth/emailSignIn.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
@@ -91,9 +91,14 @@ export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.update
     if (input.displayName !== undefined) patch.displayName = normaliseName(input.displayName);
     if (input.email !== undefined) patch.email = input.email?.trim().toLowerCase() || null;
     if (input.locale !== undefined) patch.locale = input.locale;
-    ctx.db.update(users).set({ ...patch, updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
-    // A reset link already mailed to the previous address must stop working (D-015).
-    if (patch.email !== undefined && patch.email !== u.email) invalidateResetTokens(ctx.db, u.id, ctx.now());
+    const emailChanged = patch.email !== undefined && patch.email !== u.email;
+    // A new address is not verified until a mail to it is used (an invite or a sign-in link).
+    ctx.db.update(users).set({ ...patch, ...(emailChanged ? { emailVerifiedAt: null } : {}), updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
+    // Reset links, invites and sign-in links already mailed to the previous address must stop working (D-015, D-108).
+    if (emailChanged) {
+      invalidateResetTokens(ctx.db, u.id, ctx.now());
+      revokeEmailLinks(ctx.db, u.id, ctx.now());
+    }
     const before = Object.fromEntries(Object.keys(patch).map((k) => [k, u[k as keyof UserRow]]));
     audit(ctx.db, ctx.actor, { action: 'user.update', entity: 'user', entityId: u.id, before, after: patch }, ctx.now());
     return dtoOf(ctx, getUser(ctx.db, u.id));
@@ -124,6 +129,8 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
       if (!active) {
         revokeAllUserSessions(ctx.db, u.id, now);
         invalidateResetTokens(ctx.db, u.id, now);
+        // A pending invite must not work again after a reactivation (a new one can be sent then).
+        revokeEmailLinks(ctx.db, u.id, now);
       }
       audit(ctx.db, ctx.actor, { action: active ? 'user.reactivate' : 'user.deactivate', entity: 'user', entityId: u.id }, now);
     }
@@ -142,6 +149,7 @@ export async function resetPasswordByAdmin(ctx: RequestContext, userId: string) 
     ctx.db.update(users).set({ passwordHash, mustChangePassword: true, signInMethod: 'password', updatedAt: now }).where(eq(users.id, u.id)).run();
     revokeAllUserSessions(ctx.db, u.id, now);
     invalidateResetTokens(ctx.db, u.id, now);
+    revokeEmailLinks(ctx.db, u.id, now);
     audit(ctx.db, ctx.actor, { action: 'auth.password_reset_admin', entity: 'user', entityId: u.id }, now);
   });
   return { temporaryPassword: password };

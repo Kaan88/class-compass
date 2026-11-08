@@ -2,8 +2,10 @@
  * Full-screen celebration (S13b, D-110): fanfare, then clapping and fireworks sounds; the theme mascot
  * in its celebrate pose fills the screen for about 2.5 s with canvas fireworks in the theme's
  * celebration colours (tokens, read from the CSS variables).
- * - Reduced motion (OS setting): no flying particles; the mascot and a few still stars fade in and out.
- * - Animations switched off for the class: no overlay at all (sounds still follow the sound switches).
+ * - Reduced motion (OS setting): no flying particles; the mascot and a few still stars fade in and
+ *   out; one soft chime instead of the fanfare, clapping and fireworks (`celebrationCues`).
+ * - Animations switched off for the class: no overlay at all, and only the soft chime (the sound
+ *   switches still decide whether it plays).
  * The overlay never takes clicks (pointer-events: none) and is announced once to screen readers.
  * Anything can call `celebrate()`; the layer is mounted once in the root layout.
  */
@@ -11,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useDisplay } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Mascot, motionMode, playThemeSound, useTheme } from './index.tsx';
+import { celebrationCues } from './sequences.ts';
 import type { ColorToken } from './types.ts';
 
 export const CELEBRATION_MS = 2500;
@@ -120,10 +123,12 @@ export function CelebrationLayer() {
   const mode = motionMode(display);
   useEffect(() => {
     const l: Listener = (e) => {
-      playThemeSound(display, theme, 'fanfare');
-      setTimeout(() => playThemeSound(display, theme, 'clapping'), 600);
-      setTimeout(() => playThemeSound(display, theme, 'fireworks'), 900);
-      if (motionMode(display) !== 'none') setActive(e);
+      const m = motionMode(display);
+      for (const cue of celebrationCues(m)) {
+        if (cue.at === 0) playThemeSound(display, theme, cue.event);
+        else setTimeout(() => playThemeSound(display, theme, cue.event), cue.at);
+      }
+      if (m !== 'none') setActive(e);
     };
     listeners.add(l);
     return () => void listeners.delete(l);

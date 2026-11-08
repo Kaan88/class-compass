@@ -7,8 +7,9 @@
  *   optional note and celebration (the celebration hop respects the motion settings, THM-5).
  * - S13b (D-110): the reveal is a short show: 3-2-1 countdown, drum roll, the cards one by one with a
  *   sound each, then a fanfare; "Celebrate" plays the full-screen celebration. Reduced motion keeps
- *   the order without movement; with animations off the cards appear at once (sounds still follow
- *   the sound switches). Skippable.
+ *   the order without movement and replaces the loud cues with one soft chime at the end; with
+ *   animations off the cards appear at once with that soft chime (`revealCue`; the sound switches
+ *   still decide whether it plays). Skippable.
  * Every write is an outbox command naming the lesson (UX-11, LES-4).
  */
 import { useEffect, useRef, useState } from 'react';
@@ -28,6 +29,7 @@ import { TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconCheck, IconSync, IconUndo } from '../../ui/icons.tsx';
 import { motionMode, useThemeSound } from '../../themes/index.tsx';
 import { celebrate as startCelebration } from '../../themes/Celebration.tsx';
+import { revealCue, type RevealStep } from '../../themes/sequences.ts';
 import { useDisplay } from '../../lib/display.ts';
 import { Mascot, ThemeIllustration } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
@@ -202,8 +204,13 @@ function SecretRevealStep({ lesson }: { lesson: LessonState; value: SecretStepVa
   const [show, setShow] = useState<{ phase: 'countdown' | 'drumroll' | 'cards' | 'done'; count: number; shown: number } | null>(null);
   const display = useDisplay();
   const playSoundNow = useThemeSound();
-  const playRef = useRef(playSoundNow);
-  playRef.current = playSoundNow;
+  const mode = motionMode(display);
+  const cue = (step: RevealStep) => {
+    const event = revealCue(mode, step);
+    if (event) playSoundNow(event);
+  };
+  const playRef = useRef(cue);
+  playRef.current = cue;
   const total = reveal?.selections.length ?? 0;
   // The reveal show (S13b): runs once, right after this screen revealed the round.
   useEffect(() => {
@@ -211,18 +218,18 @@ function SecretRevealStep({ lesson }: { lesson: LessonState; value: SecretStepVa
     const step = (next: typeof show, ms: number) => setTimeout(() => setShow(next), ms);
     let h: ReturnType<typeof setTimeout>;
     if (show.phase === 'countdown') {
-      playRef.current('tap');
+      playRef.current('countdown');
       h = show.count > 1 ? step({ ...show, count: show.count - 1 }, 650) : step({ ...show, phase: 'drumroll' }, 650);
     } else if (show.phase === 'drumroll') {
-      playRef.current('secretDrumroll');
+      playRef.current('drumroll');
       h = step({ ...show, phase: 'cards', shown: 0 }, 1300);
     } else if (show.shown < total) {
       h = setTimeout(() => {
-        playRef.current('secretReveal');
+        playRef.current('card');
         setShow({ ...show, shown: show.shown + 1 });
       }, show.shown === 0 ? 0 : 600);
     } else {
-      playRef.current('fanfare');
+      playRef.current('end');
       h = step({ ...show, phase: 'done' }, 0);
     }
     return () => clearTimeout(h);
@@ -236,7 +243,10 @@ function SecretRevealStep({ lesson }: { lesson: LessonState; value: SecretStepVa
       const opId = await sendSecretCommand('secret.reveal', { contextId: lesson.contextId, lessonId: lesson.id });
       const result = (await awaitCommand(opId)) as SecretReveal;
       qc.setQueryData(secretKey(lesson.id), { state: { ...st, revealed: true }, reveal: result });
-      setShow(motionMode(display) === 'none' ? null : { phase: 'countdown', count: 3, shown: 0 });
+      if (motionMode(display) === 'none') {
+        setShow(null);
+        playRef.current('end');
+      } else setShow({ phase: 'countdown', count: 3, shown: 0 });
       void qc.invalidateQueries({ queryKey: lessonKey(lesson.contextId) });
     } catch (err) {
       setError(commandErrorText(t, { code: 'CONFLICT', reason: err instanceof Error ? err.message : undefined }));
