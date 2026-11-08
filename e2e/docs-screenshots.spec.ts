@@ -32,7 +32,7 @@ async function save(lang: Locale, name: string, png: Buffer) {
  * `from`: scroll this element to the top first (teacher and admin pages: the page heading, so the
  * menu bar does not fill the picture). `clipTo`: photograph only this element.
  */
-async function shot(page: Page, lang: Locale, name: string, opts: { fullPage?: boolean; clipTo?: string; from?: string } = {}) {
+async function shot(page: Page, lang: Locale, name: string, opts: { fullPage?: boolean; clipTo?: string; from?: string; until?: string } = {}) {
   await page.waitForLoadState('networkidle').catch(() => undefined);
   await page.evaluate(() => document.fonts?.ready);
   // Short-lived messages (toasts) would cover the screen in a still picture.
@@ -41,9 +41,15 @@ async function shot(page: Page, lang: Locale, name: string, opts: { fullPage?: b
     await page.locator(opts.from).first().evaluate((el) => el.scrollIntoView({ block: 'start' }));
     await page.waitForTimeout(150);
   }
+  // `until`: the picture runs from the top of the page to just below that element, so it ends at a
+  // natural boundary (a whole card) instead of in the middle of one.
+  const until = opts.until ? await page.locator(opts.until).boundingBox() : null;
+  const width = page.viewportSize()?.width ?? 390;
   const buf = opts.clipTo
     ? await page.locator(opts.clipTo).first().screenshot({ animations: 'disabled', caret: 'hide' })
-    : await page.screenshot({ animations: 'disabled', caret: 'hide', fullPage: opts.fullPage ?? false });
+    : until
+      ? await page.screenshot({ animations: 'disabled', caret: 'hide', fullPage: true, clip: { x: 0, y: 0, width, height: Math.ceil(until.y + until.height + 6) } })
+      : await page.screenshot({ animations: 'disabled', caret: 'hide', fullPage: opts.fullPage ?? false });
   await save(lang, name, buf);
 }
 
@@ -249,13 +255,13 @@ for (const lang of ['en', 'tr'] as const) {
         const startBtn = page.getByTestId('scorer-start');
         await expect(startBtn.or(page.getByTestId('scorer-app'))).toBeVisible();
         if (await startBtn.isVisible()) {
-          await shot(page, lang, 'scorer-welcome');
+          await shot(page, lang, 'scorer-welcome', { until: '[data-testid="scorer-welcome"] > .cc-card >> nth=0' });
           await startBtn.click();
         }
         await expect(page.getByTestId('scorer-app')).toBeVisible();
         await page.getByTestId('scorer-search').fill('3a');
         await expect(page.getByTestId('scorer-results').locator('li').first()).toBeVisible();
-        await shot(page, lang, 'scorer-search');
+        await shot(page, lang, 'scorer-search', { until: '[data-testid="scorer-results"] > li >> nth=1' });
         await phone.close();
       }
       {

@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { devices, expect, test, type Page } from '@playwright/test';
+import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { api, login } from './helpers.ts';
 
 const clockFile = path.join(os.tmpdir(), `cc-e2e-clock-${process.env.E2E_PORT}`);
@@ -79,13 +79,23 @@ test('admin creates links; a phone scorer finds "isik", gives +1 and undoes; the
   await expect(phone).toHaveURL(/\/p$/u);
   await expect(phone.getByTestId('scorer-welcome')).toBeVisible();
   await expect(phone.getByTestId('scorer-install')).toBeVisible();
+  // The install sections show a chevron, so a closed one reads as something to open (usability audit).
+  for (const summary of await phone.getByTestId('scorer-install').locator('summary').all()) {
+    expect(await summary.evaluate((el) => getComputedStyle(el, '::before').content)).not.toBe('none');
+  }
   await phone.getByTestId('scorer-start').click();
+  // A few class buttons wrap instead of running off the right edge.
+  const chips = phone.locator('.cc-scorer__chips');
+  await expect(chips).toHaveAttribute('data-wrap', 'yes');
+  expect(await chips.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await phone.getByTestId('scorer-search').fill('isik');
   const first = phone.getByTestId('scorer-results').getByTestId('scorer-student').first();
   await expect(first).toContainText(/Işık/u);
   const name = (await first.locator('.cc-scorer__name').innerText()).trim();
   await first.getByRole('button', { name: `Give ${name} one point` }).click();
   await expect(phone.getByTestId('scorer-undo-bar')).toContainText(`+1 for ${name}`);
+  // "Undo" stays on one line next to the message.
+  expect(await textLines(phone.getByTestId('scorer-undo'))).toBe(1);
 
   // Live on the board within a few seconds, without a reload.
   await expect(board.getByTestId('board-place-1')).toContainText(name, { timeout: 5_000 });
@@ -122,6 +132,15 @@ test('admin creates links; a phone scorer finds "isik", gives +1 and undoes; the
   await phoneCtx.close();
   await screenCtx.close();
 });
+
+/** How many lines the text of an element takes. */
+async function textLines(locator: Locator) {
+  return locator.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.bottom))).size;
+  });
+}
 
 /** A synthetic board of a 1,500-student school (S12 review): 50 classes and a crowded first place. */
 function crowdedBoard() {
@@ -199,6 +218,42 @@ test('the board shows every tied student and 50 class totals without overlap at 
     expect(r.smallest).toBeGreaterThanOrEqual(6);
   }
   await expect(board.getByText(/more/u)).toHaveCount(0);
+  expect((await api(page, 'POST', `/api/admin/speakers/displays/${link.body.id}/revoke`)).status).toBe(200);
+  await ctx.close();
+});
+
+test('two students sharing a place keep big names and avatars on the board (usability audit)', async ({ page, browser }) => {
+  await login(page, 'admin');
+  const link = await api(page, 'POST', '/api/admin/speakers/displays', { label: `Tie screen ${Date.now().toString(36)}` });
+  expect(link.status).toBe(200);
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const board = await ctx.newPage();
+  const data = crowdedBoard();
+  const [crowd, five, one] = data.places as [(typeof data.places)[number], (typeof data.places)[number], (typeof data.places)[number]];
+  // 1st: one student; 2nd: two tied; 3rd: five tied.
+  data.places = [
+    { rank: 1, points: 3, students: one.students },
+    { rank: 2, points: 2, students: five.students.slice(0, 2) },
+    { rank: 3, points: 1, students: crowd.students.slice(0, 5) },
+  ];
+  data.classes = data.classes.slice(0, 6);
+  await board.route('**/api/board', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) }));
+  await board.goto(link.body.url as string);
+  const second = board.getByTestId('board-place-2');
+  await expect(second).toHaveAttribute('data-density', 'few');
+  await expect(board.getByTestId('board-place-3')).toHaveAttribute('data-density', 'many');
+  for (const size of [
+    { width: 1280, height: 720 },
+    { width: 1920, height: 1080 },
+  ]) {
+    await board.setViewportSize(size);
+    await board.waitForTimeout(300);
+    expect(await fitsWithoutScrolling(board)).toBe(true);
+    expect((await boardLayoutProblems(board)).problems).toEqual([]);
+    // Names of a two-way tie are at least 3 % of the screen height (about 22 px at 720p), not 2.3 %.
+    const nameSize = await second.locator('.cc-board__name').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(nameSize).toBeGreaterThanOrEqual(size.height * 0.03);
+  }
   expect((await api(page, 'POST', `/api/admin/speakers/displays/${link.body.id}/revoke`)).status).toBe(200);
   await ctx.close();
 });

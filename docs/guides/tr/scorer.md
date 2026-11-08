@@ -12,7 +12,7 @@ Yöneticinizin gönderdiği bağlantıyı telefonunuzda açın (ya da QR kodunu 
 
 ## 2. Uygulamayı ana ekranınıza ekleyin (önerilir)
 
-Böylece bağlantı zayıfken bile tek dokunuşla puan verebilirsiniz. Alttaki **Uygulamayı ana ekranınıza ekleyin** bölümünü açın (karşılama sayfasında zaten açıktır):
+Böylece bağlantı zayıfken bile tek dokunuşla puan verebilirsiniz. Alttaki **Uygulamayı ana ekranınıza ekleyin** bölümünü açın (karşılama sayfasında zaten açıktır). Telefonunuzun bölümü açıktır; diğerinin adımları için okun olduğu başlığa dokunun:
 
 - **Android (Chrome)**: sağ üstteki menü düğmesine (üç nokta) dokunun, "Uygulamayı yükle" ya da "Ana ekrana ekle"yi seçin, sonra Süper Konuşmacılar'ı ana ekranınızdan açın. Oturum kendiliğinden açılır.
 - **iPhone ve iPad (Safari)**: Safari'nin altındaki Paylaş düğmesine dokunun, "Ana Ekrana Ekle"yi, ardından **Ekle**'yi seçin. iPhone'daki uygulama ilk açılışta bir **eşleştirme kodu** ister: Safari'de, bağlantı sayfanızda **Eşleştirme kodunu göster**'e dokunun; uygulamayı ana ekrandan açın ve altı rakamı **Uygulamayı bağlayın** bölümüne yazın. Bir kod yalnızca bir kez ve 10 dakika boyunca çalışır; süresi dolduysa **Yeni kod oluştur**'a basın.

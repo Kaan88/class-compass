@@ -21,7 +21,7 @@ The board fits 1920×1080 and 1280×720 screens without scrolling. The mouse poi
 ## What the board shows
 
 - The title and **Week of …**. Every week starts fresh at the time the administrator set (normally Monday 00:00); earlier weeks are kept in the history.
-- **Top three of the week**: places 1 to 3, with points. Students with the same points share a place. While nobody has points, the board says **We are waiting for our super speakers**.
+- **Top three of the week**: places 1 to 3, with points. Students with the same points share a place: two or three are shown almost as big as a single student, more in a list with smaller names. While nobody has points, the board says **We are waiting for our super speakers**.
 - **Class points this week**: every class taking part, including classes with 0 points.
 - A connection sign: **Live**, or **Reconnecting…** when the network drops. The board keeps trying by itself and catches up when the connection is back; you do not need to reload it.
 

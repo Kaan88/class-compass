@@ -21,7 +21,7 @@ Pano 1920×1080 ve 1280×720 ekranlara kaydırma gerekmeden sığar. Fare imleci
 ## Panoda neler görünür
 
 - Başlık ve **… haftası**. Her hafta, yöneticinin belirlediği zamanda (normalde Pazartesi 00:00) sıfırdan başlar; önceki haftalar geçmişte saklanır.
-- **Haftanın ilk üçü**: puanlarıyla 1.–3. sıralar. Puanı eşit olan öğrenciler aynı sırayı paylaşır. Henüz kimsenin puanı yokken panoda **Süper konuşmacılarımızı bekliyoruz** yazar.
+- **Haftanın ilk üçü**: puanlarıyla 1.–3. sıralar. Puanı eşit olan öğrenciler aynı sırayı paylaşır: iki ya da üç öğrenci neredeyse tek öğrenci kadar büyük, daha fazlası küçük adlarla bir liste hâlinde gösterilir. Henüz kimsenin puanı yokken panoda **Süper konuşmacılarımızı bekliyoruz** yazar.
 - **Bu haftanın sınıf puanları**: 0 puanlılar dâhil katılan bütün sınıflar.
 - Bağlantı işareti: **Canlı** ya da ağ koptuğunda **Yeniden bağlanıyor…**. Pano kendiliğinden yeniden dener ve bağlantı gelince güncellenir; sayfayı yenilemeniz gerekmez.
 

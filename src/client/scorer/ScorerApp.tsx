@@ -288,6 +288,9 @@ interface UndoState {
   until: number;
 }
 
+/** Up to this many classes the class buttons wrap onto more lines; more scroll sideways. */
+export const CHIPS_WRAP_MAX = 8;
+
 function StudentCard({ s, onAward, hint }: { s: ScorerStudent; onAward: (s: ScorerStudent) => void; hint: boolean }) {
   const { t } = useI18n();
   return (
@@ -326,7 +329,7 @@ function AwardsToday({ today, onUndo, timezone }: { today: Today; onUndo: (a: Sc
             <li key={a.id} className="cc-row" data-voided={voided ? 'yes' : undefined} data-testid="scorer-today-row">
               <span className="cc-muted">{formatDate(a.occurredAt, locale, timezone, { hour: '2-digit', minute: '2-digit' })}</span>
               <span className="cc-scorer__today-name">
-                {voided ? <s>{a.fullName}</s> : a.fullName} <span className="cc-muted">{a.className}</span>
+                {voided ? <s>{a.fullName}</s> : a.fullName} <span className="cc-muted cc-scorer__today-class">{a.className}</span>
               </span>
               {voided ? (
                 <span className="cc-chip">{t('speakers.scorer.undone')}</span>
@@ -536,7 +539,7 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
         ) : null}
       </div>
       {students.data && students.data.classes.length > 1 ? (
-        <div className="cc-scorer__chips" role="group" aria-label={t('speakers.scorer.classes')}>
+        <div className="cc-scorer__chips" role="group" aria-label={t('speakers.scorer.classes')} data-wrap={students.data.classes.length <= CHIPS_WRAP_MAX ? 'yes' : undefined}>
           <Button size="small" variant={classId === null ? 'primary' : 'secondary'} aria-pressed={classId === null} onPress={() => setClassId(null)}>
             {t('speakers.scorer.allClasses')}
           </Button>

@@ -532,3 +532,10 @@ Format: `D-NNN — date — decision — rationale — status`.
   - Report charts: self-assessment steps labelled 1–5 on the axis, no chart when every value is 0 (the table stays), charts capped at 60 mm in print.
   - Smaller: homework counts shown once while checking, "2 selected" on the counts line, the attendance chip in the check grid says "Attendance: …" and is hidden when attendance was not taken; assistant duty fields take the row width; goal fields "Ready-made goal" / "Goal text" / "Write my own (below)".
   - Decided by Claude from the November usability audit (teacher area).
+
+## Super Speakers usability fixes — 2026-11-08
+- **D-141** — **Super Speakers: big shared places, a scorer that fits a phone.**
+  - Board ties (revises D-133): two or three tied students use a new `few` layout, centred one under the other like a single winner (avatar 8vh, name 3.4vh, class 2.4vh, still shrunk by the fitting loop when needed); the small-avatar list starts at four and the chips at seven. The English placeholder headline is balanced over its lines.
+  - Scorer: the undo bar's button never wraps and the message takes the rest of the row (the page already keeps 7rem free under the list, so the last cards scroll clear of the bar); the browser's own search clear button is hidden (one X); the class next to a name in "My points today" never breaks; up to eight class buttons wrap onto more lines, more scroll sideways with a faded right edge; the Android / iPhone install sections are bordered rows with a chevron that turns when opened.
+  - Guide pictures of the scorer end below a whole card (docs screenshots `until` option).
+  - Decided by Claude from the November usability audit (Super Speakers area).

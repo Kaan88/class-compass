@@ -3716,14 +3716,34 @@ li > .cc-admin-list {
 }
 .cc-scorer__search-input {
   flex: 1;
+  min-width: 0;
   min-height: var(--cc-touch-big);
   font-size: 1.35rem;
+}
+/* The app has its own clear button next to the field: hide the browser's (one X, not two). */
+.cc-scorer__search-input::-webkit-search-cancel-button,
+.cc-scorer__search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
 }
 .cc-scorer__chips {
   display: flex;
   gap: 0.4rem;
   overflow-x: auto;
   padding-bottom: 0.25rem;
+  scroll-padding-inline: 1rem;
+}
+/* A few classes wrap onto a second line; many classes scroll sideways, with the right edge fading
+   out so a cut-off chip reads as "there is more". */
+.cc-scorer__chips[data-wrap] {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.cc-scorer__chips:not([data-wrap]) {
+  padding-inline-end: 2rem;
+  /* A mask uses only the alpha: any opaque token works for the solid part. */
+  mask-image: linear-gradient(to right, var(--cc-text) calc(100% - 2.5rem), transparent);
 }
 .cc-scorer__chips .cc-btn {
   flex: none;
@@ -3785,6 +3805,14 @@ li > .cc-admin-list {
   font-weight: 700;
   z-index: 5;
 }
+.cc-scorer__undo > span {
+  flex: 1;
+  min-width: 0;
+}
+.cc-scorer__undo > .cc-btn {
+  flex: none;
+  white-space: nowrap;
+}
 .cc-scorer__today {
   list-style: none;
   margin: 0;
@@ -3797,6 +3825,9 @@ li > .cc-admin-list {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.cc-scorer__today-class {
+  white-space: nowrap;
 }
 .cc-scorer__today li[data-voided] .cc-scorer__today-name {
   color: var(--cc-text-muted);
@@ -3822,6 +3853,37 @@ li > .cc-admin-list {
   min-height: var(--cc-touch);
   display: flex;
   align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface-2);
+  list-style: none;
+}
+.cc-scorer details > summary::-webkit-details-marker {
+  display: none;
+}
+/* A chevron shows the section opens and closes: pointing right when closed, down when open. */
+.cc-scorer details > summary::before {
+  content: '';
+  flex: none;
+  width: 0.55em;
+  height: 0.55em;
+  border-inline-end: 0.18em solid currentColor;
+  border-bottom: 0.18em solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 150ms ease-out;
+}
+.cc-scorer details[open] > summary::before {
+  transform: rotate(45deg);
+}
+.cc-scorer details[open] > summary {
+  margin-bottom: 0.75rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-scorer details > summary::before {
+    transition: none;
+  }
 }
 .cc-install-steps {
   list-style: none;
@@ -4074,6 +4136,26 @@ html[data-cursor='off'] * {
 .cc-board__place[data-many] .cc-board__class {
   font-size: calc(1.8vh * var(--cc-fit));
 }
+/* Two or three tied: the names stay big and centred like a single winner's, one under the other,
+   so they are read from the back of the room (the fitting loop still shrinks them if needed). */
+.cc-board__place[data-density='few'] .cc-board__names {
+  align-items: center;
+  gap: calc(2vh * var(--cc-fit));
+}
+.cc-board__place[data-density='few'] .cc-board__student {
+  flex-direction: column;
+  text-align: center;
+  gap: calc(0.6vh * var(--cc-fit));
+}
+.cc-board__place[data-density='few'] .cc-board__student .cc-avatar {
+  --cc-avatar-size: calc(8vh * var(--cc-fit));
+}
+.cc-board__place[data-density='few'] .cc-board__name {
+  font-size: calc(3.4vh * var(--cc-fit));
+}
+.cc-board__place[data-density='few'] .cc-board__class {
+  font-size: calc(2.4vh * var(--cc-fit));
+}
 /* A crowded place (more than six tied): every name, flowing in rows of small chips. */
 .cc-board__place[data-density='crowd'] .cc-board__names {
   display: flex;
@@ -4126,6 +4208,7 @@ html[data-cursor='off'] * {
   font-weight: var(--cc-weight-display);
   font-size: 5vh;
   margin: 0 4vw;
+  text-wrap: balance;
 }
 .cc-board__classes {
   min-height: 0;

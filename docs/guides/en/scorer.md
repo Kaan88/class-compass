@@ -12,7 +12,7 @@ Open the link your administrator sent you (or scan its QR code) on your phone. T
 
 ## 2. Put the app on your home screen (recommended)
 
-Then you can give points with one tap, even when the connection is weak. Press **Put the app on your home screen** at the bottom (on the welcome page it is already open):
+Then you can give points with one tap, even when the connection is weak. Press **Put the app on your home screen** at the bottom (on the welcome page it is already open). The section for your phone is open; tap the other heading (with the arrow) to open its steps:
 
 - **Android (Chrome)**: tap the menu button (three dots) at the top right, choose **Install app** or **Add to Home screen**, then open Super Speakers from your home screen. It signs in by itself.
 - **iPhone and iPad (Safari)**: tap the **Share** button at the bottom of Safari, choose **Add to Home Screen**, then **Add**. The app on an iPhone needs a **pairing code** the first time: in Safari, on your link page, tap **Show pairing code**; open the app from the home screen and type the six digits under **Connect the app**. A code works once, for 10 minutes; **Make a new code** if it ran out.

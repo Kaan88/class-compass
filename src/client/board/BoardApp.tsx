@@ -148,8 +148,11 @@ export function useFitText(ref: RefObject<HTMLElement | null>, key: string) {
   }, [ref, key]);
 }
 
-/** How a place lays out its names: one big card, a two-column list, or a compact flowing list. */
-export const placeDensity = (count: number) => (count <= 1 ? undefined : count <= 6 ? 'many' : 'crowd');
+/**
+ * How a place lays out its names: one big card; two or three names still big, one under the other
+ * ('few'); four to six in a list with small avatars ('many'); more in a compact flowing list ('crowd').
+ */
+export const placeDensity = (count: number) => (count <= 1 ? undefined : count <= 3 ? 'few' : count <= 6 ? 'many' : 'crowd');
 
 function PlaceCard({ place, slot, changed, waiting }: { place: BoardPlace | undefined; slot: 1 | 2 | 3; changed: boolean; waiting: string }) {
   const { t } = useI18n();
