@@ -30,8 +30,9 @@ const launchOptions = { args: ['--use-fake-device-for-media-stream', '--use-fake
 export default defineConfig({
   testDir: './e2e',
   testMatch: /.*\.spec\.ts/,
-  // The guide screenshots are not a test: they run only with playwright.docs.config.ts.
-  testIgnore: /docs-screenshots\.spec\.ts/,
+  // The guide screenshots and the usability crawler are not tests: they run only with
+  // playwright.docs.config.ts and playwright.usability.config.ts.
+  testIgnore: /(docs-screenshots|usability-screens)\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

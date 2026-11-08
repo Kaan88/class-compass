@@ -6,6 +6,8 @@ build/
 coverage/
 playwright-report/
 test-results/
+# Usability screenshot sets (npm run usability:screens) — never committed
+usability-shots/
 blob-report/
 *.tsbuildinfo
 

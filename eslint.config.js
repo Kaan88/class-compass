@@ -2,7 +2,7 @@ import tseslint from 'typescript-eslint';
 import boundaries from 'eslint-plugin-boundaries';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'drizzle/**', 'data*/**', 'playwright-report/**', 'test-results/**', '.claude/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'drizzle/**', 'data*/**', 'playwright-report/**', 'test-results/**', 'usability-shots/**', '.claude/**'] },
   ...tseslint.configs.recommended,
   { rules: { '@typescript-eslint/no-explicit-any': 'off' } },
   {
