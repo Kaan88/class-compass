@@ -5,6 +5,8 @@
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { BADGE_ICONS } from '../src/shared/achievements.ts';
+import { READY_MADE } from '../src/shared/avatars.ts';
 import { THEME_KEYS } from '../src/shared/themes.ts';
 import { login } from './helpers.ts';
 
@@ -29,6 +31,9 @@ test('catalog: every theme × language, grids for 20 and 34 students, 200 % text
       // Every slot is filled: 5 mascot poses and 6 illustrations.
       await expect(panel.getByTestId(`theme-slots-${theme}`).locator('[data-pose]')).toHaveCount(5);
       await expect(panel.getByTestId(`theme-slots-${theme}`).locator('[data-illustration]')).toHaveCount(6);
+      // S13c review: every badge glyph and every ready-made avatar renders in every theme (axe below).
+      await expect(panel.getByTestId('catalog-badges').locator('svg[data-tier]')).toHaveCount(BADGE_ICONS.length);
+      await expect(panel.getByTestId('catalog-avatars').locator('svg[role="img"]')).toHaveCount(READY_MADE.length);
     }
   }
   await expect(page.getByTestId('catalog-animals-tr')).toContainText('Çok sayıda');

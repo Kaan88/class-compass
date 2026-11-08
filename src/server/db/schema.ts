@@ -1037,6 +1037,8 @@ export const goals = sqliteTable(
     /** Hidden from the student page by a teacher (S13c moderation, D-123); the words are kept as written (GOL-5). */
     hiddenAt: integer('hidden_at'),
     hiddenBy: text('hidden_by'),
+    /** When the goal became achieved (S13c review): the achievement rules date "goal reached" by this, not by `updatedAt`. */
+    achievedAt: integer('achieved_at'),
   },
   (t) => [index('goals_student_subject_idx').on(t.studentId, t.subjectId)],
 );

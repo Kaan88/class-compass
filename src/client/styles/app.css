@@ -2872,6 +2872,17 @@ html:has(.cc-classroom) {
 .cc-badge[data-revoked] {
   background: var(--cc-surface-2);
 }
+.cc-badge__progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cc-progress {
+  flex: 1 1 auto;
+  min-width: 4rem;
+  height: 0.6rem;
+  accent-color: var(--cc-accent-strong);
+}
 .cc-badge-art--locked {
   opacity: 0.55;
   filter: grayscale(1);

@@ -16,7 +16,7 @@ import { audit } from '../../lib/audit.ts';
 import { requireStudent, requireUser, type RequestContext } from '../../lib/context.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { studentScope } from '../links/scope.ts';
-import { assertClassWritable, assertTeachesClass, getClass } from '../school/policy.ts';
+import { assertClassWritable, assertTeachesClass, getClass, isClassWritable } from '../school/policy.ts';
 import { taughtClassIds } from '../school/service.ts';
 import { liveClassIdsOf, rosterRows } from '../students/service.ts';
 
@@ -67,12 +67,15 @@ export function resetAvatar(ctx: RequestContext, studentId: string) {
     const user = requireUser(ctx);
     const s = ctx.db.select().from(students).where(eq(students.id, studentId)).get();
     if (!s) throw notFound('Student');
-    if (user.role !== 'admin') {
-      const taught = taughtClassIds(ctx.db, user.id);
-      if (!liveClassIdsOf(ctx, studentId).some((c) => taught.includes(c))) throw new AppError('FORBIDDEN', 'Not your student');
-    }
+    const live = liveClassIdsOf(ctx, studentId);
+    const taught = user.role === 'admin' ? live : live.filter((c) => taughtClassIds(ctx.db, user.id).includes(c));
+    if (!taught.length && user.role !== 'admin') throw new AppError('FORBIDDEN', 'Not your student');
+    // Archived classes and years are read-only (DAT-1): refuse when every class it would act through is archived.
+    const clsRows = taught.map((c) => getClass(ctx.db, c));
+    if (clsRows.length && !clsRows.some((c) => isClassWritable(ctx.db, c))) assertClassWritable(ctx.db, clsRows[0]!);
     ctx.db.update(students).set({ avatarJson: null, avatarUpdatedAt: ctx.now() }).where(eq(students.id, studentId)).run();
-    audit(ctx.db, ctx.actor, { action: 'avatar.reset', entity: 'student', entityId: studentId, before: { hadAvatar: s.avatarJson !== null } }, ctx.now());
+    // The previous spec (catalogue keys only, no free text) is kept in the audit row so a mis-tap can be undone.
+    audit(ctx.db, ctx.actor, { action: 'avatar.reset', entity: 'student', entityId: studentId, before: { hadAvatar: s.avatarJson !== null, spec: s.avatarJson } }, ctx.now());
     return { ok: true as const };
   });
 }

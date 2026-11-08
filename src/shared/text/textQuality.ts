@@ -10,8 +10,9 @@
  *    inside another word (Scunthorpe problem); the allow list always wins.
  * 2. Nonsense check (`checkStudentText`): minimum length per kind, long runs of one character,
  *    mostly symbols or digits, shouting, keyboard mashing (QWERTY, Turkish Q and F rows), words
- *    without vowels, very long unknown words, repeated words, and too few recognised EN/TR words
- *    (our own word lists with simple suffix stripping, so "okuyacağım" counts as real).
+ *    and repeated short pieces ("asdasd"), words without vowels, very long unknown words, repeated
+ *    words ("yes yes yes", "I will I will"), a goal without a content word, and too few recognised
+ *    EN/TR words (our own word lists with simple suffix stripping, so "okuyacağım" counts as real).
  *
  * The result names a reason only; the message shown to the child is the i18n key
  * `textCheck.<REASON>` with a kind-specific example. The matched word is never stored or logged.
@@ -129,7 +130,9 @@ function onlyEndings(rest: string, stemLast: string): boolean {
   // shitty → shit + ty: a doubled final letter before the ending
   if (EN_RISKY_ENDINGS.includes(rest) || (rest.startsWith(stemLast) && EN_RISKY_ENDINGS.includes(rest.slice(1)))) return true;
   if (TR_SUFFIX_SET.has(rest)) return true;
-  for (const s of TR_SUFFIXES_LONGEST_FIRST) if (rest.startsWith(s) && TR_SUFFIX_SET.has(rest.slice(s.length))) return true;
+  // Two Turkish suffixes, but never "ki" + another suffix: "kim", "kiler" after a short stem are the
+  // ends of innocent words and names ("Sikkim"), not endings of a risky stem (Scunthorpe problem).
+  for (const s of TR_SUFFIXES_LONGEST_FIRST) if (s !== 'ki' && rest.startsWith(s) && TR_SUFFIX_SET.has(rest.slice(s.length))) return true;
   return false;
 }
 
@@ -206,6 +209,14 @@ const hasRowRun = (s: string) => {
   return false;
 };
 
+/** An unknown word made of one 2–3 letter piece typed again and again ("asdasd", "jdjd", "lololo"). */
+const REPEATED_UNIT = /^(\p{L}{2,3})\1+$/u;
+
+/** Words that carry no content on their own: a goal needs at least one other word of 3+ letters. */
+const FUNCTION_WORDS = new Set(
+  'i you he she it we they me my your a an the to of in on at for and or but with will can want would should must am is are be do does did not no yes so very too this that ben sen o biz siz onlar bu su bir ve ile icin da de mi mu ama cok cok daha en'.split(' '),
+);
+
 const lettersOf = (s: string) => [...s].filter((ch) => /\p{L}/u.test(ch));
 const vowelRatio = (w: string) => {
   const ls = lettersOf(lowerTr(w));
@@ -228,7 +239,10 @@ export function checkStudentText(text: string, kind: TextKind, opts: { limits?: 
 
   const letters = lettersOf(t);
   const words = t.split(/[^\p{L}\p{N}'’]+/u).filter((w) => /\p{L}/u.test(w));
+  // Enough words OR enough letters (Turkish packs a goal into two long words: "Sıkı çalışacağım"),
+  // and a goal needs at least one content word of 3+ letters: "I will x" is not a goal yet.
   if (words.length < minWords && letters.length < minLetters) return { ok: false, reason: 'TOO_SHORT' };
+  if (kind === 'goal' && !words.some((w) => [...w].length >= 3 && !FUNCTION_WORDS.has(foldForSearch(w).replace(/['’]/gu, '')))) return { ok: false, reason: 'TOO_SHORT' };
 
   if (new RegExp(`(\\p{L})\\1{${LONG_RUN - 1},}`, 'u').test(lowerTr(t)) || /(\S)\1{6,}/u.test(t)) return { ok: false, reason: 'REPEATED_CHARS' };
 
@@ -240,7 +254,7 @@ export function checkStudentText(text: string, kind: TextKind, opts: { limits?: 
 
   const known = words.map((w) => isRecognisedWord(w));
   const unknown = words.filter((_, i) => !known[i]).map((w) => lowerTr(w).replace(/['’]/gu, ''));
-  if (unknown.some((w) => w.length >= 4 && hasRowRun(w)) || hasRowRun(unknown.join(''))) return { ok: false, reason: 'KEYBOARD_MASH' };
+  if (unknown.some((w) => w.length >= 4 && (hasRowRun(w) || REPEATED_UNIT.test(w))) || hasRowRun(unknown.join(''))) return { ok: false, reason: 'KEYBOARD_MASH' };
   if (unknown.some((w) => [...w].length > MAX_WORD)) return { ok: false, reason: 'LONG_WORD' };
   if (unknown.some((w) => [...w].length >= 5 && vowelRatio(w) < 0.2) || (letters.length >= 8 && vowelRatio(t) < 0.22)) return { ok: false, reason: 'FEW_VOWELS' };
 
@@ -250,9 +264,14 @@ export function checkStudentText(text: string, kind: TextKind, opts: { limits?: 
     same = folded[i] === folded[i - 1] ? same + 1 : 1;
     if (same >= 4) return { ok: false, reason: 'REPEATED_WORDS' };
   }
-  if (folded.length >= 5 && new Set(folded).size / folded.length < 0.4) return { ok: false, reason: 'REPEATED_WORDS' };
+  const unique = new Set(folded).size;
+  // One word said three times ("yes yes yes"), or half the words or fewer are different ("I will I will").
+  if ((folded.length >= 3 && unique === 1) || (folded.length >= 4 && unique / folded.length <= 0.5)) return { ok: false, reason: 'REPEATED_WORDS' };
 
-  if (rule.dictionary && words.length > 0 && known.filter(Boolean).length / words.length < 0.5) return { ok: false, reason: 'UNKNOWN_WORDS' };
+  // Our word lists are small, so longer texts may have more words we do not know (names, topic words):
+  // from four words on, two in five recognised is enough; shorter texts need half.
+  const needKnown = words.length >= 4 ? 0.4 : 0.5;
+  if (rule.dictionary && words.length > 0 && known.filter(Boolean).length / words.length < needKnown) return { ok: false, reason: 'UNKNOWN_WORDS' };
   return { ok: true };
 }
 

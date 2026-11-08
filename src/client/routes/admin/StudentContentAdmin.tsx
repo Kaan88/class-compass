@@ -11,12 +11,14 @@ import { pickText } from '../../../shared/i18n/index.ts';
 import { BadgeArt } from '../../achievements/icons.tsx';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
+import { SENSITIVE } from '../../lib/queryClient.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { Button } from '../../ui/Button.tsx';
 import { TextArea, TextField } from '../../ui/Fields.tsx';
 
-const DEFAULTS_KEY = ['admin', 'achievementDefaults'];
-const TEXT_KEY = ['admin', 'textChecks'];
+// Under the sensitive prefix (same as `ADMIN` in Admin.tsx), so the PIN lock purges them (PIN-3/PIN-6).
+const DEFAULTS_KEY = [SENSITIVE, 'admin', 'achievementDefaults'];
+const TEXT_KEY = [SENSITIVE, 'admin', 'textChecks'];
 
 export function AchievementDefaultsSection() {
   const { t, locale } = useI18n();

@@ -1,8 +1,9 @@
 /**
  * Achievements on the classroom screen (S13c items 5 and 7, D-122):
  * - "Give a badge": choose students (or the whole class), choose a badge the teacher gives by hand,
- *   and it is saved through the outbox ('achievements.award', no PIN, works offline). A full-screen
- *   "Celebrate" moment then shows the badge and the names on the display.
+ *   and it is saved through the outbox ('achievements.award', no PIN, works offline). When the teacher
+ *   leaves "Celebrate on the display" ticked, a full-screen moment then shows the badge and the names
+ *   of the students who were awarded (not those who already had it); unticked, it is given quietly.
  * - This lesson's badges can be undone for 10 minutes ('achievements.undo'); later, removing one is a
  *   PIN-gated revoke in the teacher area.
  * - End Lesson "Well done!" (optional per class): the automatic badges earned during the lesson.
@@ -48,6 +49,9 @@ function useClassroomAchievements(contextId: string, lessonId?: string) {
 
 type Moment = { badgeId: string; studentIds: string[]; names: string[] };
 
+/** How long the moment waits for the server's list of awarded students before showing the chosen ones. */
+const MOMENT_WAIT_MS = 2500;
+
 function AchievementsSlot({ context, lesson }: { context: ClassroomContext; lesson: LessonState }) {
   const { t, locale } = useI18n();
   const q = useClassroomAchievements(context.id, lesson.id);
@@ -56,6 +60,7 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
   const [picked, setPicked] = useState<string[]>([]);
   const [badgeId, setBadgeId] = useState<string | null>(null);
   const [moment, setMoment] = useState<Moment | null>(null);
+  const [celebrateOn, setCelebrateOn] = useState(true);
   const data = q.data;
   if (!data?.enabled) return null;
   const badgeOf = (id: string) => data.badges.find((b) => b.id === id);
@@ -65,16 +70,32 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
   const give = async () => {
     if (!badgeId || !picked.length) return;
     const studentIds = [...picked];
+    const withMoment = celebrateOn;
     const opId = await getOutbox().enqueue('achievements.award', { contextId: context.id, lessonId: lesson.id, achievementId: badgeId, studentIds }, { contextId: context.id, lessonId: lesson.id });
     setOpen(false);
     setPicked([]);
-    // The moment is shown at once (the outbox may still be sending); the names are the chosen students.
-    setMoment({ badgeId, studentIds, names: studentIds.map(nameOf) });
     const b = badgeOf(badgeId);
+    const saved = awaitCommand(opId).then((r) => {
+      void queryClient.invalidateQueries({ queryKey: ['classroom', 'achievements', context.id] });
+      return r as { studentIds?: string[] } | undefined;
+    });
+    saved.catch(() => showToast({ message: t('achievements.awardFailed'), kind: 'error', scope: 'classroom' }));
+    if (!withMoment) {
+      // A quiet award (item 7: the moment is optional): a small note only.
+      showToast({ message: t('achievements.givenQuietly', { count: studentIds.length }), kind: 'success', scope: 'classroom' });
+      return;
+    }
+    // The moment names only the students who were actually awarded (not those who already had the
+    // badge). While offline the server's answer may not come quickly: then the chosen students are shown.
+    const answer = await Promise.race([saved.catch(() => null), new Promise<'later'>((res) => setTimeout(() => res('later'), MOMENT_WAIT_MS))]);
+    if (answer === null) return;
+    const awarded = answer !== 'later' && answer?.studentIds ? answer.studentIds : studentIds;
+    if (!awarded.length) {
+      showToast({ message: t('achievements.alreadyHad'), kind: 'info', scope: 'classroom' });
+      return;
+    }
+    setMoment({ badgeId, studentIds: awarded, names: awarded.map(nameOf) });
     celebrate(b ? t('achievements.celebrateMessage', { name: pickText(b.name, locale) }) : null);
-    void awaitCommand(opId)
-      .then(() => queryClient.invalidateQueries({ queryKey: ['classroom', 'achievements', context.id] }))
-      .catch(() => showToast({ message: t('achievements.awardFailed'), kind: 'error' }));
   };
 
   const undo = (awardIds: string[]) => {
@@ -148,6 +169,10 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
             ))}
           </div>
         </fieldset>
+        <label className="cc-tick">
+          <input type="checkbox" checked={celebrateOn} onChange={(e) => setCelebrateOn(e.target.checked)} data-testid="achievements-celebrate" />
+          <span>{t('achievements.celebrateOnDisplay')}</span>
+        </label>
         <DialogActions>
           <Button onPress={() => setOpen(false)}>{t('common.cancel')}</Button>
           <Button variant="primary" isDisabled={!badgeId || !picked.length} onPress={() => void give()} data-testid="achievements-confirm">

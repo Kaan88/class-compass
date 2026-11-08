@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { READY_MADE, lockedPartsOf, randomPerson, seededRandom, type PersonSpec } from '../../src/shared/avatars.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
+import { multipart } from '../import-fixtures.ts';
 import { linkUrl, openLink } from '../student-helpers.ts';
 
 const READING = '00000000-0000-7000-8000-00000000c001';
@@ -128,5 +129,51 @@ describe('student text checks (item 12)', () => {
     expect(goalsOf(await ok(adaPhone.get('/api/student/page'))).goals.map((g: any) => g.id)).toContain(goal.id);
     expect(auditCount('student_text.hide')).toBe(1);
     expect(auditCount('student_text.show')).toBe(1);
+  });
+});
+
+describe('archived classes are read-only for every S13c teacher write (review fix, DAT-1)', () => {
+  it('revoke, achievement settings, hiding a default, the notice switch, hiding text and resetting an avatar answer 409 CLASS_ARCHIVED', async () => {
+    const defs = (await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/achievements`))).definitions as any[];
+    const manual = defs.find((d) => d.kind === 'manual' && !d.custom)!;
+    const award = (await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/achievements/award`, { achievementId: manual.id, studentIds: [ada.id] }))).awards[0];
+    const goal = await ok(addGoal(adaPhone, 'I will read one book every week.'));
+    await ok(adaPhone.put('/api/student/avatar', { spec: plainPerson() }));
+    await ok(s.admin.post(`/api/admin/classes/${s.c3a.id}/archive`));
+    const refused = [
+      await s.teacherA.post(`/api/teacher/awards/${award.id}/revoke`, { reason: 'Given by mistake' }),
+      await s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/achievements/settings`, { levelsEnabled: false }),
+      await s.teacherA.patch(`/api/teacher/contexts/${s.ctxA.id}/achievement-definitions/${manual.id}`, { archived: true }),
+      await s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/blocked-text`, { enabled: true }),
+      await s.teacherA.put(`/api/teacher/student-text/goal/${goal.id}/hidden`, { hidden: true }),
+      await s.teacherA.req('DELETE', `/api/teacher/students/${ada.id}/avatar`),
+    ];
+    expect(refused.map((r) => [r.status, r.body.error?.details?.reason])).toEqual(refused.map(() => [409, 'CLASS_ARCHIVED']));
+    expect(auditCount('avatar.reset') + auditCount('achievement.revoke') + auditCount('student_text.hide')).toBe(0);
+  });
+
+  it('a reset keeps the previous avatar spec in the audit row so a mistake can be put back', async () => {
+    const own = plainPerson();
+    await ok(adaPhone.put('/api/student/avatar', { spec: own }));
+    await ok(s.teacherA.req('DELETE', `/api/teacher/students/${ada.id}/avatar`));
+    const row = env.db.$client.prepare("select before_json as b from audit_events where action = 'avatar.reset'").get() as { b: string };
+    expect(JSON.parse(row.b)).toMatchObject({ hadAvatar: true, spec: own });
+  });
+});
+
+describe('the language check also reads link addresses and upload names (review fix, D-123)', () => {
+  it('a link whose address has a blocked word is refused and counted; a student file with one gets a neutral name', async () => {
+    const r = await adaPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'link', url: 'https://example.org/stories/shit-happens', body: 'My story' });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.reason).toBe('TEXT_BLOCKED_WORD');
+    const counted = env.db.$client.prepare('select sum(count) as n from text_check_attempts where student_id = ?').get(ada.id) as { n: number };
+    expect(counted.n).toBe(1);
+    await ok(adaPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'link', url: 'https://example.org/stories/the-fox', body: 'My story' }));
+    const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+    const bad = multipart(pdf, 'my shit story.pdf', 'application/pdf');
+    const up = await ok(adaPhone.req('POST', '/api/student/files?kind=document', bad.body, bad.headers));
+    expect(up.name).toBe('file.pdf');
+    const fine = multipart(pdf, 'my fox story.pdf', 'application/pdf');
+    expect((await ok(adaPhone.req('POST', '/api/student/files?kind=document', fine.body, fine.headers))).name).toBe('my fox story.pdf');
   });
 });

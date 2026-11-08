@@ -10,7 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as G from '../../shared/contracts/goals.ts';
 import type { Goal, StudentGoalsSection, StudentPage } from '../../shared/contracts/goals.ts';
 import { pickText, type MessageKey } from '../../shared/i18n/index.ts';
-import { checkStudentText, exampleKeyFor, type TextKind } from '../../shared/text/textQuality.ts';
+import { checkStudentText, exampleKeyFor, findRiskyWord, type TextKind, type TextLimits } from '../../shared/text/textQuality.ts';
 import { call, upload } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useRun } from '../lib/useRun.ts';
@@ -18,7 +18,7 @@ import { CONFIDENCE_LEVELS, EntryLine, EvidenceView, FeedbackLine, GoalSummary, 
 import { Button } from '../ui/Button.tsx';
 import { Select, TextArea, TextField } from '../ui/Fields.tsx';
 import { IconCheck, IconPlus, IconTrash } from '../ui/icons.tsx';
-import { EvidenceAdder } from '../modules/goals/EvidenceAdder.tsx';
+import { EvidenceAdder, type EvidenceHintKind } from '../modules/goals/EvidenceAdder.tsx';
 import { STUDENT_PAGE_KEY } from './keys.ts';
 
 type Media = StudentPage['media'];
@@ -29,12 +29,49 @@ const OWN = '__own__';
  * (the server checks again, with the school's and teachers' extra words). Shown once the student has
  * typed a few letters, with an example of a good sentence.
  */
-function useTextHint(text: string, kind: TextKind): string | undefined {
-  const { t } = useI18n();
+function textHint(t: ReturnType<typeof useI18n>['t'], text: string, kind: TextKind, limits: TextLimits): string | undefined {
   if (text.trim().length < 4) return undefined;
-  const r = checkStudentText(text, kind);
+  // The school's goal limits come with the page, so the hint agrees with what the server accepts.
+  const r = checkStudentText(text, kind, { limits });
   if (r.ok) return undefined;
   return r.reason === 'BLOCKED_WORD' ? t('textCheck.BLOCKED_WORD') : `${t(`textCheck.${r.reason}`)} ${t(exampleKeyFor(kind))}`;
+}
+
+function useTextHint(text: string, kind: TextKind, limits: TextLimits): string | undefined {
+  const { t } = useI18n();
+  return textHint(t, text, kind, limits);
+}
+
+const splitChoices = (practice: string) =>
+  practice
+    .split(/[\n,]/u)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, G.MAX_PRACTICE_CHOICES);
+
+/** Practice choices (comma or line separated): the first one that does not pass. */
+function usePracticeHint(text: string, limits: TextLimits): string | undefined {
+  const { t } = useI18n();
+  for (const c of splitChoices(text)) {
+    const h = textHint(t, c, 'practiceChoice', limits);
+    if (h) return h;
+  }
+  return undefined;
+}
+
+/** Evidence words, captions and link addresses (the address gets the language check only, as on the server). */
+function useEvidenceHint(limits: TextLimits) {
+  const { t } = useI18n();
+  return (text: string, kind: EvidenceHintKind) => {
+    if (kind !== 'url') return textHint(t, text, kind, limits);
+    let words = text;
+    try {
+      words = decodeURIComponent(text);
+    } catch {
+      // keep the address as typed
+    }
+    return findRiskyWord(words) ? t('textCheck.BLOCKED_WORD') : undefined;
+  };
 }
 
 /** Run a student action and refresh the page (a revoked link then shows the "no longer works" page). */
@@ -74,14 +111,11 @@ function AddGoal({ data, subjectId }: { data: StudentGoalsSection; subjectId: st
   const [text, setText] = useState('');
   const [practice, setPractice] = useState('');
   const own = choice === OWN || presets.length === 0;
-  const goalHint = useTextHint(text, 'goal');
+  const goalHint = useTextHint(text, 'goal', data.textLimits);
+  const practiceHint = usePracticeHint(practice, data.textLimits);
   const valid = Boolean(categoryId) && (own ? Boolean(text.trim()) : Boolean(choice));
   const save = async () => {
-    const practiceChoices = practice
-      .split(/[\n,]/u)
-      .map((x) => x.trim())
-      .filter(Boolean)
-      .slice(0, G.MAX_PRACTICE_CHOICES);
+    const practiceChoices = splitChoices(practice);
     const r = await run(
       () => call(G.studentCreateGoal, { subjectId, ...(own ? { categoryId, text: text.trim() } : { presetId: choice }), ...(practiceChoices.length ? { practiceChoices } : {}) }),
       t('student.toast.goalAdded'),
@@ -116,7 +150,7 @@ function AddGoal({ data, subjectId }: { data: StudentGoalsSection; subjectId: st
         />
       ) : null}
       {own ? <TextField label={t('student.myGoalWords')} value={text} onChange={setText} maxLength={500} errorMessage={goalHint} /> : null}
-      <TextField label={t('student.practice')} description={t('student.practiceHint')} value={practice} onChange={setPractice} />
+      <TextField label={t('student.practice')} description={t('student.practiceHint')} value={practice} onChange={setPractice} errorMessage={practiceHint} />
       <div>
         <Button variant="primary" isDisabled={!valid} onPress={() => void save()}>
           <IconPlus />
@@ -179,7 +213,7 @@ function Reflections({ data, canWrite, subjectId }: { data: StudentGoalsSection;
   const [confidence, setConfidence] = useState<number | null>(null);
   const live = data.goals.filter((g) => g.status !== 'archived');
   const target = goalId || live[0]?.id || '';
-  const bodyHint = useTextHint(body, kind === 'self_assessment' ? 'selfAssessment' : kind === 'note' ? 'note' : 'reflection');
+  const bodyHint = useTextHint(body, kind === 'self_assessment' ? 'selfAssessment' : kind === 'note' ? 'note' : 'reflection', data.textLimits);
   const valid = Boolean(target) && Boolean(body.trim()) && (kind !== 'self_assessment' || confidence !== null);
   const mine = data.goals.flatMap((g) => g.entries.filter((e) => e.authorType === 'student').map((e) => ({ e, g })));
   const save = async () => {
@@ -241,6 +275,7 @@ function Reflections({ data, canWrite, subjectId }: { data: StudentGoalsSection;
 export function GoalsSection({ data, subjectId, media }: { data: StudentGoalsSection; subjectId: string; media: Media }) {
   const { t, locale } = useI18n();
   const run = useStudentRun();
+  const evidenceHint = useEvidenceHint(data.textLimits);
   return (
     <div className="cc-stack" data-testid="student-goals">
       {!data.canWrite ? <p className="cc-card cc-muted">{t('student.readOnly')}</p> : null}
@@ -259,6 +294,7 @@ export function GoalsSection({ data, subjectId, media }: { data: StudentGoalsSec
             upload={(kind, file, name) => upload(G.studentUploadFile, { kind }, file, name)}
             add={(input) => call(G.studentAddEvidence, { subjectId, ...input })}
             run={(fn, success) => run(fn, success)}
+            hint={evidenceHint}
           />
         ) : null}
         {data.evidence.length === 0 ? <p className="cc-muted">{t('student.noEvidence')}</p> : null}

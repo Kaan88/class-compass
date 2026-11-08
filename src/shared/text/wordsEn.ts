@@ -55,6 +55,8 @@ alphabet bonus chart colouring cooperate effort fluently grandparent kindness ne
 quietly reflection revise spoke spoken story tablet times word wordsearch worksheet clapping helpful listened answered
 new also every better each speak spoke wrote written read heard sang ran swam drew began bought brought caught taught thought
 knew felt kept left lost meant met paid sold sent slept stood understood won wore ate fell flew forgot gave grew hid held
+memorise memorize irregular regular verb noun adjective adverb pronoun preposition tense past present future plural singular
+phrase dialogue conversation presentation poster project quiz exam improve accurate fluent mistake error less fewer reduce
 `;
 
 export const EN_WORDS: ReadonlySet<string> = new Set(LIST.split(/\s+/u).filter(Boolean));

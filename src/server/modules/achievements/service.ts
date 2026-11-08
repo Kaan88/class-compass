@@ -225,9 +225,15 @@ export function studentAwards(ctx: RequestContext, contextId: string, studentId:
   return { student: studentSummary(s), awards: awardDtos(ctx.db, rows) };
 }
 
-function writableContext(ctx: RequestContext, contextId: string): ContextRow {
+/** The teacher's own context in a class that is not archived (archived classes are read-only, DAT-1). */
+function ownedWritable(ctx: RequestContext, contextId: string): ContextRow {
   const context = assertOwnsContext(ctx, contextId);
   assertClassWritable(ctx.db, getClass(ctx.db, context.classId));
+  return context;
+}
+
+function writableContext(ctx: RequestContext, contextId: string): ContextRow {
+  const context = ownedWritable(ctx, contextId);
   assertModuleEnabled(ctx.db, context.id, 'achievements');
   return context;
 }
@@ -263,7 +269,7 @@ export function createDef(ctx: RequestContext, input: In<typeof C.createAchievem
 
 export function updateDef(ctx: RequestContext, input: In<typeof C.updateAchievement>): AchievementDef {
   return tx(ctx.db, () => {
-    const context = assertOwnsContext(ctx, input.contextId);
+    const context = ownedWritable(ctx, input.contextId);
     const uid = requireUser(ctx).id;
     const d = ctx.db.select().from(achievementDefinitions).where(eq(achievementDefinitions.id, input.achievementId)).get();
     if (!d || (d.createdBy !== null && d.createdBy !== uid)) throw notFound('Achievement');
@@ -297,7 +303,7 @@ export function updateDef(ctx: RequestContext, input: In<typeof C.updateAchievem
 
 export function setSettings(ctx: RequestContext, input: In<typeof C.setAchievementSettings>): AchievementSettings {
   return tx(ctx.db, () => {
-    const context = assertOwnsContext(ctx, input.contextId);
+    const context = ownedWritable(ctx, input.contextId);
     const before = settingsOf(ctx.db, context.id);
     const patch: Record<string, unknown> = {};
     if (input.autoEnabled !== undefined) patch.autoEnabled = input.autoEnabled;
@@ -355,7 +361,7 @@ export function revoke(ctx: RequestContext, input: In<typeof C.revokeAward>): Aw
   return tx(ctx.db, () => {
     const a = ctx.db.select().from(studentAchievements).where(eq(studentAchievements.id, input.awardId)).get();
     if (!a || !a.contextId) throw notFound('Award');
-    const context = assertOwnsContext(ctx, a.contextId);
+    const context = ownedWritable(ctx, a.contextId);
     if (a.revokedAt !== null) throw new AppError('CONFLICT', 'Already removed', { reason: 'ALREADY_REVOKED' });
     if (a.source !== 'manual') throw new AppError('VALIDATION', 'Automatic badges follow what the student did', { reason: 'NOT_MANUAL' });
     const now = ctx.now();
@@ -432,7 +438,8 @@ export function classroomAward(ctx: RequestContext, p: z.infer<(typeof C.Achieve
   const { context, lesson } = lessonForCommand(ctx, p, meta);
   assertModuleEnabled(ctx.db, context.id, 'achievements');
   const { rows, already } = giveManual(ctx, context, p.achievementId, p.studentIds, { lessonId: lesson.id, opId: meta.opId });
-  return { awardIds: rows.map((r) => r.id), already };
+  // The awarded students (not those who already had it) are what the classroom moment names.
+  return { awardIds: rows.map((r) => r.id), studentIds: rows.map((r) => r.studentId), already };
 }
 
 export function classroomUndo(ctx: RequestContext, p: z.infer<(typeof C.AchievementCommands)['achievements.undo']>, meta: CommandMeta) {

@@ -188,6 +188,26 @@ describe('timeline and other sections', () => {
     expect((await s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?studentId=${kids[0]!.id.replace(/.$/, (c) => (c === '0' ? '1' : '0'))}`)).status).toBe(404);
   });
 
+  it('achievements are broken down by student, by category and by awarding teacher (S13c item 8, review fix)', async () => {
+    const base = `/api/teacher/contexts/${s.ctxA.id}/achievements`;
+    const defs = (await ok(s.teacherA.get(base))).definitions as any[];
+    const manual = defs.filter((d) => d.kind === 'manual' && d.category === 'teacher').slice(0, 2);
+    await ok(s.teacherA.post(`${base}/award`, { achievementId: manual[0].id, studentIds: [kids[0]!.id, kids[1]!.id] }));
+    const given = await ok(s.teacherA.post(`${base}/award`, { achievementId: manual[1].id, studentIds: [kids[0]!.id] }));
+    await ok(s.teacherA.post(`/api/teacher/awards/${given.awards[0].id}/revoke`, { reason: 'Given by mistake' }));
+    const sec = section(await report(), 'achievements');
+    expect(rowOf(sec, 'categories', 'teacher').slice(1)).toEqual([
+      { t: 'n', v: 2 },
+      { t: 'n', v: 0 },
+      { t: 'n', v: 1 },
+    ]);
+    const teachers = sec.tables.find((t) => t.key === 'teachers')!;
+    expect(teachers.rows).toHaveLength(1);
+    expect(teachers.rows[0]!.cells).toEqual([{ t: 'label', v: { raw: 'Test ayse.teacher' } }, { t: 'n', v: 2 }, { t: 'n', v: 1 }]);
+    const csv = await s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report/csv?section=achievements&table=categories`);
+    expect(csv.status).toBe(200);
+  });
+
   it('the school-wide usage report has no student names', async () => {
     await lessonWithTaps([[0, 1]]);
     const u = await ok(s.admin.get('/api/admin/reports/usage'));

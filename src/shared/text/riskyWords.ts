@@ -107,6 +107,7 @@ export const RISKY_PHRASES: readonly (readonly string[])[] = [
 
 /**
  * Innocent words whose folded spelling would otherwise match a risky stem plus a suffix (tested):
- * "sıkı" (tight, firm) and "sıkıcı" (boring) typed without Turkish letters are "siki" and "sikici".
+ * "sıkı" (tight, firm) and "sıkıcı" (boring) typed without Turkish letters are "siki" and "sikici";
+ * "Sikkim" is a place name.
  */
-export const BUILTIN_ALLOW: readonly string[] = ['siki', 'sikica', 'sikiyim', 'sikisik', 'sikinti', 'sikintili', 'sikmak', 'sikma', 'sikildim', 'sikici', 'sikicilar', 'sikin', 'amca', 'amcam', 'amcamla', 'ama', 'amac', 'amaci'];
+export const BUILTIN_ALLOW: readonly string[] = ['siki', 'sikica', 'sikiyim', 'sikisik', 'sikinti', 'sikintili', 'sikmak', 'sikma', 'sikildim', 'sikici', 'sikicilar', 'sikin', 'amca', 'amcam', 'amcamla', 'ama', 'amac', 'amaci', 'sikkim'];

@@ -33,6 +33,8 @@ yeni kelime anlam sözlük kart oyunu bulmaca yarışma takım grup çift
 gerçekten çok güzel harika süper mükemmel eğlenceli zor kolay ilginç önemli
 şarkı söyle resim yap kitap oku
 sıkı iyice güzelce doğruca birlikte beraber yalnız kendi kendim
+fiil düzen düzenli düzensiz isim sıfat zarf zamir edat zaman geçmiş gelecek şimdiki çoğul tekil cümle yazım hata yanlış azalt geliştir
+sunum proje sınav quiz diyalog konuşma telaffuz dilbilgisi kural
 `;
 
 export const TR_WORDS: ReadonlySet<string> = new Set(

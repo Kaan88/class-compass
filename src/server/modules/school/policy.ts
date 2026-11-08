@@ -77,6 +77,9 @@ export function assertClassWritable(db: Db, cls: ClassRow): void {
   if (cls.archivedAt) throw new AppError('CONFLICT', 'This class is archived and read-only', { reason: 'CLASS_ARCHIVED' });
 }
 
+/** The same rule as `assertClassWritable`, as a boolean (for "at least one of these classes is writable"). */
+export const isClassWritable = (db: Db, cls: ClassRow): boolean => cls.archivedAt === null && getYear(db, cls.schoolYearId).archivedAt === null;
+
 function teacherId(ctx: RequestContext): string {
   if (!ctx.user || ctx.user.role !== 'teacher') throw new AppError('FORBIDDEN', 'Teacher account required');
   return ctx.user.id;

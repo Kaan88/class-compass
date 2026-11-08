@@ -116,6 +116,27 @@ describe('rule engine, backfill and start fresh (items 2, 3)', () => {
     expect((await awardsOf(ada.id)).map((a) => a.achievementId)).toEqual([GOAL_SETTER]);
   });
 
+  it('start fresh: later activity on an old reached goal or an old homework mark never earns past work (review fix)', async () => {
+    const g = await addGoal(adaPhone, 'I will read one book every week.');
+    await ok(adaPhone.patch(`/api/student/goals/${g.id}`, { status: 'achieved' }));
+    const hw = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/homework`, { title: 'Workbook page 12', assignedOn: '2026-11-09', dueOn: '2026-11-09' }));
+    await ok(s.teacherA.post(`/api/teacher/homework/${hw.id}/marks`, { changes: [{ studentId: ada.id, status: 'completed' }] }));
+    env.clock.advance(60_000);
+    await ok(s.teacherA.post(`${base()}/start`, { mode: 'fresh' }));
+    env.clock.advance(60_000);
+    // A reflection on the old goal and a teacher progress note bump goals.updatedAt; a note bumps the mark's updatedAt.
+    await ok(adaPhone.post(`/api/student/goals/${g.id}/entries`, { kind: 'reflection', body: 'I read two chapters of my book today.' }));
+    await ok(s.teacherA.post(`/api/teacher/goals/${g.id}/progress`, { body: 'Good progress with reading.' }));
+    await ok(s.teacherA.post(`/api/teacher/homework/${hw.id}/marks`, { changes: [{ studentId: ada.id, status: 'completed', note: 'Neat work' }] }));
+    const ids = (await awardsOf(ada.id)).map((a) => a.achievementId);
+    expect(ids).not.toContain(defaultAchievementId('goals.firstReached'));
+    expect(ids).not.toContain(defaultAchievementId('homework.first'));
+    // A goal reached after the start does count.
+    const g2 = await addGoal(adaPhone, 'I will write a short story.');
+    await ok(adaPhone.patch(`/api/student/goals/${g2.id}`, { status: 'achieved' }));
+    expect((await awardsOf(ada.id)).map((a) => a.achievementId)).toContain(defaultAchievementId('goals.firstReached'));
+  });
+
   it('automatic badges can be switched off and levels hidden; the module switch turns the section off', async () => {
     await ok(s.teacherA.post(`${base()}/start`, { mode: 'quiet' }));
     await ok(s.teacherA.put(`${base()}/settings`, { autoEnabled: false, levelsEnabled: false }));
@@ -147,6 +168,9 @@ describe('manual badges in class and in the teacher area (items 4, 5)', () => {
     // Giving the same badge again in the same class is a no-op for students who hold it.
     const twice = await cmd(s.teacherA, 'achievements.award', { contextId: s.ctxA.id, lessonId, achievementId: SUNSHINE, studentIds: [ada.id] });
     expect(twice.result).toMatchObject({ awardIds: [], already: 1 });
+    // The classroom moment names only the students actually awarded (review fix).
+    expect(r.result.studentIds.sort()).toEqual([ada.id, bora.id].sort());
+    expect(twice.result.studentIds).toEqual([]);
     expect(auditCount('achievement.award')).toBe(1);
 
     const lessonView = await ok(s.teacherA.get(`/api/classroom/contexts/${s.ctxA.id}/achievements?lessonId=${lessonId}`));

@@ -24,6 +24,10 @@ import { AttendanceChip, Avatar, CounterBar, MetricCell, StudentCard, StudentGri
 import { Tabs } from '../ui/Tabs.tsx';
 import { themeLabelKey } from '../ui/ThemePreview.tsx';
 import { TEXT_SCALES } from '../routes/teacher/Teacher.tsx';
+import { ACHIEVEMENT_TIERS, BADGE_ICONS } from '../../shared/achievements.ts';
+import { READY_MADE } from '../../shared/avatars.ts';
+import { BadgeArt } from '../achievements/icons.tsx';
+import { AvatarArt } from '../avatars/AvatarArt.tsx';
 import { levelFor, sampleStudents } from './fixtures.ts';
 
 const SUBJECT = { en: 'English', tr: 'İngilizce' };
@@ -141,6 +145,19 @@ function Everything() {
           actionLabel={t('users.deactivate')}
           onConfirm={() => undefined}
         />
+      </Section>
+      <Section title={t('catalog.badgesAvatars')}>
+        {/* S13c review: every badge glyph (tiers in turn, some locked) and every ready-made avatar, in each theme, so the axe pass covers them. */}
+        <div className="cc-row" style={{ flexWrap: 'wrap' }} data-testid="catalog-badges">
+          {BADGE_ICONS.map((icon, i) => (
+            <BadgeArt key={icon} icon={icon} tier={ACHIEVEMENT_TIERS[i % ACHIEVEMENT_TIERS.length]!} size={32} locked={i % 7 === 6} />
+          ))}
+        </div>
+        <div className="cc-row" style={{ flexWrap: 'wrap' }} data-testid="catalog-avatars">
+          {READY_MADE.map((spec, i) => (
+            <AvatarArt key={i} spec={spec} size={40} title={t('catalog.avatarN', { n: i + 1 })} />
+          ))}
+        </div>
       </Section>
       <Section title={t('catalog.students')}>
         <div className="cc-row">

@@ -1,7 +1,7 @@
 /** Student text checks (S13c item 12, D-123): nonsense and risky words in English and Turkish. */
 import { describe, expect, it } from 'vitest';
 import { checkStudentText, findRiskyWord, isRecognisedWord, TEXT_KINDS } from '../../src/shared/text/textQuality.ts';
-import { GIBBERISH_EN, GIBBERISH_TR, REAL_EN, REAL_TR } from './text-corpus.ts';
+import { FRESH_EN, FRESH_TR, GIBBERISH_EN, GIBBERISH_TR, REAL_EN, REAL_TR } from './text-corpus.ts';
 
 describe('corpus (at least 100 of each, EN and TR)', () => {
   it('has enough samples', () => {
@@ -9,6 +9,10 @@ describe('corpus (at least 100 of each, EN and TR)', () => {
   });
 
   it.each([...REAL_EN, ...REAL_TR])('accepts the real child-like goal %s', (s) => {
+    expect(checkStudentText(s, 'goal')).toEqual({ ok: true });
+  });
+
+  it.each([...FRESH_EN, ...FRESH_TR])('accepts the goal written without looking at the lists %s (review fix)', (s) => {
     expect(checkStudentText(s, 'goal')).toEqual({ ok: true });
   });
 
@@ -29,6 +33,14 @@ describe('nonsense rules', () => {
     expect(checkStudentText('read read read read books', 'goal')).toEqual({ ok: false, reason: 'REPEATED_WORDS' });
     expect(checkStudentText('lorem ipsum dolor sit amet', 'goal')).toEqual({ ok: false, reason: 'UNKNOWN_WORDS' });
     expect(checkStudentText('I will read abcdefghijklmnopqrstuvwxyzab', 'goal').ok).toBe(false);
+    // Review fix: repeated short pieces, one word said three times, half the words repeated, and a goal without a content word.
+    expect(checkStudentText('I will asdasd', 'goal')).toEqual({ ok: false, reason: 'KEYBOARD_MASH' });
+    expect(checkStudentText('teacher teacher teacher', 'goal')).toEqual({ ok: false, reason: 'REPEATED_WORDS' });
+    expect(checkStudentText('I will I will', 'reflection')).toEqual({ ok: false, reason: 'REPEATED_WORDS' });
+    expect(checkStudentText('I will x', 'goal')).toEqual({ ok: false, reason: 'TOO_SHORT' });
+    expect(checkStudentText('yes yes yes', 'reflection')).toEqual({ ok: false, reason: 'REPEATED_WORDS' });
+    // Real words that look like a repeated piece are known words, so they pass.
+    expect(checkStudentText('Annem ve babam dedemi ziyaret etti.', 'reflection')).toEqual({ ok: true });
   });
 
   it('honours the configurable goal minimum', () => {
@@ -104,6 +116,8 @@ describe('risky words', () => {
     'Dickens wrote stories',
     'A cocktail of fruit juice',
     'I saw a pussycat',
+    'I live in Sikkim',
+    'Sikkim is in India',
   ])('does not block the innocent %s', (text) => {
     expect(findRiskyWord(text)).toBeNull();
   });

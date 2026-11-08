@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Avatars and badge art (S13c items 1, 9–11, D-124): original SVG drawn from the catalogue only, theme
  * tokens instead of colours, every random spec renders, 80+ badge icons with the tier shown by shape,
@@ -9,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { BadgeArt, GLYPHS } from '../../src/client/achievements/icons.tsx';
 import { AvatarArt } from '../../src/client/avatars/AvatarArt.tsx';
 import { contrast } from '../../src/client/themes/contrast.ts';
+import { themeTokens } from '../../src/client/themes/css.ts';
 import { THEME_LIST } from '../../src/client/themes/registry.ts';
 import { COLOR_TOKENS } from '../../src/client/themes/types.ts';
 import { ACHIEVEMENT_TIERS, BADGE_ICONS, DEFAULT_ACHIEVEMENTS } from '../../src/shared/achievements.ts';
@@ -78,3 +80,37 @@ describe('avatars (items 9–11)', () => {
     }
   });
 });
+
+/**
+ * S13c review: every badge glyph in every tier (and locked), and every ready-made avatar plus random
+ * specs, render as well-formed SVG whose every `var(--cc-…)` is defined by each theme. The art uses
+ * tokens only, so this is what "renders in every theme" means; the e2e catalog runs axe on the same
+ * badges and avatars in each theme (e2e/catalog.spec.ts).
+ */
+describe('every badge and avatar in every theme (item 10, review fix)', () => {
+  const VAR = /var\((--cc-[a-z0-9-]+)\)/g;
+  const wellFormed = (svg: string) => {
+    const doc = new DOMParser().parseFromString(svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"'), 'image/svg+xml');
+    return doc.getElementsByTagName('parsererror').length === 0 && doc.documentElement.nodeName === 'svg';
+  };
+  const art: string[] = [];
+  for (const icon of BADGE_ICONS) for (const tier of ACHIEVEMENT_TIERS) for (const locked of [false, true]) art.push(html(createElement(BadgeArt, { icon, tier, locked })));
+  for (const spec of READY_MADE) art.push(html(createElement(AvatarArt, { spec, size: 48, title: 'Avatar' })));
+  for (let seed = 1; seed <= 100; seed++) art.push(html(createElement(AvatarArt, { spec: seed % 2 ? randomPerson(seededRandom(seed)) : randomCreature(seededRandom(seed)), size: 48 })));
+  const used = new Set(art.flatMap((svg) => [...svg.matchAll(VAR)].map((m) => m[1]!)));
+
+  it('renders well-formed SVG for all of them', () => {
+    expect(art.length).toBeGreaterThanOrEqual(BADGE_ICONS.length * ACHIEVEMENT_TIERS.length * 2 + READY_MADE.length);
+    for (const svg of art) expect(wellFormed(svg), svg.slice(0, 120)).toBe(true);
+    expect(used.size).toBeGreaterThan(10);
+  });
+
+  it.each(THEME_LIST.map((t) => [t.key, t] as const))('every colour and style variable the art uses is defined by the %s theme', (_key, theme) => {
+    const defined = new Map(themeTokens(theme));
+    for (const v of used) {
+      expect(defined.has(v), `${theme.key} ${v}`).toBe(true);
+      expect(String(defined.get(v)).trim(), `${theme.key} ${v}`).not.toBe('');
+    }
+  });
+});
+

@@ -27,6 +27,7 @@ import { newId } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { getMediaPolicy } from '../school/modules.ts';
 import { teacherSeesStudent } from '../students/service.ts';
+import { neutralStudentFileName } from '../textChecks/service.ts';
 import { AudioMetaError, stripAudioMetadata } from './audioMeta.ts';
 import { MAX_IMAGE_EDGE, reencodeImage } from './image.ts';
 import { sniffFile } from './sniff.ts';
@@ -181,7 +182,8 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
       thumbSize,
       sniffedMime: mime,
       kind: opts.kind,
-      originalName: filename,
+      // A student's file name is shown back to them and to teachers: one with a blocked word gets a neutral name (D-123).
+      originalName: ctx.actor.type === 'student' ? neutralStudentFileName(ctx.db, filename) : filename,
       ownerStudentId: opts.ownerStudentId,
       uploadedByType: ctx.actor.type,
       uploadedById: ctx.actor.id,

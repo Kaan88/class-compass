@@ -1,6 +1,7 @@
 /**
  * Avatars in the teacher area (S13c item 11, D-124): per class, pause avatar changes, choose what shows
- * before a student picks (a generated avatar or initials), and reset one student's avatar (audited).
+ * before a student picks (a generated avatar or initials), and reset one student's avatar (typed
+ * confirmation with the student's name; audited with the previous spec).
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +14,7 @@ import { SENSITIVE } from '../../lib/queryClient.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { AVATARS_KEY } from '../../avatars/AvatarDirectory.tsx';
 import { Button } from '../../ui/Button.tsx';
+import { ConfirmDestructive } from '../../ui/Dialog.tsx';
 import { EmptyState } from '../../ui/Feedback.tsx';
 import { Select, Toggle } from '../../ui/Fields.tsx';
 import { Avatar } from '../../ui/Students.tsx';
@@ -22,6 +24,7 @@ const settingsKey = (classId: string) => [SENSITIVE, 'teacher', 'avatars', class
 function ClassAvatars({ classId }: { classId: string }) {
   const { t } = useI18n();
   const run = useRun();
+  const [resetting, setResetting] = useState<{ id: string; name: string } | null>(null);
   const s = useQuery({ queryKey: settingsKey(classId), queryFn: () => call(Av.getAvatarSettings, { classId }) });
   const roster = useQuery({ queryKey: ['classroom', 'roster-names', classId], queryFn: () => call(classroomRoster, { classId }) });
   const set = (patch: { locked?: boolean; fallback?: 'generated' | 'initials' }) =>
@@ -48,18 +51,22 @@ function ClassAvatars({ classId }: { classId: string }) {
             <li key={st.id} className="cc-row">
               <Avatar name={st.fullName} id={st.id} hue={st.avatarHue} initials={st.initials} size="sm" />
               <span>{st.fullName}</span>
-              <Button
-                size="small"
-                className="cc-push-right"
-                onPress={() => void run(() => call(Av.resetStudentAvatar, { studentId: st.id }), { success: t('avatar.resetDone'), invalidate: [AVATARS_KEY] })}
-                data-testid="avatar-reset"
-              >
+              <Button size="small" className="cc-push-right" onPress={() => setResetting({ id: st.id, name: st.fullName })} data-testid="avatar-reset">
                 {t('avatar.reset')}
               </Button>
             </li>
           ))}
         </ul>
       </section>
+      <ConfirmDestructive
+        isOpen={resetting !== null}
+        onOpenChange={(open) => (open ? null : setResetting(null))}
+        title={t('avatar.resetConfirmTitle', { name: resetting?.name ?? '' })}
+        description={t('avatar.resetConfirmBody', { name: resetting?.name ?? '' })}
+        confirmText={resetting?.name ?? ''}
+        actionLabel={t('avatar.reset')}
+        onConfirm={() => (resetting ? run(() => call(Av.resetStudentAvatar, { studentId: resetting.id }), { success: t('avatar.resetDone'), invalidate: [AVATARS_KEY] }) : undefined)}
+      />
     </div>
   );
 }

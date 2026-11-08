@@ -8,7 +8,7 @@ import { weekStartOf } from '../../../domain/counters.ts';
 import { emptyFacts, type ActivityFacts } from '../../../domain/achievements.ts';
 import { SKILL_OF_CATEGORY_ICON, type AchievementSkill, type EvidenceFilterKind } from '../../../shared/achievements.ts';
 import type { Db } from '../../db/client.ts';
-import { assistantAssignments, assistantDutyChecks, assistantResponsibilities, evidence, files, goalEntries, goals, homeworkAssignments, homeworkMarks, skillCategories } from '../../db/schema.ts';
+import { assistantAssignments, assistantDutyChecks, assistantResponsibilities, evidence, files, goalEntries, goals, homeworkAssignments, homeworkMarkChanges, homeworkMarks, skillCategories } from '../../db/schema.ts';
 import { earnedSecretTurns } from '../secret/service.ts';
 import type { ContextRow } from '../school/policy.ts';
 
@@ -38,7 +38,7 @@ export function collectFactsMany(db: Db, studentIds: readonly string[], context:
     const skill = skillOfIcon(icon);
     goalSkill.set(g.id, skill);
     get(g.studentId).goalsSet.push({ at: g.createdAt, skill });
-    if (g.status === 'achieved') get(g.studentId).goalsAchieved.push({ at: g.updatedAt, skill });
+    if (g.status === 'achieved') get(g.studentId).goalsAchieved.push({ at: g.achievedAt ?? g.createdAt, skill });
   }
   const goalOwner = new Map(goalRows.map(({ g }) => [g.id, g.studentId]));
   if (goalOwner.size) {
@@ -70,10 +70,29 @@ export function collectFactsMany(db: Db, studentIds: readonly string[], context:
   if (hw.length) {
     const byId = new Map(hw.map((a) => [a.id, a]));
     const marks = db.select().from(homeworkMarks).where(and(inArray(homeworkMarks.assignmentId, [...byId.keys()]), inArray(homeworkMarks.studentId, ids))).all();
+    const kindOf = (assignmentId: string, status: string | null) => (status === null ? null : (byId.get(assignmentId)!.statusSetJson.find((s) => s.key === status)?.kind ?? status));
+    // A mark is dated by when it first reached its current kind (the change history), not by
+    // `updatedAt`, which a later note edit bumps (S13c review: "start fresh" must not count old work).
+    const since = new Map<string, number>();
+    if (marks.length) {
+      const changes = db
+        .select({ assignmentId: homeworkMarkChanges.assignmentId, studentId: homeworkMarkChanges.studentId, afterStatus: homeworkMarkChanges.afterStatus, changedAt: homeworkMarkChanges.changedAt })
+        .from(homeworkMarkChanges)
+        .where(and(inArray(homeworkMarkChanges.assignmentId, [...byId.keys()]), inArray(homeworkMarkChanges.studentId, ids), isNull(homeworkMarkChanges.undoneAt)))
+        .all()
+        .sort((x, y) => x.changedAt - y.changedAt);
+      const last = new Map<string, string | null>();
+      for (const c of changes) {
+        const k = `${c.assignmentId}:${c.studentId}`;
+        const kind = kindOf(c.assignmentId, c.afterStatus);
+        if (!last.has(k) || last.get(k) !== kind) since.set(k, c.changedAt);
+        last.set(k, kind);
+      }
+    }
     for (const m of marks) {
       const a = byId.get(m.assignmentId)!;
-      const kind = a.statusSetJson.find((s) => s.key === m.status)?.kind ?? m.status;
-      get(m.studentId).homework.push({ at: m.updatedAt, dueOn: a.dueOn, kind });
+      const kind = kindOf(m.assignmentId, m.status)!;
+      get(m.studentId).homework.push({ at: since.get(`${m.assignmentId}:${m.studentId}`) ?? m.updatedAt, dueOn: a.dueOn, kind });
     }
   }
 

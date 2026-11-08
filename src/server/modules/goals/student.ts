@@ -25,7 +25,7 @@ import { studentScope, type ScopeContext, type StudentScope } from '../links/sco
 import type { StudentPageInput } from '../manifest.ts';
 import { isModuleEnabled } from '../school/modules.ts';
 import { getYear } from '../school/policy.ts';
-import { assertStudentText, recordBlockedAttempts } from '../textChecks/service.ts';
+import { assertNoRiskyWords, assertStudentText, limitsOf, recordBlockedAttempts, urlWords } from '../textChecks/service.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type EvidenceRow, type GoalRow } from './dto.ts';
 import { categoryUsable, getCategory, getPreset, hiddenDefaultsOf, inScope, outcomesOf, presetUsable, studentChoices } from './library.ts';
 
@@ -60,6 +60,7 @@ export function goalsSection(ctx: RequestContext, input: StudentPageInput): Stud
     presets: choices.presets,
     outcomes: outcomesOf(ctx.db, context.id),
     canWrite: sc ? canWriteIn(ctx, sc) : false,
+    textLimits: limitsOf(ctx.db),
   };
 }
 
@@ -131,6 +132,7 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.studentCreate
       deletedAt: null,
       hiddenAt: null,
       hiddenBy: null,
+      achievedAt: null,
     };
     ctx.db.insert(goals).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'goal.create', entity: 'goal', entityId: row.id, after: { subjectId: row.subjectId, categoryId: row.categoryId, presetId: row.presetId } }, now);
@@ -152,7 +154,11 @@ export function updateGoal(ctx: RequestContext, input: In<typeof C.studentUpdate
       patch.labelSnapshot = { category: goal.labelSnapshot.category };
     }
     if (input.practiceChoices !== undefined) patch.practiceChoicesJson = input.practiceChoices;
-    if (input.status !== undefined) patch.status = input.status;
+    if (input.status !== undefined) {
+      patch.status = input.status;
+      // When the goal became achieved (the achievement rules use it, not updatedAt, so later edits never re-date it).
+      if (input.status !== goal.status) patch.achievedAt = input.status === 'achieved' ? ctx.now() : null;
+    }
     ctx.db.update(goals).set(patch).where(eq(goals.id, goal.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal.update', entity: 'goal', entityId: goal.id, before: { status: goal.status }, after: { status: patch.status, textChanged: input.text !== undefined } }, ctx.now());
     activity(ctx, goal.studentId, goal.subjectId);
@@ -244,6 +250,8 @@ export function addEvidence(ctx: RequestContext, input: In<typeof C.studentAddEv
     } else if (input.kind === 'link') {
       if (!input.url) throw invalid('Add the web address', { reason: 'EVIDENCE_URL_REQUIRED' });
       url = new URL(input.url).href;
+      // The address is shown back to the student and teachers: the language check reads it too (D-123).
+      assertNoRiskyWords(ctx, textTarget(scope, input.subjectId), urlWords(url));
     } else {
       if (!input.fileId) throw invalid('Upload the file first', { reason: 'EVIDENCE_FILE_REQUIRED' });
       const f = ctx.db.select().from(files).where(eq(files.id, input.fileId)).get();

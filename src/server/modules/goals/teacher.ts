@@ -210,6 +210,7 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.teacherCreate
       deletedAt: null,
       hiddenAt: null,
       hiddenBy: null,
+      achievedAt: null,
     };
     ctx.db.insert(goals).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'goal.create', entity: 'goal', entityId: row.id, after: { studentId: row.studentId, subjectId, categoryId: row.categoryId, presetId: row.presetId, reviewOn: row.reviewOn } }, now);
@@ -233,7 +234,11 @@ export function updateGoal(ctx: RequestContext, input: In<typeof C.teacherUpdate
     }
     if (input.practiceChoices !== undefined) patch.practiceChoicesJson = input.practiceChoices;
     if (input.reviewOn !== undefined) patch.reviewOn = input.reviewOn;
-    if (input.status !== undefined) patch.status = input.status;
+    if (input.status !== undefined) {
+      patch.status = input.status;
+      // When the goal became achieved (the achievement rules use it, not updatedAt, so later edits never re-date it).
+      if (input.status !== goal.status) patch.achievedAt = input.status === 'achieved' ? ctx.now() : null;
+    }
     if (input.categoryId !== undefined && input.categoryId !== goal.categoryId) {
       const cat = getCategory(ctx.db, input.categoryId);
       if (!cat || !inScope(cat, goal.subjectId, teacherIdsOf(s))) throw notFound('Category');

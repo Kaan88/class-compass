@@ -24,6 +24,8 @@ import { VoiceRecorder } from './VoiceRecorder.tsx';
 export type EvidenceMode = 'text' | 'link' | 'picture' | 'camera' | 'document' | 'voice' | 'voiceFile';
 export type UploadKind = 'image' | 'document' | 'audio';
 export type EvidenceMedia = { photos: boolean; audio: boolean; documents: boolean };
+/** What a live hint checks: evidence words, a caption / link title, or a link's address (language check only). */
+export type EvidenceHintKind = 'evidenceText' | 'linkTitle' | 'url';
 export type NewEvidence = { kind: EvidenceKind; goalId?: string; body?: string; url?: string; fileId?: string };
 
 /** Most files added in one go. */
@@ -59,6 +61,7 @@ export function EvidenceAdder({
   upload,
   add,
   run,
+  hint,
 }: {
   goals: Array<{ id: string; label: string }>;
   media: EvidenceMedia;
@@ -67,6 +70,8 @@ export function EvidenceAdder({
   add: (input: NewEvidence) => Promise<unknown>;
   /** Runs the save with the caller's toast and refresh; resolves to a falsy value on failure. */
   run: (fn: () => Promise<unknown>, success: string) => Promise<unknown>;
+  /** Live text hints (the student page, D-123): the words of the evidence or caption, and a link's address. */
+  hint?: (text: string, kind: EvidenceHintKind) => string | undefined;
 }) {
   const { t, locale } = useI18n();
   const modes = evidenceModes(media);
@@ -224,7 +229,7 @@ export function EvidenceAdder({
         </div>
       </fieldset>
       <Select label={t('student.evidenceGoal')} items={[{ id: '', label: t('student.noGoalLink') }, ...goals]} value={goalId} onChange={setGoalId} />
-      {current === 'link' ? <TextField label={t('student.linkUrl')} description={t('student.linkHint')} type="url" value={url} onChange={setUrl} errorMessage={urlOk ? null : t('student.linkInvalid')} /> : null}
+      {current === 'link' ? <TextField label={t('student.linkUrl')} description={t('student.linkHint')} type="url" value={url} onChange={setUrl} errorMessage={urlOk ? (hint?.(url, 'url') ?? null) : t('student.linkInvalid')} /> : null}
       {current === 'picture' ? fileInput('picture', t('evidence.choosePictures'), `${ACCEPT_HINT.image},image/heic,image/heif,.heic,.heif`, true) : null}
       {current === 'camera' ? <CameraCapture idPrefix={idPrefix} onPhoto={(b) => void prepareImage(b).then((blob) => push([{ blob, name: 'photo.jpg', kind: 'image' }]))} /> : null}
       {current === 'document' ? fileInput('document', t('evidence.chooseDocuments'), media.photos ? `${ACCEPT_HINT.document},${ACCEPT_HINT.image}` : ACCEPT_HINT.document, true) : null}
@@ -246,7 +251,14 @@ export function EvidenceAdder({
           ))}
         </ul>
       ) : null}
-      <TextArea label={current === 'text' ? t('student.evidenceWords') : t('student.evidenceCaption')} rows={3} value={body} onChange={setBody} maxLength={2000} />
+      <TextArea
+        label={current === 'text' ? t('student.evidenceWords') : t('student.evidenceCaption')}
+        rows={3}
+        value={body}
+        onChange={setBody}
+        maxLength={2000}
+        errorMessage={hint?.(body, current === 'text' ? 'evidenceText' : 'linkTitle')}
+      />
       <div>
         <Button variant="primary" isDisabled={!valid || busy} onPress={() => void save()}>
           <IconPlus />

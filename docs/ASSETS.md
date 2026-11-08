@@ -27,7 +27,7 @@ No CC0 audio is currently included. If one is ever added, list it here with its 
 |---|---|---|
 | Quote of the day (125 English, 125 Turkish) | Original sayings written for Class Compass (`src/shared/quotes.ts`); no quotations of people or books | Part of this code base |
 | Risky-word lists, English and Turkish (S13c) | Written for Class Compass (`src/shared/text/riskyWords.ts`). No third-party list (LDNOOBW or other) was copied; administrators and teachers add their own words (D-123) | Part of this code base |
-| Everyday word lists for the nonsense check, English and Turkish (S13c) | Written for Class Compass (`src/shared/text/wordsEn.ts`, `wordsTr.ts`) from common school vocabulary | Part of this code base |
+| Everyday word lists for the nonsense check, English and Turkish (S13c) | Written for Class Compass (`src/shared/text/wordsEn.ts`, `wordsTr.ts`) from common school vocabulary, extended in the S13c review with English-class terms. No third-party frequency list is used: none was licence-verified, so per the brief we wrote our own | Part of this code base |
 | Text-check test corpus (S13c) | Invented child-like sentences and gibberish samples (`tests/domain/text-corpus.ts`); fictional | Part of this code base |
 
 ## Data services (not assets, listed for completeness)

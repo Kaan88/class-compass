@@ -1,15 +1,18 @@
 /**
- * Achievements in the reports (S13c item 8, RPT-1): per student, the badges awarded in the period
- * (given by the teacher / automatic), and each award in the student's timeline. Counts per student
- * only: no ranking, no comparison, no score. The table has the usual CSV download.
+ * Achievements in the reports (S13c item 8, RPT-1): the badges awarded in the period per student
+ * (given by the teacher / automatic / removed), by category (given / automatic / removed) and by the
+ * teacher who gave them, and each award in the student's timeline. Counts only: no ranking, no
+ * comparison, no score. Every table has the usual CSV download.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
+import { ACHIEVEMENT_CATEGORIES } from '../../../shared/achievements.ts';
+import type { MessageKey } from '../../../shared/i18n/index.ts';
 import { localDate } from '../../../domain/dates.ts';
 import type { ReportSectionData, TimelineEvent } from '../../../shared/contracts/reports.ts';
-import { studentAchievements } from '../../db/schema.ts';
+import { achievementDefinitions, studentAchievements, users } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
-import { col, key, n, NA, scopeIds, student, table, text } from '../reports/cells.ts';
+import { col, key, lbl, n, NA, raw, scopeIds, student, table, text } from '../reports/cells.ts';
 
 function awardsIn(ctx: RequestContext, scope: ReportScope) {
   const ids = new Set(scopeIds(scope));
@@ -21,6 +24,36 @@ function awardsIn(ctx: RequestContext, scope: ReportScope) {
     .map((a) => ({ ...a, date: localDate(a.awardedAt, scope.timezone) }))
     .filter((a) => ids.has(a.studentId) && a.date >= scope.from && a.date <= scope.to)
     .sort((a, b) => a.awardedAt - b.awardedAt);
+}
+
+type AwardIn = ReturnType<typeof awardsIn>[number];
+const CATEGORY_KEY = Object.fromEntries(ACHIEVEMENT_CATEGORIES.map((c) => [c, `report.achievements.category.${c}`])) as Record<(typeof ACHIEVEMENT_CATEGORIES)[number], MessageKey>;
+
+/** Given / automatic / removed per badge category (the category of the badge definition). */
+function byCategory(ctx: RequestContext, all: readonly AwardIn[]) {
+  const ids = [...new Set(all.map((a) => a.achievementId))];
+  const cat = new Map((ids.length ? ctx.db.select({ id: achievementDefinitions.id, category: achievementDefinitions.category }).from(achievementDefinitions).where(inArray(achievementDefinitions.id, ids)).all() : []).map((d) => [d.id, d.category]));
+  return ACHIEVEMENT_CATEGORIES.flatMap((c) => {
+    const mine = all.filter((a) => (cat.get(a.achievementId) ?? 'custom') === c);
+    if (!mine.length) return [];
+    const live = mine.filter((a) => a.revokedAt === null);
+    return [{ key: c, cells: [lbl(key(CATEGORY_KEY[c])), n(live.filter((a) => a.source === 'manual').length), n(live.filter((a) => a.source !== 'manual').length), n(mine.length - live.length)] }];
+  });
+}
+
+/** Badges given by hand, per awarding teacher (automatic badges have no awarding teacher). */
+function byTeacher(ctx: RequestContext, all: readonly AwardIn[]) {
+  const manual = all.filter((a) => a.source === 'manual' && a.awardedBy !== null);
+  const ids = [...new Set(manual.map((a) => a.awardedBy!))];
+  const names = new Map((ids.length ? ctx.db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, ids)).all() : []).map((u) => [u.id, u.name]));
+  return ids
+    .map((id) => ({ id, name: names.get(id) ?? '' }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+    .map(({ id, name }) => {
+      const mine = manual.filter((a) => a.awardedBy === id);
+      const live = mine.filter((a) => a.revokedAt === null).length;
+      return { key: id, cells: [lbl(raw(name)), n(live), n(mine.length - live)] };
+    });
 }
 
 export function achievementsSection(ctx: RequestContext, scope: ReportScope): ReportSectionData {
@@ -49,6 +82,19 @@ export function achievementsSection(ctx: RequestContext, scope: ReportScope): Re
             cells: inClass ? [student(s), n(liveMine.filter((a) => a.source === 'manual').length), n(liveMine.filter((a) => a.source !== 'manual').length), n(mine.length - liveMine.length)] : [student(s), NA, NA, NA],
           };
         }),
+      }),
+      table({
+        key: 'categories',
+        title: key('report.achievements.byCategory'),
+        columns: [col('category', key('report.col.category')), col('manual', key('report.achievements.manual'), true), col('auto', key('report.achievements.auto'), true), col('removed', key('report.achievements.removed'), true)],
+        rows: byCategory(ctx, all),
+      }),
+      table({
+        key: 'teachers',
+        title: key('report.achievements.byTeacher'),
+        note: key('report.achievements.byTeacherNote'),
+        columns: [col('teacher', key('report.achievements.teacher')), col('manual', key('report.achievements.manual'), true), col('removed', key('report.achievements.removed'), true)],
+        rows: byTeacher(ctx, all),
       }),
     ],
     notes: [key('report.achievements.noRankingNote')],

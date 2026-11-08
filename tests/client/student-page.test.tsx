@@ -81,6 +81,7 @@ const section = (subjectId: string): StudentGoalsSection => ({
   presets: [],
   outcomes: DEFAULT_GOAL_OUTCOMES,
   canWrite: false,
+  textLimits: { minGoalWords: 3, minGoalLetters: 12 },
 });
 const media = { photos: false, audio: false, documents: true };
 
@@ -109,5 +110,22 @@ describe('goals section (UX-2, UX-3)', () => {
     render(wrap(<GoalsSection data={section('sub-en')} subjectId="sub-en" media={media} />, locale));
     expect(screen.getByText(text)).toBeTruthy();
     expect(screen.queryByText(/2026-11-20/u)).toBeNull();
+  });
+
+  it('live hints use the school’s goal limits and cover practice choices, evidence words and link addresses (D-123, review fix)', () => {
+    const writable = (limits: { minGoalWords: number; minGoalLetters: number }): StudentGoalsSection => ({ ...section('sub-en'), canWrite: true, textLimits: limits });
+    const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    const { unmount } = render(wrap(<GoalsSection data={writable({ minGoalWords: 3, minGoalLetters: 12 })} subjectId="sub-en" media={media} />));
+    type(en['student.myGoalWords'], 'Read books');
+    expect(screen.getByText(en['textCheck.TOO_SHORT'], { exact: false })).toBeTruthy();
+    unmount();
+    // The admin lowered the goal minimum to two words: the hint agrees with the server.
+    render(wrap(<GoalsSection data={writable({ minGoalWords: 2, minGoalLetters: 20 })} subjectId="sub-en" media={media} />));
+    type(en['student.myGoalWords'], 'Read books');
+    expect(screen.queryByText(en['textCheck.TOO_SHORT'], { exact: false })).toBeNull();
+    type(en['student.practice'], 'read aloud, fuck this');
+    expect(screen.getAllByText(en['textCheck.BLOCKED_WORD'], { exact: false })).toHaveLength(1);
+    type(en['student.evidenceWords'], 'asdfgh qwerty zxcvb');
+    expect(screen.getByText(en['textCheck.KEYBOARD_MASH'], { exact: false })).toBeTruthy();
   });
 });

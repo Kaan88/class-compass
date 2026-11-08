@@ -339,6 +339,8 @@ export const StudentGoalsSection = z.object({
   outcomes: z.array(OutcomeDef),
   /** The student may add goals, reflections and evidence here (module on, class not archived). */
   canWrite: z.boolean(),
+  /** The school's goal length limits, so the live hints agree with the server (D-123). Word lists are never sent. */
+  textLimits: z.object({ minGoalWords: z.number().int(), minGoalLetters: z.number().int() }),
 });
 export type StudentGoalsSection = z.infer<typeof StudentGoalsSection>;
 

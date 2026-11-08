@@ -13,7 +13,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { localDate } from '../../../domain/dates.ts';
 import type * as C from '../../../shared/contracts/textChecks.ts';
-import { checkStudentText, type TextKind, type TextLimits, type WordLists } from '../../../shared/text/textQuality.ts';
+import { checkStudentText, findRiskyWord, type TextKind, type TextLimits, type WordLists } from '../../../shared/text/textQuality.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { classes, enrolments, evidence, goalEntries, goals, schoolSettings, students, teachingContexts, textCheckAttempts, textCheckWords } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
@@ -21,7 +21,7 @@ import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { assertModuleEnabled, mergeModuleConfig, moduleConfig } from '../school/modules.ts';
-import { assertOwnsContext, getClass, getSchoolSettings, todayFor } from '../school/policy.ts';
+import { assertClassWritable, assertOwnsContext, getClass, isClassWritable, getSchoolSettings, todayFor } from '../school/policy.ts';
 import { rosterRows } from '../students/service.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -67,6 +67,34 @@ export function assertStudentText(ctx: RequestContext, target: StudentTextTarget
     // Read by `recordBlockedAttempts` only; never the text.
     attempt: res.reason === 'BLOCKED_WORD' ? { studentId: target.studentId, subjectId: target.subjectId } : undefined,
   });
+}
+
+/**
+ * The language check only (no nonsense rules) for text a student supplies that is not prose: the web
+ * address of a link (host, path and query, decoded) and similar labels (S13c review, D-123). Same
+ * error and attempt count as `assertStudentText`.
+ */
+export function assertNoRiskyWords(ctx: RequestContext, target: StudentTextTarget, text: string | null | undefined): void {
+  if (!text || !findRiskyWord(text, wordListsFor(ctx.db, target.teacherIds))) return;
+  throw new AppError('VALIDATION', 'Please use kind words', { reason: 'TEXT_BLOCKED_WORD', textReason: 'BLOCKED_WORD', kind: 'linkTitle', attempt: { studentId: target.studentId, subjectId: target.subjectId } });
+}
+
+/** The words of a web address as the language check reads them: host, path and query, decoded. */
+export function urlWords(href: string): string {
+  const u = new URL(href);
+  const raw = `${u.hostname} ${u.pathname} ${u.search} ${u.hash}`;
+  try {
+    return decodeURIComponent(raw.replace(/\+/gu, ' '));
+  } catch {
+    return raw;
+  }
+}
+
+/** A student's upload name with a blocked word is replaced by a neutral one (the file itself is kept). */
+export function neutralStudentFileName(db: Db, name: string | null): string | null {
+  if (!name || !findRiskyWord(name, wordListsFor(db, []))) return name;
+  const ext = /\.[A-Za-z0-9]{1,5}$/u.exec(name)?.[0] ?? '';
+  return `file${ext.toLowerCase()}`;
 }
 
 /**
@@ -157,6 +185,7 @@ export function notice(ctx: RequestContext, contextId: string) {
 export function setNotice(ctx: RequestContext, input: In<typeof C.setBlockedTextNotice>) {
   return tx(ctx.db, () => {
     const context = assertOwnsContext(ctx, input.contextId);
+    assertClassWritable(ctx.db, getClass(ctx.db, context.classId));
     mergeModuleConfig(ctx.db, context.id, 'goals', { blockedTextNotice: input.enabled }, requireUser(ctx).id, ctx.now());
     audit(ctx.db, ctx.actor, { action: 'text_checks.notice', entity: 'teaching_context', entityId: context.id, after: { enabled: input.enabled } }, ctx.now());
     return { enabled: input.enabled };
@@ -164,7 +193,10 @@ export function setNotice(ctx: RequestContext, input: In<typeof C.setBlockedText
 }
 
 // ---------------------------------------------------------------- hide from the student page (moderation)
-/** The teacher teaches this subject in a class the student is in today. */
+/**
+ * The teacher teaches this subject in a class the student is in today, and at least one such class is
+ * writable (archived classes and years are read-only, DAT-1: 409 CLASS_ARCHIVED / YEAR_ARCHIVED).
+ */
 function assertTeachesStudentSubject(ctx: RequestContext, studentId: string, subjectId: string) {
   const uid = requireUser(ctx).id;
   const s = ctx.db.select().from(students).where(eq(students.id, studentId)).get();
@@ -176,11 +208,14 @@ function assertTeachesStudentSubject(ctx: RequestContext, studentId: string, sub
     .innerJoin(teachingContexts, and(eq(teachingContexts.classId, classes.id), eq(teachingContexts.teacherId, uid), eq(teachingContexts.subjectId, subjectId), isNull(teachingContexts.endedAt)))
     .where(eq(enrolments.studentId, studentId))
     .all();
-  const ok = rows.some(({ cls, e }) => {
-    const today = todayFor(ctx, cls);
-    return e.fromDate <= today && (e.toDate === null || e.toDate > today);
-  });
-  if (!ok) throw new AppError('FORBIDDEN', 'Not your student in this subject');
+  const matched = rows
+    .filter(({ cls, e }) => {
+      const today = todayFor(ctx, cls);
+      return e.fromDate <= today && (e.toDate === null || e.toDate > today);
+    })
+    .map((r) => r.cls);
+  if (!matched.length) throw new AppError('FORBIDDEN', 'Not your student in this subject');
+  if (!matched.some((c) => isClassWritable(ctx.db, c))) assertClassWritable(ctx.db, matched[0]!);
 }
 
 export function hide(ctx: RequestContext, input: In<typeof C.hideStudentText>) {
