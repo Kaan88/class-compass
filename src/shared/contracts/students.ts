@@ -124,6 +124,40 @@ export const AdminStudent = StudentDetail.extend({
   currentClassId: z.string().nullable(),
   currentClassName: z.string().nullable(),
 });
+/**
+ * "Remove from this class" (S13b, D-109): a teacher of the class ends the student's enrolment today
+ * (class timezone). History is kept; the student stays in other classes and can be added again.
+ */
+export const removeStudentFromClass = endpoint({
+  method: 'POST',
+  path: '/api/teacher/classes/:classId/students/:studentId/remove',
+  access: 'teacher',
+  input: z.object({ classId: Id, studentId: Id }),
+  output: Ok,
+});
+
+/** Dry run of a permanent deletion: what would be erased (counts only). */
+export const ErasePreview = z.object({
+  studentId: z.string(),
+  fullName: z.string(),
+  tables: z.array(z.object({ table: z.string(), rows: z.number().int() })),
+  clearedReferences: z.number().int(),
+  importRows: z.number().int(),
+  files: z.number().int(),
+  privateNotes: z.number().int(),
+  auditEvents: z.number().int(),
+});
+export const erasePreview = endpoint({ method: 'GET', path: '/api/admin/students/:studentId/erase', access: 'admin', input: z.object({ studentId: Id }), output: ErasePreview });
+
+/** Permanently delete a student and everything about them (KVKK erasure). `confirm` = the full name. */
+export const eraseStudent = endpoint({
+  method: 'POST',
+  path: '/api/admin/students/:studentId/erase',
+  access: 'admin',
+  input: z.object({ studentId: Id, confirm: z.string().max(300) }),
+  output: z.object({ ok: z.literal(true), files: z.number().int() }),
+});
+
 export const adminListStudents = endpoint({
   method: 'GET',
   path: '/api/admin/students',

@@ -14,14 +14,26 @@ export const AdminUser = z.object({
   mustChangePassword: z.boolean(),
   /** Interface language of the account (S13a, D-099): first sign-in, password change and PIN setup use it. */
   locale: z.enum(['en', 'tr']),
+  /** S13b (D-108): how the account signs in, whether the address was proven, and a pending invite. */
+  signInMethod: z.enum(['password', 'email_link']),
+  emailVerified: z.boolean(),
+  invitePending: z.boolean(),
+  inviteExpiresAt: z.number().nullable(),
   createdAt: z.number(),
 });
+
+/** A new invite link, shown to the administrator once (copy / QR); emailed when SMTP is configured. */
+export const InviteOut = z.object({ link: z.string(), expiresAt: z.number(), emailed: z.boolean() });
 
 const Email = z.string().trim().toLowerCase().email().max(200);
 
 export const listUsers = endpoint({ method: 'GET', path: '/api/admin/users', access: 'admin', input: Empty, output: z.object({ users: z.array(AdminUser) }) });
 
-/** The temporary password is returned exactly once and never stored in clear. */
+/**
+ * Creates an account. `setup: 'invite'` (default, S13b) returns a single-use invite link (7 days)
+ * where the person chooses how to sign in; `'temporary_password'` is the fallback: a temporary
+ * password returned exactly once and never stored in clear.
+ */
 export const createUserByAdmin = endpoint({
   method: 'POST',
   path: '/api/admin/users',
@@ -33,9 +45,14 @@ export const createUserByAdmin = endpoint({
     role: z.enum(['admin', 'teacher']),
     /** Required in the form (default English); the API falls back to English when it is left out. */
     locale: z.enum(['en', 'tr']).default('en'),
+    setup: z.enum(['invite', 'temporary_password']).default('invite'),
   }),
-  output: z.object({ user: AdminUser, temporaryPassword: z.string() }),
+  output: z.object({ user: AdminUser, temporaryPassword: z.string().nullable(), invite: InviteOut.nullable() }),
 });
+
+/** Send a new invite (the previous one stops working); also how an administrator resets a sign-in method. */
+export const inviteUser = endpoint({ method: 'POST', path: '/api/admin/users/:userId/invite', access: 'admin', input: z.object({ userId: Id }), output: z.object({ user: AdminUser, invite: InviteOut }) });
+export const revokeUserInvite = endpoint({ method: 'POST', path: '/api/admin/users/:userId/invite/revoke', access: 'admin', input: z.object({ userId: Id }), output: AdminUser });
 
 export const updateUserByAdmin = endpoint({
   method: 'PATCH',

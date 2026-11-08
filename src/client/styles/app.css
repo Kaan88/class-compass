@@ -2453,3 +2453,206 @@ html:has(.cc-classroom) {
   display: flex;
   justify-content: flex-end;
 }
+
+/* ------------------------------------------------------------------ S13b: celebration, reveal show (D-110) */
+.cc-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--cc-bg) 55%, transparent);
+  animation: cc-celebration-fade 2500ms ease-in-out 1 both;
+}
+@keyframes cc-celebration-fade {
+  0% {
+    opacity: 0;
+  }
+  12%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.cc-celebration__fireworks,
+.cc-celebration__stars {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.cc-celebration__mascot {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+}
+.cc-celebration__message {
+  margin: 0;
+  font-family: var(--cc-font-display);
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  font-weight: var(--cc-weight-display);
+  color: var(--cc-text);
+  background: var(--cc-surface);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+  border-radius: var(--cc-radius);
+  padding: 0.3rem 1.2rem;
+  box-shadow: var(--cc-shadow-raised);
+}
+.cc-reveal__show {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  min-height: 10rem;
+}
+.cc-reveal__countdown {
+  margin: 0;
+  font-family: var(--cc-font-display);
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  font-weight: var(--cc-weight-display);
+  color: var(--cc-accent-strong);
+  animation: cc-fade-in 300ms ease-out 1 both;
+}
+
+/* ------------------------------------------------------------------ S13b: invites and sign-in method (D-108) */
+.cc-invite-link {
+  display: block;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--cc-radius-sm);
+  border: 2px dashed var(--cc-border-strong);
+  background: var(--cc-surface-2);
+  word-break: break-all;
+  user-select: all;
+}
+.cc-invite-qr .cc-qr {
+  width: 11rem;
+  height: 11rem;
+}
+.cc-choices {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.cc-choice {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.9rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  cursor: pointer;
+}
+.cc-choice:has(input:checked) {
+  border-color: var(--cc-accent);
+  background: var(--cc-accent-soft);
+}
+.cc-choice[data-disabled] {
+  cursor: not-allowed;
+  background: var(--cc-surface-2);
+}
+.cc-choice > span {
+  display: grid;
+  gap: 0.2rem;
+}
+.cc-choice input {
+  margin-top: 0.3rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--cc-accent);
+}
+
+/* ------------------------------------------------------------------ S13b: quote of the day and weather */
+.cc-quote {
+  margin: 0;
+}
+.cc-quote__text {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--cc-text-muted);
+  line-height: 1.35;
+}
+.cc-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: var(--cc-weight-strong);
+}
+.cc-weather__temp {
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+}
+.cc-weather__word {
+  color: var(--cc-text-muted);
+}
+.cc-wx {
+  flex: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cc-wx__sun {
+  fill: var(--cc-warning);
+}
+.cc-wx__ray {
+  stroke: var(--cc-warning);
+  stroke-width: 2.5;
+}
+.cc-wx__moon {
+  fill: var(--cc-deco-2);
+}
+.cc-wx__cloud {
+  fill: var(--cc-surface);
+  stroke: var(--cc-text-muted);
+  stroke-width: 2;
+}
+.cc-wx__cloud--back {
+  fill: var(--cc-surface-2);
+}
+.cc-wx__drop {
+  stroke: var(--cc-accent);
+  stroke-width: 2.5;
+}
+.cc-wx__fog {
+  stroke: var(--cc-text-muted);
+  stroke-width: 2;
+}
+.cc-wx__snow {
+  fill: var(--cc-accent-soft);
+  stroke: var(--cc-accent);
+  stroke-width: 1;
+}
+.cc-wx__bolt {
+  fill: var(--cc-warning);
+  stroke: var(--cc-text);
+  stroke-width: 1;
+}
+.cc-range {
+  width: min(18rem, 100%);
+  min-height: 2.75rem;
+  accent-color: var(--cc-accent);
+}
+.cc-sheet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cc-sheet {
+  display: grid;
+  gap: 0.4rem;
+}
+.cc-sheet__preview {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.cc-sheet__preview td {
+  border: 1px solid var(--cc-border);
+  padding: 0.2rem 0.5rem;
+  white-space: nowrap;
+}

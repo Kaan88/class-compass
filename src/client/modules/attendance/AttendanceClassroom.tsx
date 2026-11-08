@@ -17,6 +17,7 @@ import { classLabel } from '../lessons/labels.ts';
 import { patchRoster, sendLessonCommand, useLessonRoster, type RosterStudent } from '../lessons/lessonClient.ts';
 import { startStep, type ClassroomContext, type DashboardSlot, type StartStepProps, type StudentCardAddon, type StudentCardExtras } from '../types.ts';
 import { AttendanceCountsLine, AttendanceList } from './AttendanceList.tsx';
+import { playEvent } from '../../themes/index.tsx';
 
 // ---------------------------------------------------------------- Start Lesson step
 /** Only the students the teacher tapped (or set with "All present"). */
@@ -87,6 +88,7 @@ function AttendanceDialog({ context, lesson, students, isOpen, onOpenChange }: {
       return { ...s, daily, exception, effective: effectiveAttendance(exception, daily) };
     });
     const ref = { contextId: context.id, lessonId: lesson.id, studentId, status };
+    playEvent('tap');
     void sendLessonCommand(kind === 'daily' ? 'attendance.setDaily' : 'attendance.setLessonException', ref);
   };
 

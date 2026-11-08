@@ -1,4 +1,4 @@
-/** Teacher class settings (ACC-5, CFG-1/2) and class roster (ACC-4/7). */
+/** Teacher class settings (ACC-5, CFG-1/2; display settings S13b, D-105) and class roster (ACC-4/7; remove from class, D-109). */
 import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ACCEPT_HINT, removeStudentPhoto, uploadStudentPhoto } from '../../../shared/contracts/files.ts';
@@ -17,7 +17,7 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
-import { ThemePreview } from '../../ui/ThemePreview.tsx';
+import { ClassDisplaySection } from './ClassDisplay.tsx';
 import { settingsPanelFor } from '../../modules/registry.ts';
 import { ClassLanguageSelect } from '../../ui/ClassLanguageSelect.tsx';
 
@@ -97,15 +97,7 @@ export function ClassSettingsPage() {
               );
             })}
           </section>
-          <section className="cc-card cc-stack">
-            <h2 className="cc-h2">{t('teacher.themePreview')}</h2>
-            <p className="cc-muted">{t('teacher.themeByAdmin')}</p>
-            <ThemePreview theme={ctx.theme} />
-            <p>
-              {t('teacher.soundsState', { state: ctx.soundsEnabled ? t('common.on') : t('common.off') })} ·{' '}
-              {t('teacher.animationsState', { state: ctx.animationsEnabled ? t('common.on') : t('common.off') })}
-            </p>
-          </section>
+          <ClassDisplaySection ctx={ctx} hasClip={contexts.data?.timeUpClip ?? false} />
         </>
       ) : null}
     </main>
@@ -126,6 +118,7 @@ export function TeacherStudentsPage() {
   const roster = useQuery({ queryKey: [SENSITIVE, 'teacher', 'roster', cid], queryFn: () => call(Students.teacherRoster, { classId: cid }), enabled: Boolean(cid) });
   const [adding, setAdding] = useState(false);
   const [photoFor, setPhotoFor] = useState<{ id: string; fullName: string; photoUrl: string | null } | null>(null);
+  const [removing, setRemoving] = useState<{ id: string; fullName: string } | null>(null);
   // Photo controls only while the admin has turned student photos on (D-014); the server enforces it too.
   const photosOn = contexts.data?.media['media.studentPhotos'] === true;
   if (contexts.isSuccess && classes.length === 0) return <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} />;
@@ -171,9 +164,42 @@ export function TeacherStudentsPage() {
                   },
                 ]
               : []),
+            {
+              key: 'remove',
+              header: t('common.actions'),
+              render: (s) => (
+                <Button size="small" variant="danger" onPress={() => setRemoving({ id: s.id, fullName: s.fullName })}>
+                  {t('students.removeFromClass')}
+                </Button>
+              ),
+            },
           ]}
         />
       ) : null}
+      <Modal isOpen={removing !== null} onOpenChange={(o) => !o && setRemoving(null)} title={t('students.removeFromClass')} role="alertdialog">
+        <p>{t('students.removeExplain', { name: removing?.fullName ?? '', cls: roster.data?.className ?? '' })}</p>
+        <DialogActions>
+          <Button onPress={() => setRemoving(null)}>{t('common.cancel')}</Button>
+          <Button
+            variant="danger"
+            onPress={async () => {
+              const s = removing!;
+              try {
+                await call(Students.removeStudentFromClass, { classId: cid, studentId: s.id });
+                showToast({ message: t('students.removed', { name: s.fullName }), kind: 'success' });
+                void qc.invalidateQueries({ queryKey: [SENSITIVE, 'teacher', 'roster', cid] });
+                void qc.invalidateQueries({ queryKey: ['classroom'] });
+              } catch (err) {
+                showToast({ message: errorText(t, err), kind: 'error' });
+              } finally {
+                setRemoving(null);
+              }
+            }}
+          >
+            {t('students.removeFromClass')}
+          </Button>
+        </DialogActions>
+      </Modal>
       <AddStudentDialog
         isOpen={adding}
         onOpenChange={setAdding}

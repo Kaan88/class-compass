@@ -3,7 +3,7 @@ import { Link, Outlet, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useI18n } from '../../lib/i18n.tsx';
 import { signOut, useMe } from '../../lib/session.ts';
-import { Button } from '../../ui/Button.tsx';
+import { Button, buttonClass } from '../../ui/Button.tsx';
 import { EmptyState } from '../../ui/Feedback.tsx';
 import { IconArchive, IconBook, IconCalendar, IconChart, IconDatabase, IconKey, IconList, IconSettings, IconShield, IconSwap, IconUser, IconUsers } from '../../ui/icons.tsx';
 import { SensitiveGate } from '../Lock.tsx';
@@ -81,6 +81,16 @@ export function AdminHome() {
     <main className="cc-page cc-stack" data-testid="admin-home">
       <h1 className="cc-h1">{t('admin.title')}</h1>
       <p className="cc-muted">{t('admin.intro')}</p>
+      <div className="cc-row" data-testid="admin-quick-actions">
+        <Link to="/admin/classes" search={{ new: 1 }} className={buttonClass('primary', 'big')}>
+          <IconArchive />
+          {t('admin.addClassroom')}
+        </Link>
+        <Link to="/admin/users" className={buttonClass('secondary', 'big')}>
+          <IconKey />
+          {t('admin.addAccount')}
+        </Link>
+      </div>
       <div className="cc-menu-grid">
         {SECTIONS.map((s) => (
           <Link key={s.to} to={s.to} className="cc-menu-tile">

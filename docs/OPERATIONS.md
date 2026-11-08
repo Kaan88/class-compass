@@ -29,6 +29,7 @@ Safety rules (D-024):
 ## Account recovery
 - **Admin reset (always available):** `POST /api/admin/users/:userId/reset-password` (admin screens arrive in S3) returns a temporary password **once**; the user must change it at next sign-in and all their sessions end. CLI fallback on the server: `npm run cli -- admin:reset-password --login <login>`.
 - **Forgotten PIN:** an admin clears it (the teacher's sessions are ended too, D-023); the teacher signs in again and sets a new PIN.
+- **Invites and email sign-in (S13b, D-108):** new accounts get a single-use invite link (7 days) by default; Accounts shows it once with Copy and a QR code and emails it when SMTP is set and the account has an address. Teachers may choose email sign-in links instead of a password (links and 6-digit codes valid 15 minutes, single use). **Without SMTP, email-link accounts cannot sign in**: Maintenance warns about them; give them a temporary password (Accounts → Reset password) or a new invite. Administrators always keep a password. `CC_TEST_MAIL_DIR` is a test-only file transport (ignored unless `NODE_ENV=test`); never set it in production.
 - **Email reset (D-015):** enabled only when `SMTP_HOST` is set (`SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` in `.env`). The sign-in page asks `GET /api/auth/password-reset` whether to offer it. A request always answers "ok" (no account enumeration); when an active account has that email, it receives a single-use link valid for **1 hour** (`<PUBLIC_ORIGIN>/reset-password#token=…`, token in the URL fragment so it never reaches server logs). Only the newest link works; at most 3 emails per account per hour and 5 requests per IP per 15 minutes. Completing a reset ends all of the user's sessions. Unused links are voided when an admin changes the account's email, resets its password or deactivates it, and when the user changes their password (D-029). **TLS:** port 465 uses implicit TLS; any other port (default 587) must offer STARTTLS — the app refuses to send in clear text (`requireTLS`) and verifies the server certificate (TLS 1.2+). Use your provider's submission port (587 or 465); a relay without TLS will not work.
 - Deactivating an account blocks sign-in and ends sessions; the account's history, assignments and audit trail remain (DAT-3). Reactivation restores access.
 
@@ -38,6 +39,10 @@ Safety rules (D-024):
 - `tests/server/permissions.test.ts` checks every registered endpoint against the access matrix (401 / 403 / 423).
 - `npm run test:e2e` — Playwright (planned, S3/S4): touchscreen, mobile student pages, PIN bypass attempts, screenshot matrix.
 - CI runs on Ubuntu and Windows.
+
+## Weather (S13b, D-106)
+
+The classroom top bar shows the current weather when Admin → School settings → Weather is on (default: Ankara, Kızılay). The server calls Open-Meteo (`WEATHER_API_URL`, default `https://api.open-meteo.com/v1/forecast`, no key) with the coordinates only, caches the answer 30 minutes (a failure 5 minutes) and gives up after 5 seconds; without internet the widget simply does not appear. The firewall must allow outbound HTTPS to `api.open-meteo.com` for it to work.
 
 ## Uploads and OCR (S9)
 - Uploaded files live in `DATA_DIR/uploads` (random `xx/yy/<uuid>` keys; never serve this folder directly, files are served only by the app after a permission check). Temporary parts go to `DATA_DIR/uploads/tmp` and are removed after each request.

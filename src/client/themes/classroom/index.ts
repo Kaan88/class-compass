@@ -1,5 +1,6 @@
 /** Clean colourful classroom theme (THM-2): a cheerful star, books and a board. One definition fills every slot. */
 import { FADE_IN } from '../motion.ts';
+import { makeSoundPack } from '../soundPack.ts';
 import type { ThemeDefinition } from '../types.ts';
 import { ClassroomDecoration, classroomIllustrations, ClassroomMascot, ClassroomPattern } from './art.tsx';
 import { avatar, colors, icons, shape, typography } from './tokens.ts';
@@ -37,13 +38,7 @@ export const classroomTheme: ThemeDefinition = {
       reduced: FADE_IN,
     },
   },
-  sounds: {
-    // The soft tone of S5 (D-048).
-    timerEnd: [{ freq: 660, at: 0, dur: 900, type: 'sine', gain: 0.15 }],
-    celebrate: [
-      { freq: 784, at: 0, dur: 180, type: 'sine', gain: 0.1 },
-      { freq: 988, at: 140, dur: 180, type: 'sine', gain: 0.1 },
-      { freq: 1175, at: 280, dur: 400, type: 'sine', gain: 0.08 },
-    ],
-  },
+  // Calm and quiet: soft sines, slower. Time's up keeps the soft tone of S5 (D-048).
+  sounds: makeSoundPack({ root: 440, wave: 'sine', scale: 'major', gain: 0.09, tempo: 0.85 }, { timeUp: [{ freq: 660, at: 0, dur: 900, type: 'sine', gain: 0.15 }, { freq: 660, at: 1100, dur: 900, type: 'sine', gain: 0.12 }] }),
+  celebration: { colors: ['accent', 'success', 'deco-1', 'deco-2'] },
 };

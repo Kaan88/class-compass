@@ -7,6 +7,7 @@
  */
 import { eq, sql } from 'drizzle-orm';
 import { schoolYearFor } from '../../domain/dates.ts';
+import { DEFAULT_SOUND_VOLUME } from '../../shared/classDisplay.ts';
 import { tx } from '../db/client.ts';
 import { classes, schoolSettings, schoolYears, students, subjects, teachingContexts, terms, users } from '../db/schema.ts';
 import { audit } from '../lib/audit.ts';
@@ -195,6 +196,9 @@ export async function seedDemo(deps: AppDeps, opts: SeedOptions = {}): Promise<D
         timezone: null,
         mainLanguage: 'en',
         secondLanguageEnabled: false,
+        soundVolume: DEFAULT_SOUND_VOLUME,
+        quoteEnabled: true,
+        timeUpSound: 'voice',
         soundsEnabled: true,
         animationsEnabled: true,
         archivedAt: null,

@@ -477,3 +477,11 @@ export function exportableSelections(db: Db, studentId?: string): { rows: Array<
   const shown = all.filter((r) => r.revealedAt !== null);
   return { rows: shown.map((r) => ({ ...r.s })), hidden: all.length - shown.length };
 }
+
+/**
+ * Permanent erasure of a student (S13b, D-109): removes their Secret Student selections (revealed or
+ * not) and returns only the number removed, so nothing about an unrevealed round leaks (SEC-3).
+ */
+export function eraseStudentSelections(db: Db, studentId: string): number {
+  return db.delete(secretSelections).where(eq(secretSelections.studentId, studentId)).run().changes;
+}

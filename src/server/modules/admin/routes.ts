@@ -5,7 +5,9 @@ import { route } from '../../lib/http.ts';
 import * as svc from './service.ts';
 
 export function registerAdminRoutes(app: FastifyInstance, deps: AppDeps) {
-  route(app, deps, C.listUsers, (ctx) => ({ users: svc.listUsers(ctx.db) }));
+  route(app, deps, C.listUsers, (ctx) => ({ users: svc.listUsers(ctx) }));
+  route(app, deps, C.inviteUser, (ctx, input) => svc.inviteUserByAdmin(ctx, input.userId));
+  route(app, deps, C.revokeUserInvite, (ctx, input) => svc.revokeInviteByAdmin(ctx, input.userId));
   route(app, deps, C.createUserByAdmin, (ctx, input) => svc.createUserByAdmin(ctx, input));
   route(app, deps, C.updateUserByAdmin, (ctx, input) => svc.updateUserByAdmin(ctx, input));
   route(app, deps, C.deactivateUser, (ctx, input) => svc.setUserActive(ctx, input.userId, false));

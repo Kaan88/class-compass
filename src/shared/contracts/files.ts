@@ -8,7 +8,8 @@ import { z } from 'zod';
 import { Ok, endpoint } from './define.ts';
 import { Id, QueryBool } from './school.ts';
 
-export const FILE_KINDS = ['image', 'document', 'audio', 'import_source'] as const;
+/** `teacher_sound` (S13b, D-107): a teacher's own time's-up clip, a teacher asset (not student media). */
+export const FILE_KINDS = ['image', 'document', 'audio', 'import_source', 'teacher_sound'] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 export const FileKindSchema = z.enum(FILE_KINDS);
 
@@ -19,6 +20,7 @@ export const UPLOAD_LIMITS: Record<FileKind, number> = {
   document: 20 * MB,
   audio: 25 * MB,
   import_source: 20 * MB,
+  teacher_sound: 2 * MB,
 };
 
 /**
@@ -46,6 +48,7 @@ export const ALLOWED_MIME: Record<FileKind, readonly string[]> = {
     'image/png',
     'image/webp',
   ],
+  teacher_sound: ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg'],
 };
 
 /** `accept` attribute for file inputs (a hint for the picker only; the server sniffs the content). */
@@ -54,6 +57,7 @@ export const ACCEPT_HINT: Record<FileKind, string> = {
   document: '.pdf,.docx,.xlsx,.xls,.csv,.txt',
   audio: 'audio/webm,audio/ogg,audio/mp4,audio/mpeg,.m4a,.mp3',
   import_source: '.csv,.txt,.xlsx,.xls,.docx,.pdf,image/jpeg,image/png,image/webp',
+  teacher_sound: 'audio/webm,audio/ogg,audio/mp4,audio/mpeg,.m4a,.mp3',
 };
 
 export const FileMeta = z.object({
@@ -112,6 +116,17 @@ export const deleteFile = endpoint({
   input: z.object({ fileId: Id }),
   output: Ok,
 });
+
+// ---------------------------------------------------------------- teacher time's-up clip (S13b, D-107)
+/**
+ * The teacher's own recorded time's-up clip (multipart field `file`): a teacher asset, not student
+ * media, so the student media flags do not apply; still sniffed (audio only) and limited to 2 MB.
+ * Replaces an earlier clip.
+ */
+export const uploadTimeUpClip = endpoint({ method: 'POST', path: '/api/teacher/time-up-clip', access: 'teacher', input: z.object({}), output: FileMeta });
+export const deleteTimeUpClip = endpoint({ method: 'DELETE', path: '/api/teacher/time-up-clip', access: 'teacher', input: z.object({}), output: Ok });
+/** The signed-in teacher's clip, playable on the classroom display (classroom access); 404 without one. */
+export const classroomTimeUpClip = endpoint({ method: 'GET', path: '/api/classroom/time-up-clip', access: 'classroom', input: z.object({ v: z.string().max(64).optional() }), output: z.unknown() });
 
 // ---------------------------------------------------------------- student photos (CRD-1, D-014)
 /**

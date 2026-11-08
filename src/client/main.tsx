@@ -12,10 +12,11 @@ import { clearAllToasts } from './lib/toast.ts';
 import { router } from './router.tsx';
 import { PUBLIC_PATHS } from './routes/guards.ts';
 import './styles/app.css';
-import { installThemeStyles } from './themes/index.tsx';
+import { installSoundUnlock, installThemeStyles } from './themes/index.tsx';
 
 // Theme tokens are generated from the theme registry (D-070) before anything renders.
 installThemeStyles();
+installSoundUnlock();
 setDisplay({});
 
 // Any 423 from the API swaps sensitive areas to the lock screen and purges sensitive data (PIN-3);

@@ -9,13 +9,14 @@ import { useEffect, useState } from 'react';
 import { formatTimer, MAX_TIMER_MS, remainingAt } from '../../../domain/timer.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import { useDisplay } from '../../lib/display.ts';
-import { playThemeSound, useTheme } from '../../themes/index.tsx';
+import { useTheme } from '../../themes/index.tsx';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { IconBack, IconBackspace, IconCheck, IconClock, IconPause, IconPlay } from '../../ui/icons.tsx';
 import { emitTimeUp } from '../classroomHooks.ts';
 import { patchLesson, sendLessonCommand, serverNow } from './lessonClient.ts';
+import { announceTimeUp } from './timeUp.ts';
 import { pauseTimer, resetTimer, setTimer, startTimer } from '../../../domain/timer.ts';
 
 const PRESETS_MIN = [1, 3, 5, 10, 15];
@@ -129,9 +130,10 @@ export function LessonTimer({ lesson, compact = false }: { lesson: LessonState; 
     if (!finished || signalledRuns.has(runKey)) return;
     remember(signalledRuns, runKey);
     const endedAt = (timer.startedAt ?? 0) + timer.remainingMs;
-    // One soft tone of the class theme, only if the class and this device allow sounds (D-048, THM-5).
+    // The class's time's-up announcement (voice, clip, chime or off; S13b, D-107), only if the class
+    // and this device allow sounds (D-048, THM-5).
     if (watchedRuns.has(runKey) || serverNow() - endedAt <= RECENT_END_MS) {
-      playThemeSound(display, theme, 'timerEnd');
+      announceTimeUp(display, theme);
       emitTimeUp({ lesson, display, locale });
     }
   }, [finished, runKey, timer.running, timer.startedAt, timer.remainingMs, display, theme, lesson, locale]);

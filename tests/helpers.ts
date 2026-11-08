@@ -9,6 +9,7 @@ import { openDatabase, runMigrations, type Db } from '../src/server/db/client.ts
 import { createUser } from '../src/server/modules/auth/service.ts';
 import type { AppDeps } from '../src/server/lib/context.ts';
 import type { Mailer, MailMessage } from '../src/server/lib/mailer.ts';
+import type { WeatherFetch } from '../src/server/modules/weather/service.ts';
 
 export const TEST_ORIGIN = 'http://localhost:5173';
 
@@ -36,7 +37,10 @@ export class FakeMailer implements Mailer {
   }
 }
 
-export async function makeEnv(overrides: Partial<Config> = {}, extra: { mailer?: Mailer | null; logStream?: { write: (line: string) => void } } = {}): Promise<TestEnv> {
+export async function makeEnv(
+  overrides: Partial<Config> = {},
+  extra: { mailer?: Mailer | null; logStream?: { write: (line: string) => void }; weatherFetch?: WeatherFetch } = {},
+): Promise<TestEnv> {
   const config = loadConfig(
     { NODE_ENV: 'test', SECRET_PEPPER: 'test-pepper-0123456789abcdef', PUBLIC_ORIGIN: TEST_ORIGIN, DATA_DIR: './data-test' },
     overrides,
@@ -44,7 +48,8 @@ export async function makeEnv(overrides: Partial<Config> = {}, extra: { mailer?:
   const db = openDatabase(':memory:');
   runMigrations(db);
   const clock = new Clock();
-  const deps: AppDeps = { db, config, now: clock.now, mailer: extra.mailer ?? null };
+  // No test ever reaches the internet: without a fake, the weather source is unreachable.
+  const deps: AppDeps = { db, config, now: clock.now, mailer: extra.mailer ?? null, weatherFetch: extra.weatherFetch ?? (() => Promise.reject(new Error('offline in tests'))) };
   const app = await buildApp(deps, extra.logStream ? { logStream: extra.logStream } : {});
   await app.ready();
   return { app, db, clock, config, deps };

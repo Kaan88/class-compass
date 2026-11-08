@@ -19,6 +19,13 @@ const EnvSchema = z.object({
   SMTP_PASS: z.string().optional().default(''),
   SMTP_FROM: z.string().optional().default(''),
   /**
+   * Test-only fake mail transport (S13b): when set and NODE_ENV=test, outgoing emails are written as
+   * JSON files into this folder instead of being sent (the e2e server reads them). Ignored otherwise.
+   */
+  CC_TEST_MAIL_DIR: z.string().optional(),
+  /** Classroom weather source (S13b, D-106): Open-Meteo's forecast API; only coordinates are sent. */
+  WEATHER_API_URL: z.string().url().default('https://api.open-meteo.com/v1/forecast'),
+  /**
    * Test-only override of the sign-in rate limit (requests per minute per address) for the e2e
    * server, which signs in many times. Honoured only when NODE_ENV=test; ignored in development and
    * always ignored in production (see `loginRateLimitMax`).
@@ -86,7 +93,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
     backupsDir: e.BACKUP_DIR ? path.resolve(e.BACKUP_DIR) : path.join(dataDir, 'backups'),
     ocrCacheDir: e.OCR_CACHE_DIR ? path.resolve(e.OCR_CACHE_DIR) : path.join(dataDir, 'ocr-cache'),
     isProd: e.NODE_ENV === 'production',
-    smtpEnabled: e.SMTP_HOST.length > 0,
+    smtpEnabled: e.SMTP_HOST.length > 0 || (e.NODE_ENV === 'test' && Boolean(e.CC_TEST_MAIL_DIR)),
     loginRateLimit: loginRateLimitMax(e),
     ...overrides,
   };

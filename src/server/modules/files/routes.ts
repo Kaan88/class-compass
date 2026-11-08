@@ -5,6 +5,7 @@ import { AppError, invalid } from '../../lib/errors.ts';
 import { rawRoute, route } from '../../lib/http.ts';
 import { teacherSeesStudent } from '../students/service.ts';
 import { removeStudentPhoto, serveClassroomPhoto, uploadStudentPhoto } from './photos.ts';
+import { deleteTimeUpClip, serveTimeUpClip, uploadTimeUpClip } from './teacherSound.ts';
 import { assertCanDeleteFile, assertCanReadFile, assertMediaAllowed, deleteFileRow, fileMeta, ingestUpload, sendFile } from './service.ts';
 
 /** Uploads are expensive (sniffing, re-encoding): at most 60 per minute per address. */
@@ -16,6 +17,7 @@ export function registerFileRoutes(app: FastifyInstance, deps: AppDeps) {
     deps,
     C.uploadFile,
     async (ctx, input, { req }) => {
+      if (input.kind === 'teacher_sound') throw invalid('Record the time’s-up clip on the profile page', { reason: 'WRONG_UPLOAD_KIND' });
       if (input.kind === 'import_source') {
         if (input.ownerStudentId) throw invalid('A student list does not belong to a student', { reason: 'OWNER_NOT_ALLOWED' });
         assertMediaAllowed(ctx.db, input.kind, 'import');
@@ -35,6 +37,13 @@ export function registerFileRoutes(app: FastifyInstance, deps: AppDeps) {
     await deleteFileRow(ctx, assertCanDeleteFile(ctx, input.fileId));
     return { ok: true as const };
   });
+
+  rawRoute(app, deps, C.uploadTimeUpClip, (ctx, _input, { req }) => uploadTimeUpClip(ctx, req), { rateLimit: UPLOAD_RATE });
+  route(app, deps, C.deleteTimeUpClip, async (ctx) => {
+    await deleteTimeUpClip(ctx);
+    return { ok: true as const };
+  });
+  rawRoute(app, deps, C.classroomTimeUpClip, (ctx, _input, { req, reply }) => serveTimeUpClip(ctx, req, reply));
 
   rawRoute(app, deps, C.uploadStudentPhoto, (ctx, input, { req }) => uploadStudentPhoto(ctx, req, input), { rateLimit: UPLOAD_RATE });
   route(app, deps, C.removeStudentPhoto, async (ctx, input) => {

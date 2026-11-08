@@ -143,22 +143,53 @@ export interface MotionSpec {
   reduced: Animation;
 }
 
-export const SOUNDS = ['timerEnd', 'celebrate'] as const;
-export type SoundName = (typeof SOUNDS)[number];
+/**
+ * The theme sound pack (S13b, D-110): one short synthesized cue per classroom event. Every theme
+ * fills all of them (usually with `makeSoundPack`, src/client/themes/soundPack.ts); the SoundManager
+ * plays them with the class volume, priorities and ducking. Callers name the event, never a sound.
+ */
+export const SOUND_EVENTS = [
+  'tap',
+  'undo',
+  'stageChange',
+  'timeUp',
+  'thresholdReached',
+  'assistantCheck',
+  'groupShuffle',
+  'secretDrumroll',
+  'secretReveal',
+  'fanfare',
+  'clapping',
+  'fireworks',
+  'pointAwarded',
+] as const;
+export type SoundEvent = (typeof SOUND_EVENTS)[number];
+/** @deprecated name kept for older call sites: a sound is named by its event. */
+export type SoundName = SoundEvent;
+export const SOUNDS = SOUND_EVENTS;
 
-/** A short synthesized sound (WebAudio): no audio files are shipped. */
+/** A short synthesized note (WebAudio): no audio files are shipped. */
 export interface ToneNote {
-  /** Frequency in Hz. */
+  /** Frequency in Hz (for 'noise': the centre of the band-pass filter). */
   freq: number;
+  /** Optional glide: the frequency reached at the end of the note. */
+  to?: number;
   /** Start offset in ms. */
   at: number;
   /** Length in ms. */
   dur: number;
-  type: 'sine' | 'triangle';
-  /** Peak gain 0..0.3 (gentle). */
+  /** 'noise' is filtered white noise (claps, drum rolls, firework crackle). */
+  type: 'sine' | 'triangle' | 'square' | 'noise';
+  /** Peak gain 0..0.3 (gentle); scaled by the class volume. */
   gain: number;
 }
 export type SoundSpec = readonly ToneNote[];
+export type ThemeSoundPack = Record<SoundEvent, SoundSpec>;
+
+/** Full-screen celebration (S13b): firework colours are theme colour tokens, never raw colours in components. */
+export interface ThemeCelebration {
+  colors: readonly ColorToken[];
+}
 
 export interface MascotProps {
   pose: MascotPose;
@@ -190,6 +221,7 @@ export interface ThemeDefinition {
   /** Illustrations, each in a 200×140 box. */
   illustrations: Record<IllustrationName, ComponentType>;
   motion: Record<MotionName, MotionSpec>;
-  /** Optional: a theme without sounds stays silent (the visual signal is always there). */
-  sounds: Record<SoundName, SoundSpec> | null;
+  /** The sound pack; null keeps the theme silent (the visual signal is always there). */
+  sounds: ThemeSoundPack | null;
+  celebration: ThemeCelebration;
 }

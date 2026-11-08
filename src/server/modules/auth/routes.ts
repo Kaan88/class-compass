@@ -10,6 +10,7 @@ import { AppError } from '../../lib/errors.ts';
 import { route, sessionCookieName } from '../../lib/http.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
 import * as svc from './service.ts';
+import * as email from './emailSignIn.ts';
 
 function setSessionCookie(deps: AppDeps, reply: FastifyReply, token: string, maxAgeMs: number) {
   reply.setCookie(sessionCookieName(deps), token, {
@@ -54,7 +55,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
   });
 
   route(app, deps, C.setPin, async (ctx, input) => {
-    await svc.setPin(ctx, requireUser(ctx), input.currentPassword, input.pin);
+    await svc.setPin(ctx, requireUser(ctx), ctx.session!, input.currentPassword, input.pin);
     return { ok: true as const };
   });
 
@@ -90,7 +91,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     return freshMe(ctx);
   });
 
-  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx) }));
+  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx) }));
   route(
     app,
     deps,
@@ -110,6 +111,47 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
       return { ok: true as const };
     },
     { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+  );
+
+  // ---------------------------------------------------------------- invites and email-link sign-in (S13b, D-108)
+  const signedIn = (ctx: RequestContext, reply: FastifyReply, r: { user: Parameters<typeof svc.toMe>[0]; session: Parameters<typeof svc.toMe>[1]; token: string }) => {
+    setSessionCookie(deps, reply, r.token, svc.SESSION_ABSOLUTE_MS);
+    return svc.toMe(r.user, r.session, ctx.now());
+  };
+  route(app, deps, C.inspectInvite, (ctx, input) => email.inspectInvite(ctx, input.token), { rateLimit: { max: 30, timeWindow: '15 minutes' } });
+  route(
+    app,
+    deps,
+    C.acceptInvite,
+    async (ctx, input, { reply }) => {
+      const r = await email.acceptInvite(ctx, ctx.ip, input);
+      if (r.status === 'check_email') return { status: r.status, me: null, requestId: r.requestId };
+      return { status: r.status, me: signedIn(ctx, reply, r), requestId: null };
+    },
+    { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+  );
+  route(app, deps, C.requestEmailLink, (ctx, input) => ({ ok: true as const, requestId: email.requestEmailLink(ctx, input.email).requestId }), {
+    rateLimit: { max: 10, timeWindow: '15 minutes' },
+  });
+  route(app, deps, C.completeEmailLink, (ctx, input, { reply }) => signedIn(ctx, reply, email.completeEmailLink(ctx, input.token)), { rateLimit: { max: 20, timeWindow: '15 minutes' } });
+  route(app, deps, C.completeEmailCode, (ctx, input, { reply }) => signedIn(ctx, reply, email.completeEmailCode(ctx, input.requestId, input.code)), {
+    rateLimit: { max: 20, timeWindow: '15 minutes' },
+  });
+  route(
+    app,
+    deps,
+    C.startEmailLinkMethod,
+    async (ctx, input) => {
+      const user = requireUser(ctx);
+      await svc.assertReauth(ctx, user, ctx.session!, input.currentPassword);
+      email.startEmailLinkMethod(ctx, user, ctx.session!);
+      return { ok: true as const };
+    },
+    { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+  );
+  route(app, deps, C.confirmEmailLinkMethod, (ctx, input) => email.confirmEmailLinkMethod(ctx, requireUser(ctx), ctx.session!, input.code), { rateLimit: { max: 10, timeWindow: '15 minutes' } });
+  route(app, deps, C.switchToPassword, (ctx, input) =>
+    email.switchToPassword(ctx, requireUser(ctx), ctx.session!, input.newPassword, svc.isFreshEmailSession(ctx.session!, ctx.now())),
   );
 
   route(app, deps, submitCommands, (ctx, input) => {

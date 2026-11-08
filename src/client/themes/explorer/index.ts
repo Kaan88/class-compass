@@ -1,5 +1,6 @@
 /** Explorer / adventure theme (THM-2): maps, compass, warm paper. One definition fills every slot. */
 import { FADE_IN } from '../motion.ts';
+import { makeSoundPack } from '../soundPack.ts';
 import type { ThemeDefinition } from '../types.ts';
 import { ExplorerDecoration, explorerIllustrations, ExplorerMascot, ExplorerPattern } from './art.tsx';
 import { avatar, colors, icons, shape, typography } from './tokens.ts';
@@ -37,15 +38,13 @@ export const explorerTheme: ThemeDefinition = {
       reduced: FADE_IN,
     },
   },
-  sounds: {
-    timerEnd: [
+  // Brass-like triangle fanfares in C major, like reaching a summit.
+  sounds: makeSoundPack({ root: 523, wave: 'triangle', scale: 'major', gain: 0.11 }, {
+    timeUp: [
       { freq: 523, at: 0, dur: 450, type: 'triangle', gain: 0.12 },
       { freq: 659, at: 380, dur: 600, type: 'triangle', gain: 0.1 },
+      { freq: 784, at: 760, dur: 700, type: 'triangle', gain: 0.1 },
     ],
-    celebrate: [
-      { freq: 523, at: 0, dur: 220, type: 'sine', gain: 0.1 },
-      { freq: 659, at: 160, dur: 220, type: 'sine', gain: 0.1 },
-      { freq: 784, at: 320, dur: 420, type: 'sine', gain: 0.1 },
-    ],
-  },
+  }),
+  celebration: { colors: ['accent', 'deco-1', 'deco-2', 'deco-3', 'success'] },
 };

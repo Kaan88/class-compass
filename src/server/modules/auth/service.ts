@@ -21,6 +21,13 @@ const PIN_LOCKOUT_MS = 5 * 60 * 1000;
 
 export const normaliseLogin = (login: string) => foldForSearch(login.trim());
 
+/** How long a session made by an email link, code or invite counts as re-authentication (S13b, D-108). */
+export const FRESH_SIGN_IN_MS = 15 * 60 * 1000;
+
+/** A session signed in with an email link, code or invite within FRESH_SIGN_IN_MS (re-authentication for email-link accounts). */
+export const isFreshEmailSession = (session: SessionRow, now: number) =>
+  (session.authMethod === 'email_link' || session.authMethod === 'invite') && now - session.createdAt <= FRESH_SIGN_IN_MS;
+
 export function toMe(user: UserRow, session: SessionRow, now: number): Me {
   return {
     kind: 'user',
@@ -31,6 +38,9 @@ export function toMe(user: UserRow, session: SessionRow, now: number): Me {
     textScale: user.textScale,
     mustChangePassword: user.mustChangePassword,
     hasPin: user.pinHash !== null,
+    signInMethod: user.signInMethod,
+    hasEmail: user.email !== null,
+    reauthFresh: isFreshEmailSession(session, now),
     classroomMode: session.classroomMode,
     pinUnlockedUntil: session.pinUnlockedUntil,
     pinUnlocked: isPinUnlocked(session, now),
@@ -79,7 +89,9 @@ export async function login(deps: AppDeps, ip: string, loginName: string, passwo
   const user = db.select().from(users).where(eq(users.login, normaliseLogin(loginName))).get();
   const userKey = user ? `login:user:${user.id}` : null;
   if (userKey) assertNotLocked(db, userKey, deps.now());
-  const ok = await verifyPassword(user?.passwordHash ?? DUMMY_HASH, password);
+  // Accounts without a password (pending invite, email-link sign-in: '') never match; the dummy hash keeps the timing the same.
+  const hasPassword = Boolean(user?.passwordHash);
+  const ok = (await verifyPassword(hasPassword ? user!.passwordHash : DUMMY_HASH, password)) && hasPassword;
   const now = deps.now();
   if (!user || !ok || user.disabledAt) {
     recordFailure(db, ipKey, now, IP_MAX_FAILURES);
@@ -88,8 +100,8 @@ export async function login(deps: AppDeps, ip: string, loginName: string, passwo
   }
   clearFailures(db, ipKey);
   if (userKey) clearFailures(db, userKey);
-  const { session, token } = createSession(deps, { kind: 'user', userId: user.id }, now);
-  audit(db, { type: 'user', id: user.id, role: user.role }, { action: 'auth.login', entity: 'user', entityId: user.id }, now);
+  const { session, token } = createSession(deps, { kind: 'user', userId: user.id }, now, SESSION_ABSOLUTE_MS, 'password');
+  audit(db, { type: 'user', id: user.id, role: user.role }, { action: 'auth.login', entity: 'user', entityId: user.id, after: { method: 'password' } }, now);
   return { user, session, token };
 }
 
@@ -98,6 +110,7 @@ export function createSession(
   who: { kind: 'user'; userId: string } | { kind: 'student'; studentLinkId: string },
   now: number,
   absoluteMs = SESSION_ABSOLUTE_MS,
+  authMethod: SessionRow['authMethod'] = who.kind === 'student' ? 'student_link' : 'password',
 ) {
   const { db } = deps;
   const pepper = deps.config.SECRET_PEPPER;
@@ -112,6 +125,7 @@ export function createSession(
     pinUnlockedUntil: null,
     pinFailures: 0,
     pinLockedUntil: null,
+    authMethod,
     createdAt: now,
     lastSeenAt: now,
     expiresAt: now + absoluteMs,
@@ -145,7 +159,8 @@ export function invalidateResetTokens(db: Db, userId: string, now: number) {
 }
 
 export async function changePassword(deps: AppDeps, user: UserRow, session: SessionRow, current: string, next: string) {
-  if (!(await verifyPassword(user.passwordHash, current))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
+  if (user.signInMethod === 'email_link') throw new AppError('CONFLICT', 'This account signs in with email links', { reason: 'EMAIL_LINK_ACCOUNT' });
+  if (!user.passwordHash || !(await verifyPassword(user.passwordHash, current))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
   const passwordHash = await hashPassword(next);
   const now = deps.now();
   tx(deps.db, () => {
@@ -156,8 +171,23 @@ export async function changePassword(deps: AppDeps, user: UserRow, session: Sess
   });
 }
 
-export async function setPin(deps: AppDeps, user: UserRow, currentPassword: string, pin: string) {
-  if (!(await verifyPassword(user.passwordHash, currentPassword))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
+/**
+ * Re-authentication before account changes (S13b, D-108): the current password for password accounts;
+ * for email-link accounts a fresh email sign-in on this session (link, code or invite in the last
+ * 15 minutes), since they have no password.
+ */
+export async function assertReauth(deps: AppDeps, user: UserRow, session: SessionRow, currentPassword: string | undefined) {
+  if (user.signInMethod === 'email_link') {
+    if (!isFreshEmailSession(session, deps.now())) throw new AppError('UNAUTHENTICATED', 'Sign in again with a fresh email link first', { reason: 'REAUTH_REQUIRED' });
+    return;
+  }
+  if (!currentPassword || !user.passwordHash || !(await verifyPassword(user.passwordHash, currentPassword))) {
+    throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
+  }
+}
+
+export async function setPin(deps: AppDeps, user: UserRow, session: SessionRow, currentPassword: string | undefined, pin: string) {
+  await assertReauth(deps, user, session, currentPassword);
   const pinHash = await hashPin(deps.config.SECRET_PEPPER, pin);
   const now = deps.now();
   deps.db.update(users).set({ pinHash, updatedAt: now }).where(eq(users.id, user.id)).run();
@@ -262,6 +292,9 @@ export function insertUser(db: Db, input: NewUserInput, passwordHash: string, ac
     locale: input.locale ?? 'en',
     textScale: 100,
     mustChangePassword: input.mustChangePassword ?? false,
+    signInMethod: 'password',
+    emailVerifiedAt: null,
+    timeUpClipFileId: null,
     disabledAt: null,
     createdAt: now,
     updatedAt: now,
@@ -291,7 +324,9 @@ export function requestPasswordReset(deps: AppDeps, emailInput: string): void {
     .select()
     .from(users)
     .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.disabledAt)))
-    .all();
+    .all()
+    // Email-link accounts have no password to reset (D-108); they sign in with a link instead.
+    .filter((u) => u.signInMethod === 'password');
   for (const user of matches) {
     const token = randomToken();
     const sent = tx(db, () => {
@@ -347,7 +382,7 @@ export async function completePasswordReset(deps: AppDeps, token: string, newPas
     if (!user || user.disabledAt) throw invalidLink();
     const now = deps.now();
     db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, fresh.id)).run();
-    db.update(users).set({ passwordHash, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
+    db.update(users).set({ passwordHash, mustChangePassword: false, signInMethod: 'password', updatedAt: now }).where(eq(users.id, user.id)).run();
     revokeAllUserSessions(db, user.id, now);
     clearFailures(db, `login:user:${user.id}`);
     audit(db, actorFor(user), { action: 'auth.password_reset_email', entity: 'user', entityId: user.id }, now);

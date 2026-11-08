@@ -1,4 +1,7 @@
-/** School-wide students (ACC-7, DAT-2/3, D-021/D-022/D-027): search, add, move, history, deactivate. */
+/**
+ * School-wide students (ACC-7, DAT-2/3, D-021/D-022/D-027): search, add, move, history, deactivate;
+ * permanent deletion of a deactivated student with a dry-run summary and typed confirmation (S13b, D-109).
+ */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
@@ -87,6 +90,25 @@ function MoveDialog({ ids, classes, onDone }: { ids: string[]; classes: Array<z.
   );
 }
 
+/** Dry run of a permanent deletion: what will be removed, in counts only. */
+function ErasePreviewText({ studentId }: { studentId: string }) {
+  const { t } = useI18n();
+  const p = useQuery({ queryKey: [...STUDENTS, 'erase', studentId], queryFn: () => call(St.erasePreview, { studentId }), staleTime: 0 });
+  if (!p.data) return <p className="cc-muted">{t('common.loading')}</p>;
+  const rows = p.data.tables.reduce((a, x) => a + x.rows, 0);
+  return (
+    <div className="cc-stack" data-testid="erase-preview">
+      <p>{t('students.eraseExplain', { name: p.data.fullName })}</p>
+      <ul>
+        <li>{t('students.eraseRows', { count: rows, tables: p.data.tables.length })}</li>
+        <li>{t('students.eraseFiles', { count: p.data.files })}</li>
+        <li>{t('students.eraseHistory', { count: p.data.auditEvents + p.data.importRows + p.data.privateNotes })}</li>
+      </ul>
+      <p className="cc-muted">{t('students.eraseKeeps')}</p>
+    </div>
+  );
+}
+
 export function AdminStudentsPage() {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -101,6 +123,7 @@ export function AdminStudentsPage() {
   const [addClass, setAddClass] = useState('');
   const [history, setHistory] = useState<string | null>(null);
   const [deactivating, setDeactivating] = useState<AdminStudent | null>(null);
+  const [erasing, setErasing] = useState<AdminStudent | null>(null);
   const classes = useQuery({ queryKey: [...ADMIN, 'classes', 'all'], queryFn: () => call(S.listClasses, { includeArchived: true }) });
   const pageSize = 100;
   const students = useQuery({
@@ -213,9 +236,14 @@ export function AdminStudentsPage() {
                     {t('users.deactivate')}
                   </Button>
                 ) : (
-                  <Button size="small" onPress={() => void run(() => call(St.reactivateStudent, { studentId: s.id }), { invalidate: [STUDENTS] })}>
-                    {t('users.reactivate')}
-                  </Button>
+                  <>
+                    <Button size="small" onPress={() => void run(() => call(St.reactivateStudent, { studentId: s.id }), { invalidate: [STUDENTS] })}>
+                      {t('users.reactivate')}
+                    </Button>
+                    <Button size="small" variant="danger" onPress={() => setErasing(s)}>
+                      {t('students.erase')}
+                    </Button>
+                  </>
                 )}
               </div>
             ),
@@ -261,6 +289,19 @@ export function AdminStudentsPage() {
         onConfirm={async () => {
           await call(St.deactivateStudent, { studentId: deactivating!.id });
           await qc.invalidateQueries({ queryKey: STUDENTS });
+        }}
+      />
+      <ConfirmDestructive
+        isOpen={erasing !== null}
+        onOpenChange={(o) => !o && setErasing(null)}
+        title={t('students.eraseTitle')}
+        description={erasing ? <ErasePreviewText studentId={erasing.id} /> : null}
+        confirmText={erasing?.fullName ?? ''}
+        actionLabel={t('students.erase')}
+        onConfirm={async () => {
+          await call(St.eraseStudent, { studentId: erasing!.id, confirm: erasing!.fullName });
+          await qc.invalidateQueries({ queryKey: ADMIN });
+          showToast({ message: t('students.erased'), kind: 'success' });
         }}
       />
     </main>

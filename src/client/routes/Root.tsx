@@ -6,6 +6,7 @@ import { useMe } from '../lib/session.ts';
 import { buttonClass } from '../ui/Button.tsx';
 import { EmptyState, Toaster } from '../ui/Feedback.tsx';
 import { ThemeBackdrop } from '../ui/Mascot.tsx';
+import { CelebrationLayer } from '../themes/Celebration.tsx';
 
 /**
  * Root layout: language and text size come from the signed-in teacher's own preferences (UX-4,
@@ -23,6 +24,7 @@ export function RootLayout() {
       <ThemeBackdrop />
       <Outlet />
       <Toaster />
+      <CelebrationLayer />
     </I18nProvider>
   );
 }

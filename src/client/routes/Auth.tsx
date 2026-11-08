@@ -1,4 +1,4 @@
-/** Sign-in, email password reset (D-015) and the (forced) password change screen. */
+/** Sign-in (password, or an emailed link for email-link accounts, D-108), email password reset (D-015) and the (forced) password change screen. */
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearch, Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,30 +11,10 @@ import { freshMe, ME_KEY, signOut, useMe } from '../lib/session.ts';
 import { Button, buttonClass } from '../ui/Button.tsx';
 import { Alert } from '../ui/Feedback.tsx';
 import { TextField } from '../ui/Fields.tsx';
-import { Mascot, ThemeDecoration } from '../ui/Mascot.tsx';
+import { AuthCard } from './AuthCard.tsx';
+import { EmailLinkRequest } from './SignIn.tsx';
 import { homeFor, safeNext } from './guards.ts';
 import { SensitiveGate } from './Lock.tsx';
-
-function AuthCard({ title, children }: { title: string; children: React.ReactNode }) {
-  const { t } = useI18n();
-  return (
-    <main className="cc-page" style={{ maxWidth: '32rem', position: 'relative' }}>
-      <div className="cc-card cc-stack" style={{ position: 'relative', overflow: 'hidden', marginTop: '3rem' }}>
-        <ThemeDecoration size={160} />
-        <div className="cc-row">
-          <Mascot size={72} />
-          <div>
-            <p className="cc-muted" style={{ margin: 0, fontWeight: 700 }}>
-              {t('app.name')}
-            </p>
-            <h1 className="cc-h1">{title}</h1>
-          </div>
-        </div>
-        {children}
-      </div>
-    </main>
-  );
-}
 
 export function LoginPage() {
   const { t } = useI18n();
@@ -46,6 +26,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
+  const [byEmail, setByEmail] = useState(false);
   const resetInfo = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000 });
 
   async function submit(e: React.FormEvent) {
@@ -66,6 +47,7 @@ export function LoginPage() {
   }
 
   if (forgot) return <ForgotPassword onBack={() => setForgot(false)} />;
+  if (byEmail) return <EmailLinkRequest onBack={() => setByEmail(false)} />;
   return (
     <AuthCard title={t('auth.signIn')}>
       <form onSubmit={submit} className="cc-stack">
@@ -83,6 +65,11 @@ export function LoginPage() {
       ) : (
         <p className="cc-muted">{t('auth.forgotAskAdmin')}</p>
       )}
+      {resetInfo.data?.emailLinkEnabled ? (
+        <Button variant="ghost" onPress={() => setByEmail(true)}>
+          {t('signin.emailMe')}
+        </Button>
+      ) : null}
     </AuthCard>
   );
 }

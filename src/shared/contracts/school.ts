@@ -13,6 +13,7 @@ export const RequiredLocalizedText = LocalizedText.refine((t) => Boolean(t.en?.t
 
 import { CONTEXT_MODULES, MEDIA_MODULES, MODULE_KEYS } from '../modules.ts';
 import { THEME_KEYS } from '../themes.ts';
+import { TIME_UP_SOUNDS } from '../classDisplay.ts';
 // Module and theme keys live in the shared catalogues (D-069, D-070); re-exported for existing imports.
 export { CONTEXT_MODULES, DEFAULT_AVAILABILITY, MEDIA_MODULES, MODULE_KEYS, type ContextModule, type MediaModule, type ModuleKey } from '../modules.ts';
 export const ContextModuleKey = z.enum(CONTEXT_MODULES);
@@ -21,6 +22,9 @@ export const ModuleKeySchema = z.enum(MODULE_KEYS);
 /** A class theme: any key of the shared theme registry (D-070). */
 export const Theme = z.enum(THEME_KEYS);
 export const Locale = z.enum(['en', 'tr']);
+
+export const TimeUpSound = z.enum(TIME_UP_SOUNDS);
+export const SoundVolume = z.number().int().min(0).max(100);
 
 /** Query-string boolean ('true'/'false') or JSON boolean. */
 export const QueryBool = z.union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')]);
@@ -32,6 +36,11 @@ export const SchoolSettings = z.object({
   weekStartsOn: z.number().int(),
   defaultLocale: Locale,
   emailResetEnabled: z.boolean(),
+  /** Classroom weather (S13b, D-106). */
+  weatherEnabled: z.boolean(),
+  weatherLabel: z.string(),
+  weatherLatitude: z.number(),
+  weatherLongitude: z.number(),
 });
 export const getSettings = endpoint({ method: 'GET', path: '/api/admin/settings', access: 'admin', input: Empty, output: SchoolSettings });
 export const updateSettings = endpoint({
@@ -43,6 +52,10 @@ export const updateSettings = endpoint({
     timezone: TimeZone.optional(),
     weekStartsOn: z.number().int().min(0).max(6).optional(),
     defaultLocale: Locale.optional(),
+    weatherEnabled: z.boolean().optional(),
+    weatherLabel: z.string().trim().min(1).max(80).optional(),
+    weatherLatitude: z.number().min(-90).max(90).optional(),
+    weatherLongitude: z.number().min(-180).max(180).optional(),
   }),
   output: SchoolSettings,
 });
@@ -123,6 +136,10 @@ export const SchoolClass = z.object({
   /** Class language mode (S13a, D-099). */
   mainLanguage: Locale,
   secondLanguageEnabled: z.boolean(),
+  /** S13b (D-105, D-107): sound volume 0–100, quote of the day, time's-up announcement. */
+  soundVolume: z.number().int(),
+  quoteEnabled: z.boolean(),
+  timeUpSound: TimeUpSound,
   archived: z.boolean(),
   yearArchived: z.boolean(),
   studentCount: z.number().int(),
@@ -156,6 +173,9 @@ export const createClass = endpoint({
     animationsEnabled: z.boolean().optional(),
     mainLanguage: Locale.optional(),
     secondLanguageEnabled: z.boolean().optional(),
+    soundVolume: SoundVolume.optional(),
+    quoteEnabled: z.boolean().optional(),
+    timeUpSound: TimeUpSound.optional(),
   }),
   output: SchoolClass,
 });
@@ -173,6 +193,9 @@ export const updateClass = endpoint({
     animationsEnabled: z.boolean().optional(),
     mainLanguage: Locale.optional(),
     secondLanguageEnabled: z.boolean().optional(),
+    soundVolume: SoundVolume.optional(),
+    quoteEnabled: z.boolean().optional(),
+    timeUpSound: TimeUpSound.optional(),
   }),
   output: SchoolClass,
 });
@@ -245,6 +268,10 @@ export const MyContext = z.object({
   /** Class language mode (S13a, D-099): what the classroom display and the label editors use. */
   mainLanguage: Locale,
   secondLanguageEnabled: z.boolean(),
+  /** S13b: sound volume, quote of the day, time's-up announcement (D-105, D-107). */
+  soundVolume: z.number().int(),
+  quoteEnabled: z.boolean(),
+  timeUpSound: TimeUpSound,
   modules: z.record(ContextModuleKey, z.boolean()),
 });
 export type MyContext = z.infer<typeof MyContext>;
@@ -253,7 +280,39 @@ export const myContexts = endpoint({
   path: '/api/teacher/contexts',
   access: 'classroom',
   input: Empty,
-  output: z.object({ contexts: z.array(MyContext), media: z.record(z.enum(MEDIA_MODULES), z.boolean()) }),
+  output: z.object({
+    contexts: z.array(MyContext),
+    media: z.record(z.enum(MEDIA_MODULES), z.boolean()),
+    /** The signed-in teacher has recorded a time's-up clip (S13b, D-107). */
+    timeUpClip: z.boolean(),
+  }),
+});
+
+/** Display settings a teacher of the class may change (S13b, D-105): theme, sounds, motion, quote, time's up. */
+export const ClassDisplay = z.object({
+  classId: z.string(),
+  theme: Theme,
+  soundsEnabled: z.boolean(),
+  soundVolume: z.number().int(),
+  animationsEnabled: z.boolean(),
+  quoteEnabled: z.boolean(),
+  timeUpSound: TimeUpSound,
+});
+export type ClassDisplay = z.infer<typeof ClassDisplay>;
+export const setClassDisplay = endpoint({
+  method: 'PUT',
+  path: '/api/teacher/classes/:classId/display',
+  access: 'teacher',
+  input: z.object({
+    classId: Id,
+    theme: Theme.optional(),
+    soundsEnabled: z.boolean().optional(),
+    soundVolume: SoundVolume.optional(),
+    animationsEnabled: z.boolean().optional(),
+    quoteEnabled: z.boolean().optional(),
+    timeUpSound: TimeUpSound.optional(),
+  }),
+  output: ClassDisplay,
 });
 
 /**

@@ -13,7 +13,7 @@ import { AAA, contrast, contrastFailures } from '../../src/client/themes/contras
 import { allThemesCss, animationName } from '../../src/client/themes/css.ts';
 import { THEME_LIST, THEMES } from '../../src/client/themes/registry.ts';
 import { soundLength } from '../../src/client/themes/sound.ts';
-import { ILLUSTRATIONS, MASCOT_POSES, MOTIONS, SOUNDS } from '../../src/client/themes/types.ts';
+import { ILLUSTRATIONS, MASCOT_POSES, MOTIONS, SOUND_EVENTS } from '../../src/client/themes/types.ts';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
 import { DEFAULT_THEME, THEME_KEYS, isThemeKey } from '../../src/shared/themes.ts';
@@ -90,19 +90,23 @@ describe.each(THEME_LIST.map((d) => [d.key, d] as const))('theme %s', (_key, def
     }
   });
 
-  it('sounds are optional, short and gentle', () => {
+  it('sounds are optional, complete (one cue per classroom event), short and gentle (S13b)', () => {
     if (def.sounds === null) return;
-    for (const s of SOUNDS) {
+    const long = new Set(['secretDrumroll', 'clapping', 'fireworks', 'fanfare', 'timeUp']);
+    for (const s of SOUND_EVENTS) {
       const spec = def.sounds[s];
-      expect(spec.length).toBeGreaterThan(0);
-      expect(soundLength(spec)).toBeLessThanOrEqual(1500);
+      expect(spec.length, s).toBeGreaterThan(0);
+      expect(soundLength(spec), s).toBeLessThanOrEqual(long.has(s) ? 2500 : 1200);
       for (const n of spec) {
         expect(n.gain).toBeGreaterThan(0);
         expect(n.gain).toBeLessThanOrEqual(0.3);
         expect(n.freq).toBeGreaterThanOrEqual(150);
-        expect(n.freq).toBeLessThanOrEqual(2000);
+        expect(n.freq).toBeLessThanOrEqual(n.type === 'noise' ? 5000 : 2500);
       }
     }
+    // Firework colours are theme tokens (THM-3: no raw colours in components).
+    expect(def.celebration.colors.length).toBeGreaterThanOrEqual(2);
+    for (const c of def.celebration.colors) expect(def.colors[c]).toMatch(/^#[0-9a-f]{6}$/iu);
   });
 
   it('typography, shape and icon slots are sane (system fonts only, readable weights)', () => {

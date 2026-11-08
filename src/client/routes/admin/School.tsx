@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, useSearch } from '@tanstack/react-router';
 import type { z } from 'zod';
 import * as AdminC from '../../../shared/contracts/admin.ts';
 import * as S from '../../../shared/contracts/school.ts';
@@ -18,9 +19,9 @@ import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { showToast } from '../../lib/toast.ts';
 import { useRun } from '../../lib/useRun.ts';
-import { Button } from '../../ui/Button.tsx';
+import { Button, buttonClass } from '../../ui/Button.tsx';
 import { ConfirmDestructive, DialogActions, Modal } from '../../ui/Dialog.tsx';
-import { Alert } from '../../ui/Feedback.tsx';
+import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconCheck } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
@@ -62,8 +63,12 @@ export function SettingsPage() {
   const settings = useQuery({ queryKey: K.settings, queryFn: () => call(S.getSettings, {}) });
   const [draft, setDraft] = useState<Partial<z.infer<typeof S.SchoolSettings>>>({});
   const [error, setError] = useState<string | null>(null);
+  const [latText, setLatText] = useState<string | null>(null);
+  const [lonText, setLonText] = useState<string | null>(null);
   if (!settings.data) return <main className="cc-page">{t('common.loading')}</main>;
   const v = { ...settings.data, ...draft };
+  const latValue = latText ?? String(v.weatherLatitude);
+  const lonValue = lonText ?? String(v.weatherLongitude);
   return (
     <main className="cc-page cc-stack">
       <h1 className="cc-h1">{t('admin.settings')}</h1>
@@ -73,8 +78,22 @@ export function SettingsPage() {
           e.preventDefault();
           setError(null);
           try {
-            await call(S.updateSettings, { schoolName: v.schoolName, timezone: v.timezone, weekStartsOn: v.weekStartsOn, defaultLocale: v.defaultLocale });
+            const lat = Number(latValue.replace(',', '.'));
+            const lon = Number(lonValue.replace(',', '.'));
+            if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) return setError(t('settings.weatherBadCoords'));
+            await call(S.updateSettings, {
+              schoolName: v.schoolName,
+              timezone: v.timezone,
+              weekStartsOn: v.weekStartsOn,
+              defaultLocale: v.defaultLocale,
+              weatherEnabled: v.weatherEnabled,
+              weatherLabel: v.weatherLabel,
+              weatherLatitude: lat,
+              weatherLongitude: lon,
+            });
             setDraft({});
+            setLatText(null);
+            setLonText(null);
             void qc.invalidateQueries({ queryKey: K.settings });
             showToast({ message: t('save.saved'), kind: 'success' });
           } catch (err) {
@@ -100,6 +119,16 @@ export function SettingsPage() {
             { id: 'tr', label: t('language.tr') },
           ]}
         />
+        <fieldset className="cc-stack cc-fieldset" data-testid="weather-settings">
+          <legend className="cc-h3">{t('settings.weather')}</legend>
+          <p className="cc-muted">{t('settings.weatherHint')}</p>
+          <Toggle label={t('settings.weatherShow')} isSelected={v.weatherEnabled} onChange={(x) => setDraft((d) => ({ ...d, weatherEnabled: x }))} />
+          <TextField label={t('settings.weatherPlace')} value={v.weatherLabel} onChange={(x) => setDraft((d) => ({ ...d, weatherLabel: x }))} isRequired />
+          <div className="cc-row" style={{ alignItems: 'flex-start' }}>
+            <TextField label={t('settings.weatherLatitude')} inputMode="decimal" value={latValue} onChange={setLatText} isRequired />
+            <TextField label={t('settings.weatherLongitude')} inputMode="decimal" value={lonValue} onChange={setLonText} isRequired />
+          </div>
+        </fieldset>
         <p>
           <span className={`cc-chip ${v.emailResetEnabled ? 'cc-chip--success' : ''}`}>
             {v.emailResetEnabled ? t('settings.emailResetOn') : t('settings.emailResetOff')}
@@ -539,7 +568,8 @@ export function ClassesPage() {
   const run = useRun();
   const years = useQuery({ queryKey: K.years, queryFn: () => call(S.listYears, {}) });
   const classes = useQuery({ queryKey: [...K.classes, 'all'], queryFn: () => call(S.listClasses, { includeArchived: true }) });
-  const [creating, setCreating] = useState(false);
+  const search = useSearch({ strict: false }) as { new?: 1 };
+  const [creating, setCreating] = useState(search.new === 1);
   const [editing, setEditing] = useState<SchoolClass | null>(null);
   const [archiving, setArchiving] = useState<SchoolClass | null>(null);
   const [promoting, setPromoting] = useState<SchoolClass | null>(null);
@@ -556,6 +586,23 @@ export function ClassesPage() {
           {t('classes.create')}
         </Button>
       </div>
+      {classes.isSuccess && classList.length === 0 ? (
+        <EmptyState
+          title={t('classes.emptyTitle')}
+          body={yearList.some((y) => !y.archived) ? t('classes.emptyBody') : t('classes.emptyNoYear')}
+          action={
+            yearList.some((y) => !y.archived) ? (
+              <Button variant="primary" onPress={() => setCreating(true)}>
+                {t('admin.addClassroom')}
+              </Button>
+            ) : (
+              <Link to="/admin/years" className={buttonClass('primary')}>
+                {t('admin.years')}
+              </Link>
+            )
+          }
+        />
+      ) : null}
       <DataTable
         caption={t('admin.classes')}
         rows={classList}

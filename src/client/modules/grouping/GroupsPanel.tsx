@@ -29,6 +29,7 @@ import { Avatar } from '../../ui/Students.tsx';
 import { LessonTimer } from '../lessons/LessonTimer.tsx';
 import { lessonKey, useLessonState, type LessonQueryData } from '../lessons/lessonClient.ts';
 import type { ClassroomContext, DashboardSlot } from '../types.ts';
+import { playEvent } from '../../themes/index.tsx';
 
 const arrangementsKey = (contextId: string) => ['classroom', 'grouping', 'arrangements', contextId] as const;
 /** Group card colours: the counter colour tokens, in this order (with the number and name, never colour alone). */
@@ -81,12 +82,14 @@ function GroupScreen({ context, lesson, st, isOpen, onOpenChange }: { context: C
     setPicked(null);
     setUndoTo(st.groupingId);
     setNotice(t('grouping.toast.shuffled'));
+    playEvent('groupShuffle');
     void sendGroupingCommand('grouping.shuffle', ref);
   };
   const undoShuffle = () => {
     if (!undoTo) return;
     setUndoTo(null);
     setNotice(null);
+    playEvent('undo');
     void sendGroupingCommand('grouping.restore', { ...ref, groupingId: undoTo });
   };
   const move = (studentId: string, toGroupId: string) => {

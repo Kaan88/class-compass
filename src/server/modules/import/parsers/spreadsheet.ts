@@ -42,10 +42,24 @@ function usedRange(ws: XLSX.WorkSheet): XLSX.Range | null {
   return { s: start, e: { r: Math.min(maxR, start.r + MAX_SHEET_ROWS - 1), c: Math.min(maxC, start.c + MAX_SHEET_COLS - 1) } };
 }
 
-export function parseWorkbook(buf: Buffer): { rows: SourceRow[]; sheets: number } {
+/** A sheet with content, for the sheet picker (S13b): its name, non-blank row count and the first rows. */
+export interface SheetInfo {
+  name: string;
+  rows: number;
+  preview: string[][];
+}
+const PREVIEW_ROWS = 5;
+const PREVIEW_COLS = 6;
+
+/**
+ * Reads every sheet with content (up to 20). Rows carry the sheet's ordinal among the sheets with
+ * content as `page`, so a caller can keep only the sheets the teacher chose (`sheetInfo[page - 1]`).
+ */
+export function parseWorkbook(buf: Buffer): { rows: SourceRow[]; sheets: number; sheetInfo: SheetInfo[] } {
   // Old BIFF5 exports without a code page are Turkish (Windows-1254, code page 1254).
   const wb = XLSX.read(buf, { type: 'buffer', cellFormula: false, cellHTML: false, cellStyles: false, codepage: 1254, dense: false, sheetRows: MAX_SHEET_ROWS });
   const rows: SourceRow[] = [];
+  const sheetInfo: SheetInfo[] = [];
   let sheets = 0;
   for (const name of wb.SheetNames.slice(0, MAX_SHEETS)) {
     if (rows.length > MAX_IMPORT_ROWS) break;
@@ -57,7 +71,9 @@ export function parseWorkbook(buf: Buffer): { rows: SourceRow[]; sheets: number 
     const data = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: '', blankrows: true });
     if (!data.some((r) => r.some((c) => String(c ?? '').trim()))) continue;
     sheets++;
+    const filled = data.map((r) => r.map((c) => String(c ?? ''))).filter((r) => r.some((c) => c.trim()));
+    sheetInfo.push({ name, rows: filled.length, preview: filled.slice(0, PREVIEW_ROWS).map((r) => r.slice(0, PREVIEW_COLS).map((c) => c.slice(0, 60))) });
     for (const r of data) rows.push({ cells: r.map((c) => String(c ?? '')), page: sheets, confidence: null });
   }
-  return { rows, sheets };
+  return { rows, sheets, sheetInfo };
 }

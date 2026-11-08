@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { TimeUpSound } from '../../shared/classDisplay.ts';
 import { DEFAULT_THEME, THEME_KEYS, type ThemeKey } from '../../shared/themes.ts';
 
 /** Theme keys come from the shared registry list (D-070); definitions live in src/client/themes. */
@@ -16,6 +17,11 @@ export interface DisplayState {
   classAnimations: boolean;
   classSounds: boolean;
   deviceSounds: boolean;
+  /** Class sound volume 0..100 (S13b). */
+  soundVolume: number;
+  /** Time's-up announcement of the class and whether its teacher has a clip (S13b, D-107). */
+  timeUpSound: TimeUpSound;
+  timeUpClip: boolean;
   textScale: number;
   locale: 'en' | 'tr';
 }
@@ -29,7 +35,7 @@ function readDeviceSounds(): boolean {
   }
 }
 
-let state: DisplayState = { theme: DEFAULT_THEME, classAnimations: true, classSounds: true, deviceSounds: true, textScale: 100, locale: 'en' };
+let state: DisplayState = { theme: DEFAULT_THEME, classAnimations: true, classSounds: true, deviceSounds: true, soundVolume: 80, timeUpSound: 'voice', timeUpClip: false, textScale: 100, locale: 'en' };
 let initialised = false;
 const listeners = new Set<() => void>();
 

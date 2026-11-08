@@ -1,7 +1,7 @@
 /**
  * Starts the REAL server for Playwright on a temporary data directory with the fictional demo school.
- * Test-only: NODE_ENV=test, a fixed test pepper, and fixed demo passwords (CC_DEMO_PASSWORD, which
- * the seed refuses outside NODE_ENV=test). The temp directory is removed on exit.
+ * Test-only: NODE_ENV=test, a fixed test pepper, fixed demo passwords (CC_DEMO_PASSWORD, which
+ * the seed refuses outside NODE_ENV=test) and a file mail transport (CC_TEST_MAIL_DIR, no SMTP). The temp directory is removed on exit.
  *   node e2e/server.ts            (PORT and E2E_PASSWORD come from playwright.config.ts)
  */
 import { spawnSync } from 'node:child_process';
@@ -13,6 +13,9 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const port = process.env.PORT ?? '3299';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-e2e-'));
+// Email goes to JSON files here instead of SMTP (test-only, config.ts); e2e/mail.ts reads them.
+const mailDir = path.join(os.tmpdir(), `cc-e2e-mail-${port}`);
+fs.rmSync(mailDir, { recursive: true, force: true });
 
 Object.assign(process.env, {
   NODE_ENV: 'test',
@@ -26,11 +29,15 @@ Object.assign(process.env, {
   CC_DEMO_PASSWORD: process.env.E2E_PASSWORD ?? 'e2e-only-Passw0rd!',
   // The suite signs in many times; the override is honoured only under NODE_ENV=test (config.ts).
   CC_TEST_LOGIN_RATE_LIMIT: '1000',
+  CC_TEST_MAIL_DIR: mailDir,
+  // No network in tests: the weather service is unreachable, so the widget stays hidden (D-106).
+  WEATHER_API_URL: 'http://127.0.0.1:9/v1/forecast',
 });
 
 const cleanup = () => {
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
+    fs.rmSync(mailDir, { recursive: true, force: true });
   } catch {
     /* best effort */
   }

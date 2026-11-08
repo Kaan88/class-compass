@@ -108,6 +108,7 @@ export function MaintenancePanel() {
       {s.offsiteStale ? <Alert kind="warning">{t('maint.offsiteStale', { hours: s.offsiteStaleHours })}</Alert> : null}
       {s.lastLocal && s.lastLocal.status === 'failed' ? <Alert>{t('maint.lastLocalFailed')}</Alert> : null}
       {s.migration.pending > 0 ? <Alert kind="warning">{t('maint.pendingMigrations', { count: s.migration.pending })}</Alert> : null}
+      {s.emailLinkAccountsWithoutSmtp > 0 ? <Alert kind="warning">{t('maint.emailLinkNoSmtp', { count: s.emailLinkAccountsWithoutSmtp })}</Alert> : null}
       <dl className="cc-report-metrics">
         <RunLine run={s.lastLocal} label={t('maint.lastLocal')} />
         <RunLine run={s.lastOffsite} label={t('maint.lastOffsite')} />

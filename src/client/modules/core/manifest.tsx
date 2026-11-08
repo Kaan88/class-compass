@@ -5,6 +5,10 @@ import { ProfilePage } from '../../routes/teacher/Teacher.tsx';
 import { TeacherReportsPage } from '../../reports/ReportsPage.tsx';
 import { IconChart, IconList, IconSettings, IconUser, IconUsers } from '../../ui/icons.tsx';
 import { defineClientModule } from '../types.ts';
+import { registerCoreTopBar } from './topBar.tsx';
+
+// Quote of the day and weather on the classroom top bar (S13b).
+registerCoreTopBar();
 
 export const coreClientManifest = defineClientModule({
   key: 'core',

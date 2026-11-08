@@ -7,9 +7,10 @@ import { Worker } from 'node:worker_threads';
 import type { SourceRow } from '../../../../domain/importing.ts';
 import { AppError } from '../../../lib/errors.ts';
 import type { ParserKind } from './worker.ts';
+import type { SheetInfo } from './spreadsheet.ts';
 
 export interface ParserResults {
-  workbook: { rows: SourceRow[]; sheets: number };
+  workbook: { rows: SourceRow[]; sheets: number; sheetInfo: SheetInfo[] };
   docx: SourceRow[];
   pdf: { rows: SourceRow[]; scanned: boolean; pages: number };
 }

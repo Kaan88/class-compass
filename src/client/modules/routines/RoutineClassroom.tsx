@@ -13,6 +13,7 @@ import { IconCheck, IconNext, IconPrev } from '../../ui/icons.tsx';
 import { patchLesson, sendLessonCommand, useRoutines } from '../lessons/lessonClient.ts';
 import { FocusTopics } from '../lessons/TopicsClassroom.tsx';
 import { startStep, type ClassroomContext, type DashboardSlot, type StartStepProps } from '../types.ts';
+import { playEvent } from '../../themes/index.tsx';
 
 // ---------------------------------------------------------------- Start Lesson step
 /** The routine the teacher picked; null = the class default (or the built-in default routine). */
@@ -62,6 +63,7 @@ function RoutineStepper({ lesson }: { context: ClassroomContext; lesson: LessonS
   const idx = lesson.stageIndex;
   const go = (i: number) => {
     if (i < 0 || i >= stages.length || i === idx) return;
+    playEvent('stageChange');
     patchLesson(lesson.contextId, (l) => ({ ...l, stageIndex: i }));
     void sendLessonCommand('lesson.setStage', { contextId: lesson.contextId, lessonId: lesson.id, stageIndex: i });
   };

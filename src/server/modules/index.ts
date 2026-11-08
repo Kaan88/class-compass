@@ -31,6 +31,7 @@ import { schoolManifest } from './school/manifest.ts';
 import { isModuleEnabled, registerModuleConfig } from './school/modules.ts';
 import { secretManifest } from './secret/manifest.ts';
 import { studentsManifest } from './students/manifest.ts';
+import { weatherManifest } from './weather/manifest.ts';
 
 export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   authManifest,
@@ -51,6 +52,7 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   linksManifest,
   reportsManifest,
   maintenanceManifest,
+  weatherManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */

@@ -5,6 +5,7 @@
  * command line / timer (restic credentials live only in the backup job's environment, never in the
  * app's; the page reads the off-site state from the recorded runs).
  */
+import { emailLinkAccountCount, emailLinkEnabled } from '../auth/emailSignIn.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { and, desc, eq } from 'drizzle-orm';
@@ -98,6 +99,7 @@ export function maintenanceStatus(ctx: RequestContext): MaintenanceStatus {
     lastRestore: dto(lastRun(ctx, 'restore')),
     offsiteStale: !offsiteOk || now - offsiteOk.finishedAt > staleMs,
     offsiteStaleHours: cfg.OFFSITE_STALE_HOURS,
+    emailLinkAccountsWithoutSmtp: emailLinkEnabled(ctx) ? 0 : emailLinkAccountCount(ctx.db),
     offsiteSetup: offsiteSetup(lastRun(ctx, 'offsite')),
     disk: {
       totalBytes,

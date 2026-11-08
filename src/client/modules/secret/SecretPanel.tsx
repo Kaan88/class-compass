@@ -5,9 +5,13 @@
  *   refresh or a class switch and never reveals who was chosen (SEC-3);
  * - End Lesson step: a calm reveal (names + avatars), Goal met / Still practising per student,
  *   optional note and celebration (the celebration hop respects the motion settings, THM-5).
+ * - S13b (D-110): the reveal is a short show: 3-2-1 countdown, drum roll, the cards one by one with a
+ *   sound each, then a fanfare; "Celebrate" plays the full-screen celebration. Reduced motion keeps
+ *   the order without movement; with animations off the cards appear at once (sounds still follow
+ *   the sound switches). Skippable.
  * Every write is an outbox command naming the lesson (UX-11, LES-4).
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import * as S from '../../../shared/contracts/secret.ts';
@@ -22,7 +26,9 @@ import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconCheck, IconSync, IconUndo } from '../../ui/icons.tsx';
-import { useThemeSound } from '../../themes/index.tsx';
+import { motionMode, useThemeSound } from '../../themes/index.tsx';
+import { celebrate as startCelebration } from '../../themes/Celebration.tsx';
+import { useDisplay } from '../../lib/display.ts';
 import { Mascot, ThemeIllustration } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { awaitCommand, lessonKey, useLessonState } from '../lessons/lessonClient.ts';
@@ -131,7 +137,6 @@ function SelectionCard({ lesson, sel, index }: { lesson: LessonState; sel: Revea
   const qc = useQueryClient();
   const [note, setNote] = useState(sel.note ?? '');
   const [celebrate, setCelebrate] = useState(0);
-  const playSound = useThemeSound();
   const send = (patch: { outcome?: S.RevealedSelection['outcome']; note?: string | null; celebration?: boolean }) => {
     const outcome = patch.outcome ?? sel.outcome ?? 'not_assessed';
     // Optimistic: show the choice right away; the outbox sends it once (UX-10/11).
@@ -171,7 +176,8 @@ function SelectionCard({ lesson, sel, index }: { lesson: LessonState; sel: Revea
           send({ celebration: v });
           if (v) {
             setCelebrate((n) => n + 1);
-            playSound('celebrate'); // only when the class and this device allow sounds (THM-5)
+            // Full-screen celebration; sounds only when the class and this device allow them (THM-5).
+            startCelebration(t('secret.wellDone', { name: sel.student.fullName }));
           }
         }}
       />
@@ -193,6 +199,34 @@ function SecretRevealStep({ lesson }: { lesson: LessonState; value: SecretStepVa
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reveal = data.data?.reveal ?? null;
+  const [show, setShow] = useState<{ phase: 'countdown' | 'drumroll' | 'cards' | 'done'; count: number; shown: number } | null>(null);
+  const display = useDisplay();
+  const playSoundNow = useThemeSound();
+  const playRef = useRef(playSoundNow);
+  playRef.current = playSoundNow;
+  const total = reveal?.selections.length ?? 0;
+  // The reveal show (S13b): runs once, right after this screen revealed the round.
+  useEffect(() => {
+    if (!show || show.phase === 'done') return;
+    const step = (next: typeof show, ms: number) => setTimeout(() => setShow(next), ms);
+    let h: ReturnType<typeof setTimeout>;
+    if (show.phase === 'countdown') {
+      playRef.current('tap');
+      h = show.count > 1 ? step({ ...show, count: show.count - 1 }, 650) : step({ ...show, phase: 'drumroll' }, 650);
+    } else if (show.phase === 'drumroll') {
+      playRef.current('secretDrumroll');
+      h = step({ ...show, phase: 'cards', shown: 0 }, 1300);
+    } else if (show.shown < total) {
+      h = setTimeout(() => {
+        playRef.current('secretReveal');
+        setShow({ ...show, shown: show.shown + 1 });
+      }, show.shown === 0 ? 0 : 600);
+    } else {
+      playRef.current('fanfare');
+      h = step({ ...show, phase: 'done' }, 0);
+    }
+    return () => clearTimeout(h);
+  }, [show, total]);
 
   if (!st || !st.roundExists) return <p className="cc-muted">{t('secret.noneThisLesson')}</p>;
   const doReveal = async () => {
@@ -202,6 +236,7 @@ function SecretRevealStep({ lesson }: { lesson: LessonState; value: SecretStepVa
       const opId = await sendSecretCommand('secret.reveal', { contextId: lesson.contextId, lessonId: lesson.id });
       const result = (await awaitCommand(opId)) as SecretReveal;
       qc.setQueryData(secretKey(lesson.id), { state: { ...st, revealed: true }, reveal: result });
+      setShow(motionMode(display) === 'none' ? null : { phase: 'countdown', count: 3, shown: 0 });
       void qc.invalidateQueries({ queryKey: lessonKey(lesson.contextId) });
     } catch (err) {
       setError(commandErrorText(t, { code: 'CONFLICT', reason: err instanceof Error ? err.message : undefined }));
@@ -225,12 +260,29 @@ function SecretRevealStep({ lesson }: { lesson: LessonState; value: SecretStepVa
       </div>
     );
   }
+  const inShow = show !== null && show.phase !== 'done';
+  if (show && (show.phase === 'countdown' || show.phase === 'drumroll')) {
+    return (
+      <div className="cc-stack cc-reveal" data-testid="secret-reveal">
+        <div className="cc-reveal__show" data-reduced={motionMode(display) === 'reduced' ? '' : undefined}>
+          <Mascot size={96} pose={show.phase === 'drumroll' ? 'thinking' : 'idle'} />
+          <p className="cc-reveal__countdown" role="status" aria-live="polite" data-testid="secret-countdown">
+            {show.phase === 'countdown' ? show.count : t('secret.drumroll')}
+          </p>
+        </div>
+        <div>
+          <Button onPress={() => setShow({ phase: 'done', count: 0, shown: total })}>{t('secret.skipShow')}</Button>
+        </div>
+      </div>
+    );
+  }
+  const visible = inShow ? reveal.selections.slice(0, show.shown) : reveal.selections;
   return (
     <div className="cc-stack cc-reveal" data-testid="secret-reveal">
       {reveal.selections.length === 0 ? <p className="cc-muted">{t('secret.shortfall.none')}</p> : <p className="cc-h2">{t('secret.revealIntro', { count: reveal.selections.length })}</p>}
       <ul className="cc-reveal__list">
-        {reveal.selections.map((sel, i) => (
-          <SelectionCard key={sel.selectionId} lesson={lesson} sel={sel} index={i} />
+        {visible.map((sel, i) => (
+          <SelectionCard key={sel.selectionId} lesson={lesson} sel={sel} index={inShow ? 0 : i} />
         ))}
       </ul>
       {reveal.absent.length ? (

@@ -8,8 +8,9 @@
  * Each stage appends its tables to the relevant section; generate migrations with `npm run db:generate`.
  */
 import { sql } from 'drizzle-orm';
-import { integer, primaryKey, sqliteTable, text, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, real, sqliteTable, text, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { THEME_KEYS } from '../../shared/themes.ts';
+import { DEFAULT_SOUND_VOLUME, DEFAULT_WEATHER, TIME_UP_SOUNDS } from '../../shared/classDisplay.ts';
 import { FILE_KINDS } from '../../shared/contracts/files.ts';
 import { IMPORT_SOURCE_TYPES, type ImportFlag } from '../../shared/contracts/import.ts';
 
@@ -22,6 +23,11 @@ export const schoolSettings = sqliteTable('school_settings', {
   timezone: text('timezone').notNull().default('Europe/Istanbul'),
   weekStartsOn: integer('week_starts_on').notNull().default(1), // 1 = Monday
   defaultLocale: text('default_locale', { enum: ['en', 'tr'] }).notNull().default('en'),
+  /** Classroom weather (S13b, D-106): Open-Meteo for these coordinates; only the coordinates are sent. */
+  weatherEnabled: integer('weather_enabled', { mode: 'boolean' }).notNull().default(true),
+  weatherLabel: text('weather_label').notNull().default(DEFAULT_WEATHER.label),
+  weatherLatitude: real('weather_latitude').notNull().default(DEFAULT_WEATHER.latitude),
+  weatherLongitude: real('weather_longitude').notNull().default(DEFAULT_WEATHER.longitude),
   updatedAt: integer('updated_at').notNull(),
 });
 
@@ -81,6 +87,10 @@ export const classes = sqliteTable(
      */
     mainLanguage: text('main_language', { enum: ['en', 'tr'] }).notNull().default('en'),
     secondLanguageEnabled: integer('second_language_enabled', { mode: 'boolean' }).notNull().default(false),
+    /** S13b (D-105, D-107): classroom sound volume 0–100, quote of the day on/off, time's-up announcement. */
+    soundVolume: integer('sound_volume').notNull().default(DEFAULT_SOUND_VOLUME),
+    quoteEnabled: integer('quote_enabled', { mode: 'boolean' }).notNull().default(true),
+    timeUpSound: text('time_up_sound', { enum: TIME_UP_SOUNDS }).notNull().default('voice'),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -143,6 +153,15 @@ export const users = sqliteTable(
     locale: text('locale', { enum: ['en', 'tr'] }).notNull().default('en'),
     textScale: integer('text_scale').notNull().default(100),
     mustChangePassword: integer('must_change_password', { mode: 'boolean' }).notNull().default(false),
+    /**
+     * S13b (D-108): how the account signs in. 'email_link' accounts have no password (`passwordHash`
+     * is '' and never verifies); administrators always use 'password'. `emailVerifiedAt` is set when
+     * an invite or a sign-in link sent to the address was used.
+     */
+    signInMethod: text('sign_in_method', { enum: ['password', 'email_link'] }).notNull().default('password'),
+    emailVerifiedAt: integer('email_verified_at'),
+    /** The teacher's recorded time's-up clip (files.kind 'teacher_sound', D-107); null = none. */
+    timeUpClipFileId: text('time_up_clip_file_id'),
     disabledAt: integer('disabled_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -162,6 +181,8 @@ export const sessions = sqliteTable(
     pinUnlockedUntil: integer('pin_unlocked_until'),
     pinFailures: integer('pin_failures').notNull().default(0),
     pinLockedUntil: integer('pin_locked_until'),
+    /** How the session was signed in (S13b, D-108): a fresh email-link/invite session counts as re-authentication for 15 minutes. */
+    authMethod: text('auth_method', { enum: ['password', 'email_link', 'invite', 'student_link'] }),
     createdAt: integer('created_at').notNull(),
     lastSeenAt: integer('last_seen_at').notNull(),
     expiresAt: integer('expires_at').notNull(),
@@ -183,11 +204,21 @@ export const authAttempts = sqliteTable(
 
 export const oneTimeTokens = sqliteTable('one_time_tokens', {
   id: text('id').primaryKey(),
-  kind: text('kind', { enum: ['password_reset'] }).notNull(),
+  /** 'invite' (7 days, S13b), 'email_signin' (15 minutes, link + 6-digit code, S13b), 'password_reset'. */
+  kind: text('kind', { enum: ['password_reset', 'invite', 'email_signin'] }).notNull(),
   userId: text('user_id').notNull().references(() => users.id),
   tokenHash: text('token_hash').notNull(),
   expiresAt: integer('expires_at').notNull(),
   usedAt: integer('used_at'),
+  /** Invites: revoked by an administrator (or replaced by a new one). */
+  revokedAt: integer('revoked_at'),
+  /** Email sign-in: HMAC of the 6-digit code, the requesting device's binding and the wrong tries. */
+  codeHash: text('code_hash'),
+  bindingHash: text('binding_hash'),
+  codeAttempts: integer('code_attempts').notNull().default(0),
+  /** Invites: the link was emailed to the account's address, so using it proves the address. */
+  sentByEmail: integer('sent_by_email', { mode: 'boolean' }).notNull().default(false),
+  createdBy: text('created_by'),
   createdAt: integer('created_at').notNull(),
 }, (t) => [uniqueIndex('one_time_tokens_hash_uq').on(t.tokenHash), index('one_time_tokens_user_idx').on(t.userId)]);
 
@@ -872,6 +903,8 @@ export const importBatches = sqliteTable(
     /** Machine-readable notices about the extraction (e.g. OCR_USED, SHEETS_READ). */
     noticesJson: text('notices_json', { mode: 'json' }).$type<string[]>().notNull(),
     countsJson: text('counts_json', { mode: 'json' }).$type<ImportCountsJson>().notNull(),
+    /** Workbooks (S13b): the sheet names the teacher chose in the sheet picker; null = not a workbook / one sheet. */
+    sheetsJson: text('sheets_json', { mode: 'json' }).$type<string[]>(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
     committedAt: integer('committed_at'),

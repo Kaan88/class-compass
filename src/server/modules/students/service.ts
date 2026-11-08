@@ -400,6 +400,31 @@ export function adminGetStudent(deps: Deps, studentId: string) {
   return { ...adminStudent(deps, s), enrolments: history };
 }
 
+/**
+ * "Remove from this class" by a teacher of the class (S13b, D-109): the current (or scheduled)
+ * enrolment in this class ends today in the class timezone, so the student leaves the roster at once.
+ * Nothing is deleted: attendance, marks, goals and the enrolment history stay (DAT-2/3).
+ */
+export function removeFromClass(ctx: RequestContext, classId: string, studentId: string) {
+  tx(ctx.db, () => {
+    const cls = assertTeachesClass(ctx, classId);
+    assertClassWritable(ctx.db, cls);
+    const today = todayFor(ctx, cls);
+    const open = ctx.db
+      .select()
+      .from(enrolments)
+      .where(and(eq(enrolments.studentId, studentId), eq(enrolments.classId, cls.id), enrolmentNotEndedOn(today)))
+      .all();
+    if (!open.length) throw notFound('Student');
+    for (const e of open) {
+      // A scheduled enrolment that has not started yet is closed on its own first day (an empty range).
+      const end = e.fromDate > today ? e.fromDate : today;
+      ctx.db.update(enrolments).set({ toDate: end }).where(eq(enrolments.id, e.id)).run();
+    }
+    audit(ctx.db, ctx.actor, { action: 'student.remove_from_class', entity: 'student', entityId: studentId, after: { classId: cls.id, date: today } }, ctx.now());
+  });
+}
+
 /** Deactivation hides the student from rosters; every record and enrolment stays intact (DAT-3). */
 export function setStudentActive(ctx: RequestContext, studentId: string, active: boolean) {
   tx(ctx.db, () => {

@@ -29,3 +29,11 @@ export const PRIVATE_NOTES_TABLE = 'private_teacher_notes';
 export function privateNotesCount(db: Db, studentId?: string): number {
   return db.select({ id: privateTeacherNotes.id }).from(privateTeacherNotes).where(studentId ? eq(privateTeacherNotes.studentId, studentId) : undefined).all().length;
 }
+
+/**
+ * Permanent erasure of a student (S13b, D-109): removes every private note about them and returns only
+ * the number removed. The notes are never read here.
+ */
+export function erasePrivateNotesOf(db: Db, studentId: string): number {
+  return db.delete(privateTeacherNotes).where(eq(privateTeacherNotes.studentId, studentId)).run().changes;
+}

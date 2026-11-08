@@ -12,7 +12,7 @@ afterEach(async () => env.app.close());
 
 describe('account administration (ACC-1/2/3, DAT-3)', () => {
   it('creates a teacher with a one-time temporary password that must be changed', async () => {
-    const r = await ok(s.admin.post('/api/admin/users', { login: 'Zehra.Teacher', displayName: 'Zehra Öğretmen', email: 'Zehra@School.example', role: 'teacher' }));
+    const r = await ok(s.admin.post('/api/admin/users', { login: 'Zehra.Teacher', displayName: 'Zehra Öğretmen', email: 'Zehra@School.example', role: 'teacher', setup: 'temporary_password' }));
     expect(r.temporaryPassword).toMatch(/^[A-Za-z0-9_-]{16}$/);
     expect(r.user).toMatchObject({ login: 'zehra.teacher', email: 'zehra@school.example', role: 'teacher', active: true, mustChangePassword: true });
     // The password is never returned again.
@@ -43,8 +43,8 @@ describe('account administration (ACC-1/2/3, DAT-3)', () => {
   });
 
   it('enforces the forced password change on the server, not only in the client (ACC-2)', async () => {
-    const t = await ok(s.admin.post('/api/admin/users', { login: 'temp.teacher', displayName: 'Geçici Öğretmen', role: 'teacher' }));
-    const a = await ok(s.admin.post('/api/admin/users', { login: 'temp.admin', displayName: 'Temp Admin', role: 'admin' }));
+    const t = await ok(s.admin.post('/api/admin/users', { login: 'temp.teacher', displayName: 'Geçici Öğretmen', role: 'teacher', setup: 'temporary_password' }));
+    const a = await ok(s.admin.post('/api/admin/users', { login: 'temp.admin', displayName: 'Temp Admin', role: 'admin', setup: 'temporary_password' }));
     const teacher = new Client(env);
     await teacher.login('temp.teacher', t.temporaryPassword);
     const admin = new Client(env);

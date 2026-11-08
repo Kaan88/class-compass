@@ -8,6 +8,7 @@ import type * as C from '../../../shared/contracts/school.ts';
 import { CONTEXT_MODULES, MEDIA_MODULES, type ContextModule, type ModuleKey } from '../../../shared/contracts/school.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { compareNames, foldForSearch, normaliseName } from '../../../shared/text/turkish.ts';
+import { DEFAULT_SOUND_VOLUME } from '../../../shared/classDisplay.ts';
 import { tx, type Db } from '../../db/client.ts';
 import {
   classes,
@@ -67,6 +68,10 @@ export function settingsDto(deps: AppDeps) {
     weekStartsOn: s.weekStartsOn,
     defaultLocale: s.defaultLocale,
     emailResetEnabled: emailResetEnabled(deps),
+    weatherEnabled: s.weatherEnabled,
+    weatherLabel: s.weatherLabel,
+    weatherLatitude: s.weatherLatitude,
+    weatherLongitude: s.weatherLongitude,
   };
 }
 
@@ -78,6 +83,10 @@ export function updateSettings(ctx: RequestContext, input: In<typeof C.updateSet
     if (input.timezone !== undefined) patch.timezone = input.timezone;
     if (input.weekStartsOn !== undefined) patch.weekStartsOn = input.weekStartsOn;
     if (input.defaultLocale !== undefined) patch.defaultLocale = input.defaultLocale;
+    if (input.weatherEnabled !== undefined) patch.weatherEnabled = input.weatherEnabled;
+    if (input.weatherLabel !== undefined) patch.weatherLabel = input.weatherLabel;
+    if (input.weatherLatitude !== undefined) patch.weatherLatitude = input.weatherLatitude;
+    if (input.weatherLongitude !== undefined) patch.weatherLongitude = input.weatherLongitude;
     ctx.db.update(schoolSettings).set(patch).where(eq(schoolSettings.id, 1)).run();
     const { updatedAt: _a, ...b } = before;
     const { updatedAt: _b, ...a } = getSchoolSettings(ctx.db);
@@ -278,6 +287,9 @@ export function classDto(deps: Pick<AppDeps, 'db' | 'now'>, c: ClassRow) {
     animationsEnabled: c.animationsEnabled,
     mainLanguage: c.mainLanguage,
     secondLanguageEnabled: c.secondLanguageEnabled,
+    soundVolume: c.soundVolume,
+    quoteEnabled: c.quoteEnabled,
+    timeUpSound: c.timeUpSound,
     archived: c.archivedAt !== null,
     yearArchived: y.archivedAt !== null,
     studentCount: activeStudentCount(deps, c),
@@ -321,6 +333,9 @@ export function createClass(ctx: RequestContext, input: In<typeof C.createClass>
       animationsEnabled: input.animationsEnabled ?? true,
       mainLanguage: input.mainLanguage ?? 'en',
       secondLanguageEnabled: input.secondLanguageEnabled ?? false,
+      soundVolume: input.soundVolume ?? DEFAULT_SOUND_VOLUME,
+      quoteEnabled: input.quoteEnabled ?? true,
+      timeUpSound: input.timeUpSound ?? 'voice',
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -348,6 +363,9 @@ export function updateClass(ctx: RequestContext, input: In<typeof C.updateClass>
     if (input.animationsEnabled !== undefined) patch.animationsEnabled = input.animationsEnabled;
     if (input.mainLanguage !== undefined) patch.mainLanguage = input.mainLanguage;
     if (input.secondLanguageEnabled !== undefined) patch.secondLanguageEnabled = input.secondLanguageEnabled;
+    if (input.soundVolume !== undefined) patch.soundVolume = input.soundVolume;
+    if (input.quoteEnabled !== undefined) patch.quoteEnabled = input.quoteEnabled;
+    if (input.timeUpSound !== undefined) patch.timeUpSound = input.timeUpSound;
     ctx.db.update(classes).set({ ...patch, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
     const before = Object.fromEntries(Object.keys(patch).map((k) => [k, c[k as keyof ClassRow]]));
     audit(ctx.db, ctx.actor, { action: 'class.update', entity: 'class', entityId: c.id, before, after: patch }, ctx.now());
@@ -486,11 +504,38 @@ export function myContexts(ctx: RequestContext) {
         animationsEnabled: cls.animationsEnabled,
         mainLanguage: cls.mainLanguage,
         secondLanguageEnabled: cls.secondLanguageEnabled,
+        soundVolume: cls.soundVolume,
+        quoteEnabled: cls.quoteEnabled,
+        timeUpSound: cls.timeUpSound,
         modules: Object.fromEntries(states.map((s) => [s.module, s.effective])) as Record<ContextModule, boolean>,
       };
     })
     .sort((a, b) => compareNames(a.className, b.className) || compareNames(subjectSortKey({ name: a.subjectName }), subjectSortKey({ name: b.subjectName })));
-  return { contexts, media: mediaRecord(ctx.db) };
+  return { contexts, media: mediaRecord(ctx.db), timeUpClip: requireUser(ctx).timeUpClipFileId !== null };
+}
+
+const DISPLAY_KEYS = ['theme', 'soundsEnabled', 'soundVolume', 'animationsEnabled', 'quoteEnabled', 'timeUpSound'] as const;
+const displayOf = (c: ClassRow) => ({ classId: c.id, theme: c.theme, soundsEnabled: c.soundsEnabled, soundVolume: c.soundVolume, animationsEnabled: c.animationsEnabled, quoteEnabled: c.quoteEnabled, timeUpSound: c.timeUpSound });
+
+/**
+ * Display settings of a class changed by one of its teachers (S13b, D-105; admins also use
+ * updateClass): theme, sounds and volume, animations, quote of the day, time's-up announcement.
+ * Shared by every teacher of the class and audited ('class.display').
+ */
+export function setClassDisplay(ctx: RequestContext, input: In<typeof C.setClassDisplay>) {
+  return tx(ctx.db, () => {
+    const c = getClass(ctx.db, input.classId);
+    if (ctx.user?.role !== 'admin') assertTeachesClass(ctx, c.id);
+    assertClassWritable(ctx.db, c);
+    const patch: Partial<ClassRow> = {};
+    for (const k of DISPLAY_KEYS) if (input[k] !== undefined && input[k] !== c[k]) (patch as Record<string, unknown>)[k] = input[k];
+    if (Object.keys(patch).length) {
+      ctx.db.update(classes).set({ ...patch, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
+      const before = Object.fromEntries(Object.keys(patch).map((k) => [k, c[k as keyof ClassRow]]));
+      audit(ctx.db, ctx.actor, { action: 'class.display', entity: 'class', entityId: c.id, before, after: patch }, ctx.now());
+    }
+    return displayOf(getClass(ctx.db, c.id));
+  });
 }
 
 /** Class language mode by a teacher of the class (S13a, D-099). Never touches label data. */

@@ -66,7 +66,7 @@ import { taughtClassIds } from '../school/service.ts';
 import { GOALS_HISTORY_TABLES, goalsHistorySince } from '../goals/history.ts';
 import { SELECTIONS_TABLE_NAME, studentInContextSelections } from '../secret/service.ts';
 import { createStudentInClass, liveClassIdsOf, liveEnrolmentsOf } from '../students/service.ts';
-import { extractFile, extractPaste, type Extracted } from './parsers/index.ts';
+import { extractFile, extractPaste, listSheets as listWorkbookSheets, type Extracted } from './parsers/index.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 type BatchRow = typeof importBatches.$inferSelect;
@@ -367,7 +367,7 @@ function summaryOf(db: Db, b: BatchRow) {
 
 function batchDto(db: Db, batchId: string): ImportBatch {
   const b = db.select().from(importBatches).where(eq(importBatches.id, batchId)).get()!;
-  return { ...summaryOf(db, b), columns: b.columnsJson, mapping: b.mappingJson, notices: b.noticesJson, rows: rowsOf(db, b.id).map(rowDto) };
+  return { ...summaryOf(db, b), columns: b.columnsJson, mapping: b.mappingJson, notices: b.noticesJson, sheets: b.sheetsJson ?? null, rows: rowsOf(db, b.id).map(rowDto) };
 }
 
 function touch(ctx: RequestContext, batchId: string, states: RowState[]) {
@@ -387,7 +387,7 @@ export async function createBatch(ctx: RequestContext, input: In<typeof C.create
     const f = assertCanReadFile(ctx, input.fileId);
     if (f.kind !== 'import_source') throw invalid('This file is not a student list upload', { reason: 'NOT_AN_IMPORT_FILE' });
     fileId = f.id;
-    extracted = await extractFile(ctx.config, { path: storagePath(ctx.config, f.storageKey), mime: f.sniffedMime, name: f.originalName });
+    extracted = await extractFile(ctx.config, { path: storagePath(ctx.config, f.storageKey), mime: f.sniffedMime, name: f.originalName }, { sheets: input.sheets });
   } else {
     if (!input.text?.trim()) throw invalid('Paste a list first', { reason: 'IMPORT_EMPTY' });
     extracted = extractPaste(input.text);
@@ -435,6 +435,7 @@ export async function createBatch(ctx: RequestContext, input: In<typeof C.create
         mappingJson: mapping,
         noticesJson: extracted.notices,
         countsJson: draftCounts(states),
+        sheetsJson: extracted.sheets,
         createdAt: now,
         updatedAt: now,
         committedAt: null,
@@ -473,6 +474,13 @@ export async function createBatch(ctx: RequestContext, input: In<typeof C.create
     audit(ctx.db, ctx.actor, { action: 'import.create', entity: 'import_batch', entityId: batchId, after: { classId: cls.id, sourceType: extracted.sourceType, fileId, rows: states.length } }, now);
     return batchDto(ctx.db, batchId);
   });
+}
+
+/** Sheet picker (S13b): the sheets of an uploaded workbook, read in the parser worker. */
+export async function listSheets(ctx: RequestContext, fileId: string) {
+  const f = assertCanReadFile(ctx, fileId);
+  if (f.kind !== 'import_source') throw invalid('This file is not a student list upload', { reason: 'NOT_AN_IMPORT_FILE' });
+  return { sheets: await listWorkbookSheets(ctx.config, { path: storagePath(ctx.config, f.storageKey), mime: f.sniffedMime }) };
 }
 
 export function listBatches(ctx: RequestContext, input: In<typeof C.listImportBatches>) {

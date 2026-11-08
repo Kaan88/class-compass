@@ -29,6 +29,7 @@ import { classLabel, LessonDashboard } from '../modules/lessons/Dashboard.tsx';
 import { EndLessonFlow, LessonSummaryView, type EndDraft } from '../modules/lessons/EndLesson.tsx';
 import { serverNow, useActiveLessons, useLessonState, useServerOffset } from '../modules/lessons/lessonClient.ts';
 import { emptyStartDraft, StartLessonFlow, type StartDraft } from '../modules/lessons/StartLesson.tsx';
+import { preloadTimeUp } from '../modules/lessons/timeUp.ts';
 import { BigButton, Button, buttonClass } from '../ui/Button.tsx';
 import { EmptyState, OutboxAttentionTray, OutboxSaveBadge, registerCommandDescription } from '../ui/Feedback.tsx';
 import { Toggle } from '../ui/Fields.tsx';
@@ -122,7 +123,7 @@ function ClassroomScreen({
   setActiveId,
   onLocale,
 }: {
-  contexts: { isLoading: boolean; isSuccess: boolean };
+  contexts: { isLoading: boolean; isSuccess: boolean; data?: { timeUpClip: boolean } | undefined };
   list: School.MyContext[];
   active: School.MyContext | null;
   setActiveId: (id: string) => void;
@@ -149,9 +150,11 @@ function ClassroomScreen({
 
   useEffect(() => {
     if (!active) return;
-    setDisplay({ theme: active.theme, classAnimations: active.animationsEnabled, classSounds: active.soundsEnabled });
-  }, [active]);
-  useEffect(() => () => setDisplay({ theme: DEFAULT_THEME, classAnimations: true, classSounds: true }), []);
+    const hasClip = contexts.data?.timeUpClip ?? false;
+    setDisplay({ theme: active.theme, classAnimations: active.animationsEnabled, classSounds: active.soundsEnabled, soundVolume: active.soundVolume, timeUpSound: active.timeUpSound, timeUpClip: hasClip });
+    preloadTimeUp(active.timeUpSound, hasClip);
+  }, [active, contexts.data?.timeUpClip]);
+  useEffect(() => () => setDisplay({ theme: DEFAULT_THEME, classAnimations: true, classSounds: true, soundVolume: 80 }), []);
 
   // The needs-attention tray names the class of every refused command (LES-4).
   useEffect(() => {

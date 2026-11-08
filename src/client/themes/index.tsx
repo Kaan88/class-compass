@@ -5,16 +5,17 @@
  */
 import { createContext, useContext, type CSSProperties, type ReactNode } from 'react';
 import type { ThemeKey } from '../../shared/themes.ts';
-import { motionAllowed, soundsAllowed, useDisplay, type DisplayState } from '../lib/display.ts';
+import { getDisplay, motionAllowed, soundsAllowed, useDisplay, type DisplayState } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { animationName } from './css.ts';
 import { themeOf } from './registry.ts';
-import { playTones } from './sound.ts';
-import type { IllustrationName, MascotPose, MotionName, SoundName, ThemeDefinition } from './types.ts';
+import { SOUND_PRIORITY, sounds } from './soundManager.ts';
+import type { IllustrationName, MascotPose, MotionName, SoundEvent, ThemeDefinition } from './types.ts';
 
 export { THEME_LIST, THEMES, themeOf } from './registry.ts';
 export { installThemeStyles } from './css.ts';
-export type { IllustrationName, MascotPose, MotionName, SoundName, ThemeDefinition } from './types.ts';
+export type { IllustrationName, MascotPose, MotionName, SoundEvent, SoundName, ThemeDefinition } from './types.ts';
+export { sounds, installSoundUnlock } from './soundManager.ts';
 
 /** Overrides the document theme for a subtree (previews, the component catalogue). */
 export const ThemeScope = createContext<ThemeKey | null>(null);
@@ -63,15 +64,25 @@ export function useThemeMotion(name: MotionName, play: boolean, explicit?: Theme
   };
 }
 
-/** Play a theme sound when the class and this device allow sounds (THM-5). Returns whether it played. */
-export function playThemeSound(display: DisplayState, theme: ThemeDefinition, name: SoundName): boolean {
+/**
+ * Play the theme's cue for a classroom event when the class and this device allow sounds (THM-5), at
+ * the class volume and the event's priority (SoundManager). Returns whether it played.
+ */
+export function playThemeSound(display: DisplayState, theme: ThemeDefinition, name: SoundEvent): boolean {
+  sounds.setMuted(!soundsAllowed(display));
+  sounds.setVolume(display.soundVolume);
   if (!soundsAllowed(display) || !theme.sounds) return false;
-  playTones(theme.sounds[name]);
-  return true;
+  return sounds.play(theme.sounds[name], SOUND_PRIORITY[name]);
+}
+
+/** For code outside components (command senders): the cue of the document (class) theme. */
+export function playEvent(name: SoundEvent): boolean {
+  const d = getDisplay();
+  return playThemeSound(d, themeOf(d.theme), name);
 }
 
 /** Hook form of playThemeSound for the current theme. */
-export function useThemeSound(): (name: SoundName) => boolean {
+export function useThemeSound(): (name: SoundEvent) => boolean {
   const theme = useTheme();
   const display = useDisplay();
   return (name) => playThemeSound(display, theme, name);

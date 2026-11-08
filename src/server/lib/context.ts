@@ -2,6 +2,7 @@ import type { Config } from '../config.ts';
 import type { Db } from '../db/client.ts';
 import type { sessions, users } from '../db/schema.ts';
 import type { Mailer } from './mailer.ts';
+import type { WeatherFetch } from '../modules/weather/service.ts';
 
 export type SessionRow = typeof sessions.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
@@ -27,6 +28,8 @@ export interface AppDeps {
    * Tests inject a fake transport here.
    */
   mailer?: Mailer | null;
+  /** Classroom weather fetcher (S13b); tests inject a fake, production uses HTTPS to Open-Meteo. */
+  weatherFetch?: WeatherFetch;
 }
 
 export interface RequestContext extends AppDeps {

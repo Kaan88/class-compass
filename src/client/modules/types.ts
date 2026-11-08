@@ -27,6 +27,8 @@ export interface ClassroomContext {
   /** Class language mode (S13a, D-099); absent in older callers = English only. */
   mainLanguage?: 'en' | 'tr';
   secondLanguageEnabled?: boolean;
+  /** Quote of the day on the classroom top bar (S13b); absent = on. */
+  quoteEnabled?: boolean;
 }
 
 /**

@@ -24,6 +24,7 @@ import { classLabel } from '../lessons/labels.ts';
 import { serverNow, useLessonState } from '../lessons/lessonClient.ts';
 import type { ClassroomContext, DashboardSlot, StudentCardAddon } from '../types.ts';
 import { applyDelta, applyReset, crossingKey, FRESH_CROSSING_MS, markShown, opensCrossing, patchCounters, sendCounterCommand, tapGuard, tapToastText, wasShown } from './countersClient.ts';
+import { playEvent } from '../../themes/index.tsx';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -43,6 +44,7 @@ function recordTap(context: ClassroomContext, lesson: LessonState, counter: Coun
     },
     counter.id,
   );
+  playEvent(crossed ? 'thresholdReached' : student ? 'pointAwarded' : 'tap');
   const sent = sendCounterCommand('counter.tap', { contextId: context.id, lessonId: lesson.id, counterId: counter.id, ...(student ? { studentId: student.id } : {}) });
   const cls = classLabel(context, locale);
   const label = pickText(student ? counter.labels.individual : counter.labels.main, locale);
@@ -50,6 +52,7 @@ function recordTap(context: ClassroomContext, lesson: LessonState, counter: Coun
   lastUndo = showUndoToast(
     tapToastText(t, { cls, label, studentName: student?.fullName ?? null, crossed }),
     async () => {
+      playEvent('undo');
       const eventId = await sent;
       tapGuard.forget(key);
       patchCounters(context.id, (c) => applyDelta(c, student?.id ?? null, -1), counter.id);

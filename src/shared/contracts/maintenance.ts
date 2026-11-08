@@ -38,6 +38,8 @@ export const MaintenanceStatus = z.object({
   /** Off-site copy older than OFFSITE_STALE_HOURS (or none at all). */
   offsiteStale: z.boolean(),
   offsiteStaleHours: z.number(),
+  /** S13b (D-108): active email-link accounts that cannot sign in because SMTP is not configured (0 when it is). */
+  emailLinkAccountsWithoutSmtp: z.number().int(),
   /**
    * Off-site setup as the last off-site run reported it (the app itself never holds the restic
    * credentials): `unknown` = no off-site run recorded yet.

@@ -8,6 +8,8 @@ import { I18nProvider, useI18n } from '../lib/i18n.tsx';
 import { setDisplay, useDisplay, type ThemeName } from '../lib/display.ts';
 import { ILLUSTRATIONS, MASCOT_POSES } from '../themes/types.ts';
 import { THEME_LIST, ThemeScope, useTheme, useThemeSound } from '../themes/index.tsx';
+import { celebrate } from '../themes/Celebration.tsx';
+import { SOUND_EVENTS } from '../themes/types.ts';
 import { showToast, showUndoToast } from '../lib/toast.ts';
 import { useMe } from '../lib/session.ts';
 import { Button, BigButton, IconButton } from '../ui/Button.tsx';
@@ -299,8 +301,14 @@ function SoundButtons() {
   const play = useThemeSound();
   return (
     <>
-      <Button onPress={() => play('timerEnd')}>{t('catalog.sound.timerEnd')}</Button>
-      <Button onPress={() => play('celebrate')}>{t('catalog.sound.celebrate')}</Button>
+      {SOUND_EVENTS.map((e) => (
+        <Button key={e} onPress={() => play(e)}>
+          {t(`sound.${e}`)}
+        </Button>
+      ))}
+      <Button variant="primary" onPress={() => celebrate()}>
+        {t('catalog.celebrate')}
+      </Button>
     </>
   );
 }

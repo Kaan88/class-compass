@@ -1,13 +1,12 @@
 /**
- * Classroom extension points left for S13b (feedback round 1b), registered from client manifests or
- * modules once they exist:
+ * Classroom extension points (S13a), registered from client manifests:
  * - top-bar slots: `quote` (centre, "quote of the day") and `weather` (right, beside the date and
  *   time). With nothing registered the slot is not rendered; a registered component that renders
  *   nothing leaves its slot hidden too (CSS `:empty`), so the top bar never shows a blank box;
  * - time's-up handlers: called once per finished run for the whole page (also with the group screen
  *   showing a second timer) when a lesson timer reaches 0 while the screen watches it
- *   (the same moment the theme tone plays). S13b adds the spoken / chime announcement here.
- * Nothing is registered in S13a: the slots and the hook exist, the features do not (ROADMAP S13b).
+ *   (the moment the class's time's-up announcement plays, modules/lessons/timeUp.ts).
+ * S13b registers the quote and the weather (modules/core/topBar.tsx).
  */
 import type { ComponentType } from 'react';
 import type { LessonState } from '../../shared/contracts/lessons.ts';

@@ -11,6 +11,7 @@ import { AppError } from '../../../lib/errors.ts';
 import { MIME } from '../../files/sniff.ts';
 import { recognise } from './ocr.ts';
 import { runParser } from './runParser.ts';
+import type { SheetInfo } from './spreadsheet.ts';
 import { decodeText, parseText } from './text.ts';
 
 export type ImportSourceType = 'paste' | 'csv' | 'xlsx' | 'xls' | 'docx' | 'pdf' | 'image';
@@ -18,6 +19,8 @@ export type ImportSourceType = 'paste' | 'csv' | 'xlsx' | 'xls' | 'docx' | 'pdf'
 export interface Extracted {
   sourceType: ImportSourceType;
   rows: SourceRow[];
+  /** Workbooks: the sheets read (names chosen in the sheet picker, or the only sheet); null otherwise. */
+  sheets: string[] | null;
   /** Machine-readable notices shown in the preview (i18n `import.notice.<KEY>`). */
   notices: string[];
 }
@@ -32,10 +35,30 @@ function cap(rows: SourceRow[], notices: string[]): SourceRow[] {
 
 export function extractPaste(text: string): Extracted {
   const notices: string[] = [];
-  return { sourceType: 'paste', rows: cap(parseText(text.normalize('NFC')), notices), notices };
+  return { sourceType: 'paste', rows: cap(parseText(text.normalize('NFC')), notices), notices, sheets: null };
 }
 
-export async function extractFile(config: Pick<Config, 'ocrCacheDir' | 'OCR_TIMEOUT_MS' | 'PARSE_TIMEOUT_MS'>, file: { path: string; mime: string; name: string | null }): Promise<Extracted> {
+/** The sheets of a workbook upload, for the sheet picker (S13b); an empty list for any other file. */
+export async function listSheets(config: Pick<Config, 'PARSE_TIMEOUT_MS'>, file: { path: string; mime: string }): Promise<SheetInfo[]> {
+  if (file.mime !== MIME.xlsx && file.mime !== MIME.xls) return [];
+  try {
+    return (await runParser('workbook', await fsp.readFile(file.path), config.PARSE_TIMEOUT_MS)).sheetInfo;
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError('VALIDATION', 'The file could not be read', { reason: 'IMPORT_UNREADABLE' });
+  }
+}
+
+/**
+ * `sheets` (workbooks with several sheets, S13b): the sheet names the teacher chose. Without a choice
+ * a workbook with more than one sheet is refused with SHEET_CHOICE_REQUIRED (the client shows the
+ * sheet picker first); a single sheet needs no choice.
+ */
+export async function extractFile(
+  config: Pick<Config, 'ocrCacheDir' | 'OCR_TIMEOUT_MS' | 'PARSE_TIMEOUT_MS'>,
+  file: { path: string; mime: string; name: string | null },
+  opts: { sheets?: string[] | undefined } = {},
+): Promise<Extracted> {
   const buf = await fsp.readFile(file.path);
   const notices: string[] = [];
   const fail = (reason: string, message: string) => new AppError('VALIDATION', message, { reason });
@@ -45,20 +68,30 @@ export async function extractFile(config: Pick<Config, 'ocrCacheDir' | 'OCR_TIME
         const { text, encoding } = decodeText(buf);
         notices.push(`ENCODING_${encoding.toUpperCase().replace(/-/gu, '_')}`);
         const csv = /\.csv$/iu.test(file.name ?? '');
-        return { sourceType: csv ? 'csv' : 'paste', rows: cap(parseText(text), notices), notices };
+        return { sourceType: csv ? 'csv' : 'paste', rows: cap(parseText(text), notices), notices, sheets: null };
       }
       case MIME.xlsx:
       case MIME.xls: {
-        const { rows, sheets } = await runParser('workbook', buf, config.PARSE_TIMEOUT_MS);
-        if (sheets > 1) notices.push('SHEETS_READ');
-        return { sourceType: file.mime === MIME.xlsx ? 'xlsx' : 'xls', rows: cap(rows, notices), notices };
+        const { rows, sheetInfo } = await runParser('workbook', buf, config.PARSE_TIMEOUT_MS);
+        const names = sheetInfo.map((s) => s.name);
+        let chosen = names;
+        if (opts.sheets?.length) {
+          const unknown = opts.sheets.filter((n) => !names.includes(n));
+          if (unknown.length) throw fail('SHEET_NOT_FOUND', 'This sheet is not in the workbook');
+          chosen = names.filter((n) => opts.sheets!.includes(n));
+        } else if (names.length > 1) {
+          throw new AppError('VALIDATION', 'Choose which sheet to read', { reason: 'SHEET_CHOICE_REQUIRED', sheets: sheetInfo });
+        }
+        const keep = new Set(chosen.map((n) => names.indexOf(n) + 1));
+        if (chosen.length > 1) notices.push('SHEETS_READ');
+        return { sourceType: file.mime === MIME.xlsx ? 'xlsx' : 'xls', rows: cap(rows.filter((r) => keep.has(r.page ?? 0)), notices), notices, sheets: chosen.length ? chosen : null };
       }
       case MIME.docx:
-        return { sourceType: 'docx', rows: cap(await runParser('docx', buf, config.PARSE_TIMEOUT_MS), notices), notices };
+        return { sourceType: 'docx', rows: cap(await runParser('docx', buf, config.PARSE_TIMEOUT_MS), notices), notices, sheets: null };
       case MIME.pdf: {
         const { rows, scanned } = await runParser('pdf', buf, config.PARSE_TIMEOUT_MS);
         if (scanned) throw fail('SCANNED_PDF', 'This PDF has no text (it is a scan). Upload a photo of the page instead.');
-        return { sourceType: 'pdf', rows: cap(rows, notices), notices };
+        return { sourceType: 'pdf', rows: cap(rows, notices), notices, sheets: null };
       }
       case MIME.jpeg:
       case MIME.png:
@@ -66,7 +99,7 @@ export async function extractFile(config: Pick<Config, 'ocrCacheDir' | 'OCR_TIME
         const lines = await recognise(config, buf);
         notices.push('OCR_LOCAL');
         if (!lines.length) throw fail('OCR_NO_TEXT', 'No text was found in the picture');
-        return { sourceType: 'image', rows: cap(freeTextRows(lines.map((l) => ({ text: l.text, confidence: l.confidence }))), notices), notices };
+        return { sourceType: 'image', rows: cap(freeTextRows(lines.map((l) => ({ text: l.text, confidence: l.confidence }))), notices), notices, sheets: null };
       }
       default:
         throw fail('IMPORT_TYPE_NOT_SUPPORTED', 'This file cannot be read as a student list');

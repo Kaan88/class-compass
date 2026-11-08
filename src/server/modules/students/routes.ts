@@ -3,6 +3,7 @@ import * as C from '../../../shared/contracts/students.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
 import * as svc from './service.ts';
+import { erasePreview, eraseStudent } from './erase.ts';
 
 export function registerStudentRoutes(app: FastifyInstance, deps: AppDeps) {
   // classroom & teacher
@@ -12,6 +13,15 @@ export function registerStudentRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.updateStudent, (ctx, input) => svc.teacherUpdateStudent(ctx, input));
   route(app, deps, C.getContextLevels, (ctx, input) => svc.getContextLevels(ctx, input.contextId));
   route(app, deps, C.setContextLevels, (ctx, input) => svc.setContextLevels(ctx, input));
+  route(app, deps, C.removeStudentFromClass, (ctx, input) => {
+    svc.removeFromClass(ctx, input.classId, input.studentId);
+    return { ok: true as const };
+  });
+  route(app, deps, C.erasePreview, (ctx, input) => erasePreview(ctx, input.studentId));
+  route(app, deps, C.eraseStudent, async (ctx, input) => {
+    const r = await eraseStudent(ctx, input.studentId, input.confirm);
+    return { ok: true as const, files: r.files };
+  });
 
   // admin
   route(app, deps, C.adminListStudents, (ctx, input) => svc.adminListStudents(ctx, input));

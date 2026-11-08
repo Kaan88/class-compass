@@ -9,6 +9,7 @@ import { enterClassroom } from './lib/session.ts';
 import { AdminHome, AdminLayout } from './routes/admin/Admin.tsx';
 import { ChangePasswordPage, LoginPage, ResetPasswordPage } from './routes/Auth.tsx';
 import { ClassroomPage } from './routes/Classroom.tsx';
+import { InvitePage, SignInLinkPage } from './routes/SignIn.tsx';
 import { homeFor, requireSession, type RouterContext } from './routes/guards.ts';
 import { NotFoundPage, RootLayout } from './routes/Root.tsx';
 import { allTeacherPages } from './modules/registry.ts';
@@ -57,6 +58,9 @@ const loginRoute = createRoute({
 
 const resetRoute = createRoute({ getParentRoute: () => rootRoute, path: '/reset-password', component: ResetPasswordPage });
 
+const inviteRoute = createRoute({ getParentRoute: () => rootRoute, path: '/invite', component: InvitePage });
+const signInLinkRoute = createRoute({ getParentRoute: () => rootRoute, path: '/signin-link', component: SignInLinkPage });
+
 const changePasswordRoute = createRoute({ getParentRoute: () => rootRoute, path: '/change-password', beforeLoad: requireSession, component: ChangePasswordPage });
 
 /** Entering the classroom view (re)engages classroom mode = PIN lock on this device (PIN-6). */
@@ -100,7 +104,13 @@ const adminUsers = createRoute({ getParentRoute: () => adminRoute, path: 'users'
 const adminSettings = createRoute({ getParentRoute: () => adminRoute, path: 'settings', component: SettingsPage });
 const adminYears = createRoute({ getParentRoute: () => adminRoute, path: 'years', component: YearsPage });
 const adminSubjects = createRoute({ getParentRoute: () => adminRoute, path: 'subjects', component: SubjectsPage });
-const adminClasses = createRoute({ getParentRoute: () => adminRoute, path: 'classes', component: ClassesPage });
+const adminClasses = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'classes',
+  // `?new=1` opens "New class" straight away (admin home quick action, S13b).
+  validateSearch: (s: Record<string, unknown>): { new?: 1 | undefined } => ({ new: s.new === 1 || s.new === '1' ? 1 : undefined }),
+  component: ClassesPage,
+});
 const adminAssignments = createRoute({ getParentRoute: () => adminRoute, path: 'assignments', component: AssignmentsPage });
 const adminModules = createRoute({ getParentRoute: () => adminRoute, path: 'modules', component: ModulesPage });
 const adminStudents = createRoute({ getParentRoute: () => adminRoute, path: 'students', component: AdminStudentsPage });
@@ -116,6 +126,8 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   resetRoute,
+  inviteRoute,
+  signInLinkRoute,
   changePasswordRoute,
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),

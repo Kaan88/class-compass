@@ -1,5 +1,6 @@
 /** Friendly animal mascots theme (THM-2): a fox cub, leaves and paw prints. One definition fills every slot. */
 import { FADE_IN } from '../motion.ts';
+import { makeSoundPack } from '../soundPack.ts';
 import type { ThemeDefinition } from '../types.ts';
 import { AnimalDecoration, animalIllustrations, AnimalMascot, AnimalPattern } from './art.tsx';
 import { avatar, colors, icons, shape, typography } from './tokens.ts';
@@ -37,15 +38,7 @@ export const animalsTheme: ThemeDefinition = {
       reduced: FADE_IN,
     },
   },
-  sounds: {
-    timerEnd: [
-      { freq: 587, at: 0, dur: 400, type: 'sine', gain: 0.12 },
-      { freq: 880, at: 300, dur: 650, type: 'sine', gain: 0.09 },
-    ],
-    celebrate: [
-      { freq: 659, at: 0, dur: 200, type: 'triangle', gain: 0.1 },
-      { freq: 784, at: 150, dur: 200, type: 'triangle', gain: 0.1 },
-      { freq: 988, at: 300, dur: 450, type: 'triangle', gain: 0.09 },
-    ],
-  },
+  // Bouncy pentatonic sine chirps, a little faster: birdsong in the zoo.
+  sounds: makeSoundPack({ root: 587, wave: 'sine', scale: 'pentatonic', gain: 0.11, tempo: 1.2 }, {}),
+  celebration: { colors: ['accent', 'deco-1', 'deco-2', 'deco-3', 'warning'] },
 };

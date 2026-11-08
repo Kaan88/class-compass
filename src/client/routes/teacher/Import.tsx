@@ -359,6 +359,53 @@ function Report({ batch, onClose }: { batch: Batch; onClose: () => void }) {
   );
 }
 
+/** Sheet picker (S13b): a workbook with several sheets shows each sheet's name, rows and first lines. */
+function SheetPicker({ sheets, busy, onRead, onCancel }: { sheets: Imp.ImportSheet[]; busy: boolean; onRead: (names: string[]) => void; onCancel: () => void }) {
+  const { t } = useI18n();
+  const [chosen, setChosen] = useState<string[]>(() => [sheets.reduce((a, b) => (b.rows > a.rows ? b : a)).name]);
+  return (
+    <section className="cc-card cc-stack" aria-labelledby="imp-sheets" data-testid="sheet-picker">
+      <h2 id="imp-sheets" className="cc-h2">
+        {t('import.sheetsTitle')}
+      </h2>
+      <p className="cc-muted">{t('import.sheetsHint')}</p>
+      <ul className="cc-stack cc-sheet-list">
+        {sheets.map((s) => (
+          <li key={s.name} className="cc-sheet">
+            <label className="cc-choice">
+              <input type="checkbox" checked={chosen.includes(s.name)} onChange={(e) => setChosen((c) => (e.target.checked ? [...c, s.name] : c.filter((x) => x !== s.name)))} />
+              <span>
+                <strong>{s.name}</strong>
+                <span className="cc-muted">{t('import.sheetRows', { count: s.rows })}</span>
+              </span>
+            </label>
+            <div className="cc-table-wrap">
+              <table className="cc-sheet__preview">
+                <caption className="cc-visually-hidden">{t('import.sheetPreview', { name: s.name })}</caption>
+                <tbody>
+                  {s.preview.map((r, i) => (
+                    <tr key={i}>
+                      {r.map((c, j) => (
+                        <td key={j}>{c}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="cc-row">
+        <Button variant="primary" isDisabled={chosen.length === 0 || busy} onPress={() => onRead(sheets.map((s) => s.name).filter((n) => chosen.includes(n)))}>
+          {busy ? t('import.reading') : t('import.readSheets', { count: chosen.length })}
+        </Button>
+        <Button onPress={onCancel}>{t('common.cancel')}</Button>
+      </div>
+    </section>
+  );
+}
+
 function Start({ classes, onCreated }: { classes: { id: string; name: string }[]; onCreated: (b: Batch) => void }) {
   const { t } = useI18n();
   const [classId, setClassId] = useState('');
@@ -368,6 +415,25 @@ function Start({ classes, onCreated }: { classes: { id: string; name: string }[]
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [picking, setPicking] = useState<{ fileId: string; sheets: Imp.ImportSheet[] } | null>(null);
+  const reset = () => {
+    setText('');
+    setFile(null);
+    setPicking(null);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+  const readSheets = async (fileId: string, sheets: string[]) => {
+    setBusy(true);
+    setError(null);
+    try {
+      onCreated(await call(Imp.createImportBatch, { classId: cid, fileId, sheets }));
+      reset();
+    } catch (err) {
+      setError(errorText(t, err));
+    } finally {
+      setBusy(false);
+    }
+  };
   const go = async (source: 'text' | 'file') => {
     setBusy(true);
     setError(null);
@@ -375,17 +441,29 @@ function Start({ classes, onCreated }: { classes: { id: string; name: string }[]
       if (source === 'text') onCreated(await call(Imp.createImportBatch, { classId: cid, text }));
       else if (file) {
         const meta = await upload(uploadFile, { kind: 'import_source' }, file);
+        // Workbooks with several sheets: the teacher chooses which to read (S13b).
+        const { sheets } = await call(Imp.listImportSheets, { fileId: meta.id });
+        if (sheets.length > 1) {
+          setPicking({ fileId: meta.id, sheets });
+          return;
+        }
         onCreated(await call(Imp.createImportBatch, { classId: cid, fileId: meta.id }));
       }
-      setText('');
-      setFile(null);
-      if (fileRef.current) fileRef.current.value = '';
+      reset();
     } catch (err) {
       setError(errorText(t, err));
     } finally {
       setBusy(false);
     }
   };
+  if (picking) {
+    return (
+      <div className="cc-stack">
+        <SheetPicker sheets={picking.sheets} busy={busy} onRead={(names) => void readSheets(picking.fileId, names)} onCancel={reset} />
+        {error ? <Alert>{error}</Alert> : null}
+      </div>
+    );
+  }
   return (
     <div className="cc-stack">
       <Select label={t('import.intoClass')} value={cid} onChange={setClassId} items={classes.map((c) => ({ id: c.id, label: c.name }))} />

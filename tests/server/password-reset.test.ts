@@ -24,7 +24,7 @@ describe('email password reset (D-015)', () => {
     env = await makeEnv({}, { mailer });
     await seedUser(env, 'teacher', 'ayse.teacher');
     const c = new Client(env);
-    expect((await c.get('/api/auth/password-reset')).body).toEqual({ emailResetEnabled: false });
+    expect((await c.get('/api/auth/password-reset')).body).toEqual({ emailResetEnabled: false, emailLinkEnabled: false });
     expect((await c.post('/api/auth/password-reset/request', { email: 'ayse@school.example' })).body).toEqual({ ok: true });
     expect(mailer.sent).toHaveLength(0);
   });
@@ -32,7 +32,7 @@ describe('email password reset (D-015)', () => {
   it('answers identically for unknown emails and sends a link only to a matching account', async () => {
     const mailer = await smtpEnv();
     const c = new Client(env);
-    expect((await c.get('/api/auth/password-reset')).body).toEqual({ emailResetEnabled: true });
+    expect((await c.get('/api/auth/password-reset')).body).toEqual({ emailResetEnabled: true, emailLinkEnabled: true });
     const unknown = await c.post('/api/auth/password-reset/request', { email: 'nobody@school.example' });
     const known = await c.post('/api/auth/password-reset/request', { email: 'AYSE@school.example ' });
     expect(unknown.status).toBe(200);

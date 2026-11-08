@@ -79,6 +79,10 @@ Ordering is deterministic: lists are sorted by `order`, then by `key`. Orders mu
 
 ## Add a theme
 
+> **Agents: read [THEMING.md](THEMING.md) first.** It explains the sound packs, the SoundManager,
+> celebrations and the time's-up announcement (S13b, D-110), with recipes for a new theme, a new
+> sound event and a new celebration trigger.
+
 A theme is a folder `src/client/themes/<key>/` that fills **every** slot of `ThemeDefinition`
 (`src/client/themes/types.ts`). Start with the scaffold, which copies the default theme with renamed
 identifiers so the tests stay green while you change it:
@@ -104,7 +108,8 @@ registry line, the names in en and tr (Turkish marked TODO) and `tests/client/th
 | `art.tsx` | `Decoration`, `Pattern` (+ `patternSize`) | Corner decoration and background tile. Kept subtle by `decoOpacity` ≤ 0.6 and `patternOpacity` ≤ 0.15. |
 | `art.tsx` | `illustrations` | `lockScreen`, `emptyState`, `threshold`, `startLesson`, `endLesson`, `celebration`, each in a 200×140 box and decorative (`aria-hidden`). The lock screen art must not hint at the page behind it. |
 | `index.ts` | `motion` | `celebrate` and `threshold`. Each has `full` and `reduced` variants, plays once and lasts 150–1500 ms. `reduced` is opacity only (`FADE_IN`). No flashing: opacity changes direction at most once. |
-| `index.ts` | `sounds` | Optional (`null` means silent). `timerEnd` and `celebrate` are WebAudio tone lists, ≤ 1500 ms, gain ≤ 0.3, played only when the class and the device allow sounds. |
+| `index.ts` | `sounds` | A sound pack with one cue per classroom event (`SOUND_EVENTS`), usually `makeSoundPack({ root, wave, scale, gain, tempo }, overrides)`; `null` means silent. Synthesized only, gain ≤ 0.3, short cues ≤ 1.2 s, celebration cues ≤ 2.5 s (THEMING.md). |
+| `index.ts` | `celebration` | `colors`: 2+ colour tokens for the celebration fireworks. |
 
 All art is coloured with `tok('name')` (that is, `var(--cc-name)`), never literals. Shared building
 blocks (`Face`, `Arms`, `Scene`, `Sparkles`, `Confetti`, …) are in `src/client/themes/art.tsx`.

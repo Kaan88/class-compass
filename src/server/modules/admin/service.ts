@@ -13,15 +13,20 @@ import type { RequestContext, UserRow } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { hashPassword, randomToken } from '../../lib/crypto.ts';
 import { conflict, invalid, notFound } from '../../lib/errors.ts';
-import { createUser, invalidateResetTokens, revokeAllUserSessions } from '../auth/service.ts';
+import { createUser, insertUser, invalidateResetTokens, revokeAllUserSessions } from '../auth/service.ts';
+import { inviteStatus, issueInvite, revokeInvite } from '../auth/emailSignIn.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
 /** 16 URL-safe characters (~96 bits). */
 export const temporaryPassword = () => randomToken(12);
 
-export function adminUserDto(u: UserRow) {
+export function adminUserDto(u: UserRow, invite: { pending: boolean; expiresAt: number | null } = { pending: false, expiresAt: null }) {
   return {
+    signInMethod: u.signInMethod,
+    emailVerified: u.emailVerifiedAt !== null,
+    invitePending: invite.pending,
+    inviteExpiresAt: invite.expiresAt,
     id: u.id,
     login: u.login,
     displayName: u.displayName,
@@ -41,26 +46,42 @@ function getUser(db: Db, id: string): UserRow {
   return u;
 }
 
-export function listUsers(db: Db) {
-  return db
+const dtoOf = (deps: Pick<RequestContext, 'db' | 'now'>, u: UserRow) => adminUserDto(u, inviteStatus(deps.db, u.id, deps.now()));
+
+export function listUsers(deps: Pick<RequestContext, 'db' | 'now'>) {
+  return deps.db
     .select()
     .from(users)
     .all()
     .sort((a, b) => compareNames(a.displayName, b.displayName))
-    .map(adminUserDto);
+    .map((u) => dtoOf(deps, u));
 }
 
 export async function createUserByAdmin(ctx: RequestContext, input: In<typeof C.createUserByAdmin>) {
-  const password = temporaryPassword();
   // The admin chooses the new account's interface language (S13a, D-099), English by default.
   const locale = input.locale;
-  const u = await createUser(
-    ctx.db,
-    { login: input.login, displayName: normaliseName(input.displayName), role: input.role, password, email: input.email ?? null, mustChangePassword: true, locale },
-    ctx.actor,
-    ctx.now(),
-  );
-  return { user: adminUserDto(u), temporaryPassword: password };
+  const base = { login: input.login, displayName: normaliseName(input.displayName), role: input.role, email: input.email ?? null, locale };
+  if (input.setup === 'temporary_password') {
+    const password = temporaryPassword();
+    const u = await createUser(ctx.db, { ...base, password, mustChangePassword: true }, ctx.actor, ctx.now());
+    return { user: dtoOf(ctx, u), temporaryPassword: password, invite: null };
+  }
+  // Invite (S13b, D-108): no password yet (''), so nobody can sign in until the invite is used.
+  const u = insertUser(ctx.db, { ...base, mustChangePassword: false }, '', ctx.actor, ctx.now());
+  const invite = issueInvite(ctx, u, ctx.actor);
+  return { user: dtoOf(ctx, u), temporaryPassword: null, invite };
+}
+
+export function inviteUserByAdmin(ctx: RequestContext, userId: string) {
+  const u = getUser(ctx.db, userId);
+  if (u.disabledAt) throw conflict('Reactivate the account first', { reason: 'ACCOUNT_INACTIVE' });
+  const invite = issueInvite(ctx, u, ctx.actor);
+  return { user: dtoOf(ctx, getUser(ctx.db, userId)), invite };
+}
+
+export function revokeInviteByAdmin(ctx: RequestContext, userId: string) {
+  revokeInvite(ctx, userId, ctx.actor);
+  return dtoOf(ctx, getUser(ctx.db, userId));
 }
 
 export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.updateUserByAdmin>) {
@@ -75,7 +96,7 @@ export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.update
     if (patch.email !== undefined && patch.email !== u.email) invalidateResetTokens(ctx.db, u.id, ctx.now());
     const before = Object.fromEntries(Object.keys(patch).map((k) => [k, u[k as keyof UserRow]]));
     audit(ctx.db, ctx.actor, { action: 'user.update', entity: 'user', entityId: u.id, before, after: patch }, ctx.now());
-    return adminUserDto(getUser(ctx.db, u.id));
+    return dtoOf(ctx, getUser(ctx.db, u.id));
   });
 }
 
@@ -106,7 +127,7 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
       }
       audit(ctx.db, ctx.actor, { action: active ? 'user.reactivate' : 'user.deactivate', entity: 'user', entityId: u.id }, now);
     }
-    return adminUserDto(getUser(ctx.db, u.id));
+    return dtoOf(ctx, getUser(ctx.db, u.id));
   });
 }
 
@@ -117,7 +138,8 @@ export async function resetPasswordByAdmin(ctx: RequestContext, userId: string) 
   const passwordHash = await hashPassword(password);
   tx(ctx.db, () => {
     const now = ctx.now();
-    ctx.db.update(users).set({ passwordHash, mustChangePassword: true, updatedAt: now }).where(eq(users.id, u.id)).run();
+    // Also the way back from email-link sign-in (e.g. SMTP was turned off, D-108).
+    ctx.db.update(users).set({ passwordHash, mustChangePassword: true, signInMethod: 'password', updatedAt: now }).where(eq(users.id, u.id)).run();
     revokeAllUserSessions(ctx.db, u.id, now);
     invalidateResetTokens(ctx.db, u.id, now);
     audit(ctx.db, ctx.actor, { action: 'auth.password_reset_admin', entity: 'user', entityId: u.id }, now);

@@ -26,6 +26,7 @@ import { Mascot } from '../../ui/Mascot.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { lessonKey, patchLesson, sendLessonCommand, useLessonState, type LessonQueryData } from '../lessons/lessonClient.ts';
 import { endStepUi, startStep, type ClassroomContext, type DashboardSlot } from '../types.ts';
+import { playEvent } from '../../themes/index.tsx';
 
 /** A local calendar date ('YYYY-MM-DD') as a weekday + day label. */
 export const dayLabel = (date: string, locale: 'en' | 'tr', opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }) =>
@@ -38,6 +39,7 @@ export const assistantInvalidation: CommandInvalidation = {
 };
 
 async function tickDuty(lesson: LessonState, responsibilityId: string, checked: boolean) {
+  if (checked) playEvent('assistantCheck');
   await queryClient.cancelQueries({ queryKey: lessonKey(lesson.contextId) });
   queryClient.setQueryData<LessonQueryData>(lessonKey(lesson.contextId), (q) => {
     const a = q?.data.assistant;

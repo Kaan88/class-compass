@@ -1,7 +1,7 @@
 /** Teacher area (PIN-gated in classroom mode): menu first (PIN-4), profile, class settings, roster. */
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useNavigate } from '@tanstack/react-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Auth from '../../../shared/contracts/auth.ts';
 import { call } from '../../lib/api.ts';
 import { errorText } from '../../lib/errors.ts';
@@ -15,6 +15,9 @@ import { menuTeacherPages } from '../../modules/registry.ts';
 import { IconBoard } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
+import { SignInMethodSection } from '../SignIn.tsx';
+import { TimeUpClipSection } from './ClassDisplay.tsx';
+import * as School from '../../../shared/contracts/school.ts';
 import { SensitiveGate } from '../Lock.tsx';
 
 export function TeacherLayout() {
@@ -119,6 +122,7 @@ export function ProfilePage() {
   const me = useMe();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const signInInfo = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000 });
   if (!me) return null;
   const update = async (patch: { locale?: 'en' | 'tr'; textScale?: number }) => {
     setError(null);
@@ -156,16 +160,29 @@ export function ProfilePage() {
         </div>
         {error ? <Alert>{error}</Alert> : null}
       </section>
-      {me.role === 'teacher' ? <PinSection hasPin={me.hasPin} /> : null}
-      <section className="cc-card cc-stack">
-        <h2 className="cc-h2">{t('password.changeTitle')}</h2>
-        <ChangePasswordForm />
-      </section>
+      {me.role === 'teacher' ? <PinSection me={me} /> : null}
+      {me.role === 'teacher' ? <ClipSection /> : null}
+      {me.signInMethod === 'password' ? (
+        <section className="cc-card cc-stack">
+          <h2 className="cc-h2">{t('password.changeTitle')}</h2>
+          <ChangePasswordForm />
+        </section>
+      ) : null}
+      <SignInMethodSection me={me} emailLinkEnabled={signInInfo.data?.emailLinkEnabled ?? false} />
     </main>
   );
 }
 
-function PinSection({ hasPin }: { hasPin: boolean }) {
+/** The time's-up clip needs to know whether one is saved (from the classroom contexts). */
+function ClipSection() {
+  const contexts = useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
+  return <TimeUpClipSection hasClip={contexts.data?.timeUpClip ?? false} />;
+}
+
+function PinSection({ me }: { me: Me }) {
+  const hasPin = me.hasPin;
+  // Email-link accounts have no password: a fresh email sign-in (15 minutes) is the re-authentication (D-108).
+  const byEmail = me.signInMethod === 'email_link';
   const { t } = useI18n();
   const qc = useQueryClient();
   const [password, setPassword] = useState('');
@@ -188,7 +205,7 @@ function PinSection({ hasPin }: { hasPin: boolean }) {
           if (!/^\d{4,8}$/.test(pin)) return setError(t('profile.pinRules'));
           if (pin !== pin2) return setError(t('profile.pinMismatch'));
           try {
-            await call(Auth.setPin, { currentPassword: password, pin });
+            await call(Auth.setPin, byEmail ? { pin } : { currentPassword: password, pin });
             setPassword('');
             setPin('');
             setPin2('');
@@ -199,7 +216,11 @@ function PinSection({ hasPin }: { hasPin: boolean }) {
           }
         }}
       >
-        <TextField label={t('password.current')} type="password" autoComplete="current-password" isRequired value={password} onChange={setPassword} />
+        {byEmail ? (
+          me.reauthFresh ? null : <Alert kind="warning">{t('error.REAUTH_REQUIRED')}</Alert>
+        ) : (
+          <TextField label={t('password.current')} type="password" autoComplete="current-password" isRequired value={password} onChange={setPassword} />
+        )}
         <div className="cc-row" style={{ alignItems: 'flex-start' }}>
           <TextField label={t('profile.newPin')} description={t('profile.pinRules')} type="password" inputMode="numeric" autoComplete="off" isRequired value={pin} onChange={setPin} />
           <TextField label={t('profile.repeatPin')} type="password" inputMode="numeric" autoComplete="off" isRequired value={pin2} onChange={setPin2} />

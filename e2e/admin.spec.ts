@@ -21,6 +21,7 @@ test('create a teacher, show the temporary password once, forced password change
     await dialog.getByLabel('Name', { exact: true }).fill('Ece Örnek (E2E)');
     // The interface language is a visible, required choice, preselected to English (S13a, D-099).
     await expect(dialog.getByLabel('Interface language')).toHaveValue('en');
+    await dialog.getByLabel('First sign-in').selectOption({ label: 'Temporary password' });
     await dialog.getByRole('button', { name: 'New account' }).click();
     const temp = await admin.getByTestId('temp-password').innerText();
     expect(temp.length).toBeGreaterThanOrEqual(10);
@@ -71,6 +72,7 @@ test('an account created with Türkçe sees the forced password change and the P
     await dialog.getByLabel('Name', { exact: true }).fill('Zeynep Deneme (E2E)');
     await dialog.getByLabel('Interface language').selectOption({ label: 'Türkçe' });
     await expect(dialog.getByLabel('Interface language')).toHaveValue('tr');
+    await dialog.getByLabel('First sign-in').selectOption({ label: 'Temporary password' });
     await dialog.getByRole('button', { name: 'New account' }).click();
     const temp = await admin.getByTestId('temp-password').innerText();
     await admin.getByRole('button', { name: 'I have stored it' }).click();

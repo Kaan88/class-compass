@@ -50,4 +50,5 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.getContextModules, (ctx, input) => ({ modules: svc.getContextModules(ctx, input.contextId) }));
   route(app, deps, C.setContextModule, (ctx, input) => svc.setContextModule(ctx, input));
   route(app, deps, C.setClassLanguage, (ctx, input) => svc.setClassLanguage(ctx, input));
+  route(app, deps, C.setClassDisplay, (ctx, input) => svc.setClassDisplay(ctx, input));
 }

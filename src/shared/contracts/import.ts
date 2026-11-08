@@ -108,17 +108,35 @@ export const ImportBatch = ImportBatchSummary.extend({
   columns: z.array(z.string()),
   mapping: ImportMapping,
   notices: z.array(z.string()),
+  /** Workbooks: the sheets read (S13b). */
+  sheets: z.array(z.string()).nullable(),
   rows: z.array(ImportRow),
 });
 export type ImportBatch = z.infer<typeof ImportBatch>;
 
-/** Create a draft from pasted text or an uploaded `import_source` file (exactly one of them). */
+/** A sheet of an uploaded workbook (S13b sheet picker): name, rows with content, the first rows. */
+export const ImportSheet = z.object({ name: z.string(), rows: z.number().int(), preview: z.array(z.array(z.string())) });
+export type ImportSheet = z.infer<typeof ImportSheet>;
+
+/** The sheets of an uploaded `import_source` workbook (empty for other files), read before extraction. */
+export const listImportSheets = endpoint({
+  method: 'POST',
+  path: '/api/import/sheets',
+  access: 'account',
+  input: z.object({ fileId: Id }),
+  output: z.object({ sheets: z.array(ImportSheet) }),
+});
+
+/**
+ * Create a draft from pasted text or an uploaded `import_source` file (exactly one of them). A
+ * workbook with several sheets needs `sheets` (names from listImportSheets); the choice is stored on the batch.
+ */
 export const createImportBatch = endpoint({
   method: 'POST',
   path: '/api/import/batches',
   access: 'account',
   input: z
-    .object({ classId: Id, text: z.string().max(200_000).optional(), fileId: Id.optional() })
+    .object({ classId: Id, text: z.string().max(200_000).optional(), fileId: Id.optional(), sheets: z.array(z.string().max(200)).min(1).max(20).optional() })
     .refine((v) => (v.text !== undefined) !== (v.fileId !== undefined), 'Paste text or choose a file'),
   output: ImportBatch,
 });
