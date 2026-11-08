@@ -10,18 +10,18 @@ In a hurry? See the [quick start for administrators](quick-start-admin.md).
 
 ![Administration](../img/en/admin-home.png)
 
-After you sign in you land on **Administration**. **Add classroom** and **Add a teacher account** are the two most common jobs; the tiles and the menu bar open every section. **Help** (top bar) opens these guides.
+After you sign in you land on **Administration**. **Add classroom** and **Add a teacher account** are the two most common jobs; the tiles open every section, and on the other pages the menu bar does (on a phone or tablet it is one **Section** list). **Help** (top bar) opens these guides. On a phone, tables show each row as a card with its buttons at the bottom.
 
-Administrator accounts always sign in with a **password** (never with email links). Classroom mode and its PIN lock are for teacher accounts only, so an administrator account is never PIN-locked: do not sign in as an administrator on the classroom device.
+Administrator accounts always sign in with a **password** (never with email links). Classroom mode and its PIN lock are for teacher accounts only, so an administrator account is never PIN-locked: do not sign in as an administrator on the classroom device. An administrator still sets a PIN in **Profile and PIN**: **Maintenance** asks for it before **Back up now** and **Verify the latest backup**.
 
 ## First setup
 
 The very first administrator account is created on the server by the IT person (`admin:create`, see `docs/OPERATIONS.md`); there is no web registration and no default password. Then, in this order:
 
-1. **School settings**: **School name**, **School timezone** (for example Europe/Istanbul), **Week starts on**, **Language for new accounts** and the weather (below).
+1. **School settings**: **School name**, **School timezone** (chosen from a list; Europe/Istanbul is first), **Week starts on**, **Language for new accounts** and the weather (below).
 2. **School years and terms**: **New school year** with its dates, then **Add term** for each term. Terms are calendar settings only.
 3. **Subjects**: **New subject** with a name in English and/or Turkish. Teachers see the name in their own language when both are given.
-4. **Classes**: **Add classroom** / **New class**: **Class name** (for example 3-A), **School year**, **Grade**, **Theme**, **Timezone** (empty = the school timezone), **Sounds** and **Animations**, and the class language.
+4. **Classes**: **Add classroom** / **New class**: **Class name** (for example 3-A), **School year**, **Grade** (a number, for example 3), **Theme** (**Show a larger preview of the theme** opens a bigger picture), **Timezone** (empty = the school timezone), **Sounds** and **Animations**, and the class language.
 5. **Accounts**: create the teacher accounts (below).
 6. **Teaching assignments**: **Assign a teacher** to a class and a subject. *A teacher sees a class only when they teach a subject in it.*
 7. **Students**: teachers usually import their class lists themselves (Teacher guide, "Importing a student list"); you can also **Add student** on **Students**.
@@ -38,10 +38,10 @@ The very first administrator account is created on the server by the IT person (
 - **Invite link (recommended)**: a single-use link valid for 7 days. The person chooses a password or email sign-in links (administrators always a password); teachers then set their classroom PIN. When the account has an email address and the school has set up email, the invite is emailed in the account's language; you can always **Copy link** or show the QR code.
 - **Temporary password**: shown to you **once**. Give it to the person safely; they must change it at their first sign-in.
 
-The list shows each account's status (**Active** / **Deactivated**), whether a PIN is set, **Must change password**, **Invite pending** and the sign-in method. Actions:
+The list shows each account's status (**Active**, **Invite pending** until the invite is used, or **Deactivated**), whether a PIN is set, **Must change password** and how the person signs in (**Sign-in: password** or **Sign-in: email links**). Actions:
 
 - **Reset password**: a new temporary password; the person is signed out everywhere. For an account that uses email links, this switches it back to a password.
-- **Clear PIN**: when a teacher forgot their PIN. They are signed out on every device and set a new PIN.
+- **Clear PIN**: when someone forgot their PIN. They are signed out on every device and set a new PIN.
 - **New invite link** / **Revoke invite**.
 - **Deactivate** / **Reactivate**: a deactivated person cannot sign in; their records stay. You cannot deactivate yourself, and at least one active administrator must remain.
 - **Edit**: name, email, interface language. Changing the email revokes open invites and sign-in links.
@@ -60,7 +60,7 @@ Class Compass sends email for invites, email sign-in links and password resets. 
 
 At the end of the year use **Maintenance** → **New school year**:
 
-1. **From the year**, the **New year's name**, **First day** and **Last day** (YYYY-MM-DD).
+1. **From the year**, the **New year's name**, **First day** and **Last day**. They are filled in with the old year moved on by one year; change them as needed (the dates have a calendar). Under the buttons a line says what is still missing.
 2. Choose: **Create the classes again (grade + 1)**, **Keep the same teachers and subjects**, **Move the students up on the first day**, **Archive the old year (read-only)**.
 3. **Preview**. Each class can be switched off (for example a final grade that graduates: it is not created again and nobody moves up from it) and new names can be changed. After any change, **Preview again**.
 4. **Start the new year**: type the old year's name to confirm. Everything happens at once and is recorded in the audit log. History stays with the students.
@@ -77,12 +77,14 @@ Single classes can also be moved with **Classes** → **Promote class**.
 
 ![Modules and media](../img/en/admin-modules.png)
 
+The page has five tabs: **Modules**, **Photos and media**, **Default goals**, **Default badges** and **Kind words**.
+
 - **Teacher modules**: modules switched off here are hidden for every teacher. Teachers switch the others on or off per class and subject.
 - **School-wide modules**: **Super Speakers** (off by default). See the [Super Speakers guide](super-speakers.md).
 - **Photos, audio and documents**: **Student photos**, **Photo evidence** and **Audio evidence** stay **off until consent is confirmed**. Turn them on only after the school has confirmed consent and its KVKK position. **Document evidence** (text, links and documents) is on by default and can be switched off.
-- **Default goal categories and goals**: **Archive** removes a default category or goal from every class (goals students already have are kept); **Restore** brings it back. Teachers can also hide a default for their own classes only.
-- **Default badges**: archive a built-in badge for every class, or restore it. Badges already given are kept.
-- **Kind words check**: **Blocked words** and **Allowed words** for the whole school (one per line; an allowed word wins), and how long a goal must be (**Words a goal needs at least**, default 3, and **Letters a goal needs at least**, default 12).
+- **Default goals**: **Archive** (at the right of each row) removes a default category or goal from every class (goals students already have are kept); **Restore** brings it back. Teachers can also hide a default for their own classes only.
+- **Default badges**: archive a built-in badge for every class, or restore it. Badges with the same name show their tier (for example "· Bronze"). Badges already given are kept.
+- **Kind words**: **Blocked words** and **Allowed words** for the whole school (one per line; an allowed word wins), and how long a goal must be (**Words a goal needs at least**, default 3, and **Letters a goal needs at least**, default 12).
 
 *Turning a module off hides it but keeps all of its data.*
 
@@ -101,13 +103,13 @@ Single classes can also be moved with **Classes** → **Promote class**.
 - **History**: which classes the student was in and why (added, imported, moved, promoted).
 - **Deactivate**: the student disappears from class lists; all records stay and they can be reactivated. Their personal link stops working.
 - **Delete permanently**: only for a deactivated student. Class Compass shows what will be deleted (records, files and photos, history entries naming the student). This cannot be undone, and backups made before today still contain the student until they expire. Class counter and assistant totals stay correct without the name, but the student's attendance, homework marks and Super Speakers points are removed, so reports and the points history no longer count them. Free text that teachers typed elsewhere and that names the student (for example a lesson reflection) is not changed. Only a note "a student was deleted" (without a name) stays in the audit log.
-- **Link**: the student's personal link (copy, print) and the **Emergency** revoke or replace (see the Teacher guide, "Student links"). For a deactivated student the link does not work and only revoke is offered.
+- **Link**: the student's personal link (copy, print) and the **Emergency** revoke or replace (see the Teacher guide, "Student links"). For a deactivated student the link does not work: no QR code or address is shown, **Reactivate the student** is offered, and the emergency action only revokes.
 
 ## Reports and audit log
 
 **Reports**: the **School-wide usage** report (counts per class, subject and teacher, no student data) and every class and subject report. Teachers' own lesson reflection notes are not shown to administrators. Every table has a **CSV** download and every download is recorded.
 
-**Audit log**: who changed what and when. Passwords, PINs and secret selections are never shown there.
+**Audit log**: who changed what and when, in words (for example "Invite link made", record type "Account"). Filter by **Record type** and **Action** from the lists. Passwords, PINs and secret selections are never shown there.
 
 ## Exports
 
@@ -122,9 +124,9 @@ An export can be downloaded **once**, within one hour, only by you; then it is d
 
 ![Maintenance](../img/en/admin-maintenance.png)
 
-**Maintenance** → **Backups** shows the **Last local backup**, **Last off-site backup**, **Last verification** and **Last restore**, disk usage, the data size, the app version and the database level, and the list of local backups. Warnings appear here when the last backup failed, when there is no recent off-site copy, when database updates are waiting for a restart, or when email-link accounts cannot sign in.
+**Maintenance** → **Backups** shows the **Last local backup**, **Last off-site backup**, **Last verification** and **Last restore**, disk usage, the data size, the app version and the database level (**Up to date**, or how many updates wait for a restart; **Technical details** shows the internal name for the IT person), and the list of local backups. Warnings appear here when the last backup failed, when there is no recent off-site copy, when database updates are waiting for a restart, or when email-link accounts cannot sign in.
 
-**Back up now** and **Verify the latest backup** ask for your PIN and are recorded. At the moment the PIN form in **Profile** is offered on teacher accounts only, so an administrator account without a PIN cannot use these two buttons; the scheduled backups on the server do not depend on them.
+**Back up now** and **Verify the latest backup** ask for your PIN and are recorded. Set the PIN once in **Profile and PIN** (your current password, then 4–8 digits); without one, the button explains this and links there. The scheduled backups on the server do not depend on these buttons.
 
 Backups are made automatically on the server (hourly local copies and a nightly off-site copy, as set up by the IT person). **Restoring a backup is done on the server, not in the browser**: the app must be stopped first. The step-by-step procedure, the off-site copies and the restore drill are in `docs/OPERATIONS.md` ("Backups", "Restore").
 

@@ -104,4 +104,15 @@ describe('account administration (ACC-1/2/3, DAT-3)', () => {
     const future = env.clock.now() + 1;
     expect((await ok(s.admin.get(`/api/admin/audit?from=${future}`))).total).toBe(0);
   });
+
+  it('lists the action and record-type codes in the log for the filter lists (ACC-9, usability audit)', async () => {
+    const codes = await ok(s.admin.get('/api/admin/audit/codes'));
+    expect(codes.actions).toEqual(expect.arrayContaining(['auth.login', 'class.create']));
+    expect(codes.entities).toEqual(expect.arrayContaining(['class', 'user']));
+    expect(codes.actions).toEqual([...new Set(codes.actions)].sort());
+    // Every listed code filters to entries of that code.
+    const first = codes.actions[0] as string;
+    expect((await ok(s.admin.get(`/api/admin/audit?action=${encodeURIComponent(first)}`))).items.every((i: any) => i.action === first)).toBe(true);
+    expect((await s.teacherA.get('/api/admin/audit/codes')).status).toBe(403);
+  });
 });

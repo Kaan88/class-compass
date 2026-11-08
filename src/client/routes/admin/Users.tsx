@@ -266,6 +266,7 @@ export function UsersPage() {
         </Button>
       </div>
       <DataTable
+        stack
         caption={t('users.caption')}
         rows={users.data?.users ?? []}
         rowKey={(u) => u.id}
@@ -288,7 +289,10 @@ export function UsersPage() {
             header: t('users.status'),
             render: (u) => (
               <div className="cc-row" style={{ gap: '0.3rem' }}>
-                {u.active ? (
+                {/* One status: an account whose invite is still open is not "Active" yet. */}
+                {u.active && u.invitePending ? (
+                  <span className="cc-chip cc-chip--warning">{t('users.invitePending')}</span>
+                ) : u.active ? (
                   <span className="cc-chip cc-chip--success">
                     <IconCheck />
                     {t('users.active')}
@@ -299,9 +303,9 @@ export function UsersPage() {
                     {t('users.deactivated')}
                   </span>
                 )}
-                {u.role === 'teacher' ? <span className="cc-chip">{u.hasPin ? t('users.pinSet') : t('users.pinNotSet')}</span> : null}
+                {u.role === 'teacher' || u.hasPin ? <span className="cc-chip">{u.hasPin ? t('users.pinSet') : t('users.pinNotSet')}</span> : null}
                 {u.mustChangePassword ? <span className="cc-chip cc-chip--warning">{t('users.mustChange')}</span> : null}
-                {u.invitePending ? <span className="cc-chip cc-chip--warning">{t('users.invitePending')}</span> : null}
+                {!u.active && u.invitePending ? <span className="cc-chip cc-chip--warning">{t('users.invitePending')}</span> : null}
                 <span className="cc-chip">{u.signInMethod === 'email_link' ? t('users.methodEmail') : t('users.methodPassword')}</span>
               </div>
             ),
@@ -341,7 +345,7 @@ export function UsersPage() {
                   </Button>
                 ) : null}
                 {u.id === me?.id ? null : u.active ? (
-                  <Button size="small" variant="danger" onPress={() => setDeactivating(u)}>
+                  <Button size="small" variant="danger-outline" onPress={() => setDeactivating(u)}>
                     {t('users.deactivate')}
                   </Button>
                 ) : (

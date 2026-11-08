@@ -112,6 +112,37 @@ test('an account created with Türkçe sees the forced password change and the P
 test('media modules are labelled as disabled until consent is confirmed', async ({ page }) => {
   await login(page, 'admin');
   await page.goto('/admin/modules');
+  await page.getByRole('tab', { name: 'Photos and media' }).click();
   await expect(page.getByText('Disabled until consent is confirmed').first()).toBeVisible();
   await expect(page.getByRole('switch', { name: /Student photos/ })).not.toBeChecked();
+});
+
+test('an administrator sets the Maintenance PIN in Profile; without one, Back up now says where (D-138) @mobile', async ({ page }) => {
+  await login(page, 'admin');
+  const me = (await (await page.request.get('/api/auth/me')).json()) as { hasPin: boolean };
+  await page.goto('/admin/profile');
+  await expect(page.getByRole('heading', { name: me.hasPin ? 'Change your PIN' : 'Set your PIN' })).toBeVisible();
+  await expect(page.getByText('Administrator accounts are never PIN-locked', { exact: false })).toBeVisible();
+  if (!me.hasPin) {
+    await page.goto('/admin/maintenance');
+    await page.getByRole('button', { name: 'Back up now' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('link', { name: 'Set a PIN in Profile' }).click();
+    await expect(page).toHaveURL(/\/admin\/profile$/u);
+  }
+});
+
+test('admin tables become cards on a phone, with the section menu as one list @mobile', async ({ page }) => {
+  test.skip(test.info().project.name !== 'mobile', 'phone layout');
+  await login(page, 'admin');
+  await page.goto('/admin/classes');
+  await expect(page.getByRole('heading', { name: 'Classes', level: 1 })).toBeVisible();
+  // No sideways scrolling, and every row's buttons are on screen.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const edit = page.getByRole('row').filter({ hasText: '3-A' }).getByRole('button', { name: 'Edit' });
+  await edit.scrollIntoViewIfNeeded();
+  const box = (await edit.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.getByLabel('Section', { exact: true }).selectOption({ label: 'Accounts' });
+  await expect(page).toHaveURL(/\/admin\/users$/u);
 });

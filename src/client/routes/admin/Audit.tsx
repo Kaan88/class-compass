@@ -1,13 +1,17 @@
-/** Audit log viewer (ACC-9, DAT-5). Secrets are already stripped by the server. */
+/**
+ * Audit log viewer (ACC-9, DAT-5). Secrets are already stripped by the server. Actions and record types
+ * are shown in words (`auditLabel`), and the filters are lists of the codes that occur in the log.
+ */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as Admin from '../../../shared/contracts/admin.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
-import { TextField } from '../../ui/Fields.tsx';
+import { Select } from '../../ui/Fields.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { ADMIN } from './Admin.tsx';
+import { auditLabel } from './auditLabels.ts';
 
 const show = (v: unknown) => (v === null || v === undefined ? '' : JSON.stringify(v, null, 2));
 
@@ -21,33 +25,37 @@ export function AuditPage() {
     queryKey: [...ADMIN, 'audit', entity, action, page],
     queryFn: () => call(Admin.queryAudit, { entity: entity || undefined, action: action || undefined, page, pageSize }),
   });
+  const codes = useQuery({ queryKey: [...ADMIN, 'audit-codes'], queryFn: () => call(Admin.auditCodes, {}), staleTime: 60_000 });
+  const collator = new Intl.Collator(locale === 'tr' ? 'tr' : 'en');
+  const sortByLabel = (xs: Array<{ id: string; label: string }>) => xs.sort((a, b) => collator.compare(a.label, b.label));
   const fmt = new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { dateStyle: 'medium', timeStyle: 'medium' });
   const total = audit.data?.total ?? 0;
   return (
     <main className="cc-page cc-stack">
       <h1 className="cc-h1">{t('admin.audit')}</h1>
       <p className="cc-muted">{t('audit.explain')}</p>
-      <div className="cc-row">
-        <TextField
+      <div className="cc-report-filters">
+        <Select
           label={t('audit.entity')}
           value={entity}
           onChange={(v) => {
             setEntity(v);
             setPage(1);
           }}
-          placeholder="user"
+          items={[{ id: '', label: t('audit.any') }, ...sortByLabel((codes.data?.entities ?? []).map((c) => ({ id: c, label: auditLabel(locale, 'entity', c) })))]}
         />
-        <TextField
+        <Select
           label={t('audit.action')}
           value={action}
           onChange={(v) => {
             setAction(v);
             setPage(1);
           }}
-          placeholder="user.create"
+          items={[{ id: '', label: t('audit.any') }, ...sortByLabel((codes.data?.actions ?? []).map((c) => ({ id: c, label: auditLabel(locale, 'action', c) })))]}
         />
       </div>
       <DataTable
+        stack
         caption={t('audit.caption', { count: total })}
         rows={audit.data?.items ?? []}
         rowKey={(i) => i.id}
@@ -55,8 +63,8 @@ export function AuditPage() {
         columns={[
           { key: 'at', header: t('audit.when'), render: (i) => fmt.format(i.at) },
           { key: 'actor', header: t('audit.who'), render: (i) => i.actorName ?? t(i.actorType === 'system' ? 'audit.system' : 'audit.unknown') },
-          { key: 'action', header: t('audit.action'), render: (i) => <code>{i.action}</code> },
-          { key: 'entity', header: t('audit.entity'), render: (i) => <code>{i.entity}</code> },
+          { key: 'action', header: t('audit.action'), render: (i) => auditLabel(locale, 'action', i.action) },
+          { key: 'entity', header: t('audit.entity'), render: (i) => auditLabel(locale, 'entity', i.entity) },
           {
             key: 'change',
             header: t('audit.change'),

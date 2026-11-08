@@ -102,3 +102,12 @@ export const queryAudit = endpoint({
   }),
   output: z.object({ items: z.array(AuditItem), total: z.number().int(), page: z.number().int(), pageSize: z.number().int() }),
 });
+
+/** The action and record-type codes that occur in the audit log, for the viewer's filter lists (translated on the client). */
+export const auditCodes = endpoint({
+  method: 'GET',
+  path: '/api/admin/audit/codes',
+  access: 'admin',
+  input: z.object({}),
+  output: z.object({ actions: z.array(z.string()), entities: z.array(z.string()) }),
+});

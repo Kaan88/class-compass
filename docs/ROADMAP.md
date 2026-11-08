@@ -226,6 +226,6 @@ Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in t
 - [x] In-app Help: Help link in the teacher menu and nav, the admin top bar, the student page and the scorer app; opens the guide in the interface language with an EN/TR switch; rendered by a small Markdown subset renderer without HTML (no innerHTML, no remote images or links), bundled at build time
 - [x] Tests: every guide in both languages, every guide link, anchor and image exists, every screenshot used and small (`tests/docs`); Help renders EN and TR for teacher, admin and student and passes axe (`e2e/help.spec.ts`)
 - [ ] Read through by the owner and a Turkish-speaking teacher (wording, anything unclear for colleagues)
-- [ ] Administrators cannot set a PIN in Profile (the PIN form is shown on teacher accounts only), but Maintenance "Back up now" and "Verify the latest backup" ask for it; the admin guide says so. Fix in the app, then update the guide
+- [x] Administrators set their Maintenance PIN in Profile (asked by "Back up now" and "Verify the latest backup"); the admin guide is updated (D-138)
 - [ ] The sign-in page is English only (before sign-in the language is not known); the Turkish teacher guide quotes its English labels
 - [ ] Re-run `npm run docs:screenshots` after visible UI changes (no automatic check that the pictures are current)

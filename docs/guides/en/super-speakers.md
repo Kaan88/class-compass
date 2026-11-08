@@ -18,14 +18,14 @@ Open **Super Speakers** in the administration menu. Under **Switch on or off**, 
 
 The **Settings** tab:
 
-- **The week starts on**: at midnight, school time. The board starts fresh then; the history is kept.
+- **Week starts on**: at midnight, school time. The board starts fresh then; the history is kept.
 - **Taking part**: **All active classes of this school year**, or switch that off and choose the classes. Students of other classes cannot get points.
 - **Undo window (minutes)**: how long a scorer can undo their own point (10 by default).
-- **Most points per scorer … within (minutes)**: stops runaway tapping (60 points within 10 minutes by default).
+- **Limit per scorer**: **At most (points)** in **In (minutes)**; the line below reads it as a sentence. It stops runaway tapping (60 points in 10 minutes by default).
 - **Board title (English)** and **Board title (Turkish)**, and the **Board messages** shown while nobody has points and on an empty podium place. Leave a field empty for the built-in message.
 - **Board language** and **Board theme**.
 - **Board sound and celebration**: plays the theme's celebration when the top three change. Off by default. Browsers may only play sound after someone has clicked the board once.
-- **Badges go to this subject**: points earn the Super Speakers badges (first point, 5, 10 and 25 points) in this subject. By default, the subject named "English". If no subject is found, no Super Speakers badges are given until you choose one.
+- **Badges go to this subject**: points earn the Super Speakers badges (first point, 5, 10 and 25 points) in this subject. By default (**Automatic: the English subject**), the subject named "English". If no subject is found, no Super Speakers badges are given until you choose one.
 
 ## Scorer links and board links
 
@@ -49,7 +49,7 @@ For each link the list shows when it was last used and, for scorers, the points 
 
 ## Award log
 
-The **Award log** tab lists the points, newest first, with filters for the period, class and scorer, and **Show removed points**. **Remove** takes back a wrong point: give a reason. The point then no longer counts on the board or in reports; the removal and its reason are recorded. Badges already earned stay. Removing a point never deletes it; only permanently deleting a student (administration area) deletes that student's points.
+The **Award log** tab lists the points, newest first, each with its **Status** (**Counts**, or how it was removed) and its action, with filters for the period, class and scorer, and **Show removed points**. **Remove** takes back a wrong point: give a reason. The point then no longer counts on the board or in reports; the removal and its reason are recorded. Badges already earned stay. Removing a point never deletes it; only permanently deleting a student (administration area) deletes that student's points.
 
 A scorer can undo only their own points, and only within the undo window. After that, an administrator removes them here.
 

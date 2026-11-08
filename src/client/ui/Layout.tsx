@@ -115,8 +115,26 @@ export interface Column<R> {
   sortValue?: (row: R) => string | number;
 }
 
-/** Simple, keyboard-accessible data table: real <table>, sortable headers are buttons with aria-sort. */
-export function DataTable<R>({ columns, rows, rowKey, caption, emptyText }: { columns: Column<R>[]; rows: R[]; rowKey: (r: R) => string; caption: string; emptyText: string }) {
+/**
+ * Simple, keyboard-accessible data table: real <table>, sortable headers are buttons with aria-sort.
+ * `stack`: below 52rem every row becomes a card of "label: value" lines with its actions at the bottom
+ * (admin tables on phones and tablets), instead of a table that scrolls sideways out of view.
+ */
+export function DataTable<R>({
+  columns,
+  rows,
+  rowKey,
+  caption,
+  emptyText,
+  stack = false,
+}: {
+  columns: Column<R>[];
+  rows: R[];
+  rowKey: (r: R) => string;
+  caption: string;
+  emptyText: string;
+  stack?: boolean;
+}) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const sorted = useMemo(() => {
     const col = sort ? columns.find((c) => c.key === sort.key) : undefined;
@@ -130,13 +148,13 @@ export function DataTable<R>({ columns, rows, rowKey, caption, emptyText }: { co
     });
   }, [rows, columns, sort]);
   return (
-    <div className="cc-table-wrap">
-      <table className="cc-table">
+    <div className={stack ? 'cc-table-wrap cc-table-wrap--stack' : 'cc-table-wrap'}>
+      <table className={stack ? 'cc-table cc-table--stack' : 'cc-table'}>
         <caption>{caption}</caption>
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
+              <th key={c.key} scope="col" className={c.sortValue ? undefined : 'cc-table__th--plain'} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
                 {c.sortValue ? (
                   <button type="button" className="cc-table__sort" onClick={() => setSort((s) => ({ key: c.key, dir: s?.key === c.key && s.dir === 1 ? -1 : 1 }))}>
                     {c.header}
@@ -160,7 +178,9 @@ export function DataTable<R>({ columns, rows, rowKey, caption, emptyText }: { co
             sorted.map((r) => (
               <tr key={rowKey(r)}>
                 {columns.map((c) => (
-                  <td key={c.key}>{c.render(r)}</td>
+                  <td key={c.key} data-label={c.header} className={c.key === 'actions' ? 'cc-table__actions' : undefined}>
+                    {c.render(r)}
+                  </td>
                 ))}
               </tr>
             ))

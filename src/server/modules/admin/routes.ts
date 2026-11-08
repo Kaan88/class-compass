@@ -18,4 +18,5 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AppDeps) {
     return { ok: true as const };
   });
   route(app, deps, C.queryAudit, (ctx, input) => svc.queryAudit(ctx.db, input));
+  route(app, deps, C.auditCodes, (ctx) => svc.auditCodes(ctx.db));
 }

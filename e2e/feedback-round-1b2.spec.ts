@@ -242,6 +242,10 @@ test('admin link dialog for a deactivated student: says the link does not work, 
     await expect(dialog.getByText('This student is deactivated, so the link does not work.')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Copy link' })).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Print card' })).toHaveCount(0);
+    // No QR code or address that could be printed or handed out as if it worked; reactivating is offered.
+    await expect(dialog.getByTestId('admin-link')).toHaveCount(0);
+    await expect(dialog.locator('.cc-qr')).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Reactivate the student' })).toBeVisible();
     await dialog.getByRole('button', { name: 'Emergency' }).click();
     const alert = admin.getByRole('alertdialog');
     await expect(alert.getByRole('button', { name: 'Revoke link' })).toBeVisible();
@@ -514,6 +518,7 @@ test('teacher library: archive a default goal for my classes; the admin archives
   await withAdmin(browser, async (admin) => {
     try {
       await admin.goto('/admin/modules');
+      await admin.getByRole('tab', { name: 'Default goals' }).click();
       const section = admin.getByTestId('admin-goal-defaults');
       const row = section.getByRole('listitem').filter({ hasText: /^I will read a short book every week\./u });
       await row.getByRole('button', { name: /^Archive:/u }).click();

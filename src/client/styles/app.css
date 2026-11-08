@@ -114,6 +114,9 @@ a {
 .cc-muted {
   color: var(--cc-text-muted);
 }
+.cc-nowrap {
+  white-space: nowrap;
+}
 .cc-h1 {
   font-size: 2rem;
   font-weight: var(--cc-weight-display);
@@ -160,6 +163,49 @@ a {
   background: var(--cc-accent-soft);
   border-color: var(--cc-accent);
   text-decoration: underline;
+}
+/* Admin section navigation: pills on wide screens, a select on phones and tablets. */
+.cc-admin-nav {
+  padding-bottom: 0;
+}
+.cc-admin-nav__select {
+  display: none;
+}
+@media (max-width: 52rem) {
+  .cc-admin-nav__pills {
+    display: none;
+  }
+  .cc-admin-nav__select {
+    display: block;
+  }
+}
+@media (max-width: 40rem) {
+  /* The top bar keeps "Help" and "Sign out" on the title's row. */
+  .cc-topbar--compact {
+    gap: 0.25rem;
+    flex-wrap: nowrap;
+  }
+  .cc-topbar--compact .cc-topbar__title {
+    min-width: 0;
+  }
+  .cc-topbar--compact > .cc-btn {
+    padding-inline: 0.5rem;
+    white-space: nowrap;
+  }
+  .cc-menu-grid--compact {
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: 0.5rem;
+  }
+  .cc-menu-grid--compact .cc-menu-tile {
+    min-height: 4rem;
+    padding: 0.6rem 0.75rem;
+    font-size: 1rem;
+    gap: 0.5rem;
+  }
+  .cc-menu-grid--compact .cc-menu-tile svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
 }
 .cc-menu-grid {
   display: grid;
@@ -233,6 +279,11 @@ a {
   background: var(--cc-danger);
   border-color: var(--cc-danger-strong);
   color: var(--cc-on-strong);
+}
+.cc-btn--danger-outline {
+  background: var(--cc-surface);
+  border-color: var(--cc-danger);
+  color: var(--cc-danger);
 }
 .cc-btn--ghost {
   border-color: transparent;
@@ -455,6 +506,28 @@ a {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.75rem;
+}
+/* The buttons (and a confirmation's type-to-confirm field) stay in view at the bottom of a dialog
+   that scrolls, e.g. a long warning on a phone; the content scrolls underneath. */
+.cc-dialog__actions,
+.cc-dialog__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding-block: 0.75rem;
+  margin-block: -0.75rem;
+  background: var(--cc-surface);
+}
+.cc-dialog__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-top: 1px solid var(--cc-border);
+}
+.cc-dialog__footer > .cc-dialog__actions {
+  position: static;
+  padding-block: 0;
+  margin-block: 0;
 }
 
 /* ------------------------------------------------------------------ tabs */
@@ -904,6 +977,70 @@ a {
   cursor: pointer;
 }
 
+/* The actions cell keeps its buttons on as few lines as possible (no one-button-per-line column). */
+.cc-table__actions > .cc-row {
+  flex-wrap: wrap;
+}
+/* Stacked tables (admin, below 52rem): each row is a card of "label: value" lines, actions at the
+   bottom in a wrapping button row; the sortable headers stay as a row of sort buttons. */
+@media (max-width: 52rem) {
+  .cc-table-wrap--stack {
+    overflow-x: visible;
+  }
+  .cc-table--stack,
+  .cc-table--stack caption,
+  .cc-table--stack tbody,
+  .cc-table--stack tbody tr {
+    display: block;
+  }
+  .cc-table--stack thead {
+    display: block;
+    background: var(--cc-surface-2);
+  }
+  .cc-table--stack thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.75rem;
+    padding: 0 0.8rem;
+  }
+  .cc-table--stack thead th {
+    border-top: 0;
+    padding: 0;
+  }
+  .cc-table--stack thead th.cc-table__th--plain {
+    display: none;
+  }
+  .cc-table--stack tbody tr {
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--cc-border);
+  }
+  .cc-table--stack tbody td {
+    display: grid;
+    grid-template-columns: minmax(6rem, 35%) minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+    border-top: 0;
+    padding: 0.3rem 0.8rem;
+    overflow-wrap: anywhere;
+  }
+  .cc-table--stack tbody td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: var(--cc-text-muted);
+  }
+  .cc-table--stack tbody td[colspan],
+  .cc-table--stack tbody td.cc-table__actions {
+    display: block;
+  }
+  .cc-table--stack tbody td[colspan]::before,
+  .cc-table--stack tbody td.cc-table__actions::before {
+    content: none;
+  }
+  .cc-table--stack tbody td.cc-table__actions {
+    padding-top: 0.5rem;
+  }
+}
+
 /* ------------------------------------------------------------------ classroom shell, banners */
 .cc-classbanner {
   position: relative;
@@ -1114,6 +1251,24 @@ a {
   font-weight: 700;
   cursor: pointer;
   text-align: left;
+}
+/* Theme choices: equal tiles in one row (or a column on phones), never uneven rows. */
+.cc-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+.cc-theme-grid .cc-theme-option {
+  min-width: 0;
+}
+.cc-theme-option__chosen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 700;
+}
+.cc-theme-option__chosen svg {
+  width: 1.1em;
+  height: 1.1em;
 }
 .cc-theme-option[aria-checked='true'] {
   border-color: var(--cc-accent);
@@ -2409,9 +2564,43 @@ html:has(.cc-classroom) {
   }
 }
 
+/* Admin lists with one action per row (default goals, default badges): the action is always in one
+   right-aligned column with a full touch target, so it is clear which row it belongs to. */
+.cc-admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+li > .cc-admin-list {
+  padding-inline-start: 1.5rem;
+}
+.cc-admin-list__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: var(--cc-touch);
+  border-bottom: 1px solid var(--cc-border);
+  padding-block: 0.25rem;
+}
+.cc-admin-list__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.cc-admin-list__action {
+  flex: none;
+  min-height: var(--cc-touch);
+  min-width: 7rem;
+}
+
 /* ------------------------------------------------------------------ reports (S11: RPT-1..6, D-091) */
 .cc-h3 {
   font-size: 1.05rem;
+  font-weight: 750;
   margin: 0;
 }
 .cc-num {
@@ -2435,6 +2624,17 @@ html:has(.cc-classroom) {
   border-radius: var(--cc-radius-sm);
   padding: 0.5rem 0.75rem;
   background: var(--cc-surface-2);
+}
+.cc-report-metric {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-maint-tag summary {
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.cc-maint-tag code {
+  overflow-wrap: anywhere;
 }
 .cc-report-metric dt {
   color: var(--cc-text-muted);
@@ -2467,8 +2667,7 @@ html:has(.cc-classroom) {
   margin: 0;
 }
 .cc-chart__svg {
-  width: 100%;
-  max-width: 48rem;
+  max-width: 100%;
   height: auto;
   display: block;
 }
@@ -2478,7 +2677,7 @@ html:has(.cc-classroom) {
 }
 .cc-chart__tick {
   fill: var(--cc-text-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .cc-chart__bar {
   stroke: var(--cc-accent-strong);

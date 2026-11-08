@@ -183,6 +183,13 @@ export function scrubSecrets(v: unknown): unknown {
 
 const parse = (s: string | null) => (s === null ? null : scrubSecrets(JSON.parse(s)));
 
+/** Distinct action and record-type codes in the audit log (codes only, never values or ids). */
+export function auditCodes(db: Db) {
+  const actions = db.selectDistinct({ v: auditEvents.action }).from(auditEvents).all().map((r) => r.v);
+  const entities = db.selectDistinct({ v: auditEvents.entity }).from(auditEvents).all().map((r) => r.v);
+  return { actions: actions.sort(), entities: entities.sort() };
+}
+
 export function queryAudit(db: Db, input: In<typeof C.queryAudit>) {
   const conds = [];
   if (input.entity) conds.push(eq(auditEvents.entity, input.entity));

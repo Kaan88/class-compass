@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import * as M from '../../../shared/contracts/maintenance.ts';
 import * as R from '../../../shared/contracts/reports.ts';
 import * as School from '../../../shared/contracts/school.ts';
@@ -13,16 +14,18 @@ import type { MessageKey } from '../../../shared/i18n/index.ts';
 import { call, urlFor } from '../../lib/api.ts';
 import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
+import { useMe } from '../../lib/session.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { ReportsPage } from '../../reports/ReportsPage.tsx';
 import { SectionView } from '../../reports/ReportView.tsx';
-import { Button } from '../../ui/Button.tsx';
-import { ConfirmDestructive, Modal } from '../../ui/Dialog.tsx';
+import { Button, buttonClass } from '../../ui/Button.tsx';
+import { ConfirmDestructive, DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { PinPad } from '../../ui/PinPad.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
 import { ADMIN } from './Admin.tsx';
+import { suggestNextYear } from './rollover.ts';
 
 const KEY = [...ADMIN, 'maintenance'] as const;
 
@@ -64,6 +67,7 @@ function RunLine({ run, label }: { run: M.BackupRunDto | null; label: string }) 
 
 function PinAction({ label, busyLabel, onPin }: { label: string; busyLabel: string; onPin: (pin: string) => Promise<unknown> }) {
   const { t } = useI18n();
+  const me = useMe();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,24 +77,39 @@ function PinAction({ label, busyLabel, onPin }: { label: string; busyLabel: stri
         {busy ? busyLabel : label}
       </Button>
       <Modal isOpen={open} onOpenChange={setOpen} title={label}>
-        <p>{t('maint.pinExplain')}</p>
-        <PinPad
-          busy={busy}
-          error={error}
-          submitLabel={label}
-          onSubmit={async (pin) => {
-            setBusy(true);
-            setError(null);
-            try {
-              await onPin(pin);
-              setOpen(false);
-            } catch (err) {
-              setError(errorText(t, err));
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
+        {me && !me.hasPin ? (
+          <>
+            {/* Administrators set this PIN in Profile (D-138); without it the server answers PIN_NOT_SET. */}
+            <Alert kind="warning">{t('maint.pinNotSet')}</Alert>
+            <DialogActions>
+              <Button onPress={() => setOpen(false)}>{t('common.cancel')}</Button>
+              <Link to="/admin/profile" className={buttonClass('primary')}>
+                {t('maint.pinSetInProfile')}
+              </Link>
+            </DialogActions>
+          </>
+        ) : (
+          <>
+            <p>{t('maint.pinExplain')}</p>
+            <PinPad
+              busy={busy}
+              error={error}
+              submitLabel={label}
+              onSubmit={async (pin) => {
+                setBusy(true);
+                setError(null);
+                try {
+                  await onPin(pin);
+                  setOpen(false);
+                } catch (err) {
+                  setError(errorText(t, err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          </>
+        )}
       </Modal>
     </>
   );
@@ -131,11 +150,14 @@ export function MaintenancePanel() {
         <div className="cc-report-metric">
           <dt>{t('maint.migration')}</dt>
           <dd>
-            <span className="cc-metric">
-              {s.migration.applied}
-              <span className="cc-metric__den"> / {s.migration.shipped}</span>
-            </span>{' '}
-            <code>{s.migration.latestTag ?? '—'}</code>
+            <span className="cc-metric">{s.migration.pending > 0 ? t('maint.migrationWaiting', { count: s.migration.pending }) : t('maint.migrationCurrent')}</span>
+            {/* The internal tag is for the IT person only (OPERATIONS); folded away so it never widens the card. */}
+            <details className="cc-maint-tag">
+              <summary>{t('maint.migrationDetails')}</summary>
+              <span className="cc-muted">
+                {t('maint.migrationCount', { applied: s.migration.applied, shipped: s.migration.shipped })} <code>{s.migration.latestTag ?? '—'}</code>
+              </span>
+            </details>
           </dd>
         </div>
       </dl>
@@ -289,7 +311,9 @@ export function RolloverPanel() {
   const list = years.data?.years ?? [];
   const [fromYearId, setFromYearId] = useState('');
   const from = list.find((y) => y.id === (fromYearId || list.find((x) => !x.archived)?.id));
-  const [form, setForm] = useState({ name: '', startsOn: '', endsOn: '' });
+  // Prefilled with the suggestion (the old year moved on by one year) until the administrator types.
+  const [typed, setForm] = useState<{ name: string; startsOn: string; endsOn: string } | null>(null);
+  const form = typed ?? suggestNextYear(from);
   const [opts, setOpts] = useState({ copyClasses: true, copyAssignments: true, promote: true, archiveOld: true });
   // Per old class: a new name typed by the administrator, and the classes that end with the old year.
   const [names, setNames] = useState<Record<string, string>>({});
@@ -318,14 +342,15 @@ export function RolloverPanel() {
           value={from?.id ?? ''}
           onChange={(v) => {
             setFromYearId(v);
+            setForm(null);
             setNames({});
             setExcluded([]);
             setPreview(null);
           }}
         />
-        <TextField label={t('rollover.newName')} value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="2027–2028" />
-        <TextField label={t('rollover.startsOn')} value={form.startsOn} onChange={(v) => setForm((f) => ({ ...f, startsOn: v }))} placeholder="2027-09-01" />
-        <TextField label={t('rollover.endsOn')} value={form.endsOn} onChange={(v) => setForm((f) => ({ ...f, endsOn: v }))} placeholder="2028-06-30" />
+        <TextField label={t('rollover.newName')} value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+        <TextField label={t('rollover.startsOn')} type="date" value={form.startsOn} onChange={(v) => setForm({ ...form, startsOn: v })} />
+        <TextField label={t('rollover.endsOn')} type="date" value={form.endsOn} onChange={(v) => setForm({ ...form, endsOn: v })} />
       </div>
       <div className="cc-stack">
         <Toggle label={t('rollover.copyClasses')} isSelected={opts.copyClasses} onChange={(v) => setOpts((o) => ({ ...o, copyClasses: v, copyAssignments: v && o.copyAssignments, promote: v && o.promote }))} />
@@ -348,6 +373,8 @@ export function RolloverPanel() {
           {t('rollover.apply')}
         </Button>
       </div>
+      {/* Why a button is disabled, in words (usability audit). */}
+      {!ready ? <p className="cc-muted">{t('rollover.needFields')}</p> : !plan ? <p className="cc-muted">{t('rollover.previewFirst')}</p> : null}
       {stale ? <Alert kind="warning">{t('rollover.stale')}</Alert> : null}
       {plan ? (
         <div className="cc-stack">
@@ -443,7 +470,7 @@ export function AdminReportsPage() {
   const { t } = useI18n();
   const [tab, setTab] = useState('usage');
   return (
-    <main className="cc-page cc-page--wide cc-stack">
+    <main className="cc-page cc-stack">
       <h1 className="cc-h1">{t('admin.reports')}</h1>
       <Tabs
         label={t('admin.reports')}

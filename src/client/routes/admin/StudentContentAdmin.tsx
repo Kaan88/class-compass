@@ -34,18 +34,21 @@ export function AchievementDefaultsSection() {
       </h2>
       <p className="cc-muted">{t('achievements.adminHint')}</p>
       {!q.data ? <p className="cc-muted">{t('common.loading')}</p> : null}
-      <ul className="cc-stack">
+      <ul className="cc-stack cc-admin-list">
         {(q.data?.definitions ?? []).map((d) => {
           const name = pickText(d.name, locale);
           return (
-            <li key={d.id} className="cc-row">
-              <BadgeArt icon={d.icon} tier={d.tier} size={32} locked={d.archived} />
-              <span className="cc-stack">
-                <strong>{name}</strong>
-                <span className="cc-muted">{pickText(d.description, locale)}</span>
+            <li key={d.id} className="cc-admin-list__row">
+              <span className="cc-admin-list__text">
+                <BadgeArt icon={d.icon} tier={d.tier} size={32} locked={d.archived} />
+                <span className="cc-stack" style={{ gap: '0.1rem' }}>
+                  {/* Badges that share a name differ by tier: the tier is written out too (D-125). */}
+                  <strong>{d.tier === 'none' ? name : `${name} · ${t(`achievements.tier.${d.tier}`)}`}</strong>
+                  <span className="cc-muted">{pickText(d.description, locale)}</span>
+                </span>
+                {d.archived ? <span className="cc-chip">{t('goals.schoolArchived')}</span> : null}
               </span>
-              {d.archived ? <span className="cc-chip">{t('goals.schoolArchived')}</span> : null}
-              <Button size="small" variant="ghost" className="cc-push-right" aria-label={`${d.archived ? t('goals.restore') : t('goals.archive')}: ${name}`} onPress={() => toggle(d.id, !d.archived)}>
+              <Button size="small" className="cc-admin-list__action" aria-label={`${d.archived ? t('goals.restore') : t('goals.archive')}: ${name}`} onPress={() => toggle(d.id, !d.archived)}>
                 {d.archived ? t('goals.restore') : t('goals.archive')}
               </Button>
             </li>

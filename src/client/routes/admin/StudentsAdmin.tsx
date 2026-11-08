@@ -35,6 +35,7 @@ function HistoryDialog({ studentId, onClose }: { studentId: string | null; onClo
     <Modal isOpen={studentId !== null} onOpenChange={(o) => !o && onClose()} title={detail.data?.fullName ?? t('common.loading')}>
       {detail.data ? (
         <DataTable
+          stack
           caption={t('students.history')}
           rows={detail.data.enrolments}
           rowKey={(e) => e.id}
@@ -60,7 +61,7 @@ function HistoryDialog({ studentId, onClose }: { studentId: string | null; onClo
  * The student's permanent link (D-115) with the emergency actions (D-118): show, copy and print the
  * card; revoke it or make a new one only in an emergency (typed name, reason, audited).
  */
-function LinkDialog({ student, onClose }: { student: AdminStudent | null; onClose: () => void }) {
+function LinkDialog({ student, onClose, onReactivate }: { student: AdminStudent | null; onClose: () => void; onReactivate: () => Promise<unknown> }) {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const key = [...STUDENTS, 'link', student?.id];
@@ -83,13 +84,21 @@ function LinkDialog({ student, onClose }: { student: AdminStudent | null; onClos
   return (
     <Modal isOpen onOpenChange={(o) => !o && onClose()} title={t('links.adminTitle', { name: student.fullName })}>
       {!d ? <p className="cc-muted">{t('common.loading')}</p> : null}
-      {d && url && !student.active ? <Alert kind="warning">{t('links.inactive')}</Alert> : null}
-      {d && url ? (
+      {d && url && !student.active ? (
+        // A deactivated student's link does not work: no QR code or address that could be printed or
+        // handed out as if it did; reactivating the student is offered instead (usability audit).
+        <div className="cc-stack" data-testid="admin-link-inactive">
+          <Alert kind="warning">{t('links.inactive')}</Alert>
+          <div>
+            <Button onPress={() => void onReactivate()}>{t('links.reactivateStudent')}</Button>
+          </div>
+        </div>
+      ) : null}
+      {d && url && student.active ? (
         <div className="cc-stack" data-testid="admin-link">
           <QrCode text={url} label={t('links.qrFor', { name: student.fullName })} />
           <code className="cc-link-url">{url}</code>
           {d.link?.replacedAt ? <Alert kind="warning">{t('links.replacedOn', { date: whenText(d.link.replacedAt, locale) })}</Alert> : null}
-          {/* A deactivated student's link does not work (item 12): no copying or printing it. */}
           {student.active ? (
             <div className="cc-row">
               <Button onPress={() => copyLink(t, url)}>
@@ -253,6 +262,7 @@ export function AdminStudentsPage() {
         <Toggle label={t('students.includeDeactivated')} isSelected={includeDeactivated} onChange={setIncludeDeactivated} />
       </div>
       <DataTable
+        stack
         caption={t('students.found', { count: total })}
         rows={students.data?.students ?? []}
         rowKey={(s) => s.id}
@@ -313,7 +323,7 @@ export function AdminStudentsPage() {
                   {t('links.adminButton')}
                 </Button>
                 {s.active ? (
-                  <Button size="small" variant="danger" onPress={() => setDeactivating(s)}>
+                  <Button size="small" variant="danger-outline" onPress={() => setDeactivating(s)}>
                     {t('users.deactivate')}
                   </Button>
                 ) : (
@@ -360,7 +370,16 @@ export function AdminStudentsPage() {
         onDone={() => void qc.invalidateQueries({ queryKey: ADMIN })}
       />
       <HistoryDialog studentId={history} onClose={() => setHistory(null)} />
-      <LinkDialog key={linkFor?.id ?? 'none'} student={linkFor} onClose={() => setLinkFor(null)} />
+      <LinkDialog
+        key={linkFor?.id ?? 'none'}
+        student={linkFor}
+        onClose={() => setLinkFor(null)}
+        onReactivate={async () => {
+          const s = linkFor!;
+          const r = await run(() => call(St.reactivateStudent, { studentId: s.id }), { success: t('links.reactivated'), invalidate: [STUDENTS] });
+          if (r) setLinkFor({ ...s, active: true });
+        }}
+      />
       <ConfirmDestructive
         isOpen={deactivating !== null}
         onOpenChange={(o) => !o && setDeactivating(null)}

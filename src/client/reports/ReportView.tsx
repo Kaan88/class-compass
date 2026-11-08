@@ -4,10 +4,12 @@
  * and a printable A4 layout. RPT-5: "not recorded", "absent" and "not in the class" are words with
  * their own look, never 0; counts show what they are out of.
  */
-import { useId } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ReportCell, ReportChart, ReportLabel, ReportSection, ReportTable } from '../../shared/contracts/reports.ts';
 import { chartValue, reportCellText, reportLabelText } from '../../shared/reportText.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { ellipsis, labelLayout, rowLabels } from './chartLabels.ts';
+import { formatDay } from '../../shared/i18n/index.ts';
 
 export function useLabel() {
   const { locale } = useI18n();
@@ -66,28 +68,50 @@ function SeriesSwatch({ i, patternId }: { i: number; patternId: string }) {
   );
 }
 
+/** Width of an element in CSS px (the chart is drawn 1:1, so its text is never scaled below 12px). */
+function useWidth<T extends HTMLElement>(fallback: number) {
+  const ref = useRef<T>(null);
+  const [width, setWidth] = useState(fallback);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([e]) => {
+      const w = Math.round(e?.contentRect.width ?? 0);
+      if (w > 0) setWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
+
+const TICK_PX = 12;
+
 /** Bar or line chart of a table (count cells only; gaps for not recorded / absent / not applicable). */
 export function ChartView({ table, chart }: { table: ReportTable; chart: ReportChart }) {
   const label = useLabel();
   const { locale } = useI18n();
   const uid = useId().replace(/:/gu, '');
+  const [figRef, measured] = useWidth<HTMLElement>(640);
   const labelIdx = table.columns.findIndex((c) => c.key === chart.labelColumn);
   const valueIdx = chart.valueColumns.map((k) => table.columns.findIndex((c) => c.key === k)).filter((i) => i >= 0);
   const rows = table.rows.slice(0, 60);
   if (labelIdx < 0 || !valueIdx.length || !rows.length) return null;
   const values = rows.map((r) => valueIdx.map((i) => chartValue(r.cells[i])));
   const max = Math.max(1, ...values.flat().map((v) => v ?? 0));
-  const W = 640;
-  const H = 220;
-  const pad = { l: 36, r: 8, t: 10, b: 46 };
+  const W = Math.max(280, Math.min(measured, 768));
+  const axis = rowLabels(table, rows, labelIdx, locale);
+  const layout = labelLayout(axis, W - 44, TICK_PX);
+  const H = 200 + (layout.rotate ? Math.round(layout.maxChars * TICK_PX * 0.45) : 0);
+  const pad = { l: 36, r: 8, t: 10, b: layout.rotate ? H - 170 : 30 };
   const band = (W - pad.l - pad.r) / rows.length;
   const y = (v: number) => pad.t + (H - pad.t - pad.b) * (1 - v / max);
   const names = valueIdx.map((i) => label(table.columns[i]!.label));
   const title = `${table.about ? `${label(table.about)} – ` : ''}${label(table.title)}`;
   const ticks = [0, Math.round(max / 2), max].filter((v, i, a) => a.indexOf(v) === i);
   return (
-    <figure className="cc-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby={`${uid}-t`} className="cc-chart__svg" preserveAspectRatio="xMinYMin meet">
+    <figure className="cc-chart" ref={figRef}>
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-labelledby={`${uid}-t`} className="cc-chart__svg" preserveAspectRatio="xMinYMin meet">
         <title id={`${uid}-t`}>{title}</title>
         <defs>
           <pattern id={`${uid}-hatch`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -122,7 +146,7 @@ export function ChartView({ table, chart }: { table: ReportTable; chart: ReportC
                     className={`cc-chart__bar cc-chart__bar--${kind}`}
                     fill={kind === 'hatch' || kind === 'dots' ? `url(#${uid}-${kind})` : undefined}
                   >
-                    <title>{`${reportCellText(r.cells[labelIdx]!, locale)} – ${names[si]}: ${v}`}</title>
+                    <title>{`${axis[ri]} – ${names[si]}: ${v}`}</title>
                   </rect>
                 );
               });
@@ -146,20 +170,32 @@ export function ChartView({ table, chart }: { table: ReportTable; chart: ReportC
                   {pts.map((p) =>
                     p.v === null ? null : (
                       <circle key={p.r.key} cx={p.x} cy={y(p.v)} r="3.5" className="cc-chart__point">
-                        <title>{`${reportCellText(p.r.cells[labelIdx]!, locale)} – ${names[si]}: ${p.v}`}</title>
+                        <title>{`${axis[rows.indexOf(p.r)]} – ${names[si]}: ${p.v}`}</title>
                       </circle>
                     ),
                   )}
                 </g>
               );
             })}
-        {rows.length <= 16
-          ? rows.map((r, ri) => (
-              <text key={r.key} x={pad.l + ri * band + band / 2} y={H - pad.b + 14} textAnchor="middle" className="cc-chart__tick">
-                {reportCellText(r.cells[labelIdx]!, locale).slice(0, 12)}
-              </text>
-            ))
-          : null}
+        {rows.map((r, ri) => {
+          if (ri % layout.step !== 0) return null;
+          const x = pad.l + ri * band + band / 2;
+          const y0 = H - pad.b + 16;
+          const full = axis[ri]!;
+          return (
+            <text
+              key={r.key}
+              x={x}
+              y={y0}
+              textAnchor={layout.rotate ? 'end' : 'middle'}
+              transform={layout.rotate ? `rotate(-40 ${x} ${y0})` : undefined}
+              className="cc-chart__tick"
+            >
+              {ellipsis(full, layout.maxChars)}
+              <title>{full}</title>
+            </text>
+          );
+        })}
       </svg>
       {names.length > 1 ? (
         <figcaption className="cc-chart__legend">
@@ -173,6 +209,20 @@ export function ChartView({ table, chart }: { table: ReportTable; chart: ReportC
       ) : null}
     </figure>
   );
+}
+
+/** A column header; a week column ("2026-10-05 – 2026-10-11") reads "5 Oct – 11 Oct", each date unbroken. */
+function ColumnLabel({ l }: { l: ReportLabel }) {
+  const label = useLabel();
+  const { locale } = useI18n();
+  if ('k' in l && l.k === 'report.col.weekRange' && typeof l.p?.from === 'string' && typeof l.p.to === 'string') {
+    return (
+      <>
+        <span className="cc-nowrap">{formatDay(l.p.from, locale, { year: false })}</span> – <span className="cc-nowrap">{formatDay(l.p.to, locale, { year: false })}</span>
+      </>
+    );
+  }
+  return <>{label(l)}</>;
 }
 
 export function TableView({ table, csvHref }: { table: ReportTable; csvHref?: string | undefined }) {
@@ -200,7 +250,7 @@ export function TableView({ table, csvHref }: { table: ReportTable; csvHref?: st
             <tr>
               {table.columns.map((c) => (
                 <th key={c.key} scope="col" className={c.numeric ? 'cc-num' : undefined}>
-                  {label(c.label)}
+                  <ColumnLabel l={c.label} />
                 </th>
               ))}
             </tr>

@@ -18,14 +18,14 @@ Yönetim menüsünden **Süper Konuşmacılar**'ı açın. **Aç ya da kapat** b
 
 **Ayarlar** sekmesi:
 
-- **Hafta şu gün başlar**: okul saatine göre gece yarısı. Pano o anda sıfırdan başlar; geçmiş korunur.
+- **Haftanın ilk günü**: okul saatine göre gece yarısı. Pano o anda sıfırdan başlar; geçmiş korunur.
 - **Katılan sınıflar**: **Bu öğretim yılının tüm etkin sınıfları** ya da bunu kapatıp sınıfları tek tek seçin. Diğer sınıfların öğrencileri puan alamaz.
 - **Geri alma süresi (dakika)**: bir puanlayıcının kendi verdiği puanı ne kadar süre geri alabileceği (varsayılan 10).
-- **Puanlayıcı başına en çok puan** **… şu süre içinde (dakika)**: art arda kontrolsüz dokunmaları durdurur (varsayılan: 10 dakikada 60 puan).
+- **Puanlayıcı başına sınır**: **Süre (dakika)** içinde **En çok (puan)**; altındaki satır bunu bir cümle olarak okur. Art arda kontrolsüz dokunmaları durdurur (varsayılan: 10 dakikada 60 puan).
 - **Pano başlığı (İngilizce)** ve **Pano başlığı (Türkçe)** ile henüz kimsenin puanı yokken ve podyumda boş bir yer varken gösterilen **Pano mesajları**. Hazır mesaj için alanı boş bırakın.
 - **Pano dili** ve **Pano teması**.
 - **Pano sesi ve kutlama**: ilk üç değiştiğinde temanın kutlamasını oynatır. Varsayılan olarak kapalıdır. Tarayıcılar ses çalmak için birinin panoya bir kez tıklamasını bekleyebilir.
-- **Rozetler bu derse verilir**: puanlar bu derste Süper Konuşmacılar rozetlerini kazandırır (ilk puan, 5, 10 ve 25 puan). Varsayılan, "English" adlı derstir. Böyle bir ders bulunamazsa siz bir ders seçene kadar Süper Konuşmacılar rozeti verilmez.
+- **Rozetler bu derse verilir**: puanlar bu derste Süper Konuşmacılar rozetlerini kazandırır (ilk puan, 5, 10 ve 25 puan). Varsayılan (**Otomatik: İngilizce dersi**), İngilizce adı "English" olan derstir. Böyle bir ders bulunamazsa siz bir ders seçene kadar Süper Konuşmacılar rozeti verilmez.
 
 ## Puanlayıcı ve pano bağlantıları
 
@@ -43,13 +43,13 @@ Yönetim menüsünden **Süper Konuşmacılar**'ı açın. **Aç ya da kapat** b
 1. **Bu ekran nerede?** (örneğin "Koridor ekranı").
 2. **Pano bağlantısı oluştur**'a basın, sonra bağlantıyı büyük ekrana bağlı bilgisayarda açın (bkz. [pano ekranı kılavuzu](board-screen.md)).
 
-Listede her bağlantının en son ne zaman kullanıldığı ve puanlayıcılar için bu haftaki puanlar görünür. **Yeni bağlantı oluştur** bir bağlantıyı yeniler: eski bağlantı hemen çalışmaz olur ve onu kullanan telefon ya da ekranların oturumu kapanır; verilmiş puanlar korunur. **Kapat** bir bağlantıyı durdurur (örneğin bir öğretmen okuldan ayrıldığında); daha sonra yenisini oluşturabilirsiniz.
+Listede her bağlantının en son ne zaman kullanıldığı ve puanlayıcılar için bu haftaki puanlar görünür. **Yeni bağlantı oluştur** bir bağlantıyı yeniler: eski bağlantı hemen çalışmaz olur ve onu kullanan telefon ya da ekranların oturumu kapanır; verilmiş puanlar korunur. **Bağlantıyı iptal et** bir bağlantıyı durdurur (örneğin bir öğretmen okuldan ayrıldığında); daha sonra yenisini oluşturabilirsiniz.
 
 > Puanlayıcı bağlantılarını anahtar gibi koruyun: bağlantıya sahip olan herkes o öğretmen adına puan verebilir.
 
 ## Puan kaydı
 
-**Puan kaydı** sekmesi puanları en yeniden eskiye doğru listeler; dönem, sınıf ve puanlayıcıya göre süzgeçler ile **Kaldırılan puanları göster** seçeneği vardır. **Kaldır** yanlış verilmiş bir puanı geri alır: bir neden yazın. Puan bundan sonra panoda ve raporlarda sayılmaz; kaldırma işlemi ve nedeni kayda geçer. Kazanılmış rozetler korunur. Kaldırmak bir puanı hiçbir zaman silmez; bir öğrencinin puanlarını yalnızca öğrenciyi kalıcı olarak silmek (yönetim alanı) siler.
+**Puan kaydı** sekmesi puanları en yeniden eskiye doğru, her birinin **Durum**u (**Sayılıyor** ya da nasıl kaldırıldığı) ve işlemiyle listeler; dönem, sınıf ve puanlayıcıya göre süzgeçler ile **Kaldırılan puanları göster** seçeneği vardır. **Kaldır** yanlış verilmiş bir puanı geri alır: bir neden yazın. Puan bundan sonra panoda ve raporlarda sayılmaz; kaldırma işlemi ve nedeni kayda geçer. Kazanılmış rozetler korunur. Kaldırmak bir puanı hiçbir zaman silmez; bir öğrencinin puanlarını yalnızca öğrenciyi kalıcı olarak silmek (yönetim alanı) siler.
 
 Puanlayıcı yalnızca kendi puanlarını ve yalnızca geri alma süresi içinde geri alabilir. Bu süreden sonra puanı yönetici buradan kaldırır.
 

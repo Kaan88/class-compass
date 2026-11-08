@@ -89,7 +89,7 @@ function SettingsPanel({ data }: { data: C.SpeakersAdmin }) {
       >
         <h2 className="cc-h2">{t('speakers.admin.settings')}</h2>
         <Select
-          label={t('speakers.admin.weekStartsOn')}
+          label={t('settings.weekStartsOn')}
           description={t('speakers.admin.weekStartsOnHint', { tz: data.timezone })}
           items={WEEKDAYS.map((d) => ({ id: String(d), label: weekdayName(d, locale) }))}
           value={String(s.weekStartsOn)}
@@ -109,11 +109,18 @@ function SettingsPanel({ data }: { data: C.SpeakersAdmin }) {
             </div>
           ) : null}
         </fieldset>
-        <div className="cc-row">
-          <TextField label={t('speakers.admin.undoWindow')} type="number" value={String(s.undoWindowMinutes)} onChange={(v) => set('undoWindowMinutes', num(v, s.undoWindowMinutes))} />
-          <TextField label={t('speakers.admin.rateMax')} type="number" value={String(s.rateLimitMax)} onChange={(v) => set('rateLimitMax', num(v, s.rateLimitMax))} />
-          <TextField label={t('speakers.admin.rateWindow')} type="number" value={String(s.rateLimitWindowMinutes)} onChange={(v) => set('rateLimitWindowMinutes', num(v, s.rateLimitWindowMinutes))} />
-        </div>
+        <TextField label={t('speakers.admin.undoWindow')} type="number" value={String(s.undoWindowMinutes)} onChange={(v) => set('undoWindowMinutes', num(v, s.undoWindowMinutes))} />
+        {/* The two numbers of the limit read as one sentence (usability audit). */}
+        <fieldset className="cc-stack cc-fieldset" data-testid="speakers-rate-limit">
+          <legend className="cc-field__label">{t('speakers.admin.rateLegend')}</legend>
+          <div className="cc-row" style={{ alignItems: 'flex-start' }}>
+            <TextField label={t('speakers.admin.rateMax')} type="number" value={String(s.rateLimitMax)} onChange={(v) => set('rateLimitMax', num(v, s.rateLimitMax))} />
+            <TextField label={t('speakers.admin.rateWindow')} type="number" value={String(s.rateLimitWindowMinutes)} onChange={(v) => set('rateLimitWindowMinutes', num(v, s.rateLimitWindowMinutes))} />
+          </div>
+          <p className="cc-muted" style={{ margin: 0 }}>
+            {t('speakers.admin.rateSummary', { max: s.rateLimitMax, minutes: s.rateLimitWindowMinutes })}
+          </p>
+        </fieldset>
         <div className="cc-row">
           <TextField label={t('speakers.admin.titleEn')} value={s.boardTitle.en ?? ''} onChange={(v) => set('boardTitle', { ...s.boardTitle, en: v })} />
           <TextField label={t('speakers.admin.titleTr')} value={s.boardTitle.tr ?? ''} onChange={(v) => set('boardTitle', { ...s.boardTitle, tr: v })} />
@@ -349,6 +356,7 @@ function AwardsPanel({ data }: { data: C.SpeakersAdmin }) {
                 <th scope="col">{t('speakers.history.class')}</th>
                 <th scope="col">{t('speakers.history.scorer')}</th>
                 <th scope="col">{t('speakers.admin.status')}</th>
+                <th scope="col">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -365,6 +373,11 @@ function AwardsPanel({ data }: { data: C.SpeakersAdmin }) {
                         {a.voidReason ? <span className="cc-muted"> – {a.voidReason}</span> : null}
                       </span>
                     ) : (
+                      t('speakers.admin.counts')
+                    )}
+                  </td>
+                  <td>
+                    {a.voidedAt ? null : (
                       <Button size="small" variant="danger" onPress={() => setVoiding(a)}>
                         {t('speakers.admin.void')}
                       </Button>
@@ -448,7 +461,7 @@ export function SuperSpeakersPage() {
   const q = useOverview();
   const [tab, setTab] = useState('settings');
   return (
-    <main className="cc-page cc-page--wide cc-stack" data-testid="speakers-admin">
+    <main className="cc-page cc-stack" data-testid="speakers-admin">
       <h1 className="cc-h1">{t('module.superSpeakers')}</h1>
       <p className="cc-muted">{t('speakers.admin.intro')}</p>
       {q.error ? <EmptyState title={t('common.error')} /> : null}

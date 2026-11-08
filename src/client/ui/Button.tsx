@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { Button as RACButton, type ButtonProps as RACButtonProps } from 'react-aria-components';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+/** `danger-outline`: a reversible but serious action (deactivate, archive); solid `danger` is kept for what cannot be undone. */
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'danger-outline' | 'ghost';
 export type ButtonSize = 'small' | 'md' | 'big';
 
 export interface ButtonProps extends Omit<RACButtonProps, 'className' | 'children'> {

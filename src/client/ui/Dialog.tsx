@@ -85,33 +85,36 @@ export function ConfirmDestructive({
         <IconAlert />
         <div>{description}</div>
       </div>
-      <TextField label={t('confirm.typeToConfirm', { text: confirmText })} value={typed} onChange={setTyped} autoFocus autoComplete="off" />
-      {error ? (
-        <p role="alert" className="cc-field__error">
-          ⚠ {error}
-        </p>
-      ) : null}
-      <DialogActions>
-        <Button onPress={() => close(false)}>{t('common.cancel')}</Button>
-        <Button
-          variant="danger"
-          isDisabled={!matches || busy}
-          onPress={async () => {
-            setBusy(true);
-            setError(null);
-            try {
-              await onConfirm();
-              close(false);
-            } catch (err) {
-              setError(errorText(t, err));
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {actionLabel}
-        </Button>
-      </DialogActions>
+      {/* Field and buttons stay visible at the bottom when a long warning scrolls (phones). */}
+      <div className="cc-dialog__footer">
+        <TextField label={t('confirm.typeToConfirm', { text: confirmText })} value={typed} onChange={setTyped} autoFocus autoComplete="off" />
+        {error ? (
+          <p role="alert" className="cc-field__error">
+            ⚠ {error}
+          </p>
+        ) : null}
+        <DialogActions>
+          <Button onPress={() => close(false)}>{t('common.cancel')}</Button>
+          <Button
+            variant="danger"
+            isDisabled={!matches || busy}
+            onPress={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                await onConfirm();
+                close(false);
+              } catch (err) {
+                setError(errorText(t, err));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {actionLabel}
+          </Button>
+        </DialogActions>
+      </div>
     </Modal>
   );
 }

@@ -166,7 +166,8 @@ export function ProfilePage() {
         </div>
         {error ? <Alert>{error}</Alert> : null}
       </section>
-      {me.role === 'teacher' ? <PinSection me={me} /> : null}
+      {/* Teachers: the classroom PIN. Administrators: the PIN that confirms Maintenance actions (D-138). */}
+      <PinSection me={me} />
       {me.role === 'teacher' ? <ClipSection /> : null}
       {me.signInMethod === 'password' ? (
         <section className="cc-card cc-stack">
@@ -201,7 +202,7 @@ function PinSection({ me }: { me: Me }) {
       <h2 id="pin-title" className="cc-h2">
         {hasPin ? t('profile.pinChange') : t('profile.pinSet')}
       </h2>
-      <p className="cc-muted">{t('profile.pinHint')}</p>
+      <p className="cc-muted">{t(me.role === 'admin' ? 'profile.pinHintAdmin' : 'profile.pinHint')}</p>
       <form
         className="cc-stack"
         onSubmit={async (e) => {

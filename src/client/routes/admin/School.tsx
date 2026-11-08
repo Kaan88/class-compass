@@ -12,7 +12,7 @@ import * as AdminC from '../../../shared/contracts/admin.ts';
 import * as G from '../../../shared/contracts/goals.ts';
 import * as S from '../../../shared/contracts/school.ts';
 import * as St from '../../../shared/contracts/students.ts';
-import { pickText } from '../../../shared/i18n/index.ts';
+import { formatDay, pickText } from '../../../shared/i18n/index.ts';
 import { compareNames } from '../../../shared/text/turkish.ts';
 import { call } from '../../lib/api.ts';
 import type { ThemeKey as ThemeName } from '../../../shared/themes.ts';
@@ -27,6 +27,7 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconCheck } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
+import { Tabs } from '../../ui/Tabs.tsx';
 import { ClassLanguageSelect, StudentPageLanguageSelect, studentPageOverride } from '../../ui/ClassLanguageSelect.tsx';
 import type { ClassLanguage } from '../../../shared/classLanguage.ts';
 import { ThemePicker, ThemePreview, themeLabelKey } from '../../ui/ThemePreview.tsx';
@@ -59,7 +60,32 @@ const ArchivedChip = () => {
   );
 };
 
+/** "1 Sept 2026 – 23 Jan 2027" in the viewer's language; each date stays on one line. */
+function DateRange({ from, to, muted = false }: { from: string; to: string; muted?: boolean }) {
+  const { locale } = useI18n();
+  return (
+    <span className={muted ? 'cc-muted cc-date-range' : 'cc-date-range'}>
+      {muted ? '(' : ''}
+      <span className="cc-nowrap">{formatDay(from, locale)}</span> – <span className="cc-nowrap">{formatDay(to, locale)}</span>
+      {muted ? ')' : ''}
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------- settings
+/** IANA time zones for the school setting: Europe/Istanbul first, the current value always included. */
+function timeZoneItems(current: string) {
+  let zones: string[] = [];
+  try {
+    zones = Intl.supportedValuesOf('timeZone');
+  } catch {
+    zones = [];
+  }
+  const list = ['Europe/Istanbul', ...zones.filter((z) => z !== 'Europe/Istanbul')];
+  if (current && !list.includes(current)) list.unshift(current);
+  return list.map((z) => ({ id: z, label: z.replace(/_/gu, ' ') }));
+}
+
 const WEEKDAYS = ['weekday.0', 'weekday.1', 'weekday.2', 'weekday.3', 'weekday.4', 'weekday.5', 'weekday.6'] as const;
 
 export function SettingsPage() {
@@ -107,7 +133,7 @@ export function SettingsPage() {
         }}
       >
         <TextField label={t('settings.schoolName')} value={v.schoolName} onChange={(x) => setDraft((d) => ({ ...d, schoolName: x }))} isRequired />
-        <TextField label={t('settings.timezone')} description={t('settings.timezoneHint')} value={v.timezone} onChange={(x) => setDraft((d) => ({ ...d, timezone: x }))} isRequired />
+        <Select label={t('settings.timezone')} description={t('settings.timezoneHint')} value={v.timezone} onChange={(x) => setDraft((d) => ({ ...d, timezone: x }))} items={timeZoneItems(v.timezone)} />
         <Select
           label={t('settings.weekStartsOn')}
           value={String(v.weekStartsOn)}
@@ -134,11 +160,13 @@ export function SettingsPage() {
             <TextField label={t('settings.weatherLongitude')} inputMode="decimal" value={lonValue} onChange={setLonText} isRequired />
           </div>
         </fieldset>
-        <p>
-          <span className={`cc-chip ${v.emailResetEnabled ? 'cc-chip--success' : ''}`}>
+        {/* A status of the server's email setup, not something this form saves: its own row, away from Save. */}
+        <fieldset className="cc-stack cc-fieldset" data-testid="email-reset-status">
+          <legend className="cc-h3">{t('settings.passwordReset')}</legend>
+          <p className="cc-muted" style={{ margin: 0 }}>
             {v.emailResetEnabled ? t('settings.emailResetOn') : t('settings.emailResetOff')}
-          </span>
-        </p>
+          </p>
+        </fieldset>
         {error ? <Alert>{error}</Alert> : null}
         <div>
           <Button type="submit" variant="primary">
@@ -256,7 +284,7 @@ export function YearsPage() {
         <section key={y.id} className="cc-card cc-stack" aria-label={y.name}>
           <div className="cc-row">
             <h2 className="cc-h2" style={{ marginRight: 'auto' }}>
-              {y.name} <span className="cc-muted">({y.startsOn} – {y.endsOn})</span>
+              {y.name} <DateRange from={y.startsOn} to={y.endsOn} muted />
             </h2>
             {y.archived ? <ArchivedChip /> : null}
             {y.archived ? (
@@ -271,26 +299,27 @@ export function YearsPage() {
                 <Button size="small" onPress={() => setAddingTerm(y)}>
                   {t('years.addTerm')}
                 </Button>
-                <Button size="small" variant="danger" onPress={() => setArchiving(y)}>
+                <Button size="small" variant="danger-outline" onPress={() => setArchiving(y)}>
                   {t('common.archive')}
                 </Button>
               </>
             )}
           </div>
           <DataTable
+            stack
             caption={t('years.terms')}
             rows={y.terms}
             rowKey={(term) => term.id}
             emptyText={t('years.noTerms')}
             columns={[
               { key: 'name', header: t('common.name'), render: (term) => pickText(term.name, locale) },
-              { key: 'dates', header: t('common.dates'), render: (term) => `${term.startsOn} – ${term.endsOn}` },
+              { key: 'dates', header: t('common.dates'), render: (term) => <DateRange from={term.startsOn} to={term.endsOn} /> },
               {
                 key: 'actions',
                 header: t('common.actions'),
                 render: (term) =>
                   y.archived ? null : (
-                    <Button size="small" onPress={() => setDeletingTerm({ id: term.id, name: pickText(term.name, locale) })}>
+                    <Button size="small" variant="danger" onPress={() => setDeletingTerm({ id: term.id, name: pickText(term.name, locale) })}>
                       {t('common.delete')}
                     </Button>
                   ),
@@ -386,6 +415,7 @@ export function SubjectsPage() {
         </Button>
       </div>
       <DataTable
+        stack
         caption={t('admin.subjects')}
         rows={subjects.data?.subjects ?? []}
         rowKey={(s) => s.id}
@@ -498,10 +528,14 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
       {cls ? null : <Select label={t('classes.year')} value={yearId} onChange={setYearId} items={writableYears.map((y) => ({ id: y.id, label: y.name }))} />}
       <div className="cc-row">
         <TextField label={t('classes.name')} value={d.name} onChange={(v) => set({ name: v })} isRequired placeholder="3-A" />
-        <TextField label={t('classes.grade')} value={d.grade} onChange={(v) => set({ grade: v.replace(/\D/g, '') })} inputMode="numeric" />
+        <TextField label={t('classes.grade')} description={t('classes.gradeHint')} placeholder="3" value={d.grade} onChange={(v) => set({ grade: v.replace(/\D/g, '') })} inputMode="numeric" />
       </div>
       <ThemePicker label={t('classes.theme')} value={d.theme} onChange={(v) => set({ theme: v })} />
-      <ThemePreview theme={d.theme} />
+      {/* The large preview is folded away inside the dialog so the form's buttons stay close. */}
+      <details className="cc-theme-details">
+        <summary>{t('classes.themePreview')}</summary>
+        <ThemePreview theme={d.theme} />
+      </details>
       <TextField label={t('classes.timezone')} description={t('classes.timezoneHint')} value={d.timezone} onChange={(v) => set({ timezone: v })} placeholder="Europe/Istanbul" />
       <ClassLanguageSelect value={d} onChange={(v) => set(v)} />
       <StudentPageLanguageSelect value={d.studentPage} onChange={(v) => set({ studentPage: v })} />
@@ -613,6 +647,7 @@ export function ClassesPage() {
         />
       ) : null}
       <DataTable
+        stack
         caption={t('admin.classes')}
         rows={classList}
         rowKey={(c) => c.id}
@@ -648,7 +683,7 @@ export function ClassesPage() {
                     {t('common.unarchive')}
                   </Button>
                 ) : c.yearArchived ? null : (
-                  <Button size="small" variant="danger" onPress={() => setArchiving(c)}>
+                  <Button size="small" variant="danger-outline" onPress={() => setArchiving(c)}>
                     {t('common.archive')}
                   </Button>
                 )}
@@ -733,6 +768,7 @@ export function AssignmentsPage() {
       </form>
       <Toggle label={t('assign.showEnded')} isSelected={includeEnded} onChange={setIncludeEnded} />
       <DataTable
+        stack
         caption={t('admin.assignments')}
         rows={contexts.data?.contexts ?? []}
         rowKey={(c) => c.id}
@@ -785,7 +821,7 @@ function GoalDefaultsSection() {
   const toggle = (kind: 'category' | 'preset', itemId: string, archived: boolean) =>
     void run(() => call(G.adminArchiveGoalDefault, { kind, itemId, archived }), { success: t('save.saved') }).then((r) => r && qc.setQueryData(K.goalDefaults, r));
   const button = (kind: 'category' | 'preset', item: { id: string; archived: boolean }, label: string) => (
-    <Button size="small" variant="ghost" aria-label={`${item.archived ? t('goals.restore') : t('goals.archive')}: ${label}`} onPress={() => toggle(kind, item.id, !item.archived)}>
+    <Button size="small" className="cc-admin-list__action" aria-label={`${item.archived ? t('goals.restore') : t('goals.archive')}: ${label}`} onPress={() => toggle(kind, item.id, !item.archived)}>
       {item.archived ? t('goals.restore') : t('goals.archive')}
     </Button>
   );
@@ -801,20 +837,24 @@ function GoalDefaultsSection() {
           const name = pickText(c.name, locale);
           return (
             <li key={c.id} className="cc-stack">
-              <div className="cc-row">
-                <h3 className="cc-h3">{name}</h3>
-                {c.archived ? <span className="cc-chip">{t('goals.schoolArchived')}</span> : null}
-                <span className="cc-push-right">{button('category', c, name)}</span>
+              <div className="cc-admin-list__row">
+                <span className="cc-admin-list__text">
+                  <h3 className="cc-h3">{name}</h3>
+                  {c.archived ? <span className="cc-chip">{t('goals.schoolArchived')}</span> : null}
+                </span>
+                {button('category', c, name)}
               </div>
-              <ul className="cc-stack">
+              <ul className="cc-stack cc-admin-list">
                 {(d?.presets ?? [])
                   .filter((p) => p.categoryId === c.id)
                   .map((p) => {
                     const text = pickText(p.text, locale);
                     return (
-                      <li key={p.id} className="cc-row">
-                        <span>{text}</span>
-                        {p.archived ? <span className="cc-chip">{t('goals.schoolArchived')}</span> : null}
+                      <li key={p.id} className="cc-admin-list__row">
+                        <span className="cc-admin-list__text">
+                          <span>{text}</span>
+                          {p.archived ? <span className="cc-chip">{t('goals.schoolArchived')}</span> : null}
+                        </span>
                         {button('preset', p, text)}
                       </li>
                     );
@@ -831,6 +871,7 @@ function GoalDefaultsSection() {
 export function ModulesPage() {
   const { t } = useI18n();
   const run = useRun();
+  const [tab, setTab] = useState('modules');
   const policies = useQuery({ queryKey: K.policies, queryFn: () => call(S.getModulePolicies, {}) });
   const list = policies.data?.policies ?? [];
   const teacherModules = list.filter((p) => !p.module.startsWith('media.') && !isSchoolModule(p.module));
@@ -838,9 +879,8 @@ export function ModulesPage() {
   const media = list.filter((p) => p.module.startsWith('media.'));
   const toggle = (module: S.ModuleKey, on: boolean) =>
     void run(() => call(S.setModulePolicy, { module, availability: on ? 'enabled' : 'disabled' }), { invalidate: [K.policies], success: t('save.saved') });
-  return (
-    <main className="cc-page cc-stack">
-      <h1 className="cc-h1">{t('admin.modules')}</h1>
+  const modules = (
+    <div className="cc-stack">
       <section className="cc-card cc-stack">
         <h2 className="cc-h2">{t('modules.teacherTitle')}</h2>
         <p className="cc-muted">{t('modules.teacherExplain')}</p>
@@ -859,27 +899,44 @@ export function ModulesPage() {
           ))}
         </section>
       ) : null}
-      <section className="cc-card cc-stack" aria-labelledby="media-title">
-        <h2 id="media-title" className="cc-h2">
-          {t('modules.mediaTitle')}
-        </h2>
-        <Alert kind="warning">{t('modules.mediaConsent')}</Alert>
-        {media.map((p) => (
-          <Toggle
-            key={p.module}
-            label={t(moduleLabelKey(p.module))}
-            description={p.module === 'media.evidenceDocuments' ? t('modules.documentsHint') : t('modules.disabledUntilConsent')}
-            isSelected={p.availability === 'enabled'}
-            onChange={(v) => toggle(p.module, v)}
-          />
-        ))}
-      </section>
-      <GoalDefaultsSection />
-      <AchievementDefaultsSection />
-      <TextChecksAdminSection />
       <p className="cc-muted">
         <IconCheck /> {t('modules.keepsData')}
       </p>
+    </div>
+  );
+  const mediaPanel = (
+    <section className="cc-card cc-stack" aria-labelledby="media-title">
+      <h2 id="media-title" className="cc-h2">
+        {t('modules.mediaTitle')}
+      </h2>
+      <Alert kind="warning">{t('modules.mediaConsent')}</Alert>
+      {media.map((p) => (
+        <Toggle
+          key={p.module}
+          label={t(moduleLabelKey(p.module))}
+          description={p.module === 'media.evidenceDocuments' ? t('modules.documentsHint') : t('modules.disabledUntilConsent')}
+          isSelected={p.availability === 'enabled'}
+          onChange={(v) => toggle(p.module, v)}
+        />
+      ))}
+    </section>
+  );
+  // One tab per part (usability audit): the page was one very long scroll with its Save at the bottom.
+  return (
+    <main className="cc-page cc-stack">
+      <h1 className="cc-h1">{t('admin.modules')}</h1>
+      <Tabs
+        label={t('admin.modules')}
+        selectedKey={tab}
+        onSelectionChange={setTab}
+        items={[
+          { id: 'modules', label: t('modules.tab.modules'), content: modules },
+          { id: 'media', label: t('modules.tab.media'), content: mediaPanel },
+          { id: 'goals', label: t('modules.tab.goals'), content: <GoalDefaultsSection /> },
+          { id: 'badges', label: t('modules.tab.badges'), content: <AchievementDefaultsSection /> },
+          { id: 'words', label: t('modules.tab.words'), content: <TextChecksAdminSection /> },
+        ]}
+      />
     </main>
   );
 }

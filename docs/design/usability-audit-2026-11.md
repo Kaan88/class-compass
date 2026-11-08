@@ -70,3 +70,25 @@ confusing or needs more than two taps, or something is cut off / colour-only / h
   checking grid itself shows the result, so this is minor.
 - Counter "+ Class" button: its accessible name ("Class: Our English Time ...") is longer than the
   visible "Class"; it contains it, so axe passes, but a shorter name would be clearer.
+
+## Fixed after the November screenshot crawl (admin area, D-138)
+
+| Screen | Issue | Severity | Fix |
+| --- | --- | --- | --- |
+| Admin tables (classes, accounts, students, assignments, audit) on phones and tablets | Status and action columns off-screen with no scroll hint; rows 150–200px tall | critical | One card per row below 52rem, actions in a wrapping row |
+| Profile / Maintenance | Administrators could not set the PIN that Back up now and Verify ask for | major | PIN form for every account; the Maintenance dialog links to Profile when no PIN is set |
+| Maintenance, Backups | Internal migration tag widened the page on phones | major | "Up to date" / waiting count; the tag under "Technical details", wrapping |
+| Audit log | Raw codes in both languages; free-text filters needing the codes | major | Actions and record types in words (EN, TR); filter lists |
+| Permanent delete and other confirmations on a phone | Type-to-confirm field and buttons below the fold of the dialog | major | Sticky dialog footer |
+| Admin navigation on a phone | 15 pills before any content; "Sign out" on its own row | major | One Section select below 52rem, none on the admin home; compact top bar |
+| Modules and media | One very long page; Archive buttons misaligned; same-name badges | major | Tabs; one right-aligned action column; tier after the badge name |
+| Reports charts | Overlapping week labels, identical stubs, 5px text on phones | major | Real-width SVG, short dates, class · subject, thinned/turned labels with ellipsis |
+| Super Speakers links (TR) | "Kapat" (same word as Close) revoked a link | major | "Bağlantıyı iptal et" / "İptal edildi" |
+| Students, link dialog | Deactivated student's link still showed a QR code and address | minor | Hidden; "Reactivate the student" offered |
+| Maintenance, New school year | Placeholders looked like values; no reason for disabled buttons; typed dates | minor | Prefilled suggestion, date pickers, a reason line |
+| Reports, Super Speakers | Wider page than the other admin pages; "Status" heading over buttons | minor | Normal page width; separate Status and action columns |
+| Accounts | "Active" and "Invite pending" together; unexplained "Password" pill; solid red Deactivate on every row | minor | One status; "Sign-in: password"; outline danger style, TR "Devre dışı bırak" |
+| School years | Reversible Archive solid red, irreversible Delete neutral; ISO dates split on phones | minor | Styles swapped; dates in words, unbroken |
+| School settings | Free-text timezone; plain weather heading; e-mail status pill above Save | minor | Timezone list; bold legend; its own "Password reset by email" row |
+| Super Speakers settings | Badge subject option in English quotes; "… within (minutes)" label; other week-start wording | minor | "Automatic: the English subject"; one limit row with a sentence; the school-settings label |
+| New class dialog | Theme names twice, uneven theme grid, big preview pushing the buttons away, no grade hint | minor | Name once, equal tiles, the large preview folded, grade hint |

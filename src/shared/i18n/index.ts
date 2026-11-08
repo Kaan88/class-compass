@@ -43,3 +43,10 @@ export function formatWeekRange(start: string, end: string, locale: Locale, time
   const day = (d: string) => `${part(d, { weekday: 'short' })} ${part(d, { day: 'numeric', month: 'short' })}`;
   return `${day(start)} – ${day(end)} ${part(end, { year: 'numeric' })}, ${timeZone}`;
 }
+
+/** A local calendar date ('YYYY-MM-DD') in words: "1 Sept 2026" / "1 Eyl 2026"; `year: false` leaves the year out. */
+export function formatDay(iso: string, locale: Locale, opts: { year?: boolean } = {}): string {
+  const at = Date.parse(`${iso}T12:00:00Z`);
+  if (Number.isNaN(at)) return iso;
+  return new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', ...(opts.year === false ? {} : { year: 'numeric' }) }).format(at);
+}

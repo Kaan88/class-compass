@@ -3,6 +3,7 @@ import type { MessageKey } from '../../shared/i18n/index.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { THEME_LIST, THEMES, ThemeProvider } from '../themes/index.tsx';
 import { Button } from './Button.tsx';
+import { IconCheck } from './icons.tsx';
 import { Mascot, ThemeDecoration, ThemeIllustration } from './Mascot.tsx';
 import { CounterBar, StudentCard } from './Students.tsx';
 
@@ -49,7 +50,7 @@ export function ThemePicker({ value, onChange, label }: { value: ThemeKey; onCha
       <span className="cc-field__label" id="theme-picker-label">
         {label}
       </span>
-      <div role="radiogroup" aria-labelledby="theme-picker-label" className="cc-swatch-row">
+      <div role="radiogroup" aria-labelledby="theme-picker-label" className="cc-swatch-row cc-theme-grid">
         {THEME_LIST.map((def) => (
           <button
             key={def.key}
@@ -60,11 +61,14 @@ export function ThemePicker({ value, onChange, label }: { value: ThemeKey; onCha
             onClick={() => onChange(def.key)}
             data-testid={`theme-option-${def.key}`}
           >
+            {/* The name is inside the preview tile once; the chosen one also says "Chosen" (not colour only). */}
             <ThemePreview theme={def.key} compact />
-            <span>
-              {value === def.key ? '✓ ' : ''}
-              {t(def.labelKey)}
-            </span>
+            {value === def.key ? (
+              <span className="cc-theme-option__chosen">
+                <IconCheck />
+                {t('theme.chosen')}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
