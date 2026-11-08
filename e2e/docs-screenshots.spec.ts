@@ -292,8 +292,8 @@ for (const lang of ['en', 'tr'] as const) {
         await page.getByTestId('avatar-change').click();
         await expect(page.getByTestId('avatar-creator')).toBeVisible();
         await page.getByTestId('avatar-tab-make').click();
-        await page.getByTestId('student-avatar').scrollIntoViewIfNeeded();
-        await shot(page, lang, 'student-avatar', { clipTo: '[data-testid="student-avatar"]' });
+        // One phone screen from the top of the avatar panel (the whole creator was a 354×2794 strip).
+        await shot(page, lang, 'student-avatar', { from: '[data-testid="student-avatar"]' });
         await phone.close();
       }
     } finally {

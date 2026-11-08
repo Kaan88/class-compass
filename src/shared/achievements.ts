@@ -165,7 +165,7 @@ export const DEFAULT_ACHIEVEMENTS: readonly DefaultAchievement[] = [
     ['reflections.note', 'Note keeper', 'Not tutan', 'Write your first note on a goal.', 'Bir hedefe ilk notunu yaz.', 'pen', 'bronze', r('note', 1)],
   ]),
   ...make('homework', [
-    ['homework.first', 'Homework hero', 'Ödev kahramanı', 'Complete your first homework.', 'İlk ödevini tamamla.', 'check', 'bronze', r('homework_completed', 1)],
+    ['homework.first', 'First homework', 'İlk ödev', 'Complete your first homework.', 'İlk ödevini tamamla.', 'check', 'bronze', r('homework_completed', 1)],
     ['homework.done5', 'Homework hero', 'Ödev kahramanı', 'Complete 5 homework tasks.', '5 ödev tamamla.', 'shield', 'bronze', r('homework_completed', 5)],
     ['homework.done10', 'Homework hero', 'Ödev kahramanı', 'Complete 10 homework tasks.', '10 ödev tamamla.', 'shield', 'silver', r('homework_completed', 10)],
     ['homework.done25', 'Homework hero', 'Ödev kahramanı', 'Complete 25 homework tasks.', '25 ödev tamamla.', 'trophy', 'gold', r('homework_completed', 25)],

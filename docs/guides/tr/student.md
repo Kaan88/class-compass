@@ -16,7 +16,9 @@ Merhaba! Öğretmenin sana **QR kodlu bir kart** verdi. Bu kart Sınıf Pusulas�
 
 Ortak kullanılan bir bilgisayarda ya da tablette işin bitince en alttaki **Bu cihazda sayfadan çık** düğmesine bas.
 
-Sınıfın iki dil kullanıyorsa üstten **English** ile **Türkçe** arasında geçiş yapabilirsin.
+**Yardım** sayfanın en üstündedir. Sınıfın iki dil kullanıyorsa orada **English** ile **Türkçe** arasında da geçiş yapabilirsin.
+
+Birden fazla dersin varsa avatarının altındaki ders adlı düğmeler seni doğrudan o derse götürür.
 
 ## Hedeflerim
 
@@ -31,11 +33,11 @@ Hedef, daha iyi olmak istediğin bir şeydir; örneğin "Her hafta bir İngilizc
 
 Öğretmenin de senin için hedef ekleyebilir. Bunlarda **Öğretmen belirledi** yazar.
 
-## Değerlendirmelerim
+## Düşüncelerim
 
 Burada bir hedefin hakkında yazarsın. **Hangi hedef?** sorusunu seç, sonra **Ne eklemek istiyorsun?**:
 
-- **Değerlendirme**: nasıl geçti, neler öğrendin.
+- **Düşünce**: nasıl geçti, neler öğrendin.
 - **Not**: hatırlamak istediğin bir şey.
 - **Kendimi nasıl hissediyorum**: **Ne kadar eminsin?** 1'den (henüz emin değilim) 5'e (çok eminim) kadar. Bu bir not değildir. Sadece senin ve öğretmeninin nasıl hissettiğini görmesine yardım eder.
 
@@ -57,14 +59,14 @@ Sınıf Pusulası yazdıklarını kaydetmeden önce kontrol eder. **Sözlerimiz 
 ## Öğretmen geri bildirimi ve ödevler
 
 - **Öğretmen geri bildirimi**: öğretmeninin hedeflerin hakkında sana yazdıkları.
-- **Ödevlerim**: ödevlerin ve durumları. **Henüz kontrol edilmedi**, öğretmeninin ödeve henüz bakmadığı anlamına gelir.
+- **Ödevlerim**: en yeni ödevlerin ve durumları. Her durumun kendi küçük resmi vardır: **Tamamlandı** için bir onay işareti, **Henüz kontrol edilmedi** için bir saat (öğretmenin ödeve henüz bakmadı). **Eski ödevleri göster** gerisini gösterir.
 
 ## Rozetlerim
 
-Rozetler çabanı kutlar: hedef koymak, kanıt eklemek, değerlendirme yazmak, ödev yapmak, sınıf yardımcısı olmak ve daha fazlası. Bazıları kendiliğinden gelir; bazılarını öğretmenin verir.
+Rozetler çabanı kutlar: hedef koymak, kanıt eklemek, düşüncelerini yazmak, ödev yapmak, sınıf yardımcısı olmak ve daha fazlası. Bazıları kendiliğinden gelir; bazılarını öğretmenin verir.
 
-- **Rozetlerim** rozetlerini, ne zaman kazandığını ve kimin verdiğini gösterir.
-- **Sıradaki rozetler** henüz kazanabileceğin rozetleri ve ne kadar yaklaştığını gösterir.
+- **Rozetlerim** en yeni rozetlerini seviyeleriyle (Bronz, Gümüş ya da Altın), ne için olduklarını, ne zaman kazandığını ve kimin verdiğini gösterir. **Tüm rozetlerimi göster** hepsini gösterir.
+- **Sıradaki rozetler** henüz kazanabileceğin rozetleri, seviyelerini ve ne kadar yaklaştığını (örneğin **3/5**) gösterir.
 - Öğretmenin kendi **seviyeni** de gösterebilir. Sayfandaki seviyeni yalnızca sen görürsün ve kimse sıralanmaz. Rozetlerini öğretmenlerin görebilir; öğretmenin bir rozeti sınıf ekranında adın ve avatarınla kutlamayı da seçebilir.
 
 Yeni bir rozet kazandığında sayfan bunu bir kez kutlar.
@@ -83,7 +85,7 @@ Bazı parçalarda **açmak için "…" rozetini kazan** yazar: önce o rozeti ka
 
 ## Öğretmenin neleri görür
 
-O dersin öğretmenleri sayfandaki o derse ait her şeyi görür: hedeflerini, değerlendirmelerini, kanıtlarını ve ne kadar emin olduğunu. Hedef, kanıt ve geri bildirim ekleyebilirler. Sayfandaki bir şeyi **gizleyebilirler** de (örneğin yanlışlıkla eklendiyse). Öğretmenin kendisi için kısa özel notlar da tutabilir; bunlar senin sayfanda hiçbir zaman görünmez.
+O dersin öğretmenleri sayfandaki o derse ait her şeyi görür: hedeflerini, düşüncelerini, kanıtlarını ve ne kadar emin olduğunu. Hedef, kanıt ve geri bildirim ekleyebilirler. Sayfandaki bir şeyi **gizleyebilirler** de (örneğin yanlışlıkla eklendiyse). Öğretmenin kendisi için kısa özel notlar da tutabilir; bunlar senin sayfanda hiçbir zaman görünmez.
 
 Sınıf arkadaşların senin sayfanı göremez. Sınıf ekranında avatarını ve adını görürler; öğretmenin açarsa öğrenci kartındaki sayılarını ve rozet kutlamalarını da görürler.
 
@@ -91,7 +93,7 @@ Sınıf arkadaşların senin sayfanı göremez. Sınıf ekranında avatarını v
 
 Sınıf Pusulası'nın çocuğunuzun sayfasıyla ne yaptığı, sade bir dille:
 
-- **Veriler nerede saklanır?** Okulun kendi Sınıf Pusulası sunucusunda. Sayfada yalnızca çocuğunuzun öğrenmeyle ilgili kayıtları bulunur: hedefler, değerlendirmeler, kanıtlar, geri bildirim, ödev durumu, rozetler ve avatar. Notlar (karne notları) ve iletişim bilgileri yoktur.
+- **Veriler nerede saklanır?** Okulun kendi Sınıf Pusulası sunucusunda. Sayfada yalnızca çocuğunuzun öğrenmeyle ilgili kayıtları bulunur: hedefler, düşünceler, kanıtlar, geri bildirim, ödev durumu, rozetler ve avatar. Notlar (karne notları) ve iletişim bilgileri yoktur.
 - **Bağlantı bir anahtardır.** Bağlantıya ya da karta sahip olan herkes, okul bağlantıyı durdurana kadar sayfayı açabilir ve sayfaya ekleme yapabilir. Kartı evde saklayın, internette paylaşmayın ve kaybolursa hemen öğretmene haber verin. Öğretmen ya da yönetici eski bağlantıyı hemen durdurup yeni bir kart hazırlayabilir. Öğrenci okuldan ayrılıp pasifleştirildiğinde bağlantı çalışmaz olur.
 - **Kim neyi görür?** Çocuğunuzun o dersteki öğretmenleri ve okulun Sınıf Pusulası yöneticileri. Diğer öğrenciler ve veliler göremez. Öğretmenler kendileri için özel notlar yazabilir; bu notlar öğrenciye gösterilmez, ancak yöneticilerin aldığı tüm okul verisi dışa aktarımında yer alır.
 - **Resim ve ses.** Okul KVKK kapsamındaki izinleri doğrulayana kadar fotoğraf ve ses kaydı kapalıdır. Resimlere izin verildiğinde konum ve kamera bilgileri sunucuda resimlerden silinir. Belgeler (PDF, Word…) olduğu gibi saklanır; yani bir belgede örneğin onu oluşturan kişinin adı kalabilir.

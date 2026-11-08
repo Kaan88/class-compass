@@ -16,7 +16,9 @@ Hello! Your teacher gave you a **card with a QR code**. It opens **your own page
 
 On a shared computer or tablet, press **Leave this page on this device** at the bottom when you are done.
 
-If your class uses two languages, you can switch between **English** and **Türkçe** at the top.
+**Help** is at the top of your page. If your class uses two languages, you can switch between **English** and **Türkçe** there too.
+
+If you have more than one subject, the buttons with the subject names under your avatar take you straight to that subject.
 
 ## My goals
 
@@ -57,14 +59,14 @@ Class Compass checks what you type before it is saved. If you see a message like
 ## Teacher feedback and homework
 
 - **Teacher feedback**: what your teacher wrote to you about your goals.
-- **My homework**: your homework and its status. **Not checked yet** means your teacher has not looked at it yet.
+- **My homework**: your newest homework and its status. Each status has its own little picture: a tick for **Completed**, a clock for **Not checked yet** (your teacher has not looked at it yet). **Show older homework** shows the rest.
 
 ## My badges
 
 Badges celebrate your effort: setting goals, adding evidence, writing reflections, doing homework, helping as the class assistant and more. Some come automatically; your teacher gives others.
 
-- **My badges** shows your badges, when you earned them and who gave them.
-- **Next badges** shows badges you can still earn, with how far you are.
+- **My badges** shows your newest badges with their level (Bronze, Silver or Gold), what they are for, when you earned them and who gave them. **Show all my badges** shows every one.
+- **Next badges** shows badges you can still earn, with their level and how far you are (for example **3 of 5**).
 - Your teacher may also show your own **level**. Only you see your level on your page, and nobody is ranked. Your teachers can see your badges, and your teacher may choose to celebrate a badge on the classroom screen with your name and avatar.
 
 When you get a new badge, your page celebrates it once.

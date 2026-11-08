@@ -188,7 +188,7 @@ Rozeti verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Geri al*
 **Hedefler** sayfasında sınıfı ve dersi seçin. **Öğrenciler** sekmesi her öğrenciyi etkin hedefleri, ulaşılan hedefleri, kanıtları, son "ne kadar eminim" değeri ve son etkinliğiyle listeler. Öğrenciyi açmak için adına dokunun:
 
 - **Yeni hedef**: bir **Kategori** ve bir **Hazır hedef** seçin ya da **Kendim yazacağım (aşağıya)**'yı seçip hedefi **Hedef metni**'ne yazın; **Çalışma yolları** (en fazla 6, virgülle ayrılmış) ve bir **Gözden geçirme tarihi** ekleyin.
-- Her hedefte: **İlerleme notu**, **Sonucu kaydet** (dört sonuç adınız) ve öğrencinin kendi değerlendirmeleri ve öz değerlendirmeleri ("Ne kadar eminsin?", 1–5). Öğrencinin öz değerlendirmesi ile sizin değerlendirmeniz her zaman ayrı tutulur.
+- Her hedefte: **İlerleme notu**, **Sonucu kaydet** (dört sonuç adınız) ve öğrencinin kendi düşünceleri ve öz değerlendirmeleri ("Ne kadar eminsin?", 1–5). Öğrencinin öz değerlendirmesi ile sizin değerlendirmeniz her zaman ayrı tutulur.
 - **Kanıtlar**: siz de kanıt ekleyebilirsiniz (öğrencinin sayfasında "Öğretmen" diye işaretlenir ve öğrenci değiştiremez): **Yaz**, **Bağlantı ekle**, **Belge ekle** ve yalnızca yöneticiniz izin verdiyse **Resim ekle**, **Fotoğraf çek**, **Sesimi kaydet** ve **Ses dosyası ekle**. **Kanıtı sil** kendi eklediğiniz kanıtı ve dosyasını siler.
 - **Öğrenciye geri bildirim**: bir hedef ya da **Bu dersteki tüm hedefler**'i seçin, yazın ve **Geri bildirimi kaydet**'e basın. Öğrenci bunu kendi sayfasında okur.
 - **Konu göster** hedefleri ve kanıtları kategoriye göre süzer.

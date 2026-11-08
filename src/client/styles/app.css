@@ -2696,7 +2696,10 @@ html:has(.cc-classroom) {
 }
 .cc-student__bar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
+  gap: 0.5rem;
   padding: 0.5rem 1rem 0;
   max-width: 42rem;
   margin: 0 auto;
@@ -2716,6 +2719,27 @@ html:has(.cc-classroom) {
   font-size: 1.7rem;
   padding-top: 0.5rem;
   border-top: var(--cc-border-width-strong) solid var(--cc-border);
+  /* Room for the sticky subject bar when jumped to. */
+  scroll-margin-top: 7rem;
+}
+.cc-student__subject:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+/* Sticky jump bar between subjects (S13 usability): every subject visible, wrapping when needed. */
+.cc-student__jump {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+  background: var(--cc-bg);
+  border-bottom: var(--cc-border-width) solid var(--cc-border);
+}
+.cc-student__jump .cc-btn {
+  flex-shrink: 0;
 }
 .cc-student__gone {
   align-items: center;
@@ -2766,8 +2790,32 @@ html:has(.cc-classroom) {
 /* S13b2 (D-119): add-evidence buttons, files waiting to upload, pictures and the in-page camera. */
 .cc-evidence-modes {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  /* Two columns on a phone (S13 usability), so the chosen mode's field stays near the buttons. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
   gap: 0.5rem;
+}
+@media (max-width: 30rem) {
+  .cc-evidence-mode {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    gap: 0.25rem;
+    padding-inline: 0.4rem;
+  }
+}
+/* A file picker drawn as a big button (FilePick): the real input is visually hidden. */
+.cc-file-pick {
+  align-items: flex-start;
+}
+.cc-file-pick__button {
+  cursor: pointer;
+}
+.cc-file-pick__input:focus-visible + .cc-file-pick__button {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-file-pick__status {
+  margin: 0;
 }
 .cc-evidence-mode {
   justify-content: flex-start;
@@ -2846,6 +2894,17 @@ html:has(.cc-classroom) {
 }
 .cc-confidence-picker .cc-btn {
   min-width: var(--cc-touch);
+}
+/* One line from 1 (not sure) to 5 (very sure), also on a phone (S13 usability). */
+.cc-confidence-picker > .cc-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(var(--cc-touch), 1fr));
+  gap: 0.4rem;
+  max-width: 24rem;
+}
+.cc-confidence-picker > .cc-row > .cc-btn {
+  min-width: 0;
+  justify-content: center;
 }
 .cc-private {
   border-style: dashed;
@@ -3449,12 +3508,27 @@ li > .cc-admin-list {
   align-items: center;
   gap: 0.5rem;
 }
+/* The choice uses its whole column, so its words are not cut (S13 usability). */
+.cc-avatar-part select {
+  width: 100%;
+  min-width: 0;
+}
+/* Phone: the name and "Surprise me" share the first line, the choice takes the whole second line
+   (S13 usability: a half-width select cut its words, "medium ligh"). */
 @media (max-width: 30rem) {
   .cc-avatar-part {
     grid-template-columns: 1fr auto;
+    grid-template-areas: 'label surprise' 'choice choice';
+    row-gap: 0.25rem;
   }
   .cc-avatar-part label {
-    grid-column: 1 / -1;
+    grid-area: label;
+  }
+  .cc-avatar-part select {
+    grid-area: choice;
+  }
+  .cc-avatar-part .cc-btn {
+    grid-area: surprise;
   }
 }
 .cc-badge-list {
@@ -3542,6 +3616,11 @@ li > .cc-admin-list {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+/* "4 of 5" / "4/5" stays on one line beside the bar. */
+.cc-badge__count {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .cc-progress {
   flex: 1 1 auto;
@@ -4256,6 +4335,9 @@ html[data-cursor='off'] * {
   display: block;
   max-width: 100%;
   height: auto;
+  /* A lazy picture keeps some room (and a plain backdrop) until it has loaded, instead of a dot. */
+  min-height: 6rem;
+  background: var(--cc-surface-2);
   border: var(--cc-border-width) solid var(--cc-border);
   border-radius: var(--cc-radius-sm);
 }

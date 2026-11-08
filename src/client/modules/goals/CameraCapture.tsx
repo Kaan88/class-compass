@@ -10,6 +10,7 @@ import { captureFrame } from '../../lib/images.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { IconCamera, IconCheck, IconSwap, IconUndo } from '../../ui/icons.tsx';
+import { FilePick } from './FilePick.tsx';
 
 /** Phones and tablets: let the operating system's camera app take the picture. */
 export function prefersSystemCamera(): boolean {
@@ -74,23 +75,17 @@ export function CameraCapture({ onPhoto, idPrefix }: { onPhoto: (photo: Blob) =>
 
   if (system || !supported) {
     return (
-      <div className="cc-field">
-        <label className="cc-field__label" htmlFor={`${idPrefix}-camera`}>
-          {t('evidence.openCamera')}
-        </label>
-        <input
-          id={`${idPrefix}-camera`}
-          className="cc-input"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) onPhoto(f);
-            e.target.value = '';
-          }}
-        />
-      </div>
+      <FilePick
+        id={`${idPrefix}-camera`}
+        label={t('evidence.openCamera')}
+        icon={<IconCamera />}
+        accept="image/*"
+        capture="environment"
+        onFiles={(files) => {
+          const f = files[0];
+          if (f) onPhoto(f);
+        }}
+      />
     );
   }
 

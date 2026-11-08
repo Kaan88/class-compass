@@ -164,3 +164,12 @@ export function FeedbackLine({ item, actions }: { item: Feedback; actions?: Reac
     </li>
   );
 }
+
+/**
+ * The full text of the chosen goal under a goal select (S13 usability): a phone cuts a long goal
+ * sentence inside the closed select mid-word. Short texts fit and are not repeated.
+ */
+export function chosenGoalHint(items: Array<{ id: string; label: string }>, value: string): string | undefined {
+  const label = items.find((i) => i.id === value && value !== '')?.label;
+  return label && label.length > 24 ? label : undefined;
+}

@@ -3,7 +3,9 @@
  * - Language: English by default; the EN/TR switch is remembered on this device only (localStorage).
  * - Theme: the student's class theme.
  * - Each subject shows the sections its modules contribute (server `studentPage` manifests), in the
- *   server's order; a key without a screen here is skipped.
+ *   server's order; a key without a screen here is skipped. With more than one subject, a sticky bar
+ *   jumps to each subject's heading (S13 usability: the page was about 33 phone screens long).
+ * - Help sits in the top bar next to the language switch, so it is found without scrolling.
  * - A refused or revoked link (401) shows a friendly "this link no longer works" page (STU-3). A busy
  *   server (429), a server error or no connection shows "try again" instead: the token is kept in
  *   memory (never stored) so the student can retry without the link, which has left the address bar.
@@ -18,7 +20,7 @@ import { setDisplay } from '../lib/display.ts';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
 import { Button } from '../ui/Button.tsx';
 import { Toaster } from '../ui/Feedback.tsx';
-import { IconGlobe } from '../ui/icons.tsx';
+import { IconBook, IconGlobe } from '../ui/icons.tsx';
 import { Avatar } from '../ui/Students.tsx';
 import { ThemeBackdrop, ThemeIllustration } from '../ui/Mascot.tsx';
 import { STUDENT_PAGE_KEY } from './keys.ts';
@@ -75,17 +77,35 @@ function LinkGone() {
   );
 }
 
-function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
+/** Move to a subject's heading (scrolled to the top, under the sticky bar) and put focus on it. */
+function goToSubject(subjectId: string) {
+  const el = document.getElementById(`subject-${subjectId}`);
+  if (!el) return;
+  const smooth = typeof window.matchMedia === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView?.({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+  el.focus({ preventScroll: true });
+}
+
+function SubjectJump({ subjects }: { subjects: Array<{ subjectId: string; name: string }> }) {
+  const { t } = useI18n();
+  return (
+    <nav className="cc-student__jump" aria-label={t('student.jumpTo')} data-testid="student-jump">
+      {subjects.map((s) => (
+        <Button key={s.subjectId} size="small" onPress={() => goToSubject(s.subjectId)}>
+          {s.name}
+        </Button>
+      ))}
+    </nav>
+  );
+}
+
+function Page({ onLanguage, help, setHelp }: { onLanguage: (l: ClassLanguage) => void; help: boolean; setHelp: (open: boolean) => void }) {
   const { t, locale } = useI18n();
   const q = useQuery({ queryKey: STUDENT_PAGE_KEY, queryFn: () => call(studentPage, {}) });
-  const [help, setHelp] = useState(false);
   useEffect(() => {
     if (q.data) setDisplay({ theme: q.data.theme });
     if (q.data) onLanguage(q.data.language);
   }, [q.data, onLanguage]);
-  if (q.error) return q.error instanceof ApiError && q.error.status === 401 ? <LinkGone /> : <p className="cc-page">{t('common.error')}</p>;
-  if (!q.data) return <p className="cc-page cc-muted">{t('common.loading')}</p>;
-  const page = q.data;
   if (help)
     return (
       <main className="cc-page cc-student cc-stack">
@@ -94,6 +114,9 @@ function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
         </Suspense>
       </main>
     );
+  if (q.error) return q.error instanceof ApiError && q.error.status === 401 ? <LinkGone /> : <p className="cc-page">{t('common.error')}</p>;
+  if (!q.data) return <p className="cc-page cc-muted">{t('common.loading')}</p>;
+  const page = q.data;
   return (
     <main className="cc-page cc-student cc-stack" data-testid="student-page">
       <header className="cc-row cc-student__head">
@@ -104,10 +127,11 @@ function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
         </div>
       </header>
       <AvatarPanel info={page.avatar} name={page.student.fullName} />
+      {page.subjects.length > 1 ? <SubjectJump subjects={page.subjects.map((s) => ({ subjectId: s.subjectId, name: pickText(s.name, locale) }))} /> : null}
       {page.subjects.length === 0 ? <p className="cc-card">{t('student.nothingYet')}</p> : null}
       {page.subjects.map((subject) => (
         <section key={subject.subjectId} className="cc-stack" aria-labelledby={`subject-${subject.subjectId}`}>
-          <h2 id={`subject-${subject.subjectId}`} className="cc-h1 cc-student__subject">
+          <h2 id={`subject-${subject.subjectId}`} className="cc-h1 cc-student__subject" tabIndex={-1}>
             {pickText(subject.name, locale)}
           </h2>
           {subject.sections.map((section) => {
@@ -118,9 +142,6 @@ function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
       ))}
       <footer className="cc-row cc-muted">
         <p>{t('student.privacy')}</p>
-        <Button size="small" variant="ghost" onPress={() => setHelp(true)}>
-          {t('help.link')}
-        </Button>
         <Button size="small" variant="ghost" onPress={() => void call(leaveStudentSession, {}).finally(() => window.location.reload())}>
           {t('student.leave')}
         </Button>
@@ -183,16 +204,25 @@ export function StudentApp({ token, open = openLink }: { token: string | null; o
     setChosen(l);
     saveLocale(l);
   };
+  const [help, setHelp] = useState(false);
+  const twoLanguages = !classLang || classLang.secondLanguageEnabled;
+  const pageShown = state === 'ok' || state === 'none';
   const onLanguage = useCallback((l: ClassLanguage) => setClassLang((old) => (old && old.mainLanguage === l.mainLanguage && old.secondLanguageEnabled === l.secondLanguageEnabled ? old : l)), []);
   return (
     <I18nProvider locale={locale}>
       <ThemeBackdrop />
-      {!classLang || classLang.secondLanguageEnabled ? (
+      {twoLanguages || (pageShown && !help) ? (
         <div className="cc-student__bar">
-          <LanguageSwitch locale={locale} onChange={change} />
+          {pageShown && !help ? (
+            <Button size="small" onPress={() => setHelp(true)}>
+              <IconBook />
+              {translate(locale, 'help.link')}
+            </Button>
+          ) : null}
+          {twoLanguages ? <LanguageSwitch locale={locale} onChange={change} /> : null}
         </div>
       ) : null}
-      {state === 'opening' ? null : state === 'invalid' ? <LinkGone /> : state === 'retry' ? <TryAgain onRetry={retry} /> : <Page onLanguage={onLanguage} />}
+      {state === 'opening' ? null : state === 'invalid' ? <LinkGone /> : state === 'retry' ? <TryAgain onRetry={retry} /> : <Page onLanguage={onLanguage} help={help} setHelp={setHelp} />}
       <Toaster />
       {/* The student's own new badges are celebrated on their page (S13c, D-122). */}
       <CelebrationLayer />

@@ -19,6 +19,8 @@ import { Alert } from '../../ui/Feedback.tsx';
 import { Select, TextArea, TextField } from '../../ui/Fields.tsx';
 import { IconCamera, IconFile, IconImage, IconLink, IconMic, IconNote, IconPlus, IconSound, IconTrash } from '../../ui/icons.tsx';
 import { CameraCapture } from './CameraCapture.tsx';
+import { FilePick } from './FilePick.tsx';
+import { chosenGoalHint } from './shared.tsx';
 import { VoiceRecorder } from './VoiceRecorder.tsx';
 
 export type EvidenceMode = 'text' | 'link' | 'picture' | 'camera' | 'document' | 'voice' | 'voiceFile';
@@ -182,25 +184,20 @@ export function EvidenceAdder({
     }
   };
 
-  const fileInput = (as: 'picture' | 'document' | 'voiceFile', label: string, accept: string, multiple: boolean) => (
-    <div className="cc-field">
-      <label className="cc-field__label" htmlFor={`${idPrefix}-${as}`}>
-        {label}
-      </label>
-      <input
+  const fileInput = (as: 'picture' | 'document' | 'voiceFile', label: string, accept: string, multiple: boolean) => {
+    const Icon = MODE_ICON[as];
+    return (
+      <FilePick
         id={`${idPrefix}-${as}`}
-        className="cc-input"
-        type="file"
-        multiple={multiple}
+        label={label}
+        icon={<Icon />}
         accept={accept}
-        onChange={(e) => {
-          const files = [...(e.target.files ?? [])];
-          e.target.value = '';
-          void take(files, as);
-        }}
+        multiple={multiple}
+        status={pending.length ? t('evidence.filesChosen', { count: pending.length }) : t('evidence.noFileYet')}
+        onFiles={(files) => void take(files, as)}
       />
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="cc-card cc-stack" data-testid="evidence-form">
@@ -228,7 +225,7 @@ export function EvidenceAdder({
           })}
         </div>
       </fieldset>
-      <Select label={t('student.evidenceGoal')} items={[{ id: '', label: t('student.noGoalLink') }, ...goals]} value={goalId} onChange={setGoalId} />
+      <Select label={t('student.evidenceGoal')} items={[{ id: '', label: t('student.noGoalLink') }, ...goals]} value={goalId} onChange={setGoalId} description={chosenGoalHint(goals, goalId)} />
       {current === 'link' ? <TextField label={t('student.linkUrl')} description={t('student.linkHint')} type="url" value={url} onChange={setUrl} errorMessage={urlOk ? (hint?.(url, 'url') ?? null) : t('student.linkInvalid')} /> : null}
       {current === 'picture' ? fileInput('picture', t('evidence.choosePictures'), `${ACCEPT_HINT.image},image/heic,image/heif,.heic,.heif`, true) : null}
       {current === 'camera' ? <CameraCapture idPrefix={idPrefix} onPhoto={(b) => void prepareImage(b).then((blob) => push([{ blob, name: 'photo.jpg', kind: 'image' }]))} /> : null}

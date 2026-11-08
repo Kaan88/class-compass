@@ -4,6 +4,10 @@
  * progress bar with its text ("2 of 3"), and the optional private level path. Nothing compares the
  * student with anyone else. New badges are celebrated once (reduced motion: a still message only);
  * then the page tells the server they were seen.
+ * S13 usability: only the newest earned badges are shown first (the rest behind "Show all my badges");
+ * every card, earned or still to earn, shows its tier word and what it is for, so two badges with the
+ * same name (one family of tiers) and an earned tier next to the next tier
+ * ("On a roll" Bronze earned, Silver next) are told apart.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -26,7 +30,9 @@ const TIER_KEY: Record<AchievementTier, 'achievements.tier.bronze' | 'achievemen
 };
 
 /** Locked badges shown before "Show all". */
-const LOCKED_FIRST = 6;
+export const LOCKED_FIRST = 4;
+/** Earned badges shown before "Show all my badges" (newest first). */
+export const EARNED_FIRST = 4;
 
 /** Celebrations already shown this visit (StrictMode and re-renders must not repeat them). */
 const celebrated = new Set<string>();
@@ -51,7 +57,10 @@ export function AchievementsSection({ data, subjectId }: { data: StudentAchievem
   const ratio = (b: (typeof data.locked)[number]) => (b.progress ? b.progress.current / b.progress.target : 0);
   const locked = [...data.locked].sort((a, b) => ratio(b) - ratio(a));
   const [showAll, setShowAll] = useState(false);
+  const [showEarned, setShowEarned] = useState(false);
   const next = showAll ? locked : locked.slice(0, LOCKED_FIRST);
+  // New badges always stay in view, even when there are more than EARNED_FIRST.
+  const earned = showEarned ? data.earned : data.earned.filter((b, i) => i < EARNED_FIRST || b.isNew);
   return (
     <section className="cc-stack" aria-labelledby={`badges-${subjectId}`} data-testid="student-achievements">
       <h3 id={`badges-${subjectId}`} className="cc-h2">
@@ -65,12 +74,13 @@ export function AchievementsSection({ data, subjectId }: { data: StudentAchievem
       ) : null}
       {data.earned.length === 0 ? <p className="cc-muted">{t('achievements.noneYet')}</p> : null}
       <ul className="cc-badge-list">
-        {data.earned.map((b) => (
+        {earned.map((b) => (
           <li key={b.id} className="cc-badge cc-badge--earned" data-testid="student-badge" data-new={b.isNew || undefined}>
             <BadgeArt icon={b.icon} tier={b.tier} size={72} />
             <span className="cc-stack cc-badge__text">
               <strong>{pickText(b.name, locale)}</strong>
               <span className="cc-muted">{t(TIER_KEY[b.tier])}</span>
+              <span className="cc-muted">{pickText(b.description, locale)}</span>
               <span className="cc-muted" data-testid="student-badge-date">
                 {t('achievements.earnedOn', { date: whenText(b.awardedAt, locale) })}
               </span>
@@ -79,6 +89,13 @@ export function AchievementsSection({ data, subjectId }: { data: StudentAchievem
           </li>
         ))}
       </ul>
+      {data.earned.length > earned.length || showEarned ? (
+        <div>
+          <Button onPress={() => setShowEarned((v) => !v)} aria-expanded={showEarned} data-testid="student-badges-earned-all">
+            {showEarned ? t('achievements.showFewer') : t('achievements.showAllEarned', { count: data.earned.length })}
+          </Button>
+        </div>
+      ) : null}
       {locked.length ? (
         <>
           <h4 className="cc-h3">{t('achievements.almostThere')}</h4>
@@ -91,11 +108,12 @@ export function AchievementsSection({ data, subjectId }: { data: StudentAchievem
                   <BadgeArt icon={b.icon} tier={b.tier} size={44} locked />
                   <span className="cc-stack cc-badge__text">
                     <strong>{pickText(b.name, locale)}</strong>
+                    <span className="cc-muted">{t(TIER_KEY[b.tier])}</span>
                     <span className="cc-muted">{pickText(b.description, locale)}</span>
                     {p && label ? (
                       <span className="cc-badge__progress">
                         <progress className="cc-progress" value={p.current} max={p.target} aria-label={`${pickText(b.name, locale)}: ${label}`} />
-                        <span>{label}</span>
+                        <span className="cc-badge__count">{label}</span>
                       </span>
                     ) : null}
                   </span>
@@ -104,7 +122,7 @@ export function AchievementsSection({ data, subjectId }: { data: StudentAchievem
             })}
           </ul>
           {locked.length > LOCKED_FIRST ? (
-            <Button onPress={() => setShowAll((v) => !v)} data-testid="student-badges-all">
+            <Button onPress={() => setShowAll((v) => !v)} aria-expanded={showAll} data-testid="student-badges-all">
               {showAll ? t('achievements.showFewer') : t('achievements.showAll', { count: locked.length })}
             </Button>
           ) : null}

@@ -1047,11 +1047,15 @@ async function studentRun(browser: Browser, dev: Device, lang: Locale, url: stri
     });
 
     await step(`student achievements ${where}`, async () => {
+      // A fresh page, so the goal and evidence forms filled above do not show in this picture.
+      await page.reload();
+      await expect(page.getByTestId('student-page')).toBeVisible();
       const ach = page.getByTestId('student-achievements').first();
       await ach.scrollIntoViewIfNeeded();
-      if ((await page.getByTestId('student-badge-locked').count()) === 0) {
-        const all = page.getByTestId('student-badges-all').first();
-        if (await all.count()) await all.click();
+      // The state is "every badge": open both lists (earned and still to earn) when they are folded.
+      for (const id of ['student-badges-earned-all', 'student-badges-all']) {
+        const all = ach.getByTestId(id);
+        if ((await all.count()) && (await all.getAttribute('aria-expanded')) === 'false') await all.click();
       }
       await page.waitForTimeout(400);
       if ((await page.getByTestId('student-badge-locked').count()) === 0) miss(`student achievements: no locked badge with progress ${where}`);

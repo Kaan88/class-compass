@@ -83,6 +83,12 @@ test('a student opens their link on a phone, adds a goal, a reflection and evide
     // unique, so each aria-labelledby names its own subject's heading (review fix; axe-core 4.14 no
     // longer reports duplicate ids, so this is checked directly).
     expect(await p.getByTestId('student-goals').count()).toBeGreaterThanOrEqual(2);
+    // With several subjects a sticky bar jumps to each one (S13 usability); Help is in the top bar.
+    const jump = p.getByRole('navigation', { name: 'Go to a subject' });
+    await jump.getByRole('button', { name: 'Mathematics' }).click();
+    await expect(p.getByRole('heading', { name: 'Mathematics', level: 2 })).toBeFocused();
+    await expect(jump).toBeInViewport();
+    await expect(p.locator('.cc-student__bar').getByRole('button', { name: 'Help', exact: true })).toBeVisible();
     const duplicateIds = await p.evaluate(() => {
       const ids = [...document.querySelectorAll('[id]')].map((e) => e.id);
       return ids.filter((id, i) => ids.indexOf(id) !== i);

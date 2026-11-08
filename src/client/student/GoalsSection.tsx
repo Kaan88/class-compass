@@ -14,7 +14,7 @@ import { checkStudentText, exampleKeyFor, findRiskyWord, type TextKind, type Tex
 import { call, upload } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useRun } from '../lib/useRun.ts';
-import { CONFIDENCE_LEVELS, EntryLine, EvidenceView, FeedbackLine, GoalSummary, goalText } from '../modules/goals/shared.tsx';
+import { chosenGoalHint, CONFIDENCE_LEVELS, EntryLine, EvidenceView, FeedbackLine, GoalSummary, goalText } from '../modules/goals/shared.tsx';
 import { Button } from '../ui/Button.tsx';
 import { Select, TextArea, TextField } from '../ui/Fields.tsx';
 import { IconCheck, IconPlus, IconTrash } from '../ui/icons.tsx';
@@ -107,6 +107,7 @@ function AddGoal({ data, subjectId }: { data: StudentGoalsSection; subjectId: st
   const run = useStudentRun();
   const [categoryId, setCategoryId] = useState(data.categories[0]?.id ?? '');
   const presets = data.presets.filter((p) => p.categoryId === categoryId);
+  const presetItems = [...presets.map((p) => ({ id: p.id, label: pickText(p.text, locale) })), { id: OWN, label: t('student.writeOwn') }];
   const [choice, setChoice] = useState('');
   const [text, setText] = useState('');
   const [practice, setPractice] = useState('');
@@ -144,9 +145,10 @@ function AddGoal({ data, subjectId }: { data: StudentGoalsSection; subjectId: st
         <Select
           label={t('student.chooseGoal')}
           placeholder={t('student.chooseGoalPlaceholder')}
-          items={[...presets.map((p) => ({ id: p.id, label: pickText(p.text, locale) })), { id: OWN, label: t('student.writeOwn') }]}
+          items={presetItems}
           value={choice}
           onChange={setChoice}
+          description={choice === OWN ? undefined : chosenGoalHint(presetItems, choice)}
         />
       ) : null}
       {own ? <TextField label={t('student.myGoalWords')} value={text} onChange={setText} maxLength={500} errorMessage={goalHint} /> : null}
@@ -213,6 +215,7 @@ function Reflections({ data, canWrite, subjectId }: { data: StudentGoalsSection;
   const [confidence, setConfidence] = useState<number | null>(null);
   const live = data.goals.filter((g) => g.status !== 'archived');
   const target = goalId || live[0]?.id || '';
+  const goalItems = live.map((g: Goal) => ({ id: g.id, label: goalText(g, locale) }));
   const bodyHint = useTextHint(body, kind === 'self_assessment' ? 'selfAssessment' : kind === 'note' ? 'note' : 'reflection', data.textLimits);
   const valid = Boolean(target) && Boolean(body.trim()) && (kind !== 'self_assessment' || confidence !== null);
   const mine = data.goals.flatMap((g) => g.entries.filter((e) => e.authorType === 'student').map((e) => ({ e, g })));
@@ -230,7 +233,7 @@ function Reflections({ data, canWrite, subjectId }: { data: StudentGoalsSection;
       </h3>
       {canWrite && live.length ? (
         <div className="cc-card cc-stack" data-testid="reflection-form">
-          <Select label={t('student.whichGoal')} items={live.map((g: Goal) => ({ id: g.id, label: goalText(g, locale) }))} value={target} onChange={setGoalId} />
+          <Select label={t('student.whichGoal')} items={goalItems} value={target} onChange={setGoalId} description={chosenGoalHint(goalItems, target)} />
           <Select
             label={t('student.reflectionKind')}
             items={G.STUDENT_ENTRY_KINDS.map((k) => ({ id: k, label: t(`goals.entry.${k}` as MessageKey) }))}
