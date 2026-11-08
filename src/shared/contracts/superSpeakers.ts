@@ -50,12 +50,20 @@ export const SpeakerStudent = z.object({
 });
 export type SpeakerStudent = z.infer<typeof SpeakerStudent>;
 
+/** Board messages {en,tr} chosen by the administrator; an empty text = the built-in translated message. */
+export const BoardMessages = z.object({
+  /** Shown while nobody has a point this week ("We are waiting for our super speakers"). */
+  placeholder: LocalizedText,
+  /** Shown in an empty podium place ("Who will be next?"). */
+  waiting: LocalizedText,
+});
+export type BoardMessages = z.infer<typeof BoardMessages>;
+
 export const BoardPlace = z.object({
   rank: z.number().int(),
   points: z.number().int(),
+  /** Every student with this total (all tied students are shown, D-133). */
   students: z.array(SpeakerStudent.omit({ classId: true })),
-  /** Tied students not shown by name ("+N more", D-133). */
-  more: z.number().int(),
 });
 export type BoardPlace = z.infer<typeof BoardPlace>;
 
@@ -63,6 +71,7 @@ export const Board = z.object({
   /** The administrator turned the module on (otherwise the board shows a calm "not active" page). */
   enabled: z.boolean(),
   title: LocalizedText,
+  messages: BoardMessages,
   language: Locale,
   theme: Theme,
   /** Board sound for a podium change (off by default, S13b sounds). */
@@ -171,6 +180,7 @@ export const SpeakersSettings = z.object({
   rateLimitMax: z.number().int().min(5).max(500),
   rateLimitWindowMinutes: z.number().int().min(1).max(60),
   boardTitle: LocalizedText,
+  boardMessages: BoardMessages,
   boardLanguage: Locale,
   theme: Theme,
   boardSound: z.boolean(),

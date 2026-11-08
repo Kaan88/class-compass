@@ -1457,6 +1457,8 @@ export const superSpeakersSettings = sqliteTable('super_speakers_settings', {
   rateLimitMax: integer('rate_limit_max').notNull().default(60),
   rateLimitWindowMinutes: integer('rate_limit_window_minutes').notNull().default(10),
   boardTitle: text('board_title', { mode: 'json' }).$type<LocalizedText>().notNull(),
+  /** Board messages {en,tr} (S12 review); null or an empty text = the built-in translated message. */
+  boardMessages: text('board_messages', { mode: 'json' }).$type<{ placeholder: LocalizedText; waiting: LocalizedText }>(),
   boardLanguage: text('board_language', { enum: ['en', 'tr'] }).notNull().default('en'),
   theme: text('theme', { enum: CLASS_THEMES }).notNull().default('explorer'),
   boardSound: integer('board_sound', { mode: 'boolean' }).notNull().default(false),

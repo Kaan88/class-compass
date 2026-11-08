@@ -13,6 +13,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultAchievementId } from '../../src/shared/achievements.ts';
 import { SCHOOL_MODULES } from '../../src/shared/modules.ts';
 import { SERVER_MODULES } from '../../src/server/modules/index.ts';
+import { NEVER_EXPORTED, SECRET_COLUMN } from '../../src/server/modules/maintenance/exports.ts';
+import { MAX_OFFLINE_AGE_MS, PAIRING_GUARD_FAILURES, pairWithCode, tapTime } from '../../src/server/modules/superSpeakers/service.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 
@@ -261,10 +263,10 @@ describe('the board (SSP-1..3, D-133)', () => {
     await ok(s.admin.post(`/api/admin/speakers/awards/${voided.opId}/void`, { reason: 'Given by mistake' }));
     const r = await screen.req('GET', '/api/board');
     const b = r.body;
-    expect(b.places.map((p: any) => [p.rank, p.points, p.students.map((x: any) => `${x.fullName} (${x.className})`), p.more])).toEqual([
-      [1, 3, ['Işık Yıldız (3-A)'], 0],
-      [2, 2, ['Ada Kurgu (3-A)', 'Cem Örnek (3-B)'], 0],
-      [3, 1, ['Bora Kurgu (3-A)'], 0],
+    expect(b.places.map((p: any) => [p.rank, p.points, p.students.map((x: any) => `${x.fullName} (${x.className})`)])).toEqual([
+      [1, 3, ['Işık Yıldız (3-A)']],
+      [2, 2, ['Ada Kurgu (3-A)', 'Cem Örnek (3-B)']],
+      [3, 1, ['Bora Kurgu (3-A)']],
     ]);
     expect(JSON.stringify(b)).not.toContain('Deniz Su');
     expect(b.classes).toEqual([
@@ -438,5 +440,119 @@ describe('secrets never reach the logs (STU-6, D-128)', () => {
     for (const secret of [tokenOf(link.url), tokenOf(board.link.url), phone.cookies.get('ccp')!, board.screen.cookies.get('ccb')!, code]) {
       expect(all).not.toContain(secret);
     }
+  });
+});
+
+describe('S12 review fixes', () => {
+  beforeEach(enable);
+
+  it('a valid pairing code still pairs after 10 wrong codes from the same (shared school) address (D-129)', async () => {
+    const { link, phone } = await newScorer();
+    const { code } = await ok(phone.post('/api/scorer/pairing'));
+    const guesser = new Client(env);
+    const wrong = code === '000000' ? '000001' : '000000';
+    for (let i = 0; i < 10; i++) expect((await guesser.post('/api/scorer/pair', { code: wrong })).status).toBe(401);
+    expect((await guesser.post('/api/scorer/pair', { code: wrong })).status).toBe(429);
+    // A teacher's installed app behind the same address: the right code works.
+    const app = new Client(env);
+    await ok(app.post('/api/scorer/pair', { code }));
+    expect((await ok(app.get('/api/scorer/me'))).id).toBe(link.id);
+  });
+
+  it('ends every unused pairing code after 100 wrong codes school-wide, so guessing stays bounded (D-129)', async () => {
+    const { phone } = await newScorer();
+    const { code } = await ok(phone.post('/api/scorer/pairing'));
+    const deps = { db: env.db, now: env.clock.now, config: env.config };
+    const wrong = code === '000000' ? '000001' : '000000';
+    for (let i = 0; i < PAIRING_GUARD_FAILURES - 1; i++) expect(() => pairWithCode(deps, `10.0.${i}.1`, wrong)).toThrow();
+    // Still valid after 99 wrong ones; the 100th ends it (audited, no code in the audit row).
+    const fresh = await ok(phone.post('/api/scorer/pairing'));
+    expect(() => pairWithCode(deps, '10.9.9.9', fresh.code === wrong ? '000002' : wrong)).toThrow();
+    expect(() => pairWithCode(deps, '10.9.9.8', fresh.code)).toThrow(/does not work/u);
+    const guard = env.db.$client.prepare(`select after_json as after from audit_events where action = 'speakers.pairing.guard'`).all() as Array<{ after: string }>;
+    expect(guard).toHaveLength(1);
+    expect(guard[0]!.after).not.toContain(fresh.code);
+    // A new code works again.
+    const again = await ok(phone.post('/api/scorer/pairing'));
+    expect(pairWithCode(deps, '10.9.9.7', again.code).token).toBeTruthy();
+  });
+
+  it('never exports pairing codes or any other sign-in secret column (DAT-4/5)', () => {
+    expect(NEVER_EXPORTED).toContain('scorer_pairings');
+    expect(SECRET_COLUMN.test('code_hash')).toBe(true);
+    // Schema-wide guard: every hash or encrypted column of an exported table is blanked.
+    const tables = env.db.$client.prepare("select name from sqlite_master where type = 'table' and name not like 'sqlite_%'").all() as Array<{ name: string }>;
+    for (const { name } of tables) {
+      if ((NEVER_EXPORTED as readonly string[]).includes(name)) continue;
+      const cols = env.db.$client.prepare('select name from pragma_table_info(?)').all(name) as Array<{ name: string }>;
+      for (const c of cols) {
+        if (!/_hash$|_cipher$/u.test(c.name)) continue;
+        expect(SECRET_COLUMN.test(c.name), `${name}.${c.name} must be blanked in exports`).toBe(true);
+      }
+    }
+  });
+
+  it('dates a point queued offline at its tap time (within 4 days), else at the server time (D-130)', async () => {
+    const { phone } = await newScorer();
+    const { screen } = await newBoard();
+    const now = env.clock.now(); // Monday 2026-11-09 10:00 Istanbul
+    const friday = Date.UTC(2026, 10, 6, 12, 0, 0); // Friday 15:00 Istanbul, last week
+    const at = async (clientTime: number) => {
+      const opId = v7();
+      const r = await ok(phone.post('/api/scorer/commands', { commands: [{ opId, type: 'points.award', payload: { studentId: isik.id }, clientTime }] }));
+      expect(r.results[0].ok).toBe(true);
+      return env.db.$client.prepare('select occurred_at as occurredAt, local_date as localDate, week_start as weekStart from point_events where id = ?').get(opId) as { occurredAt: number; localDate: string; weekStart: string };
+    };
+    expect(await at(friday)).toEqual({ occurredAt: friday, localDate: '2026-11-06', weekStart: '2026-11-02' });
+    // Last week's point is not on this week's board.
+    expect((await ok(screen.get('/api/board'))).places).toEqual([]);
+    // A device clock in the future, or more than 4 days behind, is not trusted.
+    expect((await at(now + 60_000)).occurredAt).toBe(now);
+    expect((await at(now - MAX_OFFLINE_AGE_MS - 1)).occurredAt).toBe(now);
+    expect(tapTime(now, undefined)).toBe(now);
+  });
+
+  it('measures the rate limit on tap times, so a long offline backlog is not refused (D-130)', async () => {
+    await ok(s.admin.put('/api/admin/speakers/settings', { rateLimitMax: 5, rateLimitWindowMinutes: 10 }));
+    const { phone } = await newScorer();
+    const start = env.clock.now() - 60 * 60_000;
+    // 12 taps over an hour (one every 5 minutes) arrive together: none is refused.
+    const commands = Array.from({ length: 12 }, (_, i) => ({ opId: v7(), type: 'points.award', payload: { studentId: isik.id }, clientTime: start + i * 5 * 60_000 }));
+    const r = await ok(phone.post('/api/scorer/commands', { commands }));
+    expect(r.results.every((x: Res) => x.ok)).toBe(true);
+    // Six taps within one minute are still limited.
+    const burst = Array.from({ length: 6 }, (_, i) => ({ opId: v7(), type: 'points.award', payload: { studentId: ada.id }, clientTime: env.clock.now() - 60_000 + i * 1000 }));
+    const b = await ok(phone.post('/api/scorer/commands', { commands: burst }));
+    expect(b.results.filter((x: Res) => !x.ok).map((x: Res) => x.error?.reason)).toContain('SCORER_RATE_LIMIT');
+  });
+
+  it('builds the weekly winners and class totals from whole weeks when the period starts mid-week (SSP-9)', async () => {
+    const { phone } = await newScorer();
+    await award(phone, isik.id); // Monday 2026-11-09
+    await award(phone, isik.id);
+    env.clock.advance(2 * DAY); // Wednesday 2026-11-11
+    await award(phone, cem.id);
+    await s.admin.login('root.admin');
+    const h = await ok(s.admin.get('/api/admin/speakers/history?from=2026-11-11&to=2026-11-12'));
+    const tbl = (k: string) => h.section.tables.find((t: any) => t.key === k);
+    const text = JSON.stringify(tbl('winners').rows);
+    expect(tbl('winners').rows).toHaveLength(2);
+    expect(text).toContain('Işık Yıldız');
+    expect(text).toContain('Cem Örnek');
+    expect(tbl('winners').rows[0].key).toBe(`2026-11-09:1:${isik.id}`);
+    // Class totals of that whole week: 3-A has Işık's 2 points, 3-B has Cem's 1.
+    expect(JSON.stringify(tbl('classes').rows.map((r: any) => r.cells.slice(1)))).toMatch(/3-A.*2.*3-B.*1/u);
+    // The per-student table covers exactly the chosen days.
+    expect(tbl('students').rows.map((r: any) => r.key)).toEqual([cem.id]);
+  });
+
+  it('lets the administrator change the board messages; empty means the built-in message', async () => {
+    const { screen } = await newBoard();
+    expect((await ok(screen.get('/api/board'))).messages).toEqual({ placeholder: {}, waiting: {} });
+    const saved = await ok(s.admin.put('/api/admin/speakers/settings', { boardMessages: { placeholder: { en: 'Who will speak first?', tr: 'İlk kim konuşacak?' }, waiting: { en: 'Your turn next!' } } }));
+    expect(saved.boardMessages.placeholder.tr).toBe('İlk kim konuşacak?');
+    const b = await ok(screen.get('/api/board'));
+    expect(b.messages).toEqual({ placeholder: { en: 'Who will speak first?', tr: 'İlk kim konuşacak?' }, waiting: { en: 'Your turn next!' } });
+    expect((await s.admin.put('/api/admin/speakers/settings', { boardMessages: { placeholder: { en: 'x'.repeat(201) }, waiting: {} } })).status).toBe(400);
   });
 });

@@ -1,12 +1,12 @@
 /**
  * Super Speakers rules (S12, D-130, D-133): the weekly window around Monday 00:00 Istanbul (property
- * test), the dense-ranked podium with ties and "+N more", class totals with zeros, and the Turkish
+ * test), the dense-ranked podium with ties (every tied student listed), class totals with zeros, and the Turkish
  * search (folding, word starts, class keys, student numbers) including a 1,500-student performance
  * check. Synthetic data only.
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { buildSearchIndex, classTotals, inWeek, PLACE_NAME_LIMIT, podium, searchStudents, totalsByStudent, weekRangeOf } from '../../src/domain/speakers.ts';
+import { buildSearchIndex, classTotals, inWeek, podium, searchStudents, totalsByStudent, weekRangeOf } from '../../src/domain/speakers.ts';
 import { localDate } from '../../src/domain/dates.ts';
 
 const TZ = 'Europe/Istanbul';
@@ -61,9 +61,9 @@ describe('podium (SSP-1, D-133)', () => {
       name,
     );
     expect(p).toEqual([
-      { rank: 1, points: 5, students: ['Ali', 'Zeynep'], more: 0 },
-      { rank: 2, points: 3, students: ['Çağrı'], more: 0 },
-      { rank: 3, points: 2, students: ['Deniz'], more: 0 },
+      { rank: 1, points: 5, students: ['Ali', 'Zeynep'] },
+      { rank: 2, points: 3, students: ['Çağrı'] },
+      { rank: 3, points: 2, students: ['Deniz'] },
     ]);
   });
 
@@ -73,16 +73,19 @@ describe('podium (SSP-1, D-133)', () => {
     expect(podium([{ student: 'Ali', points: 1 }], name)).toHaveLength(1);
   });
 
-  it('shows at most six tied names per place, in Turkish order, and counts the rest', () => {
+  it('lists every tied name of a place in Turkish order, however many (owner decision 1, D-133)', () => {
     const names = ['Şule', 'Ömer', 'Çınar', 'İpek', 'Işıl', 'Ufuk', 'Gül', 'Ayşe', 'Zafer'];
     const p = podium(
       names.map((n) => ({ student: n, points: 4 })),
       name,
     );
     expect(p).toHaveLength(1);
-    expect(p[0]!.students).toHaveLength(PLACE_NAME_LIMIT);
-    expect(p[0]!.students).toEqual(['Ayşe', 'Çınar', 'Gül', 'Işıl', 'İpek', 'Ömer']);
-    expect(p[0]!.more).toBe(3);
+    expect(p[0]!.students).toEqual(['Ayşe', 'Çınar', 'Gül', 'Işıl', 'İpek', 'Ömer', 'Şule', 'Ufuk', 'Zafer']);
+    const crowd = podium(
+      Array.from({ length: 120 }, (_, i) => ({ student: `Öğrenci ${String(i).padStart(3, '0')}`, points: 1 })),
+      name,
+    );
+    expect(crowd[0]!.students).toHaveLength(120);
   });
 
   it('property: places are strictly decreasing, every shown student has that total, nobody is lost', () => {
@@ -95,7 +98,7 @@ describe('podium (SSP-1, D-133)', () => {
         p.forEach((place, i) => {
           expect(place.rank).toBe(i + 1);
           const tied = scores.filter((s) => s.points === place.points);
-          expect(place.students.length + place.more).toBe(tied.length);
+          expect(place.students.length).toBe(tied.length);
           for (const st of place.students) expect(tied.some((t) => t.student === st)).toBe(true);
         });
       }),

@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as C from '../../../shared/contracts/superSpeakers.ts';
 import * as S from '../../../shared/contracts/school.ts';
 import { addDays } from '../../../domain/dates.ts';
-import { formatDate, pickText, type Locale } from '../../../shared/i18n/index.ts';
+import { formatDate, pickText, translate, type Locale } from '../../../shared/i18n/index.ts';
 import { call, urlFor } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { useRun } from '../../lib/useRun.ts';
@@ -118,6 +118,24 @@ function SettingsPanel({ data }: { data: C.SpeakersAdmin }) {
           <TextField label={t('speakers.admin.titleEn')} value={s.boardTitle.en ?? ''} onChange={(v) => set('boardTitle', { ...s.boardTitle, en: v })} />
           <TextField label={t('speakers.admin.titleTr')} value={s.boardTitle.tr ?? ''} onChange={(v) => set('boardTitle', { ...s.boardTitle, tr: v })} />
         </div>
+        <fieldset className="cc-stack cc-fieldset" data-testid="speakers-messages">
+          <legend className="cc-field__label">{t('speakers.admin.messages')}</legend>
+          <p className="cc-muted">{t('speakers.admin.messagesHint')}</p>
+          {(['placeholder', 'waiting'] as const).map((m) => (
+            <div key={m} className="cc-row">
+              {(['en', 'tr'] as const).map((l) => (
+                <TextField
+                  key={l}
+                  label={t(`speakers.admin.message.${m}.${l}`)}
+                  maxLength={200}
+                  placeholder={translate(l, m === 'placeholder' ? 'speakers.board.placeholder' : 'speakers.board.waitingShort')}
+                  value={s.boardMessages[m][l] ?? ''}
+                  onChange={(v) => set('boardMessages', { ...s.boardMessages, [m]: { ...s.boardMessages[m], [l]: v } })}
+                />
+              ))}
+            </div>
+          ))}
+        </fieldset>
         <Select
           label={t('speakers.admin.boardLanguage')}
           items={(['en', 'tr'] as const).map((l) => ({ id: l, label: t(`student.languageName.${l}`) }))}
@@ -417,8 +435,7 @@ function BoardPreview() {
       <ol className="cc-stack">
         {b.places.map((p) => (
           <li key={p.rank}>
-            <strong>{p.rank}.</strong> {p.students.map((s) => `${s.fullName} (${s.className})`).join(', ')}
-            {p.more ? ` ${t('speakers.board.more', { count: p.more })}` : ''} – {t('speakers.board.points', { count: p.points })}
+            <strong>{p.rank}.</strong> {p.students.map((s) => `${s.fullName} (${s.className})`).join(', ')} – {t('speakers.board.points', { count: p.points })}
           </li>
         ))}
       </ol>

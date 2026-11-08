@@ -18,7 +18,7 @@ import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { generatedAvatar, type AvatarSpecValue } from '../../../shared/avatars.ts';
 import type * as C from '../../../shared/contracts/superSpeakers.ts';
-import { boardLinkUrl, scorerLinkUrl, PAIRING_CODE_TTL_MS, type AdminAward, type Board, type DisplayLinkInfo, type ScorerLinkInfo, type SpeakersSettings } from '../../../shared/contracts/superSpeakers.ts';
+import { boardLinkUrl, scorerLinkUrl, PAIRING_CODE_TTL_MS, type AdminAward, type Board, type BoardMessages, type DisplayLinkInfo, type ScorerLinkInfo, type SpeakersSettings } from '../../../shared/contracts/superSpeakers.ts';
 import { compareNames, initials } from '../../../shared/text/turkish.ts';
 import { localDate } from '../../../domain/dates.ts';
 import { classTotals, podium, totalsByStudent, weekRangeOf } from '../../../domain/speakers.ts';
@@ -62,6 +62,7 @@ const defaultSettingsRow = (now: number): SettingsRow => ({
   rateLimitMax: 60,
   rateLimitWindowMinutes: 10,
   boardTitle: DEFAULT_BOARD_TITLE,
+  boardMessages: null,
   boardLanguage: 'en',
   theme: 'explorer',
   boardSound: false,
@@ -79,6 +80,9 @@ export function ensureSettings(db: Db, now: number): void {
   db.insert(superSpeakersSettings).values(defaultSettingsRow(now)).onConflictDoNothing().run();
 }
 
+/** The board messages as stored; an empty text means the built-in translated message (S12 review). */
+export const boardMessagesOf = (s: SettingsRow): BoardMessages => ({ placeholder: s.boardMessages?.placeholder ?? {}, waiting: s.boardMessages?.waiting ?? {} });
+
 export const settingsDto = (s: SettingsRow): SpeakersSettings => ({
   weekStartsOn: s.weekStartsOn,
   participatingClassIds: s.participatingClassIds,
@@ -86,6 +90,7 @@ export const settingsDto = (s: SettingsRow): SpeakersSettings => ({
   rateLimitMax: s.rateLimitMax,
   rateLimitWindowMinutes: s.rateLimitWindowMinutes,
   boardTitle: s.boardTitle,
+  boardMessages: boardMessagesOf(s),
   boardLanguage: s.boardLanguage,
   theme: s.theme,
   boardSound: s.boardSound,
@@ -283,11 +288,38 @@ export function createPairingCode(ctx: RequestContext): { code: string; expiresA
   });
 }
 
-/** A pairing code → a session of its scorer link (single use, before expiry, link still active). */
+/**
+ * School-wide guard against guessing (D-129, S12 review): every `PAIRING_GUARD_FAILURES` wrong codes
+ * (all addresses together, within the failure window) end every unused pairing code, so one guesser
+ * can try at most that many codes against any code a teacher is about to use.
+ */
+export const PAIRING_GUARD_FAILURES = 100;
+
+function pairingFailed(deps: Deps, ip: string, now: number): never {
+  const global = recordFailure(deps.db, 'speakers_pair:all', now);
+  if (global % PAIRING_GUARD_FAILURES === 0) {
+    tx(deps.db, () => {
+      deps.db
+        .update(scorerPairings)
+        .set({ expiresAt: now })
+        .where(and(isNull(scorerPairings.usedAt), gte(scorerPairings.expiresAt, now)))
+        .run();
+      audit(deps.db, { type: 'system', id: null }, { action: 'speakers.pairing.guard', entity: 'scorer_pairing', entityId: 'all', after: { failures: global } }, now);
+    });
+  }
+  // Per address: after FREE_FAILURES.pairing wrong codes the answer is 429 (a valid code still pairs).
+  if (recordFailure(deps.db, `speakers_pair:ip:${ip}`, now) > FREE_FAILURES.pairing) throw new AppError('RATE_LIMITED', 'Too many attempts. Try again later.');
+  throw new AppError('UNAUTHENTICATED', 'This code does not work', { reason: 'PAIRING_CODE_INVALID' });
+}
+
+/**
+ * A pairing code → a session of its scorer link (single use, before expiry, link still active).
+ * The code is checked first: wrong codes are limited per address and school-wide, but a valid code
+ * always pairs, so a phone on the school's shared address cannot lock pairing for every teacher
+ * (S12 review). Guessing is bounded by the school-wide guard above and the route rate limit.
+ */
 export function pairWithCode(deps: Deps, ip: string, code: string): { token: string } {
   const now = deps.now();
-  const key = `speakers_pair:ip:${ip}`;
-  if (failuresOf(deps.db, key, now) >= FREE_FAILURES.pairing) throw new AppError('RATE_LIMITED', 'Too many attempts. Try again later.');
   const hash = codeHashOf(deps, code);
   const row = deps.db
     .select()
@@ -296,10 +328,7 @@ export function pairWithCode(deps: Deps, ip: string, code: string): { token: str
     .orderBy(desc(scorerPairings.createdAt))
     .get();
   const link = row ? deps.db.select().from(scorerLinks).where(eq(scorerLinks.id, row.scorerLinkId)).get() : undefined;
-  if (!row || row.expiresAt <= now || !link || link.revokedAt !== null) {
-    recordFailure(deps.db, key, now);
-    throw new AppError('UNAUTHENTICATED', 'This code does not work', { reason: 'PAIRING_CODE_INVALID' });
-  }
+  if (!row || row.expiresAt <= now || !link || link.revokedAt !== null) pairingFailed(deps, ip, now);
   return tx(deps.db, () => {
     // Single use: only the request that marks it used gets a session.
     const used = deps.db.update(scorerPairings).set({ usedAt: now }).where(and(eq(scorerPairings.id, row.id), isNull(scorerPairings.usedAt))).run();
@@ -365,20 +394,36 @@ export function scorerAwards(ctx: RequestContext) {
 }
 
 // ---------------------------------------------------------------- commands (D-130)
+/** How old a queued point's tap time may be and still be used (a weekend plus a day off, D-130). */
+export const MAX_OFFLINE_AGE_MS = 4 * 24 * 3600_000;
+
+/**
+ * The instant a point was given: the device's tap time (`clientTime`, sent by the outbox) when it lies
+ * within the last `MAX_OFFLINE_AGE_MS`, otherwise the server time (a missing, future or far older
+ * device clock is not trusted). So a +1 tapped offline on Friday and sent on Monday counts on Friday.
+ */
+export function tapTime(now: number, clientTime: number | undefined): number {
+  if (clientTime === undefined || !Number.isFinite(clientTime)) return now;
+  if (clientTime > now || clientTime < now - MAX_OFFLINE_AGE_MS) return now;
+  return clientTime;
+}
+
 /** `points.award` {studentId}: +1 for an active student of a participating class (SSP-5, SSP-6). */
 export function awardPoint(ctx: RequestContext, p: z.infer<(typeof C.SpeakerCommands)['points.award']>, meta: CommandMeta) {
   if (!ctx.scorer) throw new AppError('FORBIDDEN', 'Only a scorer link can give Super Speakers points', { reason: 'SCORER_ONLY' });
   const scorer = ctx.scorer;
   assertEnabled(ctx.db);
   const now = ctx.now();
+  // The time of the tap: a point queued offline counts in the week (and rate window) it was given in.
+  const at = tapTime(now, meta.clientTime);
   const s = getSettings(ctx.db);
   const who = participants(ctx.db, now, s).find((x) => x.student.id === p.studentId);
   if (!who) throw new AppError('NOT_FOUND', 'This student does not take part in Super Speakers', { reason: 'NOT_PARTICIPATING' });
-  const windowStart = now - s.rateLimitWindowMinutes * 60_000;
+  const windowMs = s.rateLimitWindowMinutes * 60_000;
   const recent = ctx.db
     .select({ n: sql<number>`count(*)` })
     .from(pointEvents)
-    .where(and(eq(pointEvents.scorerLinkId, scorer.scorerLinkId), gte(pointEvents.occurredAt, windowStart)))
+    .where(and(eq(pointEvents.scorerLinkId, scorer.scorerLinkId), gte(pointEvents.occurredAt, at - windowMs), lte(pointEvents.occurredAt, at)))
     .get();
   if ((recent?.n ?? 0) >= s.rateLimitMax) {
     throw new AppError('RATE_LIMITED', 'Too many points in a short time', { reason: 'SCORER_RATE_LIMIT', max: s.rateLimitMax, minutes: s.rateLimitWindowMinutes });
@@ -389,9 +434,9 @@ export function awardPoint(ctx: RequestContext, p: z.infer<(typeof C.SpeakerComm
     studentId: who.student.id,
     scorerLinkId: scorer.scorerLinkId,
     userId: scorer.userId,
-    occurredAt: now,
-    localDate: localDate(now, tz),
-    weekStart: weekStartOf(now, tz, s.weekStartsOn),
+    occurredAt: at,
+    localDate: localDate(at, tz),
+    weekStart: weekStartOf(at, tz, s.weekStartsOn),
     classIdSnapshot: who.cls.id,
     classNameSnapshot: who.cls.name,
     voidedAt: null,
@@ -404,7 +449,7 @@ export function awardPoint(ctx: RequestContext, p: z.infer<(typeof C.SpeakerComm
   const subject = badgeSubject(ctx.db);
   if (subject) emitStudentActivity(ctx, { source: 'speakers', studentIds: [row.studentId], subjectId: subject.id });
   notifyBoardChange();
-  return { eventId: row.id, studentId: row.studentId, undoUntil: now + s.undoWindowMinutes * 60_000 };
+  return { eventId: row.id, studentId: row.studentId, undoUntil: at + s.undoWindowMinutes * 60_000 };
 }
 
 /** `points.voidOwn` {eventId}: the scorer takes back their own point within the undo window. */
@@ -429,7 +474,7 @@ export function buildBoard(db: Db, now: number): Board {
   const tz = schoolTimezone(db);
   const week = weekRangeOf(now, tz, s.weekStartsOn);
   const enabled = isEnabled(db);
-  const base = { enabled, title: s.boardTitle, language: s.boardLanguage, theme: s.theme, sound: s.boardSound, week, timezone: tz };
+  const base = { enabled, title: s.boardTitle, messages: boardMessagesOf(s), language: s.boardLanguage, theme: s.theme, sound: s.boardSound, week, timezone: tz };
   if (!enabled) {
     const rest = { ...base, places: [], classes: [], updatedAt: null };
     return { ...rest, version: versionOf(rest) };
@@ -459,7 +504,6 @@ export function buildBoard(db: Db, now: number): Board {
   const places = top.map((p) => ({
     rank: p.rank,
     points: p.points,
-    more: p.more,
     students: p.students.map((id) => {
       const st = studentRows.get(id)!;
       const ev = latest.get(id)!;

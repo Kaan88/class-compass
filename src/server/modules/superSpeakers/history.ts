@@ -49,12 +49,18 @@ export function adminHistory(ctx: RequestContext, from: string, to: string): Rep
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
   if (days > MAX_DAYS) throw invalid('Choose a shorter period', { reason: 'PERIOD_TOO_LONG' });
   const s = getSettings(ctx.db);
-  const all = pointsIn(ctx.db, from, to);
-  const live = all.filter((r) => r.voidedAt === null);
   const weeks = weeksOf(from, to, s.weekStartsOn);
+  // The weekly tables cover whole weeks (as the board showed them), even when the period starts or ends
+  // mid-week; the metrics, scorer and student tables cover exactly [from, to].
+  const weekFrom = weeks[0] ?? from;
+  const weekTo = weeks.length ? weekEndOf(weeks[weeks.length - 1]!) : to;
+  const wide = pointsIn(ctx.db, weekFrom < from ? weekFrom : from, weekTo > to ? weekTo : to);
+  const wideLive = wide.filter((r) => r.voidedAt === null);
+  const all = wide.filter((r) => r.localDate >= from && r.localDate <= to);
+  const live = all.filter((r) => r.voidedAt === null);
   const weekOf = (r: PointRow) => weekStartOfDate(r.localDate, s.weekStartsOn);
   const names = new Map(
-    (live.length ? ctx.db.select({ id: students.id, name: students.fullName }).from(students).where(inArray(students.id, [...new Set(live.map((r) => r.studentId))])).all() : []).map((r) => [r.id, r.name]),
+    (wideLive.length ? ctx.db.select({ id: students.id, name: students.fullName }).from(students).where(inArray(students.id, [...new Set(wideLive.map((r) => r.studentId))])).all() : []).map((r) => [r.id, r.name]),
   );
   const nameOf = (id: string) => names.get(id) ?? '';
   const lastClass = new Map<string, string>();
@@ -62,13 +68,12 @@ export function adminHistory(ctx: RequestContext, from: string, to: string): Rep
 
   // Winners per week: the podium (dense ranks 1–3) as the board showed it, every tied student listed.
   const winnerRows = weeks.flatMap((w) => {
-    const rows = live.filter((r) => weekOf(r) === w);
+    const rows = wideLive.filter((r) => weekOf(r) === w);
     const weekClass = new Map<string, string>();
     for (const r of [...rows].sort((a, b) => a.occurredAt - b.occurredAt)) weekClass.set(r.studentId, r.classNameSnapshot);
     const places = podium(
       [...totalsByStudent(rows)].map(([id, points]) => ({ student: id, points })),
       nameOf,
-      { limit: Number.MAX_SAFE_INTEGER },
     );
     return places.flatMap((p) =>
       p.students.map((id) => ({ key: `${w}:${p.rank}:${id}`, cells: [range(w, weekEndOf(w)), n(p.rank), student({ id, fullName: nameOf(id) }), { t: 'label' as const, v: raw(weekClass.get(id) ?? '') }, n(p.points)] })),
@@ -78,10 +83,10 @@ export function adminHistory(ctx: RequestContext, from: string, to: string): Rep
   // Totals per class and week: every class that took part or is taking part now, 0 included (SSP-3).
   const classMap = new Map<string, string>();
   for (const c of participatingClasses(ctx.db, ctx.now(), s)) classMap.set(c.id, c.name);
-  for (const r of live) if (!classMap.has(r.classIdSnapshot)) classMap.set(r.classIdSnapshot, r.classNameSnapshot);
+  for (const r of wideLive) if (!classMap.has(r.classIdSnapshot)) classMap.set(r.classIdSnapshot, r.classNameSnapshot);
   const classList = [...classMap].map(([id, name]) => ({ id, name }));
   const classWeekRows = weeks.flatMap((w) =>
-    classTotals(classList, live.filter((r) => weekOf(r) === w).map((r) => ({ classId: r.classIdSnapshot }))).map((c) => ({
+    classTotals(classList, wideLive.filter((r) => weekOf(r) === w).map((r) => ({ classId: r.classIdSnapshot }))).map((c) => ({
       key: `${w}:${c.classId}`,
       cells: [range(w, weekEndOf(w)), { t: 'label' as const, v: raw(c.name) }, n(c.points)],
     })),

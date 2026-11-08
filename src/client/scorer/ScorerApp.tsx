@@ -34,7 +34,7 @@ import { ApiError, call } from '../lib/api.ts';
 import { commandErrorText, errorText } from '../lib/errors.ts';
 import { setDisplay } from '../lib/display.ts';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
-import { isRetryable, saveStateOf } from '../lib/outbox.ts';
+import { isRetryable, saveStateOf, type OutboxOp } from '../lib/outbox.ts';
 import { Button } from '../ui/Button.tsx';
 import { NeedsAttentionTray, SaveStateBadge, Toaster } from '../ui/Feedback.tsx';
 import { IconGlobe, IconPlus, IconUndo, IconX } from '../ui/icons.tsx';
@@ -42,6 +42,7 @@ import { Avatar } from '../ui/Students.tsx';
 import { ThemeBackdrop, ThemeIllustration } from '../ui/Mascot.tsx';
 import { scorerOutbox, useScorerOutboxStatus } from './outbox.ts';
 import { AndroidSteps, IosSteps } from './InstallPictures.tsx';
+import { liveCount, todayAwards, type Today } from './today.ts';
 
 const LOCALE_KEY = 'cc.scorerLocale';
 const ME_KEY = ['scorer', 'me'] as const;
@@ -306,20 +307,21 @@ function StudentCard({ s, onAward, hint }: { s: ScorerStudent; onAward: (s: Scor
   );
 }
 
-function AwardsToday({ awards, pendingVoids, onUndo, timezone }: { awards: ScorerAward[]; pendingVoids: Set<string>; onUndo: (a: ScorerAward) => void; timezone: string }) {
+function AwardsToday({ today, onUndo, timezone }: { today: Today; onUndo: (a: ScorerAward) => void; timezone: string }) {
   const { t, locale } = useI18n();
   const now = Date.now();
+  const { awards, voiding } = today;
   return (
     <section className="cc-card cc-stack" aria-labelledby="today-title" data-testid="scorer-today">
       <h2 id="today-title" className="cc-h2">
-        {t('speakers.scorer.today', { count: awards.filter((a) => a.voidedAt === null && !pendingVoids.has(a.id)).length })}
+        {t('speakers.scorer.today', { count: liveCount(today) })}
       </h2>
       {awards.length === 0 ? <p className="cc-muted">{t('speakers.scorer.todayEmpty')}</p> : null}
       <ul className="cc-stack cc-scorer__today">
         {awards.map((a) => {
-          const voided = a.voidedAt !== null || pendingVoids.has(a.id);
+          const voided = a.voidedAt !== null || voiding.has(a.id);
           return (
-            <li key={a.id} className="cc-row" data-voided={voided ? 'yes' : undefined}>
+            <li key={a.id} className="cc-row" data-voided={voided ? 'yes' : undefined} data-testid="scorer-today-row">
               <span className="cc-muted">{formatDate(a.occurredAt, locale, timezone, { hour: '2-digit', minute: '2-digit' })}</span>
               <span className="cc-scorer__today-name">
                 {voided ? <s>{a.fullName}</s> : a.fullName} <span className="cc-muted">{a.className}</span>
@@ -352,23 +354,63 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
   const [hintFor, setHintFor] = useState<string | null>(null);
   const [showInstall, setShowInstall] = useState(false);
   const [started, setStarted] = useState(!welcome || installed);
-  /** Awards and undos queued on this device and not yet confirmed (optimistic "My awards today"). */
-  const [local, setLocal] = useState<ScorerAward[]>([]);
-  const [pendingVoids, setPendingVoids] = useState<Set<string>>(new Set());
+  /** This link's commands in the outbox, and what the server confirmed since the last refetch (today.ts). */
+  const [queued, setQueued] = useState<OutboxOp[]>([]);
+  const [confirmed, setConfirmed] = useState<ScorerAward[]>([]);
+  const [confirmedVoids, setConfirmedVoids] = useState<ReadonlySet<string>>(new Set());
   const lastTap = useRef(new Map<string, number>());
   const search = useRef<HTMLInputElement>(null);
+  const list = useMemo(() => students.data?.students ?? [], [students.data]);
+  const byId = useMemo(() => new Map(list.map((s) => [s.id, s])), [list]);
+  const byIdRef = useRef(byId);
+  byIdRef.current = byId;
+  const undoMsRef = useRef(me.undoWindowMinutes * 60_000);
+  undoMsRef.current = me.undoWindowMinutes * 60_000;
 
   useEffect(() => {
     void scorerOutbox().setOwner(me.id);
   }, [me.id]);
   useEffect(() => {
     const box = scorerOutbox();
-    return box.onSuccess(() => {
+    return box.onSuccess((op, result) => {
+      if (op.type === 'points.award') {
+        const studentId = (op.payload as { studentId: string }).studentId;
+        const st = byIdRef.current.get(studentId);
+        const undoUntil = (result.result as { undoUntil?: number } | null)?.undoUntil ?? op.clientTime + undoMsRef.current;
+        const row: ScorerAward = { id: op.opId, studentId, fullName: st?.fullName ?? '', className: st?.className ?? '', occurredAt: op.clientTime, voidedAt: null, undoUntil };
+        setConfirmed((c) => [row, ...c.filter((x) => x.id !== row.id)].slice(0, 200));
+      } else if (op.type === 'points.voidOwn') {
+        const eventId = (op.payload as { eventId: string }).eventId;
+        setConfirmedVoids((v) => new Set(v).add(eventId));
+      }
       queueMicrotask(() => {
         if (box.getStatus().pending === 0) void qc.invalidateQueries({ queryKey: AWARDS_KEY });
       });
     });
   }, [qc]);
+  // The outbox is the truth for what is still waiting or was refused (re-read on every status change).
+  useEffect(() => {
+    let live = true;
+    void scorerOutbox()
+      .all()
+      .then((ops) => {
+        if (live) setQueued(ops.filter((o) => o.ownerId === me.id));
+      });
+    return () => {
+      live = false;
+    };
+  }, [status, me.id]);
+  // Rows the server list now holds need no local copy.
+  useEffect(() => {
+    const server = awards.data?.today;
+    if (!server) return;
+    const known = new Set(server.map((a) => a.id));
+    setConfirmed((c) => (c.some((a) => known.has(a.id)) ? c.filter((a) => !known.has(a.id)) : c));
+  }, [awards.data]);
+  // A refused +1 cannot be undone: the undo bar goes (the tray explains the refusal).
+  useEffect(() => {
+    if (undo && status.rejected.some((op) => op.opId === undo.opId)) setUndo(null);
+  }, [status.rejected, undo]);
   useEffect(() => {
     if (!undo) return;
     const id = setTimeout(() => setUndo(null), Math.max(0, undo.until - Date.now()));
@@ -380,18 +422,15 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
     return () => clearTimeout(id);
   }, [hintFor]);
 
-  const list = useMemo(() => students.data?.students ?? [], [students.data]);
-  const byId = useMemo(() => new Map(list.map((s) => [s.id, s])), [list]);
   const index = useMemo(() => buildSearchIndex(list), [list]);
   const results = useMemo(() => searchStudents(index, query, { classId, limit: classId ? 400 : 40 }), [index, query, classId]);
   const recent = useMemo(() => (awards.data?.recentStudentIds ?? []).map((id) => byId.get(id)).filter((s): s is ScorerStudent => Boolean(s)), [awards.data, byId]);
 
-  // Server awards plus the ones still waiting on this device (newest first, no duplicates).
-  const today = useMemo(() => {
-    const server = awards.data?.today ?? [];
-    const known = new Set(server.map((a) => a.id));
-    return [...local.filter((a) => !known.has(a.id)), ...server];
-  }, [awards.data, local]);
+  // Server awards plus what this device still has queued or just had confirmed (newest first, no duplicates).
+  const today = useMemo(
+    () => todayAwards({ server: awards.data?.today ?? [], queued, confirmed, confirmedVoids, student: (id) => byId.get(id), undoWindowMs: me.undoWindowMinutes * 60_000 }),
+    [awards.data, queued, confirmed, confirmedVoids, byId, me.undoWindowMinutes],
+  );
 
   const award = useCallback(
     async (s: ScorerStudent) => {
@@ -403,21 +442,19 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
       }
       lastTap.current.set(s.id, now);
       const opId = await scorerOutbox().enqueue('points.award', { studentId: s.id });
-      setLocal((l) => [{ id: opId, studentId: s.id, fullName: s.fullName, className: s.className, occurredAt: now, voidedAt: null, undoUntil: now + me.undoWindowMinutes * 60_000 }, ...l].slice(0, 100));
       setUndo({ opId, name: s.fullName, until: now + UNDO_BAR_MS });
     },
-    [me.undoWindowMinutes],
+    [],
   );
   const undoAward = useCallback(async (eventId: string) => {
     await scorerOutbox().enqueue('points.voidOwn', { eventId });
-    setPendingVoids((p) => new Set(p).add(eventId));
     setUndo((u) => (u && u.opId === eventId ? null : u));
   }, []);
 
   const nameOfOp = (payload: unknown) => {
     const p = payload as { studentId?: string; eventId?: string };
     if (p.studentId) return byId.get(p.studentId)?.fullName ?? '';
-    const a = today.find((x) => x.id === p.eventId);
+    const a = today.awards.find((x) => x.id === p.eventId);
     return a?.fullName ?? '';
   };
   const attention = status.rejected.map((op) => ({
@@ -524,7 +561,7 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
       ) : students.data ? (
         <p className="cc-muted">{t('speakers.scorer.searchHint', { count: list.length })}</p>
       ) : null}
-      <AwardsToday awards={today} pendingVoids={pendingVoids} onUndo={(a) => void undoAward(a.id)} timezone={me.timezone} />
+      <AwardsToday today={today} onUndo={(a) => void undoAward(a.id)} timezone={me.timezone} />
       {showInstall ? <InstallPanel /> : null}
       <footer className="cc-row cc-muted cc-scorer__foot">
         {!installed ? (

@@ -10,8 +10,8 @@
  *   excluded absentees and missed assistant turns), the goal entries and teacher assessments of their
  *   goals, the audit events about them, the files they own, the files on their evidence and their
  *   photo. Other students' ids in those rows are blanked and JSON lists are cut down to this student.
- * Never exported: sign-in secrets (sessions, sign-in attempts, one-time tokens, password/PIN/token
- * hashes are blanked), the command log and Secret Student choices of rounds that were not revealed
+ * Never exported: sign-in secrets (sessions, sign-in attempts, one-time tokens, Super Speakers pairing
+ * codes; password/PIN/token/code hashes are blanked), the command log and Secret Student choices of rounds that were not revealed
  * (SEC-3: hidden from everyone, administrators included). Private teacher notes (GOL-6, D-086) are in
  * the FULL export since S13b2 (owner decision, D-114: one CSV for the notes table with author,
  * student and subject names), and stay out of the per-student export, whose manifest gives their count.
@@ -43,9 +43,9 @@ import { exportableSelections, SELECTIONS_TABLE_NAME } from '../secret/service.t
 /** How long a prepared export can be downloaded. */
 export const EXPORT_TTL_MS = 60 * 60_000;
 /** Tables that hold sign-in secrets or request logs, never exported. */
-export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'command_log', '__drizzle_migrations'] as const;
-/** Columns blanked in every export. */
-const SECRET_COLUMN = /(^|_)(password|pin|token|request)_hash$|^token_cipher$/u;
+export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'command_log', 'scorer_pairings', '__drizzle_migrations'] as const;
+/** Columns blanked in every export (sign-in secrets: password/PIN/token/request/code hashes, encrypted tokens). */
+export const SECRET_COLUMN = /(^|_)(password|pin|token|request|code)_hash$|^token_cipher$/u;
 const STUDENT_COLUMNS = new Set(['student_id', 'owner_student_id', 'student_a', 'student_b', 'planned_student_id', 'actual_student_id', 'matched_student_id', 'created_student_id']);
 
 /** Where prepared exports wait for their download. */

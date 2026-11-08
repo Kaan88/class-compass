@@ -1,0 +1,1 @@
+ALTER TABLE `super_speakers_settings` ADD `board_messages` text;

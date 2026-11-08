@@ -4,7 +4,9 @@
  * opens the link, searches "isik" (finds "Işık"), gives +1 and undoes it; the board on a 1920×1080
  * screen updates live (Server-Sent Events) without a reload, fits without scrolling at 1920×1080 and
  * 1280×720, and shows the placeholder after the weekly reset (server test clock moved past Monday
- * 00:00, NODE_ENV=test only). Fictional demo data only.
+ * 00:00, NODE_ENV=test only). A second test feeds the board a synthetic school (50 classes, 40 students
+ * tied for first place) and checks that every name is shown and no class row overlaps another at
+ * 1920×1080 and 1280×720 (S12 review). Fictional demo data only.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -119,4 +121,84 @@ test('admin creates links; a phone scorer finds "isik", gives +1 and undoes; the
   expect((await api(page, 'POST', `/api/admin/students/${isik.body.id}/deactivate`)).status).toBe(200);
   await phoneCtx.close();
   await screenCtx.close();
+});
+
+/** A synthetic board of a 1,500-student school (S12 review): 50 classes and a crowded first place. */
+function crowdedBoard() {
+  const given = ['Ayşe', 'Çınar', 'Işıl', 'İpek', 'Ömer', 'Şule', 'Ufuk', 'Gül', 'Deniz', 'Ece', 'Arda', 'Zeynep', 'Kerem', 'Nehir', 'Yağmur', 'Barış'];
+  const family = ['Yıldız', 'Kurgu', 'Örnek', 'Çiçekdağı', 'Şimşekoğlu', 'Akdeniz', 'Gökyüzü', 'Işıkpınar'];
+  const pupil = (i: number, cls: string) => ({ id: `0190f0f0-0000-7000-8000-${String(i).padStart(12, '0')}`, fullName: `${given[i % given.length]} ${given[(i * 7 + 3) % given.length]} ${family[i % family.length]}`, initials: 'AB', avatarHue: (i * 37) % 360, avatar: null, className: cls });
+  const classes = Array.from({ length: 50 }, (_, i) => ({ classId: `c${i}`, name: `${(i % 4) + 1}-${String.fromCharCode(65 + Math.floor(i / 4))}`, points: 50 - i }));
+  return {
+    enabled: true,
+    title: { en: 'Super Speakers' },
+    messages: { placeholder: {}, waiting: {} },
+    language: 'en',
+    theme: 'explorer',
+    sound: false,
+    week: { start: '2026-11-09', end: '2026-11-15' },
+    timezone: 'Europe/Istanbul',
+    places: [
+      { rank: 1, points: 3, students: Array.from({ length: 40 }, (_, i) => pupil(i, classes[i]!.name)) },
+      { rank: 2, points: 2, students: Array.from({ length: 5 }, (_, i) => pupil(100 + i, '2-B')) },
+      { rank: 3, points: 1, students: [pupil(200, '4-C')] },
+    ],
+    classes,
+    updatedAt: Date.UTC(2026, 10, 9, 9, 0, 0),
+    version: 'synthetic-crowded',
+  };
+}
+
+/** Every tied name and every class row is inside its box: nothing clipped, no rows on top of each other. */
+async function boardLayoutProblems(page: Page) {
+  return page.evaluate(() => {
+    const problems: string[] = [];
+    for (const ul of document.querySelectorAll<HTMLElement>('.cc-board__names')) {
+      if (ul.scrollHeight > ul.clientHeight + 1 || ul.scrollWidth > ul.clientWidth + 1) problems.push(`names of ${ul.dataset.count} overflow`);
+    }
+    const rows = [...document.querySelectorAll<HTMLElement>('.cc-board__bar-row')];
+    rows.forEach((r) => {
+      if (r.scrollHeight > r.clientHeight + 1) problems.push(`class row ${r.textContent} is taller than its slot`);
+    });
+    const rects = rows.map((r) => r.getBoundingClientRect());
+    for (let i = 0; i < rects.length; i++)
+      for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i]!;
+        const b = rects[j]!;
+        const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (overlapX > 1 && overlapY > 1) problems.push(`class rows ${i} and ${j} overlap`);
+      }
+    const smallest = Math.min(...[...document.querySelectorAll<HTMLElement>('.cc-board__name, .cc-board__bar-name')].map((e) => parseFloat(getComputedStyle(e).fontSize)));
+    return { problems, smallest, names: document.querySelectorAll('.cc-board__student').length, rows: rows.length };
+  });
+}
+
+test('the board shows every tied student and 50 class totals without overlap at 1920×1080 and 1280×720 (S12 review)', async ({ page, browser }) => {
+  await login(page, 'admin');
+  const link = await api(page, 'POST', '/api/admin/speakers/displays', { label: `Crowded hall ${Date.now().toString(36)}` });
+  expect(link.status).toBe(200);
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const board = await ctx.newPage();
+  const data = crowdedBoard();
+  await board.route('**/api/board', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) }));
+  await board.goto(link.body.url as string);
+  await expect(board.getByTestId('board-place-1')).toContainText(data.places[0]!.students[39]!.fullName);
+  for (const size of [
+    { width: 1920, height: 1080 },
+    { width: 1280, height: 720 },
+  ]) {
+    await board.setViewportSize(size);
+    await board.waitForTimeout(300);
+    expect(await fitsWithoutScrolling(board)).toBe(true);
+    const r = await boardLayoutProblems(board);
+    expect(r.problems).toEqual([]);
+    expect(r.names).toBe(46);
+    expect(r.rows).toBe(50);
+    // Small, but still text (about 7 px at 720p is the floor of the fitting loop for 40 names).
+    expect(r.smallest).toBeGreaterThanOrEqual(6);
+  }
+  await expect(board.getByText(/more/u)).toHaveCount(0);
+  expect((await api(page, 'POST', `/api/admin/speakers/displays/${link.body.id}/revoke`)).status).toBe(200);
+  await ctx.close();
 });

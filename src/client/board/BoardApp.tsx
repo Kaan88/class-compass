@@ -3,17 +3,19 @@
  * readable from the back of the room, with no scrolling at 1920×1080 or 1280×720.
  *
  * - Top 3 places of the current week (dense ranks, full name + class, avatar, points); the first place
- *   is the largest, in the centre. Ties share a place; more than six tied names show six and "+N more"
- *   (D-133). Empty places keep the placeholder style; with no points at all the friendly placeholder
- *   message is shown. Students with 0 points never appear.
- * - Class totals: every participating class, including 0, as bars with the number (never colour only).
+ *   is the largest, in the centre. Ties share a place and EVERY tied student is shown: a crowded place
+ *   switches to a compact list and its text shrinks until it fits (D-133). Empty places keep the
+ *   placeholder style; with no points at all the friendly placeholder message is shown (both messages
+ *   can be changed by the administrator). Students with 0 points never appear.
+ * - Class totals: every participating class, including 0, as bars with the number (never colour only);
+ *   many classes are spread over up to four columns with a smaller font, so rows never overlap.
  * - Live: Server-Sent Events signal a new board version; the board refetches (conditional GET). When
  *   the stream is down it reconnects with backoff and polls every 10 s meanwhile (D-134).
  * - A gentle single-play theme motion on a podium change (reduced motion respected); the theme's
  *   celebration and sounds only when the administrator turned board sound on (default off).
  * - The mouse pointer hides after a few seconds without movement.
  */
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { board as boardEndpoint, exchangeBoardLink, type Board, type BoardPlace } from '../../shared/contracts/superSpeakers.ts';
 import { formatDate, pickText, type Locale } from '../../shared/i18n/index.ts';
 import { ApiError, call, callConditional } from '../lib/api.ts';
@@ -107,26 +109,70 @@ function WeekRange({ start, end }: { start: string; end: string }) {
   return <p className="cc-board__week">{t('speakers.board.week', { from: f(start), to: f(end) })}</p>;
 }
 
-function PlaceCard({ place, slot, changed }: { place: BoardPlace | undefined; slot: 1 | 2 | 3; changed: boolean }) {
+/** The administrator's message for this language, else the built-in translated one. */
+function useBoardMessage(text: Board['messages']['placeholder'], fallback: 'speakers.board.placeholder' | 'speakers.board.waitingShort') {
+  const { t, locale } = useI18n();
+  return (text[locale] ?? '').trim() || t(fallback);
+}
+
+/** Smallest text scale the fitting loop goes down to. */
+const MIN_FIT = 0.2;
+
+/**
+ * Shrinks the text of `ref` (through `--cc-fit`) until its content fits its box without scrolling,
+ * and again when the window size changes. Every tied name stays on the board (D-133).
+ */
+export function useFitText(ref: RefObject<HTMLElement | null>, key: string) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      let scale = 1;
+      el.style.setProperty('--cc-fit', '1');
+      while (scale > MIN_FIT && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)) {
+        scale = Math.max(MIN_FIT, scale * 0.88);
+        el.style.setProperty('--cc-fit', scale.toFixed(3));
+      }
+    };
+    fit();
+    let live = true;
+    // The theme's web font may arrive after the first layout: fit again once it has.
+    void document.fonts?.ready.then(() => {
+      if (live) fit();
+    });
+    window.addEventListener('resize', fit);
+    return () => {
+      live = false;
+      window.removeEventListener('resize', fit);
+    };
+  }, [ref, key]);
+}
+
+/** How a place lays out its names: one big card, a two-column list, or a compact flowing list. */
+export const placeDensity = (count: number) => (count <= 1 ? undefined : count <= 6 ? 'many' : 'crowd');
+
+function PlaceCard({ place, slot, changed, waiting }: { place: BoardPlace | undefined; slot: 1 | 2 | 3; changed: boolean; waiting: string }) {
   const { t } = useI18n();
   const motion = useThemeMotion('threshold', changed);
+  const names = useRef<HTMLUListElement>(null);
+  useFitText(names, place ? place.students.map((s) => s.id).join(',') : '');
   if (!place) {
     return (
       <li className={`cc-board__place cc-board__place--${slot} cc-board__place--empty`} data-testid={`board-place-${slot}`} data-empty="yes">
         <span className="cc-board__rank" aria-label={t('speakers.board.placeLabel', { rank: slot })}>
           {slot}
         </span>
-        <p className="cc-board__waiting">{t('speakers.board.waitingShort')}</p>
+        <p className="cc-board__waiting">{waiting}</p>
       </li>
     );
   }
-  const many = place.students.length > 1;
+  const density = placeDensity(place.students.length);
   return (
-    <li className={`cc-board__place cc-board__place--${slot} ${motion.className ?? ''}`} style={motion.style} data-testid={`board-place-${slot}`} data-many={many ? 'yes' : undefined}>
+    <li className={`cc-board__place cc-board__place--${slot} ${motion.className ?? ''}`} style={motion.style} data-testid={`board-place-${slot}`} data-many={density ? 'yes' : undefined} data-density={density}>
       <span className="cc-board__rank" aria-label={t('speakers.board.placeLabel', { rank: place.rank })}>
         {place.rank}
       </span>
-      <ul className="cc-board__names">
+      <ul className="cc-board__names" ref={names} data-count={place.students.length}>
         {place.students.map((s) => (
           <li key={s.id} className="cc-board__student">
             <Avatar name={s.fullName} hue={s.avatarHue} initials={s.initials} spec={s.avatar} size="lg" />
@@ -137,21 +183,30 @@ function PlaceCard({ place, slot, changed }: { place: BoardPlace | undefined; sl
           </li>
         ))}
       </ul>
-      {place.more > 0 ? <p className="cc-board__more">{t('speakers.board.more', { count: place.more })}</p> : null}
       <p className="cc-board__points">{t('speakers.board.points', { count: place.points })}</p>
     </li>
   );
 }
 
+/**
+ * Columns and rows of the class totals panel: one column up to 12 classes, then up to 18 rows per
+ * column (at most four columns; a school with more classes gets smaller rows, never overlapping ones).
+ */
+export function classGrid(count: number): { columns: number; rows: number } {
+  const columns = count <= 12 ? 1 : Math.min(4, Math.ceil(count / 18));
+  return { columns, rows: Math.max(6, Math.ceil(count / columns)) };
+}
+
 function ClassTotals({ classes }: { classes: Board['classes'] }) {
   const { t } = useI18n();
   const max = Math.max(1, ...classes.map((c) => c.points));
+  const grid = classGrid(classes.length);
   return (
     <section className="cc-board__classes" aria-labelledby="board-classes-title" data-testid="board-classes">
       <h2 id="board-classes-title" className="cc-board__subtitle">
         {t('speakers.board.classTotals')}
       </h2>
-      <ol className="cc-board__bars" data-columns={classes.length > 12 ? '2' : '1'} style={{ '--cc-board-rows': String(Math.max(6, Math.ceil(classes.length / (classes.length > 12 ? 2 : 1)))) } as CSSProperties}>
+      <ol className="cc-board__bars" data-columns={String(grid.columns)} style={{ '--cc-board-rows': String(grid.rows), '--cc-board-columns': String(grid.columns) } as CSSProperties}>
         {classes.map((c) => (
           <li key={c.classId} className="cc-board__bar-row">
             <span className="cc-board__bar-name">{c.name}</span>
@@ -164,6 +219,12 @@ function ClassTotals({ classes }: { classes: Board['classes'] }) {
       </ol>
     </section>
   );
+}
+
+/** Column widths of the podium (2nd, 1st, 3rd): a crowded place gets more room. */
+export function podiumColumns(places: readonly Pick<BoardPlace, 'students'>[]): string {
+  const weight = (i: number, base: number) => base * (placeDensity(places[i]?.students.length ?? 0) === 'crowd' ? 1.7 : 1);
+  return `${weight(1, 1)}fr ${weight(0, 1.25)}fr ${weight(2, 1)}fr`;
 }
 
 const podiumKey = (b: Board) => b.places.map((p) => `${p.rank}:${p.points}:${p.students.map((s) => s.id).join(',')}`).join('|');
@@ -183,6 +244,8 @@ function BoardView({ board, live }: { board: Board; live: boolean }) {
   }, [key, board.places.length, board.sound, t]);
   const [first, second, third] = board.places;
   const empty = board.places.length === 0;
+  const placeholder = useBoardMessage(board.messages.placeholder, 'speakers.board.placeholder');
+  const waiting = useBoardMessage(board.messages.waiting, 'speakers.board.waitingShort');
   const title = pickText(board.title, locale) || t('module.superSpeakers');
   return (
     <main className="cc-board" data-testid="board" data-version={board.version}>
@@ -199,13 +262,13 @@ function BoardView({ board, live }: { board: Board; live: boolean }) {
         {empty ? (
           <div className="cc-board__placeholder" data-testid="board-placeholder">
             <ThemeIllustration name="emptyState" width={260} />
-            <p>{t('speakers.board.placeholder')}</p>
+            <p>{placeholder}</p>
           </div>
         ) : (
-          <ol className="cc-board__podium" key={changed}>
-            <PlaceCard place={second} slot={2} changed={changed > 0} />
-            <PlaceCard place={first} slot={1} changed={changed > 0} />
-            <PlaceCard place={third} slot={3} changed={changed > 0} />
+          <ol className="cc-board__podium" key={changed} style={{ '--cc-podium-columns': podiumColumns(board.places) } as CSSProperties}>
+            <PlaceCard place={second} slot={2} changed={changed > 0} waiting={waiting} />
+            <PlaceCard place={first} slot={1} changed={changed > 0} waiting={waiting} />
+            <PlaceCard place={third} slot={3} changed={changed > 0} waiting={waiting} />
           </ol>
         )}
       </section>

@@ -3195,7 +3195,8 @@ html[data-cursor='off'] * {
   padding: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1.25fr 1fr;
+  /* The board widens a crowded place (--cc-podium-columns). */
+  grid-template-columns: var(--cc-podium-columns, 1fr 1.25fr 1fr);
   align-items: end;
   gap: 1.5vw;
   min-height: 0;
@@ -3262,71 +3263,103 @@ html[data-cursor='off'] * {
   margin: 0;
 }
 .cc-board__names {
+  /* --cc-fit (set by the board) shrinks a crowded place until every tied name fits (D-133). */
+  --cc-fit: 1;
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1vh;
+  gap: calc(1vh * var(--cc-fit));
+  flex: 0 1 auto;
   min-height: 0;
   width: 100%;
+  overflow: hidden;
 }
 .cc-board__student {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.6vh;
+  gap: calc(0.6vh * var(--cc-fit));
+  min-width: 0;
 }
 .cc-board__student .cc-avatar {
-  --cc-avatar-size: 11vh;
+  --cc-avatar-size: calc(11vh * var(--cc-fit));
 }
 .cc-board__place--1 .cc-board__student .cc-avatar {
-  --cc-avatar-size: 15vh;
+  --cc-avatar-size: calc(15vh * var(--cc-fit));
 }
 .cc-board__who {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 .cc-board__name {
   font-family: var(--cc-font-display);
   font-weight: var(--cc-weight-display);
-  font-size: 3.6vh;
+  font-size: calc(3.6vh * var(--cc-fit));
   line-height: 1.15;
-  overflow-wrap: anywhere;
+  /* Names never break inside a word: the fitting loop shrinks the text instead. */
+  overflow-wrap: normal;
 }
 .cc-board__place--1 .cc-board__name {
-  font-size: 4.6vh;
+  font-size: calc(4.6vh * var(--cc-fit));
 }
 .cc-board__class {
-  font-size: 2.6vh;
+  font-size: calc(2.6vh * var(--cc-fit));
   color: var(--cc-text-muted);
 }
-/* Shared places: names in a compact two-column list with small avatars (D-133). */
+/* Shared places: names in a compact list with small avatars (D-133). */
 .cc-board__place[data-many] .cc-board__names {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.8vh 0.8vw;
+  align-items: stretch;
+  gap: calc(0.8vh * var(--cc-fit));
 }
 .cc-board__place[data-many] .cc-board__student {
   flex-direction: row;
+  align-items: center;
   text-align: start;
   gap: 0.6vw;
 }
 .cc-board__place[data-many] .cc-board__student .cc-avatar {
-  --cc-avatar-size: 5vh;
+  --cc-avatar-size: calc(5vh * var(--cc-fit));
 }
 .cc-board__place[data-many] .cc-board__name {
-  font-size: 2.3vh;
+  font-size: calc(2.3vh * var(--cc-fit));
 }
 .cc-board__place[data-many] .cc-board__class {
-  font-size: 1.8vh;
+  font-size: calc(1.8vh * var(--cc-fit));
 }
-.cc-board__more {
-  margin: 0;
-  font-size: 2.4vh;
+/* A crowded place (more than six tied): every name, flowing in rows of small chips. */
+.cc-board__place[data-density='crowd'] .cc-board__names {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: calc(0.5vh * var(--cc-fit)) calc(0.6vw * var(--cc-fit));
+}
+.cc-board__place[data-density='crowd'] .cc-board__student {
+  gap: calc(0.4vw * var(--cc-fit));
+}
+.cc-board__place[data-density='crowd'] .cc-board__student .cc-avatar {
+  --cc-avatar-size: calc(3.4vh * var(--cc-fit));
+  border-width: 1px;
+}
+.cc-board__place[data-density='crowd'] .cc-board__who {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.3em;
+}
+.cc-board__place[data-density='crowd'] .cc-board__name {
+  font-size: calc(2vh * var(--cc-fit));
+  font-family: var(--cc-font);
   font-weight: 700;
 }
+.cc-board__place[data-density='crowd'] .cc-board__class {
+  font-size: calc(1.6vh * var(--cc-fit));
+}
 .cc-board__points {
+  flex: none;
   margin: auto 0 0;
   font-size: 4vh;
   font-weight: 800;
@@ -3371,19 +3404,20 @@ html[data-cursor='off'] * {
   min-height: 0;
   display: grid;
   grid-auto-flow: column;
+  grid-template-columns: repeat(var(--cc-board-columns, 1), minmax(0, 1fr));
   grid-template-rows: repeat(var(--cc-board-rows), minmax(0, 1fr));
-  gap: 0.8vh 1.5vw;
+  /* Font and gaps follow the number of rows, so 50+ classes never overlap (S12 review). */
+  gap: calc(5vh / var(--cc-board-rows)) 1.2vw;
 }
 .cc-board__bar-row {
   display: grid;
-  grid-template-columns: minmax(4em, auto) 1fr auto;
+  grid-template-columns: minmax(2.6em, auto) 1fr auto;
   align-items: center;
-  gap: 0.8vw;
-  font-size: 3vh;
+  gap: 0.6vw;
+  font-size: min(3vh, calc(40vh / var(--cc-board-rows)));
+  line-height: 1.15;
   min-height: 0;
-}
-.cc-board__bars[data-columns='2'] .cc-board__bar-row {
-  font-size: 2.2vh;
+  min-width: 0;
 }
 .cc-board__bar-name {
   font-weight: 700;

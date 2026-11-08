@@ -5,9 +5,9 @@
  * - Week: the week containing an instant starts on `weekStartsOn` (default 1 = Monday) at 00:00 in the
  *   school timezone. The weekly "reset" is only this time window: points are never deleted.
  * - Podium: the top three PLACES of the week by dense ranking (equal totals share a place, the next
- *   total is the next place). Students with 0 points are never ranked. A place with many tied
- *   students shows the first `PLACE_NAME_LIMIT` (Turkish name order, never "who scored first") and
- *   "+N more" (D-133).
+ *   total is the next place). Students with 0 points are never ranked. A place lists EVERY tied
+ *   student in Turkish name order (never "who scored first"); the board makes a crowded place compact
+ *   instead of hiding names (owner decision 1, D-133).
  * - Class totals: every participating class, including those with 0, by total then Turkish name order.
  * - Search: Turkish folding (`foldForSearch`: "isik" finds "Işık"), any word start of the full name,
  *   the class name without separators ("3a" finds "3-A") and the student number.
@@ -33,8 +33,6 @@ export function weekRangeOf(ms: number, tz: string, weekStartsOn = 1): WeekRange
 export const inWeek = (date: string, week: WeekRange) => date >= week.start && date <= week.end;
 
 // ---------------------------------------------------------------- podium
-/** How many tied names one podium place shows before "+N more" (D-133). */
-export const PLACE_NAME_LIMIT = 6;
 export const PODIUM_PLACES = 3;
 
 export interface Scored<S> {
@@ -46,26 +44,23 @@ export interface Place<S> {
   /** 1, 2 or 3 (dense rank). */
   rank: number;
   points: number;
-  /** Shown students (at most `limit`), in Turkish name order. */
+  /** Every student with this total, in Turkish name order. */
   students: S[];
-  /** Tied students not shown by name. */
-  more: number;
 }
 
 /**
  * Dense-ranked podium: the `places` highest distinct totals above 0, each with every student who has
- * that total (names in Turkish order, at most `limit` shown, the rest counted in `more`).
+ * that total (names in Turkish order).
  */
-export function podium<S>(scores: readonly Scored<S>[], nameOf: (s: S) => string, opts: { places?: number; limit?: number } = {}): Place<S>[] {
+export function podium<S>(scores: readonly Scored<S>[], nameOf: (s: S) => string, opts: { places?: number } = {}): Place<S>[] {
   const places = opts.places ?? PODIUM_PLACES;
-  const limit = opts.limit ?? PLACE_NAME_LIMIT;
   const totals = [...new Set(scores.filter((s) => s.points > 0).map((s) => s.points))].sort((a, b) => b - a).slice(0, places);
   return totals.map((points, i) => {
     const tied = scores
       .filter((s) => s.points === points)
       .map((s) => s.student)
       .sort((a, b) => compareNames(nameOf(a), nameOf(b)));
-    return { rank: i + 1, points, students: tied.slice(0, limit), more: Math.max(0, tied.length - limit) };
+    return { rank: i + 1, points, students: tied };
   });
 }
 
