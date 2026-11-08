@@ -17,6 +17,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env src/server/cli.ts migrate",
     "seed:demo": "node --env-file-if-exists=.env src/server/cli.ts seed:demo",
+    "seed:demo-history": "node --env-file-if-exists=.env src/server/cli.ts seed:demo-history",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",

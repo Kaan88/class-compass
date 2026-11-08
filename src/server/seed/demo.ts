@@ -44,7 +44,7 @@ const ENGLISH = [
 ] as const;
 
 /** Small deterministic PRNG so the demo looks the same on every machine. */
-function mulberry32(seed: number) {
+export function mulberry32(seed: number) {
   let a = seed;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
