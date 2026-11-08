@@ -41,6 +41,7 @@ import { isModuleAvailable, isModuleEnabled } from '../modules/school/modules.ts
 import { getSchoolSettings, type ClassRow } from '../modules/school/policy.ts';
 import { rosterRowsOn } from '../modules/students/service.ts';
 import { mulberry32, SeedRefused } from './demo.ts';
+import { isSchoolDay } from './history/calendar.ts';
 import { HISTORY_GENERATORS } from './history/generators.ts';
 import type { ContextPlan, HistoryGenerator, HistoryRun, HistoryWeek, LessonRun } from './history/types.ts';
 
@@ -50,8 +51,6 @@ const DEMO_CLASSES = ['3-A', '3-B', '4-C', '2-D'] as const;
 /** Lesson start times (local) and length. */
 const PERIODS = ['08:40', '09:30', '10:30', '11:20', '13:10', '14:00'] as const;
 const LESSON_MINUTES = 38;
-/** Days without lessons (MM-DD): fictional fixed holidays (Republic Day, New Year, …). */
-const HOLIDAYS = new Set(['10-29', '01-01', '04-23', '05-01', '05-19']);
 const WEEKLY_PATTERNS: Record<number, number[]> = { 1: [3], 2: [2, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5] };
 
 export interface HistoryOptions {
@@ -102,8 +101,7 @@ function historyWeeks(today: string, yearStart: string, weeks: number, weekStart
   const first = addDays(weekStartOfDate(today, weekStartsOn), -7 * weeks);
   const out: HistoryWeek[] = [];
   for (let d = first < yearStart ? yearStart : first; d < today; d = addDays(d, 1)) {
-    const wd = weekdayOf(d);
-    if (wd === 0 || wd === 6 || HOLIDAYS.has(d.slice(5))) continue;
+    if (!isSchoolDay(d)) continue;
     const ws = weekStartOfDate(d, weekStartsOn);
     let w = out[out.length - 1];
     if (!w || w.weekStart !== ws) out.push((w = { index: out.length, weekStart: ws, days: [], last: false }));

@@ -5,21 +5,21 @@
  * scorer gives +1 points through the real `points.award` command on the backdated clock (a realistic
  * skew: a few keen speakers, most children now and then, every class some points each week); a few
  * points are taken back by the scorer within the undo window, and one is voided by the administrator
- * with a reason. Points are also given earlier today (before the real "now"), so this week's board
- * shows a podium. The points feed the Super Speakers badges through the activity hook (D-132).
+ * with a reason. Points are also given this week in school hours (earlier today, or after school on
+ * this week's latest school day), so this week's board shows a podium once the week's school has begun. The points feed the Super Speakers badges through the activity hook (D-132).
  *
  * Link tokens are never printed or logged: the links are made through the admin service, which keeps
  * only the HMAC and the sealed copy (D-128).
  */
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { weekStartOf } from '../../../domain/counters.ts';
-import { weekdayOf } from '../../../domain/dates.ts';
 import { setModulePolicy as setModulePolicyEp } from '../../../shared/contracts/school.ts';
 import { createDisplayLink, createScorerLink, voidAward } from '../../../shared/contracts/superSpeakers.ts';
 import { pointEvents } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { setModulePolicy } from '../../modules/school/service.ts';
 import { adminVoid, buildBoard, createDisplay, createScorer, ensureSettings, getSettings, participants } from '../../modules/superSpeakers/service.ts';
+import { isSchoolDay } from './calendar.ts';
 import type { HistoryGenerator, HistoryRun } from './types.ts';
 
 const KEY = 'superSpeakers';
@@ -122,14 +122,17 @@ export const superSpeakersGenerator: HistoryGenerator = {
     const weekStartsOn = getSettings(db).weekStartsOn;
     const weekStart = weekStartOf(h.realNow, h.tz, weekStartsOn);
     const latest = h.realNow - 60_000;
-    // Points earlier today (a school day), else on the latest school day of this week, else since midnight.
-    const wd = weekdayOf(h.today);
+    // Points only in school hours: earlier today when today is a school day and school has started
+    // (after 08:35), else after school on the latest school day of this week. Before the first school
+    // day of the week has started (e.g. Monday 07:00, or a Monday holiday) nobody has scored yet, so
+    // this week's board stays empty: points on last week's days would not show on it.
     const thisWeekDays = h.weeks.flatMap((w) => w.days).filter((d) => d >= weekStart);
+    const lastDay = thisWeekDays[thisWeekDays.length - 1];
     let from: number;
     let to: number;
-    if (wd !== 0 && wd !== 6 && h.at(h.today, '08:30') < latest - 5 * 60_000) [from, to] = [h.at(h.today, '08:30'), Math.min(latest, h.at(h.today, '15:30'))];
-    else if (thisWeekDays.length) [from, to] = [h.at(thisWeekDays[thisWeekDays.length - 1]!, '15:31'), h.at(thisWeekDays[thisWeekDays.length - 1]!, '15:59')];
-    else [from, to] = [Math.max(h.at(h.today, '00:05'), h.at(weekStart, '00:05')), latest];
+    if (isSchoolDay(h.today) && h.at(h.today, '08:35') < latest) [from, to] = [h.at(h.today, '08:30'), Math.min(latest, h.at(h.today, '15:30'))];
+    else if (lastDay) [from, to] = [h.at(lastDay, '15:31'), h.at(lastDay, '15:59')];
+    else return;
     if (to - from < 60_000) return;
     for (const at of instants(h, h.int(8, 14), from, to)) award(h, s, weightedPick(h, s.weights).id, at, false);
     // The board shows a podium of three places: when the totals so far do not give three different
