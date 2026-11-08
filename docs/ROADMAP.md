@@ -216,4 +216,16 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Review fixes (D-129/D-130/D-131/D-133 refined): valid pairing codes pair from a shared school address (wrong codes limited per address, school-wide guard ends codes after 100 wrong ones); pairing codes never exported; offline points dated at the tap (up to 4 days) and the rate limit measured on tap times; "My awards today" derived from the outbox (refused awards and undos never shown as done, retries once); weekly history tables built from whole weeks; board messages configurable
 
 ## User documentation (after S12)
-- [ ] Teacher, admin, Super Speakers and student/parent guides in English and Turkish (format to be chosen with the owner)
+Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in the app under Help (D-137). Index and screenshot command: `docs/guides/README.md`.
+- [x] Teacher guide (EN, TR): sign-in, PIN and classroom lock, teacher menu, start and end a lesson, classroom screen and every module panel, homework checking, goals and feedback, private notes, student links and cards, achievements and avatars, class settings, reports, importing a student list
+- [x] Administrator guide (EN, TR): first setup, accounts and invites, email (SMTP, TLS ports), school year and rollover, classes and assignments, modules and media (consent-gated media marked), weather, students (move, deactivate, delete), reports and audit, exports (KVKK), backups (restore on the server, see OPERATIONS)
+- [x] Super Speakers (EN, TR): administrator guide, one-page scorer guide (Android and iPhone install, pairing code, undo, offline), one-page board-screen setup guide
+- [x] Student and parent guide (EN, TR): child-level page guide and a KVKK-aware privacy part for parents, only what the app does
+- [x] Index (`docs/guides/README.md`) and a one-page quick start per role (teacher, administrator, student; the scorer guide is the scorer's quick start)
+- [x] Screenshots from the fictional demo school with demo history, EN and TR (30 each, palette PNG), made by a separate Playwright script: `npm run docs:screenshots` (not part of `npx playwright test`)
+- [x] In-app Help: Help link in the teacher menu and nav, the admin top bar, the student page and the scorer app; opens the guide in the interface language with an EN/TR switch; rendered by a small Markdown subset renderer without HTML (no innerHTML, no remote images or links), bundled at build time
+- [x] Tests: every guide in both languages, every guide link, anchor and image exists, every screenshot used and small (`tests/docs`); Help renders EN and TR for teacher, admin and student and passes axe (`e2e/help.spec.ts`)
+- [ ] Read through by the owner and a Turkish-speaking teacher (wording, anything unclear for colleagues)
+- [ ] Administrators cannot set a PIN in Profile (the PIN form is shown on teacher accounts only), but Maintenance "Back up now" and "Verify the latest backup" ask for it; the admin guide says so. Fix in the app, then update the guide
+- [ ] The sign-in page is English only (before sign-in the language is not known); the Turkish teacher guide quotes its English labels
+- [ ] Re-run `npm run docs:screenshots` after visible UI changes (no automatic check that the pictures are current)

@@ -2423,6 +2423,24 @@ export const en = {
   'speakers.admin.voidBody': 'The point no longer counts on the board or in reports. The removal and its reason are recorded. Badges already earned stay.',
   'speakers.admin.voidReason': 'Reason',
   'speakers.admin.voidedToast': 'Point removed',
+  // User documentation (Help)
+  'help.link': 'Help',
+  'help.title': 'Help',
+  'help.nav': 'Help',
+  'help.backToApp': 'Back to Class Compass',
+  'help.language': 'Guide language',
+  'help.guides': 'Guides',
+  'help.notFound': 'This guide is not available.',
+  'help.close': 'Back to the page',
+  'help.guide.quickStartTeacher': 'Quick start: teachers',
+  'help.guide.teacher': 'Teacher guide',
+  'help.guide.quickStartAdmin': 'Quick start: administrators',
+  'help.guide.admin': 'Administrator guide',
+  'help.guide.superSpeakers': 'Super Speakers (administrators)',
+  'help.guide.scorer': 'Super Speakers: scorers',
+  'help.guide.boardScreen': 'Super Speakers: board screen',
+  'help.guide.quickStartStudent': 'Quick start: students',
+  'help.guide.student': 'Students and parents',
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -8,7 +8,7 @@
  *   server (429), a server error or no connection shows "try again" instead: the token is kept in
  *   memory (never stored) so the student can retry without the link, which has left the address bar.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { studentPage } from '../../shared/contracts/goals.ts';
 import { exchangeStudentLink, leaveStudentSession } from '../../shared/contracts/links.ts';
@@ -28,6 +28,8 @@ import { STUDENT_SECTIONS } from './sections.tsx';
 import { displayLocale, type ClassLanguage } from '../../shared/classLanguage.ts';
 
 const LOCALE_KEY = 'cc.studentLocale';
+/** The student and parent guide (docs/guides), loaded only when "Help" is pressed. */
+const HelpPanel = lazy(() => import('../help/HelpPanel.tsx'));
 
 
 export function readStudentLocale(): Locale {
@@ -76,6 +78,7 @@ function LinkGone() {
 function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
   const { t, locale } = useI18n();
   const q = useQuery({ queryKey: STUDENT_PAGE_KEY, queryFn: () => call(studentPage, {}) });
+  const [help, setHelp] = useState(false);
   useEffect(() => {
     if (q.data) setDisplay({ theme: q.data.theme });
     if (q.data) onLanguage(q.data.language);
@@ -83,6 +86,14 @@ function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
   if (q.error) return q.error instanceof ApiError && q.error.status === 401 ? <LinkGone /> : <p className="cc-page">{t('common.error')}</p>;
   if (!q.data) return <p className="cc-page cc-muted">{t('common.loading')}</p>;
   const page = q.data;
+  if (help)
+    return (
+      <main className="cc-page cc-student cc-stack">
+        <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
+          <HelpPanel guide="student" onClose={() => setHelp(false)} />
+        </Suspense>
+      </main>
+    );
   return (
     <main className="cc-page cc-student cc-stack" data-testid="student-page">
       <header className="cc-row cc-student__head">
@@ -107,6 +118,9 @@ function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
       ))}
       <footer className="cc-row cc-muted">
         <p>{t('student.privacy')}</p>
+        <Button size="small" variant="ghost" onPress={() => setHelp(true)}>
+          {t('help.link')}
+        </Button>
         <Button size="small" variant="ghost" onPress={() => void call(leaveStudentSession, {}).finally(() => window.location.reload())}>
           {t('student.leave')}
         </Button>

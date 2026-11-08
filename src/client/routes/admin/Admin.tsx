@@ -50,6 +50,9 @@ export function AdminLayout() {
             <Link to="/admin" className="cc-topbar__title" style={{ textDecoration: 'none', color: 'inherit' }}>
               {t('admin.title')}
             </Link>
+            <Link to="/help" search={{ guide: 'admin', lang: me?.locale }} className={buttonClass('ghost')} data-testid="help-link">
+              {t('help.link')}
+            </Link>
             <Button
               variant="ghost"
               onPress={async () => {

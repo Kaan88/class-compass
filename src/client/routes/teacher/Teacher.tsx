@@ -8,7 +8,7 @@ import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { setMenuFirst } from '../../lib/menuFirst.ts';
 import { freshMe, ME_KEY, signOut, useMe, type Me } from '../../lib/session.ts';
-import { Button, BigButton } from '../../ui/Button.tsx';
+import { Button, BigButton, buttonClass } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
 import { menuTeacherPages } from '../../modules/registry.ts';
@@ -49,6 +49,9 @@ export function TeacherLayout() {
                   {t(p.labelKey)}
                 </Link>
               ))}
+              <Link to="/help" search={{ guide: 'teacher', lang: me?.locale }} data-testid="help-link">
+                {t('help.link')}
+              </Link>
             </div>
           </nav>
           <Outlet />
@@ -100,6 +103,9 @@ export function TeacherMenu() {
             {t('teacher.leaveClassroomMode')}
           </Button>
         ) : null}
+        <Link to="/help" search={{ guide: 'quick-start-teacher', lang: me.locale }} className={buttonClass('secondary')}>
+          {t('help.link')}
+        </Link>
         <Button
           variant="ghost"
           onPress={async () => {

@@ -1,0 +1,139 @@
+# Yönetici kılavuzu
+
+Bu kılavuz okulun Sınıf Pusulası yöneticileri içindir: okulu kuran, hesapları açan, öğrenci kayıtlarıyla ilgilenen ve verileri güvende tutan kişiler. Sunucunun kendisi (kurulum, e-posta ayarları, diskteki yedekler, geri yükleme) bilgi işlem sorumlusu için Sınıf Pusulası deposundaki `docs/OPERATIONS.md` dosyasında anlatılır; bu kılavuz gerektiğinde oraya yönlendirir.
+
+Resimler hayali demo okulundan alınmıştır. İçlerindeki bütün adlar uydurmadır.
+
+Aceleniz mi var? [Yöneticiler için hızlı başlangıç](quick-start-admin.md)'a bakın.
+
+## Yönetim alanı
+
+![Yönetim](../img/tr/admin-home.png)
+
+Giriş yaptıktan sonra **Yönetim** sayfası açılır. En sık yapılan iki iş **Sınıf ekle** ve **Öğretmen hesabı ekle**'dir; kutucuklar ve menü çubuğu bütün bölümleri açar. Üst çubuktaki **Yardım** bu kılavuzları açar.
+
+Yönetici hesapları her zaman **şifreyle** giriş yapar (hiçbir zaman e-posta bağlantısıyla değil). Bir cihaz sınıf modundayken yönetim alanı da öğretmen alanıyla aynı PIN kilidinin arkasındadır.
+
+## İlk kurulum
+
+İlk yönetici hesabını bilgi işlem sorumlusu sunucuda oluşturur (`admin:create`, bkz. `docs/OPERATIONS.md`); web üzerinden kayıt ve varsayılan bir şifre yoktur. Ardından şu sırayla ilerleyin:
+
+1. **Okul ayarları**: **Okul adı**, **Okul saat dilimi** (örneğin Europe/Istanbul), **Haftanın ilk günü**, **Yeni hesapların dili** ve hava durumu (aşağıda).
+2. **Eğitim yılları ve dönemler**: tarihleriyle **Yeni eğitim yılı**, ardından her dönem için **Dönem ekle**. Dönemler yalnızca takvim ayarıdır.
+3. **Dersler**: İngilizce ve/veya Türkçe adla **Yeni ders**. İki ad da girilirse öğretmenler adı kendi dillerinde görür.
+4. **Sınıflar**: **Sınıf ekle** / **Yeni sınıf**: **Sınıf adı** (örneğin 3-A), **Eğitim yılı**, **Sınıf düzeyi**, **Tema**, **Saat dilimi** (boş = okulun saat dilimi), **Sesler** ve **Animasyonlar** ile sınıf dili.
+5. **Hesaplar**: öğretmen hesaplarını açın (aşağıda).
+6. **Ders görevlendirmeleri**: bir sınıfa ve derse **Öğretmen görevlendir**. *Öğretmen bir sınıfı yalnızca o sınıfta bir derse girdiğinde görür.*
+7. **Öğrenciler**: sınıf listelerini genellikle öğretmenler kendileri aktarır (Öğretmen kılavuzu, "Öğrenci listesi aktarma"); siz de **Öğrenciler** sayfasında **Öğrenci ekle** diyebilirsiniz.
+8. **Modüller ve medya**: okulun neleri kullanacağına karar verin.
+
+![Okul ayarları](../img/tr/admin-settings.png)
+
+## Hesaplar ve davetler
+
+![Hesaplar](../img/tr/admin-accounts.png)
+
+**Yeni hesap**: **Kullanıcı adı** (3–64 harf, rakam ya da . _ @ -), **Ad**, **E-posta (isteğe bağlı)**, **Rol** (Öğretmen ya da Yönetici) ve **Arayüz dili** (kişinin giriş yaptıktan sonra gördüğü dil; profilinden değiştirebilir). Sonra **İlk giriş** yöntemini seçin:
+
+- **Davet bağlantısı (önerilen)**: 7 gün geçerli, tek kullanımlık bir bağlantı. Kişi şifre ya da e-posta giriş bağlantıları arasından seçim yapar (yöneticiler her zaman şifre kullanır) ve ardından sınıf PIN'ini belirler. Hesabın e-posta adresi varsa ve okulda e-posta ayarlanmışsa davet, hesabın dilinde e-postayla gönderilir; her zaman **Bağlantıyı kopyala** diyebilir ya da QR kodu gösterebilirsiniz.
+- **Geçici şifre**: size yalnızca **bir kez** gösterilir. Kişiye güvenli bir yolla iletin; ilk girişte değiştirmesi gerekir.
+
+Listede her hesabın durumu (**Etkin** / **Pasif**), PIN belirlenip belirlenmediği, **Şifresini değiştirmeli**, **Davet bekliyor** ve giriş yöntemi görünür. İşlemler:
+
+- **Şifreyi sıfırla**: yeni bir geçici şifre; kişinin bütün oturumları kapanır. E-posta bağlantısı kullanan bir hesabı yeniden şifreli girişe döndürür.
+- **PIN sil**: öğretmen PIN'ini unuttuğunda. Bütün cihazlarda oturumu kapanır ve yeni bir PIN belirler.
+- **Yeni davet bağlantısı** / **Daveti iptal et**.
+- **Pasifleştir** / **Yeniden etkinleştir**: pasif bir kişi giriş yapamaz; kayıtları korunur. Kendinizi pasifleştiremezsiniz ve en az bir etkin yönetici kalmalıdır.
+- **Düzenle**: ad, e-posta, arayüz dili. E-postayı değiştirmek açık davetleri ve giriş bağlantılarını iptal eder.
+
+## E-posta (SMTP)
+
+Sınıf Pusulası davetler, e-posta giriş bağlantıları ve şifre sıfırlama için e-posta gönderir. E-posta tarayıcıdan değil, bilgi işlem sorumlusu tarafından sunucuda ayarlanır: sunucunun ayar dosyasında `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` ve `SMTP_FROM` (bkz. `docs/OPERATIONS.md`).
+
+- **465 numaralı port** doğrudan TLS kullanır; **587 numaralı port** (varsayılan) STARTTLS sunmalıdır. Sınıf Pusulası hiçbir zaman şifrelemesiz e-posta göndermez ve e-posta sunucusunun sertifikasını denetler; bu yüzden TLS desteklemeyen bir sunucu çalışmaz.
+- **Okul ayarları** e-postanın çalışıp çalışmadığını gösterir: "E-posta ile şifre sıfırlama kullanılabilir" ya da "E-posta ile şifre sıfırlama kapalı (e-posta sunucusu ayarlanmadı)".
+- **E-posta yoksa**, e-posta bağlantısıyla giren hesaplar **giriş yapamaz**. **Bakım** bu hesaplar için uyarır; onlara geçici şifre (**Şifreyi sıfırla**) ya da yeni bir davet bağlantısı verin.
+
+## Eğitim yılı ve yeni yıla geçiş
+
+**Eğitim yılları ve dönemler**: tarihleri ve dönemleri düzenleyin, bir yılı **Arşivle**yin. Arşivlenen yıl salt okunurdur: arşivden çıkarılana kadar içindeki hiçbir şey değişemez; raporları erişilebilir kalır.
+
+Yıl sonunda **Bakım** → **Yeni öğretim yılı**'nı kullanın:
+
+1. **Hangi yıldan**, **Yeni yılın adı**, **İlk gün** ve **Son gün** (YYYY-AA-GG).
+2. Seçin: **Sınıfları yeniden oluştur (sınıf + 1)**, **Aynı öğretmen ve dersleri koru**, **Öğrencileri ilk gün üst sınıfa geçir**, **Eski yılı arşivle (salt okunur)**.
+3. **Önizle**. Her sınıf ayrı ayrı kapatılabilir (örneğin mezun olan son sınıf: yeniden oluşturulmaz ve kimse oradan üst sınıfa geçmez) ve yeni adlar değiştirilebilir. Her değişiklikten sonra **Yeniden önizle**.
+4. **Yeni yılı başlat**: onaylamak için eski yılın adını yazın. Her şey tek seferde yapılır ve denetim kaydına geçer. Geçmiş öğrencilerle birlikte kalır.
+
+Tek tek sınıflar **Sınıflar** → **Sınıfı üst sınıfa taşı** ile de taşınabilir.
+
+## Sınıflar ve ders görevlendirmeleri
+
+**Sınıflar**: **Yeni sınıf**, **Sınıfı düzenle** (ad, düzey, tema, saat dilimi, sesler, animasyonlar, sınıf dili ve öğrenci sayfası dili), **Arşivle** (salt okunur; arşivden çıkarılabilir) ve **Sınıfı üst sınıfa taşı** (bütün güncel öğrencileri başka bir eğitim yılındaki bir sınıfa taşır; önce o sınıfı oluşturun).
+
+**Ders görevlendirmeleri**: **Öğretmen görevlendir** (öğretmen, sınıf, ders). Öğretmen bir sınıfa girmeyi bıraktığında **Görevlendirmeyi bitir**: sınıfı artık görmez, ders kayıtları korunur ve raporları yalnızca o dersi verdiği günleri kapsar. **Sona eren görevlendirmeleri göster** eskileri listeler.
+
+## Modüller ve medya
+
+![Modüller ve medya](../img/tr/admin-modules.png)
+
+- **Öğretmen modülleri**: burada kapatılan modüller bütün öğretmenlerden gizlenir. Diğerlerini öğretmenler sınıf ve ders bazında açar ya da kapatır.
+- **Okul geneli modüller**: **Süper Konuşmacılar** (varsayılan olarak kapalı). Bkz. [Süper Konuşmacılar kılavuzu](super-speakers.md).
+- **Fotoğraf, ses ve belgeler**: **Öğrenci fotoğrafları**, **Fotoğraf kanıtı** ve **Ses kaydı kanıtı** **izinler doğrulanana kadar kapalıdır**. Bunları ancak okul velilerin iznini ve KVKK kapsamındaki tutumunu netleştirdikten sonra açın. **Belge kanıtı** (metin, bağlantı ve belgeler) varsayılan olarak açıktır ve kapatılabilir.
+- **Varsayılan hedef kategorileri ve hedefler**: **Arşivle** bir varsayılan kategoriyi ya da hedefi bütün sınıflardan kaldırır (öğrencilerin hâlihazırdaki hedefleri korunur); **Geri getir** geri getirir. Öğretmenler de bir varsayılanı yalnızca kendi sınıflarında gizleyebilir.
+- **Varsayılan rozetler**: hazır bir rozeti bütün sınıflar için arşivleyin ya da geri getirin. Verilmiş rozetler korunur.
+- **Nazik sözcük denetimi**: bütün okul için **Engellenen sözcükler** ve **İzin verilen sözcükler** (satır başına bir; izin verilen sözcük her zaman kazanır) ve bir hedefin ne kadar uzun olması gerektiği (**Bir hedefte en az sözcük**, varsayılan 3, ve **Bir hedefte en az harf**, varsayılan 12).
+
+*Bir modülü kapatmak onu gizler ama tüm verilerini korur.*
+
+## Hava durumu
+
+**Okul ayarları** → **Sınıf ekranında hava durumu**: **Hava durumunu göster**, bir **Yer adı** (sizin için) ile **Enlem** ve **Boylam**. Ücretsiz Open-Meteo hizmetine yalnızca bu koordinatlar gönderilir (anahtar yok, okul ya da öğrenci verisi yok). Sunucunun api.open-meteo.com adresine internet erişimi olmalıdır; yoksa hava durumu yalnızca görünmez.
+
+## Öğrenciler
+
+![Öğrenciler](../img/tr/admin-students.png)
+
+**Öğrenciler** okulun bütün öğrencilerini listeler: **Ada ya da numaraya göre ara**, sınıfa göre süz, **Pasif öğrencileri de göster**.
+
+- **Öğrenci ekle**.
+- **Öğrencileri taşı**: öğrencileri işaretleyip **Seçilenleri taşı**'ya basın, sınıfı ve isteğe bağlı bir **Taşıma tarihi** seçin (boş = bugün; ileri bir tarih öğrencileri o güne kadar kendi sınıflarında tutar). Geçmişleri onlarla birlikte taşınır.
+- **Geçmiş**: öğrencinin hangi sınıflarda bulunduğu ve neden (eklendi, aktarıldı, taşındı, üst sınıfa geçti).
+- **Pasifleştir**: öğrenci sınıf listelerinden kalkar; bütün kayıtları korunur ve yeniden etkinleştirilebilir. Kişisel bağlantısı çalışmaz olur.
+- **Kalıcı olarak sil**: yalnızca pasif bir öğrenci için. Sınıf Pusulası nelerin silineceğini gösterir (kayıtlar, dosyalar ve fotoğraflar, öğrencinin adının geçtiği geçmiş kayıtları). Bu işlem geri alınamaz ve bugünden önce alınmış yedekler süreleri dolana kadar öğrenciyi içermeye devam eder. Sınıf toplamları ad olmadan doğru kalır; denetim kaydında yalnızca adsız bir "bir öğrenci silindi" notu kalır.
+- **Bağlantı**: öğrencinin kişisel bağlantısı (kopyala, yazdır) ile **Acil durum** iptali ya da yenilemesi (bkz. Öğretmen kılavuzu, "Öğrenci bağlantıları"). Pasif bir öğrencinin bağlantısı çalışmaz ve yalnızca iptal sunulur.
+
+## Raporlar ve denetim kaydı
+
+**Raporlar**: **Okul geneli kullanım** raporu (sınıf, ders ve öğretmen başına sayılar, öğrenci verisi yok) ile bütün sınıf ve ders raporları. Öğretmenlerin kendi ders değerlendirme notları yöneticilere gösterilmez. Her tablonun **CSV** indirmesi vardır ve her indirme kayda geçer.
+
+**Denetim kaydı**: kim neyi ne zaman değiştirdi. Şifreler, PIN'ler ve gizli seçimler burada hiçbir zaman gösterilmez.
+
+## Dışa aktarma
+
+**Bakım** → **Dışa aktarma**:
+
+- **Tüm okul verisini dışa aktar**: her tablo için bir elektronik tablo (CSV), isteğe bağlı olarak yüklenen dosyalar (**Yüklenen dosyaları dahil et**) ve bir içerik listesi bulunan bir ZIP dosyası. Hazırlamak için `EXPORT` yazın. Dosya her öğrencinin verisini **ve öğretmenlerin özel notlarını** içerir: güvenli tutun ve yalnızca okulun veri koruma kurallarının izin verdiği biçimde paylaşın. Hiçbir zaman dahil edilmez: şifreler, PIN'ler, giriş bilgileri, öğrenci bağlantı kodları, eşleştirme kodları ve hiç açıklanmamış Gizli Öğrenciler.
+- **Bir öğrencinin verisi (KVKK talebi)**: öğrenciyi seçip **Dışa aktarmayı hazırla**'ya basın. O öğrenci hakkında kaydedilmiş her şey, dosyalarıyla birlikte. Özel öğretmen notları yazarında kalır; dosya kaç tane olduğunu belirtir.
+
+Dışa aktarılan dosya yalnızca **bir kez**, bir saat içinde ve yalnızca sizin tarafınızdan indirilebilir; sonra silinir. Hazırlama ve indirme denetim kaydına geçer.
+
+## Yedekler ve geri yükleme
+
+![Bakım](../img/tr/admin-maintenance.png)
+
+**Bakım** → **Yedekler**: **Son yerel yedek**, **Son uzak yedek**, **Son doğrulama** ve **Son geri yükleme**, disk kullanımı, veri boyutu, uygulama sürümü, veritabanı düzeyi ve yerel yedeklerin listesi. Son yedek başarısız olduğunda, yakın tarihli bir uzak kopya olmadığında, veritabanı güncellemeleri yeniden başlatma beklediğinde ya da e-posta bağlantısıyla giren hesaplar giriş yapamadığında burada uyarılar çıkar.
+
+**Şimdi yedekle** ve **Son yedeği doğrula** PIN'inizi sorar ve kayda geçer. Şu anda **Profil**'deki PIN formu yalnızca öğretmen hesaplarında sunulur; bu yüzden PIN'i olmayan bir yönetici hesabı bu iki düğmeyi kullanamaz. Sunucudaki zamanlanmış yedekler bu düğmelere bağlı değildir.
+
+Yedekler sunucuda kendiliğinden alınır (bilgi işlem sorumlusunun ayarladığı gibi saatlik yerel kopyalar ve her gece bir uzak kopya). **Yedekten geri yükleme tarayıcıdan değil, sunucuda yapılır**: önce uygulama durdurulmalıdır. Adım adım işlem, uzak kopyalar ve geri yükleme tatbikatı `docs/OPERATIONS.md` dosyasındadır ("Backups", "Restore").
+
+## Kısaca Bakım sayfası
+
+- **Yedekler**: durum, uyarılar, **Şimdi yedekle**, **Son yedeği doğrula**, yedek listesi.
+- **Dışa aktarma**: tüm okul verisi ve tek bir öğrencinin verisi.
+- **Yeni öğretim yılı**: yeni yıla geçiş.
+
+## Yardım
+
+Üst çubuktaki **Yardım** bu kılavuzları açar. Öğretmenler için [Öğretmen kılavuzu](teacher.md) vardır; [Süper Konuşmacılar kılavuzu](super-speakers.md) okul geneli puan panosunu anlatır.

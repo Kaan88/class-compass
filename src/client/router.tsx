@@ -35,6 +35,8 @@ const AuditPage = lazyRouteComponent(() => import('./routes/admin/Audit.tsx'), '
 const MaintenancePage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'MaintenancePage');
 const AdminReportsPage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'AdminReportsPage');
 const CatalogPage = lazyRouteComponent(() => import('./dev/Catalog.tsx'), 'CatalogPage');
+// User guides (Help): bundled Markdown, loaded only when opened.
+const HelpPage = lazyRouteComponent(() => import('./help/HelpPage.tsx'), 'HelpPage');
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
@@ -121,6 +123,21 @@ const adminReports = createRoute({ getParentRoute: () => adminRoute, path: 'repo
 const adminMaintenance = createRoute({ getParentRoute: () => adminRoute, path: 'maintenance', component: MaintenancePage });
 const adminProfile = createRoute({ getParentRoute: () => adminRoute, path: 'profile', component: ProfilePage });
 
+/**
+ * Help: the bundled user guides (docs/guides), read-only, `?guide=<id>&lang=<en|tr>`. Signed-in
+ * accounts only; the guides hold nothing sensitive, so it is outside the PIN gate.
+ */
+const helpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/help',
+  validateSearch: (s: Record<string, unknown>): { guide?: string | undefined; lang?: 'en' | 'tr' | undefined } => ({
+    guide: typeof s.guide === 'string' ? s.guide : undefined,
+    lang: s.lang === 'en' || s.lang === 'tr' ? s.lang : undefined,
+  }),
+  beforeLoad: requireSession,
+  component: HelpPage,
+});
+
 /** Component catalog: signed-in users only; fictional data only. */
 const catalogRoute = createRoute({ getParentRoute: () => rootRoute, path: '/dev/catalog', beforeLoad: requireSession, component: CatalogPage });
 
@@ -134,6 +151,7 @@ const routeTree = rootRoute.addChildren([
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),
   adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminSpeakers, adminMaintenance, adminAudit, adminProfile]),
+  helpRoute,
   catalogRoute,
 ]);
 

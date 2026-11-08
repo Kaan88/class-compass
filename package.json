@@ -23,6 +23,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "docs:screenshots": "playwright test -c playwright.docs.config.ts",
     "check": "node --run typecheck && node --run lint && node --run test",
     "new:module": "node scripts/new-module.ts",
     "new:theme": "node scripts/new-theme.ts"

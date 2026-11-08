@@ -3,6 +3,8 @@
  * Test-only: NODE_ENV=test, a fixed test pepper, fixed demo passwords (CC_DEMO_PASSWORD, which
  * the seed refuses outside NODE_ENV=test) and a file mail transport (CC_TEST_MAIL_DIR, no SMTP). The temp directory is removed on exit.
  *   node e2e/server.ts            (PORT and E2E_PASSWORD come from playwright.config.ts)
+ * With E2E_DEMO_HISTORY=1 (the guide screenshots, playwright.docs.config.ts) it also runs
+ * `seed:demo-history` (D-136), so the screens show weeks of fictional lessons, goals and points.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -58,4 +60,12 @@ if (seed.status !== 0) {
   process.exit(1);
 }
 console.log(`[e2e] demo school seeded in ${dataDir}`);
+if (process.env.E2E_DEMO_HISTORY === '1') {
+  const history = spawnSync(process.execPath, [path.join(root, 'src/server/cli.ts'), 'seed:demo-history', '--weeks', '6'], { env: process.env, encoding: 'utf8' });
+  if (history.status !== 0) {
+    console.error(history.stdout, history.stderr);
+    process.exit(1);
+  }
+  console.log('[e2e] demo history added');
+}
 await import('../src/server/main.ts');

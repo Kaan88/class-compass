@@ -3468,3 +3468,140 @@ html[data-cursor='off'] * {
   gap: 0.4rem;
   min-height: var(--cc-touch);
 }
+
+/* ---------------------------------------------------------------- Help: bundled user guides */
+.cc-help__layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 52rem) {
+  .cc-help__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.cc-help__toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cc-help__toc a {
+  display: flex;
+  align-items: center;
+  min-height: var(--cc-touch);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--cc-radius-sm);
+  color: var(--cc-text);
+  text-decoration: none;
+}
+.cc-help__toc a[aria-current='page'] {
+  background: var(--cc-accent-soft);
+  font-weight: 700;
+  text-decoration: underline;
+}
+.cc-help__main {
+  min-width: 0;
+}
+.cc-guide {
+  background: var(--cc-surface);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  padding: 1.25rem 1.5rem 2rem;
+  line-height: 1.6;
+  max-width: 60rem;
+  overflow-wrap: anywhere;
+}
+.cc-help-panel .cc-guide {
+  border: none;
+  padding: 0;
+}
+.cc-guide h1,
+.cc-guide h2,
+.cc-guide h3,
+.cc-guide h4 {
+  font-family: var(--cc-font-display);
+  line-height: 1.25;
+  margin: 1.5em 0 0.5em;
+  scroll-margin-top: 1rem;
+}
+.cc-guide h1 {
+  font-size: 1.9rem;
+  margin-top: 0.25em;
+}
+.cc-guide h2 {
+  font-size: 1.45rem;
+  border-bottom: var(--cc-border-width) solid var(--cc-border);
+  padding-bottom: 0.25rem;
+}
+.cc-guide h3 {
+  font-size: 1.2rem;
+}
+.cc-guide h4 {
+  font-size: 1.05rem;
+}
+.cc-guide p,
+.cc-guide ul,
+.cc-guide ol {
+  margin: 0.5em 0;
+}
+.cc-guide ul,
+.cc-guide ol {
+  padding-inline-start: 1.5rem;
+}
+.cc-guide li + li {
+  margin-top: 0.25em;
+}
+.cc-guide a {
+  color: var(--cc-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.cc-guide code {
+  background: var(--cc-surface-2);
+  border-radius: var(--cc-radius-sm);
+  padding: 0 0.25em;
+  font-size: 0.95em;
+}
+.cc-guide__code {
+  background: var(--cc-surface-2);
+  border-radius: var(--cc-radius-sm);
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+}
+.cc-guide__code code {
+  background: none;
+  padding: 0;
+}
+.cc-guide__note {
+  border-inline-start: var(--cc-border-width-strong) solid var(--cc-accent);
+  background: var(--cc-accent-soft);
+  border-radius: var(--cc-radius-sm);
+  padding: 0.25rem 1rem;
+  margin: 1em 0;
+}
+.cc-guide__figure {
+  margin: 1em 0;
+}
+.cc-guide__figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+}
+.cc-guide__inline-img {
+  max-width: 100%;
+  height: auto;
+}
+.cc-guide hr {
+  border: none;
+  border-top: var(--cc-border-width) solid var(--cc-border);
+  margin: 1.5em 0;
+}
+.cc-guide .cc-table-wrap {
+  margin: 0.75em 0;
+}

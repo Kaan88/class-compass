@@ -30,6 +30,8 @@ const launchOptions = { args: ['--use-fake-device-for-media-stream', '--use-fake
 export default defineConfig({
   testDir: './e2e',
   testMatch: /.*\.spec\.ts/,
+  // The guide screenshots are not a test: they run only with playwright.docs.config.ts.
+  testIgnore: /docs-screenshots\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
@@ -59,7 +61,7 @@ export default defineConfig({
     url: `${baseURL}/healthz`,
     timeout: 180_000,
     reuseExistingServer: false,
-    env: { PORT: String(port), E2E_PASSWORD: process.env.E2E_PASSWORD },
+    env: { PORT: String(port), E2E_PASSWORD: process.env.E2E_PASSWORD, E2E_DEMO_HISTORY: process.env.E2E_DEMO_HISTORY ?? '' },
     stdout: 'ignore',
     stderr: 'pipe',
   },

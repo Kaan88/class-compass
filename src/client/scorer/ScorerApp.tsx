@@ -12,7 +12,7 @@
  *   Needs-attention tray (UX-10/11). "My awards today" lists the scorer's awards with undo.
  * - Language: the link's language; the EN/TR switch is remembered on this device only.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { buildSearchIndex, searchStudents } from '../../domain/speakers.ts';
 import {
@@ -45,6 +45,8 @@ import { AndroidSteps, IosSteps } from './InstallPictures.tsx';
 import { liveCount, todayAwards, type Today } from './today.ts';
 
 const LOCALE_KEY = 'cc.scorerLocale';
+/** The scorer guide (docs/guides), loaded only when "Help" is pressed. */
+const HelpPanel = lazy(() => import('../help/HelpPanel.tsx'));
 const ME_KEY = ['scorer', 'me'] as const;
 const STUDENTS_KEY = ['scorer', 'students'] as const;
 const AWARDS_KEY = ['scorer', 'awards'] as const;
@@ -353,6 +355,7 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [hintFor, setHintFor] = useState<string | null>(null);
   const [showInstall, setShowInstall] = useState(false);
+  const [help, setHelp] = useState(false);
   const [started, setStarted] = useState(!welcome || installed);
   /** This link's commands in the outbox, and what the server confirmed since the last refetch (today.ts). */
   const [queued, setQueued] = useState<OutboxOp[]>([]);
@@ -464,6 +467,15 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
     canRetry: isRetryable(op),
   }));
 
+  if (help) {
+    return (
+      <main className="cc-page cc-scorer cc-stack">
+        <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
+          <HelpPanel guide="scorer" onClose={() => setHelp(false)} />
+        </Suspense>
+      </main>
+    );
+  }
   if (!started) {
     return (
       <main className="cc-page cc-scorer cc-stack" data-testid="scorer-welcome">
@@ -569,6 +581,9 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
             {t('speakers.install.title')}
           </Button>
         ) : null}
+        <Button size="small" variant="ghost" onPress={() => setHelp(true)}>
+          {t('help.link')}
+        </Button>
         <Button size="small" variant="ghost" onPress={onLeave}>
           {t('speakers.scorer.leave')}
         </Button>
