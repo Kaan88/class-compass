@@ -13,7 +13,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { EffectiveAttendance } from '../../domain/attendance.ts';
 import type { LessonCommandPayload, LessonState } from '../../shared/contracts/lessons.ts';
-import type { ContextModule } from '../../shared/modules.ts';
+import type { ContextModule, PolicyKey } from '../../shared/modules.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import type { CommandInvalidation } from '../lib/outbox-client.ts';
 
@@ -144,7 +144,7 @@ export interface ClientModuleManifest {
   /** Folder name under src/client/modules (unique). */
   key: string;
   /** Policy key from `src/shared/modules.ts`, or null for core pieces that are always on. */
-  policyKey: ContextModule | null;
+  policyKey: PolicyKey | null;
   /** Prefix of the module's i18n keys (`<namespace>.…`), present in en.ts and tr.ts. */
   i18nNamespace: string;
   dashboardSlots?: readonly DashboardSlot[];

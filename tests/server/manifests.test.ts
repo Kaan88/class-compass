@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
-import { CONTEXT_MODULES, MODULE_KEYS, moduleLabelKey } from '../../src/shared/modules.ts';
+import { MODULE_KEYS, POLICY_KEYS, moduleLabelKey, type ContextModule } from '../../src/shared/modules.ts';
 import { registeredCommandTypes } from '../../src/server/lib/commands.ts';
 import { contextModules } from '../../src/server/db/schema.ts';
 import { collectContributions, enabledContributions, installModules, reportContributions, SERVER_MODULES, studentPageContributions } from '../../src/server/modules/index.ts';
@@ -33,7 +33,7 @@ describe('server manifests', () => {
   it('every policy key is a known module key with an EN and TR label', () => {
     for (const m of SERVER_MODULES) {
       if (m.policyKey === null) continue;
-      expect(CONTEXT_MODULES).toContain(m.policyKey);
+      expect(POLICY_KEYS).toContain(m.policyKey);
       expect(en).toHaveProperty([moduleLabelKey(m.policyKey)]);
       expect(tr).toHaveProperty([moduleLabelKey(m.policyKey)]);
     }
@@ -66,7 +66,7 @@ describe('server manifests', () => {
       if (!m.config) continue;
       expect(m.policyKey).not.toBeNull();
       expect(m.config.schema.safeParse(m.config.defaults).success).toBe(true);
-      expect(moduleConfigSpec(m.policyKey!)).toBe(m.config);
+      expect(moduleConfigSpec(m.policyKey as ContextModule)).toBe(m.config);
     }
   });
 });

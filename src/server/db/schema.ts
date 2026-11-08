@@ -181,26 +181,38 @@ export const users = sqliteTable(
   (t) => [uniqueIndex('users_login_uq').on(t.login)],
 );
 
+export const SESSION_KINDS = ['user', 'student', 'scorer', 'display'] as const;
+
 export const sessions = sqliteTable(
   'sessions',
   {
     id: text('id').primaryKey(),
     tokenHash: text('token_hash').notNull(),
-    kind: text('kind', { enum: ['user', 'student'] }).notNull(),
+    /** S12 (D-128): 'scorer' and 'display' sessions come only from Super Speakers links. */
+    kind: text('kind', { enum: SESSION_KINDS }).notNull(),
     userId: text('user_id').references(() => users.id),
     studentLinkId: text('student_link_id'),
+    /** Super Speakers scorer link (S12): every request re-checks it, so a revoke ends the session at once. */
+    scorerLinkId: text('scorer_link_id'),
+    /** Super Speakers board (display) link (S12). */
+    displayLinkId: text('display_link_id'),
     classroomMode: integer('classroom_mode', { mode: 'boolean' }).notNull().default(false),
     pinUnlockedUntil: integer('pin_unlocked_until'),
     pinFailures: integer('pin_failures').notNull().default(0),
     pinLockedUntil: integer('pin_locked_until'),
     /** How the session was signed in (S13b, D-108): a fresh email-link/invite session counts as re-authentication for 15 minutes. */
-    authMethod: text('auth_method', { enum: ['password', 'email_link', 'invite', 'student_link'] }),
+    authMethod: text('auth_method', { enum: ['password', 'email_link', 'invite', 'student_link', 'scorer_link', 'scorer_pairing', 'display_link'] }),
     createdAt: integer('created_at').notNull(),
     lastSeenAt: integer('last_seen_at').notNull(),
     expiresAt: integer('expires_at').notNull(),
     revokedAt: integer('revoked_at'),
   },
-  (t) => [uniqueIndex('sessions_token_uq').on(t.tokenHash), index('sessions_user_idx').on(t.userId)],
+  (t) => [
+    uniqueIndex('sessions_token_uq').on(t.tokenHash),
+    index('sessions_user_idx').on(t.userId),
+    index('sessions_scorer_link_idx').on(t.scorerLinkId),
+    index('sessions_display_link_idx').on(t.displayLinkId),
+  ],
 );
 
 /** Login throttling per account and per IP. */
@@ -251,7 +263,8 @@ export const auditEvents = sqliteTable(
   {
     id: text('id').primaryKey(),
     at: integer('at').notNull(),
-    actorType: text('actor_type', { enum: ['user', 'student', 'system'] }).notNull(),
+    /** 'scorer' = a Super Speakers scorer link (actorId = the link id), 'display' = a board link (S12). */
+    actorType: text('actor_type', { enum: ['user', 'student', 'system', 'scorer', 'display'] }).notNull(),
     actorId: text('actor_id'),
     opId: text('op_id'),
     action: text('action').notNull(),
@@ -1330,3 +1343,124 @@ export const backupRuns = sqliteTable(
 );
 
 export const _sqlHelper = sql; // re-export for raw fragments in repos
+
+// ---------------------------------------------------------------- Super Speakers (S12)
+/**
+ * Scorer links (S12, D-128): an administrator gives a teacher a special link to award Super Speakers
+ * points, whether or not that teacher uses Class Compass otherwise. `tokenHash` = HMAC(pepper, token)
+ * is the lookup key; the token is also kept encrypted (`tokenCipher`, like student links, D-115) so
+ * the administrator can copy and show the QR code again. Regenerating gives the same row a new token
+ * (`generation` + 1) and ends every session of the old one; revoking ends them too. Awards keep
+ * pointing at the row, so history survives both. `locale` is the scorer app's starting language.
+ */
+export const scorerLinks = sqliteTable(
+  'scorer_links',
+  {
+    id: text('id').primaryKey(),
+    label: text('label').notNull(),
+    locale: text('locale', { enum: ['en', 'tr'] }).notNull().default('en'),
+    /** Optional teacher account this link belongs to (recorded on every award). */
+    userId: text('user_id').references(() => users.id),
+    tokenHash: text('token_hash').notNull(),
+    tokenCipher: text('token_cipher'),
+    generation: integer('generation').notNull().default(1),
+    createdBy: text('created_by').references(() => users.id),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    revokedAt: integer('revoked_at'),
+    revokedBy: text('revoked_by').references(() => users.id),
+    lastUsedAt: integer('last_used_at'),
+  },
+  (t) => [uniqueIndex('scorer_links_token_uq').on(t.tokenHash)],
+);
+
+/**
+ * One-time 6-digit pairing codes (S12, D-129): the installed scorer app on an iPhone has its own
+ * cookie store, so the link page shows a code that the installed app exchanges for its own session.
+ * Only HMAC(pepper, code) is stored; a code works once, for 10 minutes.
+ */
+export const scorerPairings = sqliteTable(
+  'scorer_pairings',
+  {
+    id: text('id').primaryKey(),
+    scorerLinkId: text('scorer_link_id').notNull().references(() => scorerLinks.id),
+    codeHash: text('code_hash').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    usedAt: integer('used_at'),
+  },
+  (t) => [index('scorer_pairings_code_idx').on(t.codeHash), index('scorer_pairings_link_idx').on(t.scorerLinkId)],
+);
+
+/** Read-only board links (S12, D-128): same token pattern as scorer links, revocable and regenerable. */
+export const displayLinks = sqliteTable(
+  'display_links',
+  {
+    id: text('id').primaryKey(),
+    label: text('label').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    tokenCipher: text('token_cipher'),
+    generation: integer('generation').notNull().default(1),
+    createdBy: text('created_by').references(() => users.id),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    revokedAt: integer('revoked_at'),
+    revokedBy: text('revoked_by').references(() => users.id),
+    lastUsedAt: integer('last_used_at'),
+  },
+  (t) => [uniqueIndex('display_links_token_uq').on(t.tokenHash)],
+);
+
+/**
+ * Super Speakers points (S12, D-130): one row per +1 (positive points only), `id` = the command opId.
+ * `localDate` and `weekStart` are computed in the school timezone when the point is written; the
+ * class is a snapshot (id + name) so a later class change keeps the history as it was (DAT-6). A
+ * mistaken point is voided (by its scorer within the undo window, or by an administrator with a
+ * reason), never deleted. The weekly reset is only a time window: nothing is ever removed.
+ */
+export const pointEvents = sqliteTable(
+  'point_events',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    scorerLinkId: text('scorer_link_id').notNull().references(() => scorerLinks.id),
+    /** The teacher account linked to the scorer link when the point was given (null = none). */
+    userId: text('user_id').references(() => users.id),
+    occurredAt: integer('occurred_at').notNull(),
+    localDate: text('local_date').notNull(),
+    weekStart: text('week_start').notNull(),
+    classIdSnapshot: text('class_id_snapshot').notNull().references(() => classes.id),
+    classNameSnapshot: text('class_name_snapshot').notNull(),
+    voidedAt: integer('voided_at'),
+    /** 'scorer:<linkId>' (own undo) or the administrator's user id. */
+    voidedBy: text('voided_by'),
+    voidReason: text('void_reason'),
+  },
+  (t) => [
+    index('point_events_date_idx').on(t.localDate),
+    index('point_events_student_idx').on(t.studentId, t.occurredAt),
+    index('point_events_scorer_idx').on(t.scorerLinkId, t.occurredAt),
+  ],
+);
+
+/**
+ * School-wide Super Speakers settings (S12, D-131), one row (id 1). `participatingClassIds` null =
+ * every active class of the current school year. `boardTitle` is `{en,tr}`; `theme` is a key of the
+ * theme registry. `badgeSubjectId` = the subject whose class+subjects receive the Super Speakers
+ * badges (null = found by its English name "English", D-132).
+ */
+export const superSpeakersSettings = sqliteTable('super_speakers_settings', {
+  id: integer('id').primaryKey(),
+  weekStartsOn: integer('week_starts_on').notNull().default(1),
+  participatingClassIds: text('participating_class_ids', { mode: 'json' }).$type<string[]>(),
+  undoWindowMinutes: integer('undo_window_minutes').notNull().default(10),
+  rateLimitMax: integer('rate_limit_max').notNull().default(60),
+  rateLimitWindowMinutes: integer('rate_limit_window_minutes').notNull().default(10),
+  boardTitle: text('board_title', { mode: 'json' }).$type<LocalizedText>().notNull(),
+  boardLanguage: text('board_language', { enum: ['en', 'tr'] }).notNull().default('en'),
+  theme: text('theme', { enum: CLASS_THEMES }).notNull().default('explorer'),
+  boardSound: integer('board_sound', { mode: 'boolean' }).notNull().default(false),
+  badgeSubjectId: text('badge_subject_id').references(() => subjects.id),
+  updatedAt: integer('updated_at').notNull(),
+  updatedBy: text('updated_by'),
+});

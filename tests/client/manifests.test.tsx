@@ -28,7 +28,7 @@ import {
 import { SERVER_MODULES } from '../../src/server/modules/index.ts';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
-import { CONTEXT_MODULES } from '../../src/shared/modules.ts';
+import { CONTEXT_MODULES, POLICY_KEYS } from '../../src/shared/modules.ts';
 
 const MODULES_DIR = join(import.meta.dirname, '..', '..', 'src', 'client', 'modules');
 const inBoth = (k: string) => k in en && k in tr;
@@ -46,7 +46,7 @@ describe('client module manifests', () => {
 
   it('every policy key is a known context module, and pieces belong to their manifest’s module', () => {
     for (const m of CLIENT_MODULES) {
-      if (m.policyKey !== null) expect(CONTEXT_MODULES as readonly string[]).toContain(m.policyKey);
+      if (m.policyKey !== null) expect(POLICY_KEYS as readonly string[]).toContain(m.policyKey);
       for (const p of [...(m.dashboardSlots ?? []), ...(m.startSteps ?? []), ...(m.studentCardAddons ?? [])]) {
         // A core manifest (policyKey null, e.g. lessons) owns core pieces (module null) that are always on (S13a).
         if (m.policyKey === null) expect(p.module, `${m.key}/${p.key}`).toBeNull();

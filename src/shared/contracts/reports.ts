@@ -13,7 +13,7 @@
  * All endpoints are `teacher` / `admin` access: PIN-gated in classroom mode (423, RPT-6, PIN-8).
  */
 import { z } from 'zod';
-import { CONTEXT_MODULES } from '../modules.ts';
+import { POLICY_KEYS } from '../modules.ts';
 import { Empty, LocalizedText, endpoint } from './define.ts';
 import { Id, IsoDate } from './school.ts';
 
@@ -67,7 +67,7 @@ export type ReportMetric = z.infer<typeof ReportMetric>;
 export const ReportSection = z.object({
   key: z.string(),
   /** Module policy key (null = core). */
-  module: z.enum(CONTEXT_MODULES).nullable(),
+  module: z.enum(POLICY_KEYS).nullable(),
   title: ReportLabel,
   intro: ReportLabel.optional(),
   metrics: z.array(ReportMetric),
@@ -131,7 +131,7 @@ export const TimelineEvent = z.object({
   date: z.string(),
   /** For ordering within a day. */
   at: z.number().nullable(),
-  module: z.enum(CONTEXT_MODULES).nullable(),
+  module: z.enum(POLICY_KEYS).nullable(),
   what: ReportLabel,
   detail: ReportLabel.nullable(),
 });

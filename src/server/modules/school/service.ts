@@ -6,6 +6,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/school.ts';
 import { CONTEXT_MODULES, MEDIA_MODULES, type ContextModule, type ModuleKey } from '../../../shared/contracts/school.ts';
+import { isSchoolModule } from '../../../shared/modules.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { compareNames, foldForSearch, normaliseName } from '../../../shared/text/turkish.ts';
 import { DEFAULT_SOUND_VOLUME } from '../../../shared/classDisplay.ts';
@@ -462,7 +463,8 @@ export function endTeachingContext(ctx: RequestContext, contextId: string) {
 }
 
 // ---------------------------------------------------------------- module policies
-const isMedia = (m: string) => (MEDIA_MODULES as readonly string[]).includes(m);
+// Media flags and school-wide modules (D-127) have no teacher switch.
+const isMedia = (m: string) => (MEDIA_MODULES as readonly string[]).includes(m) || isSchoolModule(m);
 
 export function listModulePolicies(db: Db) {
   const a = getAvailability(db);

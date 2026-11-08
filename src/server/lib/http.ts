@@ -5,7 +5,7 @@ import type { Access, Endpoint } from '../../shared/contracts/define.ts';
 import { sessions, users } from '../db/schema.ts';
 import { AppError } from './errors.ts';
 import { tokenHash } from './crypto.ts';
-import type { Actor, AppDeps, RequestContext, SessionRow, StudentPrincipal, UserRow } from './context.ts';
+import type { Actor, AppDeps, DisplayPrincipal, RequestContext, ScorerPrincipal, SessionRow, StudentPrincipal, UserRow } from './context.ts';
 
 export const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
 export const PIN_UNLOCK_MS = 5 * 60 * 1000;
@@ -22,6 +22,20 @@ export const studentCookieName = (deps: AppDeps) => (deps.config.isProd ? '__Hos
 export const STUDENT_SESSION_ABSOLUTE_MS = 90 * 24 * 60 * 60 * 1000;
 export const STUDENT_SESSION_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Super Speakers (S12, D-128): the scorer app and the board use their own strict cookies, like the
+ * student page. A browser can hold a teacher, a student, a scorer and a board session at once; each
+ * access class reads only its own cookie, so they never mix.
+ */
+export const scorerCookieName = (deps: AppDeps) => (deps.config.isProd ? '__Host-ccp' : 'ccp');
+export const displayCookieName = (deps: AppDeps) => (deps.config.isProd ? '__Host-ccb' : 'ccb');
+/** Scorer sessions: one school year (installed phone apps), signed out after 120 days without use. */
+export const SCORER_SESSION_ABSOLUTE_MS = 365 * 24 * 60 * 60 * 1000;
+export const SCORER_SESSION_IDLE_MS = 120 * 24 * 60 * 60 * 1000;
+/** Board sessions: one year; a board screen that stays dark for 60 days must open its link again. */
+export const DISPLAY_SESSION_ABSOLUTE_MS = 365 * 24 * 60 * 60 * 1000;
+export const DISPLAY_SESSION_IDLE_MS = 60 * 24 * 60 * 60 * 1000;
+
 /** All endpoints registered on this server (tests enumerate these). */
 export const registeredEndpoints: Endpoint[] = [];
 
@@ -35,6 +49,18 @@ export function setStudentResolver(fn: StudentResolver) {
   studentResolver = fn;
 }
 
+/** Scorer and display sessions are validated by the Super Speakers module (every request, D-128). */
+type ScorerResolver = (deps: AppDeps, session: SessionRow) => ScorerPrincipal | null;
+type DisplayResolver = (deps: AppDeps, session: SessionRow) => DisplayPrincipal | null;
+let scorerResolver: ScorerResolver = () => null;
+let displayResolver: DisplayResolver = () => null;
+export function setScorerResolver(fn: ScorerResolver) {
+  scorerResolver = fn;
+}
+export function setDisplayResolver(fn: DisplayResolver) {
+  displayResolver = fn;
+}
+
 export function clientIp(deps: AppDeps, req: FastifyRequest): string {
   if (deps.config.TRUST_PROXY) {
     const cf = req.headers['cf-connecting-ip'];
@@ -46,7 +72,14 @@ export function clientIp(deps: AppDeps, req: FastifyRequest): string {
 }
 
 /** A live session of `kind` for this cookie value (null when unknown, revoked, expired or idle). */
-function liveSession(deps: AppDeps, raw: string | undefined, kind: 'user' | 'student'): SessionRow | null {
+const IDLE_MS: Record<SessionRow['kind'], number> = {
+  user: SESSION_IDLE_MS,
+  student: STUDENT_SESSION_IDLE_MS,
+  scorer: SCORER_SESSION_IDLE_MS,
+  display: DISPLAY_SESSION_IDLE_MS,
+};
+
+function liveSession(deps: AppDeps, raw: string | undefined, kind: SessionRow['kind']): SessionRow | null {
   if (!raw) return null;
   const now = deps.now();
   const session = deps.db
@@ -54,7 +87,7 @@ function liveSession(deps: AppDeps, raw: string | undefined, kind: 'user' | 'stu
     .from(sessions)
     .where(and(eq(sessions.tokenHash, tokenHash(deps.config.SECRET_PEPPER, raw)), isNull(sessions.revokedAt)))
     .get();
-  const idle = kind === 'student' ? STUDENT_SESSION_IDLE_MS : SESSION_IDLE_MS;
+  const idle = IDLE_MS[kind];
   if (!session || session.kind !== kind || session.expiresAt <= now || session.lastSeenAt + idle <= now) return null;
   return session;
 }
@@ -86,6 +119,24 @@ function loadStudentSession(deps: AppDeps, req: FastifyRequest): { session: Sess
   return { session, student };
 }
 
+/** The scorer principal of the scorer cookie (link re-checked on every request). */
+function loadScorerSession(deps: AppDeps, req: FastifyRequest): { session: SessionRow | null; scorer: ScorerPrincipal | null } {
+  const session = liveSession(deps, req.cookies?.[scorerCookieName(deps)], 'scorer');
+  const scorer = session ? scorerResolver(deps, session) : null;
+  if (!session || !scorer) return { session: null, scorer: null };
+  touch(deps, session);
+  return { session, scorer };
+}
+
+/** The board principal of the board cookie (link re-checked on every request). */
+export function loadDisplaySession(deps: AppDeps, req: FastifyRequest): { session: SessionRow | null; display: DisplayPrincipal | null } {
+  const session = liveSession(deps, req.cookies?.[displayCookieName(deps)], 'display');
+  const display = session ? displayResolver(deps, session) : null;
+  if (!session || !display) return { session: null, display: null };
+  touch(deps, session);
+  return { session, display };
+}
+
 export function isPinUnlocked(session: SessionRow, now: number): boolean {
   return !session.classroomMode || (session.pinUnlockedUntil !== null && session.pinUnlockedUntil > now);
 }
@@ -99,6 +150,14 @@ function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext, opts:
   if (access === 'public') return;
   if (access === 'student') {
     if (!ctx.student) throw new AppError('UNAUTHENTICATED', 'Student link session required');
+    return;
+  }
+  if (access === 'scorer') {
+    if (!ctx.scorer) throw new AppError('UNAUTHENTICATED', 'Scorer link session required');
+    return;
+  }
+  if (access === 'display') {
+    if (!ctx.display) throw new AppError('UNAUTHENTICATED', 'Board link session required');
     return;
   }
   const { user, session } = ctx;
@@ -167,6 +226,16 @@ export function contextFor(deps: AppDeps, req: FastifyRequest, access: Access, o
   if (access === 'student') {
     const { session, student } = loadStudentSession(deps, req);
     ctx = { ...deps, ip: clientIp(deps, req), session, user: null, student, actor: actorOf(null, student) };
+  } else if (access === 'scorer') {
+    // Scorer endpoints see ONLY the scorer cookie (S12, D-128).
+    const { session, scorer } = loadScorerSession(deps, req);
+    const actor: Actor = scorer ? { type: 'scorer', id: scorer.scorerLinkId } : { type: 'system', id: null };
+    ctx = { ...deps, ip: clientIp(deps, req), session, user: null, student: null, scorer, display: null, actor };
+  } else if (access === 'display') {
+    // Board endpoints see ONLY the board cookie (S12, D-128).
+    const { session, display } = loadDisplaySession(deps, req);
+    const actor: Actor = display ? { type: 'display', id: display.displayLinkId } : { type: 'system', id: null };
+    ctx = { ...deps, ip: clientIp(deps, req), session, user: null, student: null, scorer: null, display, actor };
   } else {
     const { session, user } = loadUserSession(deps, req);
     ctx = { ...deps, ip: clientIp(deps, req), session, user, student: null, actor: actorOf(user, null) };

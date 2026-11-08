@@ -66,8 +66,9 @@ describe('achievements module and defaults (item 1)', () => {
     }
     const o = await ok(s.teacherA.get(base()));
     expect(o.definitions.length).toBeGreaterThanOrEqual(60);
-    // Super Speakers badges are defined but wait for that module (S12).
-    expect(o.definitions.filter((d: any) => d.category === 'speakers').every((d: any) => d.inactive)).toBe(true);
+    // Super Speakers badges are active since S12 (D-132): points feed them.
+    expect(o.definitions.filter((d: any) => d.category === 'speakers').length).toBe(4);
+    expect(o.definitions.filter((d: any) => d.category === 'speakers').every((d: any) => !d.inactive)).toBe(true);
   });
 });
 

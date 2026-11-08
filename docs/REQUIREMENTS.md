@@ -191,3 +191,17 @@ Nothing here may be dropped silently — de-scoping requires an entry in `DECISI
 - ENG-3 Tests for: new vs resumed lesson; class switching & refresh; weekly vs lesson counter boundaries; duplicate submissions & undo; Secret Student secrecy; fair rotations & absences; stable assistant schedules; grouping constraints & uneven sizes; import duplicates & uncertain OCR; attendance/homework independence; student-link isolation & revocation; protected evidence & upload validation; teacher/admin permissions & PIN locking; language & theme switching; archive & restore.
 - ENG-4 Realistic layouts with 18–20 fictional students and larger edge cases; touchscreen and mobile student pages checked.
 - ENG-5 Integration testing on Debian VM when credentials supplied; document what was tested and limitations honestly.
+
+## 21. Super Speakers (SSP) — S12, owner brief 2026-11-07/08
+- SSP-1 Board shows only the top 3 places of the current week with full name and class (podium); 0 points never shown; dense ranks for ties; placeholder "We are waiting for our super speakers" when empty.
+- SSP-2 Full names on the board.
+- SSP-3 Class totals for every participating class, including 0, sorted by total then Turkish name order.
+- SSP-4 Scorers are teachers given special links by the administrator (display name, interface language, optional teacher account); revoke and regenerate; every award records the scorer link (and user).
+- SSP-5 Positive points only (+1).
+- SSP-6 Scorer app: mobile-first search (Turkish folding, word starts, class names, student numbers), class filter, recent students, large +1 cards, double-tap guard, undo, offline queue, save state; 1,500+ students.
+- SSP-7 Weekly reset as a time window (default Monday 00:00 school time); history kept.
+- SSP-8 Live board updates (SSE with heartbeat and fallback polling), working behind Cloudflare Tunnel.
+- SSP-9 Weekly history (winners, class/week, scorer, student) in reports with CSV.
+- SSP-10 Admin page: enable, settings, participating classes, scorer and board links, award log with void (reason, audited).
+- SSP-11 Installable scorer PWA (shell-only caching) with a pairing code for iPhone home-screen apps.
+- SSP-12 Avatars on the board and scorer cards; the Super Speakers badges count live points only.

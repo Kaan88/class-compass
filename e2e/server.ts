@@ -15,6 +15,9 @@ const port = process.env.PORT ?? '3299';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-e2e-'));
 // Email goes to JSON files here instead of SMTP (test-only, config.ts); e2e/mail.ts reads them.
 const mailDir = path.join(os.tmpdir(), `cc-e2e-mail-${port}`);
+// Test clock (S12): milliseconds added to the server clock, read from this file (NODE_ENV=test only).
+const clockFile = process.env.CC_TEST_CLOCK_FILE ?? path.join(os.tmpdir(), `cc-e2e-clock-${port}`);
+fs.writeFileSync(clockFile, '0');
 fs.rmSync(mailDir, { recursive: true, force: true });
 
 Object.assign(process.env, {
@@ -32,12 +35,16 @@ Object.assign(process.env, {
   CC_TEST_MAIL_DIR: mailDir,
   // No network in tests: the weather service is unreachable, so the widget stays hidden (D-106).
   WEATHER_API_URL: 'http://127.0.0.1:9/v1/forecast',
+  // Super Speakers (S12): the e2e week rollover moves this clock; a short board heartbeat notices it fast.
+  CC_TEST_CLOCK_FILE: clockFile,
+  SPEAKERS_HEARTBEAT_MS: '1000',
 });
 
 const cleanup = () => {
   try {
     fs.rmSync(dataDir, { recursive: true, force: true });
     fs.rmSync(mailDir, { recursive: true, force: true });
+    fs.rmSync(clockFile, { force: true });
   } catch {
     /* best effort */
   }

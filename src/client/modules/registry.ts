@@ -14,7 +14,8 @@ export const byOrder = <T extends { order: number; key: string }>(xs: readonly T
 
 const all = <T,>(pick: (m: ClientModuleManifest) => readonly T[] | undefined): T[] => CLIENT_MODULES.flatMap((m) => [...(pick(m) ?? [])]);
 
-const enabled = (ctx: ClassroomContext, m: ClientModuleManifest['policyKey']) => m === null || ctx.modules[m] === true;
+// School-wide modules (D-127) contribute no classroom pieces, so they are never "on" here.
+const enabled = (ctx: ClassroomContext, m: ClientModuleManifest['policyKey']) => m === null || (ctx.modules as Record<string, boolean | undefined>)[m] === true;
 
 export const allDashboardSlots = (): DashboardSlot[] => byOrder(all((m) => m.dashboardSlots));
 export const allStartSteps = (): StartStep[] => byOrder(all((m) => m.startSteps));

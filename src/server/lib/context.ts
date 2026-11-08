@@ -10,11 +10,29 @@ export type UserRow = typeof users.$inferSelect;
 export type Actor =
   | { type: 'user'; id: string; role: 'admin' | 'teacher' }
   | { type: 'student'; id: string }
+  /** A Super Speakers scorer link (S12): `id` is the link id, never a user id. */
+  | { type: 'scorer'; id: string }
+  /** A Super Speakers board link (S12): read-only, so it only appears on the link-opened audit row. */
+  | { type: 'display'; id: string }
   | { type: 'system'; id: null };
 
 export interface StudentPrincipal {
   studentId: string;
   linkId: string;
+}
+
+/** Super Speakers scorer (S12, D-128): only from a scorer link session, re-checked on every request. */
+export interface ScorerPrincipal {
+  scorerLinkId: string;
+  /** The teacher account the administrator linked to the scorer link (recorded on awards), or null. */
+  userId: string | null;
+  label: string;
+  locale: 'en' | 'tr';
+}
+
+/** Super Speakers board display (S12, D-128): read-only. */
+export interface DisplayPrincipal {
+  displayLinkId: string;
 }
 
 /** Shared application services handed to every handler. */
@@ -37,6 +55,10 @@ export interface RequestContext extends AppDeps {
   session: SessionRow | null;
   user: UserRow | null;
   student: StudentPrincipal | null;
+  /** S12: set only for `scorer` endpoints (from the scorer cookie). */
+  scorer?: ScorerPrincipal | null;
+  /** S12: set only for `display` endpoints (from the board cookie). */
+  display?: DisplayPrincipal | null;
   actor: Actor;
 }
 
@@ -48,4 +70,8 @@ export function requireUser(ctx: RequestContext): UserRow {
 export function requireStudent(ctx: RequestContext): StudentPrincipal {
   if (!ctx.student) throw new Error('requireStudent called on non-student context');
   return ctx.student;
+}
+export function requireScorer(ctx: RequestContext): ScorerPrincipal {
+  if (!ctx.scorer) throw new Error('requireScorer called on non-scorer context');
+  return ctx.scorer;
 }

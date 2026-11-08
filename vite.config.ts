@@ -5,13 +5,17 @@ import tailwindcss from '@tailwindcss/vite';
 
 /**
  * The personal student page (S10) is its own small entry (student.html), served by the server at
- * `/s`. In development the same path is rewritten to the entry here.
+ * `/s`; the Super Speakers scorer app (scorer.html at `/p` and `/p/app`) and board (board.html at
+ * `/board`, S12) likewise. In development the same paths are rewritten to the entries here.
  */
 const studentPageInDev = (): Plugin => ({
   name: 'cc-student-page',
   configureServer(server) {
     server.middlewares.use((req, _res, next) => {
       if (req.url === '/s' || req.url?.startsWith('/s?')) req.url = `/student.html${req.url.slice(2)}`;
+      // Super Speakers (S12): the scorer link page, the installed scorer app and the board.
+      else if (req.url && /^\/(?:p|p\/app)(?:\?|$)/u.test(req.url)) req.url = `/scorer.html${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`;
+      else if (req.url && /^\/board(?:\?|$)/u.test(req.url)) req.url = `/board.html${req.url.slice('/board'.length)}`;
       next();
     });
   },
@@ -27,6 +31,8 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         student: fileURLToPath(new URL('./student.html', import.meta.url)),
+        scorer: fileURLToPath(new URL('./scorer.html', import.meta.url)),
+        board: fileURLToPath(new URL('./board.html', import.meta.url)),
       },
       // Validation + offline storage libraries, and the accessible UI primitives, in their own
       // long-cached chunks (keeps every chunk < 500 kB; S9 added the importer page, S10 the student entry).
@@ -48,7 +54,19 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/api': { target: 'http://127.0.0.1:3210', changeOrigin: false },
+      // The board's Server-Sent Events stream passes through unbuffered (D-134): the proxy keeps the
+      // connection open (no timeout) and never compresses or buffers `text/event-stream`.
+      '/api': {
+        target: 'http://127.0.0.1:3210',
+        changeOrigin: false,
+        timeout: 0,
+        proxyTimeout: 0,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (res) => {
+            if (String(res.headers['content-type'] ?? '').startsWith('text/event-stream')) res.headers['cache-control'] = 'no-store, no-transform';
+          });
+        },
+      },
       '/healthz': 'http://127.0.0.1:3210',
     },
   },

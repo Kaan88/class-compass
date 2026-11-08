@@ -47,11 +47,14 @@ describe('achievement rules', () => {
     ).toBe(1);
   });
 
-  it('evidence rules filter by kind and count distinct skills; Super Speakers rules cannot fire yet', () => {
+  it('evidence rules filter by kind and count distinct skills; Super Speakers rules count live points (S12, D-132)', () => {
     const f = emptyFacts();
     f.evidence.push({ at: 1, kind: 'image', skill: 'reading' }, { at: 2, kind: 'audio', skill: 'speaking' }, { at: 3, kind: 'image', skill: 'reading' });
     expect(ruleProgress({ event: 'evidence', threshold: 9, evidenceKind: 'image' }, f).current).toBe(2);
     expect(ruleProgress({ event: 'evidence_skills', threshold: 9 }, f).current).toBe(2);
     expect(ruleReached({ event: 'speaker_points', threshold: 1 }, f)).toBe(false);
+    f.speakerPoints.push({ at: 5 }, { at: 9 });
+    expect(ruleReached({ event: 'speaker_points', threshold: 2 }, f)).toBe(true);
+    expect(ruleReached({ event: 'speaker_points', threshold: 2 }, f, 6)).toBe(false); // "start fresh" counts only later points
   });
 });

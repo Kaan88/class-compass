@@ -30,6 +30,7 @@ const ClassesPage = lazyRouteComponent(school, 'ClassesPage');
 const AssignmentsPage = lazyRouteComponent(school, 'AssignmentsPage');
 const ModulesPage = lazyRouteComponent(school, 'ModulesPage');
 const AdminStudentsPage = lazyRouteComponent(() => import('./routes/admin/StudentsAdmin.tsx'), 'AdminStudentsPage');
+const SuperSpeakersPage = lazyRouteComponent(() => import('./routes/admin/SuperSpeakers.tsx'), 'SuperSpeakersPage');
 const AuditPage = lazyRouteComponent(() => import('./routes/admin/Audit.tsx'), 'AuditPage');
 const MaintenancePage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'MaintenancePage');
 const AdminReportsPage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'AdminReportsPage');
@@ -114,6 +115,7 @@ const adminClasses = createRoute({
 const adminAssignments = createRoute({ getParentRoute: () => adminRoute, path: 'assignments', component: AssignmentsPage });
 const adminModules = createRoute({ getParentRoute: () => adminRoute, path: 'modules', component: ModulesPage });
 const adminStudents = createRoute({ getParentRoute: () => adminRoute, path: 'students', component: AdminStudentsPage });
+const adminSpeakers = createRoute({ getParentRoute: () => adminRoute, path: 'super-speakers', component: SuperSpeakersPage });
 const adminAudit = createRoute({ getParentRoute: () => adminRoute, path: 'audit', component: AuditPage });
 const adminReports = createRoute({ getParentRoute: () => adminRoute, path: 'reports', component: AdminReportsPage });
 const adminMaintenance = createRoute({ getParentRoute: () => adminRoute, path: 'maintenance', component: MaintenancePage });
@@ -131,7 +133,7 @@ const routeTree = rootRoute.addChildren([
   changePasswordRoute,
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),
-  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminMaintenance, adminAudit, adminProfile]),
+  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminSpeakers, adminMaintenance, adminAudit, adminProfile]),
   catalogRoute,
 ]);
 

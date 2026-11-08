@@ -11,7 +11,7 @@
  */
 import type { RequestContext } from './context.ts';
 
-export const ACTIVITY_SOURCES = ['goals', 'homework', 'assistant', 'secretStudents'] as const;
+export const ACTIVITY_SOURCES = ['goals', 'homework', 'assistant', 'secretStudents', 'speakers'] as const;
 export type ActivitySource = (typeof ACTIVITY_SOURCES)[number];
 
 export interface StudentActivity {

@@ -185,7 +185,7 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
       // A student's file name is shown back to them and to teachers: one with a blocked word gets a neutral name (D-123).
       originalName: ctx.actor.type === 'student' ? neutralStudentFileName(ctx.db, filename) : filename,
       ownerStudentId: opts.ownerStudentId,
-      uploadedByType: ctx.actor.type,
+      uploadedByType: ctx.actor.type === 'user' || ctx.actor.type === 'student' ? ctx.actor.type : 'system',
       uploadedById: ctx.actor.id,
       createdAt: now,
       deletedAt: null,

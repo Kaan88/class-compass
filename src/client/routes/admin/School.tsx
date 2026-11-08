@@ -31,6 +31,7 @@ import { ClassLanguageSelect, StudentPageLanguageSelect, studentPageOverride } f
 import type { ClassLanguage } from '../../../shared/classLanguage.ts';
 import { ThemePicker, ThemePreview, themeLabelKey } from '../../ui/ThemePreview.tsx';
 import { moduleLabelKey } from '../teacher/Classes.tsx';
+import { isSchoolModule } from '../../../shared/modules.ts';
 import { ADMIN } from './Admin.tsx';
 
 const K = {
@@ -832,7 +833,8 @@ export function ModulesPage() {
   const run = useRun();
   const policies = useQuery({ queryKey: K.policies, queryFn: () => call(S.getModulePolicies, {}) });
   const list = policies.data?.policies ?? [];
-  const teacherModules = list.filter((p) => !p.module.startsWith('media.'));
+  const teacherModules = list.filter((p) => !p.module.startsWith('media.') && !isSchoolModule(p.module));
+  const schoolModules = list.filter((p) => isSchoolModule(p.module));
   const media = list.filter((p) => p.module.startsWith('media.'));
   const toggle = (module: S.ModuleKey, on: boolean) =>
     void run(() => call(S.setModulePolicy, { module, availability: on ? 'enabled' : 'disabled' }), { invalidate: [K.policies], success: t('save.saved') });
@@ -846,6 +848,17 @@ export function ModulesPage() {
           <Toggle key={p.module} label={t(moduleLabelKey(p.module))} isSelected={p.availability === 'enabled'} onChange={(v) => toggle(p.module, v)} />
         ))}
       </section>
+      {schoolModules.length ? (
+        <section className="cc-card cc-stack" aria-labelledby="school-modules-title">
+          <h2 id="school-modules-title" className="cc-h2">
+            {t('modules.schoolTitle')}
+          </h2>
+          <p className="cc-muted">{t('modules.schoolExplain')}</p>
+          {schoolModules.map((p) => (
+            <Toggle key={p.module} label={t(moduleLabelKey(p.module))} isSelected={p.availability === 'enabled'} onChange={(v) => toggle(p.module, v)} />
+          ))}
+        </section>
+      ) : null}
       <section className="cc-card cc-stack" aria-labelledby="media-title">
         <h2 id="media-title" className="cc-h2">
           {t('modules.mediaTitle')}

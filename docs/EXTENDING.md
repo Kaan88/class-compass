@@ -30,6 +30,19 @@ It creates:
 The result typechecks and passes the manifest tests (`tests/scripts/scaffold.test.ts` proves this).
 The placeholder panel is **not** a finished feature. Replace it before ticking any ROADMAP box.
 
+### School-wide modules (S12, D-127)
+
+A module that the administrator switches on for the whole school (not per class+subject), like Super
+Speakers, is listed in `SCHOOL_MODULE_CATALOG` instead of `CONTEXT_MODULE_CATALOG` (move the
+scaffold's line). Its `policyKey` is still the key; it has no `config`; gate it with
+`isModuleAvailable(db, key)`. Admin → Modules shows it under "School-wide modules". Its report and
+timeline contributions appear while the school switch is on. If it needs its own principals (links,
+screens), add an access class in `define.ts` (`ACCESS_CLASSES`), a cookie and a resolver in
+`lib/http.ts`, and extend `tests/server/permissions.test.ts` so a session of the new class is proven
+to reach only its own endpoints (see D-128). A separate client entry (its own HTML file, like
+`scorer.html` and `board.html`) goes into `vite.config.ts` (`input` and the dev rewrite) and is served
+by `app.ts` with `no-store`.
+
 ### Server manifest (`defineServerModule`)
 
 | Field | What it does |

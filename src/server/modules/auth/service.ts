@@ -107,10 +107,10 @@ export async function login(deps: AppDeps, ip: string, loginName: string, passwo
 
 export function createSession(
   deps: AppDeps,
-  who: { kind: 'user'; userId: string } | { kind: 'student'; studentLinkId: string },
+  who: { kind: 'user'; userId: string } | { kind: 'student'; studentLinkId: string } | { kind: 'scorer'; scorerLinkId: string } | { kind: 'display'; displayLinkId: string },
   now: number,
   absoluteMs = SESSION_ABSOLUTE_MS,
-  authMethod: SessionRow['authMethod'] = who.kind === 'student' ? 'student_link' : 'password',
+  authMethod: SessionRow['authMethod'] = who.kind === 'student' ? 'student_link' : who.kind === 'scorer' ? 'scorer_link' : who.kind === 'display' ? 'display_link' : 'password',
 ) {
   const { db } = deps;
   const pepper = deps.config.SECRET_PEPPER;
@@ -121,6 +121,8 @@ export function createSession(
     kind: who.kind,
     userId: who.kind === 'user' ? who.userId : null,
     studentLinkId: who.kind === 'student' ? who.studentLinkId : null,
+    scorerLinkId: who.kind === 'scorer' ? who.scorerLinkId : null,
+    displayLinkId: who.kind === 'display' ? who.displayLinkId : null,
     classroomMode: false,
     pinUnlockedUntil: null,
     pinFailures: 0,

@@ -197,9 +197,20 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Student text checks: nonsense and risky words in EN and TR, server authoritative with live hints (goal, practice choices, reflections, evidence, captions, link address; with the school's goal limits), the language check also on link addresses and upload names, our own word lists, admin block/allow lists and goal limits, teacher words, a count-only notice (off by default), hide from the student page with audit, corpus of 100+ sentences per language plus 42 goals written without looking at the lists (D-123). Archived classes are read-only for every S13c teacher write
 
 ## S12 Super Speakers (school-wide English points)
-- [ ] Scorer links (with interface language) and PWA with pairing code for iPhone, live search, +1 and undo, offline queue
-- [ ] Big-screen board: top 3 with full name and class, class totals, placeholder when empty, weekly reset, live updates
-- [ ] Admin page, award log, weekly history in reports
+- [x] School-wide module (SX manifest, `SCHOOL_MODULE_CATALOG`, one admin switch, off by default), new access classes `scorer` and `display` in the permission matrix (D-127, D-128)
+- [x] Scorer links with display name, interface language (EN default, switch on the device) and optional teacher account; copy, QR, regenerate (same row, history kept), revoke; revocation immediate (D-128)
+  - [x] Fragment token exchange → strict scorer cookie; tokens, cookies and pairing codes never logged or audited (test)
+  - [x] PWA: manifest, shell-only service worker, PNG icons, install instructions with pictures for Android and iPhone; 6-digit single-use pairing code (10 min, rate-limited) for the installed iPhone app (D-129, D-135)
+  - [ ] Installed and paired on a real iPhone and a real Android phone, and a Lighthouse installability run (only checked in desktop Chromium with a Pixel 7 viewport)
+- [x] Scorer app: instant search over the participating students held in memory (Turkish folding "isik" → "Işık", word starts, class "3a" → "3-A", student number), class chips, Recent row, avatar cards with a huge +1, 700 ms double-tap guard with "tap again", undo bar, "My points today" with undo, save state, Needs-attention tray, offline outbox (D-130). 1,500-student search performance test (domain); not yet timed on a low-end phone
+- [x] Points: idempotent `points.award` / `points.voidOwn`, participating classes, per-scorer rate limit, undo window, admin void with reason (audited), award log with filters (D-130, D-131)
+- [x] Board: top 3 with dense ranks, full name, class and avatar, ties with "+N more" (D-133), class totals for every participating class including 0 (bars with numbers), placeholder "We are waiting for our super speakers", configurable title, language and theme, connection indicator, cursor hiding, fits 1920×1080 and 1280×720 without scrolling (e2e)
+- [x] Live updates: SSE with heartbeat, version re-check and rollover detection, ETag fallback polling every 10 s, reconnect with backoff, Vite proxy; Cloudflare Tunnel headers documented (D-134, OPERATIONS)
+  - [ ] Checked through the real Cloudflare Tunnel on the test VM (lead's deploy check)
+- [x] Weekly reset as a time window; weekly history (winners, class/week, scorer, student) with CSV on the admin page; class+subject report section and timeline in the badge subject (D-131)
+- [x] Super Speakers badges active: first point, 5, 10, 25 through the activity hook; voided points do not count; badges are not taken back automatically (D-132)
+- [x] Optional board sound and celebration on a podium change, off by default; reduced motion respected (D-135)
+- [x] E2E: admin creates links in the UI; a phone scorer searches "isik", gives +1, undoes; the 1920×1080 board updates live without reload; placeholder after the weekly rollover (test clock)
 
 ## User documentation (after S12)
 - [ ] Teacher, admin, Super Speakers and student/parent guides in English and Turkish (format to be chosen with the owner)

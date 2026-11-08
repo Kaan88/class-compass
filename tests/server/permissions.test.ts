@@ -4,10 +4,13 @@
  * - teacher → 403 on every admin endpoint
  * - admin → 403 on every teacher/classroom endpoint
  * - teacher in locked classroom mode → 423 on every teacher/admin/account endpoint
+ * - Super Speakers scorer and board sessions (S12, D-128) → 401 on every endpoint outside their own
+ *   access class; signed-in staff → 401 on the scorer and board endpoints (other cookies)
  * Access is checked before input validation, so dummy ids and empty bodies are enough.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Endpoint } from '../../src/shared/contracts/define.ts';
+import { ACCESS_CLASSES } from '../../src/shared/contracts/define.ts';
 import { registeredEndpoints } from '../../src/server/lib/http.ts';
 import { Client, makeEnv, seedUser, type TestEnv } from '../helpers.ts';
 
@@ -45,7 +48,10 @@ async function expectAll(c: Client, filter: (e: Endpoint) => boolean, status: nu
 describe('permission matrix over all endpoints', () => {
   it('registers a meaningful set of endpoints, each with an access class', () => {
     expect(endpoints.length).toBeGreaterThan(50);
-    for (const e of endpoints) expect(['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account']).toContain(e.access);
+    for (const e of endpoints) expect(['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display']).toContain(e.access);
+    expect([...ACCESS_CLASSES].sort()).toEqual(['account', 'admin', 'classroom', 'display', 'public', 'scorer', 'student', 'teacher', 'user']);
+    // Every access class is in use, so each is covered by the matrix below.
+    for (const a of ACCESS_CLASSES) expect(endpoints.some((e) => e.access === a), a).toBe(true);
   });
 
   it('answers 401 to unauthenticated callers on every non-public endpoint', async () => {
@@ -62,6 +68,28 @@ describe('permission matrix over all endpoints', () => {
     const a = new Client(env);
     await a.login('root.admin');
     await expectAll(a, (e) => e.access === 'teacher' || e.access === 'classroom', 403);
+  });
+
+  it('Super Speakers scorer and board sessions reach only their own endpoints (S12, D-128)', async () => {
+    const a = new Client(env);
+    await a.login('root.admin');
+    const scorerLink = (await a.post('/api/admin/speakers/scorers', { label: 'Matrix scorer' })).body;
+    const boardLink = (await a.post('/api/admin/speakers/displays', { label: 'Matrix board' })).body;
+    const scorer = new Client(env);
+    expect((await scorer.post('/api/scorer/session', { token: scorerLink.url.split('#')[1] })).status).toBe(200);
+    const board = new Client(env);
+    expect((await board.post('/api/board/session', { token: boardLink.url.split('#')[1] })).status).toBe(200);
+    // The scorer session works on its own endpoints…
+    expect((await scorer.get('/api/scorer/me')).status).toBe(200);
+    expect((await board.get('/api/board')).status).toBe(200);
+    // …and nowhere else (the session ending endpoint is left out so the matrix keeps its session).
+    await expectAll(scorer, (e) => e.access !== 'public' && e.access !== 'scorer', 401);
+    await expectAll(board, (e) => e.access !== 'public' && e.access !== 'display', 401);
+    // Staff sessions do not carry the scorer or board cookie.
+    const t = new Client(env);
+    await t.login('ayse.teacher');
+    await expectAll(t, (e) => e.access === 'scorer' || e.access === 'display', 401);
+    await expectAll(a, (e) => e.access === 'scorer' || e.access === 'display', 401);
   });
 
   it('answers 423 on every teacher/admin/account endpoint while the classroom lock is engaged (PIN-8)', async () => {

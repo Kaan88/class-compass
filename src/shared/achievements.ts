@@ -34,8 +34,8 @@ export type EvidenceFilterKind = (typeof EVIDENCE_FILTER_KINDS)[number];
 /**
  * The rule menu (D-121). Each event counts something the student DID; `threshold` is the count to
  * reach. Streak events count weeks (reflections) or assignments (homework done on time) in a row;
- * a gap never takes a badge away. `speaker_points` belongs to Super Speakers (S12) and is inactive
- * until that module exists.
+ * a gap never takes a badge away. `speaker_points` counts Super Speakers points (S12, D-132), in the
+ * class+subjects of the badge subject (English) only.
  */
 export const RULE_EVENTS = [
   'goal_set',
@@ -59,8 +59,11 @@ export type RuleEvent = (typeof RULE_EVENTS)[number];
 /** Events whose rules may filter by skill / by evidence kind. */
 export const SKILL_FILTER_EVENTS: readonly RuleEvent[] = ['goal_set', 'goal_achieved', 'evidence', 'skill_activity'];
 export const KIND_FILTER_EVENTS: readonly RuleEvent[] = ['evidence'];
-/** Events that cannot fire yet (Super Speakers, S12). */
-export const INACTIVE_EVENTS: readonly RuleEvent[] = ['speaker_points'];
+/**
+ * Events that cannot fire yet. Empty since S12: Super Speakers points now feed `speaker_points`
+ * (live points only; a badge already given is not taken back when a point is voided, D-132).
+ */
+export const INACTIVE_EVENTS: readonly RuleEvent[] = [];
 /** Which module's data each event reads (the rule is skipped while that module is off for the class+subject). */
 export const EVENT_SOURCE: Record<RuleEvent, 'goals' | 'homework' | 'assistant' | 'secretStudents' | 'speakers'> = {
   goal_set: 'goals',

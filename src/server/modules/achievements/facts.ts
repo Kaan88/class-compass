@@ -10,6 +10,10 @@ import { SKILL_OF_CATEGORY_ICON, type AchievementSkill, type EvidenceFilterKind 
 import type { Db } from '../../db/client.ts';
 import { assistantAssignments, assistantDutyChecks, assistantResponsibilities, evidence, files, goalEntries, goals, homeworkAssignments, homeworkMarkChanges, homeworkMarks, skillCategories } from '../../db/schema.ts';
 import { earnedSecretTurns } from '../secret/service.ts';
+import { livePointTimes } from '../superSpeakers/points.ts';
+import { badgeSubject } from '../superSpeakers/service.ts';
+
+const badgeSubjectId = (db: Db) => badgeSubject(db)?.id ?? null;
 import type { ContextRow } from '../school/policy.ts';
 
 export interface FactsOptions {
@@ -121,6 +125,9 @@ export function collectFactsMany(db: Db, studentIds: readonly string[], context:
 
   // Secret Students: revealed turns where the class earned it (read through the secret module).
   for (const id of ids) get(id).secretEarned.push(...earnedSecretTurns(db, id, context.id));
+
+  // Super Speakers (S12, D-132): live points, school-wide, only in the badge subject's class+subjects.
+  if (badgeSubjectId(db) === context.subjectId) for (const [id, times] of livePointTimes(db, ids)) get(id).speakerPoints.push(...times.map((at) => ({ at })));
   return out;
 }
 

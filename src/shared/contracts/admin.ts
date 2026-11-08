@@ -77,7 +77,7 @@ export const clearUserPin = endpoint({ method: 'POST', path: '/api/admin/users/:
 export const AuditItem = z.object({
   id: z.string(),
   at: z.number(),
-  actorType: z.enum(['user', 'student', 'system']),
+  actorType: z.enum(['user', 'student', 'system', 'scorer', 'display']),
   actorId: z.string().nullable(),
   actorName: z.string().nullable(),
   action: z.string(),

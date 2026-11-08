@@ -10,8 +10,13 @@ import { z } from 'zod';
  * - student:   student session derived from a personal link
  * - user:      any signed-in teacher or admin; allowed while locked (own profile/session basics only)
  * - account:   any signed-in teacher or admin; requires PIN unlock in classroom mode (password, PIN changes)
+ * - scorer:    Super Speakers scorer session derived only from an admin-made scorer link (S12, D-128):
+ *              search the school list, award +1, undo own awards, own recent awards. Nothing else.
+ * - display:   read-only Super Speakers board session from a display link (S12, D-128): the board only.
  */
-export type Access = 'public' | 'classroom' | 'teacher' | 'admin' | 'student' | 'user' | 'account';
+export type Access = 'public' | 'classroom' | 'teacher' | 'admin' | 'student' | 'user' | 'account' | 'scorer' | 'display';
+/** Every access class (the permission matrix iterates these). */
+export const ACCESS_CLASSES = ['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display'] as const satisfies readonly Access[];
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface Endpoint<I extends z.ZodType = z.ZodType, O extends z.ZodType = z.ZodType> {

@@ -50,7 +50,22 @@ const EnvSchema = z.object({
   OFFSITE_STALE_HOURS: z.coerce.number().int().min(1).max(24 * 365).default(36),
   /** OCR language data folder (default DATA_DIR/ocr-cache); the Docker image points it at data baked in at build time. */
   OCR_CACHE_DIR: z.string().optional(),
+  /**
+   * Super Speakers board stream (S12, D-134): heartbeat interval of the Server-Sent Events stream.
+   * 25 s keeps Cloudflare's ~100 s idle timeout and other proxies from closing the stream; each
+   * heartbeat also re-checks the board link and the week (rollover).
+   */
+  SPEAKERS_HEARTBEAT_MS: z.coerce.number().int().min(500).max(90_000).default(25_000),
+  /**
+   * Test-only clock offset file (S12 e2e): when set and NODE_ENV=test, the server's clock is
+   * `Date.now()` plus the number of milliseconds in this file (so a test can move to next week).
+   * Ignored in development and production (see `testClockFile`).
+   */
+  CC_TEST_CLOCK_FILE: z.string().optional(),
 });
+
+/** The e2e clock offset file, honoured only under NODE_ENV=test. */
+export const testClockFile = (e: { NODE_ENV: string; CC_TEST_CLOCK_FILE?: string | undefined }): string | null => (e.NODE_ENV === 'test' && e.CC_TEST_CLOCK_FILE ? e.CC_TEST_CLOCK_FILE : null);
 
 /** Sign-in attempts per minute per address (production value). */
 export const LOGIN_RATE_LIMIT_MAX = 20;

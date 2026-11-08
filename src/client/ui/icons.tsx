@@ -306,3 +306,8 @@ export const IconDatabase = () => (
     <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
   </Icon>
 );
+export const IconStar = () => (
+  <Icon>
+    <path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1-4.5-4.2 6.1-.8z" />
+  </Icon>
+);

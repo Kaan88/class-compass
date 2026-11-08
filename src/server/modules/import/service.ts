@@ -32,7 +32,7 @@ import {
   type SourceRow,
 } from '../../../domain/importing.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { assistantAssignments, assistantDutyChecks, attendanceDaily, attendanceLessonExceptions, classes, counterEvents, enrolments, files, homeworkAssignments, homeworkMarkChanges, homeworkMarks, importBatches, importRows, lessons, pairConstraints, studentAchievements, studentSubjectLevels, students, teachingContexts, textCheckAttempts, type ImportCandidateJson, users } from '../../db/schema.ts';
+import { assistantAssignments, assistantDutyChecks, attendanceDaily, attendanceLessonExceptions, classes, counterEvents, enrolments, files, homeworkAssignments, homeworkMarkChanges, homeworkMarks, importBatches, importRows, lessons, pairConstraints, pointEvents, studentAchievements, studentSubjectLevels, students, teachingContexts, textCheckAttempts, type ImportCandidateJson, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
@@ -787,6 +787,8 @@ export const ENROLMENT_HISTORY_TABLES = [
   // S13c: badges and blocked-word counts (since the enrolment was created)
   'student_achievements',
   'text_check_attempts',
+  // S12: Super Speakers points earned while in the class (class snapshot)
+  'point_events',
 ] as const;
 
 /**
@@ -807,6 +809,7 @@ function enrolmentHasHistory(db: Db, e: typeof enrolments.$inferSelect): boolean
   if (goalsHistorySince(db, studentId, e.createdAt)) return true;
   if (db.select({ id: studentAchievements.id }).from(studentAchievements).where(and(eq(studentAchievements.studentId, studentId), gte(studentAchievements.awardedAt, e.createdAt))).get()) return true;
   if (db.select({ id: textCheckAttempts.studentId }).from(textCheckAttempts).where(and(eq(textCheckAttempts.studentId, studentId), gte(textCheckAttempts.updatedAt, e.createdAt))).get()) return true;
+  if (db.select({ id: pointEvents.id }).from(pointEvents).where(and(eq(pointEvents.studentId, studentId), eq(pointEvents.classIdSnapshot, classId))).get()) return true;
   if (referencedInJson(db, studentId)) return true;
   const ctxIds = db.select({ id: teachingContexts.id }).from(teachingContexts).where(eq(teachingContexts.classId, classId)).all().map((r) => r.id);
   if (!ctxIds.length) return false;

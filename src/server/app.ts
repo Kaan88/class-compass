@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Fastify, { LogController, type FastifyInstance } from 'fastify';
+import Fastify, { LogController, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
@@ -14,12 +14,19 @@ import { registerModules } from './modules/index.ts';
 import { ensureSchoolDefaults } from './modules/school/defaults.ts';
 import { MAX_UPLOAD_BYTES } from './modules/files/storage.ts';
 import { STUDENT_PAGE_PATH } from '../shared/contracts/links.ts';
+import { BOARD_PAGE_PATH, SCORER_APP_PATH, SCORER_PAGE_PATH } from '../shared/contracts/superSpeakers.ts';
 
 const CLIENT_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist/client');
 /** Built HTML of the student page entry (vite input `student.html`). */
 const STUDENT_HTML = 'student.html';
 /** `/s`, `/s?…`, `/s/…` and the built file itself: never cached, never indexed, no referrer. */
 const isStudentPagePath = (url: string) => url === STUDENT_PAGE_PATH || /^\/s[?/#]/u.test(url) || url.startsWith(`/${STUDENT_HTML}`);
+/** Super Speakers entries (S12): the scorer app (`/p`, `/p/app`) and the board (`/board`). */
+const SCORER_HTML = 'scorer.html';
+const BOARD_HTML = 'board.html';
+/** The scorer and board pages, their built files and the service worker: never cached by browsers or proxies (the worker keeps its own shell copy). */
+const isSpeakersPagePath = (url: string) =>
+  /^\/(?:p|p\/app|board)(?:[?#]|$)/u.test(url) || url.startsWith(`/${SCORER_HTML}`) || url.startsWith(`/${BOARD_HTML}`) || url.startsWith('/scorer-sw.js');
 
 /** Log redaction: never log cookies, auth headers, PINs, passwords or tokens (STU-6). */
 const REDACT = [
@@ -31,6 +38,7 @@ const REDACT = [
   '*.currentPassword',
   '*.pin',
   '*.token',
+  '*.code',
 ];
 
 /**
@@ -80,7 +88,7 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
 
   app.addHook('onSend', async (req, reply) => {
     reply.header('X-Robots-Tag', 'noindex, nofollow');
-    if (req.url.startsWith('/api/') || isStudentPagePath(req.url)) reply.header('Cache-Control', 'no-store');
+    if (req.url.startsWith('/api/') || isStudentPagePath(req.url) || isSpeakersPagePath(req.url)) reply.header('Cache-Control', 'no-store');
     // The student page and its API never send a referrer (STU-6; helmet sets it globally, kept explicit here).
     if (isStudentPagePath(req.url) || req.url.startsWith('/api/student/')) reply.header('Referrer-Policy', 'no-referrer');
   });
@@ -112,6 +120,16 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
     if (fs.existsSync(path.join(CLIENT_DIST, STUDENT_HTML))) return reply.sendFile(STUDENT_HTML);
     return reply.status(404).send('Client not built. Run `npm run build` or use `npm run dev`.');
   });
+
+  // Super Speakers (S12, D-128): the scorer link page, the installed scorer app and the board. Tokens
+  // live in the fragment only, so these URLs carry no secret.
+  const page = (file: string) => (_req: FastifyRequest, reply: FastifyReply) => {
+    if (fs.existsSync(path.join(CLIENT_DIST, file))) return reply.header('Referrer-Policy', 'no-referrer').sendFile(file);
+    return reply.status(404).send('Client not built. Run `npm run build` or use `npm run dev`.');
+  };
+  app.get(SCORER_PAGE_PATH, page(SCORER_HTML));
+  app.get(SCORER_APP_PATH, page(SCORER_HTML));
+  app.get(BOARD_PAGE_PATH, page(BOARD_HTML));
 
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api/')) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });

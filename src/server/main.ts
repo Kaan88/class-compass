@@ -1,18 +1,40 @@
+import fs from 'node:fs';
 import { buildApp } from './app.ts';
-import { loadConfig } from './config.ts';
+import { loadConfig, testClockFile } from './config.ts';
 import { openDatabase } from './db/client.ts';
 import { mailerFor } from './lib/mailer.ts';
 import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
 import { migrateWithSnapshot, writeServerLock } from './ops/backup.ts';
 
 const config = loadConfig();
+/**
+ * The clock. Only under NODE_ENV=test may an e2e run shift it with CC_TEST_CLOCK_FILE (a number of
+ * milliseconds, re-read at most every 200 ms), e.g. to see the Super Speakers board after the weekly reset.
+ */
+const clockFile = testClockFile(config);
+let offset = 0;
+let offsetReadAt = 0;
+const now = clockFile
+  ? () => {
+      const t = Date.now();
+      if (t - offsetReadAt > 200) {
+        offsetReadAt = t;
+        try {
+          offset = Number(fs.readFileSync(clockFile, 'utf8').trim()) || 0;
+        } catch {
+          offset = 0;
+        }
+      }
+      return t + offset;
+    }
+  : Date.now;
 const db = openDatabase(config.dbPath);
 // Pending migrations: a database snapshot is taken first (DAT-4, D-089); a failed snapshot stops the start.
 const snapshot = await migrateWithSnapshot(db, config, Date.now, 'startup');
 if (snapshot) console.log(`Database snapshot before migrating: ${snapshot}`);
 const releaseLock = writeServerLock(config, Date.now());
 const mailer = mailerFor(config);
-const app = await buildApp({ db, config, now: Date.now, mailer }, { logger: true });
+const app = await buildApp({ db, config, now, mailer }, { logger: true });
 // Prepared exports hold student data: remove the ones that expired without a download (D-090).
 const sweepExports = () => void cleanupExpiredExports(config, Date.now()).catch((err: unknown) => app.log.warn({ err }, 'export clean-up failed'));
 sweepExports();

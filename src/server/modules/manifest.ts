@@ -8,7 +8,7 @@
  * Adding a module: see docs/EXTENDING.md (or `npm run new:module -- <key>`).
  */
 import type { FastifyInstance } from 'fastify';
-import type { ContextModule } from '../../shared/modules.ts';
+import type { PolicyKey } from '../../shared/modules.ts';
 import type { ActivityListener } from '../lib/activity.ts';
 import type { AnyCommandDef } from '../lib/commands.ts';
 import type { AppDeps, RequestContext } from '../lib/context.ts';
@@ -99,7 +99,7 @@ export interface ServerModuleManifest {
    * Module policy key from the shared catalogue (`src/shared/modules.ts`) that switches this module
    * per class+subject, or null for a core module that is always on (auth, school, lessons…).
    */
-  policyKey: ContextModule | null;
+  policyKey: PolicyKey | null;
   /** Adds the module's HTTP endpoints (each declared in shared/contracts with `endpoint()` and `route()`). */
   routes?: (app: FastifyInstance, deps: AppDeps) => void;
   /** Outbox commands (`command({...})` from lib/commands.ts). */

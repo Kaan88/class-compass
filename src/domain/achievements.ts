@@ -23,9 +23,11 @@ export interface ActivityFacts {
   assistantDays: Array<{ at: number; date: string; allDuties: boolean }>;
   /** Revealed Secret Student turns where the class earned it. */
   secretEarned: Array<{ at: number }>;
+  /** Live (not voided) Super Speakers points, school-wide (S12, D-132). */
+  speakerPoints: Array<{ at: number }>;
 }
 
-export const emptyFacts = (): ActivityFacts => ({ goalsSet: [], goalsAchieved: [], selfAssessments: [], reflections: [], notes: [], evidence: [], homework: [], assistantDays: [], secretEarned: [] });
+export const emptyFacts = (): ActivityFacts => ({ goalsSet: [], goalsAchieved: [], selfAssessments: [], reflections: [], notes: [], evidence: [], homework: [], assistantDays: [], secretEarned: [], speakerPoints: [] });
 
 const DAY = 86_400_000;
 const dayNumber = (d: string) => Math.round(Date.parse(`${d}T00:00:00Z`) / DAY);
@@ -125,8 +127,8 @@ export function ruleProgress(rule: AchievementRule, all: ActivityFacts, since: n
       current = f(all.secretEarned).length;
       break;
     case 'speaker_points':
-      // Super Speakers (S12) does not exist yet: the badges are defined but cannot be earned.
-      current = 0;
+      // Super Speakers (S12, D-132): live points only (a voided point never counts).
+      current = f(all.speakerPoints).length;
       break;
   }
   return { current: Math.min(current, rule.threshold), target: rule.threshold };
