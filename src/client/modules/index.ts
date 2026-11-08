@@ -13,6 +13,9 @@ import { lessonsClientManifest } from './lessons/manifest.tsx';
 import { linksClientManifest } from './links/manifest.tsx';
 import { routinesClientManifest } from './routines/manifest.tsx';
 import { secretClientManifest } from './secret/manifest.tsx';
+import { achievementsClientManifest } from './achievements/manifest.tsx';
+import { avatarsClientManifest } from './avatars/manifest.tsx';
+import { textChecksClientManifest } from './textChecks/manifest.tsx';
 import type { ClientModuleManifest } from './types.ts';
 
 export const CLIENT_MODULES: readonly ClientModuleManifest[] = [
@@ -27,4 +30,7 @@ export const CLIENT_MODULES: readonly ClientModuleManifest[] = [
   homeworkClientManifest,
   goalsClientManifest,
   linksClientManifest,
+  achievementsClientManifest,
+  avatarsClientManifest,
+  textChecksClientManifest,
 ];

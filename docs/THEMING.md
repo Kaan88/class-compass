@@ -36,6 +36,14 @@ switches (animations, sounds), the device sound switch, the class volume and the
 | `motion` | `celebrate`, `threshold`: `full` (150–1500 ms, plays once) and `reduced` (opacity only). |
 | `sounds` | A full `ThemeSoundPack` (one cue per event below) or `null` (silent theme). Short cues ≤ 1.2 s, celebration and time's-up cues ≤ 2.5 s, gain ≤ 0.3, tones 150–2500 Hz, noise band ≤ 5 kHz. |
 | `celebration.colors` | 2+ colour tokens used for the fireworks (read from the CSS variables at run time). |
+| `colors` → avatars (S13c) | `avatar-<colour>` (12 catalogue colours), `avatar-skin-1`…`avatar-skin-12`, `avatar-hair-<colour>`, `avatar-ink`, `avatar-outline`, `avatar-white`, `avatar-blush`. Every avatar part is drawn with these, so a theme restyles all 120+ ready-made avatars and every creator combination by changing tokens. Keep the 12 skin tones a wide, realistic range. |
+| `colors` → badges (S13c) | `badge-bronze`, `badge-silver`, `badge-gold`, `badge-plain` (frame fills), `badge-ink` (glyph and outline, ≥ 3:1 on every fill, test-enforced) and `badge-shine`. The tier is always also shown by frame shape (circle, hexagon, rosette, rounded square) and written as a word, never colour alone. |
+
+### Badge icons and avatars (S13c, D-124, D-125)
+
+- **Add a badge icon:** add the key to `BADGE_ICONS` (`src/shared/achievements.ts`) and its 24×24 single-path glyph to `GLYPHS` (`src/client/achievements/icons.tsx`); the Record type and `tests/client/avatars-badges.test.tsx` make sure every key has a distinct glyph. Draw it yourself in the same line style (round caps, 1.8 stroke); never copy an icon set.
+- **Add an avatar part:** add the option to `PERSON_PARTS` / `CREATURE_PARTS` (and `OPTION_NAMES` in EN and TR for the accessible name) in `src/shared/avatars.ts`, then draw it in `AvatarArt.tsx` with `var(--cc-avatar-*)` colours only, no ids, filters or `<image>`. The server validates specs against the same catalogue, so an unknown value is refused until it is added there. An option can unlock with a default badge through `AVATAR_UNLOCKS`.
+- Theme-specific icon variants, frames or extra avatar families are not supported yet (ROADMAP S13c); a theme changes badges and avatars through the tokens above.
 
 ## Sound
 

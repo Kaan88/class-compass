@@ -29,6 +29,7 @@ import {
 import { initials, normaliseName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { homeworkAssignments, homeworkMarkChanges, homeworkMarks, students, teachingContexts } from '../../db/schema.ts';
+import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
@@ -344,6 +345,7 @@ function applyChanges(ctx: RequestContext, a: AssignmentRow, cls: { id: string }
     log.push({ studentId: c.studentId, before: cur?.status ?? null, after: afterStatus });
   }
   if (log.length) audit(ctx.db, ctx.actor, { action: `homework.${kind}`, entity: 'homework_assignment', entityId: a.id, opId: batchId, after: { changes: log } }, now);
+  emitStudentActivity(ctx, { source: 'homework', studentIds: log.map((l) => l.studentId), contextId: a.contextId });
   return log.length;
 }
 

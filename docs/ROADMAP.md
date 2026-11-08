@@ -189,8 +189,11 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Item 15: smaller A4 link cards (15 or 8 per page, QR ≥ 28 mm with quiet zone, black on white in every theme); e2e prints 30 students to 2 PDF pages and decodes the QR with jsQR (D-120). Not yet printed on paper and scanned with a phone
 
 ## S13c Student achievements and avatars (owner request 2026-11-08)
-- [ ] Achievements: 60+ positive default badges, auto rules and manual awards, custom badges, original themeable icon library, student page with progress and celebrations, optional private levels, reports
-- [ ] Avatars: 120+ themeable avatars plus a builder, chosen by students, unlockable accessories, shown across the classroom and student pages
+- [x] Achievements: 74 positive default badges (EN+TR; none on attendance, speed or ranking, scan-tested), automatic rules with idempotent replay and the quiet-backfill / start-fresh choice, manual and custom badges, per-teacher hiding and admin archiving of defaults, an original icon library (94 glyphs, tier by frame shape and label), the student page with progress, a one-time celebration and optional private levels, report section, timeline and CSV, included in both exports (D-121, D-122, D-125)
+- [x] Badges in class through the outbox (no PIN), undo for 10 minutes, then a PIN-gated revoke with a reason; the optional "Celebrate" moment with avatars and the optional End Lesson "Well done!" (D-122). E2E: award in class → moment on the display → badge and celebration on the student phone
+- [ ] Themes supplying their own badge icon variants, frames and avatar families (today every theme restyles badges and avatars through tokens only), and a saved-group shortcut in the award dialog (today: tick students or the whole class)
+- [x] Avatars: 120+ ready-made original avatars plus a layered character creator (12 skin tones, hijab/headscarf, Randomise, Surprise me, Undo), a server-validated spec, teacher lock/reset, parts unlocked by badges, shown on classroom cards, lists, groups, reveals and the student page (D-124, D-125). E2E: an avatar chosen on the phone appears on the classroom card; axe on the creator at 375×812; 1,500-student performance test (server side; not yet timed on a real low-end phone)
+- [x] Student text checks: nonsense and risky words in EN and TR, server authoritative with live hints, our own word lists, admin block/allow lists and goal limits, teacher words, a count-only notice (off by default), hide from the student page with audit, corpus of 100+ sentences per language (D-123)
 
 ## S12 Super Speakers (school-wide English points)
 - [ ] Scorer links (with interface language) and PWA with pairing code for iPhone, live search, +1 and undo, offline queue

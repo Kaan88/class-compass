@@ -9,6 +9,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import type { ContextModule } from '../../shared/modules.ts';
+import type { ActivityListener } from '../lib/activity.ts';
 import type { AnyCommandDef } from '../lib/commands.ts';
 import type { AppDeps, RequestContext } from '../lib/context.ts';
 import type { AttendanceListener } from './attendance/service.ts';
@@ -111,6 +112,8 @@ export interface ServerModuleManifest {
   lessonCloseHooks?: readonly LessonCloseHook[];
   /** Runs inside every attendance write (D-067). */
   attendanceListeners?: readonly AttendanceListener[];
+  /** Runs inside every write that records something a student did (S13c, `lib/activity.ts`). */
+  activityListeners?: readonly ActivityListener[];
   /** Report sections (S11, served by the reports module). */
   reports?: readonly ReportContribution[];
   /** Student timeline events (S11, served by the reports module). */

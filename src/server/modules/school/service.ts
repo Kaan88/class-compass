@@ -337,6 +337,8 @@ export function createClass(ctx: RequestContext, input: In<typeof C.createClass>
       secondLanguageEnabled: input.secondLanguageEnabled ?? false,
       studentPageMainLanguage: input.studentPage?.mainLanguage ?? null,
       studentPageSecondLanguageEnabled: input.studentPage ? input.studentPage.secondLanguageEnabled : null,
+      avatarsLocked: false,
+      avatarFallback: 'generated',
       soundVolume: input.soundVolume ?? DEFAULT_SOUND_VOLUME,
       quoteEnabled: input.quoteEnabled ?? true,
       timeUpSound: input.timeUpSound ?? 'voice',

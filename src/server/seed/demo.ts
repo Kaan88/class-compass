@@ -198,6 +198,8 @@ export async function seedDemo(deps: AppDeps, opts: SeedOptions = {}): Promise<D
         secondLanguageEnabled: false,
         studentPageMainLanguage: null,
         studentPageSecondLanguageEnabled: null,
+        avatarsLocked: false,
+        avatarFallback: 'generated',
         soundVolume: DEFAULT_SOUND_VOLUME,
         quoteEnabled: true,
         timeUpSound: 'voice',

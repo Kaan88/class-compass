@@ -26,6 +26,7 @@ import { SECRET_DEFAULT_COUNT, SECRET_MAX_COUNT, type RevealedSelection, type Se
 import { initials, sortByName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { lessons, secretRounds, secretSelections, students, teachingContexts } from '../../db/schema.ts';
+import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
@@ -349,6 +350,22 @@ function applyOutcome(ctx: RequestContext, round: RoundRow, o: { selectionId: st
     { action: 'secret.outcome', entity: 'secret_selection', entityId: sel.id, before: { studentId: sel.studentId, outcome: sel.outcome, celebration: sel.celebration }, after: { studentId: sel.studentId, outcome: o.outcome, celebration, noted: note !== null }, opId },
     now,
   );
+  // After the reveal only (the selection is 'revealed'): achievements may count the earned turn (S13c).
+  emitStudentActivity(ctx, { source: 'secretStudents', studentIds: [sel.studentId], contextId: sel.contextId });
+}
+
+/**
+ * Revealed Secret Student turns of a student where the class earned it (S13c achievements,
+ * `secret_earned`). Only revealed selections are read, so nothing about a sealed round leaves the module.
+ */
+export function earnedSecretTurns(db: Db, studentId: string, contextId: string): Array<{ at: number }> {
+  return db
+    .select({ at: secretSelections.updatedAt, outcome: secretSelections.outcome, status: secretSelections.status })
+    .from(secretSelections)
+    .where(and(eq(secretSelections.studentId, studentId), eq(secretSelections.contextId, contextId), eq(secretSelections.status, 'revealed')))
+    .all()
+    .filter((r) => r.outcome === 'goal_met')
+    .map((r) => ({ at: r.at }));
 }
 
 /** 'secret.recordOutcome' (SEC-5): Goal met / Still practising (/ not assessed), optional note and celebration. */

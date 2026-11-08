@@ -42,10 +42,25 @@ export function getOutbox(): Outbox {
     },
     ...(locks ? { lock: <T,>(fn: () => Promise<T>) => locks.request('cc-outbox', () => fn()) as Promise<T> } : {}),
   });
+  // Refetching while later commands are still queued would overwrite their optimistic changes with
+  // server state that does not have them yet (a fast run of taps then misses the bar crossing).
+  // Invalidations wait until the queue is empty, like the lesson poll does (D-045).
+  const deferred = new Map<string, QueryKey>();
+  const flush = () => {
+    const keys = [...deferred.values()];
+    deferred.clear();
+    for (const key of keys) void queryClient.invalidateQueries({ queryKey: key });
+  };
   instance.onSuccess((op) => {
     for (const inv of invalidations) {
-      if (op.type.startsWith(inv.prefix)) for (const key of inv.keys(op)) void queryClient.invalidateQueries({ queryKey: key });
+      if (op.type.startsWith(inv.prefix)) for (const key of inv.keys(op)) deferred.set(JSON.stringify(key), key);
     }
+    queueMicrotask(() => {
+      if (instance && instance.getStatus().pending === 0) flush();
+    });
+  });
+  instance.subscribe(() => {
+    if (deferred.size && instance && instance.getStatus().pending === 0) flush();
   });
   // The owner follows the signed-in account in the `me` query: sign-in, sign-out, a 401 (cache
   // cleared) and switching accounts all update it, so commands are only ever sent by their owner.

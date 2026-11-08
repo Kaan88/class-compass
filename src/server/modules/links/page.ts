@@ -11,7 +11,9 @@ import { DEFAULT_THEME } from '../../../shared/themes.ts';
 import { initials } from '../../../shared/text/turkish.ts';
 import { requireStudent, type RequestContext } from '../../lib/context.ts';
 import { studentPageContributions } from '../index.ts';
+import { studentAvatarInfo } from '../avatars/service.ts';
 import { getMediaPolicy } from '../school/modules.ts';
+import { limitsOf } from '../textChecks/service.ts';
 import { studentScope } from './scope.ts';
 
 export function studentPage(ctx: RequestContext): StudentPage {
@@ -39,5 +41,7 @@ export function studentPage(ctx: RequestContext): StudentPage {
     language: scope.classes[0] ? studentPageLanguage(scope.classes[0]) : DEFAULT_CLASS_LANGUAGE,
     media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments },
     subjects: subjects.filter((s) => s.sections.length > 0),
+    avatar: studentAvatarInfo(ctx.db, scope.student, scope.classes),
+    textLimits: limitsOf(ctx.db),
   };
 }

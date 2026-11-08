@@ -3,6 +3,7 @@
  * terms, subjects, classes (theme with live preview, timezone, sounds/animations, promotion),
  * teaching assignments, module & media policies.
  */
+import { AchievementDefaultsSection, TextChecksAdminSection } from './StudentContentAdmin.tsx';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from '@tanstack/react-router';
@@ -861,6 +862,8 @@ export function ModulesPage() {
         ))}
       </section>
       <GoalDefaultsSection />
+      <AchievementDefaultsSection />
+      <TextChecksAdminSection />
       <p className="cc-muted">
         <IconCheck /> {t('modules.keepsData')}
       </p>

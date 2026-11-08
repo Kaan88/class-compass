@@ -5,6 +5,9 @@
  */
 import { useState, type CSSProperties } from 'react';
 import { isAway, type EffectiveAttendance } from '../../domain/attendance.ts';
+import { generatedAvatar, type AvatarSpecValue } from '../../shared/avatars.ts';
+import { AvatarArt } from '../avatars/AvatarArt.tsx';
+import { useAvatarEntry } from '../avatars/context.ts';
 import { avatarHue, initials as initialsOf } from '../../shared/text/turkish.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
@@ -18,6 +21,7 @@ export function Avatar({
   photoUrl,
   photoAllowed = false,
   size = 'md',
+  spec,
 }: {
   name: string;
   id?: string;
@@ -27,12 +31,24 @@ export function Avatar({
   photoUrl?: string | null;
   photoAllowed?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  /** S13c: an explicit avatar (the student page); otherwise the teacher app's avatar directory is used. */
+  spec?: AvatarSpecValue | null;
 }) {
   const h = hue ?? avatarHue(id ?? name);
   const style = { '--cc-avatar-hue': String(h) } as CSSProperties;
   // A photo that cannot be loaded (removed, no longer allowed) falls back to the initials (IMP-6).
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const showPhoto = photoAllowed && photoUrl && failedUrl !== photoUrl;
+  const entry = useAvatarEntry(id);
+  // A photo (when allowed) first, then the chosen avatar, then the class fallback (generated or initials).
+  const art = showPhoto ? null : (spec ?? entry?.spec ?? (entry && entry.fallback === 'generated' && id ? generatedAvatar(id) : null));
+  if (art) {
+    return (
+      <span className={`cc-avatar cc-avatar--art ${size === 'md' ? '' : `cc-avatar--${size}`}`} style={style} aria-hidden="true" data-avatar={art.type}>
+        <AvatarArt spec={art} size="100%" />
+      </span>
+    );
+  }
   return (
     <span className={`cc-avatar ${size === 'md' ? '' : `cc-avatar--${size}`}`} style={style} aria-hidden="true">
       {showPhoto ? <img src={photoUrl} alt="" onError={() => setFailedUrl(photoUrl)} /> : (initials ?? initialsOf(name))}

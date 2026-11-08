@@ -51,10 +51,10 @@ describe('server manifests', () => {
     expect(registered.filter((t) => !declared.includes(t) && !t.startsWith('test.'))).toEqual([]);
   });
 
-  it('End Lesson steps run in a deterministic order: Secret Students → assistant thank-you → reflection (LES-3)', () => {
+  it('End Lesson steps run in a deterministic order: Secret Students → assistant thank-you → achievements "Well done!" → reflection (LES-3)', () => {
     installModules();
     const steps = allEndSteps();
-    expect(steps.map((s) => s.key)).toEqual(['secretStudents', 'assistantThanks', 'reflection']);
+    expect(steps.map((s) => s.key)).toEqual(['secretStudents', 'assistantThanks', 'achievementsWellDone', 'reflection']);
     const orders = steps.map((s) => s.order);
     expect(new Set(orders).size).toBe(orders.length); // no ties left to key order
     for (const m of SERVER_MODULES) for (const s of m.endSteps ?? []) expect(s.module === null || s.module === m.policyKey).toBe(true);
@@ -155,14 +155,17 @@ describe('report and student-page hooks serve enabled modules only (CFG-2, ACC-1
     expect(studentPageContributions(env.db, s.ctxA.id).map((r) => [r.key, r.module])).toEqual([
       ['goals', 'goals'],
       ['homework', 'homework'],
+      ['achievements', 'achievements'],
     ]);
-    const sectionsBefore = ['overview', 'lessonTopics', 'attendance', 'counters', 'homework', 'goals', 'lessonReflections', 'studentReflections', 'assistant', 'groupingHistory'];
+    const sectionsBefore = ['overview', 'lessonTopics', 'attendance', 'counters', 'homework', 'goals', 'lessonReflections', 'studentReflections', 'assistant', 'groupingHistory', 'achievements'];
     expect(reportContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(sectionsBefore);
     expect(reportContributions(env.db, s.ctxB.id).map((r) => r.key)).toContain('secretStudents');
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/homework`, { enabled: false }));
     expect(reportContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(sectionsBefore.filter((k) => k !== 'homework'));
-    expect(studentPageContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(['goals']);
+    expect(studentPageContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(['goals', 'achievements']);
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/goals`, { enabled: false }));
+    expect(studentPageContributions(env.db, s.ctxA.id).map((r) => r.key)).toEqual(['achievements']);
+    await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/achievements`, { enabled: false }));
     expect(studentPageContributions(env.db, s.ctxA.id)).toEqual([]);
   });
 });

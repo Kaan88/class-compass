@@ -22,6 +22,8 @@ import { IconGlobe } from '../ui/icons.tsx';
 import { Avatar } from '../ui/Students.tsx';
 import { ThemeBackdrop, ThemeIllustration } from '../ui/Mascot.tsx';
 import { STUDENT_PAGE_KEY } from './keys.ts';
+import { CelebrationLayer } from '../themes/Celebration.tsx';
+import { AvatarPanel } from './AvatarPanel.tsx';
 import { STUDENT_SECTIONS } from './sections.tsx';
 import { displayLocale, type ClassLanguage } from '../../shared/classLanguage.ts';
 
@@ -84,12 +86,13 @@ function Page({ onLanguage }: { onLanguage: (l: ClassLanguage) => void }) {
   return (
     <main className="cc-page cc-student cc-stack" data-testid="student-page">
       <header className="cc-row cc-student__head">
-        <Avatar name={page.student.fullName} hue={page.student.avatarHue} initials={page.student.initials} size="lg" />
+        <Avatar name={page.student.fullName} hue={page.student.avatarHue} initials={page.student.initials} size="lg" spec={page.avatar.spec ?? (page.avatar.fallback === 'generated' ? page.avatar.generated : null)} />
         <div className="cc-stack cc-student__who">
           <h1 className="cc-h1">{t('student.hello', { name: page.student.fullName })}</h1>
           {page.className ? <p className="cc-muted">{t('student.className', { name: page.className })}</p> : null}
         </div>
       </header>
+      <AvatarPanel info={page.avatar} name={page.student.fullName} />
       {page.subjects.length === 0 ? <p className="cc-card">{t('student.nothingYet')}</p> : null}
       {page.subjects.map((subject) => (
         <section key={subject.subjectId} className="cc-stack" aria-labelledby={`subject-${subject.subjectId}`}>
@@ -177,6 +180,8 @@ export function StudentApp({ token, open = openLink }: { token: string | null; o
       ) : null}
       {state === 'opening' ? null : state === 'invalid' ? <LinkGone /> : state === 'retry' ? <TryAgain onRetry={retry} /> : <Page onLanguage={onLanguage} />}
       <Toaster />
+      {/* The student's own new badges are celebrated on their page (S13c, D-122). */}
+      <CelebrationLayer />
     </I18nProvider>
   );
 }

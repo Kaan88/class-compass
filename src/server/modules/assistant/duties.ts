@@ -9,6 +9,7 @@ import type { z } from 'zod';
 import type { AssistantCommands } from '../../../shared/contracts/assistant.ts';
 import { assistantDutyChecks, assistantResponsibilities } from '../../db/schema.ts';
 import type { Db } from '../../db/client.ts';
+import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
@@ -52,5 +53,6 @@ export function checkDuty(ctx: RequestContext, p: z.infer<(typeof AssistantComma
   else if (p.checked) ctx.db.update(assistantDutyChecks).set({ checkedAt: now, checkedBy: uid, uncheckedAt: null }).where(eq(assistantDutyChecks.id, existing.id)).run();
   else ctx.db.update(assistantDutyChecks).set({ uncheckedAt: now }).where(eq(assistantDutyChecks.id, existing.id)).run();
   audit(ctx.db, ctx.actor, { action: p.checked ? 'assistant.duty_check' : 'assistant.duty_uncheck', entity: 'teaching_context', entityId: context.id, opId: meta.opId, after: { date: today, studentId, responsibilityId: resp.id } }, now);
+  emitStudentActivity(ctx, { source: 'assistant', studentIds: [studentId], contextId: context.id });
   return { checked: p.checked, changed: true };
 }

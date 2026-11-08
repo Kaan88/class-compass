@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as G from '../../shared/contracts/goals.ts';
 import type { Goal, StudentGoalsSection, StudentPage } from '../../shared/contracts/goals.ts';
 import { pickText, type MessageKey } from '../../shared/i18n/index.ts';
+import { checkStudentText, exampleKeyFor, type TextKind } from '../../shared/text/textQuality.ts';
 import { call, upload } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useRun } from '../lib/useRun.ts';
@@ -22,6 +23,19 @@ import { STUDENT_PAGE_KEY } from './keys.ts';
 
 type Media = StudentPage['media'];
 const OWN = '__own__';
+
+/**
+ * Live, kind feedback while typing (S13c item 12, D-123): the same shared rules the server applies
+ * (the server checks again, with the school's and teachers' extra words). Shown once the student has
+ * typed a few letters, with an example of a good sentence.
+ */
+function useTextHint(text: string, kind: TextKind): string | undefined {
+  const { t } = useI18n();
+  if (text.trim().length < 4) return undefined;
+  const r = checkStudentText(text, kind);
+  if (r.ok) return undefined;
+  return r.reason === 'BLOCKED_WORD' ? t('textCheck.BLOCKED_WORD') : `${t(`textCheck.${r.reason}`)} ${t(exampleKeyFor(kind))}`;
+}
 
 /** Run a student action and refresh the page (a revoked link then shows the "no longer works" page). */
 function useStudentRun() {
@@ -60,6 +74,7 @@ function AddGoal({ data, subjectId }: { data: StudentGoalsSection; subjectId: st
   const [text, setText] = useState('');
   const [practice, setPractice] = useState('');
   const own = choice === OWN || presets.length === 0;
+  const goalHint = useTextHint(text, 'goal');
   const valid = Boolean(categoryId) && (own ? Boolean(text.trim()) : Boolean(choice));
   const save = async () => {
     const practiceChoices = practice
@@ -100,7 +115,7 @@ function AddGoal({ data, subjectId }: { data: StudentGoalsSection; subjectId: st
           onChange={setChoice}
         />
       ) : null}
-      {own ? <TextField label={t('student.myGoalWords')} value={text} onChange={setText} maxLength={500} /> : null}
+      {own ? <TextField label={t('student.myGoalWords')} value={text} onChange={setText} maxLength={500} errorMessage={goalHint} /> : null}
       <TextField label={t('student.practice')} description={t('student.practiceHint')} value={practice} onChange={setPractice} />
       <div>
         <Button variant="primary" isDisabled={!valid} onPress={() => void save()}>
@@ -164,6 +179,7 @@ function Reflections({ data, canWrite, subjectId }: { data: StudentGoalsSection;
   const [confidence, setConfidence] = useState<number | null>(null);
   const live = data.goals.filter((g) => g.status !== 'archived');
   const target = goalId || live[0]?.id || '';
+  const bodyHint = useTextHint(body, kind === 'self_assessment' ? 'selfAssessment' : kind === 'note' ? 'note' : 'reflection');
   const valid = Boolean(target) && Boolean(body.trim()) && (kind !== 'self_assessment' || confidence !== null);
   const mine = data.goals.flatMap((g) => g.entries.filter((e) => e.authorType === 'student').map((e) => ({ e, g })));
   const save = async () => {
@@ -187,7 +203,7 @@ function Reflections({ data, canWrite, subjectId }: { data: StudentGoalsSection;
             value={kind}
             onChange={(v) => setKind(v as typeof kind)}
           />
-          <TextArea label={t('student.reflectionWords')} rows={3} value={body} onChange={setBody} maxLength={2000} />
+          <TextArea label={t('student.reflectionWords')} rows={3} value={body} onChange={setBody} maxLength={2000} errorMessage={bodyHint} />
           {kind === 'self_assessment' ? <ConfidencePicker value={confidence} onChange={setConfidence} /> : null}
           <div>
             <Button variant="primary" isDisabled={!valid} onPress={() => void save()}>

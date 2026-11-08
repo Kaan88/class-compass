@@ -25,6 +25,7 @@ export const CONTEXT_MODULE_CATALOG = [
   { key: 'grouping', defaultAvailability: 'enabled' },
   { key: 'homework', defaultAvailability: 'enabled' },
   { key: 'goals', defaultAvailability: 'enabled' },
+  { key: 'achievements', defaultAvailability: 'enabled' },
 ] as const satisfies readonly CatalogEntry[];
 
 /** Photos and audio stay off until consent is confirmed (D-014, D-026). */

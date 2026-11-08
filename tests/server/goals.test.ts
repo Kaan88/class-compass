@@ -126,8 +126,8 @@ describe('only their own contributions (GOL-5, STU-5)', () => {
   afterEach(teardown);
 
   it('student A cannot read or change student B’s goals, entries, evidence or files', async () => {
-    const goal = await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'Ada’s goal' }));
-    const withEntry = await ok(adaPhone.post(`/api/student/goals/${goal.id}/entries`, { kind: 'reflection', body: 'Ada reflects' }));
+    const goal = await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read one book every week.' }));
+    const withEntry = await ok(adaPhone.post(`/api/student/goals/${goal.id}/entries`, { kind: 'reflection', body: 'Today I read a short story.' }));
     const entryId = withEntry.entries[0].id;
     const file = await ok(upload(adaPhone, '/api/student/files?kind=document', Buffer.from('Ada’s reading log'), 'log.txt', 'text/plain'));
     const ev = await ok(adaPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'file', fileId: file.id, goalId: goal.id }));
@@ -150,7 +150,7 @@ describe('only their own contributions (GOL-5, STU-5)', () => {
     for (const r of await Promise.all(tries)) expect(r.status).toBe(404);
     // Nothing changed for Ada.
     const mine = goalsSection(await ok(adaPhone.get('/api/student/page')));
-    expect(mine.goals[0]).toMatchObject({ text: 'Ada’s goal', entries: [{ body: 'Ada reflects' }] });
+    expect(mine.goals[0]).toMatchObject({ text: 'I will read one book every week.', entries: [{ body: 'Today I read a short story.' }] });
     expect(mine.evidence).toHaveLength(1);
     // A teacher of another class cannot see them either.
     expect((await s.teacherB.get(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/goals`)).status).toBe(403);
@@ -194,7 +194,7 @@ describe('only their own contributions (GOL-5, STU-5)', () => {
   });
 
   it('teachers cannot rewrite a student’s own goal words (STUDENT_CONTRIBUTION)', async () => {
-    const own = await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'My words' }));
+    const own = await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will write a short story.' }));
     const r = await s.teacherA.patch(`/api/teacher/goals/${own.id}`, { text: 'Teacher words' });
     expect(r.status).toBe(403);
     expect((await ok(s.teacherA.patch(`/api/teacher/goals/${own.id}`, { reviewOn: '2026-12-01' }))).reviewOn).toBe('2026-12-01');
@@ -237,7 +237,7 @@ describe('private notes and Secret Student data never reach a student (GOL-6, SE
   afterAll(teardown);
 
   it('scans every student response for a private note', async () => {
-    const goal = await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'Ada reads' }));
+    const goal = await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read every day.' }));
     const note = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/private-notes`, { body: `${PRIVATE_MARKER} for Ada` }));
     expect((await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/goals`))).privateNotes).toMatchObject([{ id: note.id }]);
     // Another teacher never sees it.

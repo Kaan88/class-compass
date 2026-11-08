@@ -27,6 +27,7 @@ import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { initials, normaliseName, sortByName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { assistantAssignments, assistantPlans, assistantResponsibilities, students, teachingContexts, type AssistantAbsenceUndo } from '../../db/schema.ts';
+import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId, sha256 } from '../../lib/crypto.ts';
@@ -453,6 +454,7 @@ export function endStep(ctx: RequestContext, lesson: LessonRow, data: z.infer<ty
     .where(eq(assistantAssignments.id, row.id))
     .run();
   audit(ctx.db, ctx.actor, { action: 'assistant.thank', entity: 'assistant_assignment', entityId: row.id, after: { date: row.localDate, assistant: effective(row) } }, now);
+  emitStudentActivity(ctx, { source: 'assistant', studentIds: [effective(row)!], contextId: row.contextId });
 }
 
 // ---------------------------------------------------------------- week views

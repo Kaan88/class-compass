@@ -12,6 +12,7 @@ import { initials, normaliseName } from '../../../shared/text/turkish.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { tx } from '../../db/client.ts';
 import { defaultItemArchives, evidence, files, goalEntries, goalPresets, goals, skillCategories, students, subjects, teacherAssessments, teacherFeedback, teachingContexts } from '../../db/schema.ts';
+import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
@@ -207,9 +208,12 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.teacherCreate
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
+      hiddenAt: null,
+      hiddenBy: null,
     };
     ctx.db.insert(goals).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'goal.create', entity: 'goal', entityId: row.id, after: { studentId: row.studentId, subjectId, categoryId: row.categoryId, presetId: row.presetId, reviewOn: row.reviewOn } }, now);
+    emitStudentActivity(ctx, { source: 'goals', studentIds: [row.studentId], subjectId });
     return goalDto(ctx.db, row);
   });
 }
@@ -238,6 +242,7 @@ export function updateGoal(ctx: RequestContext, input: In<typeof C.teacherUpdate
     }
     ctx.db.update(goals).set(patch).where(eq(goals.id, goal.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal.update', entity: 'goal', entityId: goal.id, before: { status: goal.status, reviewOn: goal.reviewOn, categoryId: goal.categoryId }, after: { status: patch.status, reviewOn: patch.reviewOn, categoryId: patch.categoryId, textChanged: input.text !== undefined } }, ctx.now());
+    emitStudentActivity(ctx, { source: 'goals', studentIds: [goal.studentId], subjectId: goal.subjectId });
     return goalDto(ctx.db, ctx.db.select().from(goals).where(eq(goals.id, goal.id)).get()!);
   });
 }
@@ -279,7 +284,7 @@ export function addFeedback(ctx: RequestContext, input: In<typeof C.teacherAddFe
       if (!g || g.deletedAt !== null || g.studentId !== input.studentId || g.subjectId !== s.context.subjectId) throw notFound('Goal');
     }
     const now = ctx.now();
-    const row = { id: newId(), studentId: input.studentId, subjectId: s.context.subjectId, goalId: input.goalId ?? null, teacherId: requireUser(ctx).id, body: input.body, createdAt: now, updatedAt: now, deletedAt: null };
+    const row = { id: newId(), studentId: input.studentId, subjectId: s.context.subjectId, goalId: input.goalId ?? null, teacherId: requireUser(ctx).id, body: input.body, createdAt: now, updatedAt: now, deletedAt: null, hiddenAt: null, hiddenBy: null };
     ctx.db.insert(teacherFeedback).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'feedback.create', entity: 'teacher_feedback', entityId: row.id, after: { studentId: row.studentId, goalId: row.goalId } }, now);
     return feedbackDtos(ctx.db, [row])[0]!;
@@ -451,9 +456,10 @@ export function addEvidence(ctx: RequestContext, input: In<typeof C.teacherAddEv
       fileId = f.id;
     }
     const now = ctx.now();
-    const row = { id: newId(), studentId: input.studentId, subjectId, goalId: input.goalId ?? null, kind: input.kind, body, url, fileId, authorType: 'teacher' as const, authorId: requireUser(ctx).id, createdAt: now, updatedAt: now, deletedAt: null };
+    const row = { id: newId(), studentId: input.studentId, subjectId, goalId: input.goalId ?? null, kind: input.kind, body, url, fileId, authorType: 'teacher' as const, authorId: requireUser(ctx).id, createdAt: now, updatedAt: now, deletedAt: null, hiddenAt: null, hiddenBy: null };
     ctx.db.insert(evidence).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'evidence.create', entity: 'evidence', entityId: row.id, after: { studentId: row.studentId, subjectId, goalId: row.goalId, kind: row.kind, fileId } }, now);
+    emitStudentActivity(ctx, { source: 'goals', studentIds: [row.studentId], subjectId });
     return evidenceDtos(ctx.db, [row])[0]!;
   });
 }

@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { api, ensurePin, login } from './helpers.ts';
 
-const MODULES = ['routines', 'attendance', 'counters', 'secretStudents', 'assistant', 'grouping', 'homework', 'goals'] as const;
+const MODULES = ['routines', 'attendance', 'counters', 'secretStudents', 'assistant', 'grouping', 'homework', 'goals', 'achievements'] as const;
 type Module = (typeof MODULES)[number];
 const THEMES = ['explorer', 'animals', 'classroom'] as const;
 

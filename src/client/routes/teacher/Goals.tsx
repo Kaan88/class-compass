@@ -16,6 +16,7 @@ import * as Files from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
 import type { Goal, GoalLibrary, OutcomeDef, TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
 import * as School from '../../../shared/contracts/school.ts';
+import { hideStudentText } from '../../../shared/contracts/textChecks.ts';
 import { pickText, type MessageKey } from '../../../shared/i18n/index.ts';
 import { call, upload } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
@@ -96,6 +97,23 @@ function NewGoalForm({ contextId, studentId, library }: { contextId: string; stu
   );
 }
 
+/**
+ * Moderation (S13c item 12, D-123): hide a student's own goal, entry or evidence from the student page,
+ * or show it again. The words are kept as written (GOL-5); the server audits each change.
+ */
+function HideToggle({ kind, id, hidden }: { kind: 'goal' | 'entry' | 'evidence'; id: string; hidden: boolean }) {
+  const { t } = useI18n();
+  const run = useRun();
+  return (
+    <span className="cc-row">
+      {hidden ? <span className="cc-chip">{t('textCheck.hiddenLabel')}</span> : null}
+      <Button size="small" variant="ghost" onPress={() => void run(() => call(hideStudentText, { kind, itemId: id, hidden: !hidden }), { invalidate: [ALL] })} data-testid="student-text-hide">
+        {hidden ? t('textCheck.unhide') : t('textCheck.hide')}
+      </Button>
+    </span>
+  );
+}
+
 function GoalCard({ goal, outcomes }: { goal: Goal; outcomes: readonly OutcomeDef[] }) {
   const { t, locale } = useI18n();
   const run = useRun();
@@ -105,10 +123,11 @@ function GoalCard({ goal, outcomes }: { goal: Goal; outcomes: readonly OutcomeDe
   return (
     <li className="cc-card cc-stack cc-goal" data-testid="teacher-goal">
       <GoalSummary goal={goal} outcomes={outcomes} />
+      {goal.authorType === 'student' ? <HideToggle kind="goal" id={goal.id} hidden={goal.hidden === true} /> : null}
       {goal.entries.length ? (
         <ul className="cc-stack">
           {goal.entries.map((e) => (
-            <EntryLine key={e.id} entry={e} />
+            <EntryLine key={e.id} entry={e} actions={e.authorType === 'student' ? <HideToggle kind="entry" id={e.id} hidden={e.hidden === true} /> : null} />
           ))}
         </ul>
       ) : null}
@@ -287,7 +306,9 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
                       {t('goals.deleteEvidence')}
                     </Button>
                   </div>
-                ) : null
+                ) : (
+                  <HideToggle kind="evidence" id={e.id} hidden={e.hidden === true} />
+                )
               }
             />
           ))}

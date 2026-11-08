@@ -18,12 +18,17 @@ No CC0 audio is currently included. If one is ever added, list it here with its 
 |---|---|---|
 | Mascots, illustrations, decorations, patterns, weather pictures | Original SVG drawn in code (`src/client/themes/*/art.tsx`, `src/client/modules/core/topBar.tsx`), coloured with theme tokens | Part of this code base |
 | UI icons | Original SVG paths in `src/client/ui/icons.tsx` | Part of this code base |
+| Badge icons (94) and tier frames (S13c) | Original SVG paths drawn for Class Compass (`src/client/achievements/icons.tsx`), stroked and filled with theme tokens. No third-party icon set (D-125) | Part of this code base |
+| Avatars: 120+ ready-made characters and the layered creator parts (S13c) | Original SVG shapes drawn in code (`src/client/avatars/AvatarArt.tsx`) from a catalogue (`src/shared/avatars.ts`), coloured with theme tokens. Not copied from or imitating South Park or any other show or game (D-125) | Part of this code base |
 
 ## Text
 
 | Asset | Source | Licence |
 |---|---|---|
 | Quote of the day (125 English, 125 Turkish) | Original sayings written for Class Compass (`src/shared/quotes.ts`); no quotations of people or books | Part of this code base |
+| Risky-word lists, English and Turkish (S13c) | Written for Class Compass (`src/shared/text/riskyWords.ts`). No third-party list (LDNOOBW or other) was copied; administrators and teachers add their own words (D-123) | Part of this code base |
+| Everyday word lists for the nonsense check, English and Turkish (S13c) | Written for Class Compass (`src/shared/text/wordsEn.ts`, `wordsTr.ts`) from common school vocabulary | Part of this code base |
+| Text-check test corpus (S13c) | Invented child-like sentences and gibberish samples (`tests/domain/text-corpus.ts`); fictional | Part of this code base |
 
 ## Data services (not assets, listed for completeness)
 

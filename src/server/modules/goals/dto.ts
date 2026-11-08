@@ -12,7 +12,11 @@ export type EntryRow = typeof goalEntries.$inferSelect;
 export type EvidenceRow = typeof evidence.$inferSelect;
 export type FeedbackRow = typeof teacherFeedback.$inferSelect;
 
-export function goalDtos(db: Db, rows: readonly GoalRow[]): Goal[] {
+/**
+ * `forStudent`: the student page view, which leaves out entries a teacher hid (S13c moderation); the
+ * teacher view marks hidden items with `hidden: true` instead.
+ */
+export function goalDtos(db: Db, rows: readonly GoalRow[], opts: { forStudent?: boolean } = {}): Goal[] {
   if (!rows.length) return [];
   const ids = rows.map((g) => g.id);
   const entries = db.select().from(goalEntries).where(and(inArray(goalEntries.goalId, ids), isNull(goalEntries.deletedAt))).all();
@@ -39,14 +43,15 @@ export function goalDtos(db: Db, rows: readonly GoalRow[]): Goal[] {
     createdAt: g.createdAt,
     updatedAt: g.updatedAt,
     entries: entries
-      .filter((e) => e.goalId === g.id)
+      .filter((e) => e.goalId === g.id && !(opts.forStudent && e.hiddenAt !== null))
       .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
-      .map((e) => ({ id: e.id, kind: e.kind, authorType: e.authorType, body: e.body, confidence: e.confidence, createdAt: e.createdAt, updatedAt: e.updatedAt })),
+      .map((e) => ({ id: e.id, kind: e.kind, authorType: e.authorType, body: e.body, confidence: e.confidence, createdAt: e.createdAt, updatedAt: e.updatedAt, ...(e.hiddenAt !== null ? { hidden: true } : {}) })),
     assessments: assessments.filter((a) => a.goalId === g.id).map((a) => ({ id: a.id, outcome: a.outcome as GoalOutcome, createdAt: a.createdAt })),
+    ...(g.hiddenAt !== null ? { hidden: true } : {}),
   }));
 }
 
-export const goalDto = (db: Db, row: GoalRow): Goal => goalDtos(db, [row])[0]!;
+export const goalDto = (db: Db, row: GoalRow, opts: { forStudent?: boolean } = {}): Goal => goalDtos(db, [row], opts)[0]!;
 
 /** Live goals of a student in a subject, newest first. */
 export function goalsOf(db: Db, studentId: string, subjectId: string): GoalRow[] {
@@ -73,6 +78,7 @@ export function evidenceDtos(db: Db, rows: readonly EvidenceRow[]): Evidence[] {
       authorType: r.authorType,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
+      ...(r.hiddenAt !== null ? { hidden: true } : {}),
     };
   });
 }

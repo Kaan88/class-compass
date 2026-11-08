@@ -28,6 +28,9 @@ export const schoolSettings = sqliteTable('school_settings', {
   weatherLabel: text('weather_label').notNull().default(DEFAULT_WEATHER.label),
   weatherLatitude: real('weather_latitude').notNull().default(DEFAULT_WEATHER.latitude),
   weatherLongitude: real('weather_longitude').notNull().default(DEFAULT_WEATHER.longitude),
+  /** Student text checks (S13c, D-123): the minimum length of a goal (words OR letters). */
+  textMinGoalWords: integer('text_min_goal_words').notNull().default(3),
+  textMinGoalLetters: integer('text_min_goal_letters').notNull().default(12),
   updatedAt: integer('updated_at').notNull(),
 });
 
@@ -97,6 +100,9 @@ export const classes = sqliteTable(
      */
     studentPageMainLanguage: text('student_page_main_language', { enum: ['en', 'tr'] }),
     studentPageSecondLanguageEnabled: integer('student_page_second_language_enabled', { mode: 'boolean' }),
+    /** Avatars (S13c, D-124): teachers can stop students changing their avatar; before a student chooses, a generated avatar or the initials. */
+    avatarsLocked: integer('avatars_locked', { mode: 'boolean' }).notNull().default(false),
+    avatarFallback: text('avatar_fallback', { enum: ['generated', 'initials'] }).notNull().default('generated'),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -272,6 +278,9 @@ export const students = sqliteTable(
     avatarHue: integer('avatar_hue').notNull(), // avatarHue(id): stable across renames
     photoFileId: text('photo_file_id'),
     photoConsent: integer('photo_consent', { mode: 'boolean' }).notNull().default(false),
+    /** The student's own avatar (S13c, D-124): a catalogue spec validated on every write; null = not chosen yet. */
+    avatarJson: text('avatar_json', { mode: 'json' }).$type<Record<string, unknown>>(),
+    avatarUpdatedAt: integer('avatar_updated_at'),
     deactivatedAt: integer('deactivated_at'),
     createdByImportBatchId: text('created_by_import_batch_id'),
     createdAt: integer('created_at').notNull(),
@@ -1025,6 +1034,9 @@ export const goals = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
     deletedAt: integer('deleted_at'),
+    /** Hidden from the student page by a teacher (S13c moderation, D-123); the words are kept as written (GOL-5). */
+    hiddenAt: integer('hidden_at'),
+    hiddenBy: text('hidden_by'),
   },
   (t) => [index('goals_student_subject_idx').on(t.studentId, t.subjectId)],
 );
@@ -1046,6 +1058,8 @@ export const goalEntries = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
     deletedAt: integer('deleted_at'),
+    hiddenAt: integer('hidden_at'),
+    hiddenBy: text('hidden_by'),
   },
   (t) => [index('goal_entries_goal_idx').on(t.goalId)],
 );
@@ -1120,6 +1134,8 @@ export const evidence = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
     deletedAt: integer('deleted_at'),
+    hiddenAt: integer('hidden_at'),
+    hiddenBy: text('hidden_by'),
   },
   (t) => [index('evidence_student_subject_idx').on(t.studentId, t.subjectId), index('evidence_file_idx').on(t.fileId)],
 );
@@ -1162,9 +1178,9 @@ export const studentLinks = sqliteTable(
   ],
 );
 
-export const DEFAULT_ITEM_KINDS = ['preset', 'category'] as const;
+export const DEFAULT_ITEM_KINDS = ['preset', 'category', 'achievement'] as const;
 /**
- * Default goal presets and skill categories a teacher archived for their own classes (S13b2, D-116).
+ * Default goal presets, skill categories and (S13c) achievements a teacher archived for their own classes (S13b2, D-116).
  * A default archived school-wide by an administrator uses the row's own `archivedAt` instead.
  */
 export const defaultItemArchives = sqliteTable(
@@ -1176,6 +1192,109 @@ export const defaultItemArchives = sqliteTable(
     archivedAt: integer('archived_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.kind, t.itemId] })],
+);
+
+// ---------------------------------------------------------------- achievements (S13c)
+export const ACHIEVEMENT_TIER_VALUES = ['bronze', 'silver', 'gold', 'none'] as const;
+export const ACHIEVEMENT_CATEGORY_VALUES = ['goals', 'evidence', 'reflections', 'homework', 'skills', 'roles', 'secret', 'speakers', 'teacher', 'custom'] as const;
+export const AWARD_SOURCES = ['auto', 'manual', 'backfill'] as const;
+
+/**
+ * Achievement definitions (D-121). Defaults have a `key` and no creator (seeded once with fixed ids;
+ * archivable school-wide with `archivedAt` or per teacher in `default_item_archives`). Teachers'
+ * own badges have `createdBy` and the subject they were made for. `ruleJson` (auto badges only) is
+ * `{ event, threshold, skill?, evidenceKind? }` from the shared rule menu.
+ */
+export const achievementDefinitions = sqliteTable(
+  'achievement_definitions',
+  {
+    id: text('id').primaryKey(),
+    key: text('key'),
+    name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    description: text('description', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    icon: text('icon').notNull(),
+    tier: text('tier', { enum: ACHIEVEMENT_TIER_VALUES }).notNull(),
+    category: text('category', { enum: ACHIEVEMENT_CATEGORY_VALUES }).notNull(),
+    kind: text('kind', { enum: ['auto', 'manual'] }).notNull(),
+    ruleJson: text('rule_json', { mode: 'json' }).$type<{ event: string; threshold: number; skill?: string; evidenceKind?: string }>(),
+    subjectId: text('subject_id').references(() => subjects.id),
+    createdBy: text('created_by').references(() => users.id),
+    archivedAt: integer('archived_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('achievement_definitions_key_uq').on(t.key), index('achievement_definitions_creator_idx').on(t.createdBy)],
+);
+
+/**
+ * Awards (D-121). One live award per student, achievement and class+subject (partial unique index;
+ * replays never double-award). `nameSnapshot`/`iconSnapshot`/`tierSnapshot` keep the badge as it was
+ * (DAT-6). `awardedBy` null = automatic. A mistaken manual award is revoked (who, when, why), never
+ * deleted. `quiet` = given by "award past achievements quietly" (no celebration). `seenAt` = the
+ * student has seen it on their page (the celebration plays once).
+ */
+export const studentAchievements = sqliteTable(
+  'student_achievements',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    achievementId: text('achievement_id').notNull().references(() => achievementDefinitions.id),
+    contextId: text('context_id').references(() => teachingContexts.id),
+    lessonId: text('lesson_id'),
+    awardedAt: integer('awarded_at').notNull(),
+    awardedBy: text('awarded_by').references(() => users.id),
+    source: text('source', { enum: AWARD_SOURCES }).notNull(),
+    /** What caused it, e.g. the command opId or `event:<kind>`. Never free text. */
+    sourceRef: text('source_ref'),
+    nameSnapshot: text('name_snapshot', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    iconSnapshot: text('icon_snapshot').notNull(),
+    tierSnapshot: text('tier_snapshot', { enum: ACHIEVEMENT_TIER_VALUES }).notNull(),
+    quiet: integer('quiet', { mode: 'boolean' }).notNull().default(false),
+    seenAt: integer('seen_at'),
+    revokedAt: integer('revoked_at'),
+    revokedBy: text('revoked_by').references(() => users.id),
+    revokeReason: text('revoke_reason'),
+  },
+  (t) => [
+    uniqueIndex('student_achievements_live_uq').on(t.studentId, t.achievementId, t.contextId).where(sql`revoked_at IS NULL`),
+    index('student_achievements_student_idx').on(t.studentId),
+    index('student_achievements_context_idx').on(t.contextId, t.awardedAt),
+  ],
+);
+
+// ---------------------------------------------------------------- student text checks (S13c)
+/**
+ * Extra words for the language check (D-123): the school's block and allow lists (`ownerId` '') and
+ * words a teacher added for their classes (`ownerId` = the teacher). Lower-case, NFC.
+ */
+export const textCheckWords = sqliteTable(
+  'text_check_words',
+  {
+    id: text('id').primaryKey(),
+    scope: text('scope', { enum: ['school', 'teacher'] }).notNull(),
+    ownerId: text('owner_id').notNull().default(''),
+    list: text('list', { enum: ['block', 'allow'] }).notNull(),
+    word: text('word').notNull(),
+    createdAt: integer('created_at').notNull(),
+    createdBy: text('created_by').references(() => users.id),
+  },
+  (t) => [uniqueIndex('text_check_words_uq').on(t.scope, t.ownerId, t.list, t.word)],
+);
+
+/**
+ * How often a student tried to save text with a blocked word, per subject and local day (D-123).
+ * Counts only: the text itself is never stored.
+ */
+export const textCheckAttempts = sqliteTable(
+  'text_check_attempts',
+  {
+    studentId: text('student_id').notNull().references(() => students.id),
+    subjectId: text('subject_id').notNull().references(() => subjects.id),
+    localDate: text('local_date').notNull(),
+    count: integer('count').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.studentId, t.subjectId, t.localDate] })],
 );
 
 // ---------------------------------------------------------------- operations (S11)

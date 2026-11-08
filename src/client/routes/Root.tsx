@@ -7,6 +7,7 @@ import { buttonClass } from '../ui/Button.tsx';
 import { EmptyState, Toaster } from '../ui/Feedback.tsx';
 import { ThemeBackdrop } from '../ui/Mascot.tsx';
 import { CelebrationLayer } from '../themes/Celebration.tsx';
+import { AvatarDirectoryProvider } from '../avatars/AvatarDirectory.tsx';
 
 /**
  * Root layout: language and text size come from the signed-in teacher's own preferences (UX-4,
@@ -22,7 +23,9 @@ export function RootLayout() {
   return (
     <I18nProvider locale={locale}>
       <ThemeBackdrop />
-      <Outlet />
+      <AvatarDirectoryProvider enabled={me?.role === 'teacher'}>
+        <Outlet />
+      </AvatarDirectoryProvider>
       <Toaster />
       <CelebrationLayer />
     </I18nProvider>

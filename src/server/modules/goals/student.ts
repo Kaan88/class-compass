@@ -15,6 +15,7 @@ import type * as C from '../../../shared/contracts/goals.ts';
 import type { Evidence, Goal, StudentGoalsSection } from '../../../shared/contracts/goals.ts';
 import { tx } from '../../db/client.ts';
 import { evidence, files, goalEntries, goals } from '../../db/schema.ts';
+import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireStudent, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
@@ -24,6 +25,7 @@ import { studentScope, type ScopeContext, type StudentScope } from '../links/sco
 import type { StudentPageInput } from '../manifest.ts';
 import { isModuleEnabled } from '../school/modules.ts';
 import { getYear } from '../school/policy.ts';
+import { assertStudentText, recordBlockedAttempts } from '../textChecks/service.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type EvidenceRow, type GoalRow } from './dto.ts';
 import { categoryUsable, getCategory, getPreset, hiddenDefaultsOf, inScope, outcomesOf, presetUsable, studentChoices } from './library.ts';
 
@@ -43,8 +45,16 @@ export function goalsSection(ctx: RequestContext, input: StudentPageInput): Stud
   // The class's teacher may have archived some defaults for their classes (D-116).
   const choices = studentChoices(ctx.db, subjectId, teacherIds, context.teacherId);
   return {
-    goals: goalDtos(ctx.db, goalsOf(ctx.db, studentId, subjectId)),
-    evidence: evidenceDtos(ctx.db, evidenceOf(ctx.db, studentId, subjectId)),
+    // Items a teacher hid (S13c moderation) are left out of the student page.
+    goals: goalDtos(
+      ctx.db,
+      goalsOf(ctx.db, studentId, subjectId).filter((g) => g.hiddenAt === null),
+      { forStudent: true },
+    ),
+    evidence: evidenceDtos(
+      ctx.db,
+      evidenceOf(ctx.db, studentId, subjectId).filter((e) => e.hiddenAt === null),
+    ),
     feedback: feedbackDtos(ctx.db, feedbackOf(ctx.db, studentId, subjectId)),
     categories: choices.categories,
     presets: choices.presets,
@@ -67,18 +77,26 @@ function writableSubject(ctx: RequestContext, scope: StudentScope, subjectId: st
 function ownGoal(ctx: RequestContext, goalId: string): { goal: GoalRow; scope: StudentScope } {
   const { studentId } = requireStudent(ctx);
   const goal = ctx.db.select().from(goals).where(eq(goals.id, goalId)).get();
-  if (!goal || goal.deletedAt !== null || goal.studentId !== studentId) throw notFound('Goal');
+  if (!goal || goal.deletedAt !== null || goal.hiddenAt !== null || goal.studentId !== studentId) throw notFound('Goal');
   const scope = studentScope(ctx, studentId);
   writableSubject(ctx, scope, goal.subjectId);
   return { goal, scope };
 }
 
 const notYours = () => new AppError('FORBIDDEN', 'Only what you wrote yourself can be changed here', { reason: 'NOT_YOUR_CONTRIBUTION' });
-const reload = (ctx: RequestContext, goalId: string): Goal => goalDto(ctx.db, ctx.db.select().from(goals).where(eq(goals.id, goalId)).get()!);
+const reload = (ctx: RequestContext, goalId: string): Goal => goalDto(ctx.db, ctx.db.select().from(goals).where(eq(goals.id, goalId)).get()!, { forStudent: true });
+
+/** The text check target of a student write in a subject (S13c, D-123). */
+const textTarget = (scope: StudentScope, subjectId: string) => ({ studentId: scope.student.id, subjectId, teacherIds: teacherIdsFor(scope, subjectId) });
+const checkChoices = (ctx: RequestContext, target: ReturnType<typeof textTarget>, choices: readonly string[] | undefined) => {
+  for (const c of choices ?? []) assertStudentText(ctx, target, c, 'practiceChoice');
+};
+const ENTRY_TEXT_KIND = { reflection: 'reflection', note: 'note', progress: 'note', self_assessment: 'selfAssessment' } as const;
+const activity = (ctx: RequestContext, studentId: string, subjectId: string) => emitStudentActivity(ctx, { source: 'goals', studentIds: [studentId], subjectId });
 
 // ---------------------------------------------------------------- goals
 export function createGoal(ctx: RequestContext, input: In<typeof C.studentCreateGoal>): Goal {
-  return tx(ctx.db, () => {
+  return recordBlockedAttempts(ctx, () => tx(ctx.db, () => {
     const { studentId } = requireStudent(ctx);
     const scope = studentScope(ctx, studentId);
     const sc = writableSubject(ctx, scope, input.subjectId);
@@ -90,6 +108,9 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.studentCreate
     if (!category || !categoryUsable(category, hidden) || !inScope(category, input.subjectId, teacherIds)) throw notFound('Category');
     const own = input.text?.trim();
     if (!preset && !own) throw invalid('Write your goal or choose one', { reason: 'GOAL_TEXT_REQUIRED' });
+    const target = textTarget(scope, input.subjectId);
+    if (own) assertStudentText(ctx, target, own, 'goal');
+    checkChoices(ctx, target, input.practiceChoices);
     const now = ctx.now();
     const row: GoalRow = {
       id: newId(),
@@ -108,17 +129,23 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.studentCreate
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
+      hiddenAt: null,
+      hiddenBy: null,
     };
     ctx.db.insert(goals).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'goal.create', entity: 'goal', entityId: row.id, after: { subjectId: row.subjectId, categoryId: row.categoryId, presetId: row.presetId } }, now);
-    return goalDto(ctx.db, row);
-  });
+    activity(ctx, studentId, row.subjectId);
+    return goalDto(ctx.db, row, { forStudent: true });
+  }));
 }
 
 export function updateGoal(ctx: RequestContext, input: In<typeof C.studentUpdateGoal>): Goal {
-  return tx(ctx.db, () => {
-    const { goal } = ownGoal(ctx, input.goalId);
+  return recordBlockedAttempts(ctx, () => tx(ctx.db, () => {
+    const { goal, scope } = ownGoal(ctx, input.goalId);
     if (goal.authorType !== 'student') throw notYours();
+    const target = textTarget(scope, goal.subjectId);
+    if (input.text !== undefined) assertStudentText(ctx, target, input.text, 'goal');
+    checkChoices(ctx, target, input.practiceChoices);
     const patch: Partial<GoalRow> = { updatedAt: ctx.now() };
     if (input.text !== undefined) {
       patch.text = input.text;
@@ -128,8 +155,9 @@ export function updateGoal(ctx: RequestContext, input: In<typeof C.studentUpdate
     if (input.status !== undefined) patch.status = input.status;
     ctx.db.update(goals).set(patch).where(eq(goals.id, goal.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal.update', entity: 'goal', entityId: goal.id, before: { status: goal.status }, after: { status: patch.status, textChanged: input.text !== undefined } }, ctx.now());
+    activity(ctx, goal.studentId, goal.subjectId);
     return reload(ctx, goal.id);
-  });
+  }));
 }
 
 export function deleteGoal(ctx: RequestContext, goalId: string): void {
@@ -143,8 +171,9 @@ export function deleteGoal(ctx: RequestContext, goalId: string): void {
 
 // ---------------------------------------------------------------- entries (reflections, notes, self-assessment)
 export function addEntry(ctx: RequestContext, input: In<typeof C.studentAddEntry>): Goal {
-  return tx(ctx.db, () => {
-    const { goal } = ownGoal(ctx, input.goalId);
+  return recordBlockedAttempts(ctx, () => tx(ctx.db, () => {
+    const { goal, scope } = ownGoal(ctx, input.goalId);
+    assertStudentText(ctx, textTarget(scope, goal.subjectId), input.body, ENTRY_TEXT_KIND[input.kind]);
     if (input.kind === 'self_assessment' && input.confidence === undefined) throw invalid('Choose how sure you feel', { reason: 'CONFIDENCE_REQUIRED' });
     const now = ctx.now();
     const id = newId();
@@ -154,24 +183,27 @@ export function addEntry(ctx: RequestContext, input: In<typeof C.studentAddEntry
       .run();
     ctx.db.update(goals).set({ updatedAt: now }).where(eq(goals.id, goal.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal_entry.create', entity: 'goal_entry', entityId: id, after: { goalId: goal.id, kind: input.kind, confidence: input.confidence ?? null } }, now);
+    activity(ctx, goal.studentId, goal.subjectId);
     return reload(ctx, goal.id);
-  });
+  }));
 }
 
 function ownEntry(ctx: RequestContext, entryId: string) {
   const { studentId } = requireStudent(ctx);
   const entry = ctx.db.select().from(goalEntries).where(eq(goalEntries.id, entryId)).get();
   const goal = entry ? ctx.db.select().from(goals).where(eq(goals.id, entry.goalId)).get() : undefined;
-  if (!entry || entry.deletedAt !== null || !goal || goal.deletedAt !== null || goal.studentId !== studentId) throw notFound('Entry');
-  writableSubject(ctx, studentScope(ctx, studentId), goal.subjectId);
+  if (!entry || entry.deletedAt !== null || entry.hiddenAt !== null || !goal || goal.deletedAt !== null || goal.hiddenAt !== null || goal.studentId !== studentId) throw notFound('Entry');
+  const scope = studentScope(ctx, studentId);
+  writableSubject(ctx, scope, goal.subjectId);
   // A teacher's progress update on the student's goal is not theirs to change (GOL-5).
   if (entry.authorType !== 'student') throw notYours();
-  return { entry, goal };
+  return { entry, goal, scope };
 }
 
 export function updateEntry(ctx: RequestContext, input: In<typeof C.studentUpdateEntry>): Goal {
-  return tx(ctx.db, () => {
-    const { entry, goal } = ownEntry(ctx, input.entryId);
+  return recordBlockedAttempts(ctx, () => tx(ctx.db, () => {
+    const { entry, goal, scope } = ownEntry(ctx, input.entryId);
+    if (input.body !== undefined) assertStudentText(ctx, textTarget(scope, goal.subjectId), input.body, ENTRY_TEXT_KIND[entry.kind]);
     const patch: Partial<typeof goalEntries.$inferInsert> = { updatedAt: ctx.now() };
     if (input.body !== undefined) patch.body = input.body;
     if (input.confidence !== undefined) {
@@ -180,8 +212,9 @@ export function updateEntry(ctx: RequestContext, input: In<typeof C.studentUpdat
     }
     ctx.db.update(goalEntries).set(patch).where(eq(goalEntries.id, entry.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal_entry.update', entity: 'goal_entry', entityId: entry.id, after: { confidence: input.confidence } }, ctx.now());
+    activity(ctx, goal.studentId, goal.subjectId);
     return reload(ctx, goal.id);
-  });
+  }));
 }
 
 export function deleteEntry(ctx: RequestContext, entryId: string): void {
@@ -194,7 +227,7 @@ export function deleteEntry(ctx: RequestContext, entryId: string): void {
 
 // ---------------------------------------------------------------- evidence (GOL-4, D-014)
 export function addEvidence(ctx: RequestContext, input: In<typeof C.studentAddEvidence>): Evidence {
-  return tx(ctx.db, () => {
+  return recordBlockedAttempts(ctx, () => tx(ctx.db, () => {
     const { studentId } = requireStudent(ctx);
     const scope = studentScope(ctx, studentId);
     writableSubject(ctx, scope, input.subjectId);
@@ -203,6 +236,7 @@ export function addEvidence(ctx: RequestContext, input: In<typeof C.studentAddEv
       if (!g || g.deletedAt !== null || g.studentId !== studentId || g.subjectId !== input.subjectId) throw notFound('Goal');
     }
     const body = input.body?.trim() || null;
+    assertStudentText(ctx, textTarget(scope, input.subjectId), body, input.kind === 'text' ? 'evidenceText' : 'linkTitle');
     let url: string | null = null;
     let fileId: string | null = null;
     if (input.kind === 'text') {
@@ -222,29 +256,31 @@ export function addEvidence(ctx: RequestContext, input: In<typeof C.studentAddEv
       fileId = f.id;
     }
     const now = ctx.now();
-    const row: EvidenceRow = { id: newId(), studentId, subjectId: input.subjectId, goalId: input.goalId ?? null, kind: input.kind, body, url, fileId, authorType: 'student', authorId: studentId, createdAt: now, updatedAt: now, deletedAt: null };
+    const row: EvidenceRow = { id: newId(), studentId, subjectId: input.subjectId, goalId: input.goalId ?? null, kind: input.kind, body, url, fileId, authorType: 'student', authorId: studentId, createdAt: now, updatedAt: now, deletedAt: null, hiddenAt: null, hiddenBy: null };
     ctx.db.insert(evidence).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'evidence.create', entity: 'evidence', entityId: row.id, after: { subjectId: row.subjectId, goalId: row.goalId, kind: row.kind, fileId } }, now);
+    activity(ctx, studentId, row.subjectId);
     return evidenceDtos(ctx.db, [row])[0]!;
-  });
+  }));
 }
 
 function ownEvidence(ctx: RequestContext, evidenceId: string): EvidenceRow {
   const { studentId } = requireStudent(ctx);
   const e = ctx.db.select().from(evidence).where(eq(evidence.id, evidenceId)).get();
-  if (!e || e.deletedAt !== null || e.studentId !== studentId) throw notFound('Evidence');
+  if (!e || e.deletedAt !== null || e.hiddenAt !== null || e.studentId !== studentId) throw notFound('Evidence');
   writableSubject(ctx, studentScope(ctx, studentId), e.subjectId);
   if (e.authorType !== 'student') throw notYours();
   return e;
 }
 
 export function updateEvidence(ctx: RequestContext, input: In<typeof C.studentUpdateEvidence>): Evidence {
-  return tx(ctx.db, () => {
+  return recordBlockedAttempts(ctx, () => tx(ctx.db, () => {
     const e = ownEvidence(ctx, input.evidenceId);
     const patch: Partial<EvidenceRow> = { updatedAt: ctx.now() };
     if (input.body !== undefined) {
       const body = input.body?.trim() || null;
       if (e.kind === 'text' && !body) throw invalid('Write something first', { reason: 'EVIDENCE_TEXT_REQUIRED' });
+      assertStudentText(ctx, textTarget(studentScope(ctx, e.studentId), e.subjectId), body, e.kind === 'text' ? 'evidenceText' : 'linkTitle');
       patch.body = body;
     }
     if (input.goalId !== undefined) {
@@ -257,7 +293,7 @@ export function updateEvidence(ctx: RequestContext, input: In<typeof C.studentUp
     ctx.db.update(evidence).set(patch).where(eq(evidence.id, e.id)).run();
     audit(ctx.db, ctx.actor, { action: 'evidence.update', entity: 'evidence', entityId: e.id, after: { goalId: patch.goalId } }, ctx.now());
     return evidenceDtos(ctx.db, [ctx.db.select().from(evidence).where(eq(evidence.id, e.id)).get()!])[0]!;
-  });
+  }));
 }
 
 /** The file is this student's own upload and no live evidence shows it any more. */

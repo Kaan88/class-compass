@@ -92,6 +92,13 @@
       "when": 1794097762204,
       "tag": "0012_s13b2_links_presets_language",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1794132328532,
+      "tag": "0013_s13c_achievements_avatars_text",
+      "breakpoints": true
     }
   ]
 }

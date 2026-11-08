@@ -240,6 +240,8 @@ export function createStudentInClass(deps: Pick<AppDeps, 'db' | 'now' | 'config'
     avatarHue: avatarHue(id),
     photoFileId: null,
     photoConsent: input.photoConsent ?? false,
+    avatarJson: null,
+    avatarUpdatedAt: null,
     deactivatedAt: null,
     createdByImportBatchId: opts.importBatchId ?? null,
     createdAt: now,

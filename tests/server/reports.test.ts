@@ -181,7 +181,7 @@ describe('timeline and other sections', () => {
     const tl = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/students/${kids[0]!.id}/timeline`));
     expect(tl.events.map((e: any) => e.module)).toEqual([null, 'counters']);
     const r = await report();
-    expect(r.sections.map((x) => x.key)).toEqual(['overview', 'attendance', 'counters', 'homework', 'goals', 'lessonReflections', 'studentReflections', 'assistant', 'secretStudents', 'groupingHistory']);
+    expect(r.sections.map((x) => x.key)).toEqual(['overview', 'attendance', 'counters', 'homework', 'goals', 'lessonReflections', 'studentReflections', 'assistant', 'secretStudents', 'groupingHistory', 'achievements']);
     const one = await report(s.teacherA, `?studentId=${kids[0]!.id}`);
     expect(one.student?.id).toBe(kids[0]!.id);
     expect(one.students).toHaveLength(3);

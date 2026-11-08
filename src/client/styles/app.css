@@ -2785,3 +2785,145 @@ html:has(.cc-classroom) {
   padding: 0.2rem 0.5rem;
   white-space: nowrap;
 }
+
+/* ------------------------------------------------------------------ avatars and badges (S13c, D-124) */
+.cc-avatar--art {
+  background: var(--cc-surface-2);
+  padding: 0;
+}
+.cc-avatar-art {
+  display: block;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.cc-avatar-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+.cc-avatar-preview__card {
+  align-items: center;
+}
+.cc-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cc-avatar-choice {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0.2rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: 50%;
+  background: var(--cc-surface);
+  cursor: pointer;
+  min-height: 44px;
+}
+.cc-avatar-choice[aria-pressed='true'] {
+  border-color: var(--cc-accent);
+  box-shadow: 0 0 0 3px var(--cc-accent-soft);
+}
+.cc-avatar-choice:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-avatar-part {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+@media (max-width: 30rem) {
+  .cc-avatar-part {
+    grid-template-columns: 1fr auto;
+  }
+  .cc-avatar-part label {
+    grid-column: 1 / -1;
+  }
+}
+.cc-badge-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cc-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+}
+.cc-badge__text {
+  gap: 0.1rem;
+  min-width: 0;
+}
+.cc-badge--locked,
+.cc-badge[data-archived],
+.cc-badge[data-revoked] {
+  background: var(--cc-surface-2);
+}
+.cc-badge-art--locked {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+.cc-badge-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.5rem;
+}
+.cc-badge-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.5rem;
+  text-align: start;
+  color: var(--cc-text);
+  background: var(--cc-surface);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  cursor: pointer;
+}
+.cc-badge-choice[aria-checked='true'] {
+  border-color: var(--cc-accent);
+  background: var(--cc-accent-soft);
+}
+.cc-badge-choice:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-achievements-students {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.4rem;
+}
+.cc-achievement-moment {
+  align-items: center;
+  text-align: center;
+  padding: 1rem;
+}
+.cc-achievement-moment__badge {
+  font-size: 2.4rem;
+  font-weight: var(--cc-weight-display, 800);
+}
+.cc-achievement-moment__names {
+  font-size: 2rem;
+}
+.cc-achievement-moment__avatars {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.cc-level {
+  flex-wrap: wrap;
+}

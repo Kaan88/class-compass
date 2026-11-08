@@ -4,6 +4,7 @@
  * (attendance listeners: the assistant before Secret Students, as before SX).
  */
 import type { FastifyInstance } from 'fastify';
+import { registerActivityListener } from '../lib/activity.ts';
 import { defineCommand } from '../lib/commands.ts';
 import type { AppDeps } from '../lib/context.ts';
 import type { Db } from '../db/client.ts';
@@ -32,6 +33,9 @@ import { isModuleEnabled, registerModuleConfig } from './school/modules.ts';
 import { secretManifest } from './secret/manifest.ts';
 import { studentsManifest } from './students/manifest.ts';
 import { weatherManifest } from './weather/manifest.ts';
+import { achievementsManifest } from './achievements/manifest.ts';
+import { avatarsManifest } from './avatars/manifest.ts';
+import { textChecksManifest } from './textChecks/manifest.ts';
 
 export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   authManifest,
@@ -53,6 +57,9 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   reportsManifest,
   maintenanceManifest,
   weatherManifest,
+  achievementsManifest,
+  avatarsManifest,
+  textChecksManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */
@@ -101,6 +108,7 @@ export function installModules(): void {
     }
     for (const h of m.lessonCloseHooks ?? []) registerLessonCloseHook(h);
     for (const l of m.attendanceListeners ?? []) registerAttendanceListener(l);
+    for (const l of m.activityListeners ?? []) registerActivityListener(l);
     if (m.config) {
       if (!m.policyKey) throw new Error(`Module ${m.key} has a config but no policy key`);
       registerModuleConfig(m.policyKey, m.config);

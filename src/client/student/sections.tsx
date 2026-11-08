@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from 'react';
 import type { StudentPage, StudentPageSection } from '../../shared/contracts/goals.ts';
+import { AchievementsSection } from './AchievementsSection.tsx';
 import { GoalsSection } from './GoalsSection.tsx';
 import { HomeworkSection } from './HomeworkSection.tsx';
 
@@ -14,4 +15,5 @@ type SectionProps<K extends StudentPageSection['key']> = { data: Extract<Student
 export const STUDENT_SECTIONS: { [K in StudentPageSection['key']]: (p: SectionProps<K>) => ReactNode } = {
   goals: (p) => <GoalsSection {...p} />,
   homework: (p) => <HomeworkSection data={p.data} subjectId={p.subjectId} />,
+  achievements: (p) => <AchievementsSection data={p.data} subjectId={p.subjectId} />,
 };

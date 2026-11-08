@@ -11,7 +11,8 @@ import { registerGoalRoutes } from './routes.ts';
 import { goalsSection } from './student.ts';
 
 /** Outcome labels for teacher assessments (GOL-3), per class+subject. */
-export const goalsConfigSchema = z.object({ outcomes: OutcomeSet });
+/** `blockedTextNotice` (S13c, D-123): show the teacher how often students tried to save blocked words (counts only). */
+export const goalsConfigSchema = z.object({ outcomes: OutcomeSet, blockedTextNotice: z.boolean() });
 
 export const goalsManifest = defineServerModule({
   key: 'goals',
@@ -23,5 +24,5 @@ export const goalsManifest = defineServerModule({
   ],
   timeline: [{ key: 'goals', order: 50, build: goalsTimeline }],
   studentPage: [{ key: 'goals', order: 10, build: goalsSection }],
-  config: { schema: goalsConfigSchema, defaults: { outcomes: DEFAULT_GOAL_OUTCOMES } },
+  config: { schema: goalsConfigSchema, defaults: { outcomes: DEFAULT_GOAL_OUTCOMES, blockedTextNotice: false } },
 });

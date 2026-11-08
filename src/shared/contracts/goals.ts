@@ -13,6 +13,8 @@
 import { z } from 'zod';
 import { TOPIC_ICONS } from '../lessons.ts';
 import { LocalizedText, Ok, endpoint } from './define.ts';
+import { StudentAchievementsSection } from './achievements.ts';
+import { StudentAvatarInfo } from './avatars.ts';
 import { Id, IsoDate, QueryBool, RequiredLocalizedText, Theme } from './school.ts';
 
 export const GOAL_STATUSES = ['active', 'achieved', 'archived'] as const;
@@ -96,6 +98,8 @@ export const GoalEntry = z.object({
   confidence: z.number().int().nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  /** Hidden from the student page by a teacher (S13c moderation); only teacher responses contain hidden items. */
+  hidden: z.boolean().optional(),
 });
 export type GoalEntry = z.infer<typeof GoalEntry>;
 
@@ -125,6 +129,7 @@ export const Goal = z.object({
   entries: z.array(GoalEntry),
   /** Teacher outcomes, newest first (read-only for students). */
   assessments: z.array(Assessment),
+  hidden: z.boolean().optional(),
 });
 export type Goal = z.infer<typeof Goal>;
 
@@ -142,6 +147,7 @@ export const Evidence = z.object({
   authorType: AuthorType,
   createdAt: z.number(),
   updatedAt: z.number(),
+  hidden: z.boolean().optional(),
 });
 export type Evidence = z.infer<typeof Evidence>;
 
@@ -358,6 +364,7 @@ export type StudentHomeworkSection = z.infer<typeof StudentHomeworkSection>;
 export const StudentPageSection = z.discriminatedUnion('key', [
   z.object({ key: z.literal('goals'), data: StudentGoalsSection }),
   z.object({ key: z.literal('homework'), data: StudentHomeworkSection }),
+  z.object({ key: z.literal('achievements'), data: StudentAchievementsSection }),
 ]);
 export type StudentPageSection = z.infer<typeof StudentPageSection>;
 
@@ -369,6 +376,10 @@ export const StudentPage = z.object({
   language: z.object({ mainLanguage: z.enum(['en', 'tr']), secondLanguageEnabled: z.boolean() }),
   media: z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean() }),
   subjects: z.array(z.object({ subjectId: z.string(), name: LocalizedText, sections: z.array(StudentPageSection) })),
+  /** S13c (D-124): the student's avatar, the class lock and the unlocks earned. */
+  avatar: StudentAvatarInfo,
+  /** S13c (D-123): the school's goal length limits, for the live check while typing (the server checks again). */
+  textLimits: z.object({ minGoalWords: z.number().int(), minGoalLetters: z.number().int() }),
 });
 export type StudentPage = z.infer<typeof StudentPage>;
 
