@@ -37,10 +37,18 @@ export function createTapGuard(windowMs = DOUBLE_TAP_MS, now: () => number = () 
 
 export const tapGuard = createTapGuard();
 
+/**
+ * Queue a counter command right after its optimistic change. It is queued synchronously, before
+ * anything is awaited: until the outbox counts it as pending, an "outbox is empty" refresh (the
+ * deferred invalidation of the previous tap, the lesson poll) could replace the optimistic state with
+ * a server answer that does not have this tap, and the next tap would then miss the bar crossing.
+ * Lesson reads already in flight are cancelled (their answer would be just as old).
+ */
 export async function sendCounterCommand<T extends CounterCommandType>(type: T, payload: CounterCommandPayload<T>): Promise<string> {
   const p = payload as { contextId: string; lessonId: string };
+  const queued = getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
   await queryClient.cancelQueries({ queryKey: lessonKey(p.contextId) });
-  return getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
+  return queued;
 }
 
 /** Change the cached counters of a context right away (optimistic). Drops the ETag so the next poll is a full read. */

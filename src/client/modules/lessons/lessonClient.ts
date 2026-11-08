@@ -57,12 +57,22 @@ export const useServerOffset = () =>
 async function fetchLesson(contextId: string): Promise<LessonQueryData> {
   const prev = queryClient.getQueryData<LessonQueryData>(lessonKey(contextId));
   const r = await callConditional(L.getLessonState, { contextId }, prev?.etag ?? null);
-  if (r.notModified && prev) return prev;
+  if (r.notModified && prev) return keepWhilePending(contextId, prev);
   if (r.notModified) return fetchLessonFresh(contextId);
   learnOffset(r.data.serverNow, r.receivedAt);
   // A changed attendance stamp means someone (maybe another teacher) changed attendance.
   if (prev && prev.data.attendanceStamp !== r.data.attendanceStamp) void queryClient.invalidateQueries({ queryKey: ['classroom', 'roster', contextId] });
-  return { etag: r.etag, data: r.data };
+  return keepWhilePending(contextId, { etag: r.etag, data: r.data });
+}
+
+/**
+ * A lesson read that answers while this device still has unsent commands (a refetch on focus or on
+ * mount, a read that started before a tap) is older than the screen: keep the cached, optimistic
+ * state. The outbox invalidates the lesson again once its queue is empty (D-045).
+ */
+function keepWhilePending(contextId: string, answer: LessonQueryData): LessonQueryData {
+  if (getOutbox().getStatus().pending === 0) return answer;
+  return queryClient.getQueryData<LessonQueryData>(lessonKey(contextId)) ?? answer;
 }
 
 async function fetchLessonFresh(contextId: string): Promise<LessonQueryData> {
@@ -75,16 +85,19 @@ async function fetchLessonFresh(contextId: string): Promise<LessonQueryData> {
 /** Pause polling while this device still has commands to send (they would be overwritten on screen). */
 const pollInterval = () => (getOutbox().getStatus().pending > 0 ? false : POLL_MS);
 
+/** Query options of the polled lesson state (exported for tests). */
+export const lessonQueryOptions = (contextId: string | null) => ({
+  queryKey: lessonKey(contextId ?? 'none'),
+  queryFn: () => fetchLesson(contextId!),
+  enabled: Boolean(contextId),
+  refetchInterval: pollInterval,
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: 'always' as const,
+  staleTime: 0,
+});
+
 export function useLessonState(contextId: string | null) {
-  return useQuery({
-    queryKey: lessonKey(contextId ?? 'none'),
-    queryFn: () => fetchLesson(contextId!),
-    enabled: Boolean(contextId),
-    refetchInterval: pollInterval,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: 'always',
-    staleTime: 0,
-  });
+  return useQuery(lessonQueryOptions(contextId));
 }
 
 export function useActiveLessons(enabled: boolean) {
@@ -128,8 +141,10 @@ export function patchRoster(contextId: string, lessonId: string | null, fn: (s: 
  */
 export async function sendLessonCommand<T extends LessonCommandType>(type: T, payload: LessonCommandPayload<T>): Promise<string> {
   const p = payload as { contextId: string; lessonId?: string };
+  // Queued before anything is awaited, so it counts as pending at once (see sendCounterCommand).
+  const queued = getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
   await queryClient.cancelQueries({ queryKey: lessonKey(p.contextId) });
-  return getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
+  return queued;
 }
 
 /** Resolves with the server's result for `opId` once it was accepted; rejects if it was refused. */

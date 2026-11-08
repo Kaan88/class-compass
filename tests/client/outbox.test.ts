@@ -128,6 +128,25 @@ describe('command outbox', () => {
     expect(await box.all()).toEqual([]);
   });
 
+  it('counts a command as pending from the moment it is queued, before the IndexedDB write (no "empty queue" gap)', async () => {
+    const server = new FakeServer();
+    const box = make(server);
+    await box.start();
+    const seen: number[] = [];
+    box.subscribe(() => seen.push(box.getStatus().pending));
+    const queued = box.enqueue('counter.tap', { i: 1 });
+    expect(box.getStatus().pending).toBe(1);
+    await queued;
+    await box.flush();
+    expect(server.applied).toHaveLength(1);
+    expect(box.getStatus().pending).toBe(0);
+    // It went 1 → 0 once: never 0 while it was still waiting to be written or sent.
+    const firstZero = seen.indexOf(0);
+    expect(firstZero).toBeGreaterThan(0);
+    expect(seen.slice(0, firstZero).every((p) => p === 1)).toBe(true);
+    expect(seen.slice(firstZero).every((p) => p === 0)).toBe(true);
+  });
+
   it('single-flight: concurrent flushes and double taps do not send a command twice', async () => {
     const server = new FakeServer();
     const box = make(server);

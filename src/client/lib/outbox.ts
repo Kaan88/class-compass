@@ -178,6 +178,13 @@ export function createOutbox(opts: OutboxOptions): Outbox {
   let again = false;
   let stopped = true;
   let retryTimer: Timer | null = null;
+  /**
+   * Commands handed to `enqueue` whose IndexedDB write has not finished yet. They count as pending
+   * from the moment `enqueue` is called: the screen already shows their optimistic change, so a
+   * "queue is empty" check in that gap (deferred invalidations, the lesson poll) would let a server
+   * answer without them overwrite it.
+   */
+  const reserved = new Set<string>();
 
   const setStatus = (patch: Partial<OutboxStatus>) => {
     status = { ...status, ...patch };
@@ -190,7 +197,7 @@ export function createOutbox(opts: OutboxOptions): Outbox {
     const all = await db.ops.orderBy('seq').toArray();
     const own = all.filter(mine);
     setStatus({
-      pending: own.filter((o) => o.state === 'pending').length,
+      pending: new Set([...own.filter((o) => o.state === 'pending').map((o) => o.opId), ...reserved]).size,
       rejected: own.filter((o) => o.state === 'rejected'),
       otherAccounts: all.length - own.length,
       online: isOnline(),
@@ -351,8 +358,15 @@ export function createOutbox(opts: OutboxOptions): Outbox {
         attempts: 0,
         createdAt: now(),
       };
-      await db.ops.add(op); // persisted BEFORE any network activity
-      await refresh();
+      // Counted as pending at once (synchronously), before the IndexedDB write.
+      reserved.add(op.opId);
+      setStatus({ pending: status.pending + 1 });
+      try {
+        await db.ops.add(op); // persisted BEFORE any network activity
+      } finally {
+        reserved.delete(op.opId);
+        await refresh();
+      }
       void kick();
       return op.opId;
     },

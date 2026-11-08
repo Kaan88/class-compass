@@ -46,8 +46,10 @@ export const secretInvalidation: CommandInvalidation = {
 
 export async function sendSecretCommand<T extends SecretCommandType>(type: T, payload: SecretCommandPayload<T>): Promise<string> {
   const p = payload as { contextId: string; lessonId: string };
+  // Queued before anything is awaited, so it counts as pending at once (see sendCounterCommand).
+  const queued = getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
   await queryClient.cancelQueries({ queryKey: lessonKey(p.contextId) });
-  return getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
+  return queued;
 }
 
 // ---------------------------------------------------------------- dashboard panel (DSH-6)

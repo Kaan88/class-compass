@@ -59,17 +59,23 @@ test('tap + on students, bar and weekly counts, undo, double tap guard, offline 
     await expect(bar.getByTestId('counter-supporting')).toHaveText('0 / 10 Turkish reminders');
     await expect(bar.getByRole('meter', { name: 'Our English Time' })).toHaveAttribute('aria-valuetext', '0 / 10');
 
-    // Tap + on three students (CNT-3).
+    // Tap + on three students (CNT-3). Weekly counts are compared with the counts before this run,
+    // so the test also passes when it runs again in the same week (--repeat-each).
     const addButtons = page.getByRole('button', { name: /^Add one \(Turkish reminders\) for / });
     await expect(addButtons).toHaveCount(19);
+    const before = await counter();
+    const weeklyCount = (name: string) => (n: number) => page.getByRole('article', { name }).getByRole('img', { name: `Turkish reminders: ${n} this week` });
     const names: string[] = [];
+    const weekly: number[] = [];
     for (let i = 0; i < 3; i += 1) {
       const label = (await addButtons.nth(i).getAttribute('aria-label'))!;
-      names.push(label.replace('Add one (Turkish reminders) for ', ''));
+      const name = label.replace('Add one (Turkish reminders) for ', '');
+      names.push(name);
+      weekly.push(Number(await page.getByRole('article', { name }).getByTestId('student-count').innerText()));
       await addButtons.nth(i).click();
     }
     await expect(bar.getByTestId('counter-supporting')).toHaveText('3 / 10 Turkish reminders');
-    for (const n of names) await expect(page.getByRole('article', { name: n }).getByRole('img', { name: 'Turkish reminders: 1 this week' })).toBeVisible();
+    for (const [i, n] of names.entries()) await expect(weeklyCount(n)(weekly[i]! + 1)).toBeVisible();
     // The undo toast names the class and the student (UX-9).
     await expect(page.getByTestId('toast').filter({ hasText: `3-A · English: +1 Turkish reminders – ${names[2]}` })).toBeVisible();
     await expect.poll(async () => (await counter()).lessonTotal, { timeout: 15_000 }).toBe(3);
@@ -77,12 +83,13 @@ test('tap + on students, bar and weekly counts, undo, double tap guard, offline 
     const axe = await new AxeBuilder({ page }).include('[data-testid="counter-bar"]').include('#cc-student-grid').analyze();
     expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
     const first = await counter();
-    expect(first.students.filter((s) => s.count === 1)).toHaveLength(3);
+    const was = new Map(before.students.map((s) => [s.studentId, s.count]));
+    expect(first.students.filter((s) => s.count !== (was.get(s.studentId) ?? 0)).map((s) => s.count - (was.get(s.studentId) ?? 0))).toEqual([1, 1, 1]);
 
     // Undo the last tap: bar and card go back, the server voids the event (CNT-4).
     await page.getByTestId('toast').filter({ hasText: names[2]! }).getByRole('button', { name: 'Undo' }).click();
     await expect(bar.getByTestId('counter-supporting')).toHaveText('2 / 10 Turkish reminders');
-    await expect(page.getByRole('article', { name: names[2]! }).getByRole('img', { name: 'Turkish reminders: 0 this week' })).toBeVisible();
+    await expect(weeklyCount(names[2]!)(weekly[2]!)).toBeVisible();
     await expect.poll(async () => (await counter()).lessonTotal, { timeout: 15_000 }).toBe(2);
 
     // Double tap within 700 ms: one count and a calm message (CNT-5).
@@ -90,7 +97,7 @@ test('tap + on students, bar and weekly counts, undo, double tap guard, offline 
     await page.waitForTimeout(800);
     await card0.getByRole('button').dblclick();
     await expect(card0.getByText('Already counted – tap again to add another')).toBeVisible();
-    await expect(card0.getByRole('img', { name: 'Turkish reminders: 2 this week' })).toBeVisible();
+    await expect(weeklyCount(names[0]!)(weekly[0]! + 2)).toBeVisible();
     await expect.poll(async () => (await counter()).lessonTotal, { timeout: 15_000 }).toBe(3);
 
     // Offline taps are queued on the device and synced exactly once (UX-10/11).

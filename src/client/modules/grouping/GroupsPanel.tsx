@@ -43,8 +43,10 @@ export const groupingInvalidation: CommandInvalidation = {
 
 export async function sendGroupingCommand<T extends GroupingCommandType>(type: T, payload: GroupingCommandPayload<T>): Promise<string> {
   const p = payload as { contextId: string; lessonId: string };
+  // Queued before anything is awaited, so it counts as pending at once (see sendCounterCommand).
+  const queued = getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
   await queryClient.cancelQueries({ queryKey: lessonKey(p.contextId) });
-  return getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
+  return queued;
 }
 
 /** Optimistic move in the cached lesson state, so the card changes at once (the poll confirms it). */
