@@ -79,6 +79,8 @@ export default defineConfig({
         },
       },
       '/healthz': 'http://127.0.0.1:3210',
+      // The AI tools endpoint (S14h1, D-160), so the address shown on Profile → AI tools works in development.
+      '/mcp': { target: 'http://127.0.0.1:3210', changeOrigin: false },
     },
   },
 });

@@ -13,7 +13,7 @@ import type { RequestContext, UserRow } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { hashPassword, randomToken } from '../../lib/crypto.ts';
 import { conflict, invalid, notFound } from '../../lib/errors.ts';
-import { createUser, insertUser, invalidateResetTokens, revokeAllUserSessions } from '../auth/service.ts';
+import { createUser, insertUser, invalidateResetTokens, revokeAllUserMcpTokens, revokeAllUserSessions } from '../auth/service.ts';
 import { inviteStatus, issueInvite, revokeEmailLinks, revokeInvite } from '../auth/emailSignIn.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -129,6 +129,8 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
       if (!active) {
         revokeAllUserSessions(ctx.db, u.id, now);
         invalidateResetTokens(ctx.db, u.id, now);
+        // AI tools tokens end too, so a reactivation does not bring them back.
+        revokeAllUserMcpTokens(ctx.db, ctx.actor, u.id, now, 'deactivated');
         // A pending invite must not work again after a reactivation (a new one can be sent then).
         revokeEmailLinks(ctx.db, u.id, now);
       }
@@ -150,6 +152,7 @@ export async function resetPasswordByAdmin(ctx: RequestContext, userId: string) 
     revokeAllUserSessions(ctx.db, u.id, now);
     invalidateResetTokens(ctx.db, u.id, now);
     revokeEmailLinks(ctx.db, u.id, now);
+    revokeAllUserMcpTokens(ctx.db, ctx.actor, u.id, now, 'password_reset');
     audit(ctx.db, ctx.actor, { action: 'auth.password_reset_admin', entity: 'user', entityId: u.id }, now);
   });
   return { temporaryPassword: password };

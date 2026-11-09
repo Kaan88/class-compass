@@ -4,9 +4,10 @@
  * only on 2025-03-26, GET 405, DELETE ends the session, JSON-RPC error codes, tool errors as results,
  * the per-token rate limit and the 256 KB result cap. Fictional data only.
  */
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mcpCalls } from '../../src/server/db/schema.ts';
-import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from '../../src/server/modules/mcp/transport.ts';
+import { BATCH_MAX, LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from '../../src/server/modules/mcp/transport.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 import { Mcp, makeToken, setAi } from '../mcp-helpers.ts';
 import { buildSchool, type School } from '../school-fixture.ts';
@@ -79,7 +80,16 @@ describe('MCP transport (D-160)', () => {
     expect((await c.rpc('prompts/get', { name: 'weekly_summary', arguments: {} })).error.code).toBe(-32602);
     const bad = await c.raw('POST', { jsonrpc: '1.0', id: 3, method: 'ping' });
     expect(bad.body.error.code).toBe(-32600);
-    expect((await c.raw('POST', 'not an object')).status).toBe(400);
+    // Valid JSON that is not a message: Invalid Request.
+    const notObject = await c.raw('POST', 'not an object');
+    expect(notObject.status).toBe(400);
+    expect(notObject.body.error.code).toBe(-32600);
+    // A body that is not JSON at all: Parse error, in JSON-RPC form (review fix).
+    for (const payload of ['{"jsonrpc":"2.0", bad', '']) {
+      const res = await env.app.inject({ method: 'POST', url: '/mcp', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json', 'mcp-session-id': c.session! }, payload });
+      expect(res.statusCode, payload).toBe(400);
+      expect(JSON.parse(res.body), payload).toMatchObject({ jsonrpc: '2.0', id: null, error: { code: -32700 } });
+    }
   });
 
   it('batches only on 2025-03-26, and never with initialize', async () => {
@@ -96,6 +106,28 @@ describe('MCP transport (D-160)', () => {
     await now.init('2025-06-18');
     expect((await now.raw('POST', [{ jsonrpc: '2.0', id: 1, method: 'ping' }])).status).toBe(400);
     expect((await now.raw('POST', [{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26' } }])).status).toBe(400);
+  });
+
+  it('a batch is capped and stops at the rate limit with one log row (review fix)', async () => {
+    const { secret: own, id: ownId } = await makeToken(school.teacherA, { scopes: ['classes:read'], name: 'Batch flood' });
+    const old = new Mcp(env, own);
+    await old.init('2025-03-26');
+    const pings = (n: number, from = 1) => Array.from({ length: n }, (_, i) => ({ jsonrpc: '2.0', id: from + i, method: 'ping' }));
+    const tooBig = await old.raw('POST', pings(BATCH_MAX + 1));
+    expect(tooBig.status).toBe(400);
+    expect(tooBig.body.error.code).toBe(-32600);
+    const logged = () => env.db.select().from(mcpCalls).where(eq(mcpCalls.tokenId, ownId)).all();
+    expect(logged().filter((r) => r.method === 'ping')).toHaveLength(0);
+    // 1 (initialize) + 50 + 50 = 101 of 120; the third batch runs 19 pings, then the budget is gone.
+    expect((await old.raw('POST', pings(BATCH_MAX))).body).toHaveLength(BATCH_MAX);
+    expect((await old.raw('POST', pings(BATCH_MAX, 100))).body).toHaveLength(BATCH_MAX);
+    const third = await old.raw('POST', pings(BATCH_MAX, 200));
+    expect(third.status).toBe(200);
+    const limited = (third.body as Array<{ error?: { data?: { code: string } } }>).filter((x) => x.error?.data?.code === 'RATE_LIMITED');
+    expect(limited).toHaveLength(BATCH_MAX - 19);
+    // Every refused message is answered, but only the first is logged.
+    expect(logged().filter((r) => r.status === 'rate_limited')).toHaveLength(1);
+    expect(logged().filter((r) => r.method === 'ping' && r.status === 'ok')).toHaveLength(2 * BATCH_MAX + 19);
   });
 
   it('GET is 405 and DELETE ends the session', async () => {

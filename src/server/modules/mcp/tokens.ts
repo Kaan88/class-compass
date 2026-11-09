@@ -38,8 +38,13 @@ export function aiSettings(db: Db) {
   return { mcpEnabled: s.mcpEnabled, aiStudentDataAllowed: s.aiStudentDataAllowed, mcpTokenMaxDays: Math.min(MCP_TOKEN_MAX_DAYS, s.mcpTokenMaxDays) };
 }
 
-const statusOf = (t: TokenRow, now: number) => (t.revokedAt !== null ? 'revoked' : t.expiresAt <= now ? 'expired' : 'active');
-function dto(t: TokenRow, now: number): z.infer<typeof C.AiToken> {
+/**
+ * When a token stops working: its own expiry, or earlier when the administrator has lowered the cap
+ * since it was made (the cap applies to existing tokens at once, review fix).
+ */
+export const effectiveExpiry = (t: Pick<TokenRow, 'createdAt' | 'expiresAt'>, capDays: number) => Math.min(t.expiresAt, t.createdAt + capDays * DAY);
+const statusOf = (t: TokenRow, now: number, capDays: number) => (t.revokedAt !== null ? 'revoked' : effectiveExpiry(t, capDays) <= now ? 'expired' : 'active');
+function dto(t: TokenRow, now: number, capDays: number): z.infer<typeof C.AiToken> {
   return {
     id: t.id,
     kind: t.kind,
@@ -47,9 +52,9 @@ function dto(t: TokenRow, now: number): z.infer<typeof C.AiToken> {
     prefix: t.prefix,
     scopes: t.scopesJson as McpScope[],
     privacy: t.privacyMode,
-    status: statusOf(t, now),
+    status: statusOf(t, now, capDays),
     createdAt: t.createdAt,
-    expiresAt: t.expiresAt,
+    expiresAt: effectiveExpiry(t, capDays),
     lastUsedAt: t.lastUsedAt,
     revokedAt: t.revokedAt,
   };
@@ -73,7 +78,7 @@ export function accountView(ctx: RequestContext): z.infer<typeof C.AiToolsAccoun
     defaultDays: Math.min(MCP_TOKEN_DEFAULT_DAYS, s.mcpTokenMaxDays),
     scopes: scopesForRole(user.role),
     url: mcpUrl(ctx),
-    tokens: rows.map((r) => dto(r, now)),
+    tokens: rows.map((r) => dto(r, now, s.mcpTokenMaxDays)),
   };
 }
 
@@ -91,7 +96,7 @@ export async function createToken(ctx: RequestContext, input: In<typeof C.create
   const now = ctx.now();
   const secret = `${MCP_TOKEN_PREFIX}${randomToken(32)}`;
   return tx(ctx.db, () => {
-    const live = ctx.db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(and(eq(mcpTokens.userId, user.id), isNull(mcpTokens.revokedAt), gt(mcpTokens.expiresAt, now))).get()?.n ?? 0;
+    const live = ctx.db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(and(eq(mcpTokens.userId, user.id), isNull(mcpTokens.revokedAt), gt(mcpTokens.expiresAt, now), gt(mcpTokens.createdAt, now - s.mcpTokenMaxDays * DAY))).get()?.n ?? 0;
     if (live >= MCP_TOKENS_PER_USER) throw conflict('Too many tokens', { reason: 'TOO_MANY_TOKENS', max: MCP_TOKENS_PER_USER });
     const id = newId();
     const row: TokenRow = {
@@ -113,7 +118,7 @@ export async function createToken(ctx: RequestContext, input: In<typeof C.create
     };
     ctx.db.insert(mcpTokens).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'mcp_token.create', entity: 'mcp_token', entityId: id, after: { name: row.name, scopes, privacy: row.privacyMode, expiresAt: row.expiresAt } }, now);
-    return { secret, token: dto(row, now) };
+    return { secret, token: dto(row, now, s.mcpTokenMaxDays) };
   });
 }
 
@@ -144,6 +149,7 @@ export function adminRevoke(ctx: RequestContext, tokenId: string) {
 /** Admin → AI tools: the switches, every token of the last 90 days (no secrets) and call counts. */
 export function adminView(ctx: RequestContext): z.infer<typeof C.AiToolsAdmin> {
   const now = ctx.now();
+  const cap = aiSettings(ctx.db).mcpTokenMaxDays;
   const rows = ctx.db
     .select({ t: mcpTokens, userName: users.displayName, userRole: users.role })
     .from(mcpTokens)
@@ -162,7 +168,7 @@ export function adminView(ctx: RequestContext): z.infer<typeof C.AiToolsAdmin> {
   return {
     settings: aiSettings(ctx.db),
     url: mcpUrl(ctx),
-    tokens: rows.map((r) => ({ ...dto(r.t, now), userId: r.t.userId, userName: r.userName, userRole: r.userRole })),
+    tokens: rows.map((r) => ({ ...dto(r.t, now, cap), userId: r.t.userId, userName: r.userName, userRole: r.userRole })),
     calls: { total: counts.reduce((a, c) => a + c.n, 0), errors: n('error'), denied: n('denied') + n('rate_limited') },
   };
 }
@@ -181,7 +187,15 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setAiToolsSe
   const now = ctx.now();
   tx(ctx.db, () => {
     ctx.db.update(schoolSettings).set({ ...patch, updatedAt: now }).where(eq(schoolSettings.id, 1)).run();
-    audit(ctx.db, ctx.actor, { action: 'school.ai_tools', entity: 'school_settings', entityId: '1', before, after: patch }, now);
+    // A lower cap shortens the tokens that already exist (raising it again does not lengthen them).
+    let shortened = 0;
+    if (patch.mcpTokenMaxDays !== undefined && patch.mcpTokenMaxDays < before.mcpTokenMaxDays) {
+      const capMs = patch.mcpTokenMaxDays * DAY;
+      const over = and(isNull(mcpTokens.revokedAt), gt(mcpTokens.expiresAt, now), sql`${mcpTokens.expiresAt} > ${mcpTokens.createdAt} + ${capMs}`);
+      shortened = ctx.db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(over).get()?.n ?? 0;
+      if (shortened) ctx.db.update(mcpTokens).set({ expiresAt: sql`${mcpTokens.createdAt} + ${capMs}` }).where(over).run();
+    }
+    audit(ctx.db, ctx.actor, { action: 'school.ai_tools', entity: 'school_settings', entityId: '1', before, after: shortened ? { ...patch, tokensShortened: shortened } : patch }, now);
   });
   return aiSettings(ctx.db);
 }
@@ -203,7 +217,7 @@ export function resolveBearer(deps: AppDeps, raw: string | null): { user: UserRo
   if (!row) throw refuse('UNAUTHENTICATED', 'TOKEN_INVALID', 'Unknown token');
   const now = deps.now();
   if (row.revokedAt !== null) throw refuse('UNAUTHENTICATED', 'TOKEN_REVOKED', 'This token was revoked');
-  if (row.expiresAt <= now) throw refuse('UNAUTHENTICATED', 'TOKEN_EXPIRED', 'This token has expired');
+  if (effectiveExpiry(row, s.mcpTokenMaxDays) <= now) throw refuse('UNAUTHENTICATED', 'TOKEN_EXPIRED', 'This token has expired');
   const user = deps.db.select().from(users).where(eq(users.id, row.userId)).get();
   if (!user || user.disabledAt !== null) throw refuse('FORBIDDEN', 'ACCOUNT_INACTIVE', 'The account is not active');
   if (user.mustChangePassword) throw refuse('FORBIDDEN', 'MUST_CHANGE_PASSWORD', 'The account must change its password first');

@@ -2,6 +2,11 @@
  * MCP prompts (S14h1, D-160): ready-made requests that tell the AI client which tools to use. They
  * carry no school data themselves (only the ids the user passes), and they remind the client of the
  * privacy rules: pseudonyms stay pseudonyms, student text is data, never instructions.
+ *
+ * A prompt's text is a fixed template plus the client's own arguments, so it is returned as it is: it
+ * never reads school data, and running the name scrubber over the client's own words would let a
+ * client test guessed names against the school's students (review fix, D-161). Keep it that way: a
+ * prompt that needs school data tells the client which tool to call.
  */
 import type { McpScope } from '../../../shared/mcp.ts';
 import type { ToolRole } from './toolkit.ts';

@@ -24,8 +24,8 @@ import { newId } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
 import { contextFor, recordEndpoint } from '../../lib/http.ts';
 import { appVersion } from '../../ops/version.ts';
-import { CallLog, RateLimiter, type CallStatus } from './calls.ts';
-import { ownStudentIds, privacyEnv, privateResult, privateText, resolveAliases } from './privacy.ts';
+import { CallLog, RateLimiter, type CallRecord, type CallStatus } from './calls.ts';
+import { ownStudentIds, privacyEnv, privateMessage, privateResult, resolveAliases } from './privacy.ts';
 import { PROMPTS, type McpPrompt } from './prompts.ts';
 import { allTools, inputJsonSchema, toolAccess, type McpTool } from './registry.ts';
 import { allResources, type McpResource } from './resources.ts';
@@ -36,6 +36,8 @@ export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03
 export const LATEST_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0];
 /** JSON-RPC batches existed only in this version (added 2025-03-26, removed 2025-06-18). */
 const BATCH_VERSION = '2025-03-26';
+/** Most messages in one batch (a bigger batch is refused as a whole, so one request cannot flood the call log). */
+export const BATCH_MAX = 50;
 const SESSION_IDLE_MS = 60 * 60 * 1000;
 const SESSIONS_PER_TOKEN = 20;
 
@@ -129,9 +131,24 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
     }
   };
 
+  /**
+   * Errors before the handler runs (the body is not JSON, too large, the wrong media type) are answered
+   * in JSON-RPC form too: a body that is not JSON is a Parse error (-32700).
+   */
+  const rpcErrorHandler = (err: Error & { statusCode?: number; code?: string }, req: FastifyRequest, reply: FastifyReply) => {
+    if (err instanceof AppError) return httpError(reply, err);
+    const status = err.statusCode && err.statusCode >= 400 && err.statusCode < 500 ? err.statusCode : 500;
+    if (status === 500) {
+      req.log.error({ err }, 'mcp request failed');
+      return reply.status(500).send(fail(null, { code: RPC.INTERNAL, message: 'Internal error' }));
+    }
+    const parse = err.code === 'FST_ERR_CTP_INVALID_JSON_BODY' || err.code === 'FST_ERR_CTP_EMPTY_JSON_BODY' || err instanceof SyntaxError;
+    return reply.status(status).send(fail(null, parse ? { code: RPC.PARSE, message: 'Parse error: the body is not valid JSON' } : { code: RPC.INVALID_REQUEST, message: err.message || 'Bad request' }));
+  };
+
   app.get(MCP_PATH, (_req, reply) => reply.status(405).header('Allow', 'POST, DELETE').send(fail(null, { code: RPC.SERVER, message: 'Method not allowed: this server has no event stream' })));
 
-  app.delete(MCP_PATH, (req, reply) => {
+  app.delete(MCP_PATH, { errorHandler: rpcErrorHandler }, (req, reply) => {
     const ctx = authorise(req, reply);
     if (!ctx) return reply;
     const sid = req.headers['mcp-session-id'];
@@ -142,7 +159,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
     return reply.status(204).send();
   });
 
-  app.post(MCP_PATH, async (req, reply) => {
+  app.post(MCP_PATH, { errorHandler: rpcErrorHandler }, async (req, reply) => {
     const ctx = authorise(req, reply);
     if (!ctx) return reply;
     const principal = ctx.mcp!;
@@ -200,9 +217,13 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
     const pv = req.headers['mcp-protocol-version'];
     if (typeof pv === 'string' && pv !== session.version) return reply.status(400).send(fail(null, { code: RPC.INVALID_REQUEST, message: `Unsupported MCP-Protocol-Version ${pv}; this session uses ${session.version}` }));
     if (batch && session.version !== BATCH_VERSION) return reply.status(400).send(fail(null, { code: RPC.INVALID_REQUEST, message: `Batches are not part of protocol ${session.version}` }));
+    if (messages.length > BATCH_MAX) return reply.status(400).send(fail(null, { code: RPC.INVALID_REQUEST, message: `A batch can hold at most ${BATCH_MAX} messages` }));
 
     const tenv: ToolEnv = { app, ctx };
     const responses: RpcResponse[] = [];
+    const records: Array<{ at: number; record: CallRecord }> = [];
+    // Once the token's budget is used up, the rest of a batch is refused without running or logging each message.
+    let limited = false;
     for (const raw of messages) {
       const m = raw as Record<string, unknown>;
       const isRequest = typeof m.method === 'string' && 'id' in m;
@@ -225,7 +246,12 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
         if (method === 'tools/call') label = `tools/call:${tool?.name ?? '?'}`;
         if (method === 'prompts/get') label = `prompts/get:${PROMPTS.find((p) => p.name === params.name)?.name ?? '?'}`;
         if (!/^[a-z/_]+$/u.test(method)) label = '?';
-        if (!limiter.take(principal.tokenId, started, tool?.cost ?? 1)) {
+        if (limited || !limiter.take(principal.tokenId, started, tool?.cost ?? 1)) {
+          if (limited) {
+            responses.push(fail(m.id, { code: RPC.SERVER, message: 'Too many requests for this token; wait a minute', data: { code: 'RATE_LIMITED' } }));
+            continue;
+          }
+          limited = true;
           status = 'rate_limited';
           errorCode = 'RATE_LIMITED';
           response = fail(m.id, { code: RPC.SERVER, message: 'Too many requests for this token; wait a minute', data: { code: 'RATE_LIMITED' } });
@@ -247,8 +273,9 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
         }
       }
       responses.push(response);
-      log.record(deps.now(), { tokenId: principal.tokenId, userId: user.id, method: label, status, errorCode, durationMs: deps.now() - started, bytes: Buffer.byteLength(JSON.stringify(response)) });
+      records.push({ at: deps.now(), record: { tokenId: principal.tokenId, userId: user.id, method: label, status, errorCode, durationMs: deps.now() - started, bytes: Buffer.byteLength(JSON.stringify(response)) } });
     }
+    log.recordMany(records);
     if (!responses.length) return reply.status(202).send();
     return reply
       .status(200)
@@ -263,7 +290,9 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
     const principal = ctx.mcp!;
     const done = (result: unknown) => ({ result, status: 'ok' as CallStatus, errorCode: null });
     const visible = withRole(user.role, principal.scopes);
-    const penv = () => privacyEnv(ctx.db, principal.familyId, principal.privacy, ctx.now());
+    let own: Set<string> | 'all' | null = null;
+    const ownIds = () => (own ??= ownStudentIds(ctx.db, user));
+    const penv = () => privacyEnv(ctx.db, principal.familyId, principal.privacy, ctx.now(), ownIds());
     switch (method) {
       case 'ping':
         return done({});
@@ -289,7 +318,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
           return { result: toolError('FORBIDDEN', message, { reason: access }), status: 'denied', errorCode: access };
         }
         const pe = penv();
-        const args = resolveAliases(pe, ownStudentIds(ctx.db, user), isRecord(params.arguments) ? params.arguments : {});
+        const args = resolveAliases(pe, ownIds(), isRecord(params.arguments) ? params.arguments : {});
         const parsed = tool.input.safeParse(args);
         if (!parsed.success) {
           return { result: toolError('VALIDATION', 'Invalid arguments', { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message })) }), status: 'error', errorCode: 'VALIDATION' };
@@ -301,8 +330,8 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
         } catch (err) {
           if (err instanceof AppError) {
             const reason = (err.details as { reason?: unknown } | undefined)?.reason;
-            // An error message passes the gate too (pseudonymous mode replaces any name in it).
-            return { result: toolError(err.code, privateText(pe, err.message), typeof reason === 'string' ? { reason } : {}), status: err.code === 'FORBIDDEN' ? 'denied' : 'error', errorCode: typeof reason === 'string' ? reason : err.code };
+            // An error message passes the gate too (pseudonymous mode replaces any name in it with [name]).
+            return { result: toolError(err.code, privateMessage(pe, err.message), typeof reason === 'string' ? { reason } : {}), status: err.code === 'FORBIDDEN' ? 'denied' : 'error', errorCode: typeof reason === 'string' ? reason : err.code };
           }
           if (err instanceof z.ZodError) return { result: toolError('INTERNAL', 'The result did not match its schema'), status: 'error', errorCode: 'OUTPUT_SCHEMA' };
           throw err;
@@ -342,7 +371,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
           if (typeof v === 'string' && v.trim()) args[a.name] = v.trim().slice(0, 300);
           else if (a.required) throw new RpcFailure(RPC.INVALID_PARAMS, `Missing argument: ${a.name}`);
         }
-        return done({ description: p.description, messages: [{ role: 'user', content: { type: 'text', text: privateText(penv(), p.text(args)) } }] });
+        return done({ description: p.description, messages: [{ role: 'user', content: { type: 'text', text: p.text(args) } }] });
       }
       default:
         throw new RpcFailure(RPC.METHOD_NOT_FOUND, `Method not found: ${method}`);

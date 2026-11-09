@@ -5,10 +5,13 @@
  * - Both modes: fields marked `note`, `level`, `file`, `secret` or `linkToken` are removed (private
  *   teacher notes, grouping levels, files, photos and audio, Secret Student data, link tokens).
  * - Pseudonymous mode (the default, and the only mode while the school's "student data to AI tools"
- *   switch is off): student names become "Student N" (stable per token family, `mcp_pseudonyms`),
- *   student ids become `student-N`, student text is withheld, and student names that appear anywhere
- *   else (teacher-written text, labels, row keys) are replaced too (Turkish-aware matching), so even a
- *   field that was marked wrongly cannot carry a name out.
+ *   switch is off): student name fields become "Student N" (stable per token family, `mcp_pseudonyms`),
+ *   student ids become `student-N`, student text is withheld, and student names and numbers that appear
+ *   in free text (teacher-written text, labels, row keys, unmarked fields) are replaced too
+ *   (Turkish-aware matching, `NameScrubber`): a full name of one of the caller's own students by its
+ *   pseudonym, anything else (a single name part, another class's student) by the neutral `[name]`, so
+ *   no predictable text can map a name to a pseudonym. Staff names and fields marked `none` (school
+ *   name, keys, static documents) are not scrubbed (review fix, D-161).
  * - Named mode: names stay; student text is wrapped as `{ untrustedText }` so the client can treat it
  *   as data, never as instructions.
  *
@@ -58,14 +61,44 @@ interface NameEntry {
 }
 
 /**
- * Finds student names in any text: full names everywhere (case- and accent-insensitive, ı/i and
- * İ/I alike) and single name parts when written with a capital letter (proper-noun use), whole words
- * only, so "Ali'nin" matches "Ali" but "Alice" does not.
+ * Name parts that are also very common words (English "can", "will", "may"; Turkish "su" water, "ay"
+ * month or moon). Written in lower case they are left alone; capitalised they are replaced like any
+ * other name part. Kept deliberately short: over-replacing is the safe direction (D-161).
+ */
+export const COMMON_WORD_NAMES: ReadonlySet<string> = new Set(['can', 'will', 'may', 'su', 'ay']);
+/**
+ * Turkish case endings written straight after a name without the apostrophe ("Elifin", "Elife",
+ * "Elifte"), already folded (ı→i, ü→u): genitive, accusative, dative, locative, ablative, instrumental.
+ */
+const SUFFIX = '(?:n?[iu]n|y?[iu]|y?[ea]|[dt][ea]n?|y?l[ea])';
+/** A student number in text: four or more digits on its own, or any length next to "no", "nr", "#", "numara", "number". */
+const NUMBER_WORD_BEFORE = /(?:(?<![\p{L}\p{N}])(?:no|nr)\.?|(?<![\p{L}\p{N}])numara(?:s[iı])?|(?<![\p{L}\p{N}])number|#)\s*:?\s*$/iu;
+const NUMBER_WORD_AFTER = /^\s*(?:numaral[iı]|numara|nolu|no(?![\p{L}\p{N}]))/iu;
+
+/** What a name found in text becomes: the pseudonym (only for a full name the caller may see) or a neutral word. */
+export type LabelFor = (studentId: string) => string | null;
+/** The neutral word for a name that must not be tied to a pseudonym (a name part, someone else's student, text the client sent). */
+export const NAME_WITHHELD = '[name]';
+export const NUMBER_WITHHELD = '[student no.]';
+
+/**
+ * Finds student names in any text (D-161), case- and accent-insensitively (ı/i and İ/I alike), whole
+ * words only, so "Ali'nin" matches "Ali" but "Alice" does not:
+ * - a full name becomes `label(id)` when exactly one student has it and the caller may see that student,
+ *   otherwise the neutral `[name]`;
+ * - a single name part (given or family name), in any case, becomes `[name]`; never a pseudonym, so a
+ *   predictable text (a teacher's or the school's name) cannot reveal which child is "Student N". The
+ *   few parts in `COMMON_WORD_NAMES` count only when capitalised;
+ * - capitalised names and full names also match with a Turkish case ending and no apostrophe
+ *   ("Elifin" → "[name]'in");
+ * - student numbers (four or more digits, or any length after "no" / before "numara") become `[student no.]`.
+ * Misspelt names, nicknames, former names and the names of erased students are not known here.
  */
 export class NameScrubber {
   private re: RegExp | null;
   private entries = new Map<string, NameEntry>();
-  constructor(rows: ReadonlyArray<{ id: string; fullName: string; givenNames: string | null; familyName: string | null }>) {
+  private numbers = new Set<string>();
+  constructor(rows: ReadonlyArray<{ id: string; fullName: string; givenNames: string | null; familyName: string | null; studentNumber?: string | null }>) {
     const add = (text: string, id: string, full: boolean) => {
       const key = foldSameLength(text.normalize('NFC').trim().replace(/\s+/gu, ' '));
       if (key.length < 2) return;
@@ -78,29 +111,44 @@ export class NameScrubber {
       add(r.fullName, r.id, true);
       const parts = new Set([...r.fullName.split(/\s+/u), ...(r.givenNames ?? '').split(/\s+/u), ...(r.familyName ?? '').split(/\s+/u)]);
       for (const p of parts) if (p.trim().length >= 2) add(p, r.id, false);
+      const n = r.studentNumber?.trim();
+      if (n) this.numbers.add(foldSameLength(n));
     }
     const keys = [...this.entries.keys()].sort((a, b) => b.length - a.length).map((k) => escapeRe(k).replace(/ /gu, '\\s+'));
-    this.re = keys.length ? new RegExp(`(?<![\\p{L}\\p{N}])(?:${keys.join('|')})(?![\\p{L}\\p{N}])`, 'gu') : null;
+    this.re = keys.length ? new RegExp(`(?<![\\p{L}\\p{N}])(${keys.join('|')})(${SUFFIX})?(?![\\p{L}\\p{N}])`, 'gu') : null;
   }
 
-  /** `text` with every student name replaced by `label(id)` (or a neutral word when ambiguous). */
-  scrub(text: string, label: (id: string) => string): string {
-    if (!this.re) return text;
-    const src = text.normalize('NFC');
+  /** `text` with every student name (and student number) replaced; see the class comment. */
+  scrub(text: string, label: LabelFor): string {
+    const src = this.scrubNumbers(text.normalize('NFC'));
+    if (!this.re) return src;
     const folded = foldSameLength(src);
     let out = '';
     let last = 0;
     this.re.lastIndex = 0;
     for (let m = this.re.exec(folded); m; m = this.re.exec(folded)) {
-      const key = m[0].replace(/\s+/gu, ' ');
-      const e = this.entries.get(key);
+      const e = this.entries.get(m[1]!.replace(/\s+/gu, ' '));
+      if (!e) continue;
       const first = src[m.index]!;
-      // A single name part counts only as a proper noun (capitalised), so "can" in a sentence stays.
-      if (!e || (!e.full && first === first.toLocaleLowerCase('tr-TR'))) continue;
-      out += src.slice(last, m.index) + (e.ids.size === 1 ? label([...e.ids][0]!) : UNKNOWN_STUDENT);
+      const lower = first === first.toLocaleLowerCase('tr-TR') && first !== first.toLocaleUpperCase('tr-TR');
+      const suffix = m[2] ? src.slice(m.index + m[1]!.length, m.index + m[0].length) : '';
+      if (!e.full && lower && (suffix || COMMON_WORD_NAMES.has(m[1]!))) continue;
+      const one = e.ids.size === 1 ? [...e.ids][0]! : null;
+      const replacement = (e.full && one ? label(one) : null) ?? NAME_WITHHELD;
+      out += src.slice(last, m.index) + replacement + (suffix ? `'${suffix}` : '');
       last = m.index + m[0].length;
     }
     return last === 0 ? src : out + src.slice(last);
+  }
+
+  private scrubNumbers(src: string): string {
+    if (!this.numbers.size) return src;
+    // Whole numbers only, not parts of dates, times or decimals ("2026-11-09", "10:30", "2.5").
+    return src.replace(/(?<![\p{L}\p{N}]|\p{N}[-./:,])\p{N}+(?![\p{L}\p{N}]|[-./:,]\p{N})/gu, (n, at: number) => {
+      if (!this.numbers.has(foldSameLength(n))) return n;
+      const flagged = n.length >= 4 || NUMBER_WORD_BEFORE.test(src.slice(Math.max(0, at - 12), at)) || NUMBER_WORD_AFTER.test(src.slice(at + n.length, at + n.length + 12));
+      return flagged ? NUMBER_WITHHELD : n;
+    });
   }
 }
 
@@ -144,16 +192,59 @@ export interface PrivacyEnv {
   /** Every student of the school (names are matched in any text). */
   directory: Map<string, { id: string; fullName: string }>;
   scrubber: NameScrubber;
+  /** A full name found in text becomes this (the pseudonym) only for the caller's own students; others get a neutral word. */
+  labelFor: LabelFor;
 }
 
-type StudentRowLite = { id: string; fullName: string; givenNames: string | null; familyName: string | null };
+type StudentRowLite = { id: string; fullName: string; givenNames: string | null; familyName: string | null; studentNumber: string | null };
 
-export function privacyEnv(db: Db, familyId: string, mode: AiPrivacyMode, now: number): PrivacyEnv {
-  const rows: StudentRowLite[] = db.select({ id: students.id, fullName: students.fullName, givenNames: students.givenNames, familyName: students.familyName }).from(students).all();
-  return { mode, pseudonyms: new Pseudonyms(db, familyId, now), directory: new Map(rows.map((r) => [r.id, r])), scrubber: new NameScrubber(rows) };
+/** `own`: the students the caller may see (`ownStudentIds`); only their full names map to "Student N" inside text. */
+export function privacyEnv(db: Db, familyId: string, mode: AiPrivacyMode, now: number, own: Set<string> | 'all'): PrivacyEnv {
+  const rows: StudentRowLite[] = db
+    .select({ id: students.id, fullName: students.fullName, givenNames: students.givenNames, familyName: students.familyName, studentNumber: students.studentNumber })
+    .from(students)
+    .all();
+  const pseudonyms = new Pseudonyms(db, familyId, now);
+  return {
+    mode,
+    pseudonyms,
+    directory: new Map(rows.map((r) => [r.id, r])),
+    scrubber: new NameScrubber(rows),
+    labelFor: (id) => (own === 'all' || own.has(id) ? pseudonyms.label(id) : null),
+  };
 }
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
+/**
+ * Kinds whose text is kept as it is in pseudonymous mode (only student ids in it become aliases): staff
+ * names and data marked as not personal (school name, keys, static documents). Running the name
+ * scrubber over them would turn a predictable text (a teacher called like a student) into a key that
+ * reveals which child a pseudonym stands for.
+ */
+const KEPT_KINDS: readonly PiiKind[] = ['none', 'staffName'];
+
+/** Student ids (whole value or inside text) → `student-N`. */
+function idsToAliases(env: PrivacyEnv, s: string): string {
+  if (env.directory.has(s)) return env.pseudonyms.alias(s);
+  return s.replace(UUID, (m) => (env.directory.has(m.toLowerCase()) ? env.pseudonyms.alias(m.toLowerCase()) : m));
+}
+
+/** Pseudonymous mode, one free-text string: ids → aliases, then (unless kept) names → pseudonyms or `[name]`; ids are never scrubbed. */
+function scrubText(env: PrivacyEnv, s: string, kind: PiiKind | undefined, label: LabelFor = env.labelFor): string {
+  if (s === WITHHELD_TEXT) return s;
+  if (env.directory.has(s)) return env.pseudonyms.alias(s);
+  const keep = kind !== undefined && KEPT_KINDS.includes(kind);
+  // Ids are cut out first, so the scrubber never touches them; the parts between are scrubbed.
+  const chunk = (t: string) => (keep ? t : env.scrubber.scrub(t, label));
+  let out = '';
+  let last = 0;
+  for (const m of s.matchAll(UUID)) {
+    const id = m[0].toLowerCase();
+    out += chunk(s.slice(last, m.index)) + (env.directory.has(id) ? env.pseudonyms.alias(id) : m[0]);
+    last = m.index + m[0].length;
+  }
+  return out + chunk(s.slice(last));
+}
 
 /** Which student a name field is about: its sibling id, else a unique full-name match. */
 function studentIdFor(env: PrivacyEnv, name: string, parent: Record<string, unknown> | undefined): string | null {
@@ -166,7 +257,8 @@ function studentIdFor(env: PrivacyEnv, name: string, parent: Record<string, unkn
   return hits.length === 1 ? hits[0]!.id : null;
 }
 
-function leaf(env: PrivacyEnv, value: string, kind: PiiKind | undefined, parent: Record<string, unknown> | undefined): unknown {
+/** One string value. `free`: a string field (free text), not an enum or literal the server defined. */
+function leaf(env: PrivacyEnv, value: string, kind: PiiKind | undefined, parent: Record<string, unknown> | undefined, free = true): unknown {
   if (kind && NEVER_LEAVES.includes(kind)) return REMOVE;
   const pseudo = env.mode === 'pseudonymous';
   const studentText = kind === 'studentText' || (kind === 'authoredText' && (parent?.authorType === 'student' || parent?.src === 'student'));
@@ -180,8 +272,11 @@ function leaf(env: PrivacyEnv, value: string, kind: PiiKind | undefined, parent:
     const id = studentIdFor(env, '', parent);
     return id ? `S${env.pseudonyms.numberOf(id)}` : 'S';
   }
-  return value;
+  return free ? scrubText(env, value, kind) : idsToAliases(env, value);
 }
+
+/** A key of a record or of an unknown object (it may be a student id or a name). */
+const keyOf = (env: PrivacyEnv, k: string) => (env.mode === 'pseudonymous' ? scrubText(env, k, undefined) : k);
 
 /** Applies the marks of `schema` to `value` (already parsed by the same schema, so it is an allow-list result). */
 function walk(env: PrivacyEnv, schema: z.ZodType, value: unknown, inherited: PiiKind | undefined, parent: Record<string, unknown> | undefined): unknown {
@@ -211,7 +306,7 @@ function walk(env: PrivacyEnv, schema: z.ZodType, value: unknown, inherited: Pii
       for (const [k, v] of Object.entries(value)) {
         const field = shape[k] ?? catchall;
         const r = field ? walk(env, field, v, kind, value) : deep(env, v, kind, value);
-        if (r !== REMOVE) out[k] = r;
+        if (r !== REMOVE) out[shape[k] ? k : keyOf(env, k)] = r;
       }
       return out;
     }
@@ -224,7 +319,7 @@ function walk(env: PrivacyEnv, schema: z.ZodType, value: unknown, inherited: Pii
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(value)) {
         const r = walk(env, def.valueType as z.ZodType, v, kind, value);
-        if (r !== REMOVE) out[k] = r;
+        if (r !== REMOVE) out[keyOf(env, k)] = r;
       }
       return out;
     }
@@ -234,10 +329,11 @@ function walk(env: PrivacyEnv, schema: z.ZodType, value: unknown, inherited: Pii
       return option ? walk(env, option, value, kind, parent) : deep(env, value, kind, parent);
     }
     case 'string':
-    case 'enum':
-    case 'literal':
     case 'template_literal':
       return typeof value === 'string' ? leaf(env, value, kind, parent) : value;
+    case 'enum':
+    case 'literal':
+      return typeof value === 'string' ? leaf(env, value, kind, parent, false) : value;
     default:
       return deep(env, value, kind, parent);
   }
@@ -252,37 +348,29 @@ function deep(env: PrivacyEnv, value: unknown, kind: PiiKind | undefined, parent
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
       const r = deep(env, v, kind, value);
-      if (r !== REMOVE) out[k] = r;
+      if (r !== REMOVE) out[keyOf(env, k)] = r;
     }
     return out;
   }
   return value;
 }
 
-/** Pseudonymous mode, last pass over everything: student ids → aliases, names anywhere → pseudonyms. */
-function scrubAll(env: PrivacyEnv, value: unknown): unknown {
-  const text = (s: string) => {
-    if (s === WITHHELD_TEXT) return s;
-    if (env.directory.has(s)) return env.pseudonyms.alias(s);
-    const ids = s.replace(UUID, (m) => (env.directory.has(m.toLowerCase()) ? env.pseudonyms.alias(m.toLowerCase()) : env.directory.has(m) ? env.pseudonyms.alias(m) : m));
-    return env.scrubber.scrub(ids, env.pseudonyms.label);
-  };
-  if (typeof value === 'string') return text(value);
-  if (Array.isArray(value)) return value.map((v) => scrubAll(env, v));
-  if (isRecord(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [text(k), scrubAll(env, v)]));
-  return value;
-}
-
-/** The result as it may leave the school: marks applied, then (pseudonymous) every name and student id replaced. */
+/**
+ * The result as it may leave the school: marks applied; in pseudonymous mode student ids become
+ * aliases and names in free text (every kind except `none` and `staffName`) are replaced.
+ */
 export function privateResult(env: PrivacyEnv, schema: z.ZodType, value: unknown): unknown {
   const marked = walk(env, schema, value, undefined, undefined);
-  const kept = marked === REMOVE ? null : marked;
-  return env.mode === 'pseudonymous' ? scrubAll(env, kept) : kept;
+  return marked === REMOVE ? null : marked;
 }
 
-/** Text written for the AI client (prompts, resource documents): names replaced in pseudonymous mode. */
-export function privateText(env: PrivacyEnv, text: string): string {
-  return env.mode === 'pseudonymous' ? (scrubAll(env, text) as string) : text;
+/**
+ * A server message that may quote stored data or the request (tool errors): in pseudonymous mode every
+ * name in it becomes the neutral `[name]` (never a pseudonym, so a message cannot be used to map a
+ * guessed name to "Student N").
+ */
+export function privateMessage(env: PrivacyEnv, text: string): string {
+  return env.mode === 'pseudonymous' ? scrubText(env, text, undefined, () => null) : text;
 }
 
 // ---------------------------------------------------------------- input aliases

@@ -7,12 +7,13 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { auditEvents, mcpCalls, mcpTokens } from '../../src/server/db/schema.ts';
+import { attendanceDaily, auditEvents, commandLog, mcpCalls, mcpTokens, users } from '../../src/server/db/schema.ts';
 import { capped } from '../../src/server/modules/mcp/transport.ts';
 import { MCP_RESULT_MAX_BYTES } from '../../src/shared/mcp.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { Mcp, makeToken, PASSWORD, setAi } from '../mcp-helpers.ts';
-import { buildSchool, ok, type School } from '../school-fixture.ts';
+import { cmd, endLesson, startLesson } from '../lesson-helpers.ts';
+import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 
 let env: TestEnv;
 let s: School;
@@ -115,15 +116,78 @@ describe('the order of checks on every call (D-160)', () => {
     await s.teacherA.login('ayse.teacher');
     await s.teacherB.login('mehmet.teacher');
     await s.admin.login('root.admin');
-    // 3. The account: deactivated accounts' tokens stop at once.
+    // 3. The account: an inactive account's tokens stop at once (deactivation also revokes them, see below;
+    //    the account check stays as a second line).
     const mehmet = await makeToken(s.teacherB, { scopes: ['classes:read'], name: 'Mehmet' });
     expect((await init(mehmet.secret)).status).toBe(200);
-    await ok(s.admin.post(`/api/admin/users/${s.mehmet.id}/deactivate`));
-    const inactive = await init(mehmet.secret);
-    expect(inactive.status).toBe(403);
-    expect(reason(inactive)).toBe('ACCOUNT_INACTIVE');
-    await ok(s.admin.post(`/api/admin/users/${s.mehmet.id}/reactivate`));
+    env.db.update(users).set({ disabledAt: env.clock.now() }).where(eq(users.id, s.mehmet.id)).run();
+    try {
+      const inactive = await init(mehmet.secret);
+      expect(inactive.status).toBe(403);
+      expect(reason(inactive)).toBe('ACCOUNT_INACTIVE');
+    } finally {
+      env.db.update(users).set({ disabledAt: null }).where(eq(users.id, s.mehmet.id)).run();
+    }
     expect((await init(mehmet.secret)).status).toBe(200);
+    env.db.update(users).set({ mustChangePassword: true }).where(eq(users.id, s.mehmet.id)).run();
+    try {
+      expect(reason(await init(mehmet.secret))).toBe('MUST_CHANGE_PASSWORD');
+    } finally {
+      env.db.update(users).set({ mustChangePassword: false }).where(eq(users.id, s.mehmet.id)).run();
+    }
+  });
+
+  it('deactivation, password resets and password changes end every token for good (review fix)', async () => {
+    const revoked = async (secret: string) => {
+      const r = await init(secret);
+      expect(r.status).toBe(401);
+      expect(reason(r)).toBe('TOKEN_REVOKED');
+    };
+    // Deactivate, then reactivate: the old token does not come back.
+    const before = await makeToken(s.teacherB, { scopes: ['classes:read'], name: 'Before deactivation' });
+    await ok(s.admin.post(`/api/admin/users/${s.mehmet.id}/deactivate`));
+    await ok(s.admin.post(`/api/admin/users/${s.mehmet.id}/reactivate`));
+    await revoked(before.secret);
+    const row = env.db.select().from(mcpTokens).where(eq(mcpTokens.id, before.id)).get()!;
+    expect(row.revokedBy).toBeNull();
+    const all = env.db.select().from(auditEvents).where(eq(auditEvents.action, 'mcp_token.revoke_all')).all();
+    expect(all.some((a) => a.entityId === s.mehmet.id && (a.afterJson ?? '').includes('deactivated'))).toBe(true);
+    // An administrator's password reset: revoked even after the new password is set.
+    await s.teacherB.login('mehmet.teacher');
+    const beforeReset = await makeToken(s.teacherB, { scopes: ['classes:read'], name: 'Before reset' });
+    const { temporaryPassword } = await ok(s.admin.post(`/api/admin/users/${s.mehmet.id}/reset-password`));
+    await s.teacherB.login('mehmet.teacher', temporaryPassword);
+    await ok(s.teacherB.post('/api/auth/password', { currentPassword: temporaryPassword, newPassword: PASSWORD }));
+    await revoked(beforeReset.secret);
+    // The owner's own password change.
+    await s.teacherB.login('mehmet.teacher');
+    const beforeChange = await makeToken(s.teacherB, { scopes: ['classes:read'], name: 'Before change' });
+    await ok(s.teacherB.post('/api/auth/password', { currentPassword: PASSWORD, newPassword: PASSWORD }));
+    await revoked(beforeChange.secret);
+    // A token made afterwards works.
+    await s.teacherB.login('mehmet.teacher');
+    expect((await init((await makeToken(s.teacherB, { scopes: ['classes:read'], name: 'After' })).secret)).status).toBe(200);
+  });
+
+  it('a lower lifetime cap applies to tokens that already exist (review fix)', async () => {
+    const long = await makeToken(s.teacherA, { scopes: ['classes:read'], days: 60, name: 'Sixty days' });
+    expect((await init(long.secret)).status).toBe(200);
+    await setAi(s.admin, { mcpTokenMaxDays: 7 });
+    try {
+      expect((await init(long.secret)).status).toBe(200);
+      env.clock.advance(8 * 24 * 60 * 60 * 1000);
+      await s.teacherA.login('ayse.teacher');
+      await s.admin.login('root.admin');
+      await s.teacherB.login('mehmet.teacher');
+      expect(reason(await init(long.secret))).toBe('TOKEN_EXPIRED');
+      const listed = (await ok(s.teacherA.get('/api/account/ai-tools'))).tokens.find((t: { id: string }) => t.id === long.id);
+      expect(listed.status).toBe('expired');
+    } finally {
+      await setAi(s.admin, { mcpTokenMaxDays: 90 });
+    }
+    // Raising the cap again does not bring it back.
+    expect(reason(await init(long.secret))).toBe('TOKEN_EXPIRED');
+    expect(env.db.select().from(mcpTokens).where(eq(mcpTokens.id, long.id)).get()!.expiresAt).toBeLessThan(env.clock.now());
   });
 
   it('then role → scope → the endpoint’s own ownership checks', async () => {
@@ -183,6 +247,35 @@ describe('writes through AI tools (D-160)', () => {
     // A classroom command needs a running lesson and is idempotent by opId.
     const noLesson = await c.call('classroom_command', { command: 'attendance.markAllPresent', contextId: s.ctxA.id, lessonId: '0190f0f0-0000-7000-8000-000000000000' });
     expect(noLesson.data.ok).toBe(false);
+  });
+
+  it('classroom writes go through the command log: applied once, replayed by opId, students named by alias (review fix)', async () => {
+    const kid = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Pelin Outboxzed' });
+    const lessonId = await startLesson(s.teacherA, s.ctxA.id);
+    try {
+      const c = new Mcp(env, (await makeToken(s.teacherA, { scopes: ['classes:read', 'classroom:command'], name: 'Outbox' })).secret);
+      await c.init();
+      const roster = await c.call('class_roster', { contextId: s.ctxA.id });
+      const alias = (roster.data.students as Array<{ id: string; fullName: string }>).find((x) => /^student-\d+$/u.test(x.id))!.id;
+      // Mark everyone present: applied once, and the same opId is a replay (through /mcp and through the cookie path).
+      const allOp = '0190f0f0-0000-7000-8000-00000000a001';
+      const all = await c.call('classroom_command', { command: 'attendance.markAllPresent', contextId: s.ctxA.id, lessonId, opId: allOp });
+      expect(all.data).toMatchObject({ ok: true, replayed: false, opId: allOp });
+      expect(env.db.select().from(commandLog).where(eq(commandLog.opId, allOp)).get()).toMatchObject({ actorKey: `user:${s.ayse.id}`, type: 'attendance.markAllPresent' });
+      expect((await c.call('classroom_command', { command: 'attendance.markAllPresent', contextId: s.ctxA.id, lessonId, opId: allOp })).data).toMatchObject({ ok: true, replayed: true });
+      expect((await cmd(s.teacherA, 'attendance.markAllPresent', { contextId: s.ctxA.id, lessonId }, { opId: allOp })).replayed).toBe(true);
+      expect(env.db.select().from(attendanceDaily).where(eq(attendanceDaily.studentId, kid.id)).get()?.status).toBe('present');
+      // One student's attendance, named by the pseudonymous alias.
+      const oneOp = '0190f0f0-0000-7000-8000-00000000a002';
+      const one = await c.call('classroom_command', { command: 'attendance.setDaily', contextId: s.ctxA.id, lessonId, studentId: alias, status: 'late', opId: oneOp });
+      expect(one.data).toMatchObject({ ok: true, replayed: false });
+      expect(env.db.select().from(commandLog).where(eq(commandLog.opId, oneOp)).get()?.actorKey).toBe(`user:${s.ayse.id}`);
+      expect(env.db.select().from(attendanceDaily).all().filter((r) => r.status === 'late')).toHaveLength(1);
+      expect((await c.call('classroom_command', { command: 'attendance.setDaily', contextId: s.ctxA.id, lessonId, studentId: alias, status: 'late', opId: oneOp })).data.replayed).toBe(true);
+      expect(env.db.select().from(attendanceDaily).all().filter((r) => r.status === 'late')).toHaveLength(1);
+    } finally {
+      await endLesson(s.teacherA, s.ctxA.id, lessonId);
+    }
   });
 
   it('results over 256 KB are cut with a note', () => {

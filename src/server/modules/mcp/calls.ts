@@ -5,7 +5,7 @@
  */
 import { lt } from 'drizzle-orm';
 import { MCP_RATE_PER_MINUTE } from '../../../shared/mcp.ts';
-import type { Db } from '../../db/client.ts';
+import { tx, type Db } from '../../db/client.ts';
 import { mcpCalls } from '../../db/schema.ts';
 import { newId } from '../../lib/crypto.ts';
 
@@ -30,7 +30,17 @@ export class CallLog {
     this.db = db;
   }
   record(now: number, r: CallRecord) {
-    this.db.insert(mcpCalls).values({ id: newId(), at: now, tokenId: r.tokenId, userId: r.userId, method: r.method.slice(0, 120), status: r.status, errorCode: r.errorCode ?? null, durationMs: Math.max(0, Math.round(r.durationMs)), bytes: r.bytes }).run();
+    this.recordMany([{ at: now, record: r }]);
+  }
+  /** Several records (the messages of one batch) in one transaction. */
+  recordMany(rows: ReadonlyArray<{ at: number; record: CallRecord }>) {
+    if (!rows.length) return;
+    const now = Math.max(...rows.map((x) => x.at));
+    tx(this.db, () => {
+      for (const { at, record: r } of rows) {
+        this.db.insert(mcpCalls).values({ id: newId(), at, tokenId: r.tokenId, userId: r.userId, method: r.method.slice(0, 120), status: r.status, errorCode: r.errorCode ?? null, durationMs: Math.max(0, Math.round(r.durationMs)), bytes: r.bytes }).run();
+      }
+    });
     if (now - this.lastPurge > PURGE_EVERY_MS) {
       this.lastPurge = now;
       this.db.delete(mcpCalls).where(lt(mcpCalls.at, now - CALL_RETENTION_MS)).run();

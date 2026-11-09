@@ -11,9 +11,11 @@ AI tools are **off** until an administrator switches them on, and **student name
 With **pseudonyms** (the default, and the only choice while the school's "Student data to AI tools" switch is off):
 
 - Students appear as **"Student 1", "Student 2"** and so on, and their ids as `student-1`, `student-2`. The numbers stay the same for one token, so the assistant can follow a student across questions. It can use `student-3` in its own requests (only for your own students).
-- Student names inside text you or other teachers wrote (a lesson reflection, feedback, a homework title) are replaced by the pseudonym, also in Turkish spellings (İ/I, ş, ğ…).
+- Student names and student numbers inside text you or other teachers wrote (a lesson reflection, feedback, a homework title) are replaced as far as the app can recognise them, also in Turkish spellings (İ/I, ş, ğ…), in capitals or lower case and with an apostrophe ("Elif'in"). A student's full name becomes their pseudonym; a first name or surname on its own becomes `[name]`, and a student number `[student no.]`.
 - **Anything a student wrote** (goals, reflections, notes to themselves, evidence text and links) is **withheld**.
-- What does leave: class and subject names, dates, counts with their totals, attendance and homework statuses per pseudonym, your own text with names replaced, goal categories and presets, settings.
+- What does leave: the school's name, teachers' names, class and subject names, dates, counts with their totals, attendance and homework statuses per pseudonym, your own text with names replaced, goal categories and presets, settings.
+
+> **Please do not write students' names or numbers into text you will use with AI tools** (feedback, reflections, homework titles). The app cannot recognise everything: misspelt names and nicknames, a former name, the name of a student who has left and been deleted, a name in lower case with an ending but no apostrophe ("elifin"), the names Can, Su, Ay, Will and May written in lower case, and short numbers (one to three digits) without "no" go out as they were written. Staff names and your school's name are not changed.
 
 With **names** (only when the administrator allows student data, and only for tokens made with "Names"):
 
@@ -70,5 +72,5 @@ Useful tools: **class_overview**, **class_report** (ask for a few sections when 
 
 - A token works only at the `/mcp` address, never in the app itself, and a signed-in browser cannot use `/mcp`.
 - Each token may make about 120 calls a minute; very large answers are shortened with a note asking for a narrower question.
-- When an account is deactivated, or must change its password, its tokens stop working.
+- When an account is deactivated, or its password is reset or changed, all its tokens are revoked for good (reactivating the account does not bring them back): make new ones afterwards. When the administrator shortens the longest time a token may last, existing tokens are shortened too.
 - The assistant sees only your own classes and students, exactly like you do.

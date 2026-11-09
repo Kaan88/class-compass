@@ -9,9 +9,11 @@
  * - aliases resolve only to the caller's own students.
  * Fictional data only.
  */
+import fs from 'node:fs';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { lessons } from '../../src/server/db/schema.ts';
-import { foldSameLength, NameScrubber, unmarkedStrings } from '../../src/server/modules/mcp/privacy.ts';
+import { lessons, mcpPseudonyms, schoolSettings, users } from '../../src/server/db/schema.ts';
+import { foldSameLength, NAME_WITHHELD, NameScrubber, NUMBER_WITHHELD, unmarkedStrings } from '../../src/server/modules/mcp/privacy.ts';
 import { allTools, inputJsonSchema, type McpTool } from '../../src/server/modules/mcp/registry.ts';
 import { allResources } from '../../src/server/modules/mcp/resources.ts';
 import { PROMPTS } from '../../src/server/modules/mcp/prompts.ts';
@@ -23,9 +25,15 @@ import { linkUrl, openLink } from '../student-helpers.ts';
 
 const READING = '00000000-0000-7000-8000-00000000c001';
 // Marker names: unusual enough that any hit is a leak; Turkish letters on purpose.
-const MAVI = { fullName: 'Mavimarker Kuzeyzed' };
+const MAVI = { fullName: 'Mavimarker Kuzeyzed', studentNumber: '93817' };
 const ILKAY = { fullName: 'İlkaymarker Şahinzed' };
-const NAME_MARKERS = ['mavimarker', 'kuzeyzed', 'ilkaymarker', 'sahinzed'];
+const NAME_MARKERS = ['mavimarker', 'kuzeyzed', 'ilkaymarker', 'sahinzed', '93817'];
+// Students who share a name part with the teacher, the school and words in the guides (review fix): staff names, the
+// school name and static documents must come out exactly as they are, never with a pseudonym in them.
+const TEACHER_NAME = 'Ada Yilmazteach';
+const SCHOOL_NAME = 'Deniz İlkokulu';
+const ADA = { fullName: 'Ada Qwertmarker' };
+const DENIZ = { fullName: 'Deniz Asdfmarker' };
 // Marker texts written by students.
 const GOAL_TEXT = 'I will read Zorbuxtext stories every week.';
 const REFLECTION = 'Reading Quillfernote books was fun today.';
@@ -52,7 +60,11 @@ beforeAll(async () => {
   env = await makeEnv();
   s = await buildSchool(env);
   await setAi(s.admin, { mcpEnabled: true });
-  mavi = await addStudent(s.teacherA, s.c3a.id, { fullName: MAVI.fullName });
+  mavi = await addStudent(s.teacherA, s.c3a.id, MAVI);
+  await addStudent(s.teacherA, s.c3a.id, ADA);
+  await addStudent(s.teacherA, s.c3a.id, DENIZ);
+  env.db.update(users).set({ displayName: TEACHER_NAME }).where(eq(users.id, s.ayse.id)).run();
+  env.db.update(schoolSettings).set({ schoolName: SCHOOL_NAME }).run();
   ilkay = await addStudent(s.teacherA, s.c3a.id, { fullName: ILKAY.fullName });
   for (const m of ['goals', 'homework']) await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/${m}`, { enabled: true }));
 
@@ -70,9 +82,12 @@ beforeAll(async () => {
   const tgoal = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ilkay.id}/goals`, { categoryId: READING, text: 'Read one page aloud every day.' }));
   teacherGoalId = tgoal.id;
   await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${mavi.id}/feedback`, { goalId: goal.id, body: 'Well done Mavimarker, and İLKAYMARKER helped too.' }));
+  // Quick tablet notes: lower case, a Turkish ending without the apostrophe, a possessive, the student number.
+  await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${mavi.id}/feedback`, { goalId: goal.id, body: 'mavimarker read well today, şahinzed too. Kuzeyzedin book and kuzeyzed’in pen. Seat of no 93817. Mavimarker Kuzeyzed read to the class.' }));
   await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${mavi.id}/private-notes`, { body: 'Privnotemarker about the family.' }));
   await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/levels`, { levels: [{ studentId: mavi.id, level: 'LVLMARKER' }] }));
   const hw = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/homework`, { title: 'Read with Kuzeyzed', dueOn: '2026-11-10', notes: 'Hwnotemarker' }));
+  await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/homework`, { title: 'Pair work: ilkaymarker and friends, 93817 too', dueOn: '2026-11-11' }));
   assignmentId = hw.id;
   await ok(s.teacherA.post(`/api/teacher/homework/${hw.id}/marks`, { changes: [{ studentId: mavi.id, status: 'missing', note: 'Marknotemarker' }] }));
 
@@ -129,9 +144,11 @@ function argsFor(t: McpTool, alias: (id: string) => string): Record<string, unkn
 const visibleTo = (role: 'teacher' | 'admin') => (t: { role: string }) => t.role === 'any' || t.role === role;
 
 /** Calls every tool, reads every resource and gets every prompt; returns all the text that left. */
-async function everything(c: Mcp, role: 'teacher' | 'admin'): Promise<{ texts: Map<string, string>; failed: string[] }> {
+async function everything(c: Mcp, role: 'teacher' | 'admin'): Promise<{ texts: Map<string, string>; prompts: Map<string, string>; failed: string[] }> {
   await c.init();
   const texts = new Map<string, string>();
+  // Prompts echo the client's own arguments (a student's name here): they are checked on their own.
+  const prompts = new Map<string, string>();
   const failed: string[] = [];
   for (const t of allTools().filter(visibleTo(role))) {
     // Real ids as input (aliases are tested on their own below).
@@ -145,9 +162,9 @@ async function everything(c: Mcp, role: 'teacher' | 'admin'): Promise<{ texts: M
   }
   for (const p of (await c.rpc('prompts/list')).result.prompts as Array<{ name: string; arguments: Array<{ name: string }> }>) {
     const args = Object.fromEntries(p.arguments.map((a) => [a.name, a.name === 'contextId' ? s.ctxA.id : `about ${MAVI.fullName}`]));
-    texts.set(`prompt ${p.name}`, JSON.stringify((await c.rpc('prompts/get', { name: p.name, arguments: args })).result));
+    prompts.set(p.name, JSON.stringify((await c.rpc('prompts/get', { name: p.name, arguments: args })).result));
   }
-  return { texts, failed };
+  return { texts, prompts, failed };
 }
 
 describe('classification (D-161)', () => {
@@ -172,11 +189,28 @@ describe('classification (D-161)', () => {
     expect(PROMPTS.map((p) => p.name).sort()).toEqual(['design_theme', 'goal_presets', 'topic_plan', 'weekly_summary']);
   });
 
-  it('matches names Turkish-aware, whole words only, parts only when capitalised', () => {
-    const sc = new NameScrubber([{ id: 'a', fullName: 'İlkay Şahin', givenNames: null, familyName: null }, { id: 'b', fullName: 'Can Ak', givenNames: null, familyName: null }]);
-    const label = (id: string) => `<${id}>`;
-    expect(sc.scrub('ILKAY ŞAHİN came. ilkay sahin too. Ilkay’ın kitabı.', label)).toBe('<a> came. <a> too. <a>’ın kitabı.');
-    expect(sc.scrub('We can read. Can read. Canan read.', label)).toBe('We can read. <b> read. Canan read.');
+  it('matches names Turkish-aware and whole words only; a pseudonym only for a full name of the caller’s own student', () => {
+    const sc = new NameScrubber([
+      { id: 'a', fullName: 'İlkay Şahin', givenNames: null, familyName: null },
+      { id: 'b', fullName: 'Can Ak', givenNames: null, familyName: null },
+      { id: 'c', fullName: 'Mehmet Ali Öztürk', givenNames: 'Mehmet Ali', familyName: 'Öztürk', studentNumber: '4711' },
+      { id: 'd', fullName: 'Ayşe Kaya', givenNames: null, familyName: null, studentNumber: '12' },
+      { id: 'e', fullName: 'Elif Su', givenNames: null, familyName: null },
+    ]);
+    const label = (id: string) => (id === 'd' ? null : `<${id}>`); // 'd' is in another teacher's class
+    // Full names in any case and spelling; a single part is the neutral [name], never a pseudonym.
+    expect(sc.scrub('ILKAY ŞAHİN came. ilkay sahin too. Ilkay’ın kitabı.', label)).toBe('<a> came. <a> too. [name]’ın kitabı.');
+    // Lower-case parts and possessives are names too (review fix); "Alice" and "Canan" are not "Ali" and "Can".
+    expect(sc.scrub('mehmet ali was late, öztürk too. ayşe’nin kitabı. Alice and Canan.', label)).toBe('[name] [name] was late, [name] too. [name]’nin kitabı. Alice and Canan.');
+    // A capitalised name with a Turkish ending and no apostrophe; lower case with an ending stays (a known limit).
+    expect(sc.scrub('Elifin defteri, Ayşeye verdim. kayalar.', label)).toBe("[name]'in defteri, [name]'ye verdim. kayalar.");
+    // Someone else's student: the full name is neutral too.
+    expect(sc.scrub('Ayşe Kaya helped.', label)).toBe('[name] helped.');
+    // Very common words count only when capitalised.
+    expect(sc.scrub('We can read. Can read. su içtik. Su read.', label)).toBe('We can read. [name] read. su içtik. [name] read.');
+    // Student numbers: four or more digits, or next to "no" / "numara"; not dates, times or other counts.
+    expect(sc.scrub('no 4711 and 4711. No: 12, 12 numara. Read 12 pages on 2026-11-12 at 10:12.', label)).toBe(`no ${NUMBER_WITHHELD} and ${NUMBER_WITHHELD}. No: ${NUMBER_WITHHELD}, ${NUMBER_WITHHELD} numara. Read 12 pages on 2026-11-12 at 10:12.`);
+    expect(NAME_WITHHELD).toBe('[name]');
   });
 });
 
@@ -203,13 +237,49 @@ describe('pseudonymous mode (D-161)', () => {
     expect(goals.student.fullName).toMatch(/^Student \d+$/u);
     expect(goals.student.id).toMatch(/^student-\d+$/u);
     expect(goals.goals.find((g: { authorType: string }) => g.authorType === 'student').text).toBe('[withheld: student text]');
-    expect(goals.feedback.some((f: { body: string }) => /Well done Student \d+, and Student \d+ helped too\./u.test(f.body))).toBe(true);
+    // A single name part becomes the neutral [name] (never a pseudonym); a full name of the caller's own student its pseudonym.
+    const bodies = (goals.feedback as Array<{ body: string }>).map((f) => f.body);
+    expect(bodies).toContain('Well done [name], and [name] helped too.');
+    expect(bodies).toContain(`[name] read well today, [name] too. [name]'in book and [name]’in pen. Seat of no [student no.]. ${goals.student.fullName} read to the class.`);
+    expect(a.texts.get('tool list_homework')).toContain('Pair work: [name] and friends, [student no.] too');
     expect(goals.privateNotes).toBeUndefined();
     expect(goals.evidence.every((e: Record<string, unknown>) => !('file' in e))).toBe(true);
     const summary = JSON.parse(a.texts.get('tool lesson_summary')!);
-    expect(summary.reflection.note).toMatch(/^Student \d+ read aloud beautifully\.$/u);
+    expect(summary.reflection.note).toBe('[name] read aloud beautifully.');
     // The same student keeps the same pseudonym across calls of one token.
     expect(JSON.parse(a.texts.get('tool student_summary')!).student.fullName).toBe(goals.student.fullName);
+
+    // Staff names, the school name and static documents come out exactly as they are (review fix): a teacher
+    // called like a student, a school named like one, a guide's example name never turn into "Student N".
+    expect(new Set((goals.feedback as Array<{ teacherName: string }>).map((f) => f.teacherName))).toEqual(new Set([TEACHER_NAME]));
+    expect(JSON.parse(b.texts.get('tool school_settings')!).schoolName).toBe(SCHOOL_NAME);
+    for (const [where, text] of [...a.texts, ...b.texts]) expect(text, where).not.toMatch(/Student \d+ (?:Yilmazteach|İlkokulu)/u);
+    for (const lang of ['en', 'tr'] as const) {
+      for (const file of fs.readdirSync(`docs/guides/${lang}`).filter((f) => f.endsWith('.md'))) {
+        const uri = `resource classcompass://guides/${lang}/${file.replace(/\.md$/u, '')}`;
+        expect(a.texts.get(uri), uri).toBe(fs.readFileSync(`docs/guides/${lang}/${file}`, 'utf8'));
+      }
+    }
+    expect(a.texts.get('resource classcompass://guides/tr/admin')).toContain('**Ada ya da numaraya göre ara**');
+    // Prompts return the client's own words as they are: no name is turned into a pseudonym (no oracle).
+    for (const [name, text] of [...a.prompts, ...b.prompts]) {
+      expect(text, name).not.toMatch(/Student \d|\[name\]/u);
+      expect(text, name).toContain(MAVI.fullName);
+    }
+  });
+
+  it('a guessed name sent by the client never comes back as a pseudonym (no name-to-pseudonym oracle)', async () => {
+    const other = await addStudent(s.teacherB, s.c3b.id, { fullName: 'Zeynep Oraclezed' });
+    const c = new Mcp(env, (await makeToken(s.teacherA, { scopes: ['classes:read', 'homework:write'], name: 'Oracle' })).secret);
+    await c.init();
+    const idea = 'Zeynep Oraclezed and Nobody Realperson';
+    const prompt = await c.rpc('prompts/get', { name: 'design_theme', arguments: { idea } });
+    expect(prompt.result.messages[0].content.text).toContain(`for: ${idea}`);
+    // Written through a tool and read back: another class's student is the neutral [name], not "Student N".
+    const hw = await c.call('create_homework', { contextId: s.ctxA.id, title: 'Ask Zeynep Oraclezed', dueOn: '2026-11-13' });
+    expect(hw.isError).toBe(false);
+    expect(hw.data.title).toBe('Ask [name]');
+    expect(env.db.select().from(mcpPseudonyms).where(eq(mcpPseudonyms.studentId, other.id)).all()).toEqual([]);
   });
 
   it('aliases resolve only to the caller’s own students', async () => {

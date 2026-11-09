@@ -8,12 +8,14 @@ Yapay zekâ araçları bir yönetici açana kadar **kapalıdır**. Yönetici, ok
 
 ## Okuldan ne çıkar
 
-**Takma adlarla** (varsayılan; okulun "Öğrenci verisi yapay zekâ araçlarına" anahtarı kapalıyken tek seçenek):
+**Takma adlarla** (varsayılan; okulun "Öğrenci verisi yapay zekâ araçlarına" ayarı kapalıyken tek seçenek):
 
 - Öğrenciler **"Student 1", "Student 2"** gibi takma adlarla, kimlikleri de `student-1`, `student-2` diye görünür. Numaralar bir anahtar için hep aynı kalır; böylece asistan bir öğrenciyi sorular boyunca izleyebilir. Kendi isteklerinde `student-3` yazabilir (yalnızca sizin öğrencileriniz için).
-- Sizin ya da başka öğretmenlerin yazdığı metinlerdeki öğrenci adları (ders sonu değerlendirmesi, geri bildirim, ödev başlığı) da takma adla değiştirilir; Türkçe yazımlar da tanınır (İ/I, ş, ğ…).
+- Sizin ya da başka öğretmenlerin yazdığı metinlerdeki (ders sonu değerlendirmesi, geri bildirim, ödev başlığı) öğrenci adları ve okul numaraları, uygulamanın tanıyabildiği ölçüde değiştirilir: Türkçe yazımlar (İ/I, ş, ğ…), büyük ya da küçük harf ve kesme işaretli ekler ("Elif’in") de tanınır. Öğrencinin tam adı takma adıyla, tek başına yazılmış bir ad ya da soyadı `[name]` ile, okul numarası da `[student no.]` ile değiştirilir.
 - **Öğrencinin yazdığı her şey** (hedefler, değerlendirmeler, kendine notlar, kanıt metinleri ve bağlantılar) **gönderilmez**.
-- Çıkanlar: sınıf ve ders adları, tarihler, toplamlarıyla birlikte sayılar, takma ad başına yoklama ve ödev durumları, adları değiştirilmiş kendi metinleriniz, hedef kategorileri ve hazır hedefler, ayarlar.
+- Çıkanlar: okulun adı, öğretmen adları, sınıf ve ders adları, tarihler, toplamlarıyla birlikte sayılar, takma ad başına yoklama ve ödev durumları, adları değiştirilmiş kendi metinleriniz, hedef kategorileri ve hazır hedefler, ayarlar.
+
+> **Yapay zekâ araçlarıyla kullanacağınız metinlere (geri bildirim, ders sonu değerlendirmesi, ödev başlığı) lütfen öğrenci adı ya da numarası yazmayın.** Uygulama her şeyi tanıyamaz: yanlış yazılmış adlar ve lakaplar, öğrencinin eski adı, okuldan ayrılıp silinmiş bir öğrencinin adı, küçük harfle ve kesme işareti olmadan ek almış bir ad ("elifin"), küçük harfle yazılmış Can, Su, Ay, Will ve May adları ve başında "no" olmayan kısa (bir ile üç haneli) numaralar yazıldığı gibi gider. Öğretmen adları ve okulunuzun adı değiştirilmez.
 
 **Adlarla** (yalnızca yönetici öğrenci verisine izin verdiyse ve yalnızca "Adlar" seçilerek oluşturulan anahtarlarda):
 
@@ -70,5 +72,5 @@ Ardından Claude’a örneğin şunu sorun: "class-compass’ı kullan: 3-A İng
 
 - Bir anahtar yalnızca `/mcp` adresinde çalışır, uygulamanın kendisinde asla; oturum açık bir tarayıcı da `/mcp` adresini kullanamaz.
 - Her anahtar dakikada yaklaşık 120 çağrı yapabilir; çok büyük yanıtlar, daha dar bir soru sorulmasını isteyen bir notla kısaltılır.
-- Bir hesap devre dışı bırakıldığında ya da parolasını değiştirmesi gerektiğinde anahtarları çalışmaz.
+- Bir hesap devre dışı bırakıldığında ya da parolası sıfırlandığında veya değiştirildiğinde bütün anahtarları kalıcı olarak iptal edilir (hesap yeniden etkinleştirilse de geri gelmez); sonra yenilerini oluşturun. Yönetici bir anahtarın en uzun geçerlilik süresini kısaltırsa var olan anahtarların süresi de kısalır.
 - Asistan, tıpkı sizin gibi yalnızca kendi sınıflarınızı ve öğrencilerinizi görür.

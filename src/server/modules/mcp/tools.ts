@@ -170,7 +170,7 @@ const classroomCommand = handTool({
   role: 'teacher',
   readOnly: false,
   input: z.discriminatedUnion('command', commandOptions as unknown as [z.ZodObject, ...z.ZodObject[]]),
-  output: z.object({ ok: z.boolean(), replayed: z.boolean(), opId: z.string(), reason: z.string().meta(pii('none')).optional(), message: z.string().meta(pii('none')).optional() }),
+  output: z.object({ ok: z.boolean(), replayed: z.boolean(), opId: z.string(), reason: z.string().meta(pii('none')).optional(), message: z.string().meta(pii('teacherText')).optional() }),
   run: (env, input) => {
     const { command, opId, ...payload } = input as { command: ClassroomCommand; opId?: string; contextId: string; lessonId: string };
     const r = executeCommand(env.ctx, { opId: opId ?? newId(), type: command, contextId: payload.contextId, lessonId: payload.lessonId, payload });

@@ -30,7 +30,7 @@ import type { Actor, AppDeps, SessionRow, UserRow } from '../../lib/context.ts';
 import { hashPassword, newId, randomToken, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
-import { actorFor, createSession, invalidateResetTokens, revokeAllUserSessions, SESSION_ABSOLUTE_MS, toMe } from './service.ts';
+import { actorFor, createSession, invalidateResetTokens, revokeAllUserMcpTokens, revokeAllUserSessions, SESSION_ABSOLUTE_MS, toMe } from './service.ts';
 
 export const INVITE_MS = 7 * 24 * 60 * 60 * 1000;
 export const EMAIL_LINK_MS = 15 * 60 * 1000;
@@ -368,6 +368,7 @@ export function confirmEmailLinkMethod(deps: AppDeps, user: UserRow, session: Se
     deps.db.update(users).set({ signInMethod: 'email_link', passwordHash: '', emailVerifiedAt: now, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
     revokeAllUserSessions(deps.db, user.id, now, session.id);
     invalidateResetTokens(deps.db, user.id, now);
+    revokeAllUserMcpTokens(deps.db, actorFor(user), user.id, now, 'method_change');
     audit(deps.db, actorFor(user), { action: 'auth.method_change', entity: 'user', entityId: user.id, before: { method: 'password' }, after: { method: 'email_link' } }, now);
     return { ok: true as const };
   });
@@ -383,6 +384,7 @@ export async function switchToPassword(deps: AppDeps, user: UserRow, session: Se
   tx(deps.db, () => {
     deps.db.update(users).set({ signInMethod: 'password', passwordHash, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
     revokeAllUserSessions(deps.db, user.id, now, session.id);
+    revokeAllUserMcpTokens(deps.db, actorFor(user), user.id, now, 'method_change');
     audit(deps.db, actorFor(user), { action: 'auth.method_change', entity: 'user', entityId: user.id, before: { method: 'email_link' }, after: { method: 'password' } }, now);
   });
   return meOf(deps, user.id, session.id);

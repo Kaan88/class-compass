@@ -25,14 +25,15 @@ export interface McpResource {
   mimeType: string;
   scope: McpScope | null;
   role: ToolRole;
-  /** The allow-list schema with `pii()` marks (documents are plain text: `none` then name-scrubbed). */
+  /** The allow-list schema with `pii()` marks (static documents are `none`). */
   output: z.ZodType;
   read: (env: ToolEnv) => Promise<unknown> | unknown;
 }
 
 const readDoc = (rel: string) => fs.readFileSync(path.join(DOCS, rel), 'utf8');
 const exists = (rel: string) => fs.existsSync(path.join(DOCS, rel));
-const Doc = z.string().meta(pii('teacherText'));
+/** Static documents from docs/: no school data, so not name-scrubbed (a guide's example name must not be turned into a pseudonym, D-161). */
+const Doc = z.string().meta(pii('none'));
 
 /** First `#` heading of a Markdown file, as its title. */
 function titleOf(rel: string): string {

@@ -2,7 +2,7 @@ import { and, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import type { Me } from '../../../shared/contracts/auth.ts';
 import { foldForSearch } from '../../../shared/text/turkish.ts';
 import type { Db } from '../../db/client.ts';
-import { authAttempts, oneTimeTokens, sessions, users } from '../../db/schema.ts';
+import { authAttempts, mcpTokens, oneTimeTokens, sessions, users } from '../../db/schema.ts';
 import { tx } from '../../db/client.ts';
 import { translate } from '../../../shared/i18n/index.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
@@ -149,6 +149,21 @@ export function revokeAllUserSessions(db: Db, userId: string, now: number, excep
 }
 
 /**
+ * Revoke every live AI tools token of a user (D-160, S14h1 review fix), with `revoked_by` null (the
+ * system). Called wherever the account's sign-in credentials change or it is deactivated, next to
+ * `revokeAllUserSessions`: a token made by someone who knew the password must not outlive the lock-out,
+ * and a reactivation must not bring old tokens back. Audited when there was anything to revoke.
+ */
+export function revokeAllUserMcpTokens(db: Db, actor: Actor, userId: string, now: number, reason: 'deactivated' | 'password_reset' | 'password_change' | 'method_change') {
+  const live = and(eq(mcpTokens.userId, userId), isNull(mcpTokens.revokedAt), gt(mcpTokens.expiresAt, now));
+  const n = db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(live).get()?.n ?? 0;
+  if (!n) return 0;
+  db.update(mcpTokens).set({ revokedAt: now, revokedBy: null }).where(live).run();
+  audit(db, actor, { action: 'mcp_token.revoke_all', entity: 'user', entityId: userId, after: { count: n, reason } }, now);
+  return n;
+}
+
+/**
  * Void every unused password-reset link of a user (D-015). Called whenever the account's email,
  * password or active state changes, so a link sent to an old mailbox, or issued before an admin
  * reset after a suspected compromise, can no longer be used.
@@ -169,6 +184,7 @@ export async function changePassword(deps: AppDeps, user: UserRow, session: Sess
     deps.db.update(users).set({ passwordHash, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
     revokeAllUserSessions(deps.db, user.id, now, session.id);
     invalidateResetTokens(deps.db, user.id, now);
+    revokeAllUserMcpTokens(deps.db, actorFor(user), user.id, now, 'password_change');
     audit(deps.db, actorFor(user), { action: 'auth.password_change', entity: 'user', entityId: user.id }, now);
   });
 }
@@ -386,6 +402,7 @@ export async function completePasswordReset(deps: AppDeps, token: string, newPas
     db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, fresh.id)).run();
     db.update(users).set({ passwordHash, mustChangePassword: false, signInMethod: 'password', updatedAt: now }).where(eq(users.id, user.id)).run();
     revokeAllUserSessions(db, user.id, now);
+    revokeAllUserMcpTokens(db, actorFor(user), user.id, now, 'password_reset');
     clearFailures(db, `login:user:${user.id}`);
     audit(db, actorFor(user), { action: 'auth.password_reset_email', entity: 'user', entityId: user.id }, now);
   });

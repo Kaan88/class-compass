@@ -23,7 +23,7 @@ import { openDatabase, type Db } from './db/client.ts';
 import { users } from './db/schema.ts';
 import { audit } from './lib/audit.ts';
 import { hashPassword } from './lib/crypto.ts';
-import { createUser, normaliseLogin, revokeAllUserSessions } from './modules/auth/service.ts';
+import { createUser, normaliseLogin, revokeAllUserMcpTokens, revokeAllUserSessions } from './modules/auth/service.ts';
 import { backupNow, errorSummary, listBackups, migrateWithSnapshot, recordRun, resolveBackupFile, restoreBackup, RestoreRefused, verifyBackup, type RunRecord } from './ops/backup.ts';
 import { offsiteBackup, offsiteCheck, offsiteInit, offsiteProblems, offsiteSnapshots, tail } from './ops/restic.ts';
 import { appVersion, hasAppTables, levelText, migrationLevel } from './ops/version.ts';
@@ -93,6 +93,7 @@ switch (cmd) {
     const now = Date.now();
     db().update(users).set({ passwordHash: await hashPassword(password), mustChangePassword: true, updatedAt: now }).where(eq(users.id, u.id)).run();
     revokeAllUserSessions(db(), u.id, now);
+    revokeAllUserMcpTokens(db(), system, u.id, now, 'password_reset');
     audit(db(), system, { action: 'auth.password_reset_cli', entity: 'user', entityId: u.id }, now);
     console.log(`Password reset for ${u.login}; they must change it at next sign-in.`);
     break;
