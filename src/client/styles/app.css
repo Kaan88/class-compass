@@ -1508,6 +1508,24 @@ html:has(.cc-lesson-board) .cc-toaster {
   border: var(--cc-border-width) solid var(--cc-border);
   border-radius: var(--cc-radius);
   background: var(--cc-bg);
+  container-type: inline-size;
+}
+/* S14i (usability crawl): on a phone the classroom sample is narrow; the name gets the whole row
+   beside the avatar (it showed one letter per line) and the counter bar wraps its count. */
+@container (max-width: 22rem) {
+  .cc-theme-sample .cc-student-card {
+    grid-template-areas:
+      'avatar name name'
+      'meta meta add';
+  }
+  .cc-theme-sample .cc-student-card__add {
+    min-width: var(--cc-touch);
+    min-height: var(--cc-touch);
+  }
+  .cc-theme-sample .cc-counterbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 }
 /* The theme's background pattern stays inside its sample instead of covering the page. */
 .cc-theme-sample .cc-backdrop {

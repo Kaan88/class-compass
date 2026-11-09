@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { dictionaries, type Locale } from '../src/shared/i18n/index.ts';
 import { DEFAULT_THEME, THEME_KEYS } from '../src/shared/themes.ts';
-import { api, ensurePin, login, PIN, studentLinkUrl } from './helpers.ts';
+import { api, ensurePin, login, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const LABEL = process.env.USABILITY_LABEL ?? 'before';
@@ -210,7 +210,8 @@ async function chooseClass(page: Page, cls = '3-A') {
     const sel = selects.nth(i);
     if (!(await sel.isVisible().catch(() => false))) continue;
     const opts = (await sel.locator('option').allInnerTexts()).map((o) => o.trim());
-    const pick = opts.find((o) => new RegExp(`^${esc(cls)} · (English|İngilizce)$`, 'u').test(o)) ?? opts.find((o) => o === cls);
+    // The report and statistics choosers add the school year ("3-A · English · 2026–2027").
+    const pick = opts.find((o) => new RegExp(`^${esc(cls)} · (English|İngilizce)( · .+)?$`, 'u').test(o)) ?? opts.find((o) => o === cls);
     if (!pick) continue;
     const current = await sel.evaluate((e) => (e as HTMLSelectElement).selectedOptions[0]?.textContent?.trim() ?? '');
     if (current !== pick) {
@@ -455,6 +456,14 @@ async function teacherExtras(page: Page, p: string, base: Omit<ShotSpec, 'state'
       await page.getByLabel(nm('Period')).first().selectOption({ label: (await page.getByLabel(nm('Period')).first().locator('option').allInnerTexts()).find((o) => /^(month|ay)$/iu.test(o.trim()))! }).catch(() => undefined);
       await page.waitForTimeout(1000);
       await S('class-month');
+      // S14e1 (D-153): the view bar with the Customise tree open.
+      await step(`teacher/reports customise ${base.dev.name} ${base.lang}`, async () => {
+        const customise = page.getByRole('button', { name: nm('Customise') }).first();
+        await customise.click();
+        await expect(page.getByTestId('report-view-tree')).toBeVisible();
+        await S('views-customise-open');
+        await customise.click();
+      });
       const student = page.getByLabel(nm('Student')).first();
       const opts = await student.locator('option').allInnerTexts();
       if (opts.length > 1) {
@@ -519,6 +528,18 @@ async function teacherExtras(page: Page, p: string, base: Omit<ShotSpec, 'state'
       return;
     }
     case 'avatars': {
+      return;
+    }
+    case 'students': {
+      // S14e2 (D-154): a student's name opens the statistics drawer.
+      await chooseClass(page);
+      await page.getByTestId('student-name').first().click();
+      const drawer = page.getByTestId('student-stats');
+      await expect(drawer).toBeVisible();
+      await expect(drawer.getByTestId('student-stats-report')).toBeVisible();
+      await page.waitForTimeout(800);
+      await S('stats-drawer');
+      await drawer.getByTestId('dialog-close').click();
       return;
     }
     default:
@@ -665,6 +686,69 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
       await pick('Large');
       await S('dashboard', 'density-large');
       await pick('Normal');
+    });
+
+    // S14a (D-145): the Display popover with the size, Customise layout and the Sound check.
+    await step(`classroom display popover and sound check ${where}`, async () => {
+      await d.getByTestId('classroom-settings').click();
+      await expect(d.getByTestId('sound-check')).toBeVisible();
+      await S('display-popover', 'sound-check');
+      await d.keyboard.press('Escape');
+    });
+
+    // S14e2 (D-154): a card's name opens the small positive card (never statistics).
+    await step(`classroom student card ${where}`, async () => {
+      await d.getByTestId('student-card-name').nth(2).click();
+      const card = d.getByTestId('classroom-student-card');
+      await expect(card).toBeVisible();
+      await d.waitForTimeout(600);
+      await S('student-card', 'positive-card');
+      await card.getByTestId('dialog-close').click();
+      await expect(card).toBeHidden();
+    });
+
+    // S14b (D-148): every button of the dock opens its full-screen view.
+    await step(`classroom dock views ${where}`, async () => {
+      const dock = d.getByTestId('lesson-dock');
+      await expect(dock).toBeVisible();
+      const keys = await dock.locator('button[data-testid^="dock-"][aria-haspopup="dialog"]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.testid!.slice(5)));
+      for (const key of keys) {
+        await step(`classroom dock view ${key} ${where}`, async () => {
+          await d.getByTestId(`dock-${key}`).click();
+          const view = d.getByTestId(`dock-view-${key}`);
+          await expect(view).toBeVisible();
+          await d.waitForTimeout(500);
+          await S('dock-view', key);
+          await view.getByTestId('dialog-close').click();
+          await expect(view).toBeHidden();
+        });
+      }
+    });
+
+    // S14b (D-148): Customise layout asks for the PIN, then the editor; Cancel relocks.
+    await step(`classroom layout editor ${where}`, async () => {
+      await d.getByTestId('classroom-settings').click();
+      const customise = d.getByTestId('customise-layout');
+      if (await customise.isDisabled()) {
+        await S('display-popover', 'customise-needs-wider-screen');
+        await d.keyboard.press('Escape');
+        return;
+      }
+      await customise.click();
+      const dialog = d.getByTestId('pin-dialog');
+      await expect(dialog).toBeVisible();
+      await S('layout-editor', 'pin-dialog');
+      await dialog.locator('input').first().fill(PIN);
+      await dialog.locator('input').first().press('Enter');
+      const editor = d.getByTestId('layout-editor');
+      await expect(editor).toBeVisible();
+      await d.waitForTimeout(500);
+      await S('layout-editor', 'editing');
+      await d.locator('[data-testid^="layout-frame-"]').first().click().catch(() => undefined);
+      await d.waitForTimeout(300);
+      await S('layout-editor', 'box-selected');
+      await editor.getByRole('button', { name: nm('Cancel') }).click();
+      await expect(editor).toHaveCount(0);
     });
 
     await step(`classroom routine next stage ${where}`, async () => {
@@ -919,6 +1003,15 @@ async function adminExtras(page: Page, p: string, base: Omit<ShotSpec, 'state'>,
       await page.keyboard.press('Escape');
       return;
     }
+    case 'themes': {
+      // S14g (D-158): the worked example checked and previewed (not saved).
+      await page.getByTestId('theme-file').setInputFiles({ name: 'ocean.theme.json', mimeType: 'application/json', buffer: Buffer.from(read('docs/examples/ocean.theme.json')) });
+      await page.getByRole('button', { name: nm('Check package') }).click();
+      await expect(page.getByTestId('theme-package-preview')).toBeVisible();
+      await page.waitForTimeout(600);
+      await S('import-preview');
+      return;
+    }
     default:
       return;
   }
@@ -940,9 +1033,9 @@ test('student page', async ({ browser }) => {
   const students = (await api(tp, 'GET', `/api/teacher/classes/${ctx3A.classId}/student-links`)).body.students as Array<{ id: string; link: { url: string | null } | null }>;
   const withLink = students.filter((s) => s.link?.url);
   let chosen = withLink[0]!.id;
-  for (const s of withLink.slice(0, 10)) {
+  for (const s of withLink) {
     const g = await api(tp, 'GET', `/api/teacher/contexts/${ctx3A.id}/students/${s.id}/goals`);
-    if (g.status === 200 && (g.body?.goals?.length ?? 0) > 0 && (g.body?.evidence?.length ?? 0) > 0) {
+    if (g.status === 200 && ((g.body?.goals ?? []) as Array<{ status: string }>).some((x) => x.status !== 'archived') && (g.body?.evidence?.length ?? 0) > 0) {
       chosen = s.id;
       break;
     }
@@ -1258,6 +1351,77 @@ test('super speakers scorer and board', async ({ browser }) => {
     }
   } finally {
     await api(ap, 'PUT', '/api/admin/speakers/settings', { boardLanguage: before.settings.boardLanguage, theme: before.settings.theme });
+    await admin.context.close();
+  }
+});
+
+// ================================================================== AI tools (switched on only here)
+test('AI tools pages and the consent page', async ({ browser }) => {
+  const admin = await signIn(browser, 'admin');
+  const ap = admin.page;
+  const before = (await api(ap, 'GET', '/api/admin/ai-tools')).body.settings as { mcpEnabled: boolean; aiStudentDataAllowed: boolean };
+  const CALLBACK = 'http://127.0.0.1:47123/callback';
+  try {
+    expect((await api(ap, 'PUT', '/api/admin/ai-tools', { mcpEnabled: true })).status).toBe(200);
+    const origin = new URL(ap.url()).origin;
+    // One personal token, so Profile and Admin list one (its secret is shown only once, in the dialog).
+    const teacher = await signIn(browser, 'english');
+    await ensurePin(teacher.page);
+    const tok = await api(teacher.page, 'POST', '/api/account/ai-tools/tokens', { name: 'Lesson planning (UX)', scopes: ['classes:read', 'reports:read'], days: 7, currentPassword: PASSWORD });
+    if (tok.status !== 200) miss('AI tools: the example token could not be made', tok.status);
+    const reg = await ap.request.post('/oauth/register', { headers: { 'content-type': 'application/json' }, data: JSON.stringify({ client_name: 'Example AI app (UX)', redirect_uris: [CALLBACK], token_endpoint_auth_method: 'none' }) });
+    const clientId = reg.status() === 201 ? ((await reg.json()) as { client_id: string }).client_id : null;
+    if (!clientId) miss('AI tools: the example app could not register', reg.status());
+    try {
+      for (const lang of ['en', 'tr'] as const) {
+        await setLocale(ap, lang);
+        await setLocale(teacher.page, lang);
+        for (const [dev, l] of OFFICE_RUNS.filter(([, x]) => x === lang)) {
+          const where = `${dev.name} ${l}`;
+          await step(`admin/ai-tools switched on ${where}`, async () => {
+            const { context, page } = await newPage(browser, dev, l, { storageState: await admin.context.storageState() });
+            try {
+              await page.goto('/admin/ai-tools');
+              await expect(page.getByTestId('admin-ai-tools')).toBeVisible();
+              await page.waitForTimeout(600);
+              await shot(page, { area: 'admin', page: 'ai-tools', state: 'switched-on', dev, lang: l });
+            } finally {
+              await context.close();
+            }
+          });
+          const { context, page } = await newPage(browser, dev, l, { storageState: await teacher.context.storageState() });
+          try {
+            await step(`teacher/profile AI tools ${where}`, async () => {
+              await page.goto('/teacher/profile');
+              const section = page.getByTestId('ai-tools');
+              await expect(section).toBeVisible();
+              await section.scrollIntoViewIfNeeded();
+              await shot(page, { area: 'teacher', page: 'profile', state: 'ai-tools-on', dev, lang: l });
+            });
+            await step(`oauth consent ${where}`, async () => {
+              if (!clientId) throw new Error('no registered app');
+              await page.route('http://127.0.0.1:47123/**', (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'Back in the app.' }));
+              const challenge = 'x'.repeat(43);
+              const q = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: CALLBACK, code_challenge: challenge, code_challenge_method: 'S256', state: `ux-${l}`, resource: `${origin}/mcp`, scope: 'classes:read reports:read' });
+              await page.goto(`/oauth/authorize?${q.toString()}`);
+              await expect(page).toHaveURL(/\/oauth\/consent\?request=/u);
+              await expect(page.getByTestId('oauth-consent')).toBeVisible();
+              await shot(page, { area: 'auth', page: 'oauth-consent', state: 'default', dev, lang: l });
+              cover('/oauth/consent');
+            });
+          } finally {
+            await context.close();
+          }
+        }
+      }
+    } finally {
+      await setLocale(teacher.page, 'en');
+      await teacher.context.close();
+    }
+  } finally {
+    await setLocale(ap, 'en');
+    // Switching AI tools off also ends every OAuth connection and waiting request (D-160).
+    await api(ap, 'PUT', '/api/admin/ai-tools', { mcpEnabled: before.mcpEnabled, aiStudentDataAllowed: before.aiStudentDataAllowed });
     await admin.context.close();
   }
 });
