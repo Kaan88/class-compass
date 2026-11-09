@@ -81,14 +81,17 @@ function InlineNodes({ nodes, links }: { nodes: Inline[]; links: GuideLinkHandle
   });
 }
 
-function Blocks({ blocks, links }: { blocks: Block[]; links: GuideLinkHandler }): ReactNode {
+function Blocks({ blocks, links, titleId }: { blocks: Block[]; links: GuideLinkHandler; titleId?: string }): ReactNode {
   const { t } = useI18n();
+  const firstH1 = titleId ? blocks.findIndex((b) => b.kind === 'heading' && b.level === 1) : -1;
   return blocks.map((b, i) => {
     switch (b.kind) {
       case 'heading': {
         const Tag = `h${b.level}` as const;
+        // The guide's title can be the screen's title (`titleId`): focusable, the focus goes there.
+        const title = i === firstH1;
         return (
-          <Tag key={i} id={b.id} className={`cc-guide__h${b.level}`}>
+          <Tag key={i} id={title ? titleId : b.id} tabIndex={title ? -1 : undefined} className={`cc-guide__h${b.level}`}>
             <InlineNodes nodes={b.content} links={links} />
           </Tag>
         );
@@ -169,8 +172,12 @@ function Blocks({ blocks, links }: { blocks: Block[]; links: GuideLinkHandler })
   });
 }
 
-/** One guide in one language. `anchor` scrolls to a heading once the guide is shown. */
-export function GuideView({ guide, locale, anchor, links }: { guide: GuideId; locale: Locale; anchor?: string | null; links: GuideLinkHandler }) {
+/**
+ * One guide in one language. `anchor` scrolls to a heading once the guide is shown. With `titleId`
+ * (a page whose screens each focus their h1, S14d D-151), the guide's own h1 gets that id and the
+ * focus once per guide when its text has loaded.
+ */
+export function GuideView({ guide, locale, anchor, links, titleId }: { guide: GuideId; locale: Locale; anchor?: string | null; links: GuideLinkHandler; titleId?: string }) {
   const { t } = useI18n();
   const [state, setState] = useState<{ key: string; text: string | null } | null>(null);
   const key = `${locale}/${guide}`;
@@ -193,11 +200,17 @@ export function GuideView({ guide, locale, anchor, links }: { guide: GuideId; lo
     if (target) target.scrollIntoView({ block: 'start' });
     else root.current?.scrollIntoView?.({ block: 'start' });
   }, [text, anchor]);
+  const focused = useRef<GuideId | null>(null);
+  useEffect(() => {
+    if (!text || !titleId || focused.current === guide) return;
+    focused.current = guide;
+    root.current?.querySelector<HTMLElement>(`[id="${CSS.escape(titleId)}"]`)?.focus({ preventScroll: true });
+  }, [text, titleId, guide]);
   if (text === undefined) return <p className="cc-muted">{t('common.loading')}</p>;
   if (text === null) return <Alert>{t('help.notFound')}</Alert>;
   return (
     <article ref={root} className="cc-guide" lang={locale} data-testid="guide" data-guide={guide}>
-      <Blocks blocks={blocks} links={links} />
+      <Blocks blocks={blocks} links={links} titleId={titleId} />
     </article>
   );
 }

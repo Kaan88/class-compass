@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_STARTERS, defaultStarterId } from '../../src/server/modules/goals/starters.ts';
-import { blankRange, fillBlank, hasBlank, isUnfinishedStarter, normaliseStarter, STARTER_KINDS, STARTER_SAMPLE, STARTER_TEXT_KIND } from '../../src/shared/text/starters.ts';
+import { blankRange, fillBlank, hasBlank, isUnfinishedStarter, normaliseStarter, STARTER_KINDS, STARTER_SAMPLE, STARTER_TEXT_KIND, starterKindsOf, type StarterKind } from '../../src/shared/text/starters.ts';
 import { checkStudentText } from '../../src/shared/text/textQuality.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
@@ -17,6 +17,8 @@ const WRITING = '00000000-0000-7000-8000-00000000c002';
 const GOAL_1 = defaultStarterId('goal', 1);
 
 const ALL_STARTER_TEXTS = STARTER_KINDS.flatMap((k) => DEFAULT_STARTERS[k].flatMap((t) => [t.en!, t.tr!]));
+/** What the server passes for a text kind: the built-ins of the matching starter kind only. */
+const startersOfKind = (kind: StarterKind) => starterKindsOf(STARTER_TEXT_KIND[kind]).flatMap((k) => DEFAULT_STARTERS[k].flatMap((t) => [t.en!, t.tr!]));
 
 /** Short, child-like words that finish a starter (a real student would write these). */
 const FILL: Record<'en' | 'tr', string> = { en: 'my English words', tr: 'İngilizce kelimeleri' };
@@ -40,23 +42,54 @@ describe('built-in starters (D-152)', () => {
     expect(ids.size).toBe(STARTER_KINDS.reduce((n, k) => n + DEFAULT_STARTERS[k].length, 0));
   });
 
-  it('filled starters pass the student text checks; unchanged ones (blank kept or removed) fail with STARTER_UNFINISHED (GOL-5, D-123)', () => {
+  it('filled starters pass the student text checks; unchanged ones fail with STARTER_UNFINISHED, and so does an end blank only deleted (GOL-5, D-123)', () => {
     for (const kind of STARTER_KINDS) {
       for (const t of DEFAULT_STARTERS[kind]) {
         for (const lang of ['en', 'tr'] as const) {
           const starter = t[lang]!;
           const textKind = STARTER_TEXT_KIND[kind];
-          const opts = { starters: ALL_STARTER_TEXTS };
-          for (const words of [STARTER_SAMPLE[lang], FILL[lang]]) {
-            const filled = fillBlank(starter, words);
-            expect(checkStudentText(filled, textKind, opts), `${kind} ${lang}: "${filled}"`).toEqual({ ok: true });
+          for (const opts of [{ starters: startersOfKind(kind) }, { starters: ALL_STARTER_TEXTS }]) {
+            for (const words of [STARTER_SAMPLE[lang], FILL[lang]]) {
+              const filled = fillBlank(starter, words);
+              expect(checkStudentText(filled, textKind, opts), `${kind} ${lang}: "${filled}"`).toEqual({ ok: true });
+            }
+            expect(checkStudentText(starter, textKind, opts), `${kind} ${lang}: "${starter}"`).toEqual({ ok: false, reason: 'STARTER_UNFINISHED' });
           }
-          expect(checkStudentText(starter, textKind, opts), `${kind} ${lang}: "${starter}"`).toEqual({ ok: false, reason: 'STARTER_UNFINISHED' });
+          // Blank deleted: refused only when the blank ended the starter ("I want to get better at.");
+          // with the blank in the middle or at the start what is left is often a real sentence.
           const blankRemoved = starter.replace('___', '');
-          expect(checkStudentText(blankRemoved, textKind, opts), `${kind} ${lang}: "${blankRemoved}"`).toEqual({ ok: false, reason: 'STARTER_UNFINISHED' });
+          const res = checkStudentText(blankRemoved, textKind, { starters: startersOfKind(kind) });
+          if (/___[.!?: ]*$/u.test(starter)) expect(res, `${kind} ${lang}: "${blankRemoved}"`).toEqual({ ok: false, reason: 'STARTER_UNFINISHED' });
+          else expect(res.ok ? null : res.reason, `${kind} ${lang}: "${blankRemoved}"`).not.toBe('STARTER_UNFINISHED');
         }
       }
     }
+  });
+
+  it('natural sentences a child writes on their own pass, even when they are a starter without its middle blank (D-123, S14d review)', () => {
+    const natural: Array<[StarterKind, string]> = [
+      ['practice', 'Read at bedtime'],
+      ['practice', 'Practise with a friend'],
+      ['practice', 'Write in my notebook'],
+      ['practice', 'Yatmadan önce okumak'],
+      ['goal', 'I will read this week.'],
+      ['goal', 'I will practise every day.'],
+      ['goal', 'Bu hafta okuyacağım.'],
+      ['reflection', 'I was proud of my reading today.'],
+      ['note', 'I need help with spelling.'],
+      ['selfAssessment', 'It is hard but I try.'],
+      ['evidence', 'I made this at home.'],
+      ['caption', 'My story'],
+    ];
+    for (const [kind, text] of natural) {
+      // Every built-in of every kind is passed here, so no natural sentence hits any starter.
+      expect(checkStudentText(text, STARTER_TEXT_KIND[kind], { starters: ALL_STARTER_TEXTS }), `${kind}: "${text}"`).toEqual({ ok: true });
+    }
+    // Starters are compared only within their kind: a note's starter words are not refused as a goal.
+    expect(starterKindsOf('goal')).toEqual(['goal']);
+    expect(starterKindsOf('linkTitle')).toEqual(['caption']);
+    expect(checkStudentText('I need help with.', 'note', { starters: startersOfKind('note') })).toEqual({ ok: false, reason: 'STARTER_UNFINISHED' });
+    expect(checkStudentText('I need help with.', 'goal', { starters: startersOfKind('goal') })).not.toEqual({ ok: false, reason: 'STARTER_UNFINISHED' });
   });
 
   it('a blank is caught without the list; case, spaces and punctuation do not hide a starter; real sentences pass', () => {
@@ -112,6 +145,10 @@ describe('starters on the student page and the STARTER_UNFINISHED rule', () => {
     expect(reasonOf(await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: '___ konusunda daha iyi olmak istiyorum.' }))).toBe('TEXT_STARTER_UNFINISHED');
     const goal = await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I want to get better at reading stories.', practiceChoices: ['Read comics at bedtime.'] }));
     expect(reasonOf(await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read comics.', practiceChoices: ['Read ___ at bedtime.'] }))).toBe('TEXT_STARTER_UNFINISHED');
+    // Real sentences pass (S14d review): practice ideas that are a starter without its middle blank,
+    // and a goal that matches another kind's starter (only the goal starters are compared).
+    await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read this week.', practiceChoices: ['Read at bedtime', 'Practise with a friend'] }));
+    await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I need help with.' }));
     expect(reasonOf(await adaPhone.post(`/api/student/goals/${goal.id}/entries`, { kind: 'reflection', body: 'Today I learned ___.' }))).toBe('TEXT_STARTER_UNFINISHED');
     expect(reasonOf(await adaPhone.post(`/api/student/goals/${goal.id}/entries`, { kind: 'self_assessment', body: 'It is going well because', confidence: 4 }))).toBe('TEXT_STARTER_UNFINISHED');
     await ok(adaPhone.post(`/api/student/goals/${goal.id}/entries`, { kind: 'self_assessment', body: 'It is going well because I read every night.', confidence: 4 }));
@@ -147,18 +184,24 @@ describe('starters on the student page and the STARTER_UNFINISHED rule', () => {
     const libB = await ok(s.teacherB.get(`/api/teacher/contexts/${s.ctxB.id}/goal-library`));
     expect(libB.starters.some((x: any) => x.id === own.id)).toBe(false);
     expect((await s.teacherB.patch(`/api/teacher/starters/${own.id}`, { archived: true })).status).toBe(404);
-    // Its own words sent unchanged are refused too, also after it was archived.
-    expect(reasonOf(await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read with my family.' }))).toBe('TEXT_STARTER_UNFINISHED');
+    // Its words with the blank, or with only its end blank deleted, are refused too, also after it was
+    // archived; without a middle blank it is a real sentence and is saved (S14d review).
+    const ends = await ok(make({ kind: 'goal', text: { en: 'My reading plan is ___.' } }));
+    expect(reasonOf(await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read ___ with my family.' }))).toBe('TEXT_STARTER_UNFINISHED');
+    expect(reasonOf(await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'My reading plan is.' }))).toBe('TEXT_STARTER_UNFINISHED');
     const archived = await ok(s.teacherA.patch(`/api/teacher/starters/${own.id}`, { archived: true }));
     expect(archived.archived).toBe(true);
+    await ok(s.teacherA.patch(`/api/teacher/starters/${ends.id}`, { archived: true }));
     expect((await startersOnPage()).some((x) => x.id === own.id)).toBe(false);
-    expect(reasonOf(await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read with my family.' }))).toBe('TEXT_STARTER_UNFINISHED');
+    expect(reasonOf(await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read ___ with my family.' }))).toBe('TEXT_STARTER_UNFINISHED');
+    expect(reasonOf(await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'My reading plan is' }))).toBe('TEXT_STARTER_UNFINISHED');
+    await ok(adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read with my family.' }));
     // Editing checks again.
     expect(reasonOf(await s.teacherA.patch(`/api/teacher/starters/${own.id}`, { text: { en: 'No blank here.' } }))).toBe('STARTER_NEEDS_BLANK');
     const edited = await ok(s.teacherA.patch(`/api/teacher/starters/${own.id}`, { text: { en: 'We will read ___ together.' }, archived: false }));
     expect(edited.text).toEqual({ en: 'We will read ___ together.' });
     const actions = env.db.$client.prepare("select action from audit_events where entity = 'text_starter' order by action").all() as Array<{ action: string }>;
-    expect(actions.map((a) => a.action)).toEqual(['text_starter.create', 'text_starter.create', 'text_starter.update', 'text_starter.update']);
+    expect(actions.map((a) => a.action)).toEqual(['text_starter.create', 'text_starter.create', 'text_starter.create', 'text_starter.update', 'text_starter.update', 'text_starter.update']);
   });
 
   it('a category starter is offered only while its category can be chosen', async () => {

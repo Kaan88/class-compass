@@ -27,6 +27,9 @@ export const STARTER_TEXT_KIND: Record<StarterKind, TextKind> = {
   practice: 'practiceChoice',
 };
 
+/** The starter kinds whose texts are checked as this text kind (each text kind has at most one). */
+export const starterKindsOf = (kind: TextKind): StarterKind[] => STARTER_KINDS.filter((k) => STARTER_TEXT_KIND[k] === kind);
+
 /** A word that fills the blank when a teacher's starter is checked (it must read as real words). */
 export const STARTER_SAMPLE: Record<'en' | 'tr', string> = { en: 'reading books', tr: 'kitap okumak' };
 
@@ -53,15 +56,21 @@ const core = (text: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 
+/** Only punctuation or spaces after the starter's last blank: the child's words were meant to end it. */
+const BLANK_AT_END_RE = /_{2,}[^\p{L}\p{N}_]*$/u;
+
 /**
- * The text is not finished: a blank is still in it, or it is only one of the starters (with the blank
- * removed). A student taps a starter and must add their own words.
+ * The text is not finished (S14d review): a blank is still in it, or it is a starter whose blank was
+ * at its end with only that blank removed ("I want to get better at."), so nothing of the child's own
+ * was added. A starter with its blank in the middle or at the start is NOT compared: what is left
+ * without the blank is often a real sentence a child writes on their own ("Read at bedtime.", "I will
+ * read this week.", D-123). Callers pass only the starters of the text's own kind (`starterKindsOf`).
  */
 export function isUnfinishedStarter(text: string, starters: readonly string[]): boolean {
   if (hasBlank(text)) return true;
   const c = core(text);
   if (!c) return false;
-  return starters.some((s) => core(s) === c);
+  return starters.some((s) => BLANK_AT_END_RE.test(s) && core(s) === c);
 }
 
 /** Where the first blank is (for selecting it in the text box), or null. */

@@ -198,12 +198,15 @@ describe('sentence starters (D-152)', () => {
     expect(box.value).toBe('Today I learned ___.');
   });
 
-  it('asks "Replace your words?" before replacing the child’s own words', () => {
+  it('asks "Replace your words?" before replacing the child’s own words; after No the focus is back on the chip', () => {
     render(wrap(<StarterBox initial="I like foxes." />));
     fireEvent.click(screen.getByRole('button', { name: 'Today I learned …' }));
     expect(screen.getByTestId('inline-confirm').textContent).toContain(en['starters.replace']);
+    expect(document.activeElement?.textContent).toBe(en['starters.replaceNo']);
     fireEvent.click(screen.getByRole('button', { name: en['starters.replaceNo'] }));
     expect((screen.getByLabelText('box') as HTMLTextAreaElement).value).toBe('I like foxes.');
+    expect(screen.queryByTestId('inline-confirm')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Today I learned …' }));
     fireEvent.click(screen.getByRole('button', { name: 'Today I learned …' }));
     fireEvent.click(screen.getByRole('button', { name: en['starters.replaceYes'] }));
     expect((screen.getByLabelText('box') as HTMLTextAreaElement).value).toBe('Today I learned ___.');
@@ -222,11 +225,22 @@ describe('sentence starters (D-152)', () => {
     fireEvent.click(screen.getByRole('button', { name: en['student.next'] }));
     expect(screen.getByText(en['textCheck.STARTER_UNFINISHED'], { exact: false })).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
+    // Only the end blank deleted: still unfinished, and the hint does not talk about a ___ that is gone.
+    fireEvent.change(screen.getByLabelText(en['student.myGoalWords']), { target: { value: 'I want to get better at.' } });
+    fireEvent.click(screen.getByRole('button', { name: en['student.next'] }));
+    expect(screen.getByText(en['starters.addWords'], { exact: false })).toBeTruthy();
+    expect(screen.queryByText(en['textCheck.STARTER_UNFINISHED'], { exact: false })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
     // Typing clears the hint; a finished sentence moves on to the practice ideas.
     fireEvent.change(screen.getByLabelText(en['student.myGoalWords']), { target: { value: 'I want to get better at reading stories.' } });
     expect(screen.queryByText(en['textCheck.STARTER_UNFINISHED'], { exact: false })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: en['student.next'] }));
     expect(screen.getByRole('heading', { name: en['student.newGoal.practice'] })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Read … at bedtime.' })).toBeTruthy();
+    // A real practice idea that is a starter without its middle blank is accepted (S14d review, D-123).
+    fireEvent.change(screen.getByLabelText(en['student.newGoal.idea']), { target: { value: 'Read at bedtime' } });
+    fireEvent.click(screen.getByRole('button', { name: en['student.newGoal.addIdea'] }));
+    expect(screen.getByRole('list', { name: en['student.newGoal.ideas'] }).textContent).toContain('Read at bedtime');
+    expect(screen.queryByText(en['starters.addWords'], { exact: false })).toBeNull();
   });
 });

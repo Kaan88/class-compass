@@ -4,8 +4,10 @@
  * - the link opens (token in the fragment, removed from the address bar) on the home screen: hello,
  *   the subject switch (3-A has Goals in several subjects, remembered on the device), the tiles;
  * - New goal (category → ready goal → practice idea from a starter chip), How is it going? (goal →
- *   face → starter + own words), Show my work (how → which goal → words), My goals with the teacher's
- *   feedback, achievements; Back and a reload keep the screen (screens live in the query string);
+ *   face → starter + own words; "Something I learned" and "Note to myself" saved as a reflection and a
+ *   note), Show my work (how → which goal → words), My goals with the teacher's feedback, My
+ *   achievements, My homework, Help; Back and a reload keep the screen (screens live in the query
+ *   string); the focus is on each screen's h1;
  * - a link with a screen in the query and the token in the fragment opens that screen (the token is
  *   never taken for a screen);
  * - axe on every screen, in English and in Turkish; an emergency revoke (D-118) shows "This link no
@@ -46,6 +48,11 @@ test('a student uses the home tiles and short steps on a phone, with sentence st
   expect(url).toMatch(/\/s#[A-Za-z0-9_-]{43}$/u);
   const feedback = `Lovely reading this week (${Date.now()})`;
   expect((await api(page, 'POST', `/api/teacher/contexts/${contextId}/students/${student.id}/feedback`, { body: feedback })).status).toBe(200);
+  // Achievements and homework on for this class+subject (their tiles and screens are checked too).
+  type ModuleSetting = { module: string; enabled: boolean; config: Record<string, unknown> | null };
+  const modules = (await api(page, 'GET', `/api/teacher/contexts/${contextId}/modules`)).body.modules as ModuleSetting[];
+  const original = modules.filter((m) => m.module === 'achievements' || m.module === 'homework');
+  for (const m of original) expect((await api(page, 'PUT', `/api/teacher/contexts/${contextId}/modules/${m.module}`, { enabled: true, config: m.config })).status).toBe(200);
 
   const phone = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true, locale: 'en-GB' });
   const p = await phone.newPage();
@@ -62,7 +69,7 @@ test('a student uses the home tiles and short steps on a phone, with sentence st
     await subjects.getByRole('button', { name: 'English', exact: true }).click();
     await expect(subjects.getByRole('button', { name: 'English', exact: true })).toHaveAttribute('aria-pressed', 'true');
     const tiles = p.getByRole('navigation', { name: 'What do you want to do?' });
-    for (const name of ['My goals', 'New goal', 'How is it going?', 'Show my work', 'My avatar']) await expect(tiles.getByRole('link', { name })).toBeVisible();
+    for (const name of ['My goals', 'New goal', 'How is it going?', 'Show my work', /^My achievements/u, 'My homework', 'My avatar']) await expect(tiles.getByRole('link', { name })).toBeVisible();
     expect(await noSideScroll(p), 'horizontal scroll on home').toBeLessThanOrEqual(0);
     expect(await seriousViolations(p)).toEqual([]);
 
@@ -117,6 +124,29 @@ test('a student uses the home tiles and short steps on a phone, with sentence st
     await expect(goal).toContainText('It is going well because I read every night.');
     await expect(goal).toContainText('Confidence 4 of 5');
 
+    // ---- Every entry kind stays reachable: "Something I learned" (a reflection) and "Note to myself" (a note).
+    const kinds = [
+      { choice: 'Something I learned', chip: 'Today I learned …', words: 'three new animal words', saved: 'Today I learned three new animal words.', kind: 'reflection' },
+      { choice: 'Note to myself', chip: 'Remember to …', words: 'bring my reading book', saved: 'Remember to bring my reading book.', kind: 'note' },
+    ] as const;
+    for (const k of kinds) {
+      await p.getByTestId('student-back').click();
+      await tiles.getByRole('link', { name: 'How is it going?' }).click();
+      await p.getByRole('button', { name: 'I will read a short book every week.' }).click();
+      await p.getByRole('button', { name: k.choice }).click();
+      expect(query(p)).toMatchObject({ screen: 'howIsItGoing', step: '3' });
+      await p.getByRole('button', { name: k.chip }).click();
+      await p.keyboard.type(k.words);
+      await expect(p.getByLabel('My words')).toHaveValue(k.saved);
+      expect(await seriousViolations(p)).toEqual([]);
+      await p.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(title(p)).toHaveText('My goals');
+      await expect(goal).toContainText(k.saved);
+    }
+    const saved = (await api(page, 'GET', `/api/teacher/contexts/${contextId}/students/${student.id}/goals`)).body.goals as Array<{ presetText: { en?: string } | null; entries: Array<{ kind: string; body: string }> }>;
+    const entries = saved.find((g) => g.presetText?.en === 'I will read a short book every week.')!.entries;
+    for (const k of kinds) expect(entries.find((e) => e.body === k.saved)?.kind, k.choice).toBe(k.kind);
+
     // ---- Show my work: how → which goal → words (pictures and voice stay off while the media flags are off, D-014).
     await p.getByTestId('student-back').click();
     await tiles.getByRole('link', { name: 'Show my work' }).click();
@@ -127,7 +157,7 @@ test('a student uses the home tiles and short steps on a phone, with sentence st
     await form.getByRole('button', { name: 'For all my learning' }).click();
     await form.getByRole('button', { name: 'This is my …' }).click();
     await p.keyboard.type('book list about a little fox');
-    await expect(form.getByLabel('Write your evidence')).toHaveValue('This is my book list about a little fox.');
+    await expect(form.getByLabel('Write about your work')).toHaveValue('This is my book list about a little fox.');
     expect(await seriousViolations(p)).toEqual([]);
     await form.getByRole('button', { name: 'Save my work' }).click();
     await expect(p.getByTestId('student-evidence').getByRole('listitem').filter({ hasText: 'This is my book list about a little fox.' })).toBeVisible();
@@ -138,6 +168,30 @@ test('a student uses the home tiles and short steps on a phone, with sentence st
     await expect(title(p)).toHaveText('My avatar');
     expect(await seriousViolations(p)).toEqual([]);
     await p.goBack();
+    await expect(p.getByRole('heading', { name: `Hello, ${student.fullName}!`, level: 1 })).toBeFocused();
+
+    // ---- My achievements, My homework and Help: axe, and the focus on each screen's h1.
+    for (const [tile, heading] of [
+      [/^My achievements/u, 'My achievements'],
+      ['My homework', 'My homework'],
+    ] as const) {
+      await tiles.getByRole('link', { name: tile }).click();
+      await expect(title(p)).toHaveText(heading);
+      await expect(title(p)).toBeFocused();
+      expect(await noSideScroll(p), `horizontal scroll on ${heading}`).toBeLessThanOrEqual(0);
+      expect(await seriousViolations(p)).toEqual([]);
+      await p.getByTestId('student-back').click();
+      await expect(p.getByRole('heading', { name: `Hello, ${student.fullName}!`, level: 1 })).toBeFocused();
+    }
+    // Help is its own screen; its guide's h1 is the screen title and takes the focus once it has loaded.
+    await p.locator('.cc-student__bar').getByRole('button', { name: 'Help', exact: true }).click();
+    await expect(p.getByTestId('help-panel')).toBeVisible();
+    expect(query(p)).toMatchObject({ screen: 'help' });
+    await expect(title(p)).toHaveText(/guide for students and parents/u);
+    await expect(title(p)).toBeFocused();
+    await expect(p.getByRole('heading', { level: 1 })).toHaveCount(1);
+    expect(await seriousViolations(p)).toEqual([]);
+    await p.getByRole('button', { name: 'Back to the page' }).first().click();
     await expect(p.getByRole('heading', { name: `Hello, ${student.fullName}!`, level: 1 })).toBeFocused();
 
     // ---- Two subjects: Mathematics has its own tiles; the choice survives a reload.
@@ -218,6 +272,7 @@ test('a student uses the home tiles and short steps on a phone, with sentence st
   } finally {
     await phone.close();
     await setLanguage('en', false);
+    for (const m of original) await api(page, 'PUT', `/api/teacher/contexts/${contextId}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
   }
 });
 

@@ -224,7 +224,7 @@ export function EvidenceAdder({
           drop(it.key);
         }
         return true;
-      }, t('student.toast.evidenceAdded'));
+      }, t(steps ? 'student.work.saved' : 'student.toast.evidenceAdded'));
       if (ok) {
         reset();
         if (steps) {
@@ -383,7 +383,8 @@ export function EvidenceAdder({
           })
         : null}
       <TextArea
-        label={current === 'text' ? t('student.evidenceWords') : t('student.evidenceCaption')}
+        // The steps are for 7–10-year-olds: simpler words than the teacher's form (D-151).
+        label={current === 'text' ? t(steps ? 'student.work.words' : 'student.evidenceWords') : t(steps ? 'student.work.caption' : 'student.evidenceCaption')}
         rows={3}
         value={body}
         onChange={(v) => {

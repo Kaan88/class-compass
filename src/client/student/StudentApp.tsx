@@ -218,7 +218,8 @@ function Page({ onLanguage, nav }: { onLanguage: (l: ClassLanguage) => void; nav
   if (screen === 'help')
     content = (
       <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
-        <HelpPanel guide="student" onClose={nav.back} />
+        {/* The guide's h1 is this screen's title; it takes the focus when it has loaded (lazy). */}
+        <HelpPanel guide="student" onClose={nav.back} titleId={SCREEN_TITLE_ID} />
       </Suspense>
     );
   else if (screen === 'avatar')

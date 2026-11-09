@@ -2,7 +2,8 @@
  * Sentence starter chips (S14d, D-152) above a text box on the student page. Tapping a chip puts the
  * starter in the box and selects its blank (`___`), so the child types straight over it. When the box
  * already has the child's own words, "Replace your words?" asks first, in the page (never a browser
- * dialog). Chips show the blank as "…" so a screen reader does not read underscores.
+ * dialog); after "No, keep my words" the focus goes back to the chip that asked. Chips show the
+ * blank as "…" so a screen reader does not read underscores.
  */
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { blankRange, isUnfinishedStarter } from '../../shared/text/starters.ts';
@@ -28,6 +29,15 @@ export function SentenceStarters({
   const { t } = useI18n();
   const [asking, setAsking] = useState<string | null>(null);
   const select = useRef<string | null>(null);
+  const chips = useRef<HTMLDivElement>(null);
+  /** The chip to focus again after "No" (its index): the question and its focused button are gone. */
+  const returnTo = useRef<number | null>(null);
+  useEffect(() => {
+    if (asking !== null || returnTo.current === null) return;
+    const i = returnTo.current;
+    returnTo.current = null;
+    chips.current?.querySelector<HTMLButtonElement>(`[data-starter="${i}"]`)?.focus();
+  }, [asking]);
   // After the box shows the starter: focus it and select the blank.
   useEffect(() => {
     const el = target.current;
@@ -44,6 +54,10 @@ export function SentenceStarters({
     setAsking(null);
     onChange(s);
   };
+  const keep = () => {
+    returnTo.current = asking === null ? null : starters.indexOf(asking);
+    setAsking(null);
+  };
   const tap = (s: string) => {
     // Empty, or still only a starter: nothing of the child's own would be lost.
     if (!value.trim() || isUnfinishedStarter(value, starters)) put(s);
@@ -51,18 +65,18 @@ export function SentenceStarters({
   };
   return (
     <div className="cc-stack cc-starters">
-      <div className="cc-starters__chips" role="group" aria-label={t('starters.title')} data-testid="sentence-starters">
+      <div ref={chips} className="cc-starters__chips" role="group" aria-label={t('starters.title')} data-testid="sentence-starters">
         <span className="cc-starters__title" aria-hidden="true">
           {t('starters.title')}
         </span>
-        {starters.map((s) => (
-          <Button key={s} size="small" className="cc-starters__chip" onPress={() => tap(s)}>
+        {starters.map((s, i) => (
+          <Button key={s} size="small" className="cc-starters__chip" onPress={() => tap(s)} data-starter={i}>
             {chipText(s)}
           </Button>
         ))}
       </div>
       {asking !== null ? (
-        <InlineConfirm message={t('starters.replace')} confirmLabel={t('starters.replaceYes')} cancelLabel={t('starters.replaceNo')} onConfirm={() => put(asking)} onCancel={() => setAsking(null)} />
+        <InlineConfirm message={t('starters.replace')} confirmLabel={t('starters.replaceYes')} cancelLabel={t('starters.replaceNo')} onConfirm={() => put(asking)} onCancel={keep} />
       ) : null}
     </div>
   );

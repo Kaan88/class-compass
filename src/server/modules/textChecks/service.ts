@@ -14,6 +14,7 @@ import type { z } from 'zod';
 import { localDate } from '../../../domain/dates.ts';
 import type * as C from '../../../shared/contracts/textChecks.ts';
 import { checkStudentText, findRiskyWord, type TextKind, type TextLimits, type WordLists } from '../../../shared/text/textQuality.ts';
+import { starterKindsOf } from '../../../shared/text/starters.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { classes, enrolments, evidence, goalEntries, goals, schoolSettings, students, teachingContexts, textCheckAttempts, textCheckWords } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
@@ -58,12 +59,12 @@ export interface StudentTextTarget {
 
 /**
  * Throws 400 with `reason: TEXT_<REASON>` (and `textReason`) when the text does not pass. The sentence
- * starters of the subject (S14d, D-152) are passed in, so a starter sent unchanged or with its blank
+ * starters of the subject and of this text's kind (S14d, D-152) are passed in, so a starter sent unchanged or with its blank
  * is refused (`TEXT_STARTER_UNFINISHED`); like every reason but a blocked word, it is not counted.
  */
 export function assertStudentText(ctx: RequestContext, target: StudentTextTarget, text: string | null | undefined, kind: TextKind): void {
   if (text === null || text === undefined) return;
-  const res = checkStudentText(text, kind, { limits: limitsOf(ctx.db), lists: wordListsFor(ctx.db, target.teacherIds), starters: starterTextsFor(ctx.db, target.subjectId, target.teacherIds) });
+  const res = checkStudentText(text, kind, { limits: limitsOf(ctx.db), lists: wordListsFor(ctx.db, target.teacherIds), starters: starterTextsFor(ctx.db, target.subjectId, target.teacherIds, starterKindsOf(kind)) });
   if (res.ok) return;
   throw new AppError('VALIDATION', res.reason === 'BLOCKED_WORD' ? 'Please use kind words' : 'Please write real words and a little more', {
     reason: `TEXT_${res.reason}`,

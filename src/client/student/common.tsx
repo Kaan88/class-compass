@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type { StudentGoalsSection } from '../../shared/contracts/goals.ts';
 import type { Locale } from '../../shared/i18n/index.ts';
-import { blankRange, type StarterKind } from '../../shared/text/starters.ts';
+import { blankRange, hasBlank, starterKindsOf, type StarterKind } from '../../shared/text/starters.ts';
 import { checkStudentText, exampleKeyFor, findRiskyWord, type TextKind } from '../../shared/text/textQuality.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { useRun } from '../lib/useRun.ts';
@@ -25,8 +25,11 @@ export function useStudentRun() {
   };
 }
 
-/** The starter texts of the page in every language it has (for the "only a starter" check). */
-export const starterTexts = (data: StudentGoalsSection) => data.starters.flatMap((s) => [s.text.en, s.text.tr].filter((x): x is string => Boolean(x)));
+/** The page's starter texts of one text kind, in every language it has (for the "only a starter" check). */
+export const starterTexts = (data: StudentGoalsSection, kind: TextKind) => {
+  const kinds = starterKindsOf(kind);
+  return data.starters.filter((s) => kinds.includes(s.kind)).flatMap((s) => [s.text.en, s.text.tr].filter((x): x is string => Boolean(x)));
+};
 
 /** Starters of one kind in the page language; a category's own starters first, then the general ones. */
 export function startersOf(data: StudentGoalsSection, kind: StarterKind, locale: Locale, categoryId: string | null = null): string[] {
@@ -46,7 +49,6 @@ export type SaveCheck = { hint?: string; send: boolean };
  */
 export function useSaveCheck(data: StudentGoalsSection) {
   const { t } = useI18n();
-  const starters = starterTexts(data);
   return (text: string, kind: TextKind | 'url'): SaveCheck => {
     if (kind === 'url') {
       let words = text;
@@ -57,10 +59,11 @@ export function useSaveCheck(data: StudentGoalsSection) {
       }
       return findRiskyWord(words) ? { hint: t('textCheck.BLOCKED_WORD'), send: true } : { send: true };
     }
-    const r = checkStudentText(text, kind, { limits: data.textLimits, starters });
+    const r = checkStudentText(text, kind, { limits: data.textLimits, starters: starterTexts(data, kind) });
     if (r.ok) return { send: true };
     if (r.reason === 'BLOCKED_WORD') return { hint: t('textCheck.BLOCKED_WORD'), send: true };
-    if (r.reason === 'STARTER_UNFINISHED') return { hint: t('textCheck.STARTER_UNFINISHED'), send: false };
+    // With the blank still there say where the words go; without it (the blank was deleted) do not name a ___ the child cannot see.
+    if (r.reason === 'STARTER_UNFINISHED') return { hint: t(hasBlank(text) ? 'textCheck.STARTER_UNFINISHED' : 'starters.addWords'), send: false };
     return { hint: `${t(`textCheck.${r.reason}`)} ${t(exampleKeyFor(kind))}`, send: false };
   };
 }

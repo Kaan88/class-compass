@@ -9,7 +9,8 @@ import { Button } from '../ui/Button.tsx';
 import type { GuideId } from './guides.ts';
 import { GuideView } from './GuideView.tsx';
 
-export default function HelpPanel({ guide: first, onClose }: { guide: GuideId; onClose: () => void }) {
+/** `titleId`: the guide's h1 becomes the screen's title and gets the focus once loaded (student page, D-151). */
+export default function HelpPanel({ guide: first, onClose, titleId }: { guide: GuideId; onClose: () => void; titleId?: string }) {
   const { t, locale } = useI18n();
   const [guide, setGuide] = useState<GuideId>(first);
   return (
@@ -17,7 +18,7 @@ export default function HelpPanel({ guide: first, onClose }: { guide: GuideId; o
       <div>
         <Button onPress={onClose}>{t('help.close')}</Button>
       </div>
-      <GuideView guide={guide} locale={locale} links={{ href: () => '#', open: (g) => setGuide(g) }} />
+      <GuideView guide={guide} locale={locale} titleId={titleId} links={{ href: () => '#', open: (g) => setGuide(g) }} />
       <div>
         <Button onPress={onClose}>{t('help.close')}</Button>
       </div>

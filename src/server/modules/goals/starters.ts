@@ -10,8 +10,9 @@
  *   language(s).
  * - Archiving follows D-116: a teacher hides a default for their own classes (`default_item_archives`,
  *   kind 'starter'), an administrator archives it for the school (`archivedAt`).
- * - `starterTextsFor` gives every starter text of a subject (archived ones too) to the server's
- *   `STARTER_UNFINISHED` check, so a starter sent unchanged is refused even after it was hidden.
+ * - `starterTextsFor` gives every starter text of a subject and kind (archived ones too) to the
+ *   server's `STARTER_UNFINISHED` check, so a starter sent unchanged is refused even after it was
+ *   hidden, and a goal is never compared with a practice idea's starter.
  */
 import { and, eq, isNull, or, type SQL } from 'drizzle-orm';
 import type { Starter, StudentStarter } from '../../../shared/contracts/goals.ts';
@@ -144,9 +145,12 @@ export function studentStarters(db: Db, subjectId: string, teacherIds: readonly 
   return out;
 }
 
-/** Every starter text (both languages, archived ones too) a student of this subject may have been offered. */
-export function starterTextsFor(db: Db, subjectId: string, teacherIds: readonly string[]): string[] {
-  return startersFor(db, subjectId, teacherIds, true).flatMap((s) => [s.text.en, s.text.tr].filter((x): x is string => Boolean(x?.trim())));
+/** Every starter text of these kinds (both languages, archived ones too) a student of this subject may have been offered. */
+export function starterTextsFor(db: Db, subjectId: string, teacherIds: readonly string[], kinds: readonly StarterKind[]): string[] {
+  if (!kinds.length) return [];
+  return startersFor(db, subjectId, teacherIds, true)
+    .filter((s) => kinds.includes(s.kind))
+    .flatMap((s) => [s.text.en, s.text.tr].filter((x): x is string => Boolean(x?.trim())));
 }
 
 /** Every built-in starter with its school-wide state (admin, D-116). */
