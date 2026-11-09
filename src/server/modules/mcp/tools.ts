@@ -15,7 +15,7 @@ import * as R from '../../../shared/contracts/reports.ts';
 import * as S from '../../../shared/contracts/school.ts';
 import * as T from '../../../shared/contracts/themes.ts';
 import { DEFAULT_THEME, THEME_KEYS, type BuiltinThemeKey } from '../../../shared/themes.ts';
-import { CONTRAST_PAIRS, pairContrast } from '../../../shared/themePackage/contrast.ts';
+import { AA, AA_LARGE, CONTRAST_PAIRS, contrast as contrastRatio, hslToRgb, isOpaqueHex, pairContrast } from '../../../shared/themePackage/contrast.ts';
 import { Art, themePackageJsonSchema, ThemeSlug } from '../../../shared/themePackage/schema.ts';
 import { COLOR_TOKENS, ILLUSTRATIONS, MASCOT_POSES } from '../../../shared/themePackage/tokens.ts';
 import { FIXED_COLORS, packageArt, validateThemePackage } from '../../../shared/themePackage/validate.ts';
@@ -280,6 +280,19 @@ export function previewPackage(source: string) {
     const ratio = round2(pairContrast(value[p.fg]!, value[p.bg]!));
     return { fg: p.fg, bg: p.bg, ratio, min: p.min, pass: ratio >= p.min, why: p.why };
   });
+  // Avatars: the validator also checks avatar-text on every avatar hue (big 3:1, small 4.5:1); show the worst hue of each size.
+  const tone = (t: unknown) => (isRecord(t) && [t.saturation, t.lightness, t.lightnessSmall].every((n) => typeof n === 'number') ? (t as { saturation: number; lightness: number; lightnessSmall: number }) : null);
+  const avatarTone = tone(obj.avatar) ?? tone(readExample(base)?.avatar) ?? { saturation: 50, lightness: 36, lightnessSmall: 28 };
+  const worst = (lightness: number, min: number) => {
+    let hue = 0;
+    let ratio = Infinity;
+    for (let h = 0; h < 360; h += 5) {
+      const r = isOpaqueHex(value['avatar-text']!) ? contrastRatio(value['avatar-text']!, hslToRgb(h, avatarTone.saturation, lightness)) : 1;
+      if (r < ratio) [hue, ratio] = [h, r];
+    }
+    return { worstHue: hue, ratio: round2(ratio), min, pass: ratio >= min };
+  };
+  const avatars = { tone: avatarTone, big: worst(avatarTone.lightness, AA_LARGE), small: worst(avatarTone.lightnessSmall, AA) };
   const art = Art.safeParse(obj.art);
   const parsed = packageArt({ art: art.success ? art.data : undefined });
   return {
@@ -287,6 +300,7 @@ export function previewPackage(source: string) {
     base,
     colors,
     contrast,
+    avatars,
     art: {
       mascot: MASCOT_POSES.map((pose) => ({ pose, source: parsed.mascot ? ('package' as const) : ('base' as const) })),
       illustrations: ILLUSTRATIONS.map((name) => ({ name, source: parsed.illustrations[name] ? ('package' as const) : ('base' as const) })),
@@ -300,7 +314,7 @@ export function previewPackage(source: string) {
 const previewTheme = handTool({
   name: 'preview_theme',
   description:
-    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
+    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, the worst avatar hue for big and small avatar initials (the validator checks every hue), and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
     THEME_GUIDE,
   scope: null,
   role: 'any',
@@ -312,6 +326,11 @@ const previewTheme = handTool({
     base: z.enum(THEME_KEYS),
     colors: z.array(z.object({ token: z.enum(COLOR_TOKENS), value: z.string().meta(pii('none')), source: Source })),
     contrast: z.array(z.object({ fg: z.enum(COLOR_TOKENS), bg: z.enum(COLOR_TOKENS), ratio: z.number(), min: z.number(), pass: z.boolean(), why: z.string().meta(pii('none')) })),
+    avatars: z.object({
+      tone: z.object({ saturation: z.number(), lightness: z.number(), lightnessSmall: z.number() }),
+      big: z.object({ worstHue: z.number(), ratio: z.number(), min: z.number(), pass: z.boolean() }),
+      small: z.object({ worstHue: z.number(), ratio: z.number(), min: z.number(), pass: z.boolean() }),
+    }),
     art: z.object({
       mascot: z.array(z.object({ pose: z.enum(MASCOT_POSES), source: Source })),
       illustrations: z.array(z.object({ name: z.enum(ILLUSTRATIONS), source: Source })),

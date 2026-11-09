@@ -114,6 +114,18 @@ describe('preview_theme (D-164)', () => {
     expect(r.data.report.ok).toBe(true);
     expect(r.data.contrast.every((p: { pass: boolean }) => p.pass)).toBe(true);
     expect(r.data.art.decoration).toBe('base');
+    expect(r.data.avatars.big.pass && r.data.avatars.small.pass).toBe(true);
+  });
+
+  it('shows an avatar-only contrast failure that the pair table cannot (review fix)', async () => {
+    const pkg = example('explorer');
+    pkg.avatar = { saturation: 20, lightness: 92, lightnessSmall: 92 };
+    const r = await teacher.call('preview_theme', { package: pkg });
+    expect(r.data.report.ok).toBe(false);
+    expect(r.data.report.errors.some((e: { path: string }) => e.path.startsWith('avatar'))).toBe(true);
+    expect(r.data.contrast.every((p: { pass: boolean }) => p.pass)).toBe(true);
+    expect(r.data.avatars.small.pass).toBe(false);
+    expect(r.data.avatars.small.ratio).toBeLessThan(r.data.avatars.small.min);
   });
 });
 

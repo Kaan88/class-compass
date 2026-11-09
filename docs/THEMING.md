@@ -438,7 +438,7 @@ folder. What it gets:
 | `docs/examples/*.theme.json` | Resources `classcompass://themes/examples/<key>` (`ocean` and one per built-in theme) |
 | Export on Admin → Themes | `export_theme`: a built-in key gives the same package as the admin page (`<key>-copy`); an imported theme its stored package (teachers: enabled themes; administrators with `themes:write`: any). Read-only |
 | `validateThemePackage` | `validate_theme` (the same report; nothing is saved) |
-| `/dev/catalog` and the admin preview | `preview_theme`: the report, the base theme, every colour token with its value and source (package, base theme, fixed print colour), every contrast pair with ratio, minimum and pass, and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn |
+| `/dev/catalog` and the admin preview | `preview_theme`: the report, the base theme, every colour token with its value and source (package, base theme, fixed print colour), every contrast pair with ratio, minimum and pass, the worst avatar hue for big and small initials, and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn |
 | Import on Admin → Themes | `import_theme_draft` (administrators with `themes:write`): saves a **draft** only |
 
 The server's instructions (sent on `initialize`) and every theme tool's description point at this
