@@ -401,7 +401,7 @@ describe('deleting students (S13b item 7, D-109)', () => {
     expect(await ok(s.admin.post(`/api/admin/students/${ada.id}/erase`, { confirm: 'Ada Zümrüt Yılmaz' }))).toEqual({ ok: true, files: 2 });
 
     // Scan every table and text cell for the id, the name and the number.
-    const needles = [ada.id, 'Ada Zümrüt Yılmaz', 'Zümrüt', '4711', file.id];
+    const needles = [ada.id, 'Ada Zümrüt Yılmaz', 'Zümrüt', file.id];
     // The class list is gone from the database (the batch keeps its rows without it) and from disk.
     expect(count('select count(*) n from files where id = ?', upload.id)).toBe(0);
     expect(count('select count(*) n from import_batches where id = ? and file_id is null', batch.id)).toBe(1);
@@ -411,6 +411,9 @@ describe('deleting students (S13b item 7, D-109)', () => {
       for (const row of env.db.$client.prepare(`select * from "${t}"`).all() as Array<Record<string, unknown>>) {
         const text = JSON.stringify(row);
         for (const n of needles) if (text.includes(n)) hits.push(`${t}: ${n}`);
+        // The student number is short: match it only as a whole token, so a random id or a millisecond
+        // timestamp that happens to contain the digits '4711' is not a false hit (it made this test flaky).
+        if (/(?<![0-9A-Za-z])4711(?![0-9A-Za-z])/u.test(text)) hits.push(`${t}: student number`);
       }
     }
     expect(hits).toEqual([]);
