@@ -8,7 +8,7 @@ Sınıf Pusulası'nda bir okulu kurmak. Her sayfa [Yönetici kılavuzu](admin.md
 4. **Dersler ve sınıflar.** **Dersler** → **Yeni ders**; **Sınıflar** → **Yeni sınıf** (ad, düzey, sınıf dili).
 5. **Öğretmenler.** **Hesaplar** → **Davet bağlantısı (önerilen)** ile **Yeni hesap**. Ardından **Ders görevlendirmeleri** → her sınıf ve ders için **Öğretmen görevlendir**: öğretmen bir sınıfı yalnızca görevlendirme sayesinde görür.
 6. **Modüller ve medya.** Okulun hangi modülleri kullanacağına karar verin. **Öğrenci fotoğrafları**, **Fotoğraf kanıtı** ve **Ses kaydı kanıtı** izinler doğrulanana kadar (KVKK) kapalı kalsın.
-7. **Öğrenciler.** Sınıf listelerini genellikle öğretmenler kendileri aktarır; siz de **Öğrenciler** sayfasında **Öğrenci ekle** diyebilirsiniz.
+7. **Öğrenciler.** **Öğrenci aktar** → bir sınıf seçin → e-Okul listesini okutun → onaylayın. Boş sınıflar işaretlidir; böylece öğretmenler başlamadan her sınıfı doldurabilirsiniz. Öğretmenler kendi listelerini de aktarabilir; siz de **Öğrenciler** sayfasında **Öğrenci ekle** diyebilirsiniz.
 
 Sonra **Bakım** sayfasını düzenli olarak kontrol edin: yedeklerin durumu ve uyarılar. Yedekten geri yükleme sunucuda yapılır (bkz. `docs/OPERATIONS.md`).
 

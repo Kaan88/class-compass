@@ -24,7 +24,7 @@ The very first administrator account is created on the server by the IT person (
 4. **Classes**: **Add classroom** / **New class**: **Class name** (for example 3-A), **School year**, **Grade** (a number, for example 3), **Theme** (**Show a larger preview of the theme** opens a bigger picture), **Timezone** (empty = the school timezone), **Sounds** and **Animations**, and the class language.
 5. **Accounts**: create the teacher accounts (below).
 6. **Teaching assignments**: **Assign a teacher** to a class and a subject. *A teacher sees a class only when they teach a subject in it.*
-7. **Students**: teachers usually import their class lists themselves (Teacher guide, "Importing a student list"); you can also **Add student** on **Students**.
+7. **Students**: fill the classes from the e-Okul lists on **Import students** (below), so teachers find their classes with the students already in. Teachers can also import lists into their own classes (Teacher guide, "Importing a student list"), and you can **Add student** on **Students**.
 8. **Modules and media**: decide what the school uses.
 
 ![School settings](../img/en/admin-settings.png)
@@ -112,6 +112,19 @@ The full technical description (every colour, the limits, the drawing rules, a w
 ## Weather
 
 **School settings** → **Weather on the classroom screen**: **Show the weather**, a **Place name** (for you) and the **Latitude** and **Longitude**. Only these coordinates are sent to the free Open-Meteo service (no key, no school or student data). The server needs internet access to api.open-meteo.com; without it, the weather simply does not appear.
+
+## Import students
+
+**Import students** fills the classes of the school year before teachers start. The table **Classes of the school year** shows every class of an open school year with its number of students; a class without students says **Empty**, and the line above the table says how many classes are still empty.
+
+1. Press **Import into …** next to a class (or choose it in **Import into class**).
+2. Choose the e-Okul file (Excel, CSV, Word, PDF or a photo of a typed list) and press **Read file**, or paste the list and press **Preview**. Everything is read on this server; photos go through text recognition on the server too.
+3. Check the preview exactly as a teacher does (Teacher guide, "Importing a student list"): the columns, the flagged rows and the students who may already exist. Then confirm.
+4. The class count goes up. Do the next class.
+
+One file is read into one class. If your e-Okul export holds several classes, export one list per class or read the same file once for each class: when the file has a class column, rows of other classes are marked **Listed in another class** and skipped.
+
+The history below lists **All imports in the school** with who made each one. **Undo import** removes what an import added, as for teachers. Teachers do not see the imports an administrator made and cannot undo them; they simply find the students in their class. Every import and undo is in the audit log under your name.
 
 ## Students
 

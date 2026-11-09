@@ -406,10 +406,15 @@ function SheetPicker({ sheets, busy, onRead, onCancel }: { sheets: Imp.ImportShe
   );
 }
 
-function Start({ classes, onCreated }: { classes: { id: string; name: string }[]; onCreated: (b: Batch) => void }) {
+/** A class the importer can fill: `label` replaces the name in the class picker (admin: name and count). */
+export type ImporterClass = { id: string; name: string; label?: string };
+
+function Start({ classes, onCreated, classId: chosen, onClassChange }: { classes: ImporterClass[]; onCreated: (b: Batch) => void; classId?: string; onClassChange?: (id: string) => void }) {
   const { t } = useI18n();
-  const [classId, setClassId] = useState('');
-  const cid = classId || classes[0]?.id || '';
+  const [own, setOwn] = useState('');
+  const classId = chosen ?? own;
+  const setClassId = onClassChange ?? setOwn;
+  const cid = classes.some((c) => c.id === classId) ? classId : classes[0]?.id || '';
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -466,7 +471,7 @@ function Start({ classes, onCreated }: { classes: { id: string; name: string }[]
   }
   return (
     <div className="cc-stack">
-      <Select label={t('import.intoClass')} value={cid} onChange={setClassId} items={classes.map((c) => ({ id: c.id, label: c.name }))} />
+      <Select label={t('import.intoClass')} value={cid} onChange={setClassId} items={classes.map((c) => ({ id: c.id, label: c.label ?? c.name }))} />
       <section className="cc-card cc-stack" aria-labelledby="imp-file">
         <h2 id="imp-file" className="cc-h2">
           {t('import.fileTitle')}
@@ -498,7 +503,7 @@ function Start({ classes, onCreated }: { classes: { id: string; name: string }[]
   );
 }
 
-function History({ tz, onOpen }: { tz: string; onOpen: (id: string) => void }) {
+function History({ tz, onOpen, showCreator }: { tz: string; onOpen: (id: string) => void; showCreator: boolean }) {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const list = useQuery({ queryKey: [...KEY, 'list'], queryFn: () => call(Imp.listImportBatches, {}) });
@@ -510,13 +515,14 @@ function History({ tz, onOpen }: { tz: string; onOpen: (id: string) => void }) {
         {t('import.historyTitle')}
       </h2>
       <DataTable
-        caption={t('import.historyCaption')}
+        caption={showCreator ? t('import.historyCaptionAll') : t('import.historyCaption')}
         rows={list.data.batches}
         rowKey={(b) => b.id}
         emptyText={t('import.noHistory')}
         columns={[
           { key: 'at', header: t('audit.when'), sortValue: (b) => b.createdAt, render: (b) => formatDate(b.createdAt, locale, tz, { dateStyle: 'medium', timeStyle: 'short' }) },
           { key: 'class', header: t('import.col.class'), sortValue: (b) => b.className, render: (b) => b.className },
+          ...(showCreator ? [{ key: 'by', header: t('import.col.by'), sortValue: (b: Imp.ImportBatchSummary) => b.createdByName, render: (b: Imp.ImportBatchSummary) => b.createdByName }] : []),
           { key: 'source', header: t('import.col.source'), render: (b) => b.fileName ?? t(`import.source.${b.sourceType}`) },
           { key: 'status', header: t('import.col.status'), render: (b) => t(`import.status.${b.status}`) },
           { key: 'counts', header: t('import.col.result'), render: (b) => (b.status === 'draft' ? '—' : t('import.countsShort', { added: b.counts.added ?? 0, matched: b.counts.matched ?? 0 })) },
@@ -561,16 +567,26 @@ function History({ tz, onOpen }: { tz: string; onOpen: (id: string) => void }) {
   );
 }
 
-export function ImportPage() {
+/**
+ * The importer itself (S9, shared with the admin page in S16a, D-163): start (class, file or pasted
+ * text) -> preview -> report, and the history with undo. The caller chooses the classes: a teacher's
+ * own classes, or every open class for an administrator (the server enforces the same rule).
+ */
+export function Importer({
+  classes,
+  tz,
+  showCreator = false,
+  classId,
+  onClassChange,
+}: {
+  classes: ImporterClass[];
+  tz: string;
+  showCreator?: boolean;
+  classId?: string;
+  onClassChange?: (id: string) => void;
+}) {
   const { t } = useI18n();
   const qc = useQueryClient();
-  const contexts = useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
-  const classes = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const c of contexts.data?.contexts ?? []) seen.set(c.classId, c.className);
-    return sortByName([...seen].map(([id, name]) => ({ id, name })), (c) => c.name);
-  }, [contexts.data]);
-  const tz = contexts.data?.contexts[0]?.timezone ?? 'UTC';
   const [batchId, setBatchId] = useState<string | null>(null);
   const batch = useQuery({ queryKey: [...KEY, 'batch', batchId], queryFn: () => call(Imp.getImportBatch, { batchId: batchId! }), enabled: Boolean(batchId) });
   const show = (b: Batch) => {
@@ -582,10 +598,8 @@ export function ImportPage() {
     setBatchId(null);
     void qc.invalidateQueries({ queryKey: [...KEY, 'list'] });
   };
-  if (contexts.isSuccess && classes.length === 0) return <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} />;
   return (
-    <main className="cc-page cc-stack" data-testid="import-page">
-      <h1 className="cc-h1">{t('import.title')}</h1>
+    <>
       <Alert kind="warning">
         <span data-testid="import-ocr-notice">{t('import.localNotice')}</span>
       </Alert>
@@ -596,12 +610,30 @@ export function ImportPage() {
           <Report batch={batch.data} onClose={close} />
         )
       ) : (
-        <Start classes={classes} onCreated={show} />
+        <Start classes={classes} onCreated={show} {...(classId !== undefined ? { classId } : {})} {...(onClassChange ? { onClassChange } : {})} />
       )}
-      <History tz={tz} onOpen={setBatchId} />
+      <History tz={tz} onOpen={setBatchId} showCreator={showCreator} />
       <p className="cc-muted">
         <IconUsers /> {t('import.namesRule')}
       </p>
+    </>
+  );
+}
+
+export function ImportPage() {
+  const { t } = useI18n();
+  const contexts = useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
+  const classes = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of contexts.data?.contexts ?? []) seen.set(c.classId, c.className);
+    return sortByName([...seen].map(([id, name]) => ({ id, name })), (c) => c.name);
+  }, [contexts.data]);
+  const tz = contexts.data?.contexts[0]?.timezone ?? 'UTC';
+  if (contexts.isSuccess && classes.length === 0) return <EmptyState title={t('classroom.noClasses.title')} body={t('classroom.noClasses.body')} />;
+  return (
+    <main className="cc-page cc-stack" data-testid="import-page">
+      <h1 className="cc-h1">{t('import.title')}</h1>
+      <Importer classes={classes} tz={tz} />
     </main>
   );
 }

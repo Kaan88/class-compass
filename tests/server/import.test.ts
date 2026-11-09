@@ -202,4 +202,40 @@ describe('student list importer (IMP-1..5)', () => {
     expect((await commit(s.admin, b.id)).counts.added).toBe(1);
     expect(await rosterNames(s.teacherB, s.c3b.id)).toContain('Yaz Kurgu');
   });
+
+  it('S16a (D-163): admin batches are audited with the admin as actor, stay out of the teacher history and are reverted by an admin', async () => {
+    const b = (await ok(s.admin.post('/api/import/batches', { classId: s.c3b.id, text: 'Deniz Örnek\nIrmak Kurgu\n' }))) as Batch;
+    expect((await commit(s.admin, b.id)).counts.added).toBe(2);
+    const actors = env.db.select().from(auditEvents).where(eq(auditEvents.entityId, b.id)).all();
+    expect(actors.map((a) => a.action)).toEqual(expect.arrayContaining(['import.create', 'import.commit']));
+    expect(actors.every((a) => a.actorType === 'user' && a.actorId === s.adminUser.id)).toBe(true);
+    // The class teacher sees the students but not the admin's batch, and cannot open or revert it.
+    expect(await rosterNames(s.teacherB, s.c3b.id)).toEqual(expect.arrayContaining(['Deniz Örnek', 'Irmak Kurgu']));
+    const teacherList = (await ok(s.teacherB.get('/api/import/batches'))).batches as Array<{ id: string }>;
+    expect(teacherList.map((x) => x.id)).not.toContain(b.id);
+    expect((await s.teacherB.get(`/api/import/batches/${b.id}`)).status).toBe(404);
+    expect((await s.teacherB.post(`/api/import/batches/${b.id}/revert`, { confirm: true })).status).toBe(404);
+    expect((await s.teacherA.post(`/api/import/batches/${b.id}/revert`, { confirm: true })).status).toBe(404);
+    // The admin lists every batch (with the creator) and can undo it.
+    const adminList = (await ok(s.admin.get('/api/import/batches'))).batches as Array<{ id: string; createdByName: string }>;
+    expect(adminList.find((x) => x.id === b.id)?.createdByName).toBeTruthy();
+    const reverted = (await ok(s.admin.post(`/api/import/batches/${b.id}/revert`, { confirm: true }))) as Batch;
+    expect(reverted.status).toBe('reverted');
+    expect(await rosterNames(s.teacherB, s.c3b.id)).not.toContain('Deniz Örnek');
+    const revertAudit = env.db.select().from(auditEvents).where(eq(auditEvents.entityId, b.id)).all().find((a) => a.action === 'import.revert');
+    expect(revertAudit?.actorId).toBe(s.adminUser.id);
+  });
+
+  it('S16a (D-163): one file with several classes is read once per class; rows of other classes are skipped', async () => {
+    const text = 'Sınıfı\tAdı Soyadı\n3-A\tSarp Deneme\n3-B\tLale Deneme\n3-B\tOnur Deneme\n';
+    const b = (await ok(s.admin.post('/api/import/batches', { classId: s.c3b.id, text }))) as Batch;
+    expect(b.mapping.className).not.toBeNull();
+    const byName = Object.fromEntries(studentRows(b).map((r) => [r.parsed.fullName, r]));
+    expect(byName['Sarp Deneme']).toMatchObject({ decision: 'skip' });
+    expect(byName['Sarp Deneme']!.flags).toContain('class_mismatch');
+    expect(byName['Lale Deneme']!.decision).toBe('add');
+    const done = await commit(s.admin, b.id);
+    expect(done.counts.added).toBe(2);
+    await ok(s.admin.post(`/api/import/batches/${b.id}/revert`, { confirm: true }));
+  });
 });

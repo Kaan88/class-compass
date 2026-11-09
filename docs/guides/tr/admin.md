@@ -24,7 +24,7 @@ Yönetici hesapları her zaman **şifreyle** giriş yapar (hiçbir zaman e-posta
 4. **Sınıflar**: **Sınıf ekle** / **Yeni sınıf**: **Sınıf adı** (örneğin 3-A), **Eğitim yılı**, **Sınıf düzeyi** (bir sayı, örneğin 3), **Tema** (**Temanın büyük önizlemesini göster** daha büyük bir resim açar), **Saat dilimi** (boş = okulun saat dilimi), **Sesler** ve **Animasyonlar** ile sınıf dili.
 5. **Hesaplar**: öğretmen hesaplarını açın (aşağıda).
 6. **Ders görevlendirmeleri**: bir sınıfa ve derse **Öğretmen görevlendir**. *Öğretmen bir sınıfı yalnızca o sınıfta bir derse girdiğinde görür.*
-7. **Öğrenciler**: sınıf listelerini genellikle öğretmenler kendileri aktarır (Öğretmen kılavuzu, "Öğrenci listesi aktarma"); siz de **Öğrenciler** sayfasında **Öğrenci ekle** diyebilirsiniz.
+7. **Öğrenciler**: sınıfları **Öğrenci aktar** sayfasında e-Okul listeleriyle doldurun (aşağıda); öğretmenler sınıflarını öğrencileri eklenmiş olarak bulur. Öğretmenler kendi sınıflarına da liste aktarabilir (Öğretmen kılavuzu, "Öğrenci listesi aktarma"); siz de **Öğrenciler** sayfasında **Öğrenci ekle** diyebilirsiniz.
 8. **Modüller ve medya**: okulun neleri kullanacağına karar verin.
 
 ![Okul ayarları](../img/tr/admin-settings.png)
@@ -112,6 +112,19 @@ Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bi
 ## Hava durumu
 
 **Okul ayarları** → **Sınıf ekranında hava durumu**: **Hava durumunu göster**, bir **Yer adı** (sizin için) ile **Enlem** ve **Boylam**. Ücretsiz Open-Meteo hizmetine yalnızca bu koordinatlar gönderilir (anahtar yok, okul ya da öğrenci verisi yok). Sunucunun api.open-meteo.com adresine internet erişimi olmalıdır; yoksa hava durumu yalnızca görünmez.
+
+## Öğrenci aktar
+
+**Öğrenci aktar**, öğretmenler başlamadan önce eğitim yılının sınıflarını doldurmak içindir. **Eğitim yılının sınıfları** tablosu açık eğitim yıllarındaki her sınıfı öğrenci sayısıyla gösterir; öğrencisi olmayan sınıfta **Boş** yazar, tablonun üstündeki satır da kaç sınıfın hâlâ boş olduğunu söyler.
+
+1. Bir sınıfın yanındaki **… sınıfına aktar** düğmesine basın (ya da sınıfı **Aktarılacak sınıf** listesinden seçin).
+2. e-Okul dosyasını seçin (Excel, CSV, Word, PDF ya da yazılı listenin fotoğrafı) ve **Dosyayı oku** deyin ya da listeyi yapıştırıp **Önizle** deyin. Her şey bu sunucuda okunur; fotoğraflardaki yazı tanıma da sunucuda yapılır.
+3. Önizlemeyi öğretmenlerin yaptığı gibi kontrol edin (Öğretmen kılavuzu, "Öğrenci listesi aktarma"): sütunlar, işaretli satırlar ve zaten kayıtlı olabilecek öğrenciler. Sonra onaylayın.
+4. Sınıfın öğrenci sayısı artar. Sıradaki sınıfa geçin.
+
+Bir dosya tek bir sınıfa okunur. e-Okul dışa aktarımınızda birden çok sınıf varsa her sınıf için ayrı liste alın ya da aynı dosyayı her sınıf için bir kez okutun: dosyada sınıf sütunu varsa başka sınıfların satırları **Başka bir sınıfta listelenmiş** diye işaretlenir ve atlanır.
+
+Aşağıdaki geçmiş, **Okuldaki tüm aktarmalar** listesini kimin yaptığıyla birlikte gösterir. **Aktarmayı geri al**, öğretmenlerde olduğu gibi aktarmanın eklediklerini kaldırır. Öğretmenler yöneticinin yaptığı aktarmaları görmez ve geri alamaz; öğrencileri sınıflarında hazır bulur. Her aktarma ve geri alma, adınızla denetim kaydına yazılır.
 
 ## Öğrenciler
 
