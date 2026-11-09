@@ -39,9 +39,10 @@ describe('AI guidelines (D-159)', () => {
     for (const p of paths) expect(existsSync(join(ROOT, p)), p).toBe(true);
   });
 
-  it('THEMING.md says the MCP theme tools come with S14h and links the worked example', () => {
+  it('THEMING.md names the MCP theme tools (S14h1, D-160) and links the worked example', () => {
     const md = readFileSync(THEMING_MD, 'utf8');
-    expect(md).toContain('MCP theme tools arrive with S14h');
+    for (const tool of ['theme_schema', 'validate_theme', 'import_theme_draft', 'export_theme']) expect(md).toContain(`\`${tool}\``);
+    expect(md).toContain('classcompass://docs/theming');
     expect(md).toContain('examples/ocean.theme.json');
     expect(existsSync(join(ROOT, 'docs', 'examples', 'ocean.theme.json'))).toBe(true);
   });

@@ -6,6 +6,8 @@
  * - teacher in locked classroom mode → 423 on every teacher/admin/account endpoint
  * - Super Speakers scorer and board sessions (S12, D-128) → 401 on every endpoint outside their own
  *   access class; signed-in staff → 401 on the scorer and board endpoints (other cookies)
+ * - AI tools (S14h1, D-160): `/mcp` answers 403 while the school switch is off, then 401 without a
+ *   bearer token; cookies of every kind never work there, and a bearer token never works anywhere else
  * Access is checked before input validation, so dummy ids and empty bodies are enough.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -48,14 +50,14 @@ async function expectAll(c: Client, filter: (e: Endpoint) => boolean, status: nu
 describe('permission matrix over all endpoints', () => {
   it('registers a meaningful set of endpoints, each with an access class', () => {
     expect(endpoints.length).toBeGreaterThan(50);
-    for (const e of endpoints) expect(['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display']).toContain(e.access);
-    expect([...ACCESS_CLASSES].sort()).toEqual(['account', 'admin', 'classroom', 'display', 'public', 'scorer', 'student', 'teacher', 'user']);
+    for (const e of endpoints) expect(['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display', 'mcp']).toContain(e.access);
+    expect([...ACCESS_CLASSES].sort()).toEqual(['account', 'admin', 'classroom', 'display', 'mcp', 'public', 'scorer', 'student', 'teacher', 'user']);
     // Every access class is in use, so each is covered by the matrix below.
     for (const a of ACCESS_CLASSES) expect(endpoints.some((e) => e.access === a), a).toBe(true);
   });
 
   it('answers 401 to unauthenticated callers on every non-public endpoint', async () => {
-    await expectAll(new Client(env), (e) => e.access !== 'public', 401);
+    await expectAll(new Client(env), (e) => e.access !== 'public' && e.access !== 'mcp', 401);
   });
 
   it('answers 403 to teachers on every admin endpoint (ACC-1)', async () => {
@@ -83,8 +85,8 @@ describe('permission matrix over all endpoints', () => {
     expect((await scorer.get('/api/scorer/me')).status).toBe(200);
     expect((await board.get('/api/board')).status).toBe(200);
     // …and nowhere else (the session ending endpoint is left out so the matrix keeps its session).
-    await expectAll(scorer, (e) => e.access !== 'public' && e.access !== 'scorer', 401);
-    await expectAll(board, (e) => e.access !== 'public' && e.access !== 'display', 401);
+    await expectAll(scorer, (e) => e.access !== 'public' && e.access !== 'scorer' && e.access !== 'mcp', 401);
+    await expectAll(board, (e) => e.access !== 'public' && e.access !== 'display' && e.access !== 'mcp', 401);
     // Staff sessions do not carry the scorer or board cookie.
     const t = new Client(env);
     await t.login('ayse.teacher');
@@ -98,5 +100,37 @@ describe('permission matrix over all endpoints', () => {
     expect((await t.post('/api/auth/pin', { currentPassword: 'correct-horse-battery', pin: '2468' })).status).toBe(200);
     expect((await t.post('/api/classroom/enter')).status).toBe(200);
     await expectAll(t, (e) => e.access === 'teacher' || e.access === 'admin' || e.access === 'account', 423);
+  });
+
+  it('AI tools: /mcp takes only a bearer token, and a bearer token works only on /mcp (S14h1, D-160)', async () => {
+    const a = new Client(env);
+    await a.login('root.admin');
+    const isMcp = (e: Endpoint) => e.access === 'mcp';
+    // The school switch comes first: off, every caller gets 403.
+    await expectAll(new Client(env), isMcp, 403);
+    expect((await a.put('/api/admin/ai-tools', { mcpEnabled: true })).status).toBe(200);
+    try {
+      await expectAll(new Client(env), isMcp, 401);
+      // A signed-in teacher or administrator cookie never works on /mcp.
+      const t = new Client(env);
+      await t.login('ayse.teacher');
+      await expectAll(t, isMcp, 401);
+      await expectAll(a, isMcp, 401);
+      // A bearer token never works on the app's own endpoints, not even next to a valid cookie.
+      const made = await t.post('/api/account/ai-tools/tokens', { name: 'Matrix', scopes: ['classes:read'], days: 7, currentPassword: 'correct-horse-battery' });
+      expect(made.status).toBe(200);
+      const bearer = { authorization: `Bearer ${made.body.secret as string}` };
+      const wrong: string[] = [];
+      for (const e of endpoints.filter((x) => !isMcp(x))) {
+        const r = await t.req(e.method, urlOf(e), e.method === 'GET' ? undefined : {}, bearer);
+        if (r.status !== 401) wrong.push(`${e.method} ${e.path} → ${r.status}`);
+      }
+      expect(wrong).toEqual([]);
+      // …while the same token works on /mcp.
+      const init = await env.app.inject({ method: 'POST', url: '/mcp', headers: { ...bearer, 'content-type': 'application/json' }, payload: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'matrix', version: '1' } } }) });
+      expect(init.statusCode).toBe(200);
+    } finally {
+      expect((await a.put('/api/admin/ai-tools', { mcpEnabled: false })).status).toBe(200);
+    }
   });
 });

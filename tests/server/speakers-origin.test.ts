@@ -123,7 +123,8 @@ describe('CSRF by endpoint path (D-157)', () => {
     const seen = new Set<string>();
     return registeredEndpoints.filter((e) => {
       const k = `${e.method} ${e.path}`;
-      if (e.method === 'GET' || seen.has(k)) return false;
+      // /mcp has its own Origin rule (bearer only, D-160): checked in its own test below.
+      if (e.method === 'GET' || e.access === 'mcp' || seen.has(k)) return false;
       seen.add(k);
       return true;
     });
@@ -159,6 +160,20 @@ describe('CSRF by endpoint path (D-157)', () => {
       if (!(fromEvil.statusCode === 403 && fromEvil.json().error?.code === 'CSRF')) wrong.push(`${e.method} ${e.path} from a foreign origin → ${fromEvil.statusCode}`);
     }
     expect(wrong).toEqual([]);
+  });
+
+  it('/mcp (S14h1, D-160): no Origin is fine, the main origin is fine, the speakers or a foreign origin never', async () => {
+    env = await makeEnv({ SPEAKERS_ORIGIN: SPEAKERS });
+    for (const origin of [SPEAKERS, EVIL]) {
+      const r = await raw(env, 'POST', '/mcp', MAIN_HOST, { origin, 'content-type': 'application/json' }, {});
+      expect(r.statusCode, origin).toBe(403);
+      expect(r.json().error.data).toMatchObject({ code: 'CSRF', reason: 'ORIGIN_NOT_ALLOWED' });
+    }
+    // Same origin or none: the next check answers (AI tools are off by default).
+    for (const headers of [{ origin: TEST_ORIGIN }, {}] as Array<Record<string, string>>) {
+      const r = await raw(env, 'POST', '/mcp', MAIN_HOST, { ...headers, 'content-type': 'application/json' }, {});
+      expect(r.json().error.data).toMatchObject({ code: 'FEATURE_DISABLED', reason: 'MCP_DISABLED' });
+    }
   });
 
   it('unset: another origin is refused everywhere, as before', async () => {
