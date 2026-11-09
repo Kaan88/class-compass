@@ -285,8 +285,9 @@ Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, m
 - [x] S14i Notification Open preselects the class and the student on Achievements (opens the student), Avatars, Student links and the Kind words check (the row is marked); the Super Speakers report already did through the report deep link
   - Review fixes: the Achievements dialog opens once for the linked student (closing it uses the link up, so switching tabs or classes does not open it again); `e2e/notifications.spec.ts` opens all four pages from their links and checks the class, the dialog and the marked row
 - [x] S14i Docs review fixes: ARCHITECTURE brought up to S14 (every access class, the S14f origins and host routing, the `custom_themes` table); forward notes on D-085 (→ D-151), D-103 and D-139 (→ D-148), D-128, D-134 and D-135 (→ D-157); the S14 header names the migrations on main (0017 to 0024)
-- [ ] S14i Full `npx playwright test` (both projects) on main after the wave (the lead)
-- [ ] S14i Redeploy test.sareteacher.com: only after asking the owner (faketime image from the new tag, keep the override, migrations run on start)
+- [x] S14i Full `npx playwright test` (both projects) on main after the wave: 78 passed, 3 skipped (phone-only tests in the display project) on `6c1c2f3`; `npm run check` 1,588 tests, `npm run build` student page 427.1 kB
+- [x] S14i Redeploy test.sareteacher.com (owner asked, 2026-11-09): image `class-compass:0.1.0-6c1c2f3` built on the mini PC (first real Docker build of S14; Help guides and pictures in the image), faketime image from the new tag, override kept with the clock reset to Thu 12 Nov 2026 09:30 Istanbul; backup before the switch, pre-migration snapshot by the app, all 25 migrations applied, demo data kept, AI tools off, `/healthz` healthy behind Cloudflare Access
+  - [ ] Owner and Sare try the new version on the test site (sound, board, student page, Help guides)
 
 ## User documentation (after S12)
 Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in the app under Help (D-137). Index and screenshot command: `docs/guides/README.md`.
