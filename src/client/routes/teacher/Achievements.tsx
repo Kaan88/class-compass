@@ -25,6 +25,7 @@ import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { StudentStatsButton } from '../../ui/StudentName.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
+import type { TeacherPageSearch } from '../../modules/types.ts';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'achievements'] as const;
@@ -268,12 +269,14 @@ function BadgesTab({ contextId, defs }: { contextId: string; defs: A.Achievement
   );
 }
 
-function OverviewTab({ contextId }: { contextId: string }) {
+function OverviewTab({ contextId, linkedStudent }: { contextId: string; linkedStudent?: string | undefined }) {
   const { t } = useI18n();
   const q = useQuery({ queryKey: overviewKey(contextId), queryFn: () => call(A.achievementsOverview, { contextId }) });
-  const [student, setStudent] = useState<string | null>(null);
+  // A notification's Open names the student: their achievements open once the list has them (S14i).
+  const [student, setStudent] = useState<string | null>(linkedStudent ?? null);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const d = q.data;
+  const shown = student && d.students.some((s) => s.id === student) ? student : null;
   const manual = d.definitions.filter((x) => x.kind === 'manual' && !x.archived);
   return (
     <div className="cc-stack">
@@ -297,7 +300,7 @@ function OverviewTab({ contextId }: { contextId: string }) {
           ))}
         </ul>
       </section>
-      {student ? <StudentDialog contextId={contextId} studentId={student} manual={manual} onClose={() => setStudent(null)} /> : null}
+      {shown ? <StudentDialog contextId={contextId} studentId={shown} manual={manual} onClose={() => setStudent(null)} /> : null}
     </div>
   );
 }
@@ -308,11 +311,12 @@ function BadgesLoader({ contextId }: { contextId: string }) {
   return q.data ? <BadgesTab contextId={contextId} defs={q.data.definitions} /> : <p className="cc-muted">{t('common.loading')}</p>;
 }
 
-export function AchievementsPage() {
+/** `contextId` and `studentId` in `search` (a notification's Open, S14i) preselect the class+subject and open the student's achievements. */
+export function AchievementsPage({ search }: { search: TeacherPageSearch }) {
   const { t, locale } = useI18n();
   const contexts = useQuery({ queryKey: CONTEXTS_KEY, queryFn: () => call(School.myContexts, {}) });
   const list = contexts.data?.contexts ?? [];
-  const [picked, setPicked] = useState<string>('');
+  const [picked, setPicked] = useState<string>(search.contextId ?? '');
   const ctx = list.find((c) => c.id === picked) ?? list[0];
   return (
     <main className="cc-page cc-stack" data-testid="achievements-page">
@@ -325,7 +329,7 @@ export function AchievementsPage() {
             key={ctx.id}
             label={t('teacher.achievements')}
             items={[
-              { id: 'overview', label: t('achievements.tab.overview'), content: <OverviewTab contextId={ctx.id} /> },
+              { id: 'overview', label: t('achievements.tab.overview'), content: <OverviewTab contextId={ctx.id} linkedStudent={ctx.id === search.contextId ? search.studentId : undefined} /> },
               { id: 'badges', label: t('achievements.tab.badges'), content: <BadgesLoader contextId={ctx.id} /> },
             ]}
           />

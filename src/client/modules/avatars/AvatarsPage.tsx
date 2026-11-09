@@ -19,10 +19,13 @@ import { EmptyState } from '../../ui/Feedback.tsx';
 import { Select, Toggle } from '../../ui/Fields.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { StudentName } from '../../ui/StudentName.tsx';
+import { useLinkedRow } from '../../ui/linkedRow.ts';
+import type { TeacherPageSearch } from '../types.ts';
 
 const settingsKey = (classId: string) => [SENSITIVE, 'teacher', 'avatars', classId] as const;
 
-function ClassAvatars({ classId }: { classId: string }) {
+function ClassAvatars({ classId, linkedStudent }: { classId: string; linkedStudent?: string | undefined }) {
+  const linked = useLinkedRow(linkedStudent);
   const { t } = useI18n();
   const run = useRun();
   const [resetting, setResetting] = useState<{ id: string; name: string } | null>(null);
@@ -49,7 +52,7 @@ function ClassAvatars({ classId }: { classId: string }) {
         <h2 className="cc-h2">{t('avatar.students')}</h2>
         <ul className="cc-stack">
           {(roster.data?.students ?? []).map((st) => (
-            <li key={st.id} className="cc-row">
+            <li key={st.id} className="cc-row" {...linked(st.id)}>
               <Avatar name={st.fullName} id={st.id} hue={st.avatarHue} initials={st.initials} size="sm" />
               <StudentName id={st.id} name={st.fullName} classId={classId} />
               <Button size="small" className="cc-push-right" onPress={() => setResetting({ id: st.id, name: st.fullName })} data-testid="avatar-reset">
@@ -72,11 +75,12 @@ function ClassAvatars({ classId }: { classId: string }) {
   );
 }
 
-export function AvatarsPage() {
+/** `classId` and `studentId` in `search` (a notification's Open, S14i) preselect the class and mark the student. */
+export function AvatarsPage({ search }: { search: TeacherPageSearch }) {
   const { t } = useI18n();
   const contexts = useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
   const classes = [...new Map((contexts.data?.contexts ?? []).map((c) => [c.classId, { id: c.classId, label: c.className }])).values()];
-  const [picked, setPicked] = useState('');
+  const [picked, setPicked] = useState(search.classId ?? '');
   const cls = classes.find((c) => c.id === picked) ?? classes[0];
   return (
     <main className="cc-page cc-stack" data-testid="avatars-page">
@@ -86,7 +90,7 @@ export function AvatarsPage() {
       {cls ? (
         <>
           <Select label={t('teacher.chooseClass')} items={classes} value={cls.id} onChange={setPicked} />
-          <ClassAvatars key={cls.id} classId={cls.id} />
+          <ClassAvatars key={cls.id} classId={cls.id} linkedStudent={cls.id === search.classId ? search.studentId : undefined} />
         </>
       ) : null}
     </main>

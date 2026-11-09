@@ -34,6 +34,8 @@ import { Select, TextArea, TextField } from '../../ui/Fields.tsx';
 import { IconAlert, IconCopy, IconPrint, IconX } from '../../ui/icons.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { StudentName } from '../../ui/StudentName.tsx';
+import { useLinkedRow } from '../../ui/linkedRow.ts';
+import type { TeacherPageSearch } from '../../modules/types.ts';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'links'] as const;
@@ -239,7 +241,8 @@ function LinkStatusLine({ s }: { s: StudentLinkRow }) {
   );
 }
 
-function ClassLinks({ classId }: { classId: string }) {
+function ClassLinks({ classId, linkedStudent }: { classId: string; linkedStudent?: string | undefined }) {
+  const linked = useLinkedRow(linkedStudent);
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: [...ALL, classId], queryFn: () => call(L.classLinks, { classId }) });
@@ -267,7 +270,7 @@ function ClassLinks({ classId }: { classId: string }) {
       {data.students.length === 0 ? <p className="cc-muted">{t('links.noStudents')}</p> : null}
       <ul className="cc-stack cc-noprint" data-testid="link-list">
         {data.students.map((s) => (
-          <li key={s.id} className="cc-card cc-stack" data-testid="link-row">
+          <li key={s.id} className="cc-card cc-stack" data-testid="link-row" {...linked(s.id)}>
             <div className="cc-row">
               <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
               <StudentName id={s.id} name={s.fullName} classId={classId} />
@@ -307,11 +310,12 @@ function ClassLinks({ classId }: { classId: string }) {
   );
 }
 
-export function StudentLinksPage() {
+/** `classId` and `studentId` in `search` (a notification's Open, S14i) preselect the class and mark the student. */
+export function StudentLinksPage({ search }: { search: TeacherPageSearch }) {
   const { t } = useI18n();
   const contexts = useQuery({ queryKey: CONTEXTS_KEY, queryFn: () => call(School.myContexts, {}) });
   const classes = [...new Map((contexts.data?.contexts ?? []).map((c) => [c.classId, { id: c.classId, label: c.className }])).values()];
-  const [picked, setPicked] = useState('');
+  const [picked, setPicked] = useState(search.classId ?? '');
   const cls = classes.find((c) => c.id === picked) ?? classes[0];
   return (
     <main className="cc-page cc-stack" data-testid="links-page">
@@ -328,7 +332,7 @@ export function StudentLinksPage() {
           <div className="cc-noprint">
             <Select label={t('links.chooseClass')} items={classes} value={cls.id} onChange={setPicked} />
           </div>
-          <ClassLinks key={cls.id} classId={cls.id} />
+          <ClassLinks key={cls.id} classId={cls.id} linkedStudent={cls.id === search.classId ? search.studentId : undefined} />
         </>
       ) : null}
     </main>

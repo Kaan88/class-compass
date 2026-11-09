@@ -5890,6 +5890,13 @@ html[data-cursor='off'] * {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+/* The student a notification's Open named, on a class page (S14i, `ui/linkedRow.ts`): an outline and
+   aria-current, not colour alone. */
+[data-linked='true'] {
+  outline: 3px solid var(--cc-accent);
+  outline-offset: 3px;
+  border-radius: var(--cc-radius-sm);
+}
 
 /* ---------------------------------------------------------------- AI tools (S14h1, D-160) */
 .cc-ai-scopes {

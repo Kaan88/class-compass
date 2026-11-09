@@ -29,18 +29,20 @@ const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /** The teacher page a line opens (with the class+subject and the student preselected where the page reads them). */
-function deepLink(item: NotificationItem): { page: string; search: Record<string, string> } | null {
+export function deepLink(item: NotificationItem): { page: string; search: Record<string, string> } | null {
   if (item.gone) return null;
   const base: Record<string, string> = { ...(item.context ? { contextId: item.context.id } : {}), studentId: item.student.id };
+  // Class pages (avatars, student links) take the class; the student's row is marked there (S14i).
+  const byClass: Record<string, string> = { ...(item.context ? { classId: item.context.classId } : {}), studentId: item.student.id };
   switch (item.category) {
     case 'achievementEarned':
       return { page: 'achievements', search: base };
     case 'avatarChanged':
-      return { page: 'avatars', search: {} };
+      return { page: 'avatars', search: byClass };
     case 'linkNewDevice':
-      return { page: 'student-links', search: item.context ? { classId: item.context.classId } : {} };
+      return { page: 'student-links', search: byClass };
     case 'textBlocked':
-      return { page: 'text-checks', search: {} };
+      return { page: 'text-checks', search: base };
     case 'speakersPoints':
       return { page: 'reports', search: { ...base, view: 'achievementsSpeakers' } };
     default:

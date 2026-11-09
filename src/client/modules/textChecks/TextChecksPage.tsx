@@ -15,6 +15,8 @@ import { useRun } from '../../lib/useRun.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Select, Toggle } from '../../ui/Fields.tsx';
 import { StudentName } from '../../ui/StudentName.tsx';
+import { useLinkedRow } from '../../ui/linkedRow.ts';
+import type { TeacherPageSearch } from '../types.ts';
 
 const WORDS_KEY = [SENSITIVE, 'teacher', 'textWords'] as const;
 const noticeKey = (contextId: string) => [SENSITIVE, 'teacher', 'blockedText', contextId] as const;
@@ -47,8 +49,9 @@ function Words() {
   );
 }
 
-function Notice({ contextId }: { contextId: string }) {
+function Notice({ contextId, linkedStudent }: { contextId: string; linkedStudent?: string | undefined }) {
   const { t } = useI18n();
+  const linked = useLinkedRow(linkedStudent);
   const run = useRun();
   const q = useQuery({ queryKey: noticeKey(contextId), queryFn: () => call(T.blockedTextNotice, { contextId }) });
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
@@ -64,7 +67,7 @@ function Notice({ contextId }: { contextId: string }) {
         q.data.students.length ? (
           <ul className="cc-stack">
             {q.data.students.map((s) => (
-              <li key={s.id} className="cc-row">
+              <li key={s.id} className="cc-row" {...linked(s.id)}>
                 {/* The name opens the student's statistics (S14e2). */}
                 <StudentName id={s.id} name={s.fullName} contextId={contextId} />
                 <span>{t('textCheck.noticeCount', { count: s.count, date: s.lastDate })}</span>
@@ -79,11 +82,12 @@ function Notice({ contextId }: { contextId: string }) {
   );
 }
 
-export function TextChecksPage() {
+/** `contextId` and `studentId` in `search` (a notification's Open, S14i) preselect the class+subject and mark the student. */
+export function TextChecksPage({ search }: { search: TeacherPageSearch }) {
   const { t, locale } = useI18n();
   const contexts = useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
   const list = contexts.data?.contexts ?? [];
-  const [picked, setPicked] = useState('');
+  const [picked, setPicked] = useState(search.contextId ?? '');
   const ctx = list.find((c) => c.id === picked) ?? list[0];
   return (
     <main className="cc-page cc-stack" data-testid="text-checks-page">
@@ -93,7 +97,7 @@ export function TextChecksPage() {
       {ctx ? (
         <>
           <Select label={t('teacher.chooseClass')} items={list.map((c) => ({ id: c.id, label: `${c.className} · ${pickText(c.subjectName, locale)}` }))} value={ctx.id} onChange={setPicked} />
-          <Notice key={ctx.id} contextId={ctx.id} />
+          <Notice key={ctx.id} contextId={ctx.id} linkedStudent={ctx.id === search.contextId ? search.studentId : undefined} />
         </>
       ) : null}
     </main>
