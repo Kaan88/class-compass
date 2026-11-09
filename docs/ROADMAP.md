@@ -223,7 +223,8 @@ Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, m
 - [x] S14a Quick fixes: per-student counters on by default (D-143), "badges" → "achievements" in EN and TR with a guard test (D-144), evidence buttons that never overflow plus `e2e/button-groups.spec.ts` (D-147; also menu tiles, topic choices, group options, reflection, attendance statuses). With the boxes on, 16 cards fit at 1440×900 (19 from 1920×1080); the 18–20 target with boxes comes with S14b's board
   - [x] Not met by the default layout yet (open, for S14b): with the boxes on, D-139 fails at 1280×720 (class bar under the fold) and D-103 at 1440×900 (16 of 19 cards); pinned by "known gap until S14b" in `e2e/classroom-layout.spec.ts`. Closed by S14b's board (D-148): the gap test is now a normal guard
 - [x] S14a Sound: WebAudio unlock kept armed until the context runs, louder cues, "Sound is off · Turn sound on" chip, Test sound and diagnostics, new lesson/timer/group/achievement events (D-145; `groupMove` is declared and played from S14c)
-  - [ ] Heard by the owner on the MacBook (Safari and Chrome) and on the classroom speakers; iPad silent switch
+  - [x] Sound works on the test site (6c1c2f3): confirmed by the owner, 2026-11-09
+  - [ ] Heard on the classroom speakers; iPad silent switch
 - [x] S14a Avatars: recognisable dinosaurs and mythical creatures (rex, stegosaur, long-neck, unicorn, dragon, phoenix), Turkish names (D-146)
 - [x] S14a Review fixes: headphones, scarf, medal and backpack follow the side-view dinosaur heads and necks, the unicorn's scarf stays off its muzzle (D-146); boxes-on floors at every viewport and a test that pins the D-139/D-103 gap of the default layout for S14b (D-143)
   - [ ] Sare and a few children name each redrawn species
