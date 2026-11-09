@@ -371,6 +371,14 @@ that show it pick up the new package within a few minutes (an open board usually
 the fixture of `tests/server/themes.test.ts`, `tests/client/theme-packages.test.tsx` and
 `e2e/theme-packages.spec.ts`).
 
+Next to it, `docs/examples/<key>.theme.json` holds one package per built-in theme
+([explorer](examples/explorer.theme.json), [animals](examples/animals.theme.json),
+[classroom](examples/classroom.theme.json)): exactly what **Admin → Themes → Export** downloads (key
+`<key>-copy`, "(copy)" names; the art stays with the base theme). They are generated from the theme
+definitions by `npm run docs:theme-examples`, and `tests/docs/theme-examples.test.ts` fails when a
+built-in theme changes and the files were not regenerated (D-164). Run it after changing a built-in
+theme's colours, typography, shape, motion or sounds.
+
 - **Palette.** `bg` `#eef6f8` (sea foam) and white `surface` with `text` `#0f2430` (deep sea): 7:1+
   on both. `accent` `#0b6e8a` (sea blue) with white labels; `accent-strong` one step darker for
   links. `focus` stays a warm rust (`#a8480f`) so the focus ring is never mistaken for the accent.
@@ -419,14 +427,24 @@ console.log(report.errors, report.warnings);
 Fix every error (the `path` says where; contrast errors give the ratio and the minimum). Never put
 real people or a real school in a package. Enabling a theme stays a human action on Admin → Themes.
 
-**MCP theme tools (S14h1, D-160).** An AI assistant connected to `/mcp` with a personal token
-(`docs/guides/en/ai-tools.md`) has `theme_schema` (the package JSON Schema and the built-in keys),
-`validate_theme` (the same `validateThemePackage` report; nothing is saved), `import_theme_draft`
-(administrators with the `themes:write` scope: saves a **draft** only; enabling stays a human action
-on Admin → Themes after the preview) and `export_theme` (an imported theme's package; built-in
-themes are exported from the admin page). This guide is the resource `classcompass://docs/theming`
-and the schema `classcompass://themes/package-schema`; the prompt `design_theme` walks through the
-checklist above.
+**MCP theme tools (S14h1, D-160; S16b, D-164).** An AI assistant connected to `/mcp` (personal
+token or OAuth, `docs/guides/en/ai-tools.md`) can make a package as well as an agent in the git
+folder. What it gets:
+
+| Here in git | Over MCP |
+|---|---|
+| This guide | Resource `classcompass://docs/theming` (relative links rewritten: documents that are resources become `classcompass://` links, other files are named as repository files) |
+| `docs/theme-package.schema.json` | Resource `classcompass://themes/package-schema`, tool `theme_schema` |
+| `docs/examples/*.theme.json` | Resources `classcompass://themes/examples/<key>` (`ocean` and one per built-in theme) |
+| Export on Admin → Themes | `export_theme`: a built-in key gives the same package as the admin page (`<key>-copy`); an imported theme its stored package (teachers: enabled themes; administrators with `themes:write`: any). Read-only |
+| `validateThemePackage` | `validate_theme` (the same report; nothing is saved) |
+| `/dev/catalog` and the admin preview | `preview_theme`: the report, the base theme, every colour token with its value and source (package, base theme, fixed print colour), every contrast pair with ratio, minimum and pass, and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn |
+| Import on Admin → Themes | `import_theme_draft` (administrators with `themes:write`): saves a **draft** only |
+
+The server's instructions (sent on `initialize`) and every theme tool's description point at this
+guide and the examples, so an assistant that does not read resources by itself still finds them; the
+prompt `design_theme` walks through the checklist above. Looking at the real preview and **enabling**
+a theme stay human actions on Admin → Themes.
 
 ## Sound
 

@@ -241,6 +241,9 @@ describe('Docker build context and image layout (S14i)', () => {
       ...filesIn('docs/guides/en', '.md'),
       ...filesIn('docs/guides/tr', '.md'),
       'docs/THEMING.md',
+      'docs/theme-package.schema.json',
+      // The theme example packages (S16b, D-164): MCP resources and export_theme of a built-in theme.
+      ...filesIn('docs/examples', '.json'),
       ...filesIn('src/server', '.ts'),
       ...filesIn('src/shared', '.ts'),
       ...filesIn('src/domain', '.ts'),

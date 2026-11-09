@@ -68,6 +68,7 @@ disagree, the doc in `docs/` wins (and fix this file).
 | `npm run db:generate -- --name <stage_desc>` | Generate a migration after a schema change (in a stage: only after your final rebase, Stage workflow step 4); check that SQLite table rebuilds do not cascade-delete data; commit the SQL and `drizzle/meta`. |
 | `npm run new:module -- <key>` / `npm run new:theme -- <key>` | Scaffolds (`docs/EXTENDING.md`). |
 | `npm run docs:theming` | Regenerate the token table and limits in `docs/THEMING.md` and `docs/theme-package.schema.json` (drift-tested). |
+| `npm run docs:theme-examples` | Regenerate `docs/examples/<key>.theme.json` from the built-in themes (served to AI tools; drift-tested). |
 | `npm run docs:screenshots`, `npm run usability:screens` | Guide screenshots and the usability screen crawl (separate Playwright configs). |
 
 ## Stage workflow

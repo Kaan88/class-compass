@@ -1,0 +1,210 @@
+{
+  "format": "class-compass-theme",
+  "version": 1,
+  "key": "explorer-copy",
+  "name": {
+    "en": "Explorer (copy)",
+    "tr": "Kâşif (kopya)"
+  },
+  "description": {
+    "en": "Maps, a compass and warm paper for little explorers.",
+    "tr": "Küçük kâşifler için harita, pusula ve sıcak kâğıt."
+  },
+  "mascotName": {
+    "en": "Compy the compass explorer",
+    "tr": "Pusula kâşifi Compy"
+  },
+  "base": "explorer",
+  "colors": {
+    "bg": "#f4efe3",
+    "surface": "#fffaf0",
+    "surface-2": "#efe4cc",
+    "text": "#14182b",
+    "text-muted": "#4f4a3d",
+    "border": "#cdbf9f",
+    "border-strong": "#5b5140",
+    "accent": "#1f6f5c",
+    "accent-strong": "#175646",
+    "accent-soft": "#d7ece5",
+    "accent-text": "#ffffff",
+    "focus": "#a8480f",
+    "success": "#17733f",
+    "success-soft": "#dcf3e5",
+    "warning": "#8a5100",
+    "warning-soft": "#fff1d1",
+    "danger": "#b3261e",
+    "danger-strong": "#8c1d17",
+    "danger-soft": "#fde3e1",
+    "on-strong": "#ffffff",
+    "overlay": "#14182b8c",
+    "shadow-color": "#14182b1f",
+    "display-banner-bg": "#fff1d1",
+    "display-banner-text": "#14182b",
+    "display-banner-border": "#8a5100",
+    "level-0": "#efe4cc",
+    "level-1": "#fff1d1",
+    "level-2": "#ffd27a",
+    "level-3": "#fde3e1",
+    "level-edge-0": "#cdbf9f",
+    "level-edge-1": "#8a5100",
+    "level-edge-2": "#6e3f00",
+    "level-edge-3": "#b3261e",
+    "counter-accent": "#1f6f5c",
+    "counter-accent-edge": "#175646",
+    "counter-teal": "#1f6f5c",
+    "counter-teal-edge": "#175646",
+    "counter-plum": "#7a35a6",
+    "counter-plum-edge": "#642b88",
+    "counter-rust": "#c25a22",
+    "counter-rust-edge": "#6e3f00",
+    "counter-leaf": "#4f8a37",
+    "counter-leaf-edge": "#17733f",
+    "counter-berry": "#d6406a",
+    "counter-berry-edge": "#8c1d17",
+    "segment-on": "#1f6f5c",
+    "segment-off": "#efe4cc",
+    "avatar-text": "#ffffff",
+    "icon-accent": "#a8480f",
+    "deco-1": "#1f6f5c",
+    "deco-2": "#c8642c",
+    "deco-3": "#cdbf9f",
+    "pattern": "#8a6d3b",
+    "mascot-body": "#1f6f5c",
+    "mascot-belly": "#fffaf0",
+    "mascot-accent": "#c8642c",
+    "mascot-ink": "#14182b",
+    "mascot-cheek": "#e2557a",
+    "art-sky": "#e3efe9",
+    "art-ground": "#e6d6b0",
+    "art-light": "#fff3cf",
+    "avatar-red": "#d9483b",
+    "avatar-orange": "#e8833a",
+    "avatar-yellow": "#f2c94c",
+    "avatar-green": "#4caf6a",
+    "avatar-teal": "#2a9d8f",
+    "avatar-blue": "#3b7dd8",
+    "avatar-navy": "#2c3e7a",
+    "avatar-purple": "#8a5cc2",
+    "avatar-pink": "#e46aa6",
+    "avatar-brown": "#8d5b3e",
+    "avatar-grey": "#8a93a6",
+    "avatar-mint": "#8fd6c0",
+    "avatar-skin-1": "#fde3cf",
+    "avatar-skin-2": "#f8d5b8",
+    "avatar-skin-3": "#f1c29a",
+    "avatar-skin-4": "#e8b07f",
+    "avatar-skin-5": "#d99a68",
+    "avatar-skin-6": "#c68652",
+    "avatar-skin-7": "#b07142",
+    "avatar-skin-8": "#965c35",
+    "avatar-skin-9": "#7d4a2a",
+    "avatar-skin-10": "#653a22",
+    "avatar-skin-11": "#4f2d1b",
+    "avatar-skin-12": "#3b2115",
+    "avatar-hair-black": "#1f1a17",
+    "avatar-hair-darkBrown": "#3e2a1f",
+    "avatar-hair-brown": "#6b4428",
+    "avatar-hair-auburn": "#8e3b22",
+    "avatar-hair-ginger": "#c4622d",
+    "avatar-hair-blonde": "#d9b45a",
+    "avatar-hair-lightBlonde": "#ecd796",
+    "avatar-hair-grey": "#9a9a9a",
+    "avatar-hair-white": "#ececec",
+    "avatar-hair-blue": "#3b6fd1",
+    "avatar-hair-pink": "#e07bb0",
+    "avatar-hair-purple": "#7d4fc0",
+    "avatar-ink": "#1d2033",
+    "avatar-outline": "#1d203340",
+    "avatar-white": "#ffffff",
+    "avatar-blush": "#f0807f",
+    "badge-bronze": "#c07a3f",
+    "badge-silver": "#a9b2c3",
+    "badge-gold": "#e5b631",
+    "badge-plain": "#6c8cd5",
+    "badge-ink": "#1d2033",
+    "badge-shine": "#ffffff"
+  },
+  "typography": {
+    "body": "system",
+    "display": "friendly",
+    "weightBody": 400,
+    "weightStrong": 700,
+    "weightHeading": 800,
+    "weightDisplay": 850,
+    "trackingBody": 0,
+    "trackingDisplay": 0.01
+  },
+  "shape": {
+    "radiusRem": 0.85,
+    "radiusSmRem": 0.5,
+    "borderPx": 2,
+    "borderStrongPx": 3,
+    "shadow": "paper",
+    "shadowRaised": "raised"
+  },
+  "avatar": {
+    "saturation": 50,
+    "lightness": 36,
+    "lightnessSmall": 28
+  },
+  "icons": {
+    "strokeWidth": 2.4,
+    "linecap": "round",
+    "linejoin": "round"
+  },
+  "decoOpacity": 0.22,
+  "patternOpacity": 0.07,
+  "motion": {
+    "celebrate": {
+      "preset": "hop",
+      "durationMs": 900,
+      "easing": "ease-in-out"
+    },
+    "threshold": {
+      "preset": "slideIn",
+      "durationMs": 600,
+      "easing": "ease-out"
+    }
+  },
+  "sounds": {
+    "root": 523,
+    "wave": "triangle",
+    "scale": "major",
+    "gain": 0.11,
+    "tempo": 1,
+    "overrides": {
+      "timeUp": [
+        {
+          "freq": 523,
+          "at": 0,
+          "dur": 450,
+          "type": "triangle",
+          "gain": 0.12
+        },
+        {
+          "freq": 659,
+          "at": 380,
+          "dur": 600,
+          "type": "triangle",
+          "gain": 0.1
+        },
+        {
+          "freq": 784,
+          "at": 760,
+          "dur": 700,
+          "type": "triangle",
+          "gain": 0.1
+        }
+      ]
+    }
+  },
+  "celebration": {
+    "colors": [
+      "accent",
+      "deco-1",
+      "deco-2",
+      "deco-3",
+      "success"
+    ]
+  }
+}

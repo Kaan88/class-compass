@@ -14,13 +14,16 @@ import { TimelineEvent } from '../../../shared/contracts/reports.ts';
 import * as R from '../../../shared/contracts/reports.ts';
 import * as S from '../../../shared/contracts/school.ts';
 import * as T from '../../../shared/contracts/themes.ts';
-import { THEME_KEYS } from '../../../shared/themes.ts';
-import { themePackageJsonSchema, ThemeSlug } from '../../../shared/themePackage/schema.ts';
-import { validateThemePackage } from '../../../shared/themePackage/validate.ts';
+import { DEFAULT_THEME, THEME_KEYS, type BuiltinThemeKey } from '../../../shared/themes.ts';
+import { CONTRAST_PAIRS, pairContrast } from '../../../shared/themePackage/contrast.ts';
+import { Art, themePackageJsonSchema, ThemeSlug } from '../../../shared/themePackage/schema.ts';
+import { COLOR_TOKENS, ILLUSTRATIONS, MASCOT_POSES } from '../../../shared/themePackage/tokens.ts';
+import { FIXED_COLORS, packageArt, validateThemePackage } from '../../../shared/themePackage/validate.ts';
 import { executeCommand } from '../../lib/commands.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
 import { publicTheme } from '../themes/service.ts';
+import { readExample } from './resources.ts';
 import { callEndpoint, handTool, type HandTool, type ToolEnv } from './toolkit.ts';
 
 const Id = S.Id;
@@ -179,11 +182,14 @@ const classroomCommand = handTool({
 });
 
 const ThemeReportOut = T.ThemeReport;
+/** Where an MCP agent learns theme work (D-164): said in every theme tool's description. */
+const THEME_GUIDE =
+  'Guide: the resource classcompass://docs/theming; complete example packages: classcompass://themes/examples/<key> (ocean, and one per built-in theme), or export_theme.';
 
 const themeSchema = handTool({
   name: 'theme_schema',
   description:
-    'The JSON Schema of a Class Compass theme package (format, key slug, names in English and Turkish, base theme, every colour token, typography and shape presets, motion presets, sound parameters and optional SVG art). Read the theming guide resource (classcompass://docs/theming) for palette design, contrast rules and the SVG allow-list. Holds no school data.',
+    'The JSON Schema of a Class Compass theme package (format, key slug, names in English and Turkish, base theme, every colour token, typography and shape presets, motion presets, sound parameters and optional SVG art). Read the theming guide resource (classcompass://docs/theming) for palette design, contrast rules and the SVG allow-list. Holds no school data. ' + THEME_GUIDE,
   scope: null,
   role: 'any',
   readOnly: true,
@@ -195,7 +201,7 @@ const themeSchema = handTool({
 const validateTheme = handTool({
   name: 'validate_theme',
   description:
-    'Checks a theme package (JSON object or text) with the same validator the admin page uses: schema, colour contrast (WCAG pairs), sound limits, SVG allow-list and size. Returns the report (errors with a path and message, warnings, stats); nothing is saved. Fix every error before import_theme_draft.',
+    'Checks a theme package (JSON object or text) with the same validator the admin page uses: schema, colour contrast (WCAG pairs), sound limits, SVG allow-list and size. Returns the report (errors with a path and message, warnings, stats); nothing is saved. Fix every error before import_theme_draft; preview_theme shows every contrast ratio and what falls back to the base theme. ' + THEME_GUIDE,
   scope: null,
   role: 'any',
   readOnly: true,
@@ -221,19 +227,100 @@ const importThemeDraft = handTool({
 const exportTheme = handTool({
   name: 'export_theme',
   description:
-    "Returns the package JSON of an imported theme, to start a new theme from it (change the key and names). Teachers can export enabled themes; administrators with themes:write any imported theme. Built-in themes are not packages here: start from the theme_schema tool and the worked 'ocean' example in the theming guide, or use Export on Admin → Themes.",
+    "Returns the package JSON of a theme, to start a new theme from it. A built-in key (explorer, animals, classroom) gives the same package as Export on Admin → Themes: key '<key>-copy' and '(copy)' names, its art stays with the base theme (also the resource classcompass://themes/examples/<key>). An imported theme gives its stored package: change the key and names before import_theme_draft. Teachers can export built-in and enabled themes; administrators with themes:write any imported theme. Read-only. " + THEME_GUIDE,
   scope: null,
   role: 'any',
   readOnly: true,
   cost: 2,
   input: z.object({ key: ThemeSlug }),
-  output: z.object({ package: T.PackageDto.meta(pii('label')) }),
+  output: z.object({ package: T.PackageDto.meta(pii('label')), note: z.string().meta(pii('none')) }),
   run: async (env, input) => {
-    if ((THEME_KEYS as readonly string[]).includes(input.key)) throw new AppError('NOT_FOUND', 'Built-in themes are exported from Admin → Themes', { reason: 'THEME_BUILTIN' });
+    if ((THEME_KEYS as readonly string[]).includes(input.key)) {
+      const pkg = readExample(input.key);
+      if (!pkg) throw new AppError('NOT_FOUND', 'The built-in theme package file is missing from this server', { reason: 'THEME_EXAMPLE_MISSING' });
+      return { package: T.PackageDto.parse(pkg), note: `The built-in theme "${input.key}" as Admin → Themes exports it (key "${input.key}-copy"). Give it your own key and names before import_theme_draft.` };
+    }
+    const note = 'An imported theme: give the copy a new key and names before import_theme_draft.';
     const admin = env.ctx.user?.role === 'admin' && env.ctx.mcp?.scopes.includes('themes:write');
-    if (admin) return { package: (await callEndpoint(env, T.getCustomTheme, { key: input.key })).package };
-    return { package: publicTheme(env.ctx, { key: input.key }).body };
+    if (admin) return { package: (await callEndpoint(env, T.getCustomTheme, { key: input.key })).package, note };
+    return { package: publicTheme(env.ctx, { key: input.key }).body, note };
   },
 });
 
-export const HAND_WRITTEN_TOOLS: readonly HandTool[] = [classOverview, studentSummary, createGoalPreset, createSentenceStarter, classroomCommand, themeSchema, validateTheme, importThemeDraft, exportTheme];
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const Source = z.enum(['package', 'base', 'fixed']);
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * What a theme package looks like without a browser (D-164): the colour set after the base-theme
+ * fallback, every contrast pair with its ratio, and which pictures come from the base theme. The base
+ * theme's colours come from its generated example package (docs/examples/<base>.theme.json).
+ */
+export function previewPackage(source: string) {
+  const { report } = validateThemePackage(source);
+  let raw: unknown = null;
+  try {
+    raw = JSON.parse(source);
+  } catch {
+    raw = null;
+  }
+  const obj = isRecord(raw) ? raw : {};
+  const base: BuiltinThemeKey = (THEME_KEYS as readonly string[]).includes(obj.base as string) ? (obj.base as BuiltinThemeKey) : DEFAULT_THEME;
+  const baseColors = (readExample(base)?.colors ?? {}) as Record<string, string>;
+  const own = isRecord(obj.colors) ? obj.colors : {};
+  const fixed = FIXED_COLORS as Record<string, string>;
+  const colors = COLOR_TOKENS.map((token) => {
+    if (token in fixed) return { token, value: fixed[token]!, source: 'fixed' as const };
+    const v = own[token];
+    if (typeof v === 'string' && /^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/u.test(v)) return { token, value: v, source: 'package' as const };
+    return { token, value: baseColors[token] ?? '#000000', source: 'base' as const };
+  });
+  const value = Object.fromEntries(colors.map((c) => [c.token, c.value])) as Record<string, string>;
+  const contrast = CONTRAST_PAIRS.map((p) => {
+    const ratio = round2(pairContrast(value[p.fg]!, value[p.bg]!));
+    return { fg: p.fg, bg: p.bg, ratio, min: p.min, pass: ratio >= p.min, why: p.why };
+  });
+  const art = Art.safeParse(obj.art);
+  const parsed = packageArt({ art: art.success ? art.data : undefined });
+  return {
+    report,
+    base,
+    colors,
+    contrast,
+    art: {
+      mascot: MASCOT_POSES.map((pose) => ({ pose, source: parsed.mascot ? ('package' as const) : ('base' as const) })),
+      illustrations: ILLUSTRATIONS.map((name) => ({ name, source: parsed.illustrations[name] ? ('package' as const) : ('base' as const) })),
+      decoration: parsed.decoration ? ('package' as const) : ('base' as const),
+      pattern: parsed.pattern ? ('package' as const) : ('base' as const),
+    },
+    sounds: obj.sounds === null ? ('silent' as const) : isRecord(obj.sounds) ? ('package' as const) : ('base' as const),
+  };
+}
+
+const previewTheme = handTool({
+  name: 'preview_theme',
+  description:
+    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
+    THEME_GUIDE,
+  scope: null,
+  role: 'any',
+  readOnly: true,
+  cost: 2,
+  input: z.object({ package: PackageInput }),
+  output: z.object({
+    report: ThemeReportOut,
+    base: z.enum(THEME_KEYS),
+    colors: z.array(z.object({ token: z.enum(COLOR_TOKENS), value: z.string().meta(pii('none')), source: Source })),
+    contrast: z.array(z.object({ fg: z.enum(COLOR_TOKENS), bg: z.enum(COLOR_TOKENS), ratio: z.number(), min: z.number(), pass: z.boolean(), why: z.string().meta(pii('none')) })),
+    art: z.object({
+      mascot: z.array(z.object({ pose: z.enum(MASCOT_POSES), source: Source })),
+      illustrations: z.array(z.object({ name: z.enum(ILLUSTRATIONS), source: Source })),
+      decoration: Source,
+      pattern: Source,
+    }),
+    sounds: z.enum(['package', 'silent', 'base']),
+  }),
+  run: (_env, input) => previewPackage(packageText(input.package)),
+});
+
+export const HAND_WRITTEN_TOOLS: readonly HandTool[] = [classOverview, studentSummary, createGoalPreset, createSentenceStarter, classroomCommand, themeSchema, validateTheme, previewTheme, importThemeDraft, exportTheme];

@@ -72,6 +72,6 @@ export const PROMPTS: readonly McpPrompt[] = [
     scope: null,
     role: 'any',
     text: (a) =>
-      `Design a Class Compass theme package${a.idea ? ` for: ${a.idea}` : ''}. Read theme_schema and the theming guide resource (classcompass://docs/theming): pick a base theme, a calm palette with every colour token, typography and shape presets, motion presets and gentle sounds within the limits; art is optional. Use a new slug key and names in English and Turkish, never a real person or school. Run validate_theme and fix every error (contrast errors give the ratio and the minimum). Administrators may then call import_theme_draft; enabling the theme stays a human action on Admin → Themes.`,
+      `Design a Class Compass theme package${a.idea ? ` for: ${a.idea}` : ''}. Read the theming guide resource (classcompass://docs/theming) and theme_schema, and start from a complete example: classcompass://themes/examples/ocean, classcompass://themes/examples/<built-in key> or export_theme. Pick a base theme, a calm palette with every colour token, typography and shape presets, motion presets and gentle sounds within the limits; art is optional. Use a new slug key and names in English and Turkish, never a real person or school. Run validate_theme and fix every error (contrast errors give the ratio and the minimum) until it is clean; preview_theme shows every contrast ratio and what falls back to the base theme. Administrators may then call import_theme_draft; enabling the theme stays a human action on Admin → Themes.`,
   },
 ];

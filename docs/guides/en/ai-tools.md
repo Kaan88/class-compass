@@ -71,7 +71,9 @@ claude mcp add --transport http class-compass https://school.example.org/mcp --h
 
 Then ask Claude, for example: "Use class-compass: give me a short summary of last week in 3-A English." Claude starts with **list_my_classes** and asks before it changes anything when you tell it to.
 
-Useful tools: **class_overview**, **class_report** (ask for a few sections when a report is large), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** and **set_topic_plan**, **create_homework**; for themes **theme_schema**, **validate_theme** and, for administrators, **import_theme_draft** (it saves a draft; enabling a theme stays your decision on **Themes**). Ready-made requests (prompts): weekly summary, goal presets, topic plan, design a theme.
+Useful tools: **class_overview**, **class_report** (ask for a few sections when a report is large), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** and **set_topic_plan**, **create_homework**; for themes **theme_schema**, **validate_theme**, **preview_theme**, **export_theme** and, for administrators, **import_theme_draft** (it saves a draft; enabling a theme stays your decision on **Themes**). Ready-made requests (prompts): weekly summary, goal presets, topic plan, design a theme.
+
+**Making a theme with an assistant.** The assistant can read the theming guide and complete example themes (one for each built-in theme), copy any theme with **export_theme**, check its work with **validate_theme** and see every colour contrast with **preview_theme**. None of this contains school data. An administrator's assistant can save the result as a draft; you look at the preview and switch the theme on yourself on **Themes**.
 
 ## claude.ai and Claude Desktop
 

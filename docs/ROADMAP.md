@@ -305,6 +305,17 @@ Measured by the lead on 2026-11-09 with fictional schools on the development PC,
 - [ ] The notification tick watched on the intended server over a real school day (no stall over about 100 ms); not part of the 2026-11-09 run
 - [ ] A full lesson day on the real classroom display after deployment
 
+## S16b Theme authoring over MCP (owner request 2026-11-09)
+An AI agent connected over MCP makes theme packages as well as an agent in the git folder; decision D-164, no migration.
+- [x] One generated package per built-in theme in `docs/examples/<key>.theme.json` (`npm run docs:theme-examples`; drift and validity test `tests/docs/theme-examples.test.ts`)
+- [x] Every example is the MCP resource `classcompass://themes/examples/<key>`; `docs/examples` is in the Docker image (`tests/scripts/docker.test.ts`)
+- [x] `export_theme` returns built-in themes (the admin page's `<key>-copy` package) for teachers and administrators, read-only
+- [x] THEMING.md and the guides served with relative links rewritten to `classcompass://` URIs or named as repository files; files in git unchanged
+- [x] Server instructions, the theme tools and the `design_theme` prompt point at the guide and the examples
+- [x] `preview_theme`: contrast table, resolved colours after the base fallback, art fallback (no images)
+- [x] Tests: `tests/server/mcp-themes.test.ts`, privacy registry scan and conformance still green; docs (THEMING, ai-tools EN/TR, D-164)
+- [ ] Tried end to end from Claude Code and claude.ai against the test site (needs the Access bypass and a redeploy; owner)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site

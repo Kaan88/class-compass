@@ -71,7 +71,9 @@ claude mcp add --transport http class-compass https://school.example.org/mcp --h
 
 Ardından Claude’a örneğin şunu sorun: "class-compass’ı kullan: 3-A İngilizce dersinin geçen haftasının kısa bir özetini çıkar." Claude işe **list_my_classes** ile başlar; isterseniz bir şeyi değiştirmeden önce size sorar.
 
-İşe yarayan araçlar: **class_overview**, **class_report** (rapor büyükse birkaç bölüm isteyin), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** ve **set_topic_plan**, **create_homework**; temalar için **theme_schema**, **validate_theme** ve yöneticiler için **import_theme_draft** (taslak kaydeder; bir temayı etkinleştirmek **Temalar** sayfasında sizin kararınız olarak kalır). Hazır istekler (prompts): haftalık özet, hazır hedefler, konu planı, tema tasarımı.
+İşe yarayan araçlar: **class_overview**, **class_report** (rapor büyükse birkaç bölüm isteyin), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** ve **set_topic_plan**, **create_homework**; temalar için **theme_schema**, **validate_theme**, **preview_theme**, **export_theme** ve yöneticiler için **import_theme_draft** (taslak kaydeder; bir temayı etkinleştirmek **Temalar** sayfasında sizin kararınız olarak kalır). Hazır istekler (prompts): haftalık özet, hazır hedefler, konu planı, tema tasarımı.
+
+**Asistanla tema hazırlamak.** Asistan tema kılavuzunu ve eksiksiz örnek temaları (her hazır tema için bir tane) okuyabilir, **export_theme** ile herhangi bir temanın kopyasını alabilir, işini **validate_theme** ile denetleyip **preview_theme** ile tüm renk kontrastlarını görebilir. Bunların hiçbirinde okul verisi yoktur. Bir yöneticinin asistanı sonucu taslak olarak kaydedebilir; önizlemeye bakıp temayı **Temalar** sayfasında siz açarsınız.
 
 ## claude.ai ve Claude Desktop
 

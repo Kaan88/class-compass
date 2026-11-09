@@ -245,6 +245,7 @@ blocks (`Face`, `Arms`, `Scene`, `Sparkles`, `Confetti`, …) are in `src/client
 | `themeSounds(params, overrides)` | `src/client/themes/soundPack.ts` | A built-in theme's sounds plus the parameters exported into packages. |
 | `presetMotion`, `FONT_PRESETS`, `SHADOW_PRESETS` | `src/shared/themePackage/motion.ts`, `presets.ts` | Motions, fonts and shadows by name (built-in themes use them too). |
 | `npm run docs:theming` | `scripts/theme-docs.ts` | Regenerate the token table, the limits and the package schema in the docs. |
+| `npm run docs:theme-examples` | `scripts/theme-examples.ts` | Regenerate `docs/examples/<key>.theme.json` for every built-in theme (served over MCP; drift-tested, D-164). |
 
 ### What the registry gives you
 
@@ -266,6 +267,7 @@ labels, the same counter levels (number + pattern + word) and the same flows.
 - [ ] Look at `/dev/catalog` (all poses and illustrations; the animation switch replays motions; sound buttons) in both languages and at 200 % text.
 - [ ] `npm run test:e2e -- catalog` (axe on every theme, plus screenshots attached to the report).
 - [ ] Translate the `TODO(tr)` lines. Record the theme in ROADMAP and DECISIONS.
+- [ ] `npm run docs:theme-examples` (one example package per built-in theme, served over MCP; drift-tested, D-164).
 - [ ] `npm run docs:theming` (the token table shows every built-in theme's values; drift-tested).
 
 ## Add a language (notes)

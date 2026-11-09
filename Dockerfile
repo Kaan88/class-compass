@@ -50,6 +50,7 @@ COPY --chown=root:root drizzle ./drizzle
 COPY --chown=root:root docs/guides/en ./docs/guides/en
 COPY --chown=root:root docs/guides/tr ./docs/guides/tr
 COPY --chown=root:root docs/THEMING.md docs/theme-package.schema.json ./docs/
+COPY --chown=root:root docs/examples ./docs/examples
 COPY --chown=root:root scripts/prepare-ocr.ts ./scripts/prepare-ocr.ts
 COPY --from=build --chown=root:root /app/dist/client ./dist/client
 COPY --from=build --chown=root:root /out/ocr /opt/class-compass/ocr

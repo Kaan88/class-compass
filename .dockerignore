@@ -48,6 +48,7 @@ docs/*
 !docs/guides/
 !docs/THEMING.md
 !docs/theme-package.schema.json
+!docs/examples/
 .claude/
 .vscode/
 .idea/

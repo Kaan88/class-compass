@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { lessons, mcpPseudonyms, schoolSettings, users } from '../../src/server/db/schema.ts';
 import { foldSameLength, NAME_WITHHELD, NameScrubber, NUMBER_WITHHELD, unmarkedStrings } from '../../src/server/modules/mcp/privacy.ts';
 import { allTools, inputJsonSchema, type McpTool } from '../../src/server/modules/mcp/registry.ts';
-import { allResources } from '../../src/server/modules/mcp/resources.ts';
+import { allResources, linkDocs } from '../../src/server/modules/mcp/resources.ts';
 import { PROMPTS } from '../../src/server/modules/mcp/prompts.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 import { endLesson, startLesson } from '../lesson-helpers.ts';
@@ -127,6 +127,7 @@ function argsFor(t: McpTool, alias: (id: string) => string): Record<string, unkn
     validate_theme: { package: '{}' },
     import_theme_draft: { package: '{}' },
     export_theme: { key: 'no-such-theme' },
+    preview_theme: { package: '{}' },
     update_school_settings: { weatherEnabled: true },
     set_module_policy: { module: 'goals', availability: 'enabled' },
   };
@@ -249,7 +250,7 @@ describe('pseudonymous mode (D-161)', () => {
     // The same student keeps the same pseudonym across calls of one token.
     expect(JSON.parse(a.texts.get('tool student_summary')!).student.fullName).toBe(goals.student.fullName);
 
-    // Staff names, the school name and static documents come out exactly as they are (review fix): a teacher
+    // Staff names, the school name and static documents come out exactly as they are (review fix; documents only with their links rewritten, D-164): a teacher
     // called like a student, a school named like one, a guide's example name never turn into "Student N".
     expect(new Set((goals.feedback as Array<{ teacherName: string }>).map((f) => f.teacherName))).toEqual(new Set([TEACHER_NAME]));
     expect(JSON.parse(b.texts.get('tool school_settings')!).schoolName).toBe(SCHOOL_NAME);
@@ -257,7 +258,7 @@ describe('pseudonymous mode (D-161)', () => {
     for (const lang of ['en', 'tr'] as const) {
       for (const file of fs.readdirSync(`docs/guides/${lang}`).filter((f) => f.endsWith('.md'))) {
         const uri = `resource classcompass://guides/${lang}/${file.replace(/\.md$/u, '')}`;
-        expect(a.texts.get(uri), uri).toBe(fs.readFileSync(`docs/guides/${lang}/${file}`, 'utf8'));
+        expect(a.texts.get(uri), uri).toBe(linkDocs(fs.readFileSync(`docs/guides/${lang}/${file}`, 'utf8'), `guides/${lang}/${file}`));
       }
     }
     expect(a.texts.get('resource classcompass://guides/tr/admin')).toContain('**Ada ya da numaraya göre ara**');
