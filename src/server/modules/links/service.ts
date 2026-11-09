@@ -86,7 +86,12 @@ function recordExchangeFailure(deps: AppDeps, ip: string, now: number): number {
  * deactivated students get the same answer (401 LINK_INVALID), so the endpoint reveals nothing about
  * which links existed; too many of them from one address answer 429 instead.
  */
-export function exchangeToken(deps: AppDeps, ip: string, token: string): { token: string } {
+/**
+ * Exchanges a link token for a student session. `knownLinkId` is the link of the live student session
+ * the device already holds (null when none): opening the same link again on that device is not a new
+ * device, so it does not notify the teachers (D-155).
+ */
+export function exchangeToken(deps: AppDeps, ip: string, token: string, knownLinkId: string | null = null): { token: string } {
   const hash = tokenHash(deps.config.SECRET_PEPPER, token);
   const link = deps.db.select().from(studentLinks).where(eq(studentLinks.tokenHash, hash)).get();
   // The lookup is by HMAC (an attacker cannot steer it); the final comparison is constant-time.
@@ -101,8 +106,9 @@ export function exchangeToken(deps: AppDeps, ip: string, token: string): { token
     const { token: sessionToken } = createSession(deps, { kind: 'student', studentLinkId: link.id }, now, STUDENT_SESSION_ABSOLUTE_MS);
     deps.db.update(studentLinks).set({ lastUsedAt: now }).where(eq(studentLinks.id, link.id)).run();
     audit(deps.db, { type: 'student', id: link.studentId }, { action: 'student_link.open', entity: 'student_link', entityId: link.id, after: { generation: link.generation } }, now);
-    // Every exchange is a new device (a device with a session cookie never exchanges again).
-    notify(deps, { category: 'linkNewDevice', studentId: link.studentId, subjectId: null, entity: 'student_link', entityId: link.id });
+    // A device without a live session for this link (a new phone, or one whose cookie was cleared or
+    // ran out) tells the teachers who want it; the same device opening its link again does not.
+    if (knownLinkId !== link.id) notify(deps, { category: 'linkNewDevice', studentId: link.studentId, subjectId: null, entity: 'student_link', entityId: link.id });
     return { token: sessionToken };
   });
 }

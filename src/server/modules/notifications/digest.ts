@@ -6,13 +6,15 @@
  *    email address and the digest switched on), after the teacher's chosen hour in the school
  *    timezone, a plain-text email in the teacher's language with COUNTS ONLY: how many unread
  *    notifications of each kind arrived since the last digest (at most a week back; the last 24 hours
- *    for the first one), after the same access check as the page. Student names (with a count each) only when the
+ *    for the first one), after the same access check as the page. A row that keeps collecting while
+ *    unread counts only its new part (`count - digestedCount`); a digest that went out moves
+ *    `digestedCount` up to what it mailed. Student names (with a count each) only when the
  *    teacher opted in; never student text, never class lists. Nothing new = no email (`empty`).
  *
  * A digest row (teacher, local day) is inserted BEFORE the mail goes out, so two ticks never send
  * twice; a failed send is recorded as `failed` and not retried that day (no SMTP hammering).
  */
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { localDate } from '../../../domain/dates.ts';
 import { categoryOn, NOTIFICATION_CATEGORIES, type NotificationCategory } from '../../../shared/notifications.ts';
 import { translate, type Locale } from '../../../shared/i18n/index.ts';
@@ -44,6 +46,8 @@ export interface DigestContent {
   total: number;
   byCategory: Partial<Record<NotificationCategory, number>>;
   byStudent: Array<{ fullName: string; count: number }>;
+  /** The rows counted, with their `count` at that moment (marked as digested once the mail went out). */
+  covered: Array<{ id: string; count: number }>;
 }
 
 /** What a teacher's digest would say now (unread rows they may see, updated after `since`, of the kinds `keep` accepts). */
@@ -55,16 +59,32 @@ export function digestContent(deps: Pick<AppDeps, 'db' | 'now'>, userId: string,
     .all();
   const byCategory: Partial<Record<NotificationCategory, number>> = {};
   const students = new Map<string, { fullName: string; count: number }>();
+  const covered: DigestContent['covered'] = [];
   let total = 0;
   for (const { row, fullName } of visibleRows(deps, userId, rows)) {
     if (!keep(row.category)) continue;
-    byCategory[row.category] = (byCategory[row.category] ?? 0) + row.count;
+    // Only what is new since the last digest (or since the teacher read the row).
+    const fresh = row.count - row.digestedCount;
+    if (fresh <= 0) continue;
+    covered.push({ id: row.id, count: row.count });
+    byCategory[row.category] = (byCategory[row.category] ?? 0) + fresh;
     const s = students.get(row.studentId) ?? { fullName, count: 0 };
-    s.count += row.count;
+    s.count += fresh;
     students.set(row.studentId, s);
-    total += row.count;
+    total += fresh;
   }
-  return { total, byCategory, byStudent: sortByName([...students.values()], (s) => s.fullName) };
+  return { total, byCategory, byStudent: sortByName([...students.values()], (s) => s.fullName), covered };
+}
+
+/** After a digest went out: what it counted is not new any more (never lowers a newer mark). */
+function markDigested(deps: Pick<AppDeps, 'db'>, covered: DigestContent['covered']): void {
+  for (const { id, count } of covered) {
+    deps.db
+      .update(notifications)
+      .set({ digestedCount: sql`max(${notifications.digestedCount}, ${count})` })
+      .where(eq(notifications.id, id))
+      .run();
+  }
 }
 
 /** The plain-text email (counts only; names only when `includeNames`). */
@@ -132,6 +152,7 @@ export async function runNotificationTick(deps: AppDeps): Promise<{ purged: numb
     const mail = digestMail(u.locale, u.displayName, content, settings.digest.includeNames, `${deps.config.origins.main}/teacher/notifications`);
     try {
       await mailer.send({ to: u.email, subject: mail.subject, text: mail.text });
+      markDigested(deps, content.covered);
       setStatus('sent');
       result.sent += 1;
     } catch {

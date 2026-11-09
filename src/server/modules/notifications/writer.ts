@@ -75,10 +75,12 @@ export function writeNotifications(deps: NotifyDeps, e: NotifyEvent): void {
             .get()
         : undefined;
     if (existing) {
-      // Read again (an aggregate the teacher already read becomes new with the next point).
+      // Read again (an aggregate the teacher already read becomes new with the next point). What the
+      // teacher had already read is not new: the digest counts only what came after it.
+      const digestedCount = existing.readAt !== null ? existing.count : existing.digestedCount;
       deps.db
         .update(notifications)
-        .set({ count: existing.count + add, updatedAt: now, readAt: null, contextId: c.context.id })
+        .set({ count: existing.count + add, digestedCount, updatedAt: now, readAt: null, contextId: c.context.id })
         .where(eq(notifications.id, existing.id))
         .run();
       continue;
@@ -95,6 +97,7 @@ export function writeNotifications(deps: NotifyDeps, e: NotifyEvent): void {
         entity: e.entity,
         entityId: e.entityId,
         count: add,
+        digestedCount: 0,
         localDate: date,
         createdAt: now,
         updatedAt: now,

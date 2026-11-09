@@ -53,35 +53,42 @@ export function TeacherLayout() {
   );
 }
 
+const useContextsQuery = () => useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
+
 /** The teacher's class+subjects (classroom-safe list, shared query); undefined while loading. */
 export function useTeacherContexts(): School.MyContext[] | undefined {
-  const q = useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
-  return q.data?.contexts;
+  return useContextsQuery().data?.contexts;
 }
 /** What the menu needs to hide the pages of modules that are off everywhere (S14e3, D-156). */
 export const useMenuContexts = useTeacherContexts;
 
 /**
  * A teacher page from a manifest (the `/teacher/$page` route). A page whose module is off in every
- * class+subject of the teacher shows an empty state that points to Class settings (S14e3, D-156); its
- * address keeps working.
+ * class+subject of the teacher shows an empty state (S14e3, D-156); its address keeps working. When
+ * the teacher switched it off, the empty state points to Class settings; when the administrator made
+ * the module unavailable school-wide, it says so and offers no switch the teacher cannot use.
  */
 export function TeacherPageView({ page, search }: { page: TeacherPage; search: TeacherPageSearch }) {
   const { t } = useI18n();
-  const contexts = useMenuContexts();
-  if (!pageAvailable(page, contexts)) {
+  const q = useContextsQuery();
+  if (!pageAvailable(page, q.data?.contexts)) {
+    const byAdmin = page.module ? q.data?.available[page.module] === false : false;
     return (
       <main className="cc-page cc-stack" data-testid="module-off-page">
         <h1 className="cc-h1">{t(page.labelKey)}</h1>
-        <EmptyState
-          title={t('teacher.moduleOff.title', { page: t(page.labelKey) })}
-          body={t('teacher.moduleOff.body')}
-          action={
-            <Link to="/teacher/$page" params={{ page: 'classes' }} className={buttonClass('primary')}>
-              {t('teacher.moduleOff.action')}
-            </Link>
-          }
-        />
+        {byAdmin ? (
+          <EmptyState title={t('teacher.moduleOff.adminTitle', { page: t(page.labelKey) })} body={t('teacher.moduleOff.adminBody')} />
+        ) : (
+          <EmptyState
+            title={t('teacher.moduleOff.title', { page: t(page.labelKey) })}
+            body={t('teacher.moduleOff.body')}
+            action={
+              <Link to="/teacher/$page" params={{ page: 'classes' }} className={buttonClass('primary')}>
+                {t('teacher.moduleOff.action')}
+              </Link>
+            }
+          />
+        )}
       </main>
     );
   }
@@ -131,7 +138,8 @@ function TeacherNav() {
                   {t(p.labelKey)}
                 </Link>
               ))}
-            <Link to="/teacher/$page" params={{ page: 'setup' }} data-section={inSetup ? 'current' : undefined}>
+            {/* On a setup page the Class setup link is the current section: said by aria-current, shown by more than colour. */}
+            <Link to="/teacher/$page" params={{ page: 'setup' }} data-section={inSetup ? 'current' : undefined} aria-current={inSetup ? 'location' : undefined}>
               {t('teacher.setup')}
             </Link>
             <Link to="/teacher/$page" params={{ page: 'profile' }}>

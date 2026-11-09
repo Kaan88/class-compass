@@ -192,6 +192,21 @@ describe('categories and defaults (D-155)', () => {
     expect((await list(s.teacherA)).items.filter((i) => i.category === 'textBlocked').map((i) => i.count)).toEqual([1, 3]);
   });
 
+  it('the same device opening its link again is not a new device; another device is (D-155, S14e3 review)', async () => {
+    await switchOn(s.teacherA, 'linkNewDevice');
+    const token = tokenOf(await linkUrl(s.teacherA, s.c3a.id, ada.id));
+    // Ada's phone already holds a session for this link: scanning the card again twice notifies nobody.
+    await ok(adaPhone.post('/api/student/session', { token }));
+    await ok(adaPhone.post('/api/student/session', { token }));
+    expect((await list(s.teacherA)).items.filter((i) => i.category === 'linkNewDevice')).toEqual([]);
+    // A device holding a session for another student's link is a new device for Ada's link.
+    const boraPhone = await openLink(env, await linkUrl(s.teacherA, s.c3a.id, bora.id));
+    await ok(boraPhone.post('/api/student/session', { token }));
+    // A fresh device is too.
+    await ok(new Client(env).post('/api/student/session', { token }));
+    expect((await list(s.teacherA)).items.filter((i) => i.category === 'linkNewDevice' && i.student.id === ada.id)).toMatchObject([{ count: 2 }]);
+  });
+
   it('Super Speakers points: a daily count for the teachers of the badge subject, not for the scorer’s own account', async () => {
     await ok(s.admin.put('/api/admin/module-policies/superSpeakers', { availability: 'enabled' }));
     await switchOn(s.teacherA, 'speakersPoints');
@@ -302,6 +317,26 @@ describe('page, bell and settings endpoints', () => {
     expect((await s.teacherA.post('/api/teacher/notifications/read', {})).status).toBe(400);
   });
 
+  it('the bell count polls never keep a classroom device unlocked; other teacher requests do (PIN-7)', async () => {
+    expect((await s.teacherA.post('/api/auth/pin', { currentPassword: 'correct-horse-battery', pin: '2468' })).status).toBe(200);
+    expect((await s.teacherA.post('/api/classroom/enter')).status).toBe(200);
+    expect((await s.teacherA.post('/api/auth/pin/unlock', { pin: '2468' })).status).toBe(200);
+    // Polled every minute with nobody at the device: still answered while unlocked, never extended.
+    for (let i = 0; i < 4; i++) {
+      env.clock.advance(60_000);
+      expect((await s.teacherA.get('/api/teacher/notifications/count')).status).toBe(200);
+    }
+    env.clock.advance(61_000);
+    expect((await s.teacherA.get('/api/teacher/notifications/count')).status).toBe(423);
+    expect((await s.teacherA.get('/api/teacher/notifications')).status).toBe(423);
+    // Real use (the list) still slides the window.
+    expect((await s.teacherA.post('/api/auth/pin/unlock', { pin: '2468' })).status).toBe(200);
+    for (let i = 0; i < 6; i++) {
+      env.clock.advance(60_000);
+      expect((await s.teacherA.get('/api/teacher/notifications')).status).toBe(200);
+    }
+  });
+
   it('answers 423 while the classroom lock is engaged (PIN-8)', async () => {
     expect((await s.teacherA.post('/api/auth/pin', { currentPassword: 'correct-horse-battery', pin: '2468' })).status).toBe(200);
     expect((await s.teacherA.post('/api/classroom/enter')).status).toBe(200);
@@ -387,6 +422,51 @@ describe('daily digest (counts only, off by default)', () => {
     await none.app.close();
   });
 
+  it('counts only what is new since the last digest: a line that keeps collecting, or comes back after being read (S14e3 review)', async () => {
+    await withEmail('ayse.teacher', 'ayse@example.org');
+    await ok(s.teacherA.put('/api/teacher/notification-settings', { categories: { textBlocked: true }, digest: { enabled: true, hour: 18, includeNames: false } }));
+    // 10:00: a goal, edited three times (one line, count 3).
+    const goal = await addGoal();
+    for (const n of ['two', 'three', 'four']) await ok(adaPhone.patch(`/api/student/goals/${goal.id}`, { text: `I will read ${n} books every week.` }));
+    // A blocked attempt the teacher reads, then another one: the day's line comes back with a count of 2, 1 of it new.
+    expect((await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read this shit book.' })).status).toBe(400);
+    const blocked = (await list(s.teacherA)).items.find((i) => i.category === 'textBlocked');
+    await ok(s.teacherA.post('/api/teacher/notifications/read', { ids: [blocked.id] }));
+    expect((await adaPhone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read this shit book.' })).status).toBe(400);
+    expect((await list(s.teacherA)).items.find((i) => i.category === 'textBlocked')).toMatchObject({ count: 2, read: false });
+    env.clock.advance(8 * HOUR); // 18:00
+    expect((await runNotificationTick(env.deps)).sent).toBe(1);
+    const first = mailer.sent[0]!;
+    expect(first.subject).toBe('Class Compass: 5 new things from your students');
+    expect(first.text).toContain('- New goals: 1');
+    expect(first.text).toContain('- Goals changed: 3');
+    expect(first.text).toContain('- Text stopped by the kind words check (a count only): 1');
+
+    // 19:00: one more change to the same (still unread) goal; the next digest says 1, not 4.
+    await travel(HOUR);
+    await ok(adaPhone.patch(`/api/student/goals/${goal.id}`, { text: 'I will read five books every week.' }));
+    expect((await list(s.teacherA)).items.find((i) => i.category === 'goalEdited')).toMatchObject({ count: 4, read: false });
+    await travel(DAY - HOUR);
+    expect((await runNotificationTick(env.deps)).sent).toBe(1);
+    const second = mailer.sent[1]!;
+    expect(second.subject).toBe('Class Compass: 1 new thing from your students');
+    expect(second.text).toContain('- Goals changed: 1');
+    expect(second.text).not.toMatch(/New goals|kind words/u);
+  });
+
+  it('a digest that failed does not count as mailed: the next one counts the whole line again', async () => {
+    await withEmail('ayse.teacher', 'ayse@example.org');
+    await ok(s.teacherA.put('/api/teacher/notification-settings', { categories: {}, digest: { enabled: true, hour: 9, includeNames: false } }));
+    const goal = await addGoal();
+    await ok(adaPhone.patch(`/api/student/goals/${goal.id}`, { text: 'I will read two books every week.' }));
+    const failing = { ...env.deps, mailer: { send: () => Promise.reject(new Error('smtp down')) } };
+    expect(await runNotificationTick(failing)).toMatchObject({ failed: 1 });
+    await travel(DAY - HOUR); // 09:00 the next day (the first digest looks back 24 hours)
+    expect(await runNotificationTick(env.deps)).toMatchObject({ sent: 1 });
+    expect(mailer.sent[0]!.text).toContain('- Goals changed: 1');
+    expect(mailer.sent[0]!.text).toContain('- New goals: 1');
+  });
+
   it('a failed send is recorded and not retried that day', async () => {
     await withEmail('ayse.teacher', 'ayse@example.org');
     await ok(s.teacherA.put('/api/teacher/notification-settings', { categories: {}, digest: { enabled: true, hour: 9, includeNames: false } }));
@@ -395,6 +475,21 @@ describe('daily digest (counts only, off by default)', () => {
     expect(await runNotificationTick(failing)).toMatchObject({ failed: 1 });
     expect(await runNotificationTick(env.deps)).toMatchObject({ sent: 0, failed: 0 });
     expect((env.db.$client.prepare('select status from notification_digests').get() as any).status).toBe('failed');
+  });
+});
+
+describe('teacher menu (D-156)', () => {
+  it('the teacher contexts say which modules the administrator allows, so an off page can say who turned it off', async () => {
+    const before = await ok(s.teacherA.get('/api/teacher/contexts'));
+    expect(before.available.homework).toBe(true);
+    await ok(s.admin.put('/api/admin/module-policies/homework', { availability: 'disabled' }));
+    const after = await ok(s.teacherA.get('/api/teacher/contexts'));
+    expect(after.available.homework).toBe(false);
+    expect(after.contexts.every((c: any) => c.modules.homework === false)).toBe(true);
+    // A teacher's own switch leaves the school-wide availability as it is.
+    await ok(s.admin.put('/api/admin/module-policies/homework', { availability: 'enabled' }));
+    await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/homework`, { enabled: false }));
+    expect((await ok(s.teacherA.get('/api/teacher/contexts'))).available.homework).toBe(true);
   });
 });
 

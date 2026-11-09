@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { studentPage } from '../../../shared/contracts/goals.ts';
 import * as C from '../../../shared/contracts/links.ts';
 import type { AppDeps } from '../../lib/context.ts';
-import { route, STUDENT_SESSION_ABSOLUTE_MS, studentCookieName } from '../../lib/http.ts';
+import { currentStudentLinkId, route, STUDENT_SESSION_ABSOLUTE_MS, studentCookieName } from '../../lib/http.ts';
 import { onStudentCreated } from '../students/service.ts';
 import { studentPage as buildStudentPage } from './page.ts';
 import * as svc from './service.ts';
@@ -23,8 +23,9 @@ export function registerLinkRoutes(app: FastifyInstance, deps: AppDeps) {
     app,
     deps,
     C.exchangeStudentLink,
-    (ctx, input, { reply }) => {
-      const { token } = svc.exchangeToken(ctx, ctx.ip, input.token);
+    (ctx, input, { req, reply }) => {
+      // A device that already holds a live session for this link is not a new device (D-155).
+      const { token } = svc.exchangeToken(ctx, ctx.ip, input.token, currentStudentLinkId(deps, req));
       // A separate, strict cookie (STU-4): never sent on cross-site requests, not readable by scripts.
       reply.setCookie(studentCookieName(deps), token, {
         path: '/',

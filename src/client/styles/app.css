@@ -5778,10 +5778,12 @@ html[data-cursor='off'] * {
 }
 
 /* ------------------------------------------------------------------ S14e3 teacher menu and notifications (D-155, D-156) */
-/* The Class setup link stays marked on every setup page (the hub and the pages it lists). */
+/* The Class setup link stays marked on every setup page (the hub and the pages it lists): colour plus
+   the same underline as the current page's link (never colour alone), and aria-current="location". */
 .cc-nav a[data-section='current'] {
   background: var(--cc-accent-soft);
   border-color: var(--cc-accent);
+  text-decoration: underline;
 }
 /* The bell: an icon link with the unread count, at the end of the teacher navigation. */
 .cc-bell {
@@ -5890,57 +5892,53 @@ html[data-cursor='off'] * {
 }
 
 /* S14e3 (carried over from S14a): on a phone at a large text size no page scrolls sideways. Long words
-   break, rows and fields shrink, headings and card padding follow the screen width, and wide tables
-   scroll inside their own box (.cc-table-wrap). e2e/button-groups.spec.ts checks every page of the
-   teacher menu at 375 px with 200 % text, in English and Turkish. */
+   break (headings keep their rem size, so they still grow with the text size), rows and fields
+   shrink, card padding follows the screen width, and wide tables scroll inside their own box
+   (.cc-table-wrap). The student page keeps its own S14d phone sizes (not .cc-student).
+   e2e/button-groups.spec.ts checks every page of the teacher menu at 375 px with 200 % text, in
+   English and Turkish. */
 @media (max-width: 40rem) {
-  .cc-page {
+  .cc-page:where(:not(.cc-student)) {
     overflow-wrap: break-word;
     padding-inline: 0.75rem;
   }
-  .cc-page .cc-h1 {
-    font-size: min(2rem, 10vw);
-  }
-  .cc-page .cc-h2 {
-    font-size: min(1.4rem, 8vw);
-  }
-  .cc-page .cc-card {
+  .cc-page:where(:not(.cc-student)) .cc-card {
     padding: min(1.25rem, 4vw);
   }
-  .cc-page .cc-btn,
-  .cc-page .cc-switch,
-  .cc-page .cc-field__label,
-  .cc-page .cc-field__hint,
-  .cc-page .cc-h1,
-  .cc-page .cc-h2,
-  .cc-page .cc-h3,
-  .cc-page summary,
-  .cc-page .cc-att-chip {
+  .cc-page:where(:not(.cc-student)) .cc-btn,
+  .cc-page:where(:not(.cc-student)) .cc-switch,
+  .cc-page:where(:not(.cc-student)) .cc-field__label,
+  .cc-page:where(:not(.cc-student)) .cc-field__hint,
+  .cc-page:where(:not(.cc-student)) .cc-h1,
+  .cc-page:where(:not(.cc-student)) .cc-h2,
+  .cc-page:where(:not(.cc-student)) .cc-h3,
+  .cc-page:where(:not(.cc-student)) summary,
+  .cc-page:where(:not(.cc-student)) .cc-att-chip {
     overflow-wrap: anywhere;
     min-width: 0;
   }
-  .cc-page .cc-btn {
+  .cc-page:where(:not(.cc-student)) .cc-btn {
     max-width: 100%;
     text-align: center;
   }
-  .cc-page .cc-att-chip {
+  .cc-page:where(:not(.cc-student)) .cc-att-chip {
     white-space: normal;
     flex-wrap: wrap;
     max-width: 100%;
   }
-  .cc-page .cc-switch {
+  .cc-page:where(:not(.cc-student)) .cc-switch {
     flex-wrap: wrap;
     max-width: 100%;
   }
-  .cc-page .cc-switch > span:not(.cc-switch__track) {
+  .cc-page:where(:not(.cc-student)) .cc-switch > span:not(.cc-switch__track) {
     min-width: 0;
   }
-  .cc-page .cc-row > * {
+  .cc-page:where(:not(.cc-student)) .cc-row > * {
     min-width: 0;
     max-width: 100%;
   }
-  .cc-page .cc-select,
-  .cc-page .cc-input {
+  .cc-page:where(:not(.cc-student)) .cc-select,
+  .cc-page:where(:not(.cc-student)) .cc-input {
     max-width: 100%;
   }
 }

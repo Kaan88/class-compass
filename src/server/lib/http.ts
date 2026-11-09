@@ -146,6 +146,17 @@ export interface AccessOptions {
   allowWithTemporaryPassword?: boolean | undefined;
   /** Which origins may send a mutating request (S14f, D-157); `route()` sets it from the endpoint path. Default `main`. */
   originClass?: OriginClass | undefined;
+  /** See Endpoint.background: checks the PIN unlock but never slides its window (PIN-7). */
+  background?: boolean | undefined;
+}
+
+/**
+ * The link of the live student session this request already carries (the student cookie), or null.
+ * The link exchange uses it to tell a device that opens its own link again from a new device
+ * (S14e3, D-155); it is never an access decision.
+ */
+export function currentStudentLinkId(deps: AppDeps, req: FastifyRequest): string | null {
+  return liveSession(deps, req.cookies?.[studentCookieName(deps)], 'student')?.studentLinkId ?? null;
 }
 
 /**
@@ -200,8 +211,8 @@ function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext, opts:
   if (mustChange) refuseTemporary();
   if (access === 'teacher' && user.role !== 'teacher') throw new AppError('FORBIDDEN', 'Teacher account required');
   if (access === 'admin' && user.role !== 'admin') throw new AppError('FORBIDDEN', 'Administrator account required');
-  if (session.classroomMode) {
-    // Sliding inactivity window (PIN-7).
+  if (session.classroomMode && !opts.background) {
+    // Sliding inactivity window (PIN-7). Background polls (the bell) are not activity.
     const until = now + PIN_UNLOCK_MS;
     deps.db.update(sessions).set({ pinUnlockedUntil: until }).where(eq(sessions.id, session.id)).run();
     session.pinUnlockedUntil = until;
@@ -288,7 +299,7 @@ export function rawRoute<I extends z.ZodType, O extends z.ZodType>(
     url: ep.path,
     config: opts.rateLimit ? { rateLimit: opts.rateLimit } : {},
     handler: async (req, reply) => {
-      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword, originClass });
+      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword, originClass, background: ep.background });
       const raw = { ...((req.query as object) ?? {}), ...((req.params as object) ?? {}) };
       const parsed = ep.input.safeParse(raw);
       if (!parsed.success) throw new AppError('VALIDATION', 'Invalid input', z.treeifyError(parsed.error));
@@ -315,7 +326,7 @@ export function route<I extends z.ZodType, O extends z.ZodType>(
     url: ep.path,
     config: opts.rateLimit ? { rateLimit: opts.rateLimit } : {},
     handler: async (req, reply) => {
-      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword, originClass });
+      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword, originClass, background: ep.background });
       const params = (req.params ?? {}) as Record<string, unknown>;
       const raw = ep.method === 'GET' ? { ...(req.query as object), ...params } : { ...((req.body as object) ?? {}), ...params };
       const parsed = ep.input.safeParse(raw);

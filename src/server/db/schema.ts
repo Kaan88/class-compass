@@ -1583,6 +1583,7 @@ export const classroomLayouts = sqliteTable(
  * the student (deep links). The daily aggregate categories (`AGGREGATE_CATEGORIES`: blocked text,
  * Super Speakers points) keep one row per teacher, student, category and local day with a `count`
  * (unique partial index); other categories bump the count of an unread row about the same record.
+ * `digestedCount` keeps the daily digest to what is new since the last one (S14e3 review).
  * Purged after NOTIFICATION_RETENTION_DAYS (90) by the notifications tick; erased with the student
  * (`student_id`); in the full export, not in the per-student export (teacher-side data, like notes).
  */
@@ -1598,6 +1599,11 @@ export const notifications = sqliteTable(
     entity: text('entity', { enum: NOTIFICATION_ENTITIES }).notNull(),
     entityId: text('entity_id'),
     count: integer('count').notNull().default(1),
+    /**
+     * How much of `count` the teacher already had: counted in a digest that went out, or there when the
+     * teacher read the row before it became unread again. The digest mails only `count - digestedCount`.
+     */
+    digestedCount: integer('digested_count').notNull().default(0),
     /** The day it happened (school timezone), for the daily aggregates and the digest. */
     localDate: text('local_date').notNull(),
     createdAt: integer('created_at').notNull(),

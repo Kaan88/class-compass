@@ -125,6 +125,13 @@ test('choice buttons fit at 375/768/1280 px, in English and Turkish, at 100 % an
       await sp.goto(link);
       await expect(sp.getByTestId('student-page')).toBeVisible();
       await expect(sp.locator('html')).toHaveAttribute('lang', lang);
+      // The teacher pages' phone rules leave the student page alone: its name heading keeps the S14d
+      // size of 1.6rem at 375 px (S14e3 review).
+      await sp.setViewportSize({ width: 375, height: 900 });
+      expect(
+        await sp.locator('.cc-student__who .cc-h1').first().evaluate((h) => parseFloat(getComputedStyle(h).fontSize) / parseFloat(getComputedStyle(document.documentElement).fontSize)),
+      ).toBeCloseTo(1.6, 2);
+      await sp.setViewportSize({ width: 1280, height: 900 });
       await sp.getByRole('group', { name: T('student.home.subject') }).getByRole('button', { name: lang === 'en' ? 'English' : 'İngilizce', exact: true }).click();
       await checkAll(sp, '.cc-student-tiles', `${lang} student home tiles`);
       await checkAll(sp, '.cc-student__subjects', `${lang} student subject switch`);
@@ -225,8 +232,14 @@ test('no teacher menu page scrolls sideways at 375 px with 200 % text', async ({
         await page.goto(href);
         await expect(page.locator('main h1').first()).toBeVisible();
         await page.waitForLoadState('networkidle');
+        const h1Size = () => page.locator('main h1').first().evaluate((h) => parseFloat(getComputedStyle(h).fontSize));
+        await page.evaluate(() => document.documentElement.style.setProperty('--cc-text-scale', '1'));
+        const h1At1 = await h1Size();
         await page.evaluate(() => document.documentElement.style.setProperty('--cc-text-scale', '2'));
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        // The page fits because long words wrap, not because headings stop growing (THM-6, WCAG 1.4.4).
+        const h1At2 = await h1Size();
+        if (h1At2 < h1At1 * 1.9) problems.push(`${lang} ${href}: the h1 grows from ${h1At1}px to only ${h1At2}px at 200 % text`);
         const wide = await page.evaluate(() => {
           const vw = document.documentElement.clientWidth;
           if (document.documentElement.scrollWidth <= vw + 1) return null;

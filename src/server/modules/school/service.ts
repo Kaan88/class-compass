@@ -531,7 +531,13 @@ export function myContexts(ctx: RequestContext) {
       };
     })
     .sort((a, b) => compareNames(a.className, b.className) || compareNames(subjectSortKey({ name: a.subjectName }), subjectSortKey({ name: b.subjectName })));
-  return { contexts, media: mediaRecord(ctx.db), timeUpClip: requireUser(ctx).timeUpClipFileId !== null };
+  const avail = getAvailability(ctx.db);
+  return {
+    contexts,
+    media: mediaRecord(ctx.db),
+    available: Object.fromEntries(CONTEXT_MODULES.map((m) => [m, avail[m]])) as Record<ContextModule, boolean>,
+    timeUpClip: requireUser(ctx).timeUpClipFileId !== null,
+  };
 }
 
 const DISPLAY_KEYS = ['theme', 'soundsEnabled', 'soundVolume', 'animationsEnabled', 'quoteEnabled', 'timeUpSound'] as const;

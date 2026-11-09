@@ -2,9 +2,11 @@
  * Notifications and the teacher menu (S14e3, D-155, D-156). Fictional demo data only; module switches
  * the test changes are put back in `finally`.
  * - A student adds a goal on their page → the bell shows 1 → the notifications page lists it under the
- *   student → "Open" deep-links to the student's goals (and marks it read); axe on the list and settings.
+ *   student → "Open" deep-links to the student's goals (and marks it read); with a filter on, "Mark
+ *   these as read" replaces "Mark all as read"; axe on the list and settings.
  * - The menu: Today tiles, one Class setup tile and its hub with tabs; a module switched off in every
- *   class of the teacher hides its tile, and its old address shows an empty state; axe.
+ *   class of the teacher hides its tile, and its old address shows an empty state (which says so when
+ *   the administrator turned the module off school-wide); axe.
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
@@ -60,6 +62,19 @@ test('a student adds a goal: the bell shows 1, the page lists it, Open goes to t
   await expect(item).toContainText('New');
   expect(await seriousViolations(page)).toEqual([]);
 
+  // With a filter on, the button marks only the lines shown, and only shows when some are new.
+  const list = page.getByTestId('notifications-page');
+  await expect(list.getByRole('button', { name: 'Mark all as read' })).toBeVisible();
+  await list.getByLabel('Kind').selectOption({ label: 'Goals and reflections' });
+  await expect(list.getByRole('button', { name: 'Mark these as read' })).toBeVisible();
+  await expect(list.getByRole('button', { name: 'Mark all as read' })).toHaveCount(0);
+  await list.getByLabel('Kind').selectOption({ label: 'Avatars, links and kind words' });
+  await list.getByLabel('Show').selectOption({ label: 'New only' });
+  await expect(list.getByText('Nothing matches these filters.')).toBeVisible();
+  await expect(list.getByRole('button', { name: /^Mark (these|all) as read$/u })).toHaveCount(0);
+  await list.getByLabel('Show').selectOption({ label: 'All' });
+  await list.getByLabel('Kind').selectOption({ label: 'All kinds' });
+
   // The student's name opens the statistics drawer (S14e2).
   await card.getByTestId('student-name').click();
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -78,7 +93,7 @@ test('a student adds a goal: the bell shows 1, the page lists it, Open goes to t
   expect(await seriousViolations(page)).toEqual([]);
 });
 
-test('teacher menu: Today tiles, one Class setup hub, and pages of modules that are off everywhere are hidden', async ({ page }) => {
+test('teacher menu: Today tiles, one Class setup hub, and pages of modules that are off everywhere are hidden', async ({ page, browser }) => {
   test.setTimeout(120_000);
   await login(page, 'english');
   await ensurePin(page);
@@ -98,6 +113,9 @@ test('teacher menu: Today tiles, one Class setup hub, and pages of modules that 
   // The nav marks Class setup on every setup page.
   await hub.getByRole('tabpanel').getByRole('link', { name: 'Counters' }).click();
   await expect(page.locator('.cc-teacher-nav__links a[data-section="current"]')).toHaveText('Class setup');
+  // Not by colour alone: said to screen readers and underlined (S14e3 review).
+  await expect(page.locator('.cc-teacher-nav__links').getByRole('link', { name: 'Class setup' })).toHaveAttribute('aria-current', 'location');
+  await expect(page.locator('.cc-teacher-nav__links a[data-section="current"]')).toHaveCSS('text-decoration-line', 'underline');
   expect(await seriousViolations(page)).toEqual([]);
 
   // Homework off in every class+subject of this teacher: no tile, no nav link, the address shows an empty state.
@@ -118,4 +136,25 @@ test('teacher menu: Today tiles, one Class setup hub, and pages of modules that 
   }
   await page.goto('/teacher');
   await expect(today.locator('a.cc-menu-tile')).toHaveText(['Attendance', 'Homework', 'Goals', 'Reports', /^Notifications/u]);
+
+  // Homework made unavailable school-wide by the administrator: the page says so and offers no Class
+  // settings switch the teacher could not use (S14e3 review).
+  const adminCtx = await browser.newContext();
+  const admin = await adminCtx.newPage();
+  try {
+    await login(admin, 'admin');
+    const was = ((await api(admin, 'GET', '/api/admin/module-policies')).body.policies as Array<{ module: string; availability: string }>).find((p) => p.module === 'homework')!.availability;
+    try {
+      expect((await api(admin, 'PUT', '/api/admin/module-policies/homework', { availability: 'disabled' })).status).toBe(200);
+      await page.goto('/teacher/homework');
+      await expect(page.getByTestId('module-off-page')).toBeVisible();
+      await expect(page.getByText('Homework is turned off by your administrator')).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Open Class settings' })).toHaveCount(0);
+      expect(await seriousViolations(page)).toEqual([]);
+    } finally {
+      await api(admin, 'PUT', '/api/admin/module-policies/homework', { availability: was });
+    }
+  } finally {
+    await adminCtx.close();
+  }
 });

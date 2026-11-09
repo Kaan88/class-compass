@@ -44,11 +44,15 @@ export const notificationsList = endpoint({
   output: z.object({ items: z.array(NotificationItem), unread: z.number().int(), truncated: z.boolean() }),
 });
 
-/** Polled every 60 s while the bell is on screen; answers 304 to a matching `If-None-Match`. */
+/**
+ * Polled every 60 s while the bell is on screen; answers 304 to a matching `If-None-Match`. A
+ * background poll: it never keeps a classroom device's PIN unlock alive (PIN-7).
+ */
 export const notificationsCount = endpoint({
   method: 'GET',
   path: '/api/teacher/notifications/count',
   access: 'teacher',
+  background: true,
   input: Empty,
   output: z.object({ unread: z.number().int() }),
 });

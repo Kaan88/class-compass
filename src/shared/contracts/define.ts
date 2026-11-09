@@ -36,6 +36,12 @@ export interface Endpoint<I extends z.ZodType = z.ZodType, O extends z.ZodType =
    * 403 MUST_CHANGE_PASSWORD; `user` endpoints (me, logout, lock/unlock, preferences) stay open.
    */
   allowWithTemporaryPassword?: boolean;
+  /**
+   * A background poll (S14e3: the notifications bell): in classroom mode it still needs the PIN unlock
+   * like any `teacher`/`admin`/`account` endpoint, but it never slides the unlock window (PIN-7), so a
+   * screen left open with nobody at it still relocks on the server.
+   */
+  background?: boolean;
 }
 
 export function endpoint<I extends z.ZodType, O extends z.ZodType>(e: Endpoint<I, O>): Endpoint<I, O> {

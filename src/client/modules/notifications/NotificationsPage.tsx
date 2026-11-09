@@ -1,8 +1,8 @@
 /**
  * Notifications page (S14e3, D-155): what the teacher's current students did, grouped by student
  * (each name opens the statistics drawer through `StudentName`, D-154), newest first, with filters
- * (new only, kind, class), "Open" deep links (which mark the line read), mark read per student or
- * all, and a Settings tab (categories, the daily email). Every query is `['sensitive', …]`.
+ * (new only, kind, class), "Open" deep links (which mark the line read), mark read per student, all
+ * (or, with a filter on, only the lines shown), and a Settings tab (categories, the daily email). Every query is `['sensitive', …]`.
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
@@ -89,6 +89,9 @@ function NotificationList() {
   }, [items]);
   const markRead = (ids: string[]) => run(() => call(C.markNotificationsRead, { ids }), { success: t('notifications.toast.read'), invalidate: [NOTIFICATIONS_KEY] });
   const filtered = unread || group !== '' || contextId !== '';
+  // With a filter on, only the unread lines on screen are marked (never other classes or kinds the
+  // teacher has not seen); without one, every unread line of the teacher.
+  const shownUnread = items.filter((i) => !i.read).map((i) => i.id);
   return (
     <div className="cc-stack">
       <div className="cc-row cc-notifications__filters">
@@ -113,7 +116,13 @@ function NotificationList() {
           onChange={setContextId}
           items={[{ id: '', label: t('notifications.filter.anyClass') }, ...(contexts ?? []).map((c) => ({ id: c.id, label: `${c.className} · ${pickText(c.subjectName, locale)}` }))]}
         />
-        {q.data?.unread ? (
+        {filtered ? (
+          shownUnread.length ? (
+            <Button variant="primary" onPress={() => void markRead(shownUnread)}>
+              {t('notifications.markShownRead')}
+            </Button>
+          ) : null
+        ) : q.data?.unread ? (
           <Button variant="primary" onPress={() => void run(() => call(C.markNotificationsRead, { all: true }), { success: t('notifications.toast.read'), invalidate: [NOTIFICATIONS_KEY] })}>
             {t('notifications.markAllRead')}
           </Button>

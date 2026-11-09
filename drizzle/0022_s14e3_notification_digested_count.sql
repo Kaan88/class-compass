@@ -1,0 +1,1 @@
+ALTER TABLE `notifications` ADD `digested_count` integer DEFAULT 0 NOT NULL;

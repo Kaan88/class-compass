@@ -306,6 +306,11 @@ export const myContexts = endpoint({
   output: z.object({
     contexts: z.array(MyContext),
     media: z.record(z.enum(MEDIA_MODULES), z.boolean()),
+    /**
+     * Class+subject modules the administrator allows school-wide (S14e3): a teacher page whose module
+     * is off everywhere says whether the teacher can switch it on or the administrator turned it off.
+     */
+    available: z.record(ContextModuleKey, z.boolean()),
     /** The signed-in teacher has recorded a time's-up clip (S13b, D-107). */
     timeUpClip: z.boolean(),
   }),
