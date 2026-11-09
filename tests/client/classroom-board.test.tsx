@@ -10,7 +10,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it } from 'vitest';
 import { LessonBoard } from '../../src/client/modules/lessons/board/Board.tsx';
-import { layoutKey, setLayoutEditing } from '../../src/client/modules/lessons/board/layoutClient.ts';
+import { isLayoutEditing, layoutKey, setLayoutEditing } from '../../src/client/modules/lessons/board/layoutClient.ts';
 import { lessonKey, rosterKey } from '../../src/client/modules/lessons/lessonClient.ts';
 import type { ClassroomContext } from '../../src/client/modules/types.ts';
 import { toDock } from '../../src/domain/classroomLayout.ts';
@@ -18,7 +18,7 @@ import { cloneLayout, DEFAULT_LAYOUT, type ClassroomLayout } from '../../src/sha
 import type { LessonState } from '../../src/shared/contracts/lessons.ts';
 
 afterEach(() => {
-  setLayoutEditing(false);
+  setLayoutEditing(null);
   cleanup();
 });
 
@@ -107,7 +107,7 @@ describe('classroom board (D-148)', () => {
   });
 
   it('the layout editor: Enter picks a box up, arrows move it, Enter puts it down, Shift+arrows resize, Escape cancels, Undo goes back', async () => {
-    setLayoutEditing(true);
+    setLayoutEditing('ctx-board-1');
     renderBoard(ctx({ routines: true, counters: true }), null);
     expect(screen.getByTestId('layout-editor')).toBeTruthy();
     const announce = screen.getByTestId('layout-announce');
@@ -148,5 +148,22 @@ describe('classroom board (D-148)', () => {
       fireEvent.click(undo);
     });
     expect(rows()[0]).toBe('core.timer:4 routine:8');
+  });
+
+  it('the editor belongs to one class: leaving its board (another class) closes it', async () => {
+    setLayoutEditing('ctx-board-1');
+    const view = renderBoard(ctx({}), null);
+    expect(screen.getByTestId('layout-editor')).toBeTruthy();
+    const other = { ...ctx({}), id: 'ctx-board-2' };
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <LessonBoard key={other.id} context={other} lesson={{ ...lesson, contextId: other.id }} onEnd={() => undefined} />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByTestId('layout-editor')).toBeNull();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(isLayoutEditing()).toBe(false);
   });
 });

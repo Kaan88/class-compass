@@ -111,7 +111,7 @@ export function LayoutEditor({
   const finish = async () => {
     if (finished.current) return;
     finished.current = true;
-    setLayoutEditing(false);
+    setLayoutEditing(null);
     await lockNow(qc).catch(() => undefined);
   };
   const finishRef = useRef(finish);
@@ -132,7 +132,7 @@ export function LayoutEditor({
       // Deferred, so React's development double mount does not count as leaving.
       setTimeout(() => {
         if (mounted === 0 && isLayoutEditing()) {
-          setLayoutEditing(false);
+          setLayoutEditing(null);
           void lockNow(qc).catch(() => undefined);
         }
       }, 0);

@@ -270,7 +270,7 @@ export function ClassroomTopBar({
         </DialogTrigger>
         {tools}
       </div>
-      {pinOpen ? <PinDialog isOpen onOpenChange={setPinOpen} title={t('board.customise')} hint={t('board.pinHint')} onUnlocked={() => setLayoutEditing(true)} /> : null}
+      {pinOpen ? <PinDialog isOpen onOpenChange={setPinOpen} title={t('board.customise')} hint={t('board.pinHint')} onUnlocked={() => (context ? setLayoutEditing(context.id) : undefined)} /> : null}
     </header>
   );
 }

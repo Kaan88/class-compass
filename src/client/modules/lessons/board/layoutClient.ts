@@ -1,8 +1,9 @@
 /**
  * Classroom board layout on the client (S14b, D-148): the teacher's stored layout for the class
  * (classroom access, read while locked), saving and resetting it (teacher access: only after the PIN),
- * and whether the layout editor is open on this device. The editor is opened from the top bar's
- * Display popover after the PIN dialog; the board shows it while `useLayoutEditing()` is true.
+ * and whether the layout editor is open on this device (and for which class+subject). The editor is
+ * opened from the top bar's Display popover after the PIN dialog; the board of that class shows it
+ * while `useLayoutEditing()` names its context.
  */
 import { useQuery } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
@@ -27,19 +28,20 @@ export const saveLayout = async (contextId: string, applyTo: C.LayoutScope, layo
 export const resetLayout = async (contextId: string, applyTo: C.LayoutScope) => applied(contextId, await call(C.resetClassroomLayout, { contextId, applyTo }));
 
 // ---------------------------------------------------------------- editor open on this device
-let editing = false;
+/** The context whose layout is being edited on this device, or null. */
+let editing: string | null = null;
 const listeners = new Set<() => void>();
 const subscribe = (fn: () => void) => {
   listeners.add(fn);
   return () => listeners.delete(fn);
 };
-export function setLayoutEditing(v: boolean) {
-  if (editing === v) return;
-  editing = v;
+export function setLayoutEditing(contextId: string | null) {
+  if (editing === contextId) return;
+  editing = contextId;
   listeners.forEach((l) => l());
 }
-export const isLayoutEditing = () => editing;
-export const useLayoutEditing = () => useSyncExternalStore(subscribe, isLayoutEditing, () => false);
+export const isLayoutEditing = () => editing !== null;
+export const useLayoutEditing = () => useSyncExternalStore(subscribe, () => editing, () => null);
 
 /** Below 64rem the board is one column and the editor is not offered (D-148). */
 export const EDITOR_MEDIA = '(min-width: 64rem)';

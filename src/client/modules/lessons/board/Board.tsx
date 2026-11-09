@@ -130,6 +130,6 @@ export function LessonBoard({ context, lesson, onEnd }: { context: ClassroomCont
   const stored = q.data?.layout ?? null;
   // `available` is a new Set on every render: the layout is recomputed only when its contents change.
   const layout = useMemo(() => effectiveLayout(stored, available), [stored, availableKey]);
-  if (editing && wide) return <LayoutEditor key={context.id} initial={layout} source={q.data?.source ?? 'default'} context={context} lesson={lesson} onEnd={onEnd} boardRef={boardRef} />;
+  if (editing === context.id && wide) return <LayoutEditor key={context.id} initial={layout} source={q.data?.source ?? 'default'} context={context} lesson={lesson} onEnd={onEnd} boardRef={boardRef} />;
   return <BoardRows layout={layout} context={context} lesson={lesson} onEnd={onEnd} boardRef={boardRef} />;
 }
