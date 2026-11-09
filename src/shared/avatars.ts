@@ -309,8 +309,10 @@ export const OPTION_NAMES: Readonly<Record<string, LocalizedTextValue>> = {
   'species.antennae': { en: 'alien with antennae', tr: 'antenli uzaylı' },
   'species.threeEyes': { en: 'three-eyed alien', tr: 'üç gözlü uzaylı' },
   'species.bigHead': { en: 'big-headed alien', tr: 'koca kafalı uzaylı' },
-  'species.rex': { en: 'little rex', tr: 'küçük reks' },
-  'species.spikes': { en: 'spiky dinosaur', tr: 'dikenli dinozor' },
+  // S14a (D-146): Turkish dinosaur and mythical names confirmed by the owner; lower case like every
+  // option name, because they are read inside the avatar's name ("Mavi tiranozor").
+  'species.rex': { en: 'little rex', tr: 'tiranozor' },
+  'species.spikes': { en: 'spiky dinosaur', tr: 'stegozor' },
   'species.longNeck': { en: 'long-necked dinosaur', tr: 'uzun boyunlu dinozor' },
   'species.apple': { en: 'apple friend', tr: 'elma dostu' },
   'species.carrot': { en: 'carrot friend', tr: 'havuç dostu' },
@@ -320,7 +322,7 @@ export const OPTION_NAMES: Readonly<Record<string, LocalizedTextValue>> = {
   'species.crab': { en: 'crab', tr: 'yengeç' },
   'species.unicorn': { en: 'unicorn', tr: 'tek boynuzlu at' },
   'species.dragon': { en: 'dragon', tr: 'ejderha' },
-  'species.phoenix': { en: 'fire bird', tr: 'ateş kuşu' },
+  'species.phoenix': { en: 'fire bird', tr: 'anka kuşu' },
   'species.astronaut': { en: 'astronaut', tr: 'astronot' },
   'species.pilot': { en: 'rocket pilot', tr: 'roket pilotu' },
   'species.starKid': { en: 'star kid', tr: 'yıldız çocuk' },

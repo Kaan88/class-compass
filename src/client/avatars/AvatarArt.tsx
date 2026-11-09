@@ -7,6 +7,11 @@
  * One small inline SVG per avatar, no images and no fetch: cheap to draw on an old phone and safe on
  * the classroom display. Layers, back to front: background, pet, body/top, face, hair, features,
  * glasses, hat, accessory.
+ *
+ * S14a (D-146): the dinosaurs and mythical creatures are redrawn so children can name them at a glance
+ * (a T. rex with jaw and teeth, a stegosaur with plates, a long-necked dinosaur, a unicorn with muzzle
+ * and spiral horn, a dragon with snout, horns and wings, a phoenix with beak and flame crest).
+ * `SPECIES_FACE` places each species' eyes, mouth and hat; specs are unchanged (D-124).
  */
 import { memo } from 'react';
 import type { AvatarSpecValue, CreatureSpec, PersonSpec } from '../../shared/avatars.ts';
@@ -543,9 +548,60 @@ function Person({ s }: { s: PersonSpec }) {
 }
 
 // ---------------------------------------------------------------- creatures
+/**
+ * Where a species' face goes (S14a, D-146): the eyes (centre, height, spacing, size), which mouth it
+ * has (a person mouth, a beak, a snout, a horse's muzzle or a dinosaur jaw), where a hat sits and
+ * whether something must be drawn over the hat (the unicorn's horn). The stored spec does not change
+ * (D-124): the same eyes, mouth and hat options, drawn where they belong on each animal.
+ */
+type MouthStyle = 'person' | 'beak' | 'snout' | 'muzzle' | 'jaw';
+interface FaceSpot {
+  eyes: { x: number; y: number; dx: number; scale: number };
+  mouth: { style: MouthStyle; x: number; y: number; w: number };
+  hat: { x: number; top: number; scale: number };
+  overHat?: 'horn';
+}
+const face = (eyes: Partial<FaceSpot['eyes']>, mouth: Partial<FaceSpot['mouth']>, hat: Partial<FaceSpot['hat']>, overHat?: 'horn'): FaceSpot => {
+  const e = { x: 50, y: 50, dx: 9, scale: 1, ...eyes };
+  return { eyes: e, mouth: { style: 'person', x: 50, y: e.y + 11, w: 14, ...mouth }, hat: { x: 50, top: 22, scale: 1, ...hat }, overHat };
+};
+export const SPECIES_FACE: Readonly<Record<string, FaceSpot>> = {
+  cat: face({}, {}, { top: 26 }),
+  bear: face({}, {}, { top: 26 }),
+  bunny: face({}, {}, { top: 26 }),
+  bigHead: face({ y: 44 }, {}, {}),
+  apple: face({ y: 58 }, {}, {}),
+  carrot: face({ y: 58 }, {}, {}),
+  strawberry: face({ y: 58 }, {}, {}),
+  // Dinosaurs, seen from the side and facing right.
+  rex: face({ x: 71, y: 33, dx: 5, scale: 0.75 }, { style: 'jaw', x: 76, y: 44, w: 26 }, { x: 68, top: 20, scale: 0.7 }),
+  spikes: face({ x: 80, y: 57, dx: 4.5, scale: 0.6 }, { style: 'snout', x: 87, y: 64, w: 7 }, { x: 80, top: 45, scale: 0.55 }),
+  longNeck: face({ x: 67, y: 18, dx: 4, scale: 0.55 }, { style: 'snout', x: 74, y: 23, w: 6 }, { x: 66, top: 12, scale: 0.5 }),
+  // Mythical creatures, from the front.
+  unicorn: face({ y: 44 }, { style: 'muzzle', y: 74, w: 10 }, { top: 24 }, 'horn'),
+  dragon: face({ y: 46 }, { style: 'snout', y: 66, w: 14 }, { top: 26 }),
+  phoenix: face({ y: 46, dx: 8 }, { style: 'beak', y: 54, w: 12 }, { top: 30 }),
+};
+const DEFAULT_FACE = face({}, {}, {});
+export const faceOf = (s: Pick<CreatureSpec, 'species'>): FaceSpot => SPECIES_FACE[s.species] ?? DEFAULT_FACE;
+
+/** Mouth options that show an open mouth on a snout or a jaw. */
+const OPEN = new Set(['grin', 'laugh', 'teeth', 'tongue']);
+
+/** A second shade of the body colour: the body colour under a thin layer of ink. */
+function Shade({ d, colour, amount = 0.28 }: { d: string; colour: string; amount?: number }) {
+  return (
+    <g>
+      <path d={d} fill={colour} />
+      <path d={d} fill={INK} opacity={amount} />
+    </g>
+  );
+}
+
 function CreatureBody({ s }: { s: CreatureSpec }) {
   const c = col(s.color);
   const dark = { fill: INK, opacity: 0.18 };
+  const light = { fill: WHITE, opacity: 0.3 };
   switch (s.species) {
     case 'cat':
       return (
@@ -622,28 +678,70 @@ function CreatureBody({ s }: { s: CreatureSpec }) {
         </g>
       );
     case 'threeEyes':
-      return <ellipse cx="50" cy="56" rx="27" ry="28" fill={c} />;
-    case 'bigHead':
-      return <ellipse cx="50" cy="48" rx="32" ry="28" fill={c} />;
-    case 'rex':
       return (
-        <g fill={c}>
-          <path d="M26 84V48q0-24 28-24t20 24l-2 8H50v28z" />
+        <g>
+          {/* Two little waving arms, so the alien is more than an egg. */}
+          <path d="M26 64q-10 2-10 12M74 64q10 2 10 12" stroke={c} strokeWidth="6" strokeLinecap="round" fill="none" />
+          <ellipse cx="50" cy="56" rx="27" ry="28" fill={c} />
+        </g>
+      );
+    case 'bigHead':
+      return (
+        <g>
+          {/* A small body under the big head. */}
+          <path d="M36 100q0-22 14-22t14 22z" fill={c} />
+          <ellipse cx="50" cy="48" rx="32" ry="28" fill={c} />
+        </g>
+      );
+    case 'rex':
+      // A little T. rex facing right: big head with a jaw (drawn with the face), tiny arms, strong legs, tail.
+      return (
+        <g>
+          <path d="M32 64Q16 64 6 78L10 83Q22 76 36 77Z" fill={c} />
+          <path d="M33 76h10v15h5v5H33z" fill={c} />
+          <Shade d="M49 76h9v15h5v5H49z" colour={c} amount={0.2} />
+          <ellipse cx="46" cy="69" rx="20" ry="15" fill={c} />
+          <ellipse cx="51" cy="73" rx="11" ry="8" {...light} />
+          <path d="M40 58Q36 25 62 24H79Q93 25 93 37V44Q93 52 83 52H65Q60 62 47 64Z" fill={c} />
+          <path d="M57 65l7 2 1.5 4" stroke={INK} strokeOpacity="0.55" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <ellipse cx="88" cy="31" rx="1.5" ry="1.1" fill={INK} />
         </g>
       );
     case 'spikes':
+      // A stegosaur facing right: plates along the back, four legs, a spiky tail, a small head.
       return (
-        <g fill={c}>
-          <path d="M30 34l6-12 6 10 8-12 8 12 6-10 6 12z" opacity="0.7" />
-          <ellipse cx="50" cy="58" rx="26" ry="26" />
+        <g>
+          {(
+            [
+              [20, 48],
+              [30, 38],
+              [43, 33],
+              [56, 35],
+              [66, 43],
+            ] as const
+          ).map(([x, y]) => (
+            <Shade key={x} d={`M${x - 6} ${y + 10}Q${x - 8} ${y - 1} ${x} ${y - 9}Q${x + 8} ${y - 1} ${x + 6} ${y + 10}Z`} colour={c} />
+          ))}
+          <path d="M18 64Q8 60 4 50L8 48Q14 56 22 58Z" fill={c} />
+          <path d="M7 49l-3-7 6 4zM12 54l-2-7 6 5z" fill={WHITE} stroke={INK} strokeWidth="0.7" />
+          <Shade d="M20 66h8v18h-8zM58 66h8v18h-8z" colour={c} amount={0.2} />
+          <path d="M28 66h8v18h-8zM66 66h8v18h-8z" fill={c} />
+          <path d="M12 70Q16 40 44 40Q68 40 74 62V72Q44 78 12 72Z" fill={c} />
+          <path d="M66 62Q72 48 84 48Q96 50 95 60Q94 70 84 71H68Z" fill={c} />
+          <path d="M20 68Q44 74 70 68" stroke={WHITE} strokeOpacity="0.35" strokeWidth="3" fill="none" />
         </g>
       );
     case 'longNeck':
+      // A long-necked dinosaur: the body and four legs low in the circle, a curved neck, a small head.
       return (
-        <g fill={c}>
-          <rect x="42" y="30" width="16" height="50" rx="8" />
-          <ellipse cx="54" cy="30" rx="18" ry="14" />
-          <ellipse cx="50" cy="84" rx="26" ry="12" />
+        <g>
+          <path d="M24 72Q10 70 4 60L8 57Q14 66 26 66Z" fill={c} />
+          <Shade d="M26 76h7v18h-7zM50 76h7v18h-7z" colour={c} amount={0.2} />
+          <path d="M36 76h7v18h-7zM60 76h7v18h-7z" fill={c} />
+          <ellipse cx="44" cy="72" rx="23" ry="12" fill={c} />
+          <path d="M55 68Q70 46 63 22" stroke={c} strokeWidth="11" strokeLinecap="round" fill="none" />
+          <ellipse cx="68" cy="20" rx="12" ry="8" fill={c} />
+          <path d="M60 54Q66 42 63 30" stroke={WHITE} strokeOpacity="0.3" strokeWidth="3" strokeLinecap="round" fill="none" />
         </g>
       );
     case 'apple':
@@ -695,30 +793,65 @@ function CreatureBody({ s }: { s: CreatureSpec }) {
           <ellipse cx="50" cy="60" rx="28" ry="20" />
         </g>
       );
-    case 'unicorn':
+    case 'unicorn': {
+      // A horse's head from the front: ears, a mane in a second colour, a muzzle; the horn comes last.
+      const mane = v(s.color === 'pink' ? 'avatar-purple' : 'avatar-pink');
       return (
         <g>
-          <path d="M50 4l-5 22h10z" fill={v('badge-gold')} />
-          <ellipse cx="50" cy="54" rx="25" ry="28" fill={c} />
-          <path d="M70 34q14 10 6 30" stroke={v('avatar-pink')} strokeWidth="5" fill="none" />
+          <path d="M31 30Q16 52 26 86L38 80Q30 58 40 34Z" fill={mane} />
+          <path d="M33 31l2-17 11 12zM67 31l-2-17-11 12z" fill={c} />
+          <path d="M37 27l1-7 5 5zM63 27l-1-7-5 5z" fill={INK} opacity="0.2" />
+          <ellipse cx="50" cy="52" rx="21" ry="27" fill={c} />
+          <path d="M40 27Q50 17 60 27Q52 25 46 35Q44 30 40 27Z" fill={mane} />
+          <ellipse cx="50" cy="68" rx="14" ry="10" {...light} />
+          <ellipse cx="45" cy="68" rx="1.5" ry="2.2" fill={INK} />
+          <ellipse cx="55" cy="68" rx="1.5" ry="2.2" fill={INK} />
         </g>
       );
+    }
     case 'dragon':
-      return (
-        <g fill={c}>
-          <path d="M20 40l12 10-2-18zM80 40l-12 10 2-18z" opacity="0.7" />
-          <ellipse cx="50" cy="56" rx="26" ry="27" />
-          <path d="M36 28l4-10 4 8 6-10 6 10 4-8 4 10z" fill={v('avatar-yellow')} />
-        </g>
-      );
-    case 'phoenix':
+      // From the front: bat wings, dark horns curving back, spiky ear fins, a crest fin, a snout with
+      // nostrils and fangs, scales.
       return (
         <g>
-          <path d="M50 10q-10 10-4 20q4-8 4-20zM50 10q10 10 4 20q-4-8-4-20z" fill={v('avatar-yellow')} />
-          <path d="M18 60q16-4 20 10zM82 60q-16-4-20 10z" fill={v('avatar-orange')} />
-          <ellipse cx="50" cy="56" rx="22" ry="27" fill={c} />
+          <Shade d="M32 66Q10 62 4 38Q14 45 18 40Q20 50 26 46Q28 56 34 54Z" colour={c} />
+          <Shade d="M68 66Q90 62 96 38Q86 45 82 40Q80 50 74 46Q72 56 66 54Z" colour={c} />
+          <ellipse cx="50" cy="90" rx="18" ry="16" fill={c} />
+          <path d="M42 84h16M43 90h14M45 96h10" stroke={WHITE} strokeOpacity="0.4" strokeWidth="2" />
+          <Shade d="M38 34Q24 26 22 8Q34 20 44 29Z" colour={c} amount={0.4} />
+          <Shade d="M62 34Q76 26 78 8Q66 20 56 29Z" colour={c} amount={0.4} />
+          <Shade d="M30 42L16 36L22 46L14 50L29 54ZM70 42L84 36L78 46L86 50L71 54Z" colour={c} amount={0.3} />
+          <ellipse cx="50" cy="50" rx="22" ry="21" fill={c} />
+          <Shade d="M45 31Q49 17 60 20Q53 24 53 31Z" colour={c} amount={0.35} />
+          <ellipse cx="50" cy="63" rx="15" ry="10" {...light} />
+          <ellipse cx="45" cy="59" rx="1.4" ry="1.9" fill={INK} />
+          <ellipse cx="55" cy="59" rx="1.4" ry="1.9" fill={INK} />
+          <path d="M31 52q3-3 6 0M30 57q3-3 6 0M63 52q3-3 6 0M64 57q3-3 6 0" stroke={INK} strokeOpacity="0.3" strokeWidth="1.2" fill="none" />
         </g>
       );
+    case 'phoenix': {
+      // A fire bird: flame crest, raised flame wings, long tail feathers; its beak is its mouth.
+      const red = v('avatar-red');
+      const orange = v('avatar-orange');
+      const yellow = v('avatar-yellow');
+      return (
+        <g>
+          <path d="M44 74Q32 90 32 100H42Q42 88 48 78Z" fill={red} />
+          <path d="M56 74Q68 90 68 100H58Q58 88 52 78Z" fill={orange} />
+          <path d="M47 76Q48 92 46 100H54Q52 92 53 76Z" fill={yellow} />
+          <path d="M32 60Q12 56 5 32Q13 37 16 33Q18 41 22 39Q24 47 31 46Z" fill={orange} stroke={INK} strokeOpacity="0.3" />
+          <path d="M68 60Q88 56 95 32Q87 37 84 33Q82 41 78 39Q76 47 69 46Z" fill={orange} stroke={INK} strokeOpacity="0.3" />
+          <path d="M31 56Q20 52 16 42Q22 46 25 44Q27 50 32 50Z" fill={yellow} />
+          <path d="M69 56Q80 52 84 42Q78 46 75 44Q73 50 68 50Z" fill={yellow} />
+          <path d="M44 34Q33 26 36 14Q42 23 46 25Z" fill={orange} />
+          <path d="M56 34Q67 26 64 14Q58 23 54 25Z" fill={orange} />
+          <path d="M50 33Q39 21 46 4Q50 15 53 11Q61 22 50 33Z" fill={red} />
+          <path d="M50 32Q45 23 48 15Q51 22 54 20Q55 27 50 32Z" fill={yellow} />
+          <ellipse cx="50" cy="57" rx="20" ry="24" fill={c} />
+          <ellipse cx="50" cy="70" rx="11" ry="9" {...light} />
+        </g>
+      );
+    }
     case 'astronaut':
       return (
         <g>
@@ -761,17 +894,90 @@ function CreatureBody({ s }: { s: CreatureSpec }) {
   }
 }
 
+/** The mouth that belongs to the species, following the spec's mouth option where it can (open or closed). */
+function SpeciesMouth({ spot, kind, colour }: { spot: FaceSpot['mouth']; kind: string; colour: string }) {
+  const { x, y, w } = spot;
+  const open = OPEN.has(kind);
+  const line = { stroke: INK, strokeWidth: 2, fill: 'none', strokeLinecap: 'round' as const };
+  switch (spot.style) {
+    case 'beak': {
+      // A beak, never a person's mouth; orange on a yellow bird so it always shows.
+      const fill = v(colour === 'yellow' || colour === 'orange' ? 'avatar-red' : 'avatar-yellow');
+      return (
+        <g data-part="beak">
+          <path d={`M${x - w / 2} ${y}H${x + w / 2}L${x} ${y + (open ? 7 : 10)}Z`} fill={fill} stroke={INK} strokeWidth="1" strokeLinejoin="round" />
+          {open ? <path d={`M${x - w / 2 + 1} ${y + 2}H${x + w / 2 - 1}L${x} ${y + 11}Z`} fill={fill} stroke={INK} strokeWidth="1" strokeLinejoin="round" /> : null}
+        </g>
+      );
+    }
+    case 'jaw': {
+      // A dinosaur jaw along the head, with a row of teeth; open shows the inside.
+      const left = x - w / 2;
+      const teeth = Array.from({ length: Math.floor(w / 6) }, (_, i) => `M${left + 3 + i * 6} ${y}l1.6 3.2 1.6-3.2z`).join('');
+      return (
+        <g data-part="jaw">
+          {open ? <path d={`M${left} ${y - 1}L${left + w} ${y - 2}L${left + w - 2} ${y + 5}Q${x} ${y + 9} ${left + 1} ${y + 4}Z`} fill={INK} /> : null}
+          {open && kind === 'tongue' ? <path d={`M${x - 4} ${y + 4}q4 4 8 0`} fill={v('avatar-blush')} /> : null}
+          <path d={`M${left} ${y}H${left + w}`} {...line} />
+          <path d={teeth} fill={WHITE} stroke={INK} strokeWidth="0.6" strokeLinejoin="round" />
+        </g>
+      );
+    }
+    case 'muzzle':
+      return (
+        <g data-part="muzzle">
+          {open ? <path d={`M${x - w / 2} ${y - 1}q${w / 2} ${w * 0.6} ${w} 0z`} fill={INK} /> : <path d={`M${x - w / 2} ${y}q${w / 2} 3 ${w} 0`} {...line} />}
+          {open && kind === 'tongue' ? <path d={`M${x - 2} ${y + 1.5}q2 3.5 4 0`} fill={v('avatar-blush')} /> : null}
+        </g>
+      );
+    case 'snout': {
+      // A wide snout (the dragon) always shows two small fangs: it is a dragon, not a cow.
+      const fangs = w >= 12;
+      return (
+        <g data-part="snout">
+          {open ? <path d={`M${x - w / 2} ${y - 1}q${w / 2} ${w * 0.55} ${w} 0z`} fill={INK} /> : <path d={`M${x - w / 2} ${y}q${w / 2} ${Math.max(2, w * 0.3)} ${w} 0`} {...line} />}
+          {fangs ? <path d={`M${x - 5} ${y + (open ? -0.5 : 1)}l1.5 3.4 1.5-3.4zM${x + 2} ${y + (open ? -0.5 : 1)}l1.5 3.4 1.5-3.4z`} fill={WHITE} stroke={INK} strokeWidth="0.5" /> : null}
+        </g>
+      );
+    }
+    default:
+      return (
+        <g data-part="mouth" transform={x === 50 ? undefined : `translate(${x - 50} 0)`}>
+          <Mouth kind={kind} cy={y} />
+        </g>
+      );
+  }
+}
+
+/** The unicorn's spiral horn, drawn after the hat so it always shows. */
+function Horn() {
+  return (
+    <g data-part="horn">
+      <path d="M50 1l-5.5 26h11z" fill={v('badge-gold')} stroke={INK} strokeWidth="0.8" strokeLinejoin="round" />
+      <path d="M46 22l8-2.4M46.8 16l6.6-2M47.8 10l4.6-1.4M48.8 5l2.4-.7" stroke={INK} strokeOpacity="0.45" strokeWidth="1" strokeLinecap="round" />
+    </g>
+  );
+}
+
 function Creature({ s }: { s: CreatureSpec }) {
-  const eyeY = s.species === 'bigHead' ? 44 : s.species === 'longNeck' ? 28 : s.family === 'fruits' ? 58 : 50;
-  const mouthY = eyeY + 11;
+  const f = faceOf(s);
+  const e = f.eyes;
+  const h = f.hat;
+  const eyesMoved = e.x !== 50 || e.scale !== 1;
+  const hatMoved = h.x !== 50 || h.scale !== 1;
   return (
     <g>
       <Background kind={s.bg} colour={s.bgColor} />
       <CreatureBody s={s} />
-      <Eyes kind={s.eyes} cy={eyeY} dx={s.species === 'longNeck' ? 6 : 9} />
-      {s.species === 'threeEyes' ? <circle cx="50" cy={eyeY - 9} r="2.6" fill={INK} /> : null}
-      <Mouth kind={s.mouth} cy={mouthY} />
-      <Hat kind={s.hat} colour={s.accentColor} top={s.family === 'animals' || s.species === 'unicorn' ? 26 : 22} />
+      <g transform={eyesMoved ? `translate(${e.x} ${e.y}) scale(${e.scale}) translate(-50 ${-e.y})` : undefined}>
+        <Eyes kind={s.eyes} cy={e.y} dx={e.dx / e.scale} />
+      </g>
+      {s.species === 'threeEyes' ? <circle cx="50" cy={e.y - 9} r="2.6" fill={INK} /> : null}
+      <SpeciesMouth spot={f.mouth} kind={s.mouth} colour={s.color} />
+      <g data-part="hat" transform={hatMoved ? `translate(${h.x} ${h.top}) scale(${h.scale}) translate(-50 ${-h.top})` : undefined}>
+        <Hat kind={s.hat} colour={s.accentColor} top={h.top} />
+      </g>
+      {f.overHat === 'horn' ? <Horn /> : null}
       <Accessory kind={s.accessory} colour={s.accentColor} />
     </g>
   );

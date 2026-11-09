@@ -14,7 +14,7 @@ import { themeTokens } from '../../src/client/themes/css.ts';
 import { THEME_LIST } from '../../src/client/themes/registry.ts';
 import { COLOR_TOKENS } from '../../src/client/themes/types.ts';
 import { ACHIEVEMENT_TIERS, BADGE_ICONS, DEFAULT_ACHIEVEMENTS } from '../../src/shared/achievements.ts';
-import { AVATAR_COLOURS, HAIR_COLOURS, PERSON_PARTS, READY_MADE, SKIN_TONES, generatedAvatar, randomCreature, randomPerson, seededRandom } from '../../src/shared/avatars.ts';
+import { ALL_SPECIES, AVATAR_COLOURS, CREATURE_FAMILIES, CREATURE_FAMILY_KEYS, HAIR_COLOURS, OPTION_NAMES, PERSON_PARTS, READY_MADE, SKIN_TONES, describeAvatar, generatedAvatar, randomCreature, randomPerson, seededRandom, type CreatureFamily, type CreatureSpec } from '../../src/shared/avatars.ts';
 import { AvatarSpec } from '../../src/shared/contracts/avatars.ts';
 
 const RAW_COLOUR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/;
@@ -87,6 +87,85 @@ describe('avatars (items 9–11)', () => {
  * tokens only, so this is what "renders in every theme" means; the e2e catalog runs axe on the same
  * badges and avatars in each theme (e2e/catalog.spec.ts).
  */
+describe('recognisable creatures (S14a, D-146)', () => {
+  const ALL_SPECIES_SPECS = CREATURE_FAMILY_KEYS.flatMap((family) => (CREATURE_FAMILIES[family] as readonly string[]).map((species) => ({ family, species })));
+  const base = (family: CreatureFamily, species: string, over: Partial<CreatureSpec> = {}): CreatureSpec => ({
+    v: 1,
+    type: 'creature',
+    family,
+    species,
+    color: 'blue',
+    eyes: 'dots',
+    mouth: 'smile',
+    hat: 'none',
+    accessory: 'none',
+    accentColor: 'red',
+    bg: 'circle',
+    bgColor: 'yellow',
+    ...over,
+  });
+  /** The body of the picture: everything between the background circle and the eyes. */
+  const bodyOf = (spec: CreatureSpec) => {
+    const svg = html(createElement(AvatarArt, { spec, size: 48 }));
+    const doc = new DOMParser().parseFromString(svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"'), 'image/svg+xml');
+    const layers = [...doc.documentElement.firstElementChild!.children];
+    return layers[1]!; // [0] background, [1] body, [2] eyes …
+  };
+
+  it('every species has its own outline, and none is a bare ellipse or circle', () => {
+    const signatures = new Map<string, string>();
+    for (const { family, species } of ALL_SPECIES_SPECS) {
+      const body = bodyOf(base(family, species));
+      const shapes = [body, ...body.querySelectorAll('*')].filter((e) => ['path', 'ellipse', 'circle', 'rect'].includes(e.nodeName));
+      expect(shapes.length > 1 || shapes[0]?.nodeName === 'path', `${species}: more than one plain shape`).toBe(true);
+      const sig = new XMLSerializer().serializeToString(body);
+      expect(signatures.has(sig), `${species} looks like ${signatures.get(sig)}`).toBe(false);
+      signatures.set(sig, species);
+    }
+  });
+
+  it('the unicorn horn is drawn after the hat, whatever the hat', () => {
+    for (const hat of PERSON_PARTS.hat) {
+      const svg = html(createElement(AvatarArt, { spec: base('mythical', 'unicorn', { hat }) }));
+      const hatAt = svg.indexOf('data-part="hat"');
+      const hornAt = svg.indexOf('data-part="horn"');
+      expect(hatAt, hat).toBeGreaterThan(0);
+      expect(hornAt, hat).toBeGreaterThan(hatAt);
+    }
+  });
+
+  it('a beak species never gets a person mouth, whatever mouth was chosen', () => {
+    for (const mouth of PERSON_PARTS.mouth) {
+      const svg = html(createElement(AvatarArt, { spec: base('mythical', 'phoenix', { mouth }) }));
+      expect(svg, mouth).toContain('data-part="beak"');
+      expect(svg, mouth).not.toContain('data-part="mouth"');
+    }
+  });
+
+  it('dinosaurs and mythical creatures get their own mouths (jaw, snout, muzzle), people-like mouths stay elsewhere', () => {
+    const part = (family: CreatureFamily, species: string) => /data-part="(\w+)"/.exec(html(createElement(AvatarArt, { spec: base(family, species) })).replace(/data-part="hat"/g, ''))?.[1];
+    expect(part('dinosaurs', 'rex')).toBe('jaw');
+    expect(part('dinosaurs', 'spikes')).toBe('snout');
+    expect(part('dinosaurs', 'longNeck')).toBe('snout');
+    expect(part('mythical', 'unicorn')).toBe('muzzle');
+    expect(part('mythical', 'dragon')).toBe('snout');
+    expect(part('animals', 'cat')).toBe('mouth');
+  });
+
+  it('keeps every stored spec valid: the ready-made list and the catalogue did not change shape (D-124)', () => {
+    expect(READY_MADE).toHaveLength(120);
+    for (const r of READY_MADE) expect(AvatarSpec.safeParse(r).success).toBe(true);
+    for (const species of ['rex', 'spikes', 'longNeck', 'unicorn', 'dragon', 'phoenix']) expect(ALL_SPECIES).toContain(species);
+  });
+
+  it('uses the Turkish names the owner confirmed; the English names stay', () => {
+    const tr = (s: string) => OPTION_NAMES[`species.${s}`]!.tr;
+    expect(['rex', 'spikes', 'longNeck', 'unicorn', 'dragon', 'phoenix'].map(tr)).toEqual(['tiranozor', 'stegozor', 'uzun boyunlu dinozor', 'tek boynuzlu at', 'ejderha', 'anka kuşu']);
+    expect(OPTION_NAMES['species.phoenix']!.en).toBe('fire bird');
+    expect(describeAvatar(base('dinosaurs', 'rex'), 'tr')).toBe('Mavi tiranozor');
+  });
+});
+
 describe('every badge and avatar in every theme (item 10, review fix)', () => {
   const VAR = /var\((--cc-[a-z0-9-]+)\)/g;
   const wellFormed = (svg: string) => {
