@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { DEFAULT_SCHOOL_DAYS } from '../../../shared/contracts/assistant.ts';
 import { defineServerModule } from '../manifest.ts';
 import { assistantSection, assistantTimeline } from './report.ts';
-import { assistantCommands, assistantEndStep } from './commands.ts';
+import { assistantCommands, assistantEndStep, assistantStartStep } from './commands.ts';
 import { assistantLessonState, registerAssistantRoutes } from './routes.ts';
 import { onAttendanceChange } from './service.ts';
 
@@ -16,6 +16,8 @@ export const assistantManifest = defineServerModule({
   // Today's assistant rides on the polled lesson state (DSH-3); first use creates this week's plan (AST-2).
   lessonState: [assistantLessonState],
   endSteps: [assistantEndStep],
+  // Duty ticks on the Start Lesson screen (S14b, D-149).
+  startSteps: [assistantStartStep],
   commands: assistantCommands,
   reports: [
     { key: 'assistant', order: 70, meta: { title: 'report.section.assistant', tables: [{ key: 'students', title: 'report.assistant.byStudent' }] }, build: assistantSection },

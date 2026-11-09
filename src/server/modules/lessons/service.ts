@@ -27,6 +27,7 @@ import { assertModuleEnabled, isModuleEnabled } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, effectiveTimezone, getClass, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { endStepsFor, type LessonRow } from './endSteps.ts';
 import { defaultTemplateId, resolveRoutine, usableTemplates } from './routines.ts';
+import { runStartSteps } from './startSteps.ts';
 import { plannedTopics, usableTopicSnapshots } from './topics.ts';
 
 type P<T extends keyof typeof LessonCommands> = z.infer<(typeof LessonCommands)[T]>;
@@ -239,7 +240,9 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
     // just confirmed is shared daily data for today and is still applied (D-053), never dropped.
     if (existing.localDate >= today) {
       const attendanceKept = applyStartAttendance(ctx, context.id, cls, today, p, meta.opId);
-      return { started: false, reason: 'LESSON_ALREADY_ACTIVE' as const, lessonId: existing.id, attendanceKept };
+      // Only the steps that record per-day data run on a resume (S14b, D-149: the duty ticks).
+      const notes = runStartSteps(ctx, existing, p.steps, { resumed: true, opId: meta.opId });
+      return { started: false, reason: 'LESSON_ALREADY_ACTIVE' as const, lessonId: existing.id, attendanceKept, ...notes };
     }
     // Left running past the end of its day: abandon it (keep its data) and start fresh.
     const abandoned = updateLesson(ctx, existing, { status: 'abandoned', timerJson: { ...existing.timerJson, running: false, startedAt: null } });
@@ -277,8 +280,10 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
   };
   ctx.db.insert(lessons).values(row).run();
   const attendanceKept = applyStartAttendance(ctx, context.id, cls, today, p, meta.opId);
+  // Module start steps after attendance, so they see who is in the room (S14b, D-149).
+  const notes = runStartSteps(ctx, row, p.steps, { resumed: false, opId: meta.opId });
   audit(ctx.db, ctx.actor, { action: 'lesson.start', entity: 'lesson', entityId: row.id, after: { contextId: context.id, localDate: today, routine: routine.templateId, stages: routine.stages.length, ...(startTopics.dropped.length ? { droppedTopics: startTopics.dropped } : {}) }, opId: meta.opId }, now);
-  return { started: true, lessonId: row.id, attendanceKept };
+  return { started: true, lessonId: row.id, attendanceKept, ...notes };
 }
 
 /**

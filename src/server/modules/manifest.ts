@@ -14,6 +14,7 @@ import type { AnyCommandDef } from '../lib/commands.ts';
 import type { AppDeps, RequestContext } from '../lib/context.ts';
 import type { AttendanceListener } from './attendance/service.ts';
 import type { EndLessonStep } from './lessons/endSteps.ts';
+import type { StartLessonStep } from './lessons/startSteps.ts';
 import type { LessonCloseHook, LessonStateContributor } from './lessons/service.ts';
 import type { ModuleConfigSpec } from './school/modules.ts';
 import type { ClassRow, ContextRow, YearRow } from './school/policy.ts';
@@ -131,6 +132,12 @@ export interface ServerModuleManifest {
   lessonState?: readonly LessonStateContributor[];
   /** End Lesson steps (D-051); `module` must be this manifest's policyKey (or null for core steps). */
   endSteps?: readonly EndLessonStep[];
+  /**
+   * Start Lesson steps (S14b, D-149): the server side of a client start step that sends
+   * `lesson.start` `steps[key]`; runs after attendance, `onResume` ones also when the start resumes
+   * a running lesson. `module` must be this manifest's policyKey (or null for core steps).
+   */
+  startSteps?: readonly StartLessonStep[];
   /** Runs inside the transaction that ends or abandons a lesson (D-067). */
   lessonCloseHooks?: readonly LessonCloseHook[];
   /** Runs inside every attendance write (D-067). */

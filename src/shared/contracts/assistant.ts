@@ -170,6 +170,17 @@ export const assistantHistory = endpoint({
 /** End Lesson step 'assistantThanks' (optional): thank today's assistant. */
 export const AssistantEndStepInput = z.object({ thanked: z.boolean().default(false) });
 
+/**
+ * Start Lesson step 'assistant' (S14b, D-149): the responsibilities ticked (`check`) or unticked
+ * (`uncheck`) on the start screen for the assistant it showed (`studentId`). Applied only if that
+ * student is still today's assistant when the lesson starts.
+ */
+export const AssistantStartStepInput = z.object({
+  studentId: Id,
+  check: z.array(Id).max(30).default([]),
+  uncheck: z.array(Id).max(30).default([]),
+});
+
 /** Classroom commands (POST /api/commands), lesson-scoped (S13a, D-100). */
 export const AssistantCommands = {
   /** Tick (or untick) a responsibility for today's assistant. */

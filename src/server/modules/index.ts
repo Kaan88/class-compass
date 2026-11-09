@@ -11,6 +11,7 @@ import type { Db } from '../db/client.ts';
 import type { PolicyKey } from '../../shared/modules.ts';
 import { adminManifest } from './admin/manifest.ts';
 import { assistantManifest } from './assistant/manifest.ts';
+import { classroomLayoutManifest } from './classroomLayout/manifest.ts';
 import { registerAttendanceListener } from './attendance/service.ts';
 import { attendanceManifest } from './attendance/manifest.ts';
 import { authManifest } from './auth/manifest.ts';
@@ -21,6 +22,7 @@ import { groupingManifest } from './grouping/manifest.ts';
 import { homeworkManifest } from './homework/manifest.ts';
 import { importManifest } from './import/manifest.ts';
 import { registerEndLessonStep } from './lessons/endSteps.ts';
+import { registerStartLessonStep } from './lessons/startSteps.ts';
 import { lessonsManifest } from './lessons/manifest.ts';
 import { linksManifest } from './links/manifest.ts';
 import { registerLessonCloseHook, registerLessonStateContributor } from './lessons/service.ts';
@@ -46,6 +48,7 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   schoolManifest,
   studentsManifest,
   lessonsManifest,
+  classroomLayoutManifest,
   routinesManifest,
   attendanceManifest,
   countersManifest,
@@ -110,6 +113,10 @@ export function installModules(): void {
     for (const s of m.endSteps ?? []) {
       if (s.module !== null && s.module !== m.policyKey) throw new Error(`End Lesson step ${s.key} belongs to ${s.module}, not ${m.key}`);
       registerEndLessonStep(s);
+    }
+    for (const s of m.startSteps ?? []) {
+      if (s.module !== null && s.module !== m.policyKey) throw new Error(`Start Lesson step ${s.key} belongs to ${s.module}, not ${m.key}`);
+      registerStartLessonStep(s);
     }
     for (const h of m.lessonCloseHooks ?? []) registerLessonCloseHook(h);
     for (const l of m.attendanceListeners ?? []) registerAttendanceListener(l);

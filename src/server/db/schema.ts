@@ -1552,3 +1552,23 @@ export const customThemes = sqliteTable('custom_themes', {
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
+
+// ---------------------------------------------------------------- classroom board layout (S14b)
+/**
+ * A teacher's own classroom board layout (S14b, D-148): `scope` is 'all' (every class of the
+ * teacher) or a teaching context id (one class+subject; it wins over 'all'). `layoutJson` is a
+ * `ClassroomLayout` (shared/classroomLayout.ts), validated on every write and again on every read (an
+ * invalid stored layout is never served: the board falls back to the default). A personal display
+ * preference: no student data, not audited, replaced in place (`version` feeds the ETag).
+ */
+export const classroomLayouts = sqliteTable(
+  'classroom_layouts',
+  {
+    userId: text('user_id').notNull().references(() => users.id),
+    scope: text('scope').notNull(),
+    layoutJson: text('layout_json', { mode: 'json' }).$type<unknown>().notNull(),
+    version: integer('version').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.scope] })],
+);

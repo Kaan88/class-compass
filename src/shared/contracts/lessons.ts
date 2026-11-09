@@ -178,6 +178,11 @@ export const LessonCommands = {
     othersPresent: z.boolean().optional(),
     /** Today's topic(s) (S13a): omitted = the weekly plan's topics for today; [] = no topic. */
     topicIds: TopicIds.optional(),
+    /**
+     * Inputs of the module Start Lesson steps (S14b, D-149), by step key (the server's `startSteps`
+     * registry, e.g. `assistant`: the duties ticked on the start screen). Each step validates its own.
+     */
+    steps: z.record(z.string().max(64), z.unknown()).optional(),
   }),
   'lesson.setStage': z.object({ ...LessonRef, stageIndex: z.number().int().min(0).max(MAX_STAGES) }),
   'lesson.timer.start': z.object(LessonRef),
@@ -203,7 +208,14 @@ export const StartLessonResult = z.object({
   lessonId: z.string(),
   /** Start-screen entries not written because the record changed in the meantime (D-053). */
   attendanceKept: z.number().int().optional(),
+  /**
+   * Duty ticks from the start screen that were not recorded because today's assistant changed in the
+   * meantime (attendance moved the turn, S14b, D-149).
+   */
+  dutiesDropped: z.number().int().optional(),
 });
+/** What a Start Lesson step may report back in the start result (S14b). */
+export type StartStepNotes = { dutiesDropped?: number };
 
 /** The core End Lesson step (LES-3): how did the lesson go? */
 export const ReflectionStepInput = z.object({ rating: z.number().int().min(1).max(4).nullable().default(null), note: z.string().trim().max(500).nullable().default(null) });
