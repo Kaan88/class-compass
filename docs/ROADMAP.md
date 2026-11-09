@@ -294,9 +294,11 @@ Measured by the lead on 2026-11-09 with fictional schools on the development PC,
 - [x] Date formatters and collators cached per locale and options (`shared/intl.ts`): `localDate`, the digest hour, the shared date texts, the grouping level order and the Turkish comparators; the goals report computes each day once and groups by student and week (whole-year class report on the big school 807 → 114 ms, RSS after two reports 1,771 → 318 MB); CONVENTIONS rule
 - [x] Notifications: the teacher's current access read once per request with the same rules (`teacherStudentScopes`, `moduleEnabledLookup`); count 180 → 10 ms, list 353 → 29 ms on the big school (PC); a test checks it against the old per-student check across six classes and after access is lost part-way
 - [x] Full export streamed table by table from a read snapshot (own read-only connection in one read transaction; a backup copy for in-memory test databases), in pieces with turns of the event loop: the classroom probe waited at most 18 ms during the export (before about 1.1 s), RSS after it 713 → 358 MB; tests: byte-for-byte the same tables as before, turns during one big table, a consistent snapshot while the school writes
-- [x] Notification tick: the 90-day purge deletes in chunks of 500 with yields, the digest yields between teachers (tested)
+- [x] Notification tick: the 90-day purge deletes in chunks of 500 with yields, the digest yields between teachers (tested); a safeguard: the cause of the one 1.2–1.5 s stall seen was not confirmed (the old purge of about 12k rows took about 0.1 s on the PC)
+- [x] Review fixes: Super Speakers (section and history), the attendance week table and the homework section group or batch their reads instead of re-scanning per week or reading per assignment; outputs compared byte for byte on the big school and pinned by tests (whole-year class report 112 → 80 ms, Super Speakers history 355 → 23 ms)
 - [x] D-162 (measurements, causes, fixes, the snapshot choice, server size), OPERATIONS "Server size", CONVENTIONS rule on Intl formatters and long jobs; `npm run check` 1,597 tests, `npm run build` student page 427.3 kB; e2e `notifications`, `admin`, `report-views`, `student-stats`: 14 passed, 1 skipped (phone-only test in the display project)
 - [ ] Re-measured on the intended server after deployment
+- [ ] The notification tick watched on the intended server after deployment (no stall over about 100 ms)
 - [ ] A full lesson day on the real classroom display after deployment
 
 ## User documentation (after S12)

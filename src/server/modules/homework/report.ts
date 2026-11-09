@@ -11,7 +11,8 @@ import { homeworkAssignments } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
 import { col, date, key, lbl, n, raw, scopeIds, student, table, text } from '../reports/cells.ts';
-import { expectedStudents, marksOf } from './service.ts';
+import { rosterRowsOn, type StudentRow } from '../students/service.ts';
+import { expectedStudents, marksOfMany } from './service.ts';
 
 type Kind = (typeof HOMEWORK_STATUS_KINDS)[number];
 const KINDS: readonly Kind[] = ['completed', 'partly_completed', 'submitted_late', 'missing', 'excused', 'other', 'not_checked'];
@@ -30,9 +31,19 @@ function assignmentsDue(ctx: RequestContext, scope: ReportScope) {
 /** Per assignment: the expected students in scope and each one's status key and kind. */
 function marksFor(ctx: RequestContext, scope: ReportScope) {
   const ids = new Set(scopeIds(scope));
-  return assignmentsDue(ctx, scope).map((a) => {
-    const marks = marksOf(ctx.db, a.id);
-    const { roster, extra } = expectedStudents(ctx.db, a, scope.cls.id, marks);
+  const assignments = assignmentsDue(ctx, scope);
+  // One read for every assignment's marks and one roster per distinct due date (D-162), not 2–3 reads
+  // per assignment; the expected students and their order are the same as `expectedStudents` alone.
+  const marksById = marksOfMany(ctx.db, assignments.map((a) => a.id));
+  const rosters = new Map<string, StudentRow[]>();
+  const rosterOn = (day: string) => {
+    let r = rosters.get(day);
+    if (!r) rosters.set(day, (r = rosterRowsOn(ctx.db, scope.cls.id, day).map((x) => x.student)));
+    return r;
+  };
+  return assignments.map((a) => {
+    const marks = marksById.get(a.id)!;
+    const { roster, extra } = expectedStudents(ctx.db, a, scope.cls.id, marks, rosterOn(a.dueOn));
     const kindOf = new Map(a.statusSetJson.map((s) => [s.key, s.kind as Kind]));
     const labelOf = new Map(a.statusSetJson.map((s) => [s.key, s.label]));
     const expected = [...roster, ...extra].filter((s) => ids.has(s.id));

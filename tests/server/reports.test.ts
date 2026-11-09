@@ -296,3 +296,50 @@ describe('S11 review fixes', () => {
     expect(succ.students.map((x) => x.id)).toContain(newcomer.id);
   });
 });
+
+describe('S15a review fixes: grouped report sections give the same tables (D-162)', () => {
+  const DAY_MS = 24 * 3600_000;
+  const cells = (sec: ReportSection, table: string) => sec.tables.find((t) => t.key === table)!.rows.map((r) => [r.key, ...r.cells.slice(1)]);
+
+  it('RPT-1: the attendance week table adds up each week’s own days', async () => {
+    await lessonWithTaps([], [1]); // Monday 2026-11-09: Arda absent, the others present
+    env.clock.advance(7 * DAY_MS); // Monday 2026-11-16
+    await s.teacherA.login('ayse.teacher');
+    await lessonWithTaps([], [1, 2]);
+    env.clock.advance(4 * DAY_MS); // Friday 2026-11-20
+    await s.teacherA.login('ayse.teacher');
+    const r = await report(s.teacherA, '?from=2026-11-09&to=2026-11-20');
+    expect(cells(section(r, 'attendance'), 'weeks')).toEqual([
+      ['2026-11-09', { t: 'n', v: 1, d: 5 }, { t: 'n', v: 2 }, { t: 'n', v: 1 }, { t: 'n', v: 0 }, { t: 'n', v: 0 }],
+      ['2026-11-16', { t: 'n', v: 1, d: 5 }, { t: 'n', v: 1 }, { t: 'n', v: 2 }, { t: 'n', v: 0 }, { t: 'n', v: 0 }],
+    ]);
+  });
+
+  it('RPT-5, HW-4: homework read in one pass keeps the roster per due date and the marked students who left', async () => {
+    const hw = (title: string, dueOn: string) => ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/homework`, { title, dueOn, assignedOn: '2026-11-09' }));
+    const mark = (id: string, studentId: string, status: string) => ok(s.teacherA.post(`/api/teacher/homework/${id}/marks`, { changes: [{ studentId, status }] }));
+    const a1 = await hw('Fictional reading log', '2026-11-12');
+    const a2 = await hw('Fictional word list', '2026-11-12');
+    const a3 = await hw('Fictional poster', '2026-11-16');
+    await mark(a1.id, kids[0]!.id, 'completed');
+    await mark(a2.id, kids[1]!.id, 'missing');
+    await mark(a3.id, kids[2]!.id, 'partly_completed');
+    // Ece leaves the class before the first due date: still expected where she was marked, not elsewhere.
+    env.db.$client.prepare("update enrolments set to_date = '2026-11-11' where student_id = ? and class_id = ?").run(kids[0]!.id, s.c3a.id);
+    env.clock.advance(8 * DAY_MS); // Tuesday 2026-11-17
+    await s.teacherA.login('ayse.teacher');
+    const sec = section(await report(s.teacherA, '?from=2026-11-09&to=2026-11-17'), 'homework');
+    // expected, then completed, partly, late, missing, excused, other, not checked out of expected
+    const counts = (d: number, ...v: number[]) => [{ t: 'n', v: d }, ...v.map((x) => ({ t: 'n', v: x, d }))];
+    const byAssignment = sec.tables.find((t) => t.key === 'assignments')!.rows.map((r) => [r.key, ...r.cells.slice(2)]);
+    expect(byAssignment).toEqual([
+      [a1.id, ...counts(3, 1, 0, 0, 0, 0, 0, 2)],
+      [a2.id, ...counts(2, 0, 0, 0, 1, 0, 0, 1)],
+      [a3.id, ...counts(2, 0, 1, 0, 0, 0, 0, 1)],
+    ]);
+    expect(rowOf(sec, 'students', kids[0]!.id).slice(1)).toEqual(counts(1, 1, 0, 0, 0, 0, 0, 0));
+    expect(rowOf(sec, 'students', kids[1]!.id).slice(1)).toEqual(counts(3, 0, 0, 0, 1, 0, 0, 2));
+    expect(sec.metrics.find((m) => m.key === 'outstanding')!.cell).toEqual({ t: 'n', v: 2, d: 7 });
+    expect(sec.tables.find((t) => t.key === 'outstanding')!.rows.map((r) => r.key)).toEqual([`${a2.id}|${kids[1]!.id}`, `${a3.id}|${kids[2]!.id}`]);
+  });
+});

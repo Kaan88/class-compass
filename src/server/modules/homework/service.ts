@@ -83,9 +83,25 @@ export function marksOf(db: Db, assignmentId: string): Map<string, MarkRow> {
   return new Map(db.select().from(homeworkMarks).where(eq(homeworkMarks.assignmentId, assignmentId)).all().map((m) => [m.studentId, m]));
 }
 
-/** Students expected to hand it in: enrolled on the due date, plus anyone already marked. */
-export function expectedStudents(db: Db, a: AssignmentRow, classId: string, marks: ReadonlyMap<string, MarkRow>) {
-  const roster = rosterRowsOn(db, classId, a.dueOn).map((r) => r.student);
+/**
+ * The marks of several assignments in one read per 500 ids (reports, D-162): assignment id → the same
+ * map `marksOf` gives (every listed id has an entry, empty when nothing is marked).
+ */
+export function marksOfMany(db: Db, assignmentIds: readonly string[]): Map<string, Map<string, MarkRow>> {
+  const out = new Map<string, Map<string, MarkRow>>(assignmentIds.map((id) => [id, new Map()]));
+  for (let i = 0; i < assignmentIds.length; i += 500) {
+    const ids = assignmentIds.slice(i, i + 500);
+    for (const m of db.select().from(homeworkMarks).where(inArray(homeworkMarks.assignmentId, ids)).all()) out.get(m.assignmentId)!.set(m.studentId, m);
+  }
+  return out;
+}
+
+/**
+ * Students expected to hand it in: enrolled on the due date, plus anyone already marked. `roster` is the
+ * class's roster on the due date when the caller already read it (a report reads it once per due date).
+ */
+export function expectedStudents(db: Db, a: AssignmentRow, classId: string, marks: ReadonlyMap<string, MarkRow>, rosterOnDue?: readonly StudentRow[]) {
+  const roster = rosterOnDue ? [...rosterOnDue] : rosterRowsOn(db, classId, a.dueOn).map((r) => r.student);
   const inRoster = new Set(roster.map((s) => s.id));
   const extraIds = [...marks.keys()].filter((id) => !inRoster.has(id));
   const extra = extraIds.length ? db.select().from(students).where(inArray(students.id, extraIds)).all() : [];

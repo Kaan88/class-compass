@@ -393,6 +393,34 @@ describe('admin: award log, void, history, report section, badges (SSP-9..12, D-
     expect((await s.admin.get('/api/admin/speakers/history?from=2026-11-22&to=2026-11-09')).body.error.details.reason).toBe('BAD_PERIOD');
   });
 
+  it('SSP-9: weeks, students and scorers add up the same when the rows are grouped once (S15a review, D-162)', async () => {
+    const one = await newScorer('Ms Deniz');
+    const two = await newScorer('Mr Arın');
+    await award(one.phone, isik.id);
+    await award(one.phone, isik.id);
+    await award(one.phone, ada.id);
+    await award(two.phone, cem.id);
+    const voided = await award(two.phone, isik.id);
+    await ok(s.admin.post(`/api/admin/speakers/awards/${voided.opId}/void`, { reason: 'Given by mistake' }));
+    env.clock.advance(7 * DAY); // Monday 2026-11-16
+    await award(one.phone, isik.id);
+    await s.admin.login('root.admin');
+    await s.teacherA.login('ayse.teacher');
+    const nums = (cs: any[]) => cs.filter((c) => c.t === 'n').map((c) => (c.d === undefined ? [c.v] : [c.v, c.d]));
+    const rowsOf = (sec: any, t: string) => Object.fromEntries(sec.tables.find((x: any) => x.key === t).rows.map((r: any) => [r.key, nums(r.cells)]));
+
+    const rep = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?from=2026-11-09&to=2026-11-22`));
+    const sec = rep.sections.find((x: any) => x.key === 'superSpeakers');
+    expect(rowsOf(sec, 'students')).toEqual({ [isik.id]: [[3], [2, 2]], [ada.id]: [[1], [1, 2]] });
+    expect(rowsOf(sec, 'weeks')).toEqual({ '2026-11-09': [[3], [2, 2]], '2026-11-16': [[1], [1, 2]] });
+
+    const h = (await ok(s.admin.get('/api/admin/speakers/history?from=2026-11-09&to=2026-11-22'))).section;
+    expect(rowsOf(h, 'students')).toEqual({ [isik.id]: [[3], [2, 2]], [ada.id]: [[1], [1, 2]], [cem.id]: [[1], [1, 2]] });
+    expect(rowsOf(h, 'scorers')).toEqual({ [one.link.id]: [[4], [0], [2]], [two.link.id]: [[1], [1], [1]] });
+    expect(rowsOf(h, 'classes')).toEqual({ [`2026-11-09:${s.c3a.id}`]: [[3]], [`2026-11-09:${s.c3b.id}`]: [[1]], [`2026-11-16:${s.c3a.id}`]: [[1]], [`2026-11-16:${s.c3b.id}`]: [[0]] });
+    expect(Object.keys(rowsOf(h, 'winners'))).toEqual([`2026-11-09:1:${isik.id}`, `2026-11-09:2:${ada.id}`, `2026-11-09:2:${cem.id}`, `2026-11-16:1:${isik.id}`]);
+  });
+
   it('adds a section to the class report of the badge subject only', async () => {
     const { phone } = await newScorer();
     await award(phone, isik.id);

@@ -43,6 +43,29 @@ function weeksOf(from: string, to: string, weekStartsOn: number): string[] {
 }
 const nextDay = (d: string) => addDays(d, 1);
 
+/** The rows grouped by a key, each group in the rows' order (one pass instead of a filter per key, D-162). */
+function groupBy(rows: readonly PointRow[], keyOf: (r: PointRow) => string): Map<string, PointRow[]> {
+  const out = new Map<string, PointRow[]>();
+  for (const r of rows) {
+    const k = keyOf(r);
+    const list = out.get(k);
+    if (list) list.push(r);
+    else out.set(k, [r]);
+  }
+  return out;
+}
+
+/** `weekStartOfDate` of each row's local day, worked out once per distinct day. */
+function weekOfRow(weekStartsOn: number): (r: PointRow) => string {
+  const cache = new Map<string, string>();
+  return (r) => {
+    let w = cache.get(r.localDate);
+    if (w === undefined) cache.set(r.localDate, (w = weekStartOfDate(r.localDate, weekStartsOn)));
+    return w;
+  };
+}
+const NONE: readonly PointRow[] = [];
+
 /** The administrator's school-wide history section for [from, to] (SSP-9). */
 export function adminHistory(ctx: RequestContext, from: string, to: string): ReportSectionData {
   if (from > to) throw invalid('The start date is after the end date', { reason: 'BAD_PERIOD' });
@@ -58,7 +81,8 @@ export function adminHistory(ctx: RequestContext, from: string, to: string): Rep
   const wideLive = wide.filter((r) => r.voidedAt === null);
   const all = wide.filter((r) => r.localDate >= from && r.localDate <= to);
   const live = all.filter((r) => r.voidedAt === null);
-  const weekOf = (r: PointRow) => weekStartOfDate(r.localDate, s.weekStartsOn);
+  const weekOf = weekOfRow(s.weekStartsOn);
+  const liveByWeek = groupBy(wideLive, weekOf);
   const names = new Map(
     (wideLive.length ? ctx.db.select({ id: students.id, name: students.fullName }).from(students).where(inArray(students.id, [...new Set(wideLive.map((r) => r.studentId))])).all() : []).map((r) => [r.id, r.name]),
   );
@@ -68,7 +92,7 @@ export function adminHistory(ctx: RequestContext, from: string, to: string): Rep
 
   // Winners per week: the podium (dense ranks 1–3) as the board showed it, every tied student listed.
   const winnerRows = weeks.flatMap((w) => {
-    const rows = wideLive.filter((r) => weekOf(r) === w);
+    const rows = liveByWeek.get(w) ?? NONE;
     const weekClass = new Map<string, string>();
     for (const r of [...rows].sort((a, b) => a.occurredAt - b.occurredAt)) weekClass.set(r.studentId, r.classNameSnapshot);
     const places = podium(
@@ -86,7 +110,7 @@ export function adminHistory(ctx: RequestContext, from: string, to: string): Rep
   for (const r of wideLive) if (!classMap.has(r.classIdSnapshot)) classMap.set(r.classIdSnapshot, r.classNameSnapshot);
   const classList = [...classMap].map(([id, name]) => ({ id, name }));
   const classWeekRows = weeks.flatMap((w) =>
-    classTotals(classList, wideLive.filter((r) => weekOf(r) === w).map((r) => ({ classId: r.classIdSnapshot }))).map((c) => ({
+    classTotals(classList, (liveByWeek.get(w) ?? NONE).map((r) => ({ classId: r.classIdSnapshot }))).map((c) => ({
       key: `${w}:${c.classId}`,
       cells: [range(w, weekEndOf(w)), { t: 'label' as const, v: raw(c.name) }, n(c.points)],
     })),
@@ -95,9 +119,10 @@ export function adminHistory(ctx: RequestContext, from: string, to: string): Rep
   // Per scorer: points given, taken back (own undo or voided by an administrator), students reached.
   const linkIds = [...new Set(all.map((r) => r.scorerLinkId))];
   const labels = new Map((linkIds.length ? ctx.db.select({ id: scorerLinks.id, label: scorerLinks.label }).from(scorerLinks).where(inArray(scorerLinks.id, linkIds)).all() : []).map((r) => [r.id, r.label]));
+  const byScorer = groupBy(all, (r) => r.scorerLinkId);
   const scorerRows = linkIds
     .map((id) => {
-      const mine = all.filter((r) => r.scorerLinkId === id);
+      const mine = byScorer.get(id) ?? NONE;
       const ok = mine.filter((r) => r.voidedAt === null);
       return { id, label: labels.get(id) ?? '', given: ok.length, voided: mine.length - ok.length, reached: new Set(ok.map((r) => r.studentId)).size };
     })
@@ -106,11 +131,12 @@ export function adminHistory(ctx: RequestContext, from: string, to: string): Rep
 
   // Per student: points in the period and the number of weeks with a point.
   const totals = totalsByStudent(live);
+  const liveByStudent = groupBy(live, (r) => r.studentId);
   const studentRows = [...totals]
     .sort((a, b) => b[1] - a[1] || compareNames(nameOf(a[0]), nameOf(b[0])))
     .map(([id, points]) => ({
       key: id,
-      cells: [student({ id, fullName: nameOf(id) }), { t: 'label' as const, v: raw(lastClass.get(id) ?? '') }, n(points), n(new Set(live.filter((r) => r.studentId === id).map(weekOf)).size, weeks.length)],
+      cells: [student({ id, fullName: nameOf(id) }), { t: 'label' as const, v: raw(lastClass.get(id) ?? '') }, n(points), n(new Set((liveByStudent.get(id) ?? NONE).map(weekOf)).size, weeks.length)],
     }));
 
   return {
@@ -172,11 +198,25 @@ export function speakersReportSection(ctx: RequestContext, scope: ReportScope): 
   const rows = classPoints(ctx.db, scope, ids);
   const s = getSettings(ctx.db);
   const weeks = weeksOf(scope.from, scope.to < scope.today ? scope.to : scope.today, s.weekStartsOn);
-  const weekOf = (r: PointRow) => weekStartOfDate(r.localDate, s.weekStartsOn);
+  const weekOf = weekOfRow(s.weekStartsOn);
   const totals = totalsByStudent(rows);
+  const byWeek = groupBy(rows, weekOf);
+  const byStudent = groupBy(rows, (r) => r.studentId);
+  // Asked once per student and week by each table: worked out once.
+  const enrolledMemo = new Map<string, boolean>();
   const enrolledIn = (id: string, w: string) => {
-    for (let d = w; d <= weekEndOf(w); d = nextDay(d)) if (d >= scope.from && d <= scope.to && scope.enrolledOn(id, d)) return true;
-    return false;
+    const k = `${id}|${w}`;
+    let v = enrolledMemo.get(k);
+    if (v === undefined) {
+      v = false;
+      for (let d = w; d <= weekEndOf(w); d = nextDay(d))
+        if (d >= scope.from && d <= scope.to && scope.enrolledOn(id, d)) {
+          v = true;
+          break;
+        }
+      enrolledMemo.set(k, v);
+    }
+    return v;
   };
   return {
     key: 'superSpeakers',
@@ -194,7 +234,7 @@ export function speakersReportSection(ctx: RequestContext, scope: ReportScope): 
         columns: [col('student', key('report.col.student')), col('points', key('speakers.history.points'), true), col('weeks', key('speakers.history.weeksWithPoints'), true)],
         rows: scope.students.map((st) => {
           const inWeeks = weeks.filter((w) => enrolledIn(st.id, w)).length;
-          const mine = rows.filter((r) => r.studentId === st.id);
+          const mine = byStudent.get(st.id) ?? NONE;
           return { key: st.id, cells: inWeeks ? [student(st), n(mine.length), n(new Set(mine.map(weekOf)).size, inWeeks)] : [student(st), NA, NA] };
         }),
         chart: { kind: 'bar', labelColumn: 'student', valueColumns: ['points'] },
@@ -204,7 +244,7 @@ export function speakersReportSection(ctx: RequestContext, scope: ReportScope): 
         title: key('speakers.report.byWeek'),
         columns: [col('week', key('speakers.history.week')), col('points', key('speakers.history.points'), true), col('students', key('speakers.report.studentsWithPoints'), true)],
         rows: weeks.map((w) => {
-          const inWeek = rows.filter((r) => weekOf(r) === w);
+          const inWeek = byWeek.get(w) ?? NONE;
           const enrolled = scope.students.filter((st) => enrolledIn(st.id, w)).length;
           return { key: w, cells: [range(w, weekEndOf(w)), n(inWeek.length), n(new Set(inWeek.map((r) => r.studentId)).size, enrolled)] };
         }),

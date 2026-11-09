@@ -64,6 +64,16 @@ export function attendanceSection(ctx: RequestContext, scope: ReportScope): Repo
   });
   const lessonsRecorded = scope.lessons.filter((l) => ids.some((sid) => daily.has(`${sid}|${l.localDate}`))).length;
   const weeks = weekStartsBetween({ from: scope.from, to: scope.to }, scope.weekStartsOn);
+  // The daily rows tallied per day once (D-162); a week then adds up its seven days instead of scanning
+  // every row again for every week.
+  const perDay = new Map<string, Record<AttendanceStatus, number>>();
+  for (const [k, st] of daily) {
+    const d = k.slice(k.indexOf('|') + 1);
+    let t = perDay.get(d);
+    if (!t) perDay.set(d, (t = { present: 0, late: 0, absent: 0, excused: 0 }));
+    t[st] += 1;
+  }
+  const schoolDaySet = new Set(schoolDays);
   return {
     key: 'attendance',
     title: key('report.section.attendance'),
@@ -101,13 +111,18 @@ export function attendanceSection(ctx: RequestContext, scope: ReportScope): Repo
         ],
         rows: weeks.map((w) => {
           const we = addDays(w, 6);
-          const wd = schoolDays.filter((d) => d >= w && d <= we);
           const tally: Record<AttendanceStatus, number> = { present: 0, late: 0, absent: 0, excused: 0 };
-          for (const [k, st] of daily) {
-            const d = k.split('|')[1]!;
-            if (d >= w && d <= we) tally[st] += 1;
+          let schoolDaysInWeek = 0;
+          let recordedInWeek = 0;
+          for (let i = 0, d = w; i < 7; i += 1, d = addDays(d, 1)) {
+            if (schoolDaySet.has(d)) {
+              schoolDaysInWeek += 1;
+              if (recordedDays.has(d)) recordedInWeek += 1;
+            }
+            const t = perDay.get(d);
+            if (t) for (const st of STATUSES) tally[st] += t[st];
           }
-          return { key: w, cells: [range(w, we), n(wd.filter((d) => recordedDays.has(d)).length, wd.length), n(tally.present), n(tally.absent), n(tally.late), n(tally.excused)] };
+          return { key: w, cells: [range(w, we), n(recordedInWeek, schoolDaysInWeek), n(tally.present), n(tally.absent), n(tally.late), n(tally.excused)] };
         }),
         chart: { kind: 'bar', labelColumn: 'week', valueColumns: ['present', 'absent', 'late', 'excused'] },
       }),
