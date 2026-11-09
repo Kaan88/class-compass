@@ -14,7 +14,20 @@ export type Actor =
   | { type: 'scorer'; id: string }
   /** A Super Speakers board link (S12): read-only, so it only appears on the link-opened audit row. */
   | { type: 'display'; id: string }
+  /**
+   * An AI tool acting for a signed-in account through a personal token (S14h1, D-160): `id` is the
+   * account's user id, exactly as for `user`, and `tokenId` goes into the audit row (`via_token_id`).
+   */
+  | { type: 'mcp'; id: string; role: 'admin' | 'teacher'; tokenId: string }
   | { type: 'system'; id: null };
+
+/**
+ * The account behind an actor: the user for a signed-in person or an AI tool acting for them, null
+ * for students, links and the system. Use this wherever a user id is taken from the actor.
+ */
+export function actorUserId(actor: Actor): string | null {
+  return actor.type === 'user' || actor.type === 'mcp' ? actor.id : null;
+}
 
 export interface StudentPrincipal {
   studentId: string;
@@ -33,6 +46,20 @@ export interface ScorerPrincipal {
 /** Super Speakers board display (S12, D-128): read-only. */
 export interface DisplayPrincipal {
   displayLinkId: string;
+}
+
+/**
+ * An AI tool's principal (S14h1, D-160): resolved from the bearer token on every request after the
+ * school switch, the token (expiry, revocation) and the account (active) were checked.
+ */
+export interface McpPrincipal {
+  tokenId: string;
+  /** Pseudonyms are stable per family (a personal token is its own family; S14h2's OAuth refresh chains share one). */
+  familyId: string;
+  kind: 'pat' | 'oauth';
+  scopes: readonly string[];
+  /** The effective privacy mode: the mode captured at issue, narrowed to pseudonymous while the school does not allow student data. */
+  privacy: 'pseudonymous' | 'named';
 }
 
 /** Shared application services handed to every handler. */
@@ -59,6 +86,8 @@ export interface RequestContext extends AppDeps {
   scorer?: ScorerPrincipal | null;
   /** S12: set only for `display` endpoints (from the board cookie). */
   display?: DisplayPrincipal | null;
+  /** S14h1: set only for `mcp` endpoints and generated tool calls (from the bearer token). */
+  mcp?: McpPrincipal | null;
   actor: Actor;
 }
 

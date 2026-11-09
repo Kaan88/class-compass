@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pii, type McpScope } from '../mcp.ts';
 
 /**
  * Access classes (ARCHITECTURE §3). Every endpoint MUST declare exactly one; the server refuses
@@ -13,10 +14,25 @@ import { z } from 'zod';
  * - scorer:    Super Speakers scorer session derived only from an admin-made scorer link (S12, D-128):
  *              search the school list, award +1, undo own awards, own recent awards. Nothing else.
  * - display:   read-only Super Speakers board session from a display link (S12, D-128): the board only.
+ * - mcp:       the AI tools endpoint `/mcp` (S14h1, D-160): a bearer token only, never a cookie; bearer
+ *              tokens are refused on every other access class.
  */
-export type Access = 'public' | 'classroom' | 'teacher' | 'admin' | 'student' | 'user' | 'account' | 'scorer' | 'display';
+export type Access = 'public' | 'classroom' | 'teacher' | 'admin' | 'student' | 'user' | 'account' | 'scorer' | 'display' | 'mcp';
 /** Every access class (the permission matrix iterates these). */
-export const ACCESS_CLASSES = ['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display'] as const satisfies readonly Access[];
+export const ACCESS_CLASSES = ['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display', 'mcp'] as const satisfies readonly Access[];
+
+/**
+ * An endpoint offered to AI tools as a generated MCP tool (S14h1, D-160). Only `classroom`, `teacher`
+ * and `admin` endpoints may opt in (checked at start-up). `description` is written for an AI client:
+ * what the tool returns and what is withheld. `cost` counts against the token's rate limit (default 1).
+ */
+export interface McpExposure {
+  scope: McpScope;
+  tool: string;
+  description: string;
+  readOnly: boolean;
+  cost?: number;
+}
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface Endpoint<I extends z.ZodType = z.ZodType, O extends z.ZodType = z.ZodType> {
@@ -42,6 +58,8 @@ export interface Endpoint<I extends z.ZodType = z.ZodType, O extends z.ZodType =
    * screen left open with nobody at it still relocks on the server.
    */
   background?: boolean;
+  /** S14h1 (D-160): expose this endpoint as an MCP tool. Its output schema must mark personal data with `pii()`. */
+  mcp?: McpExposure;
 }
 
 export function endpoint<I extends z.ZodType, O extends z.ZodType>(e: Endpoint<I, O>): Endpoint<I, O> {
@@ -57,7 +75,9 @@ export const ErrorBody = z.object({
 });
 export type ErrorBody = z.infer<typeof ErrorBody>;
 
-export const LocalizedText = z.object({ en: z.string().max(200).optional(), tr: z.string().max(200).optional() });
+/** A staff-editable label in both languages (D-161: marked `label`, so names typed into it are replaced for AI tools). */
+export const LocalizedText = z.object({ en: z.string().max(200).optional(), tr: z.string().max(200).optional() }).meta(pii('label'));
+export { pii };
 
 /** Stable error codes shared by client and server. */
 export const ErrorCodes = {

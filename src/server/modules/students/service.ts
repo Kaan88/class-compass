@@ -13,7 +13,7 @@ import { tx, type Db } from '../../db/client.ts';
 import { classes, enrolments, studentSubjectLevels, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { Actor, AppDeps, RequestContext } from '../../lib/context.ts';
-import { requireUser } from '../../lib/context.ts';
+import { actorUserId, requireUser } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import {
@@ -229,7 +229,7 @@ export function createStudentInClass(deps: Pick<AppDeps, 'db' | 'now' | 'config'
   if (!input.allowDuplicateName) assertNameNotDuplicate(deps, nameFold, opts.visibleClassIds);
   const now = deps.now();
   const id = newId();
-  const actorId = actor.type === 'user' ? actor.id : null;
+  const actorId = actorUserId(actor);
   const row: StudentRow = {
     id,
     studentNumber,

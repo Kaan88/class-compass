@@ -32,7 +32,7 @@ import {
   type SourceRow,
 } from '../../../domain/importing.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { assistantAssignments, assistantDutyChecks, attendanceDaily, attendanceLessonExceptions, classes, counterEvents, enrolments, files, homeworkAssignments, homeworkMarkChanges, homeworkMarks, importBatches, importRows, lessons, notifications, pairConstraints, pointEvents, studentAchievements, studentSubjectLevels, students, teachingContexts, textCheckAttempts, type ImportCandidateJson, users } from '../../db/schema.ts';
+import { assistantAssignments, assistantDutyChecks, attendanceDaily, attendanceLessonExceptions, classes, counterEvents, enrolments, files, homeworkAssignments, homeworkMarkChanges, homeworkMarks, importBatches, importRows, lessons, mcpPseudonyms, notifications, pairConstraints, pointEvents, studentAchievements, studentSubjectLevels, students, teachingContexts, textCheckAttempts, type ImportCandidateJson, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
@@ -791,6 +791,8 @@ export const ENROLMENT_HISTORY_TABLES = [
   'point_events',
   // S14e3: teacher notifications about the student (they follow the rows above; since the enrolment was created)
   'notifications',
+  // S14h1 (D-161): the student was shown to an AI tool under a pseudonym (kept so "Student N" stays the same student)
+  'mcp_pseudonyms',
 ] as const;
 
 /**
@@ -813,6 +815,7 @@ function enrolmentHasHistory(db: Db, e: typeof enrolments.$inferSelect): boolean
   if (db.select({ id: textCheckAttempts.studentId }).from(textCheckAttempts).where(and(eq(textCheckAttempts.studentId, studentId), gte(textCheckAttempts.updatedAt, e.createdAt))).get()) return true;
   if (db.select({ id: pointEvents.id }).from(pointEvents).where(and(eq(pointEvents.studentId, studentId), eq(pointEvents.classIdSnapshot, classId))).get()) return true;
   if (db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.studentId, studentId), gte(notifications.createdAt, e.createdAt))).get()) return true;
+  if (db.select({ id: mcpPseudonyms.studentId }).from(mcpPseudonyms).where(and(eq(mcpPseudonyms.studentId, studentId), gte(mcpPseudonyms.createdAt, e.createdAt))).get()) return true;
   if (referencedInJson(db, studentId)) return true;
   const ctxIds = db.select({ id: teachingContexts.id }).from(teachingContexts).where(eq(teachingContexts.classId, classId)).all().map((r) => r.id);
   if (!ctxIds.length) return false;

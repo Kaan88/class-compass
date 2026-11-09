@@ -219,6 +219,7 @@ export function queryAudit(db: Db, input: In<typeof C.queryAudit>) {
       actorType: r.actorType,
       actorId: r.actorId,
       actorName: r.actorType === 'system' ? null : (names.get(r.actorId ?? '') ?? null),
+      viaAiTool: r.viaTokenId !== null,
       action: r.action,
       entity: r.entity,
       entityId: r.entityId,

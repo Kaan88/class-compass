@@ -5,7 +5,7 @@ import type { Access, Endpoint } from '../../shared/contracts/define.ts';
 import { sessions, users } from '../db/schema.ts';
 import { AppError } from './errors.ts';
 import { tokenHash } from './crypto.ts';
-import type { Actor, AppDeps, DisplayPrincipal, RequestContext, ScorerPrincipal, SessionRow, StudentPrincipal, UserRow } from './context.ts';
+import type { Actor, AppDeps, DisplayPrincipal, McpPrincipal, RequestContext, ScorerPrincipal, SessionRow, StudentPrincipal, UserRow } from './context.ts';
 
 export const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
 export const PIN_UNLOCK_MS = 5 * 60 * 1000;
@@ -40,6 +40,24 @@ export const DISPLAY_SESSION_IDLE_MS = 60 * 24 * 60 * 60 * 1000;
 export const registeredEndpoints: Endpoint[] = [];
 
 /**
+ * The handlers `route()` registered, per app instance (S14h1, D-160): the MCP module turns endpoints
+ * that opt in with `mcp: {…}` into tools and calls the same handler, so a tool runs exactly the
+ * endpoint's access, ownership and audit code.
+ */
+const handlersByApp = new WeakMap<FastifyInstance, Map<Endpoint, Handler<z.ZodType, z.ZodType>>>();
+export function registeredHandler(app: FastifyInstance, ep: Endpoint): Handler<z.ZodType, z.ZodType> | undefined {
+  return handlersByApp.get(app)?.get(ep);
+}
+/** Access classes whose endpoints may be offered to AI tools; `user`, `account`, `public` and link sessions never are. */
+export const MCP_EXPOSABLE_ACCESS = ['classroom', 'teacher', 'admin'] as const;
+
+/** Record an endpoint whose Fastify routes a module registers itself (the `/mcp` transport). */
+export function recordEndpoint(ep: Endpoint) {
+  if (!ep.access) throw new Error(`Endpoint ${ep.method} ${ep.path} has no access class`);
+  registeredEndpoints.push(ep);
+}
+
+/**
  * Student sessions are validated by the links module (re-checks the link is still active on every
  * request, STU-3). Until that module registers a resolver, student sessions are rejected.
  */
@@ -59,6 +77,27 @@ export function setScorerResolver(fn: ScorerResolver) {
 }
 export function setDisplayResolver(fn: DisplayResolver) {
   displayResolver = fn;
+}
+
+/**
+ * AI tools (S14h1, D-160): the MCP module resolves the bearer token on every request, in this order:
+ * the school switch is on, the token is known, not expired and not revoked, its account is active.
+ * It throws an AppError for each refusal. Until the module registers, `/mcp` is refused.
+ */
+type McpResolver = (deps: AppDeps, token: string | null) => { user: UserRow; principal: McpPrincipal };
+let mcpResolver: McpResolver = () => {
+  throw new AppError('FEATURE_DISABLED', 'AI tools are not available', { reason: 'MCP_DISABLED' });
+};
+export function setMcpResolver(fn: McpResolver) {
+  mcpResolver = fn;
+}
+
+/** The bearer token of the Authorization header, or null (any other scheme counts as none). */
+export function bearerOf(req: FastifyRequest): string | null {
+  const h = req.headers.authorization;
+  if (typeof h !== 'string') return null;
+  const m = /^Bearer[ ]+(\S+)\s*$/iu.exec(h);
+  return m ? m[1]! : null;
 }
 
 export function clientIp(deps: AppDeps, req: FastifyRequest): string {
@@ -219,6 +258,16 @@ function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext, opts:
   }
 }
 
+/**
+ * `/mcp` (S14h1, D-160): a browser page on another site must not reach a local or tunnelled server
+ * through the user's browser (DNS rebinding), so an Origin header, when present, must be the main
+ * origin. Clients that are not browsers send none. No CSRF header: the bearer token is not ambient.
+ */
+function enforceMcpOrigin(deps: AppDeps, req: FastifyRequest) {
+  const origin = req.headers.origin;
+  if (origin !== undefined && origin !== deps.config.origins.main) throw new AppError('CSRF', 'Origin not allowed', { reason: 'ORIGIN_NOT_ALLOWED' });
+}
+
 function actorOf(user: UserRow | null, student: StudentPrincipal | null): Actor {
   if (user) return { type: 'user', id: user.id, role: user.role };
   if (student) return { type: 'student', id: student.studentId };
@@ -252,6 +301,15 @@ export type Handler<I extends z.ZodType, O extends z.ZodType> = (
 
 /** Build the per-request context and enforce access. Exported for non-JSON routes (files, CSV). */
 export function contextFor(deps: AppDeps, req: FastifyRequest, access: Access, opts: AccessOptions = {}): RequestContext {
+  if (access === 'mcp') {
+    // Bearer only (S14h1, D-160): cookies are never read here, so a signed-in browser cannot call it.
+    enforceMcpOrigin(deps, req);
+    const { user, principal } = mcpResolver(deps, bearerOf(req));
+    const actor: Actor = { type: 'mcp', id: user.id, role: user.role, tokenId: principal.tokenId };
+    return { ...deps, ip: clientIp(deps, req), session: null, user, student: null, scorer: null, display: null, mcp: principal, actor };
+  }
+  // A bearer token never works on the app's own endpoints, whatever cookies come with it.
+  if (req.headers.authorization !== undefined && bearerOf(req) !== null) throw new AppError('UNAUTHENTICATED', 'Bearer tokens are accepted only by the AI tools endpoint', { reason: 'BEARER_NOT_ALLOWED' });
   enforceCsrf(deps, req, opts.originClass ?? 'main');
   // Student endpoints see ONLY the student session (studentId comes from it, STU-4/5); every other
   // endpoint sees only the teacher/admin session, so a browser holding both never mixes them.
@@ -292,6 +350,7 @@ export function rawRoute<I extends z.ZodType, O extends z.ZodType>(
   opts: { rateLimit?: { max: number; timeWindow: string } } = {},
 ) {
   if (!ep.access) throw new Error(`Endpoint ${ep.method} ${ep.path} has no access class`);
+  if (ep.mcp) throw new Error(`Endpoint ${ep.method} ${ep.path}: raw routes (files, CSV, streams) are never MCP tools`);
   registeredEndpoints.push(ep as unknown as Endpoint);
   const originClass = originClassOf(ep.path);
   app.route({
@@ -319,7 +378,11 @@ export function route<I extends z.ZodType, O extends z.ZodType>(
   opts: { rateLimit?: { max: number; timeWindow: string } } = {},
 ) {
   if (!ep.access) throw new Error(`Endpoint ${ep.method} ${ep.path} has no access class`);
+  if (ep.mcp && !(MCP_EXPOSABLE_ACCESS as readonly string[]).includes(ep.access)) throw new Error(`Endpoint ${ep.method} ${ep.path}: ${ep.access} endpoints are never MCP tools`);
   registeredEndpoints.push(ep as unknown as Endpoint);
+  let handlers = handlersByApp.get(app);
+  if (!handlers) handlersByApp.set(app, (handlers = new Map()));
+  handlers.set(ep as unknown as Endpoint, handler as unknown as Handler<z.ZodType, z.ZodType>);
   const originClass = originClassOf(ep.path);
   app.route({
     method: ep.method,

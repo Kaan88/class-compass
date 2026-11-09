@@ -219,7 +219,7 @@ export function goalsTimeline(ctx: RequestContext, scope: ReportScope, studentId
   const mine = gs.filter((g) => g.studentId === studentId);
   const ids = new Set(mine.map((g) => g.id));
   const out: TimelineEvent[] = [];
-  for (const g of mine) out.push({ date: day(g.createdAt), at: g.createdAt, module: 'goals', what: key('report.timeline.goalSet'), detail: { raw: g.text } });
+  for (const g of mine) out.push({ date: day(g.createdAt), at: g.createdAt, module: 'goals', what: key('report.timeline.goalSet'), detail: g.authorType === 'student' ? { raw: g.text, src: 'student' } : { raw: g.text } });
   for (const e of entries.filter((x) => ids.has(x.goalId) && x.kind === 'self_assessment' && x.confidence !== null)) {
     out.push({ date: day(e.createdAt), at: e.createdAt, module: 'goals', what: key('report.timeline.selfAssessment'), detail: key('report.goals.confidenceValue', { value: e.confidence ?? 0 }) });
   }

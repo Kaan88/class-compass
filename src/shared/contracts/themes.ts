@@ -7,16 +7,16 @@ import { z } from 'zod';
 import { THEME_ISSUE_CODES } from '../themePackage/validate.ts';
 import { ThemeSlug } from '../themePackage/schema.ts';
 import { THEME_KEYS } from '../themes.ts';
-import { endpoint, Empty } from './define.ts';
+import { endpoint, Empty, pii } from './define.ts';
 
 export const CUSTOM_THEME_STATUSES = ['draft', 'enabled', 'disabled'] as const;
 export type CustomThemeStatus = (typeof CUSTOM_THEME_STATUSES)[number];
 
 const Issue = z.object({
   code: z.enum(THEME_ISSUE_CODES),
-  path: z.string(),
-  message: z.string(),
-  params: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+  path: z.string().meta(pii('none')),
+  message: z.string().meta(pii('none')),
+  params: z.record(z.string(), z.union([z.string(), z.number()])).optional().meta(pii('none')),
 });
 export const ThemeReport = z.object({
   ok: z.boolean(),
@@ -37,7 +37,7 @@ export const PackageDto = z
   .catchall(z.unknown());
 export type PackageDto = z.infer<typeof PackageDto>;
 
-const Labels = z.object({ en: z.string(), tr: z.string() });
+const Labels = z.object({ en: z.string(), tr: z.string() }).meta(pii('label'));
 export const CustomThemeSummary = z.object({
   key: z.string(),
   status: z.enum(CUSTOM_THEME_STATUSES),
@@ -64,6 +64,7 @@ export const listCustomThemes = endpoint({
   access: 'admin',
   input: Empty,
   output: z.object({ themes: z.array(CustomThemeSummary), limit: z.number().int() }),
+  mcp: { scope: 'themes:write', tool: 'list_custom_themes', readOnly: true, description: 'Administrators: the imported theme packages (key, names, base theme, status draft/enabled/disabled, how many classes use each, warnings). Use export_theme for a package itself. No personal data.' },
 });
 export const getCustomTheme = endpoint({
   method: 'GET',

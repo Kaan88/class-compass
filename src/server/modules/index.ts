@@ -29,6 +29,7 @@ import { linksManifest } from './links/manifest.ts';
 import { registerLessonCloseHook, registerLessonStateContributor } from './lessons/service.ts';
 import type { ClassroomCardContribution, ReportContribution, ServerModuleManifest, StudentPageContribution, TimelineContribution } from './manifest.ts';
 import { maintenanceManifest } from './maintenance/manifest.ts';
+import { mcpManifest } from './mcp/manifest.ts';
 import { notificationsManifest } from './notifications/manifest.ts';
 import { reportsManifest } from './reports/manifest.ts';
 import { routinesManifest } from './routines/manifest.ts';
@@ -71,6 +72,7 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   superSpeakersManifest,
   themesManifest,
   notificationsManifest,
+  mcpManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */

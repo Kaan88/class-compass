@@ -78,6 +78,8 @@ export const AuditItem = z.object({
   id: z.string(),
   at: z.number(),
   actorType: z.enum(['user', 'student', 'system', 'scorer', 'display']),
+  /** The change came through an AI tool acting for this account (S14h1, D-160). */
+  viaAiTool: z.boolean(),
   actorId: z.string().nullable(),
   actorName: z.string().nullable(),
   action: z.string(),

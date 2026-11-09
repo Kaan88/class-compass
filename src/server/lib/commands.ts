@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import type { CommandEnvelope, CommandResult } from '../../shared/contracts/commands.ts';
 import { tx } from '../db/client.ts';
 import { commandLog } from '../db/schema.ts';
-import type { RequestContext } from './context.ts';
+import { actorUserId, type RequestContext } from './context.ts';
 import { sha256, stableStringify } from './crypto.ts';
 import { AppError } from './errors.ts';
 
@@ -46,7 +46,10 @@ export function defineCommand<S extends z.ZodType>(def: CommandDef<S>): CommandD
 
 export const registeredCommandTypes = () => [...registry.keys()];
 
+/** The opId owner: an AI tool acting for an account is that account (S14h1), so replays match either way. */
 function actorKey(ctx: RequestContext) {
+  const userId = actorUserId(ctx.actor);
+  if (userId) return `user:${userId}`;
   return ctx.actor.type === 'system' ? 'system' : `${ctx.actor.type}:${ctx.actor.id}`;
 }
 

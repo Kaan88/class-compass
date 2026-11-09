@@ -32,6 +32,15 @@ export const schoolSettings = sqliteTable('school_settings', {
   /** Student text checks (S13c, D-123): the minimum length of a goal (words OR letters). */
   textMinGoalWords: integer('text_min_goal_words').notNull().default(3),
   textMinGoalLetters: integer('text_min_goal_letters').notNull().default(12),
+  /**
+   * AI tools over MCP (S14h1, D-160, D-161): the `/mcp` endpoint answers only while `mcpEnabled`;
+   * names and student text leave the school only while `aiStudentDataAllowed` (otherwise pseudonyms).
+   * Both off by default; changed on Admin → AI tools (audited). `mcpTokenMaxDays` caps a personal
+   * token's lifetime (at most 90).
+   */
+  mcpEnabled: integer('mcp_enabled', { mode: 'boolean' }).notNull().default(false),
+  aiStudentDataAllowed: integer('ai_student_data_allowed', { mode: 'boolean' }).notNull().default(false),
+  mcpTokenMaxDays: integer('mcp_token_max_days').notNull().default(90),
   updatedAt: integer('updated_at').notNull(),
 });
 
@@ -277,6 +286,8 @@ export const auditEvents = sqliteTable(
     entityId: text('entity_id'),
     beforeJson: text('before_json'),
     afterJson: text('after_json'),
+    /** The MCP token the change came through (S14h1, D-160); the actor is then the token's account. */
+    viaTokenId: text('via_token_id'),
   },
   (t) => [index('audit_entity_idx').on(t.entity, t.entityId), index('audit_at_idx').on(t.at)],
 );
@@ -1637,4 +1648,74 @@ export const notificationDigests = sqliteTable(
     itemsJson: text('items_json', { mode: 'json' }).$type<Record<string, number>>().notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
+);
+
+// ---------------------------------------------------------------- AI tools over MCP (S14h1, D-160, D-161)
+/**
+ * Tokens for the `/mcp` endpoint. `kind` 'pat' = a personal token made on the Profile (shown once;
+ * only its HMAC with the pepper is stored, `prefix` is the first characters for recognising it);
+ * 'oauth' is reserved for S14h2's OAuth access tokens. `familyId` groups tokens that share pseudonyms
+ * (a personal token is its own family; an OAuth refresh chain shares one). `clientId` is the OAuth
+ * client (null for personal tokens). `scopes` and `privacyMode` are captured at issue; the effective
+ * mode is narrowed to pseudonymous while the school does not allow student data. Revoked and expired
+ * rows are kept (the call log and audit rows point at them).
+ */
+export const mcpTokens = sqliteTable(
+  'mcp_tokens',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind', { enum: ['pat', 'oauth'] }).notNull(),
+    familyId: text('family_id').notNull(),
+    clientId: text('client_id'),
+    userId: text('user_id').notNull().references(() => users.id),
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    prefix: text('prefix').notNull(),
+    scopesJson: text('scopes_json', { mode: 'json' }).$type<string[]>().notNull(),
+    privacyMode: text('privacy_mode', { enum: ['pseudonymous', 'named'] }).notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    lastUsedAt: integer('last_used_at'),
+    revokedAt: integer('revoked_at'),
+    /** Who revoked it: the owner, an administrator, or null for the system (account deactivated). */
+    revokedBy: text('revoked_by'),
+  },
+  (t) => [uniqueIndex('mcp_tokens_hash_uq').on(t.tokenHash), index('mcp_tokens_user_idx').on(t.userId), index('mcp_tokens_family_idx').on(t.familyId)],
+);
+
+/**
+ * Pseudonyms (D-161): "Student N" for one token family. Numbers are given in the order students first
+ * appear in that family's results and never change, so an AI tool can follow a student across calls
+ * without learning the name. Deleted with the student (erasure).
+ */
+export const mcpPseudonyms = sqliteTable(
+  'mcp_pseudonyms',
+  {
+    familyId: text('family_id').notNull(),
+    studentId: text('student_id').notNull().references(() => students.id),
+    number: integer('number').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.familyId, t.studentId] }), uniqueIndex('mcp_pseudonyms_number_uq').on(t.familyId, t.number), index('mcp_pseudonyms_student_idx').on(t.studentId)],
+);
+
+/**
+ * One row per MCP request (D-160): what was called, by which token and account, the outcome, how long
+ * it took and how big the answer was. Never the arguments or the result. Kept 180 days.
+ */
+export const mcpCalls = sqliteTable(
+  'mcp_calls',
+  {
+    id: text('id').primaryKey(),
+    at: integer('at').notNull(),
+    tokenId: text('token_id').notNull(),
+    userId: text('user_id').notNull(),
+    /** JSON-RPC method, plus the tool, resource or prompt name (`tools/call:class_report`). */
+    method: text('method').notNull(),
+    status: text('status', { enum: ['ok', 'error', 'denied', 'rate_limited'] }).notNull(),
+    errorCode: text('error_code'),
+    durationMs: integer('duration_ms').notNull(),
+    bytes: integer('bytes').notNull(),
+  },
+  (t) => [index('mcp_calls_at_idx').on(t.at), index('mcp_calls_token_idx').on(t.tokenId, t.at)],
 );

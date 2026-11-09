@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 import { ATTENDANCE_STATUSES, MAX_LESSON_TOPICS, MAX_STAGES, MAX_TIMER_MS, TOPIC_ICONS } from '../lessons.ts';
-import { LocalizedText, Ok, endpoint } from './define.ts';
+import { LocalizedText, Ok, endpoint, pii } from './define.ts';
 import { AssistantToday } from './assistant.ts';
 import { CountersLessonState } from './counters.ts';
 import { GroupingLessonState } from './grouping.ts';
@@ -21,8 +21,8 @@ export const Timer = z.object({ durationMs: z.number().int(), startedAt: z.numbe
 /** A lesson topic (S13a, D-101): a skill category as it was when chosen (name + icon snapshot, DAT-6). */
 export const LessonTopic = z.object({ id: z.string(), name: LocalizedText, icon: z.enum(TOPIC_ICONS).nullable() });
 export type LessonTopic = z.infer<typeof LessonTopic>;
-export const TopicIds = z.array(Id).max(MAX_LESSON_TOPICS);
-export const Reflection = z.object({ rating: z.number().int().min(1).max(4).nullable(), note: z.string().max(500).nullable() });
+export const TopicIds = z.array(Id).max(MAX_LESSON_TOPICS).meta(pii('none'));
+export const Reflection = z.object({ rating: z.number().int().min(1).max(4).nullable(), note: z.string().max(500).nullable().meta(pii('teacherText')) });
 
 /** The lesson as every classroom device sees it (no notes, no identities beyond the roster). */
 export const LessonState = z.object({
@@ -83,6 +83,7 @@ export const activeLessons = endpoint({
   access: 'classroom',
   input: z.object({}),
   output: z.object({ lessons: z.array(z.object({ contextId: z.string(), lessonId: z.string(), startedAt: z.number(), stageIndex: z.number().int(), stageCount: z.number().int() })) }),
+  mcp: { scope: 'classes:read', tool: 'active_lessons', readOnly: true, description: 'Lessons running now in your class+subjects (lessonId, start time, routine stage). Needed for classroom_command. No student data.' },
 });
 
 export const RoutineTemplate = z.object({
@@ -107,11 +108,11 @@ export const lessonRoutines = endpoint({
 
 export const LessonStudent = z.object({
   id: z.string(),
-  fullName: z.string(),
-  initials: z.string(),
+  fullName: z.string().meta(pii('studentName')),
+  initials: z.string().meta(pii('studentInitials')),
   avatarHue: z.number().int(),
   /** Card photo (CRD-1): only when photos are on and consent is recorded (D-014). */
-  photoUrl: z.string().nullable().optional(),
+  photoUrl: z.string().nullable().optional().meta(pii('file')),
   daily: AttendanceStatus.nullable(),
   exception: AttendanceStatus.nullable(),
   effective: EffectiveAttendance,
@@ -127,6 +128,7 @@ export const lessonRoster = endpoint({
   access: 'classroom',
   input: z.object({ contextId: Id, lessonId: Id.optional() }),
   output: z.object({ localDate: z.string(), attendanceEnabled: z.boolean(), students: z.array(LessonStudent) }),
+  mcp: { scope: 'classes:read', tool: 'class_roster', readOnly: true, description: 'The students in one of your classes today (ids and names) with today\'s attendance (daily status, the lesson\'s exception with lessonId, and the effective status). Withheld: photos, numbers, levels, notes.' },
 });
 
 export const AttendanceCounts = z.object({ present: z.number().int(), absent: z.number().int(), late: z.number().int(), excused: z.number().int(), not_recorded: z.number().int() });
@@ -134,7 +136,7 @@ export const LessonSummary = z.object({
   id: z.string(),
   contextId: z.string(),
   status: z.enum(['active', 'ended', 'abandoned']),
-  className: z.string(),
+  className: z.string().meta(pii('label')),
   subjectName: LocalizedText,
   localDate: z.string(),
   startedAt: z.number(),
@@ -152,6 +154,7 @@ export const lessonSummary = endpoint({
   access: 'classroom',
   input: z.object({ lessonId: Id }),
   output: LessonSummary,
+  mcp: { scope: 'reports:read', tool: 'lesson_summary', readOnly: true, description: 'One lesson of yours: class, subject, date, routine and how far it got, attendance counts and your own end-of-lesson reflection (rating and note). Counts only for students.' },
 });
 
 // ---------------------------------------------------------------- commands (POST /api/commands)
@@ -233,6 +236,7 @@ export const listRoutineTemplates = endpoint({
     /** Default template per context (DEFAULT_ROUTINE_ID when none chosen). */
     defaults: z.array(z.object({ contextId: z.string(), templateId: z.string() })),
   }),
+  mcp: { scope: 'classes:read', tool: 'list_routines', readOnly: true, description: 'Your lesson routines (named stages such as Warm-up, Main task, Plenary) and which one each class+subject uses by default. No student data.' },
 });
 export const createRoutineTemplate = endpoint({
   method: 'POST',
@@ -318,14 +322,15 @@ export const attendanceHistory = endpoint({
     changes: z.array(
       z.object({
         at: z.number(),
-        actorName: z.string().nullable(),
-        studentName: z.string().nullable(),
+        actorName: z.string().nullable().meta(pii('staffName')),
+        studentName: z.string().nullable().meta(pii('studentName')),
         kind: z.enum(['daily', 'exception']),
         before: AttendanceStatus.nullable(),
         after: AttendanceStatus.nullable(),
       }),
     ),
   }),
+  mcp: { scope: 'reports:read', tool: 'attendance_history', readOnly: true, description: 'Daily attendance counts of one class over a period (present, absent, late, excused, not recorded; "not recorded" is never zero), and with `date` who changed attendance that day. Use classId from list_my_classes.' },
 });
 
 // ---------------------------------------------------------------- lesson topics (S13a, D-101)
@@ -347,6 +352,7 @@ export const getTopicPlan = endpoint({
   access: 'teacher',
   input: z.object({ contextId: Id }),
   output: z.object({ topics: z.array(LessonTopic), plan: TopicPlan }),
+  mcp: { scope: 'classes:read', tool: 'get_topic_plan', readOnly: true, description: 'The lesson topics of one class+subject (the goal categories, with ids and icons) and the weekly plan: ISO weekday "1" (Monday) … "7" → topic ids. No student data.' },
 });
 export const setTopicPlan = endpoint({
   method: 'PUT',
@@ -354,4 +360,5 @@ export const setTopicPlan = endpoint({
   access: 'teacher',
   input: z.object({ contextId: Id, plan: TopicPlan }),
   output: z.object({ topics: z.array(LessonTopic), plan: TopicPlan }),
+  mcp: { scope: 'settings:write', tool: 'set_topic_plan', readOnly: false, description: 'Replaces the weekly topic plan of one of your class+subjects: ISO weekday "1"…"7" → existing topic ids (see get_topic_plan; a few per day at most). Returns the plan.' },
 });

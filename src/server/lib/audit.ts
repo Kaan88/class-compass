@@ -12,14 +12,19 @@ export interface AuditEntry {
   opId?: string | null;
 }
 
-/** Write an audit row. Call inside the same transaction as the change. Never include secrets. */
+/**
+ * Write an audit row. Call inside the same transaction as the change. Never include secrets. An AI
+ * tool acting for an account (S14h1, D-160) is recorded as that account with the token in
+ * `via_token_id`, so the audit log names the person and says the change came through an AI tool.
+ */
 export function audit(db: Db, actor: Actor, e: AuditEntry, now: number): void {
   db.insert(auditEvents)
     .values({
       id: newId(),
       at: now,
-      actorType: actor.type,
+      actorType: actor.type === 'mcp' ? 'user' : actor.type,
       actorId: actor.id,
+      viaTokenId: actor.type === 'mcp' ? actor.tokenId : null,
       opId: e.opId ?? null,
       action: e.action,
       entity: e.entity,

@@ -4,7 +4,7 @@
  */
 import { z } from 'zod';
 import { isIsoDate, isValidTimeZone } from '../dates.ts';
-import { Empty, Ok, LocalizedText, endpoint } from './define.ts';
+import { Empty, Ok, LocalizedText, endpoint, pii } from './define.ts';
 
 export const Id = z.string().min(1).max(64);
 export const IsoDate = z.string().refine(isIsoDate, 'Expected a date YYYY-MM-DD');
@@ -24,7 +24,7 @@ export const ModuleKeySchema = z.enum(MODULE_KEYS);
  * only checks the shape; the server checks that it is usable (`assertThemeUsable`: built-in or
  * enabled) before writing it, for classes and the Super Speakers board.
  */
-export const Theme = z.union([z.enum(THEME_KEYS), z.string().regex(THEME_SLUG)]);
+export const Theme = z.union([z.enum(THEME_KEYS), z.string().regex(THEME_SLUG)]).meta(pii('none'));
 export const Locale = z.enum(['en', 'tr']);
 
 export const TimeUpSound = z.enum(TIME_UP_SOUNDS);
@@ -35,18 +35,25 @@ export const QueryBool = z.union([z.boolean(), z.enum(['true', 'false']).transfo
 
 // ---------------------------------------------------------------- settings
 export const SchoolSettings = z.object({
-  schoolName: z.string(),
+  schoolName: z.string().meta(pii('none')),
   timezone: z.string(),
   weekStartsOn: z.number().int(),
   defaultLocale: Locale,
   emailResetEnabled: z.boolean(),
   /** Classroom weather (S13b, D-106). */
   weatherEnabled: z.boolean(),
-  weatherLabel: z.string(),
+  weatherLabel: z.string().meta(pii('label')),
   weatherLatitude: z.number(),
   weatherLongitude: z.number(),
 });
-export const getSettings = endpoint({ method: 'GET', path: '/api/admin/settings', access: 'admin', input: Empty, output: SchoolSettings });
+export const getSettings = endpoint({
+  method: 'GET',
+  path: '/api/admin/settings',
+  access: 'admin',
+  input: Empty,
+  output: SchoolSettings,
+  mcp: { scope: 'school:read', tool: 'school_settings', readOnly: true, description: 'The school settings: name, timezone, first day of the week, default language and the classroom weather place. No personal data.' },
+});
 export const updateSettings = endpoint({
   method: 'PATCH',
   path: '/api/admin/settings',
@@ -62,19 +69,27 @@ export const updateSettings = endpoint({
     weatherLongitude: z.number().min(-180).max(180).optional(),
   }),
   output: SchoolSettings,
+  mcp: { scope: 'settings:admin', tool: 'update_school_settings', readOnly: false, description: 'Administrators: changes school settings (name, timezone, first day of the week, default language, classroom weather on/off and its place). Send only the fields to change. The AI tools switches are not here: they are a human decision on Admin → AI tools. Returns the settings.' },
 });
 
 // ---------------------------------------------------------------- years & terms
 export const Term = z.object({ id: z.string(), schoolYearId: z.string(), name: LocalizedText, startsOn: z.string(), endsOn: z.string() });
 export const SchoolYear = z.object({
   id: z.string(),
-  name: z.string(),
+  name: z.string().meta(pii('label')),
   startsOn: z.string(),
   endsOn: z.string(),
   archived: z.boolean(),
   terms: z.array(Term),
 });
-export const listYears = endpoint({ method: 'GET', path: '/api/admin/years', access: 'admin', input: Empty, output: z.object({ years: z.array(SchoolYear) }) });
+export const listYears = endpoint({
+  method: 'GET',
+  path: '/api/admin/years',
+  access: 'admin',
+  input: Empty,
+  output: z.object({ years: z.array(SchoolYear) }),
+  mcp: { scope: 'school:read', tool: 'list_years', readOnly: true, description: 'Administrators: the school years with their terms (names and dates) and whether each is archived (read-only). No personal data.' },
+});
 export const createYear = endpoint({
   method: 'POST',
   path: '/api/admin/years',
@@ -115,6 +130,7 @@ export const listSubjects = endpoint({
   access: 'admin',
   input: z.object({ includeArchived: QueryBool.optional() }),
   output: z.object({ subjects: z.array(Subject) }),
+  mcp: { scope: 'school:read', tool: 'list_subjects', readOnly: true, description: 'Administrators: the subjects with their English and Turkish names (archived ones with includeArchived "true"). No personal data.' },
 });
 export const createSubject = endpoint({ method: 'POST', path: '/api/admin/subjects', access: 'admin', input: z.object({ name: RequiredLocalizedText }), output: Subject });
 export const updateSubject = endpoint({
@@ -133,7 +149,7 @@ export const StudentPageLanguageInput = z.object({ mainLanguage: Locale, secondL
 export const SchoolClass = z.object({
   id: z.string(),
   schoolYearId: z.string(),
-  name: z.string(),
+  name: z.string().meta(pii('label')),
   grade: z.number().int().nullable(),
   /**
    * The class's chosen theme as stored (D-158): the admin editor sends it back unchanged, so saving
@@ -173,6 +189,7 @@ export const listClasses = endpoint({
   access: 'admin',
   input: z.object({ yearId: Id.optional(), includeArchived: QueryBool.optional() }),
   output: z.object({ classes: z.array(SchoolClass) }),
+  mcp: { scope: 'school:read', tool: 'list_classes', readOnly: true, description: 'Administrators: the classes (name, grade, theme, languages, display settings, number of students), optionally of one school year. No student names.' },
 });
 export const createClass = endpoint({
   method: 'POST',
@@ -223,9 +240,9 @@ export const unarchiveClass = endpoint({ method: 'POST', path: '/api/admin/class
 export const TeachingContextAdmin = z.object({
   id: z.string(),
   teacherId: z.string(),
-  teacherName: z.string(),
+  teacherName: z.string().meta(pii('staffName')),
   classId: z.string(),
-  className: z.string(),
+  className: z.string().meta(pii('label')),
   subjectId: z.string(),
   subjectName: LocalizedText,
   activeFrom: z.number(),
@@ -237,6 +254,7 @@ export const listTeachingContexts = endpoint({
   access: 'admin',
   input: z.object({ classId: Id.optional(), teacherId: Id.optional(), includeEnded: QueryBool.optional() }),
   output: z.object({ contexts: z.array(TeachingContextAdmin) }),
+  mcp: { scope: 'school:read', tool: 'list_teaching_assignments', readOnly: true, description: 'Administrators: who teaches which subject in which class (teaching assignments = class+subjects, with context ids for the report tools), optionally filtered; ended ones with includeEnded "true". Teacher names are included; no student data.' },
 });
 export const assignTeachingContext = endpoint({
   method: 'POST',
@@ -261,6 +279,7 @@ export const getModulePolicies = endpoint({
   access: 'admin',
   input: Empty,
   output: z.object({ policies: z.array(ModulePolicy) }),
+  mcp: { scope: 'school:read', tool: 'module_policies', readOnly: true, description: 'Administrators: which modules the school makes available to teachers. No personal data.' },
 });
 export const setModulePolicy = endpoint({
   method: 'PUT',
@@ -268,6 +287,7 @@ export const setModulePolicy = endpoint({
   access: 'admin',
   input: z.object({ module: ModuleKeySchema, availability: z.enum(['enabled', 'disabled']) }),
   output: ModulePolicy,
+  mcp: { scope: 'settings:admin', tool: 'set_module_policy', readOnly: false, description: 'Administrators: makes a module available to every teacher or not (disabled modules keep their data). Returns the policy.' },
 });
 
 // ---------------------------------------------------------------- teacher: own contexts & modules
@@ -275,7 +295,7 @@ export const setModulePolicy = endpoint({
 export const MyContext = z.object({
   id: z.string(),
   classId: z.string(),
-  className: z.string(),
+  className: z.string().meta(pii('label')),
   subjectId: z.string(),
   subjectName: LocalizedText,
   /** The theme the screens show: the chosen one, or the default while an imported choice is switched off (D-158). */
@@ -314,6 +334,7 @@ export const myContexts = endpoint({
     /** The signed-in teacher has recorded a time's-up clip (S13b, D-107). */
     timeUpClip: z.boolean(),
   }),
+  mcp: { scope: 'classes:read', tool: 'list_my_classes', readOnly: true, description: 'Start here. The signed-in teacher\'s class+subjects: contextId (used by most tools), class and subject names, the class language and display settings, and which modules are on in each. No student data.' },
 });
 
 /** Display settings a teacher of the class may change (S13b, D-105): theme, sounds, motion, quote, time's up. */
@@ -369,7 +390,7 @@ export const ContextModuleSetting = z.object({
   enabled: z.boolean(),
   /** available && enabled */
   effective: z.boolean(),
-  config: z.record(z.string(), z.unknown()).nullable(),
+  config: z.record(z.string(), z.unknown()).nullable().meta(pii('teacherText')),
 });
 export const getContextModules = endpoint({
   method: 'GET',
@@ -377,6 +398,7 @@ export const getContextModules = endpoint({
   access: 'teacher',
   input: z.object({ contextId: Id }),
   output: z.object({ modules: z.array(ContextModuleSetting) }),
+  mcp: { scope: 'classes:read', tool: 'class_modules', readOnly: true, description: 'The modules of one class+subject: available school-wide, switched on by the teacher, and their small settings. No student data.' },
 });
 export const setContextModule = endpoint({
   method: 'PUT',
@@ -384,4 +406,5 @@ export const setContextModule = endpoint({
   access: 'teacher',
   input: z.object({ contextId: Id, module: ContextModuleKey, enabled: z.boolean(), config: z.record(z.string(), z.unknown()).nullable().optional() }),
   output: ContextModuleSetting,
+  mcp: { scope: 'settings:write', tool: 'set_class_module', readOnly: false, description: 'Switches a module on or off for one of your class+subjects, optionally with its settings (the same as Class settings; data of a module that is off is kept). Returns the module\'s setting.' },
 });

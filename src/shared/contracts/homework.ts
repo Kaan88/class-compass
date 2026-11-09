@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 import { ATTENDANCE_STATUSES } from '../lessons.ts';
-import { LocalizedText, endpoint } from './define.ts';
+import { LocalizedText, endpoint, pii } from './define.ts';
 import { Id, IsoDate, RequiredLocalizedText } from './school.ts';
 
 /** What a status means for counting (reports, outstanding list). */
@@ -60,12 +60,12 @@ export const HomeworkCounts = z.object({
 export const HomeworkAssignment = z.object({
   id: z.string(),
   contextId: z.string(),
-  title: z.string(),
-  details: z.string().nullable(),
+  title: z.string().meta(pii('teacherText')),
+  details: z.string().nullable().meta(pii('teacherText')),
   assignedOn: z.string(),
   dueOn: z.string(),
   /** Private teacher note. */
-  notes: z.string().nullable(),
+  notes: z.string().nullable().meta(pii('note')),
   statuses: z.array(HomeworkStatusDef),
   archived: z.boolean(),
   updatedAt: z.number(),
@@ -89,6 +89,7 @@ export const listHomework = endpoint({
     range: z.object({ view: HomeworkView, by: HomeworkDateField, from: z.string(), to: z.string() }),
     assignments: z.array(HomeworkAssignment),
   }),
+  mcp: { scope: 'classes:read', tool: 'list_homework', readOnly: true, description: 'Homework of one class+subject for a day, week or month (by due or assigned date): title, details, dates, the status list and counts per status (a student without a mark is "not checked", never "missing"). Withheld: your private notes.' },
 });
 
 const Title = z.string().trim().min(1).max(200);
@@ -101,6 +102,7 @@ export const createHomework = endpoint({
   access: 'teacher',
   input: z.object({ contextId: Id, title: Title, details: Details, assignedOn: IsoDate.optional(), dueOn: IsoDate, notes: Notes }),
   output: HomeworkAssignment,
+  mcp: { scope: 'homework:write', tool: 'create_homework', readOnly: false, description: 'Sets homework for one of your class+subjects (title, optional details students can see, assigned and due dates, optional private note). Students see it on their page. Never put a student name in the title or details. Returns the assignment (private note withheld).' },
 });
 export const updateHomework = endpoint({
   method: 'PATCH',
@@ -108,6 +110,7 @@ export const updateHomework = endpoint({
   access: 'teacher',
   input: z.object({ assignmentId: Id, title: Title.optional(), details: Details, assignedOn: IsoDate.optional(), dueOn: IsoDate.optional(), notes: Notes }),
   output: HomeworkAssignment,
+  mcp: { scope: 'homework:write', tool: 'update_homework', readOnly: false, description: 'Changes the title, details or dates of a homework assignment of yours. Returns the assignment (private note withheld).' },
 });
 /** Archive (or restore); marks are kept (CFG-2, DAT-5). */
 export const archiveHomework = endpoint({
@@ -116,9 +119,10 @@ export const archiveHomework = endpoint({
   access: 'teacher',
   input: z.object({ assignmentId: Id, archived: z.boolean() }),
   output: HomeworkAssignment,
+  mcp: { scope: 'homework:write', tool: 'archive_homework', readOnly: false, description: 'Archives (or restores) a homework assignment of yours; marks are kept. Returns the assignment.' },
 });
 
-const CheckStudent = z.object({ id: z.string(), fullName: z.string(), initials: z.string(), avatarHue: z.number().int() });
+const CheckStudent = z.object({ id: z.string(), fullName: z.string().meta(pii('studentName')), initials: z.string().meta(pii('studentInitials')), avatarHue: z.number().int() });
 export const EffectiveAttendanceValue = z.enum([...ATTENDANCE_STATUSES, 'not_recorded']);
 
 const checkRow = z.object({
@@ -138,7 +142,7 @@ export const HomeworkCheck = z.object({
   assignment: HomeworkAssignment,
   attendanceDate: z.string(),
   attendanceEnabled: z.boolean(),
-  rows: z.array(checkRow.extend({ note: z.string().nullable() })),
+  rows: z.array(checkRow.extend({ note: z.string().nullable().meta(pii('note')) })),
 });
 export type HomeworkCheck = z.infer<typeof HomeworkCheck>;
 
@@ -162,6 +166,7 @@ export const setHomeworkMarks = endpoint({
   access: 'teacher',
   input: z.object({ assignmentId: Id, batchId: BatchId.optional(), changes: z.array(MarkChange).min(1).max(200) }),
   output: MarkResult.extend({ check: HomeworkCheck }),
+  mcp: { scope: 'homework:write', tool: 'set_homework_marks', readOnly: false, description: 'Records homework statuses for students of one assignment (studentId or \'student-N\' alias, a status key from the assignment\'s status list). Pass the same batchId (a UUID) to retry safely. Returns the checking grid (notes withheld).' },
 });
 /** "Mark all remaining as …": every student still NOT CHECKED gets `status` (HW-4). */
 export const markRemainingHomework = endpoint({
@@ -185,6 +190,7 @@ export const homeworkCheck = endpoint({
   access: 'teacher',
   input: z.object({ assignmentId: Id }),
   output: HomeworkCheck,
+  mcp: { scope: 'reports:read', tool: 'homework_check', readOnly: true, description: 'The checking grid of one assignment: every student\'s status (no mark = not checked, never missing) and their attendance on the due date. Withheld: notes.' },
 });
 
 /** Outstanding work (HW-1, RPT-5): due assignments with students marked missing/partly, and how many are still not checked. */
@@ -197,7 +203,7 @@ export const outstandingHomework = endpoint({
     today: z.string(),
     items: z.array(
       z.object({
-        assignment: z.object({ id: z.string(), title: z.string(), dueOn: z.string() }),
+        assignment: z.object({ id: z.string(), title: z.string().meta(pii('teacherText')), dueOn: z.string() }),
         statuses: z.array(HomeworkStatusDef),
         students: z.array(z.object({ student: CheckStudent, status: z.string() })),
         notChecked: z.number().int(),
@@ -205,6 +211,7 @@ export const outstandingHomework = endpoint({
       }),
     ),
   }),
+  mcp: { scope: 'reports:read', tool: 'outstanding_homework', readOnly: true, description: 'Homework of one class+subject that is due, with the students marked missing or partly done and how many are still not checked.' },
 });
 
 export const getHomeworkSettings = endpoint({
@@ -213,6 +220,7 @@ export const getHomeworkSettings = endpoint({
   access: 'teacher',
   input: z.object({ contextId: Id }),
   output: HomeworkSettings,
+  mcp: { scope: 'classes:read', tool: 'homework_settings', readOnly: true, description: 'The homework status list of one class+subject (keys, English and Turkish labels, what each counts as) and whether checking is allowed on the classroom screen.' },
 });
 export const setHomeworkSettings = endpoint({
   method: 'PUT',

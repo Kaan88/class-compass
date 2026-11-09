@@ -25,7 +25,7 @@ import { authAttempts, classes, sessions, studentLinks, students } from '../../d
 import { audit } from '../../lib/audit.ts';
 import { notify } from '../../lib/notify.ts';
 import type { Actor, AppDeps, RequestContext, SessionRow, StudentPrincipal } from '../../lib/context.ts';
-import { requireUser } from '../../lib/context.ts';
+import { actorUserId, requireUser } from '../../lib/context.ts';
 import { newId, openSecret, randomToken, sealSecret, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { STUDENT_SESSION_ABSOLUTE_MS } from '../../lib/http.ts';
@@ -143,7 +143,7 @@ function insertLink(deps: LinkDeps, actor: Actor, studentId: string, origin: Lin
     tokenCipher: sealSecret(deps.config.SECRET_PEPPER, SEAL_PURPOSE, id, token),
     generation,
     origin,
-    createdBy: actor.type === 'user' ? actor.id : null,
+    createdBy: actorUserId(actor),
     createdAt: now,
     revokedAt: null,
     revokedBy: null,

@@ -22,7 +22,7 @@ import { ALLOWED_MIME, EVIDENCE_IMAGE_EDGE, UPLOAD_LIMITS, type FileKind, type F
 import { tx, type Db } from '../../db/client.ts';
 import { evidence, files, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
-import type { RequestContext } from '../../lib/context.ts';
+import { actorUserId, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { getMediaPolicy } from '../school/modules.ts';
@@ -185,8 +185,8 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
       // A student's file name is shown back to them and to teachers: one with a blocked word gets a neutral name (D-123).
       originalName: ctx.actor.type === 'student' ? neutralStudentFileName(ctx.db, filename) : filename,
       ownerStudentId: opts.ownerStudentId,
-      uploadedByType: ctx.actor.type === 'user' || ctx.actor.type === 'student' ? ctx.actor.type : 'system',
-      uploadedById: ctx.actor.id,
+      uploadedByType: actorUserId(ctx.actor) ? 'user' : ctx.actor.type === 'student' ? 'student' : 'system',
+      uploadedById: actorUserId(ctx.actor) ?? ctx.actor.id,
       createdAt: now,
       deletedAt: null,
     };
