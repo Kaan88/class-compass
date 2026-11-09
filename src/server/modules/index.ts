@@ -26,7 +26,7 @@ import { registerStartLessonStep } from './lessons/startSteps.ts';
 import { lessonsManifest } from './lessons/manifest.ts';
 import { linksManifest } from './links/manifest.ts';
 import { registerLessonCloseHook, registerLessonStateContributor } from './lessons/service.ts';
-import type { ReportContribution, ServerModuleManifest, StudentPageContribution, TimelineContribution } from './manifest.ts';
+import type { ClassroomCardContribution, ReportContribution, ServerModuleManifest, StudentPageContribution, TimelineContribution } from './manifest.ts';
 import { maintenanceManifest } from './maintenance/manifest.ts';
 import { reportsManifest } from './reports/manifest.ts';
 import { routinesManifest } from './routines/manifest.ts';
@@ -76,6 +76,7 @@ export type Registered<T> = T & { readonly module: PolicyKey | null };
 let reports: Registered<ReportContribution>[] = [];
 let studentPage: Registered<StudentPageContribution>[] = [];
 let timeline: Registered<TimelineContribution>[] = [];
+let classroomCard: Registered<ClassroomCardContribution>[] = [];
 let installed = false;
 
 const byOrder = <T extends { order: number; key: string }>(xs: T[]) => xs.sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
@@ -90,6 +91,7 @@ export function collectContributions(manifests: readonly ServerModuleManifest[])
     reports: byOrder(manifests.flatMap((m) => stamp(m, m.reports))),
     studentPage: byOrder(manifests.flatMap((m) => stamp(m, m.studentPage))),
     timeline: byOrder(manifests.flatMap((m) => stamp(m, m.timeline))),
+    classroomCard: byOrder(manifests.flatMap((m) => stamp(m, m.classroomCard))),
   };
 }
 
@@ -128,7 +130,7 @@ export function installModules(): void {
       registerModuleConfig(m.policyKey, m.config);
     }
   }
-  ({ reports, studentPage, timeline } = collectContributions(SERVER_MODULES));
+  ({ reports, studentPage, timeline, classroomCard } = collectContributions(SERVER_MODULES));
   installed = true;
 }
 
@@ -149,3 +151,5 @@ export const reportContributions = (db: Db, contextId: string): Registered<Repor
 export const studentPageContributions = (db: Db, contextId: string): Registered<StudentPageContribution>[] => enabledContributions(studentPage, db, contextId);
 /** Student timeline contributions of the modules enabled for `contextId`, in order. */
 export const timelineContributions = (db: Db, contextId: string): Registered<TimelineContribution>[] => enabledContributions(timeline, db, contextId);
+/** S14e2 (D-154): classroom student card items of the modules enabled for `contextId`, in order. */
+export const classroomCardContributions = (db: Db, contextId: string): Registered<ClassroomCardContribution>[] => enabledContributions(classroomCard, db, contextId);

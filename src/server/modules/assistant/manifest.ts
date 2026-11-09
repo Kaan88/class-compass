@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { DEFAULT_SCHOOL_DAYS } from '../../../shared/contracts/assistant.ts';
 import { defineServerModule } from '../manifest.ts';
+import { assistantCard } from './card.ts';
 import { assistantSection, assistantTimeline } from './report.ts';
 import { assistantCommands, assistantEndStep, assistantStartStep } from './commands.ts';
 import { assistantLessonState, registerAssistantRoutes } from './routes.ts';
@@ -23,6 +24,8 @@ export const assistantManifest = defineServerModule({
     { key: 'assistant', order: 70, meta: { title: 'report.section.assistant', tables: [{ key: 'students', title: 'report.assistant.byStudent' }] }, build: assistantSection },
   ],
   timeline: [{ key: 'assistant', order: 70, build: assistantTimeline }],
+  // Days as the class assistant this term on the classroom student card (S14e2, D-154).
+  classroomCard: [{ key: 'assistant', order: 30, build: assistantCard }],
   // Absence carry-forward and same-day correction (D-065, D-068).
   attendanceListeners: [onAttendanceChange],
   config: { schema: assistantConfigSchema, defaults: { schoolDays: [...DEFAULT_SCHOOL_DAYS], showPanel: true } },

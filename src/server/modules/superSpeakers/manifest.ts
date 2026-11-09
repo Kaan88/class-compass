@@ -8,6 +8,7 @@
 import { setDisplayResolver, setScorerResolver } from '../../lib/http.ts';
 import { defineServerModule } from '../manifest.ts';
 import { superSpeakersCommands } from './commands.ts';
+import { speakersCard } from './card.ts';
 import { speakersReportSection, speakersTimeline } from './history.ts';
 import { registerSpeakersRoutes } from './routes.ts';
 import { resolveDisplay, resolveScorer } from './service.ts';
@@ -37,4 +38,6 @@ export const superSpeakersManifest = defineServerModule({
     },
   ],
   timeline: [{ key: 'superSpeakers', order: 95, build: speakersTimeline }],
+  // The student's own points this week on the classroom student card, never a rank (S14e2, D-154).
+  classroomCard: [{ key: 'superSpeakers', order: 20, build: speakersCard }],
 });

@@ -4,6 +4,7 @@ import { defineServerModule } from '../manifest.ts';
 import { countersSection, countersTimeline } from './report.ts';
 import { counterCommands } from './commands.ts';
 import { countersLessonState, registerCounterRoutes } from './routes.ts';
+import { countersCard } from './service.ts';
 
 export const countersManifest = defineServerModule({
   key: 'counters',
@@ -29,6 +30,8 @@ export const countersManifest = defineServerModule({
     },
   ],
   timeline: [{ key: 'counters', order: 30, build: countersTimeline }],
+  // The student's counts on the classroom student card, only while the reminder boxes are on (S14e2, D-154).
+  classroomCard: [{ key: 'counters', order: 40, build: countersCard }],
   // The English-reminder boxes on student cards are shown unless the teacher hides them (S14a, D-143; supersedes D-102).
   config: { schema: z.object({ showReminderBoxes: z.boolean() }), defaults: { showReminderBoxes: true } },
 });

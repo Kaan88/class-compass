@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { ANNOUNCE_MODES } from '../../../shared/contracts/achievements.ts';
 import { defineServerModule } from '../manifest.ts';
+import { achievementsCard } from './card.ts';
 import { achievementsCommands, achievementsEndStep } from './commands.ts';
 import { achievementsSection, achievementsTimeline } from './report.ts';
 import { registerAchievementRoutes } from './routes.ts';
@@ -44,5 +45,7 @@ export const achievementsManifest = defineServerModule({
   ],
   timeline: [{ key: 'achievements', order: 90, build: achievementsTimeline }],
   studentPage: [{ key: 'achievements', order: 30, build: studentSection }],
+  // Recent achievements on the classroom student card (S14e2, D-154).
+  classroomCard: [{ key: 'achievements', order: 10, build: achievementsCard }],
   config: { schema: achievementsConfigSchema, defaults: DEFAULT_SETTINGS },
 });

@@ -64,6 +64,24 @@ export function listReportContexts(ctx: RequestContext, viewer: Viewer): ReportC
 }
 
 /**
+ * S14e2 (D-154): the teacher's class+subjects whose reports can show this student: the student was
+ * in the class at some time in the school year (for an ended assignment, while the teacher held it).
+ * Same order as the report filter (current first).
+ */
+export function studentReportContexts(ctx: RequestContext, studentId: string): ReportContextInfo[] {
+  const spans = ctx.db.select({ classId: enrolments.classId, fromDate: enrolments.fromDate, toDate: enrolments.toDate }).from(enrolments).where(eq(enrolments.studentId, studentId)).all();
+  if (!spans.length) return [];
+  const own = new Map(ctx.db.select().from(teachingContexts).where(eq(teachingContexts.teacherId, ctx.user!.id)).all().map((c) => [c.id, c]));
+  return listReportContexts(ctx, 'teacher').filter((info) => {
+    const held = heldPeriod(own.get(info.id)!, 'teacher', info.timezone);
+    const from = held && held.from > info.year.startsOn ? held.from : info.year.startsOn;
+    const to = held && held.to < info.year.endsOn ? held.to : info.year.endsOn;
+    // toDate is exclusive (D-021): an enrolment that ended on `from` was over before the period began.
+    return spans.some((s) => s.classId === info.classId && s.fromDate <= to && (s.toDate === null || s.toDate > from));
+  });
+}
+
+/**
  * The period of a report: the given dates, by default the school year up to today. Clamped to the
  * school year (enrolments and school days are per year); at most MAX_REPORT_DAYS long.
  */

@@ -12,6 +12,7 @@ import { addDays, localDate } from '../../../domain/dates.ts';
 import type * as C from '../../../shared/contracts/counters.ts';
 import type { CounterConfig, CounterLessonState, CountersLessonState } from '../../../shared/contracts/counters.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
+import type { ClassroomCardItem } from '../../../shared/contracts/classroomCard.ts';
 import {
   customLabels,
   ENGLISH_ACTIVE_RESPONSE,
@@ -46,6 +47,7 @@ import { getActiveLesson, lessonForCommand, updateLesson } from '../lessons/serv
 import { assertModuleEnabled, isModuleEnabled, moduleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, effectiveTimezone, getClass, getSchoolSettings, getYear, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { rosterRowsOn } from '../students/service.ts';
+import type { ClassroomCardInput } from '../manifest.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 type P<T extends keyof typeof C.CounterCommands> = z.infer<(typeof C.CounterCommands)[T]>;
@@ -207,6 +209,25 @@ function studentCounts(db: Db, counter: CounterRow, period: Period | null, weekS
     .all();
   for (const r of rows) if (r.studentId) out.set(r.studentId, Number(r.n));
   return out;
+}
+
+/**
+ * The classroom student card (S14e2, D-154): the student's counts of the per-student counters in their
+ * current periods, the same numbers the card's reminder boxes show, and only while those boxes are on
+ * (D-143). Nothing when the boxes are off or the class+subject has no per-student counter.
+ */
+export function countersCard(ctx: RequestContext, input: ClassroomCardInput): Extract<ClassroomCardItem, { key: 'counters' }>['data'] | null {
+  if (moduleConfig(ctx.db, input.context.id, 'counters').showReminderBoxes === false) return null;
+  const weekStartsOn = getSchoolSettings(ctx.db).weekStartsOn;
+  const list = countersOf(ctx.db, input.context.id)
+    .filter((c) => c.scope !== 'lesson')
+    .map((c) => ({
+      id: c.id,
+      labels: c.labelsJson,
+      colour: c.colour as CounterColour,
+      count: studentCounts(ctx.db, c, periodFor(ctx.db, c, input.cls, input.today, weekStartsOn), weekStartsOn, [input.studentId]).get(input.studentId) ?? 0,
+    }));
+  return list.length ? { counters: list } : null;
 }
 
 interface BarState {

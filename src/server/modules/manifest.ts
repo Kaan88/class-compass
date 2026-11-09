@@ -22,6 +22,7 @@ import type { StudentRow } from './students/service.ts';
 import type { lessons } from '../db/schema.ts';
 import type { ReportSectionData, TimelineEvent } from '../../shared/contracts/reports.ts';
 import type { StudentPageSection } from '../../shared/contracts/goals.ts';
+import type { ClassroomCardItem } from '../../shared/contracts/classroomCard.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 
 type LessonRow = typeof lessons.$inferSelect;
@@ -116,6 +117,32 @@ export interface StudentPageContribution {
   build: (ctx: RequestContext, input: StudentPageInput) => StudentPageSection['data'] | null;
 }
 
+/**
+ * What a classroom card item is built for (S14e2, D-154): one student, enrolled in the class today,
+ * of a class+subject the signed-in teacher owns (checked by the students module before any build).
+ */
+export interface ClassroomCardInput {
+  studentId: string;
+  context: ContextRow;
+  cls: ClassRow;
+  /** Today in the class timezone. */
+  today: string;
+}
+
+/**
+ * A module's item on the classroom student card (S14e2, D-154): shown on the classroom display when
+ * a name is tapped, so POSITIVE things only. `key` and the returned shape must be a member of the
+ * shared `ClassroomCardItem` union (an allow-list: never attendance, homework, goals or text, levels,
+ * Secret Student data, notes, ranks). Only the items of core modules and of modules enabled for the
+ * class+subject are built; return null when there is nothing to show (never a zero that reads as a
+ * failure).
+ */
+export interface ClassroomCardContribution {
+  key: ClassroomCardItem['key'];
+  order: number;
+  build: (ctx: RequestContext, input: ClassroomCardInput) => ClassroomCardItem['data'] | null;
+}
+
 export interface ServerModuleManifest {
   /** Folder name under src/server/modules (unique). */
   key: string;
@@ -150,6 +177,8 @@ export interface ServerModuleManifest {
   timeline?: readonly TimelineContribution[];
   /** S10 student page sections (served by the links module's `/api/student/page`). */
   studentPage?: readonly StudentPageContribution[];
+  /** S14e2 classroom student card items (served by the students module, `classroom` access, D-154). */
+  classroomCard?: readonly ClassroomCardContribution[];
   /** Default config + Zod schema for `context_modules.configJson` of `policyKey`. */
   config?: ModuleConfigSpec;
 }

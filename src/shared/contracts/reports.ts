@@ -161,6 +161,19 @@ export const studentTimeline = endpoint({
   output: Timeline,
 });
 
+/**
+ * S14e2 (D-154): the class+subjects of the signed-in teacher (current first, ended ones too) in which
+ * the student was in the class during the time the report can cover. The student stats drawer's
+ * class+subject picker; another teacher's student gives an empty list.
+ */
+export const studentReportContexts = endpoint({
+  method: 'GET',
+  path: '/api/teacher/students/:studentId/report-contexts',
+  access: 'teacher',
+  input: z.object({ studentId: Id }),
+  output: z.object({ contexts: z.array(ReportContextInfo) }),
+});
+
 // ---------------------------------------------------------------- admin (school-wide)
 export const adminReportContexts = endpoint({ method: 'GET', path: '/api/admin/reports/contexts', access: 'admin', input: Empty, output: z.object({ contexts: z.array(ReportContextInfo) }) });
 export const adminContextReport = endpoint({ method: 'GET', path: '/api/admin/contexts/:contextId/report', access: 'admin', input: ReportInput, output: Report });

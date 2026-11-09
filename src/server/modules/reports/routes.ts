@@ -12,7 +12,7 @@ import { audit } from '../../lib/audit.ts';
 import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { rawRoute, route } from '../../lib/http.ts';
 import { getSchoolSettings } from '../school/policy.ts';
-import { listReportContexts } from './scope.ts';
+import { listReportContexts, studentReportContexts } from './scope.ts';
 import { attachment, buildReport, buildTimeline, csvDelimiter, csvName, findTable, tableCsv } from './service.ts';
 import { usageReport } from './usage.ts';
 import { createReportView, deleteReportView, listReportViews, reportCatalog, setDefaultReportView, updateReportView } from './views.ts';
@@ -42,6 +42,7 @@ export function registerReportRoutes(app: FastifyInstance, deps: AppDeps) {
     return sendCsv(ctx, reply, tableCsv(t, locale, csvDelimiter(input.delimiter)), csvName(report, input.section, input.table, locale), { contextId: input.contextId, section: input.section, table: input.table, from: report.from, to: report.to });
   });
   route(app, deps, C.studentTimeline, (ctx, input) => buildTimeline(ctx, input));
+  route(app, deps, C.studentReportContexts, (ctx, input) => ({ contexts: studentReportContexts(ctx, input.studentId) }));
 
   route(app, deps, C.adminReportContexts, (ctx) => ({ contexts: listReportContexts(ctx, 'admin') }));
   route(app, deps, C.adminContextReport, (ctx, input) => buildReport(ctx, input, 'admin'));
