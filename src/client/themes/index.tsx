@@ -3,19 +3,19 @@
  * key: the slot comes from the active theme (the class theme on the classroom display, a ThemeScope
  * for previews and the catalogue).
  */
-import { createContext, useContext, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import type { ThemeKey } from '../../shared/themes.ts';
 import { getDisplay, motionAllowed, soundsAllowed, useDisplay, type DisplayState } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { animationName } from './css.ts';
 import { themeOf } from './registry.ts';
-import { SOUND_PRIORITY, sounds } from './soundManager.ts';
+import { SOUND_PRIORITY, soundStatus, sounds, type SoundSnapshot, type SoundStatus } from './soundManager.ts';
 import type { IllustrationName, MascotPose, MotionName, SoundEvent, ThemeDefinition } from './types.ts';
 
 export { THEME_LIST, THEMES, themeOf } from './registry.ts';
 export { installThemeStyles } from './css.ts';
 export type { IllustrationName, MascotPose, MotionName, SoundEvent, SoundName, ThemeDefinition } from './types.ts';
-export { sounds, installSoundUnlock } from './soundManager.ts';
+export { sounds, installSoundUnlock, SELF_UNLOCK_ATTR, type SoundSnapshot, type SoundStatus } from './soundManager.ts';
 
 /** Overrides the document theme for a subtree (previews, the component catalogue). */
 export const ThemeScope = createContext<ThemeKey | null>(null);
@@ -69,10 +69,28 @@ export function useThemeMotion(name: MotionName, play: boolean, explicit?: Theme
  * the class volume and the event's priority (SoundManager). Returns whether it played.
  */
 export function playThemeSound(display: DisplayState, theme: ThemeDefinition, name: SoundEvent): boolean {
-  sounds.setMuted(!soundsAllowed(display));
-  sounds.setVolume(display.soundVolume);
+  syncSoundSwitches(display);
   if (!soundsAllowed(display) || !theme.sounds) return false;
-  return sounds.play(theme.sounds[name], SOUND_PRIORITY[name]);
+  return sounds.play(theme.sounds[name], SOUND_PRIORITY[name], name);
+}
+
+/** Tells the SoundManager the class volume and the class and device switches (status and mute). */
+export function syncSoundSwitches(display: DisplayState) {
+  sounds.setSwitches(display.classSounds, display.deviceSounds);
+  sounds.setVolume(display.soundVolume);
+}
+
+/**
+ * Sound status for this screen (S14a, D-145): `running`, `locked` (waiting for a tap), `unavailable`,
+ * `mutedClass`, `mutedDevice` or `volumeZero`, with the manager's snapshot (context state, last cue)
+ * for the Sound check.
+ */
+export function useSoundStatus(): { status: SoundStatus; snapshot: SoundSnapshot } {
+  const display = useDisplay();
+  useEffect(() => syncSoundSwitches(display), [display]);
+  const snapshot = useSyncExternalStore(sounds.subscribe, sounds.snapshot, sounds.snapshot);
+  const status = soundStatus(snapshot.audio, { classSounds: display.classSounds, deviceSounds: display.deviceSounds, volume: display.soundVolume });
+  return { status, snapshot };
 }
 
 /** For code outside components (command senders): the cue of the document (class) theme. */

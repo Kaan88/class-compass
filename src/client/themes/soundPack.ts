@@ -65,6 +65,17 @@ export function makeSoundPack(opts: SoundPackOptions, overrides: Partial<ThemeSo
     fireworks: pops,
     // Reduced-motion stand-in for the loud sequences (celebration, reveal show): one quiet two-note chime.
     softChime: [n(4, 0, 260, g * 0.5, 'sine'), n(7, 180, 420, g * 0.45, 'sine')],
+    // S14a (D-145): the lesson begins (rising, welcoming) and ends (falling, settling).
+    lessonStart: arpeggio([0, 2, 4, 7], 120, 260, g * 0.85),
+    lessonEnd: [n(7, 0, 220, g * 0.8), n(4, 180, 220, g * 0.8), n(2, 360, 220, g * 0.75), n(0, 540, 480, g * 0.75)],
+    // "Ready, go": two quick notes when the timer starts.
+    timerStart: [n(4, 0, 90, g * 0.7), n(7, 110, 170, g * 0.75)],
+    // A student moved to another group: one short slide upwards (S14c wires it).
+    groupMove: [{ ...n(2, 0, 120, g * 0.6), to: degree(opts.root, 5, sc) }],
+    // An achievement given in class without the full celebration: a bright sparkle.
+    achievementGiven: [n(4, 0, 120, g * 0.8), n(7, 100, 120, g * 0.8), n(9, 200, 380, g * 0.85)],
+    // "Test sound" in the Display popover and class settings: three clear notes at tap loudness.
+    soundTest: arpeggio([0, 4, 7], 160, 240, g),
   };
   return { ...pack, ...overrides };
 }

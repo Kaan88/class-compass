@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { formatTimer, MAX_TIMER_MS, remainingAt } from '../../../domain/timer.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import { useDisplay } from '../../lib/display.ts';
-import { useTheme } from '../../themes/index.tsx';
+import { playEvent, useTheme } from '../../themes/index.tsx';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
@@ -177,6 +177,7 @@ export function LessonTimer({ lesson, compact = false }: { lesson: LessonState; 
             onPress={() => {
               apply((tm) => startTimer(tm, serverNow()));
               void sendLessonCommand('lesson.timer.start', ref);
+              playEvent('timerStart');
             }}
           >
             <IconPlay />

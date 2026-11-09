@@ -119,6 +119,15 @@ describe('en/tr dictionaries', () => {
     const empty = [...Object.entries(en), ...Object.entries(tr)].filter(([, v]) => v.trim() === '').map(([k]) => k);
     expect(empty).toEqual([]);
   });
+
+  it('say "achievements", never "badges" (EN) or "rozet" (TR) (S14a, D-144)', () => {
+    // Placeholders such as {badge} are code, not words the user reads.
+    const words = (s: string) => s.replace(/\{\w+\}/g, '');
+    const enHits = Object.entries(en).filter(([, v]) => /\bbadges?\b/i.test(words(v))).map(([k]) => k);
+    const trHits = Object.entries(tr).filter(([, v]) => /rozet/i.test(words(v))).map(([k]) => k);
+    expect(enHits).toEqual([]);
+    expect(trHits).toEqual([]);
+  });
 });
 
 describe('no untranslated text in JSX', () => {

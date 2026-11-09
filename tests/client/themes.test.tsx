@@ -13,6 +13,7 @@ import { AAA, contrast, contrastFailures } from '../../src/client/themes/contras
 import { allThemesCss, animationName } from '../../src/client/themes/css.ts';
 import { THEME_LIST, THEMES } from '../../src/client/themes/registry.ts';
 import { soundLength } from '../../src/client/themes/sound.ts';
+import { NOTE_GAIN_CAP, outputPeakDb } from '../../src/client/themes/soundManager.ts';
 import { ILLUSTRATIONS, MASCOT_POSES, MOTIONS, SOUND_EVENTS } from '../../src/client/themes/types.ts';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
@@ -107,6 +108,27 @@ describe.each(THEME_LIST.map((d) => [d.key, d] as const))('theme %s', (_key, def
     // Firework colours are theme tokens (THM-3: no raw colours in components).
     expect(def.celebration.colors.length).toBeGreaterThanOrEqual(2);
     for (const c of def.celebration.colors) expect(def.colors[c]).toMatch(/^#[0-9a-f]{6}$/iu);
+  });
+
+  it('is clearly audible but never clips (S14a, D-145): a tap at volume 80 peaks between −12 and −6 dBFS', () => {
+    if (def.sounds === null) return;
+    const tapPeak = Math.max(...def.sounds.tap.map((n) => Math.min(NOTE_GAIN_CAP, n.gain)));
+    const db = outputPeakDb(tapPeak, 80);
+    expect(db).toBeGreaterThanOrEqual(-12);
+    expect(db).toBeLessThanOrEqual(-6);
+    // The loudest moment of any cue (notes that overlap add up) stays under 0 dBFS at full volume.
+    for (const e of SOUND_EVENTS) {
+      const spec = def.sounds[e];
+      const loudest = Math.max(...spec.map((a) => spec.filter((b) => b.at <= a.at && b.at + b.dur > a.at).reduce((sum, n) => sum + Math.min(NOTE_GAIN_CAP, n.gain), 0)));
+      expect(outputPeakDb(loudest, 100), e).toBeLessThan(0);
+    }
+  });
+
+  it('every sound event has a name in en and tr (catalogue buttons, Sound check)', () => {
+    for (const e of SOUND_EVENTS) {
+      expect(en[`sound.${e}` as keyof typeof en], `en sound.${e}`).toBeTruthy();
+      expect(tr[`sound.${e}` as keyof typeof tr], `tr sound.${e}`).toBeTruthy();
+    }
   });
 
   it('typography, shape and icon slots are sane (system fonts only, readable weights)', () => {

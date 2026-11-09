@@ -225,15 +225,20 @@ a {
     height: 1.5rem;
   }
 }
+/* S14a (D-147): tiles never wider than the screen (min(100%, …)) and no empty tracks (auto-fit). */
 .cc-menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 1rem;
 }
 .cc-menu-tile {
   display: flex;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
+  /* "anywhere" (not break-word) also lowers the tile's min-content width, so a long word at 200 %
+     text on a phone breaks instead of pushing the tile off the screen. */
+  overflow-wrap: anywhere;
   min-height: 6rem;
   padding: 1rem 1.25rem;
   border-radius: var(--cc-radius);
@@ -1593,6 +1598,70 @@ html:has(.cc-classroom) {
 .cc-popover__group {
   gap: 0.4rem;
 }
+/* The popover grew a Sound check block (S14a): it scrolls on short displays instead of leaving the screen. */
+.cc-popover {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* S14a (D-145): "Sound is off · Turn sound on" in the classroom top bar until a tap unlocks audio. */
+.cc-sound-chip {
+  border-color: var(--cc-warning);
+  background: var(--cc-warning-soft);
+  color: var(--cc-warning);
+  gap: 0.4rem;
+}
+.cc-sound-chip__state + .cc-sound-chip__action::before {
+  content: '·';
+  margin-inline-end: 0.4rem;
+}
+@media (max-width: 90rem) {
+  /* Narrower displays keep the bar on one row: the words "Sound is off" stay for screen readers. */
+  .cc-sound-chip__state {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .cc-sound-chip__state + .cc-sound-chip__action::before {
+    content: none;
+  }
+}
+.cc-sound-check__status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0;
+  font-weight: 700;
+  max-width: 26rem;
+}
+.cc-sound-check__status .cc-icon {
+  flex: none;
+  margin-top: 0.1em;
+}
+.cc-sound-check__facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 0.9rem;
+  margin: 0;
+}
+.cc-sound-check__facts dt {
+  color: var(--cc-text-muted);
+}
+.cc-sound-check__facts dd {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.cc-sound-check__actions {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cc-sound-check__hint {
+  margin: 0;
+  max-width: 26rem;
+}
 .cc-lesson-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--cc-rail, 24rem);
@@ -1995,10 +2064,13 @@ html:has(.cc-classroom) {
 }
 .cc-reflect {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  /* min(100%, …): one column when even one track does not fit (S14a, D-147). */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
   gap: 0.75rem;
 }
 .cc-reflect__option {
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2113,6 +2185,20 @@ html:has(.cc-classroom) {
   }
   .cc-att-set__more {
     justify-content: flex-end;
+  }
+  /* S14a (D-147): when four columns cannot hold the words (big text on a phone), two columns. The
+     container query is in em, so it follows the text size. */
+  .cc-att-set {
+    container-type: inline-size;
+  }
+  @container (max-width: 13em) {
+    .cc-att-set__statuses {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .cc-att-set__statuses .cc-btn {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
   }
 }
 .cc-segmented .cc-btn[aria-pressed='true'] {
@@ -2316,6 +2402,10 @@ html:has(.cc-classroom) {
 }
 .cc-group-option {
   font-size: 1.15rem;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .cc-group-option[aria-pressed='true'] {
   background: var(--cc-accent);
@@ -2604,12 +2694,20 @@ html:has(.cc-classroom) {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  /* auto-fit and min(100%, …) (S14a, D-147): no empty tracks, never wider than the screen. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   gap: 0.6rem;
+}
+.cc-topic-choices > li {
+  min-width: 0;
 }
 .cc-topic-choice {
   width: 100%;
+  min-width: 0;
   justify-content: flex-start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
 }
 .cc-topic-choice[aria-pressed='true'],
 .cc-icon-picker .cc-btn[aria-pressed='true'],
@@ -2838,22 +2936,15 @@ html:has(.cc-classroom) {
 .cc-evidence audio {
   width: 100%;
 }
-/* S13b2 (D-119): add-evidence buttons, files waiting to upload, pictures and the in-page camera. */
+/* S13b2 (D-119): add-evidence buttons, files waiting to upload, pictures and the in-page camera.
+   S14a (D-147): the buttons never overflow. auto-FIT (no empty tracks), every track at least 11rem
+   unless the card is narrower, labels that wrap between words (and inside a word only when one word
+   is wider than the button). On phones the icon goes above the label (like .cc-reflect__option) in
+   two columns, so the chosen mode's field stays near the buttons; that rule comes after the base one. */
 .cc-evidence-modes {
   display: grid;
-  /* Two columns on a phone (S13 usability), so the chosen mode's field stays near the buttons; 7rem
-     still gives two columns in a 290px card with the student page's 18px root size. */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 7rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
   gap: 0.5rem;
-}
-@media (max-width: 30rem) {
-  .cc-evidence-mode {
-    flex-direction: column;
-    justify-content: center;
-    text-align: center;
-    gap: 0.25rem;
-    padding-inline: 0.4rem;
-  }
 }
 /* A file picker drawn as a big button (FilePick): the real input is visually hidden. */
 .cc-file-pick {
@@ -2871,8 +2962,30 @@ html:has(.cc-classroom) {
 }
 .cc-evidence-mode {
   justify-content: flex-start;
+  min-width: 0;
   min-height: var(--cc-touch-big);
+  padding-inline: 0.8rem;
+  white-space: normal;
   text-align: start;
+  line-height: 1.2;
+}
+.cc-evidence-mode__label {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+@media (max-width: 30rem) {
+  .cc-evidence-modes {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  }
+  .cc-evidence-mode {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    gap: 0.25rem;
+    padding-inline: 0.4rem;
+    padding-block: 0.5rem;
+    font-size: 1.1rem;
+  }
 }
 .cc-evidence-pending {
   list-style: none;

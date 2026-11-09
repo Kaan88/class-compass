@@ -77,7 +77,7 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
 
 - **Gizli Öğrenciler**: gizli öğrencileri açıklayın ve sonuçlarını kaydedin (bkz. [Gizli Öğrenci](#gizli-öğrenci)).
 - **Yardımcıya teşekkür**.
-- **Aferin!**: bu derste kazanılan otomatik rozetler; yalnızca sınıf bunu Başarılar'da seçtiyse.
+- **Aferin!**: bu derste kazanılan otomatik başarılar; yalnızca sınıf bunu Başarılar'da seçtiyse.
 - **Değerlendirme**: **Ders nasıl geçti?** (Zordu, İdare eder, İyi, Harika) ve kendiniz için isteğe bağlı bir not.
 
 **Kaydet ve dersi bitir**'e basın. **Ders kaydedildi** özeti süreyi, ulaşılan rutin aşamalarını ve yoklamayı gösterir. **Derse dön** bitirmeyi iptal eder ve süren derse geri götürür.
@@ -97,7 +97,7 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
   - **Bu cihazda sesler**.
 - **Öğretmen alanı** (PIN'inizi sorar).
 
-**Ana sütunda** **Bugünün odağı** (dersin konusu, **Değiştir** ile), **öğrenci kartları** ve onların altında modül panelleri (sayaçlar, yardımcı, gizli öğrenciler, gruplar, ödev, rozetler) bulunur. **Öğrencileri göster** / **Öğrencileri gizle** kartları açıp kapatır.
+**Ana sütunda** **Bugünün odağı** (dersin konusu, **Değiştir** ile), **öğrenci kartları** ve onların altında modül panelleri (sayaçlar, yardımcı, gizli öğrenciler, gruplar, ödev, başarılar) bulunur. **Öğrencileri göster** / **Öğrencileri gizle** kartları açıp kapatır.
 
 **Sağ sütunda** rutin ve zamanlayıcı yer alır. **Yoklama** ve **Dersi bitir** her zaman bu sütunun altında kalır; sütun ekrandan uzunsa kendi içinde kayar.
 
@@ -116,7 +116,7 @@ Kısa mesajlar (örneğin **Ders başladı**) sol altta kısa bir süre görün�
 
 Bir sayaç bütün sınıf için (**sınıf çubuğu**) ve/veya her öğrenci için bir şey sayar; örneğin İngilizce hatırlatmalarını. Sınıf çubuğundaki **+** ile bir tane ekleyin. Çubuk dolduğunda seçilen tepki bir kez, sakin bir biçimde görünür ve hiçbir öğrencinin adını söylemez. Tepki "Sınıf yeniden başlıyor" ise **Çubuğu yeniden başlat** çubuğu 0'a döndürür (dokunuşlar kayıtlı kalır).
 
-Öğrenci kartlarındaki sayılar varsayılan olarak kapalıdır; Sınıf ayarları → Sayaçlar'daki **Öğrenci kartlarında hatırlatma kutuları** ile açın. Her dokunuştan sonra **Geri al** düğmeli kısa bir mesaj çıkar. Sayaçlar puan değil, sayıdır. Sayaçları, adlarını, sınırını, düzeylerini ve tepkilerini **Sayaçlar** sayfasında oluşturup düzenlersiniz; **Haftalık geçmiş** öğrenci ve haftaya göre sayıları gösterir.
+Her öğrenci kartında öğrencinin sayısı ve bir **+** düğmesi görünür. Bir sınıfta gizlemek için Sınıf ayarları → Sayaçlar'daki **Öğrenci kartlarında hatırlatma kutuları** anahtarını kapatın. Her dokunuştan sonra **Geri al** düğmeli kısa bir mesaj çıkar. Sayaçlar puan değil, sayıdır. Sayaçları, adlarını, sınırını, düzeylerini ve tepkilerini **Sayaçlar** sayfasında oluşturup düzenlersiniz; **Haftalık geçmiş** öğrenci ve haftaya göre sayıları gösterir.
 
 ### Gruplar ve grup ekranı
 
@@ -148,14 +148,14 @@ Yardımcı paneli bugünün yardımcısını ve görevlerini işaret kutularıyl
 
 Seçilen öğrenci derste yoksa yerine başkası seçilir; gelmeyen öğrencinin sırası daha sonraki bir tura kalır.
 
-### Başarılar: derste rozet vermek
+### Başarılar: derste başarı vermek
 
-1. Başarılar panelindeki **Rozet ver**'e basın.
+1. Başarılar panelindeki **Başarı ver**'e basın.
 2. **Kim alıyor?**: öğrencileri işaretleyin ya da **Tüm sınıf**'ı seçin.
-3. **Bir rozet seçin**. Rozet, adlar ve avatarlarla kısa bir kutlama için **Ekranda kutla**'yı işaretleyin.
+3. **Bir başarı seçin**. Başarı, adlar ve avatarlarla kısa bir kutlama için **Ekranda kutla**'yı işaretleyin.
 4. **N öğrenciye ver**'e basın.
 
-Rozeti verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Geri al** sunar. Sonrasında da bu derste verdiğiniz bir rozeti 10 dakika içinde geri alabilirsiniz (**Bu derste verilen rozetler** → **Geri al**). Daha sonra yanlışlıkla verilmiş bir rozeti öğretmen alanından kaldırırsınız (bkz. [Başarılar ve avatarlar](#başarılar-ve-avatarlar)). Otomatik rozetler ekranda hiçbir zaman duyurulmaz; sınıf bunları Dersi bitir'deki **Aferin!** adımında topluca görebilir.
+Başarıyı verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Geri al** sunar. Sonrasında da bu derste verdiğiniz bir başarıyı 10 dakika içinde geri alabilirsiniz (**Bu derste verilen başarılar** → **Geri al**). Daha sonra yanlışlıkla verilmiş bir başarıyı öğretmen alanından kaldırırsınız (bkz. [Başarılar ve avatarlar](#başarılar-ve-avatarlar)). Otomatik başarılar ekranda hiçbir zaman duyurulmaz; sınıf bunları Dersi bitir'deki **Aferin!** adımında topluca görebilir.
 
 ### Derste ödev
 
@@ -206,7 +206,7 @@ Bir öğrencinin hedef sayfasındaki **Özel notlar** yalnızca sizin içindir. 
 
 ![Öğrenci bağlantıları](../img/tr/student-links.png)
 
-Her öğrencinin kendi sayfasına (hedefleri, değerlendirmeleri, kanıtları, sizin geri bildiriminiz, ödevleri, rozetleri ve avatarı) giden **kalıcı, kişisel bir bağlantısı** vardır. Bağlantılar öğrenci eklendiğinde kendiliğinden oluşur.
+Her öğrencinin kendi sayfasına (hedefleri, değerlendirmeleri, kanıtları, sizin geri bildiriminiz, ödevleri, başarıları ve avatarı) giden **kalıcı, kişisel bir bağlantısı** vardır. Bağlantılar öğrenci eklendiğinde kendiliğinden oluşur.
 
 **Öğrenci bağlantıları** sayfasında sınıfı seçin. Her öğrenci için **Bağlantıyı kopyala**, QR kodu göster ya da **Kartı yazdır**. Tarayıcı kendisi kopyalayamadığında (örneğin https olmayan bir okul ağında) bağlantı küçük bir pencerede seçili olarak açılır; elle kopyalayabilirsiniz. **Tüm kartları yazdır** bütün sınıfı A4'e basar: **Küçük (A4 sayfada 15)** ya da **Büyük (A4 sayfada 8)**; **Kartları önizle** önce gösterir. QR kodlar her temada beyaz üzerine siyahtır.
 
@@ -228,13 +228,13 @@ Eski bağlantı ve basılmış bütün kartlar hemen çalışmaz olur. Listede a
 
 **Öğrenciler ve ayarlar**
 
-- İlk seferde Sınıf Pusulası **Rozetler nasıl başlasın?** diye sorar: **Geçmiş başarıları sessizce ver** (bugünden önce yapılan çalışmalar için rozetler, kutlama olmadan) ya da **Bugünden itibaren başla**. Seçim yapmadan önce de istediğiniz zaman elle rozet verebilirsiniz.
-- **Otomatik rozetler**, **Öğrenci sayfalarında kişisel seviyeler** (her öğrenci yalnızca kendi seviyesini görür; hiçbir sıralama yoktur) ve **Ders sonunda "Aferin!" göster**.
-- Bir öğrenciye rozet verin ya da yanlışlıkla verilmiş bir rozeti bir nedenle **Kaldır**ın (geçmişte saklanır). Otomatik rozetler öğrencinin yaptıklarına göre gelir ve elle kaldırılamaz.
+- İlk seferde Sınıf Pusulası **Başarılar nasıl başlasın?** diye sorar: **Geçmiş başarıları sessizce ver** (bugünden önce yapılan çalışmalar için başarılar, kutlama olmadan) ya da **Bugünden itibaren başla**. Seçim yapmadan önce de istediğiniz zaman elle başarı verebilirsiniz.
+- **Otomatik başarılar**, **Öğrenci sayfalarında kişisel seviyeler** (her öğrenci yalnızca kendi seviyesini görür; hiçbir sıralama yoktur) ve **Ders sonunda "Aferin!" göster**.
+- Bir öğrenciye başarı verin ya da yanlışlıkla verilmiş bir başarıyı bir nedenle **Kaldır**ın (geçmişte saklanır). Otomatik başarılar öğrencinin yaptıklarına göre gelir ve elle kaldırılamaz.
 
-**Rozetler**: bütün rozetler türlerine göre gruplanmış (hedefler, kanıtlar, ödev…; açmak için bir gruba dokunun), her birinin seviyesi (Bronz, Gümüş, Altın) adının yanında. **Kendi rozetinizi yapın**: bir ad, ne için verildiği, bir resim, bir seviye ve **Nasıl verilir** (**Öğretmen verir** ya da "5 kez kanıt ekler" gibi bir kuralla **Otomatik**). **Sınıflarımda gizle** hazır bir rozeti sizin sınıflarınızda gizler; **Yeniden göster** geri getirir.
+**Tüm başarılar**: bütün başarılar türlerine göre gruplanmış (hedefler, kanıtlar, ödev…; açmak için bir gruba dokunun), her birinin seviyesi (Bronz, Gümüş, Altın) adının yanında. **Kendi başarınızı oluşturun**: bir ad, ne için verildiği, bir resim, bir seviye ve **Nasıl verilir** (**Öğretmen verir** ya da "5 kez kanıt ekler" gibi bir kuralla **Otomatik**). **Sınıflarımda gizle** hazır bir başarıyı sizin sınıflarınızda gizler; **Yeniden göster** geri getirir.
 
-Rozetler çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri karşılaştırmaya bağlı değildir ve öğrenci sayfası yalnızca öğrencinin kendi rozetlerini ve seviyesini gösterir. Rozetler sınıf ekranında yalnızca siz birini kutladığınızda ya da sınıf **Aferin!** adımını gösterdiğinde görünür.
+Başarılar çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri karşılaştırmaya bağlı değildir ve öğrenci sayfası yalnızca öğrencinin kendi başarılarını ve seviyesini gösterir. Başarılar sınıf ekranında yalnızca siz birini kutladığınızda ya da sınıf **Aferin!** adımını gösterdiğinde görünür.
 
 ![Öğretmen alanında Avatarlar](../img/tr/avatars.png)
 

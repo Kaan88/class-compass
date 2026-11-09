@@ -15,6 +15,7 @@ import { Alert } from '../../ui/Feedback.tsx';
 import { IconCheck, IconNext, IconPlay, IconPrev } from '../../ui/icons.tsx';
 import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
+import { playEvent } from '../../themes/index.tsx';
 import { awaitCommand, sendLessonCommand } from './lessonClient.ts';
 import { initialStartValues, startStepsFor, useStartContributions, type ClassroomContext } from '../registry.ts';
 
@@ -55,6 +56,7 @@ export function StartLessonFlow({
   const start = async () => {
     setStarting(true);
     setError(null);
+    playEvent('lessonStart');
     try {
       const opId = await sendLessonCommand('lesson.start', { ...contribution.input, contextId: context.id });
       const result = (await awaitCommand(opId)) as z.infer<typeof StartLessonResult> | null;

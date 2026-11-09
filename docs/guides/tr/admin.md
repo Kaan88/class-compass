@@ -77,13 +77,13 @@ Tek tek sınıflar **Sınıflar** → **Sınıfı üst sınıfa taşı** ile de 
 
 ![Modüller ve medya](../img/tr/admin-modules.png)
 
-Sayfanın beş sekmesi vardır: **Modüller**, **Fotoğraf ve medya**, **Varsayılan hedefler**, **Varsayılan rozetler** ve **Nazik sözcükler**.
+Sayfanın beş sekmesi vardır: **Modüller**, **Fotoğraf ve medya**, **Varsayılan hedefler**, **Varsayılan başarılar** ve **Nazik sözcükler**.
 
 - **Öğretmen modülleri**: burada kapatılan modüller bütün öğretmenlerden gizlenir. Diğerlerini öğretmenler sınıf ve ders bazında açar ya da kapatır.
 - **Okul geneli modüller**: **Süper Konuşmacılar** (varsayılan olarak kapalı). Bkz. [Süper Konuşmacılar kılavuzu](super-speakers.md).
 - **Fotoğraf, ses ve belgeler**: **Öğrenci fotoğrafları**, **Fotoğraf kanıtı** ve **Ses kaydı kanıtı** **izinler doğrulanana kadar kapalıdır**. Bunları ancak okul velilerin iznini ve KVKK kapsamındaki tutumunu netleştirdikten sonra açın. **Belge kanıtı** (metin, bağlantı ve belgeler) varsayılan olarak açıktır ve kapatılabilir.
 - **Varsayılan hedefler**: **Arşivle** (her satırın sağında) bir varsayılan kategoriyi ya da hedefi bütün sınıflardan kaldırır (öğrencilerin hâlihazırdaki hedefleri korunur); **Geri getir** geri getirir. Öğretmenler de bir varsayılanı yalnızca kendi sınıflarında gizleyebilir.
-- **Varsayılan rozetler**: hazır bir rozeti bütün sınıflar için arşivleyin ya da geri getirin. Aynı adı taşıyan rozetler düzeylerini de gösterir (örneğin "· Bronz"). Verilmiş rozetler korunur.
+- **Varsayılan başarılar**: hazır bir başarıyı bütün sınıflar için arşivleyin ya da geri getirin. Aynı adı taşıyan başarılar düzeylerini de gösterir (örneğin "· Bronz"). Verilmiş başarılar korunur.
 - **Nazik sözcükler**: bütün okul için **Engellenen sözcükler** ve **İzin verilen sözcükler** (satır başına bir; izin verilen sözcük her zaman kazanır) ve bir hedefin ne kadar uzun olması gerektiği (**Bir hedefte en az sözcük**, varsayılan 3, ve **Bir hedefte en az harf**, varsayılan 12).
 
 *Bir modülü kapatmak onu gizler ama tüm verilerini korur.*

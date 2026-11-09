@@ -22,6 +22,7 @@ import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts'
 import { queryClient } from '../../lib/queryClient.ts';
 import { showToast, showUndoToast } from '../../lib/toast.ts';
 import { celebrate } from '../../themes/Celebration.tsx';
+import { playEvent } from '../../themes/index.tsx';
 import { BigButton, Button } from '../../ui/Button.tsx';
 import { IconStar } from '../../ui/icons.tsx';
 import { PanelHead } from '../../ui/Layout.tsx';
@@ -76,6 +77,8 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
     if (!badgeId || !picked.length) return;
     const studentIds = [...picked];
     const withMoment = celebrateOn;
+    // A quiet award gets its own short cue; a celebrated one plays the celebration's fanfare (D-145).
+    if (!withMoment) playEvent('achievementGiven');
     const opId = await getOutbox().enqueue('achievements.award', { contextId: context.id, lessonId: lesson.id, achievementId: badgeId, studentIds }, { contextId: context.id, lessonId: lesson.id });
     setOpen(false);
     setPicked([]);

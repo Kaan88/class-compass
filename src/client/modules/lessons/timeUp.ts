@@ -9,7 +9,7 @@
  */
 import { TIME_UP_PHRASE, type TimeUpSound } from '../../../shared/classDisplay.ts';
 import { soundsAllowed, type DisplayState } from '../../lib/display.ts';
-import { playThemeSound, sounds } from '../../themes/index.tsx';
+import { playThemeSound, sounds, syncSoundSwitches } from '../../themes/index.tsx';
 import type { ThemeDefinition } from '../../themes/types.ts';
 
 export const TIME_UP_CLIP_URL = '/api/classroom/time-up-clip';
@@ -36,6 +36,30 @@ function speech(): SpeechSynthesis | null {
   return typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
 }
 
+/**
+ * The voice list, kept fresh (S14a, D-145): Chrome and Safari fill it asynchronously and change it
+ * later (`voiceschanged`), so the first time's up of the day must not see an empty or stale list.
+ */
+let voiceCache: SpeechSynthesisVoice[] = [];
+let watchingVoices = false;
+export function currentVoices(): SpeechSynthesisVoice[] {
+  const synth = speech();
+  if (!synth) return [];
+  if (!watchingVoices) {
+    watchingVoices = true;
+    try {
+      synth.addEventListener('voiceschanged', () => {
+        voiceCache = synth.getVoices();
+      });
+    } catch {
+      /* older engines: getVoices() below is still asked every time */
+    }
+  }
+  const now = synth.getVoices();
+  if (now.length) voiceCache = now;
+  return voiceCache;
+}
+
 function speak(voice: SpeechSynthesisVoice): boolean {
   const synth = speech();
   if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return false;
@@ -58,19 +82,18 @@ function speak(voice: SpeechSynthesisVoice): boolean {
 export function preloadTimeUp(setting: TimeUpSound, hasClip: boolean) {
   if (setting === 'clip' && hasClip) void sounds.preloadClip(TIME_UP_CLIP_URL);
   // Some browsers fill the voice list asynchronously: ask once so it is ready.
-  if (setting === 'voice') speech()?.getVoices();
+  if (setting === 'voice') currentVoices();
 }
 
 /** Plays the class's time's-up announcement; returns what was played. */
 export function announceTimeUp(display: DisplayState, theme: ThemeDefinition): TimeUpPlan {
-  const voice = pickEnglishVoice(speech()?.getVoices() ?? []);
+  const voice = pickEnglishVoice(currentVoices());
   const plan = planTimeUp(display.timeUpSound, { sounds: soundsAllowed(display), englishVoice: voice !== null, clip: display.timeUpClip });
   const chime = () => playThemeSound(display, theme, 'timeUp');
   if (plan === 'voice' && voice) {
     if (!speak(voice)) chime();
   } else if (plan === 'clip') {
-    sounds.setVolume(display.soundVolume);
-    sounds.setMuted(false);
+    syncSoundSwitches(display);
     void sounds.playClip(TIME_UP_CLIP_URL).then((ok) => {
       if (!ok) chime();
     });

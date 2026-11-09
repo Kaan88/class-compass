@@ -50,6 +50,7 @@ function fakeContext() {
       return { ...node(), type: 'sine', frequency: param(440), start: () => undefined, stop: () => undefined };
     },
     createBiquadFilter: () => ({ ...node(), type: 'bandpass', frequency: param(), Q: param() }),
+    createDynamicsCompressor: () => ({ ...node(), threshold: param(0), knee: param(0), ratio: param(1), attack: param(0), release: param(0) }),
     createBuffer: (_c: number, len: number) => {
       log.buffers++;
       const data = new Float32Array(len);
@@ -86,7 +87,7 @@ describe('SoundManager (S13b, D-110)', () => {
     m.unlock();
     expect(create).toHaveBeenCalledTimes(1);
     expect(f.log.resumed).toBe(1);
-    expect(f.log.buffers).toBe(1);
+    expect(f.log.buffers).toBe(2); // the 1-sample silent primer (WebKit) and the noise buffer, once each (S14a)
     expect(m.unlocked).toBe(true);
   });
 
@@ -96,13 +97,15 @@ describe('SoundManager (S13b, D-110)', () => {
     m.setVolume(40);
     expect(m.play(pack.tap, 1)).toBe(true);
     const master = f.log.gains[0]!;
-    expect(master.value).toBeCloseTo(0.4);
+    expect(master.value).toBeCloseTo(0.16); // perceptual curve: (40 / 100)² (S14a, D-145)
     m.setVolume(150);
     expect(m.getVolume()).toBe(100);
-    m.setMuted(true);
+    m.setSwitches(false, true);
     now += 1000;
     expect(m.play(pack.fanfare, 4)).toBe(false);
-    m.setMuted(false);
+    m.setSwitches(true, false);
+    expect(m.play(pack.fanfare, 4)).toBe(false);
+    m.setSwitches(true, true);
     m.setVolume(0);
     expect(m.isMuted()).toBe(true);
     expect(m.play(pack.fanfare, 4)).toBe(false);
@@ -122,7 +125,7 @@ describe('SoundManager (S13b, D-110)', () => {
     const f = fakeContext();
     const m = new SoundManager(() => f.ctx, () => now);
     m.play(pack.stageChange, 2);
-    const stageBus = f.log.gains[1]!; // [0] master, [1] the first cue's bus
+    const stageBus = f.log.gains[2]!; // [0] master, [1] makeup, [2] the first cue's bus
     expect(stageBus.value).toBe(1);
     const gainsBefore = f.log.gains.length;
     m.play(pack.fanfare, 4);

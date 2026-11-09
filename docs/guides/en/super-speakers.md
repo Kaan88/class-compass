@@ -25,7 +25,7 @@ The **Settings** tab:
 - **Board title (English)** and **Board title (Turkish)**, and the **Board messages** shown while nobody has points and on an empty podium place. Leave a field empty for the built-in message.
 - **Board language** and **Board theme**.
 - **Board sound and celebration**: plays the theme's celebration when the top three change. Off by default. Browsers may only play sound after someone has clicked the board once.
-- **Badges go to this subject**: points earn the Super Speakers badges (first point, 5, 10 and 25 points) in this subject. By default (**Automatic: the English subject**), the subject named "English". If no subject is found, no Super Speakers badges are given until you choose one.
+- **Achievements go to this subject**: points earn the Super Speakers achievements (first point, 5, 10 and 25 points) in this subject. By default (**Automatic: the English subject**), the subject named "English". If no subject is found, no Super Speakers achievements are given until you choose one.
 
 ## Scorer links and board links
 
@@ -49,7 +49,7 @@ For each link the list shows when it was last used and, for scorers, the points 
 
 ## Award log
 
-The **Award log** tab lists the points, newest first, each with its **Status** (**Counts**, or how it was removed) and its action, with filters for the period, class and scorer, and **Show removed points**. **Remove** takes back a wrong point: give a reason. The point then no longer counts on the board or in reports; the removal and its reason are recorded. Badges already earned stay. Removing a point never deletes it; only permanently deleting a student (administration area) deletes that student's points.
+The **Award log** tab lists the points, newest first, each with its **Status** (**Counts**, or how it was removed) and its action, with filters for the period, class and scorer, and **Show removed points**. **Remove** takes back a wrong point: give a reason. The point then no longer counts on the board or in reports; the removal and its reason are recorded. Achievements already earned stay. Removing a point never deletes it; only permanently deleting a student (administration area) deletes that student's points.
 
 A scorer can undo only their own points, and only within the undo window. After that, an administrator removes them here.
 
@@ -57,7 +57,7 @@ A scorer can undo only their own points, and only within the undo window. After 
 
 The **History** tab shows a chosen period: **Weekly winners** (the top three of each whole week, as the board showed them, with shared places for equal points), **Points per class and week**, **Points per scorer** and **Points per student**, each with a CSV download. Removed points are not counted.
 
-Super Speakers points also appear in the class report and the student timeline of the badge subject (Teacher guide, "Reports and CSV").
+Super Speakers points also appear in the class report and the student timeline of the achievement subject (Teacher guide, "Reports and CSV").
 
 ## Board now
 
@@ -85,4 +85,4 @@ When it is switched on:
 - Points are positive only (+1). There are no minus points.
 - The board shows full names, classes and avatars of the top three (all tied students), and the class totals including classes with 0 points.
 - A point given offline on a phone is sent when the connection is back and counts on the day it was tapped (up to 4 days back).
-- Students never see a ranking on their own page; they see their own Super Speakers badges.
+- Students never see a ranking on their own page; they see their own Super Speakers achievements.

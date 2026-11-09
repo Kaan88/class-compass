@@ -238,8 +238,8 @@ function useCounterCards(context: ClassroomContext, lesson: LessonState, enabled
     return () => all.forEach((h) => clearTimeout(h));
   }, []);
   if (!enabled) return null;
-  // The per-student reminder boxes on the cards are off unless the class+subject turns them on (S13a, D-102).
-  if (q.data?.data.counters?.showReminderBoxes !== true) return null;
+  // The per-student reminder boxes on the cards are on unless the class+subject hides them (S14a, D-143).
+  if (q.data?.data.counters?.showReminderBoxes === false) return null;
   const list = (q.data?.data.counters?.counters ?? []).filter((c) => c.scope !== 'lesson');
   if (list.length === 0) return null;
   const counter = list.find((c) => c.id === picked) ?? list.find((c) => c.kind === 'english_reminders') ?? list[0]!;

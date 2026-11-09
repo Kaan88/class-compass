@@ -12,10 +12,10 @@ function CounterHistoryRoute({ search }: { search: TeacherPageSearch }) {
   return <CounterHistoryPage key={search.counterId ?? 'none'} initialCounterId={search.counterId} />;
 }
 
-/** Class settings: the per-student reminder boxes on the student cards (S13a: off by default). */
+/** Class settings: the per-student reminder boxes on the student cards (on by default since S14a, D-143). */
 function CountersSettingsPanel({ contextId }: { contextId: string }) {
   const { t } = useI18n();
-  return <ModuleConfigToggle contextId={contextId} module="counters" field="showReminderBoxes" defaultValue={false} label={t('counter.showReminderBoxes')} description={t('counter.showReminderBoxesHint')} />;
+  return <ModuleConfigToggle contextId={contextId} module="counters" field="showReminderBoxes" defaultValue={true} label={t('counter.showReminderBoxes')} description={t('counter.showReminderBoxesHint')} />;
 }
 
 export const countersClientManifest = defineClientModule({

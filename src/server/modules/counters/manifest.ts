@@ -29,6 +29,6 @@ export const countersManifest = defineServerModule({
     },
   ],
   timeline: [{ key: 'counters', order: 30, build: countersTimeline }],
-  // S13a: the English-reminder boxes on student cards are hidden unless the teacher shows them.
-  config: { schema: z.object({ showReminderBoxes: z.boolean() }), defaults: { showReminderBoxes: false } },
+  // The English-reminder boxes on student cards are shown unless the teacher hides them (S14a, D-143; supersedes D-102).
+  config: { schema: z.object({ showReminderBoxes: z.boolean() }), defaults: { showReminderBoxes: true } },
 });

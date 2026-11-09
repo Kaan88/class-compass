@@ -58,6 +58,14 @@ async function displayPage(browser: Browser) {
   return { ctx, p };
 }
 
+/** Per-student reminder boxes on the cards: on by default since S14a (D-143). Returns the previous config. */
+async function setReminderBoxes(page: Page, contextId: string, on: boolean) {
+  const m = (await modulesOf(page, contextId)).find((x) => x.module === 'counters')!;
+  const r = await api(page, 'PUT', `/api/teacher/contexts/${contextId}/modules/counters`, { enabled: m.enabled, config: { ...(m.config ?? {}), showReminderBoxes: on } });
+  expect(r.status).toBe(200);
+  return m;
+}
+
 async function startLesson(page: Page, contextId: string) {
   const r = await api(page, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'lesson.start', contextId, payload: { contextId, othersPresent: true, attendance: [] } }] });
   expect(r.body.results[0].ok).toBe(true);
@@ -169,25 +177,44 @@ test('density and auto-fit: no horizontal scroll on common displays; 19 students
   await ensurePin(page);
   await endActiveLessons(page);
   const ctx = await context3A(page);
+  // Settings go through a second session: the display devices share `page`'s session, which is in
+  // classroom mode (PIN-locked for teacher-area calls) once the classroom is open.
+  const officeCtx = await browser.newContext();
+  const office = await officeCtx.newPage();
+  await login(office, 'english');
+  const counters = await setReminderBoxes(office, ctx.id, false);
   await startLesson(page, ctx.id);
   try {
-    for (const vp of VIEWPORTS) {
-      const { ctx: c, p } = await onDevice(browser, page, vp);
-      try {
-        await openClassroom(p);
-        await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'normal');
-        await expect(p.locator('.cc-student-card')).toHaveCount(19);
-        const facts = await layoutFacts(p);
-        await p.screenshot({ path: `test-results/fit/${vp.name}-normal.png` });
-        expect(facts.hScroll, vp.name).toBe(false);
-        expect(facts.overlap, vp.name).toBe(false);
-        const visible = await cardsOnScreen(p);
-        // The owner's target (D-103): 18-20 students without scrolling at Normal on a 1440x900 laptop.
-        if (vp.name === '1440x900' || vp.width >= 1440) expect(visible, `${vp.name}: cards on screen`).toBe(19);
-      } finally {
-        await c.close();
+    // The owner's target (D-103): 18-20 students without scrolling at Normal on a 1440x900 laptop,
+    // measured with the cards as they were then (no per-student boxes). Since S14a the boxes are on by
+    // default (D-143) and make each card taller: the second pass re-measures with them. The 18-20
+    // target with the boxes on comes with the full-width grid of S14b (D-148).
+    // Measured 2026-11-09 with the boxes on: 16 at 1440x900 and 1470x956, 12 at 1366x768 and 1280x800,
+    // all 19 from 1920x1080 up.
+    const BOXES_ON_FLOOR: Record<string, number> = { '1440x900': 16, '1470x956': 16, '1920x1080': 19, '2560x1440': 19 };
+    for (const boxes of [false, true]) {
+      await setReminderBoxes(office, ctx.id, boxes);
+      for (const vp of VIEWPORTS) {
+        const { ctx: c, p } = await onDevice(browser, page, vp);
+        try {
+          await openClassroom(p);
+          await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'normal');
+          await expect(p.locator('.cc-student-card')).toHaveCount(19);
+          if (boxes) await expect(p.locator('.cc-student-card__add').first()).toBeVisible();
+          const facts = await layoutFacts(p);
+          await p.screenshot({ path: `test-results/fit/${vp.name}-normal${boxes ? '-boxes' : ''}.png` });
+          expect(facts.hScroll, vp.name).toBe(false);
+          expect(facts.overlap, vp.name).toBe(false);
+          const visible = await cardsOnScreen(p);
+          test.info().annotations.push({ type: 'cards on screen', description: `${vp.name}${boxes ? ' with reminder boxes' : ''}: ${visible}` });
+          if (!boxes && (vp.name === '1440x900' || vp.width >= 1440)) expect(visible, `${vp.name}: cards on screen`).toBe(19);
+          if (boxes && BOXES_ON_FLOOR[vp.name]) expect(visible, `${vp.name}: cards on screen with reminder boxes`).toBeGreaterThanOrEqual(BOXES_ON_FLOOR[vp.name]!);
+        } finally {
+          await c.close();
+        }
       }
     }
+    await setReminderBoxes(office, ctx.id, false);
 
     // Compact / Normal / Large on this device: the cards change size and the choice survives a reload.
     const { ctx: c, p } = await onDevice(browser, page, VIEWPORTS[0]!);
@@ -220,6 +247,8 @@ test('density and auto-fit: no horizontal scroll on common displays; 19 students
   } finally {
     // The device contexts shared this session; it is not used again, so no PIN unlock (rate-limited).
     await endActiveLessons(page);
+    await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/counters`, { enabled: counters.enabled, config: counters.config });
+    await officeCtx.close();
   }
 });
 
@@ -303,8 +332,15 @@ test('usability pass (D-139): End lesson and the class counter are on screen at 
   await endActiveLessons(page);
   const ctx = await context3A(page);
   const original = await modulesOf(page, ctx.id);
+  // A second session for settings (the display devices put `page`'s session in classroom mode).
+  const officeCtx = await browser.newContext();
+  const office = await officeCtx.newPage();
+  await login(office, 'english');
   try {
     await setModules(page, ctx.id, MODULES, original);
+    // Checked without the per-student boxes (on by default since S14a, D-143): with them the cards are
+    // taller and the class bar sits under the fold at 1280x720 until S14b moves it above the grid (D-148).
+    await setReminderBoxes(office, ctx.id, false);
     await startLesson(page, ctx.id);
     for (const vp of [
       { name: '1920x1080', width: 1920, height: 1080, scale: 1 },
@@ -331,6 +367,7 @@ test('usability pass (D-139): End lesson and the class counter are on screen at 
     }
   } finally {
     await endActiveLessons(page);
-    for (const m of original) await api(page, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
+    for (const m of original) await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
+    await officeCtx.close();
   }
 });

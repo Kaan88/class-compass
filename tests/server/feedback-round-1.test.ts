@@ -330,10 +330,12 @@ describe('per-class language (S13a, D-099)', () => {
   });
 });
 
-describe('counters reminder boxes (S13a, D-102)', () => {
-  it('are hidden by default and shown when the class+subject turns them on', async () => {
+describe('counters reminder boxes (S14a, D-143 supersedes D-102)', () => {
+  it('are shown by default (CNT-3) and a saved "off" stays off', async () => {
     const lessonId = await startLesson(s.teacherA, ctx());
     const read = async () => (await lessonState(s.teacherA, ctx())).counters;
+    expect((await read()).showReminderBoxes).toBe(true);
+    await ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/modules/counters`, { enabled: true, config: { showReminderBoxes: false } }));
     expect((await read()).showReminderBoxes).toBe(false);
     await ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/modules/counters`, { enabled: true, config: { showReminderBoxes: true } }));
     expect((await read()).showReminderBoxes).toBe(true);

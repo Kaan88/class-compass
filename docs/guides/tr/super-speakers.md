@@ -25,7 +25,7 @@ Yönetim menüsünden **Süper Konuşmacılar**'ı açın. **Aç ya da kapat** b
 - **Pano başlığı (İngilizce)** ve **Pano başlığı (Türkçe)** ile henüz kimsenin puanı yokken ve podyumda boş bir yer varken gösterilen **Pano mesajları**. Hazır mesaj için alanı boş bırakın.
 - **Pano dili** ve **Pano teması**.
 - **Pano sesi ve kutlama**: ilk üç değiştiğinde temanın kutlamasını oynatır. Varsayılan olarak kapalıdır. Tarayıcılar ses çalmak için birinin panoya bir kez tıklamasını bekleyebilir.
-- **Rozetler bu derse verilir**: puanlar bu derste Süper Konuşmacılar rozetlerini kazandırır (ilk puan, 5, 10 ve 25 puan). Varsayılan (**Otomatik: İngilizce dersi**), İngilizce adı "English" olan derstir. Böyle bir ders bulunamazsa siz bir ders seçene kadar Süper Konuşmacılar rozeti verilmez.
+- **Başarılar bu derse verilir**: puanlar bu derste Süper Konuşmacılar başarılarını kazandırır (ilk puan, 5, 10 ve 25 puan). Varsayılan (**Otomatik: İngilizce dersi**), İngilizce adı "English" olan derstir. Böyle bir ders bulunamazsa siz bir ders seçene kadar Süper Konuşmacılar başarısı verilmez.
 
 ## Puanlayıcı ve pano bağlantıları
 
@@ -49,7 +49,7 @@ Listede her bağlantının en son ne zaman kullanıldığı ve puanlayıcılar i
 
 ## Puan kaydı
 
-**Puan kaydı** sekmesi puanları en yeniden eskiye doğru, her birinin **Durum**u (**Sayılıyor** ya da nasıl kaldırıldığı) ve işlemiyle listeler; dönem, sınıf ve puanlayıcıya göre süzgeçler ile **Kaldırılan puanları göster** seçeneği vardır. **Kaldır** yanlış verilmiş bir puanı geri alır: bir neden yazın. Puan bundan sonra panoda ve raporlarda sayılmaz; kaldırma işlemi ve nedeni kayda geçer. Kazanılmış rozetler korunur. Kaldırmak bir puanı hiçbir zaman silmez; bir öğrencinin puanlarını yalnızca öğrenciyi kalıcı olarak silmek (yönetim alanı) siler.
+**Puan kaydı** sekmesi puanları en yeniden eskiye doğru, her birinin **Durum**u (**Sayılıyor** ya da nasıl kaldırıldığı) ve işlemiyle listeler; dönem, sınıf ve puanlayıcıya göre süzgeçler ile **Kaldırılan puanları göster** seçeneği vardır. **Kaldır** yanlış verilmiş bir puanı geri alır: bir neden yazın. Puan bundan sonra panoda ve raporlarda sayılmaz; kaldırma işlemi ve nedeni kayda geçer. Kazanılmış başarılar korunur. Kaldırmak bir puanı hiçbir zaman silmez; bir öğrencinin puanlarını yalnızca öğrenciyi kalıcı olarak silmek (yönetim alanı) siler.
 
 Puanlayıcı yalnızca kendi puanlarını ve yalnızca geri alma süresi içinde geri alabilir. Bu süreden sonra puanı yönetici buradan kaldırır.
 
@@ -57,7 +57,7 @@ Puanlayıcı yalnızca kendi puanlarını ve yalnızca geri alma süresi içinde
 
 **Geçmiş** sekmesi seçilen bir dönemi gösterir: **Haftanın kazananları** (her tam haftanın ilk üçü, panonun gösterdiği gibi; eşit puanlar aynı sırayı paylaşır), **Sınıf ve haftaya göre puanlar**, **Puanlayıcıya göre puanlar** ve **Öğrenciye göre puanlar**; her birinin CSV indirmesi vardır. Kaldırılan puanlar sayılmaz.
 
-Süper Konuşmacılar puanları rozet dersinin sınıf raporunda ve öğrenci zaman çizelgesinde de görünür (Öğretmen kılavuzu, "Raporlar ve CSV").
+Süper Konuşmacılar puanları başarı dersinin sınıf raporunda ve öğrenci zaman çizelgesinde de görünür (Öğretmen kılavuzu, "Raporlar ve CSV").
 
 ## Panonun şu anki hali
 
@@ -85,4 +85,4 @@ Bu özellik açıldığında:
 - Puanlar yalnızca artı yöndedir (+1). Eksi puan yoktur.
 - Pano ilk üç öğrencinin (eşit puanlıların hepsinin) adını soyadını, sınıfını ve avatarını, ayrıca 0 puanlı sınıflar dâhil sınıf toplamlarını gösterir.
 - Telefonda çevrimdışı verilen bir puan bağlantı geri geldiğinde gönderilir ve dokunulduğu güne sayılır (en fazla 4 gün geriye kadar).
-- Öğrenciler kendi sayfalarında hiçbir sıralama görmez; yalnızca kendi Süper Konuşmacılar rozetlerini görürler.
+- Öğrenciler kendi sayfalarında hiçbir sıralama görmez; yalnızca kendi Süper Konuşmacılar başarılarını görürler.

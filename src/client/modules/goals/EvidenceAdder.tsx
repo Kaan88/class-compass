@@ -219,7 +219,7 @@ export function EvidenceAdder({
                 }}
               >
                 <Icon />
-                {t(`evidence.mode.${m}`)}
+                <span className="cc-evidence-mode__label">{t(`evidence.mode.${m}`)}</span>
               </Button>
             );
           })}

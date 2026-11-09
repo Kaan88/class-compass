@@ -17,6 +17,7 @@ import { IconFace, IconFlag, IconPrev } from '../../ui/icons.tsx';
 import { MetricCell } from '../../ui/Students.tsx';
 import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
+import { playEvent } from '../../themes/index.tsx';
 import { awaitCommand, sendLessonCommand } from './lessonClient.ts';
 import { endStepUis, type ClassroomContext } from '../registry.ts';
 import type { ReflectionValue } from './ReflectionStep.tsx';
@@ -53,6 +54,7 @@ export function EndLessonFlow({
   const finish = async () => {
     setBusy(true);
     setError(null);
+    playEvent('lessonEnd');
     const steps = { ...values };
     const r = steps.reflection as ReflectionValue | undefined;
     if (r) steps.reflection = { rating: r.rating, note: r.note.trim() ? r.note.trim() : null };

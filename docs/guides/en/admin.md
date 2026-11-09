@@ -77,13 +77,13 @@ Single classes can also be moved with **Classes** → **Promote class**.
 
 ![Modules and media](../img/en/admin-modules.png)
 
-The page has five tabs: **Modules**, **Photos and media**, **Default goals**, **Default badges** and **Kind words**.
+The page has five tabs: **Modules**, **Photos and media**, **Default goals**, **Default achievements** and **Kind words**.
 
 - **Teacher modules**: modules switched off here are hidden for every teacher. Teachers switch the others on or off per class and subject.
 - **School-wide modules**: **Super Speakers** (off by default). See the [Super Speakers guide](super-speakers.md).
 - **Photos, audio and documents**: **Student photos**, **Photo evidence** and **Audio evidence** stay **off until consent is confirmed**. Turn them on only after the school has confirmed consent and its KVKK position. **Document evidence** (text, links and documents) is on by default and can be switched off.
 - **Default goals**: **Archive** (at the right of each row) removes a default category or goal from every class (goals students already have are kept); **Restore** brings it back. Teachers can also hide a default for their own classes only.
-- **Default badges**: archive a built-in badge for every class, or restore it. Badges with the same name show their tier (for example "· Bronze"). Badges already given are kept.
+- **Default achievements**: archive a built-in achievement for every class, or restore it. Achievements with the same name show their tier (for example "· Bronze"). Achievements already given are kept.
 - **Kind words**: **Blocked words** and **Allowed words** for the whole school (one per line; an allowed word wins), and how long a goal must be (**Words a goal needs at least**, default 3, and **Letters a goal needs at least**, default 12).
 
 *Turning a module off hides it but keeps all of its data.*

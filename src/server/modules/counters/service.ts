@@ -341,7 +341,7 @@ export function countersLessonState(ctx: RequestContext, context: ContextRow, cl
             }),
     };
   });
-  return { weekStart, weekEnd: weekEndOf(weekStart), counters: list, showReminderBoxes: moduleConfig(ctx.db, context.id, 'counters').showReminderBoxes === true };
+  return { weekStart, weekEnd: weekEndOf(weekStart), counters: list, showReminderBoxes: moduleConfig(ctx.db, context.id, 'counters').showReminderBoxes !== false };
 }
 
 // ---------------------------------------------------------------- commands

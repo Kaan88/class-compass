@@ -69,7 +69,7 @@ The teacher menu is the start page of the teacher area. **Open the classroom scr
 
 ![Start lesson: the attendance step](../img/en/start-lesson.png)
 
-A lesson keeps running when you refresh the page or switch to another class and back. A class with a running lesson is marked **Lesson in progress**. If the Wi-Fi drops, your taps are kept on the device and sent later; the save badge shows **Offline – N changes waiting**. Anything the server could not save appears under **Needs attention** with **Try again** and **Dismiss**.
+A lesson keeps running when you refresh the page or switch to another class and back. A class with a running lesson is marked **Lesson in progress**. If the Wi-Fi drops, your taps are kept on the device and sent later; the save status shows **Offline – N changes waiting**. Anything the server could not save appears under **Needs attention** with **Try again** and **Dismiss**.
 
 ### End a lesson
 
@@ -77,7 +77,7 @@ Press **End lesson**. Depending on the modules, you go through:
 
 - **Secret Students**: reveal the secret students and record their result (see [Secret Student](#secret-student)).
 - **Thank the assistant**.
-- **Well done!**: the automatic badges earned this lesson, only if the class chose this in Achievements.
+- **Well done!**: the automatic achievements earned this lesson, only if the class chose this in Achievements.
 - **Reflection**: **How did the lesson go?** (Tough, Okay, Good, Great) and an optional note for yourself.
 
 Press **Save and end lesson**. The summary **Lesson saved** shows the time, the routine stages reached and attendance. **Back to the lesson** cancels the end and returns to the running lesson.
@@ -97,7 +97,7 @@ Press **Save and end lesson**. The summary **Lesson saved** shows the time, the 
   - **Sounds on this device**.
 - **Teacher area** (asks for your PIN).
 
-**The main column** shows **Today's focus** (the lesson topic, with **Change**), the **student cards** and, under them, the module panels (counters, assistant, Secret Students, groups, homework, badges). **Show students** / **Hide students** folds the cards away.
+**The main column** shows **Today's focus** (the lesson topic, with **Change**), the **student cards** and, under them, the module panels (counters, assistant, Secret Students, groups, homework, achievements). **Show students** / **Hide students** folds the cards away.
 
 **The right-hand column** holds the routine and the timer. **Attendance** and **End lesson** always stay at the bottom of this column; if the column is longer than the screen, it scrolls on its own.
 
@@ -116,7 +116,7 @@ Short messages (for example **Lesson started**) appear for a moment at the botto
 
 A counter counts something for the whole class (the **class bar**) and/or for each student, for example English reminders. Tap **+** on the class bar to add one. When the bar is full, the chosen response appears once, calmly, and never names a student. If the response is "Class reset", **Start the bar again** sets the bar back to 0 (the taps stay recorded).
 
-Counts on the student cards are off by default; switch them on with **Reminder boxes on student cards** in Class settings → Counters. Every tap shows a short message with **Undo**. Counters are counts, never scores. Create and edit counters, their labels, limit, levels and responses on the **Counters** page; **Weekly history** shows counts per student and week.
+Each student card shows the student's count with a **+** button. To hide them for a class, switch off **Reminder boxes on student cards** in Class settings → Counters. Every tap shows a short message with **Undo**. Counters are counts, never scores. Create and edit counters, their labels, limit, levels and responses on the **Counters** page; **Weekly history** shows counts per student and week.
 
 ### Groups and the group screen
 
@@ -148,14 +148,14 @@ The assistant panel shows today's assistant and their responsibilities with tick
 
 A chosen student who is absent is replaced; a student who was away keeps their turn for a later round.
 
-### Achievements: giving a badge in class
+### Achievements: giving an achievement in class
 
-1. Press **Give a badge** on the achievements panel.
+1. Press **Give an achievement** on the achievements panel.
 2. **Who gets it?**: tick students or **Whole class**.
-3. **Choose a badge**. Tick **Celebrate on the display** for a short celebration with the badge, the names and the avatars.
+3. **Choose an achievement**. Tick **Celebrate on the display** for a short celebration with the achievement, the names and the avatars.
 4. Press **Give to N**.
 
-Right after you give a badge, a message at the bottom of the screen offers **Undo** for a few seconds. After that you can still undo a badge given in this lesson for 10 minutes (**Badges given this lesson** → **Undo**). Later, remove a badge given by mistake in the teacher area (see [Achievements and avatars](#achievements-and-avatars)). Automatic badges are never announced on the display; a class can collect them in the End Lesson step **Well done!**.
+Right after you give an achievement, a message at the bottom of the screen offers **Undo** for a few seconds. After that you can still undo an achievement given in this lesson for 10 minutes (**Achievements given this lesson** → **Undo**). Later, remove an achievement given by mistake in the teacher area (see [Achievements and avatars](#achievements-and-avatars)). Automatic achievements are never announced on the display; a class can collect them in the End Lesson step **Well done!**.
 
 ### Homework in class
 
@@ -206,7 +206,7 @@ On a student's goals page, **Private notes** are for you only. They are never sh
 
 ![Student links](../img/en/student-links.png)
 
-Every student has one **permanent personal link** to their own page (goals, reflections, evidence, your feedback, homework, badges and avatar). Links are made automatically when a student is added.
+Every student has one **permanent personal link** to their own page (goals, reflections, evidence, your feedback, homework, achievements and avatar). Links are made automatically when a student is added.
 
 On the **Student links** page, choose the class. For each student you can **Copy link**, show the QR code, or **Print card**. When the browser cannot copy by itself (for example on a school network without https), the link opens in a small window, already selected, so you can copy it by hand. **Print all cards** prints the whole class on A4: **Small (15 per A4 page)** or **Large (8 per A4 page)**; **Preview cards** shows them first. The QR codes are black on white in every theme.
 
@@ -228,13 +228,13 @@ On the **Achievements** page, choose the class and subject.
 
 **Students and settings**
 
-- The first time, Class Compass asks **How should badges start?**: **Award past achievements quietly** (badges for work done before today, without celebrations) or **Start fresh from today**. You can give badges by hand at any time before you choose.
-- **Automatic badges**, **Private levels on student pages** (each student sees only their own level; nothing is ranked) and **Show "Well done!" at the end of the lesson**.
-- Give a badge to a student, or **Remove** a badge given by mistake with a reason (kept in the history). Automatic badges follow what the student did and cannot be removed by hand.
+- The first time, Class Compass asks **How should achievements start?**: **Award past achievements quietly** (achievements for work done before today, without celebrations) or **Start fresh from today**. You can give achievements by hand at any time before you choose.
+- **Automatic achievements**, **Private levels on student pages** (each student sees only their own level; nothing is ranked) and **Show "Well done!" at the end of the lesson**.
+- Give an achievement to a student, or **Remove** an achievement given by mistake with a reason (kept in the history). Automatic achievements follow what the student did and cannot be removed by hand.
 
-**Badges**: all badges, grouped by kind (goals, evidence, homework…; tap a group to open it), each with its level (Bronze, Silver, Gold) next to the name. **Make your own badge**: a name, what it is for, a picture, a level and **How it is given** (**Given by the teacher**, or **Automatic** with a rule such as "adds evidence, 5 times"). **Hide for my classes** hides a built-in badge for your classes; **Show again** brings it back.
+**All achievements**: every achievement, grouped by kind (goals, evidence, homework…; tap a group to open it), each with its level (Bronze, Silver, Gold) next to the name. **Make your own achievement**: a name, what it is for, a picture, a level and **How it is given** (**Given by the teacher**, or **Automatic** with a rule such as "adds evidence, 5 times"). **Hide for my classes** hides a built-in achievement for your classes; **Show again** brings it back.
 
-Badges reward effort: none depends on attendance, speed or comparing students, and a student's page shows only their own badges and level. Badges appear on the classroom screen only when you celebrate one or the class shows **Well done!**.
+Achievements reward effort: none depends on attendance, speed or comparing students, and a student's page shows only their own achievements and level. Achievements appear on the classroom screen only when you celebrate one or the class shows **Well done!**.
 
 ![Avatars in the teacher area](../img/en/avatars.png)
 

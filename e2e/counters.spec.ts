@@ -9,7 +9,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { api, ensurePin, login, PIN } from './helpers.ts';
 
-/** The per-student reminder boxes on the cards are off by default since S13a (D-102); this test turns them on. */
+/** The per-student reminder boxes on the cards are on by default since S14a (D-143); this test sets them explicitly. */
 async function setReminderBoxes(page: Page, contextId: string, on: boolean) {
   const mods = (await api(page, 'GET', `/api/teacher/contexts/${contextId}/modules`)).body.modules as Array<{ module: string; enabled: boolean; config: Record<string, unknown> | null }>;
   const m = mods.find((x) => x.module === 'counters')!;

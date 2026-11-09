@@ -14,7 +14,7 @@ export const countersLessonState: LessonStateContributor = {
     if (!isModuleEnabled(ctx.db, context.id, 'counters')) return 'off';
     // First use in an English class+subject creates the English preset (CNT-1).
     svc.ensureDefaultCounters(ctx, context, getClass(ctx.db, context.classId));
-    return `${svc.countersStamp(ctx.db, context.id)}:${moduleConfig(ctx.db, context.id, 'counters').showReminderBoxes === true ? 'b' : 'n'}`;
+    return `${svc.countersStamp(ctx.db, context.id)}:${moduleConfig(ctx.db, context.id, 'counters').showReminderBoxes !== false ? 'b' : 'n'}`;
   },
   body: (ctx, context, lesson) => {
     if (!lesson || !isModuleEnabled(ctx.db, context.id, 'counters')) return null;

@@ -213,6 +213,13 @@ export const SOUND_EVENTS = [
   'fireworks',
   'pointAwarded',
   'softChime',
+  // S14a (D-145)
+  'lessonStart',
+  'lessonEnd',
+  'timerStart',
+  'groupMove',
+  'achievementGiven',
+  'soundTest',
 ] as const;
 export type SoundEvent = (typeof SOUND_EVENTS)[number];
 /** @deprecated name kept for older call sites: a sound is named by its event. */
