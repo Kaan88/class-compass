@@ -27,6 +27,8 @@ With **names** (only when the administrator allows student data, and only for to
 
 ## For administrators: switch it on
 
+![AI tools in the administration area](../img/en/ai-tools-admin.png)
+
 Open **AI tools** in the administration menu.
 
 - **AI tools are on**: switches the `/mcp` address on. While it is off, no token works and no new token can be made.
@@ -43,6 +45,8 @@ Switching AI tools off disconnects every connected app.
 If your school reaches Class Compass through Cloudflare Access, the IT person must let `/mcp`, the sign-in addresses for AI apps (`/oauth/…`) and their discovery addresses (`/.well-known/oauth-…`) through (see `docs/OPERATIONS.md`, "AI tools"): an AI tool cannot sign in to Cloudflare.
 
 ## Make a personal token
+
+![AI tools in Profile and PIN](../img/en/ai-tools-profile.png)
 
 Open **Profile** (teachers from the menu, administrators from the administration menu) and find **AI tools**. On a classroom computer the PIN is asked first.
 
@@ -92,6 +96,8 @@ claude mcp add --transport http class-compass https://school.example.org/mcp
 Then start Claude Code, type `/mcp`, choose **class-compass** and **Authenticate**. Your browser opens the consent page; its return address is on your own computer (for example `localhost:43215`), which the page points out. After **Allow** the browser says you can go back to the terminal, and Claude Code is connected. A personal token (above) keeps working too; use whichever you prefer.
 
 ## The consent page
+
+![The consent page](../img/en/oauth-consent.png)
 
 The page that opens when an AI app wants to connect is your decision, so read it:
 

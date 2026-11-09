@@ -17,7 +17,7 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { translate, type Locale, type MessageKey } from '../src/shared/i18n/index.ts';
-import { api, ensurePin, login, PIN, studentLinkUrl } from './helpers.ts';
+import { api, ensurePin, login, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
 
 const IMG_ROOT = path.resolve(import.meta.dirname, '../docs/guides/img');
 
@@ -104,12 +104,22 @@ for (const lang of ['en', 'tr'] as const) {
     const classLang = lang === 'tr' ? { mainLanguage: 'tr', secondLanguageEnabled: true } : { mainLanguage: 'en', secondLanguageEnabled: false };
     expect((await api(tp, 'PUT', `/api/teacher/classes/${ctx3A.classId}/language`, classLang)).status).toBe(200);
     expect((await api(ap, 'PUT', '/api/admin/speakers/settings', { boardLanguage: lang })).status).toBe(200);
+    let aiToolsOn = false;
 
     try {
       // ---------------------------------------------------------------- teacher area
       await tp.goto('/teacher');
       await expect(tp.getByTestId('teacher-menu')).toBeVisible();
       await shot(tp, lang, 'teacher-menu');
+
+      // S14e3 (D-156): the Class setup hub; (D-155) the notifications page.
+      await tp.goto('/teacher/setup');
+      await expect(tp.getByTestId('setup-hub')).toBeVisible();
+      await shot(tp, lang, 'setup-hub', { from: 'main h1' });
+      await tp.goto('/teacher/notifications');
+      await expect(tp.getByTestId('notifications-page')).toBeVisible();
+      await tp.waitForTimeout(800);
+      await shot(tp, lang, 'notifications', { from: 'main h1' });
 
       await tp.goto('/teacher/profile');
       await expect(tp.getByTestId('profile-page')).toBeVisible();
@@ -135,6 +145,24 @@ for (const lang of ['en', 'tr'] as const) {
       await expect(tp.getByTestId('teacher-goal').first()).toBeVisible();
       await shot(tp, lang, 'goals-student', { from: '[data-testid="teacher-student-goals"]' });
 
+      // S14d (D-152): the teacher's sentence starters on the library tab.
+      await tp.goto('/teacher/goals');
+      await expect(tp.getByTestId('goals-page')).toBeVisible();
+      await tp.getByLabel(T('teacher.chooseClass'), { exact: true }).selectOption({ label: classLabel });
+      await tp.getByRole('tab', { name: T('goals.tab.library') }).click();
+      await expect(tp.getByTestId('library-starters')).toBeVisible();
+      await shot(tp, lang, 'goals-starters', { from: '[data-testid="library-starters"]' });
+
+      // S14e2 (D-154): a student's name opens the statistics drawer.
+      await tp.goto('/teacher/students');
+      await tp.locator('main select').first().selectOption({ label: '3-A' });
+      await tp.getByTestId('student-name').nth(3).click();
+      const stats = tp.getByTestId('student-stats');
+      await expect(stats.getByTestId('student-stats-report')).toBeVisible();
+      await tp.waitForTimeout(1000);
+      await shot(tp, lang, 'student-stats');
+      await stats.getByTestId('dialog-close').click();
+
       await tp.goto('/teacher/homework');
       await expect(tp.getByTestId('homework-page')).toBeVisible();
       await tp.getByLabel(T('teacher.chooseClass'), { exact: true }).selectOption({ label: classLabel });
@@ -156,12 +184,44 @@ for (const lang of ['en', 'tr'] as const) {
       await expect(tp.getByRole('heading', { name: T('teacher.avatars'), level: 1 })).toBeVisible();
       await shot(tp, lang, 'avatars', { from: 'main h1' });
 
-      await tp.goto('/teacher/reports');
+      // The report deep link (D-153) opens 3-A English for this month.
+      await tp.goto(`/teacher/reports?contextId=${ctx3A.id}&period=month`);
       await expect(tp.getByRole('heading', { name: T('teacher.reports'), level: 1 })).toBeVisible();
-      await tp.getByLabel(T('report.ui.context'), { exact: true }).selectOption({ label: classLabel }).catch(() => undefined);
-      await tp.getByLabel(T('report.ui.period'), { exact: true }).selectOption({ label: T('report.preset.month') }).catch(() => undefined);
+      await expect(tp.getByLabel(T('report.ui.context'), { exact: true }).locator('option:checked')).toContainText(classLabel);
       await tp.waitForTimeout(800);
       await shot(tp, lang, 'reports', { from: 'main h1' });
+      // S14e1 (D-153): the view bar with the Customise tree open.
+      await tp.getByRole('button', { name: T('reportViews.customise'), exact: true }).click();
+      await expect(tp.getByTestId('report-view-tree')).toBeVisible();
+      await shot(tp, lang, 'report-views', { from: '.cc-report-viewbar' });
+      await tp.getByRole('button', { name: T('reportViews.customise'), exact: true }).click();
+
+      // ---------------------------------------------------------------- AI tools (S14h1/h2; switched on only here)
+      {
+        expect((await api(ap, 'PUT', '/api/admin/ai-tools', { mcpEnabled: true })).status).toBe(200);
+        aiToolsOn = true;
+        if (lang === 'en') {
+          const tok = await api(tp, 'POST', '/api/account/ai-tools/tokens', { name: 'Claude Code on my laptop', scopes: ['classes:read', 'reports:read', 'goals:read'], days: 30, currentPassword: PASSWORD });
+          expect(tok.status).toBe(200);
+        }
+        await ap.goto('/admin/ai-tools');
+        await expect(ap.getByTestId('admin-ai-tools')).toBeVisible();
+        await ap.waitForTimeout(600);
+        await shot(ap, lang, 'ai-tools-admin', { from: 'main h1' });
+        await tp.goto('/teacher/profile');
+        await expect(tp.getByTestId('ai-tools')).toBeVisible();
+        await shot(tp, lang, 'ai-tools-profile', { from: '[data-testid="ai-tools"]' });
+        // The consent page, as Claude Code opens it (a loopback address that is never reached here).
+        const callback = 'http://127.0.0.1:47123/callback';
+        const reg = await tp.request.post('/oauth/register', { headers: { 'content-type': 'application/json' }, data: JSON.stringify({ client_name: 'Claude Code', redirect_uris: [callback], token_endpoint_auth_method: 'none' }) });
+        expect(reg.status()).toBe(201);
+        const clientId = ((await reg.json()) as { client_id: string }).client_id;
+        const origin = new URL(tp.url()).origin;
+        const q = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: callback, code_challenge: 'D'.repeat(43), code_challenge_method: 'S256', state: 'docs', resource: `${origin}/mcp`, scope: 'classes:read reports:read' });
+        await tp.goto(`/oauth/authorize?${q.toString()}`);
+        await expect(tp.getByTestId('oauth-consent')).toBeVisible();
+        await shot(tp, lang, 'oauth-consent', { from: 'main h1' });
+      }
 
       await tp.goto('/teacher/import');
       await expect(tp.getByRole('heading', { name: T('import.title'), level: 1 })).toBeVisible();
@@ -185,6 +245,30 @@ for (const lang of ['en', 'tr'] as const) {
       await tp.getByRole('button', { name: T('routine.next') }).click().catch(() => undefined);
       await tp.waitForTimeout(1000);
       await shot(tp, lang, 'classroom');
+
+      // S14e2 (D-154): a name on a card opens the small positive card.
+      await tp.getByTestId('student-card-name').nth(2).click();
+      const card = tp.getByTestId('classroom-student-card');
+      await expect(card).toBeVisible();
+      await tp.waitForTimeout(600);
+      await shot(tp, lang, 'classroom-card');
+      await card.getByTestId('dialog-close').click();
+      await expect(card).toBeHidden();
+
+      // S14b (D-148): Customise layout (PIN, then the editor with the timer box selected); Cancel relocks.
+      await tp.getByTestId('classroom-settings').click();
+      await tp.getByTestId('customise-layout').click();
+      const pinDialog = tp.getByTestId('pin-dialog');
+      await expect(pinDialog).toBeVisible();
+      await pinDialog.locator('input').first().fill(PIN);
+      await pinDialog.locator('input').first().press('Enter');
+      const editor = tp.getByTestId('layout-editor');
+      await expect(editor).toBeVisible();
+      await tp.locator('[data-testid="layout-frame-core.timer"]').click().catch(() => undefined);
+      await tp.waitForTimeout(400);
+      await shot(tp, lang, 'layout-editor');
+      await editor.getByRole('button', { name: T('common.cancel'), exact: true }).click();
+      await expect(editor).toHaveCount(0);
 
       // Groups: from the board's dock (S14b) the full-screen group screen; choose an option.
       const groups = tp.getByTestId('dock-groups');
@@ -236,6 +320,14 @@ for (const lang of ['en', 'tr'] as const) {
       await ap.goto('/admin/maintenance');
       await expect(ap.getByRole('heading', { name: T('admin.maintenance'), level: 1 })).toBeVisible();
       await shot(ap, lang, 'admin-maintenance', { from: 'main h1' });
+      // S14g (D-158): the worked example theme checked and previewed (not saved).
+      await ap.goto('/admin/themes');
+      await expect(ap.getByRole('heading', { name: T('themes.title'), level: 1 })).toBeVisible();
+      await ap.getByTestId('theme-file').setInputFiles({ name: 'ocean.theme.json', mimeType: 'application/json', buffer: fs.readFileSync(path.resolve(import.meta.dirname, '../docs/examples/ocean.theme.json')) });
+      await ap.getByRole('button', { name: T('themes.import.check'), exact: true }).click();
+      await expect(ap.getByTestId('theme-package-preview')).toBeVisible();
+      await ap.waitForTimeout(600);
+      await shot(ap, lang, 'admin-themes', { from: '[data-testid="theme-report"]' });
       await ap.goto('/admin/super-speakers');
       await expect(ap.getByTestId('speakers-admin')).toBeVisible();
       await shot(ap, lang, 'speakers-admin', { from: 'main h1' });
@@ -279,9 +371,9 @@ for (const lang of ['en', 'tr'] as const) {
         const withLink = students.filter((s) => s.link?.url);
         // A student with goals and an avatar from the demo history makes the clearest picture.
         let chosen = withLink[0]!.id;
-        for (const s of withLink.slice(0, 8)) {
+        for (const s of withLink) {
           const g = await api(tp, 'GET', `/api/teacher/contexts/${ctx3A.id}/students/${s.id}/goals`);
-          if (g.status === 200 && (g.body?.goals?.length ?? 0) > 0 && (g.body?.evidence?.length ?? 0) > 0) {
+          if (g.status === 200 && ((g.body?.goals ?? []) as Array<{ status: string }>).some((x) => x.status !== 'archived') && (g.body?.evidence?.length ?? 0) > 0) {
             chosen = s.id;
             break;
           }
@@ -299,6 +391,26 @@ for (const lang of ['en', 'tr'] as const) {
         await expect(page.getByTestId('student-goals')).toBeVisible();
         await shot(page, lang, 'student-goals', { from: '#student-screen-title' });
         await page.getByTestId('student-back').click();
+        // New goal → a category → "My own words" with a sentence starter tapped.
+        await page.getByTestId('student-tile-newGoal').click();
+        await page.locator('.cc-student-choices .cc-student-choice').first().click();
+        await page.getByRole('button', { name: T('student.newGoal.own'), exact: true }).click();
+        await page.getByTestId('sentence-starters').getByRole('button').first().click();
+        await page.waitForTimeout(400);
+        await shot(page, lang, 'student-new-goal', { from: '#student-screen-title' });
+        // How is it going? → a goal → the five faces.
+        const home = new URL(page.url()).pathname;
+        await page.goto(home);
+        await page.getByTestId('student-tile-howIsItGoing').click();
+        await page.locator('.cc-student-choices--list .cc-student-choice').first().click();
+        await expect(page.getByTestId('how-face-4')).toBeVisible();
+        await shot(page, lang, 'student-how', { from: '#student-screen-title' });
+        // Show my work: how do you want to show it?
+        await page.goto(home);
+        await page.getByTestId('student-tile-showMyWork').click();
+        await expect(page.getByTestId('evidence-form')).toBeVisible();
+        await shot(page, lang, 'student-work', { from: '#student-screen-title' });
+        await page.goto(home);
         await page.getByTestId('student-tile-avatar').click();
         await page.getByTestId('avatar-change').click();
         await expect(page.getByTestId('avatar-creator')).toBeVisible();
@@ -308,6 +420,8 @@ for (const lang of ['en', 'tr'] as const) {
         await phone.close();
       }
     } finally {
+      // AI tools are off in the demo school; switching them off also ends the example connection (D-160).
+      if (aiToolsOn) await api(ap, 'PUT', '/api/admin/ai-tools', { mcpEnabled: false });
       await api(tp, 'POST', '/api/auth/pin/unlock', { pin: PIN });
       await api(tp, 'PUT', `/api/teacher/classes/${ctx3A.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false });
       await api(ap, 'PUT', '/api/admin/speakers/settings', { boardLanguage: 'en' });

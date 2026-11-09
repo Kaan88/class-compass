@@ -27,6 +27,8 @@ Yapay zekâ araçları bir yönetici açana kadar **kapalıdır**. Yönetici, ok
 
 ## Yöneticiler için: açma
 
+![Yönetim alanında yapay zekâ araçları](../img/tr/ai-tools-admin.png)
+
 Yönetim menüsünde **Yapay zekâ araçları**’nı açın.
 
 - **Yapay zekâ araçları açık**: `/mcp` adresini açar. Kapalıyken hiçbir anahtar çalışmaz ve yeni anahtar oluşturulamaz.
@@ -43,6 +45,8 @@ Yapay zekâ araçlarını kapatmak, bütün bağlı uygulamaların bağlantısı
 Okulunuz Sınıf Pusulası’na Cloudflare Access üzerinden ulaşıyorsa, bilişim sorumlusunun `/mcp` adresini, yapay zekâ uygulamalarının giriş adreslerini (`/oauth/…`) ve bulma adreslerini (`/.well-known/oauth-…`) dışarıda bırakması gerekir (bkz. `docs/OPERATIONS.md`, "AI tools"): bir yapay zekâ aracı Cloudflare’e giriş yapamaz.
 
 ## Kişisel anahtar oluşturma
+
+![Profil ve PIN sayfasında yapay zekâ araçları](../img/tr/ai-tools-profile.png)
 
 **Profil**’i açın (öğretmenler menüden, yöneticiler yönetim menüsünden) ve **Yapay zekâ araçları** bölümünü bulun. Sınıf bilgisayarında önce PIN sorulur.
 
@@ -92,6 +96,8 @@ claude mcp add --transport http class-compass https://school.example.org/mcp
 Ardından Claude Code’u başlatın, `/mcp` yazın, **class-compass**’ı ve **Authenticate**’i seçin. Tarayıcınızda izin sayfası açılır; dönüş adresi kendi bilgisayarınızdadır (örneğin `localhost:43215`) ve sayfa bunu belirtir. **İzin ver**’den sonra tarayıcı terminale dönebileceğinizi söyler ve Claude Code bağlanmış olur. Kişisel anahtar (yukarıda) da çalışmaya devam eder; hangisini isterseniz onu kullanın.
 
 ## İzin sayfası
+
+![İzin sayfası](../img/tr/oauth-consent.png)
 
 Bir yapay zekâ uygulaması bağlanmak istediğinde açılan sayfa sizin kararınızdır; lütfen okuyun:
 

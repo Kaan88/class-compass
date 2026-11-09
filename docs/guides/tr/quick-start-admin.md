@@ -12,4 +12,8 @@ Sınıf Pusulası'nda bir okulu kurmak. Her sayfa [Yönetici kılavuzu](admin.md
 
 Sonra **Bakım** sayfasını düzenli olarak kontrol edin: yedeklerin durumu ve uyarılar. Yedekten geri yükleme sunucuda yapılır (bkz. `docs/OPERATIONS.md`).
 
-İsteğe bağlı: okul geneli İngilizce puan panosu **Süper Konuşmacılar**'ı açın ([Süper Konuşmacılar kılavuzu](super-speakers.md)).
+İsteğe bağlı:
+
+- **Süper Konuşmacılar**, okul geneli İngilizce puan panosu ([Süper Konuşmacılar kılavuzu](super-speakers.md)).
+- **Temalar**: bir tema paketini içe aktarın, önizleyin ve öğretmenler için açın ([Temalar](admin.md#temalar)).
+- **Yapay zekâ araçları**: öğretmenlerin bir yapay zekâ asistanı bağlamasına izin verin; öğrenci adları varsayılan olarak okulda kalır ([Yapay zekâ araçları kılavuzu](ai-tools.md)).

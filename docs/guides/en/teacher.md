@@ -52,7 +52,20 @@ In **Profile and PIN** you also choose your **Language** and **Text size** (they
 
 ![The teacher menu](../img/en/teacher-menu.png)
 
-The teacher menu is the start page of the teacher area. **Open the classroom screen** (or **Back to the classroom**) takes you to the lesson screen. The tiles open the pages of the teacher area. Only modules that are switched on for at least one of your classes have pages here. **Help** opens these guides. On the other pages of the teacher area, the row of links at the top opens every page; on a phone or tablet it is one **Page** list.
+The teacher menu is the start page of the teacher area. It has three parts:
+
+- **Open the classroom screen** (or **Back to the classroom**) takes you to the lesson screen.
+- **Today**: the pages you use every day: **Attendance**, **Homework**, **Goals**, **Reports** and **Notifications** (the bell, with the number of new notifications; see [Notifications](#notifications)).
+- **Class setup**: one tile for everything you set up once and change now and then. It opens a page with three tabs:
+  - **Classes and students**: **Class settings**, **Students**, **Import a student list**, **Student links**, **Avatars**.
+  - **Lesson tools**: **Lesson topics**, **Routines**, **Counters**, **Daily Assistant**, **Secret Students**, **Grouping**.
+  - **Achievements and kind words**: **Achievements**, **Kind words check**.
+
+Under them, **Profile and PIN**, **Help** (these guides), **Leave classroom mode on this device** (only in classroom mode) and **Sign out**.
+
+Pages of a module that is switched off in all your classes are left out of the menu. If you open such a page from an old bookmark, it says that the module is switched off and offers **Open Class settings**; nothing was deleted. On the other pages of the teacher area, the row of links at the top (with the bell) opens the pages; on a phone or tablet it is one **Page** list.
+
+![Class setup](../img/en/setup-hub.png)
 
 ## Starting and ending a lesson
 
@@ -62,7 +75,7 @@ The teacher menu is the start page of the teacher area. **Open the classroom scr
 2. If you teach more than one class or subject, tap the class at the top, for example **3-A · English**. The active class and subject are always shown at the top, so nothing is recorded in the wrong class.
 3. Press **Start lesson**. The steps depend on the modules that are on:
    - **Attendance**: everyone is present unless you change it. Tap a student to switch between absent, late, excused and present.
-   - **Today's assistant**: who helps today.
+   - **Today's assistant**: who helps today, with their duties. Tick what the assistant has already done (for example "Help organise the classroom"); the ticks are saved when the lesson begins.
    - **Today's topic**: the focus of the lesson (Listening, Reading, Vocabulary, Grammar, Writing, Speaking, Phonics or your own topics). The weekly plan from **Lesson topics** suggests it; you can change it.
    - **Routine**: choose the routine for this lesson.
 4. Press **Begin lesson**.
@@ -76,7 +89,7 @@ A lesson keeps running when you refresh the page or switch to another class and 
 Press **End lesson**. Depending on the modules, you go through:
 
 - **Secret Students**: reveal the secret students and record their result (see [Secret Student](#secret-student)).
-- **Thank the assistant**.
+- **Thank the assistant**: tick the duties the assistant did today, then thank them.
 - **Well done!**: the automatic achievements earned this lesson, only if the class chose this in Achievements.
 - **Reflection**: **How did the lesson go?** (Tough, Okay, Good, Great) and an optional note for yourself.
 
@@ -95,22 +108,47 @@ Press **Save and end lesson**. The summary **Lesson saved** shows the time, the 
   - **Class language**: only when the class uses two languages, to switch the screen between them.
   - **Size**: **Compact**, **Normal** or **Large**. Pick what is readable from the back of the room; the screen also fits itself to the display. The choice is remembered on this device.
   - **Sounds on this device**.
+  - **Customise layout** (see [Customise layout](#customise-layout)).
+  - **Sound check** (see [Sounds and celebrations](#sounds-and-celebrations)).
 - **Teacher area** (asks for your PIN).
 
-**The main column** shows **Today's focus** (the lesson topic, with **Change**), the **student cards** and, under them, the module panels (counters, assistant, Secret Students, groups, homework, achievements). **Show students** / **Hide students** folds the cards away.
+Under the top bar the lesson board is built from boxes, from top to bottom:
 
-**The right-hand column** holds the routine and the timer. **Attendance** and **End lesson** always stay at the bottom of this column; if the column is longer than the screen, it scrolls on its own.
+1. **A wide row** with the **routine**, every stage visible, next to a big **timer**.
+2. **Today's focus** (the lesson topic, with **Change**) and the **counter bar**.
+3. **The student cards**, across the whole width. **Hide students** / **Show students** above them folds the cards away (for example while you show something on the board).
+4. **Lesson tools**: a row of big buttons at the bottom: **Attendance**, **Daily Assistant**, **Secret Students**, **Groups**, **Homework** and **Achievements**. A button opens its panel full screen; the board under it waits until you close the panel with **Close** (or the Escape key). Messages and **Undo** for what you do in a panel appear inside the panel. A small number on a button counts something for the class, for example the secret students chosen; it never shows anything private. **End lesson** always stays at the end of the row.
 
-Short messages (for example **Lesson started**) appear for a moment at the bottom left. Messages with **Undo** stay a little longer.
+A box whose module is switched off for this class is simply not there, and its neighbours take the space. Short messages (for example **Lesson started: 3-A · English**) appear for a moment at the bottom left. Messages with **Undo** stay a little longer.
+
+**With a keyboard** (for example on a laptop connected to the projector): Tab moves from box to box and to the buttons inside them, Enter or the space bar presses a button, and Escape closes a full-screen panel.
+
+### Customise layout
+
+![Customise layout](../img/en/layout-editor.png)
+
+You can move and resize the boxes of the board yourself, for example to make the timer bigger or to put the counters in the lesson tools row:
+
+1. **Display** → **Customise layout**. It asks for your PIN, because the layout belongs to you.
+2. Drag a box by its handle to another place, or onto the **Lesson tools** row to make it a button there; drag the line between two boxes to change their width or height. Or select a box and use the buttons above it (**Move … left**, **Wider**, **Taller**, **Move to lesson tools**, **Show as a box**…). With the keyboard: Enter picks a box up, the arrow keys move it, Shift with the arrow keys changes its size, Enter puts it down, Escape cancels.
+3. **Undo** takes back the last change. Under **Save for**, choose **This class** or **All my classes**, then **Save**. **Reset** goes back to the default layout; **Cancel** leaves without saving.
+
+The teacher area locks again as soon as you save or cancel. Customise layout needs a wide screen; on a narrow window the button says **Needs a wider screen.** A layout saved for one class wins over the one for all your classes.
+
+### A student's card on the classroom screen
+
+![A student's card on the classroom screen](../img/en/classroom-card.png)
+
+Tap a student's **name** on their card to open a small card for the class to see: **Recent achievements**, **Super Speakers this week** (their own points), **Daily assistant** (days this term) and **Counters** (only while the reminder boxes are on). It shows only positive things: never attendance, homework, goals, notes, levels or comparisons with other students, and it has no link to statistics. The **+** on the student card still counts a reminder, as before. Statistics are only in the teacher area (see [Student statistics](#student-statistics)).
 
 ### Routine and timer
 
-- **Routine**: the current stage (**Now · stage 2 of 6**). Use **Next stage** and **Previous stage**, or tap a stage.
-- **Timer**: choose 1, 3, 5, 10 or 15 minutes, or **Number keys** to type a time (1 3 0 is 1:30). **Start**, **Pause** and **Reset**. When the time is up, Class Compass plays what the class chose in **Class settings** → **When the timer ends**.
+- **Routine**: the current stage (**Now · stage 2 of 6**), with every stage of the routine in view. Use **Next stage** and **Previous stage**, or tap a stage.
+- **Timer**: choose 1, 3, 5, 10 or 15 minutes, or **Set time** to type a time on the number keys (1 3 0 is 1:30). **Start**, **Pause** and **Reset**. When the time is up, Class Compass plays what the class chose in **Class settings** → **When the timer ends**.
 
 ### Attendance during the lesson
 
-**Attendance** opens the list for today. A change normally applies to the **whole day** and is shared with the other teachers of the class. Tick **Only for this lesson** when a student arrives late or leaves during the day. **Everyone else present** fills the rest. Older days and lesson exceptions are on the **Attendance** page of the teacher area.
+**Attendance** (in the lesson tools row) opens the list for today. A change normally applies to the **whole day** and is shared with the other teachers of the class. Tick **Only for this lesson** when a student arrives late or leaves during the day. **Everyone else present** fills the rest. Older days and lesson exceptions are on the **Attendance** page of the teacher area.
 
 ### Counters
 
@@ -122,7 +160,7 @@ Each student card shows the student's count with a **+** button. To hide them fo
 
 ![The group screen](../img/en/group-screen.png)
 
-Press **Choose groups** (or **Open groups** when groups are already shown). The full-screen group screen shows the group options; the four default options are Lions, Eagles, Dolphins and Tigers, each giving Group 1 to Group 5.
+Press **Groups** in the lesson tools row (when Groups is a box on your board: **Choose groups**, or **Open groups** when groups are already shown). The full-screen group screen shows the group options; the four default options are Lions, Eagles, Dolphins and Tigers, each giving Group 1 to Group 5.
 
 - Tap an option to make groups for the students who are here. Absent students are left out for this lesson only.
 - **Shuffle** makes new groups; **Undo shuffle** brings the previous ones back.
@@ -137,11 +175,11 @@ Levels, pair rules ("should / should not work together") and their notes are **n
 
 ### Daily assistant
 
-The assistant panel shows today's assistant and their responsibilities with tick boxes. If the assistant is marked absent, the next student takes over automatically. **Hide** / **Show the assistant** hides the panel for this lesson; the default is set on the **Daily Assistant** page (**Settings**: school days, responsibilities, **Show the assistant panel in lessons**). On the **Week** tab you **Plan this week**, **Announce** the plan, swap two days or **Set assistant** for a day; **History** shows the turns.
+**Daily Assistant** (in the lesson tools row) shows today's assistant and their responsibilities with tick boxes; the ticks from the start screen are already there. If the assistant is marked absent, the next student takes over automatically. **Hide** / **Show the assistant** hides the panel for this lesson; the default is set on the **Daily Assistant** page (**Settings**: school days, responsibilities, **Show the assistant panel in lessons**). On the **Week** tab you **Plan this week**, **Announce** the plan, swap two days or **Set assistant** for a day; **History** shows the turns.
 
 ### Secret Student
 
-1. During the lesson press **Choose secret students**. Class Compass picks students who are present (2 by default; 1 to 10 on the **Secret Students** page). Nobody, not even you, sees who until the end of the lesson. **Choose again** puts them back and picks new ones.
+1. During the lesson open **Secret Students** and press **Choose secret students**. Class Compass picks students who are present (2 by default; 1 to 10 on the **Secret Students** page). Nobody, not even you, sees who until the end of the lesson. **Choose again** puts them back and picks new ones.
 2. At **End lesson**, press **Reveal the secret students**. A short countdown with a drum roll plays (**Show at once** skips it).
 3. Under **For your records**, record a result for each: **Goal met**, **Still practising** or **Not assessed**, with an optional note.
 4. **Celebrate {name}** plays the celebration for that student.
@@ -150,7 +188,7 @@ A chosen student who is absent is replaced; a student who was away keeps their t
 
 ### Achievements: giving an achievement in class
 
-1. Press **Give an achievement** on the achievements panel.
+1. Open **Achievements** and press **Give an achievement**.
 2. **Who gets it?**: tick students or **Whole class**.
 3. **Choose an achievement**. Tick **Celebrate on the display** for a short celebration with the achievement, the names and the avatars.
 4. Press **Give to N**.
@@ -159,7 +197,7 @@ Right after you give an achievement, a message at the bottom of the screen offer
 
 ### Homework in class
 
-If **Allow checking on the classroom screen** is on (Homework → Settings; off by default), the homework panel shows the homework due this week with a **Check** button for each. **Close** is next to the title of the checking list. Private notes are never shown on the classroom screen.
+If **Allow checking on the classroom screen** is on (Homework → Settings; off by default), **Homework** shows the homework due this week with a **Check** button for each. **Close** is next to the title of the checking list. Private notes are never shown on the classroom screen.
 
 ### Sounds and celebrations
 
@@ -196,6 +234,17 @@ On the **Goals** page, choose the class and subject. The **Students** tab lists 
 - **Hide from student page** hides a student's goal, entry or evidence from their page (for example after a mistake). The words are kept as the student wrote them, and the change is recorded.
 
 The **Categories and preset goals** tab holds the school's default categories and goals and your own. **Archive** hides a default for your classes only (other teachers are not affected); **Restore** brings it back. Items marked "Archived by the school" were archived by the administrator. **Outcome labels** sets the four labels you use when you assess a goal.
+
+### Sentence starters
+
+![Sentence starters in the Goals library](../img/en/goals-starters.png)
+
+On their page, students can tap a **sentence starter** to begin writing, for example "I want to get better at ___." The starter goes into the box with the ___ selected, and the student types their own words in its place. A starter sent unchanged is not saved: the student is asked to finish the sentence.
+
+The **Sentence starters** list is on the **Categories and preset goals** tab. Class Compass has built-in starters in English and Turkish for each place where students write (**Where students see it**: **New goal: my own words**, **New goal: practice ideas**, **How is it going?**, **Something I learned**, **Note to myself**, **Show my work: words** and **Show my work: a few words about a picture, file or link**).
+
+- **New sentence starter**: choose where students see it, optionally **Only for goals in this category**, write the starter in English and/or Turkish with ___ where the student writes, and press **Add sentence starter**. Class Compass checks that the starter reads as a kind, real sentence once a word is put in place of ___.
+- **Archive** hides a built-in starter for your classes only; **Restore** brings it back. Starters archived by the administrator are gone for the whole school.
 
 When a student types an unkind word or nonsense, Class Compass asks them kindly to change it and does not save the text. See [Kind words check](#kind-words-check).
 
@@ -263,11 +312,43 @@ Choose the class and subject at the top.
 
 ![Reports](../img/en/reports.png)
 
-On the **Reports** page, choose the **Class and subject**, the **Period** (**Day**, **Week**, **Month**, **Term**, **School year** or **Custom**) and, optionally, one **Student** (then you also see their **Timeline**). Sections follow the modules: overview, attendance, counters, homework, goals and skills, reflections, assistant, Secret Students, grouping, achievements and topics.
+On the **Reports** page, choose the **Class and subject**, the **Period** (**Day**, **Week**, **Month**, **Term**, **School year** or **Custom**) and, optionally, one **Student** (then you also see their **Timeline**). Sections follow the modules: overview, attendance, counters, homework, goals and skills, reflections, assistant, Secret Students, grouping, achievements, Super Speakers and topics. Each section can be folded with its title; **Open all sections** and **Close all sections** do it for every section.
+
+### Report views
+
+![Customising a report view](../img/en/report-views.png)
+
+A **View** is a choice of sections, so a report shows only what you need:
+
+- Built-in views: **Everything**, **Attendance & homework**, **Goals & reflections**, **Classroom tools**, **Achievements & Super Speakers** and **Student overview** (one row per student in each area).
+- **Customise** opens the list of sections and their tables; tick what to show. The view then says "(changed, not saved)". **Save as new view…** keeps the choice under a name (up to 30 views); **Save changes to “…”** updates a view of your own; **Undo changes** goes back; **Delete view** deletes only the saved choice, never report data. A view saves only the choice of sections, not the class, student or period.
+- **Make default**: the view marked ★ opens first on the Reports page, on every device you sign in on.
+
+The address of the page always holds the class, student, view and period, so a bookmark or a link from another page (for example **Open full report** in a student's statistics, or **Open** on a notification) opens the same report again.
 
 - Every number says what it is out of. "Not recorded" means nobody recorded it and is never counted as 0. There is no overall score.
 - **CSV** under each table downloads it for a spreadsheet; **Print** prints the report on A4.
 - You see only your own classes and subjects, also from earlier years; an ended assignment covers only the days you taught it.
+
+## Student statistics
+
+![A student's statistics](../img/en/student-stats.png)
+
+In the teacher area, a student's **name** opens their statistics almost everywhere: on **Students**, **Attendance**, **Student links**, **Avatars**, **Homework**, **Daily Assistant**, **Secret Students**, the **Kind words check** and in every report table. Where the name already does something (on **Goals** and **Achievements** it opens the student), a small **Statistics for …** button next to it opens them instead.
+
+The statistics panel shows the class and subject (choose another one if the student is in several of your classes), a period, the **Student overview** report in short sections and the **Latest events**. **Open full report** opens the Reports page for that student. Only you see this panel; it is never shown on the classroom screen, where a name opens only the small positive card (see [A student's card on the classroom screen](#a-students-card-on-the-classroom-screen)).
+
+## Notifications
+
+![Notifications](../img/en/notifications.png)
+
+The **bell** on the teacher menu and in the row of links shows how many new things your students did on their own pages: new or changed goals, goals reached, reflections, notes, self-assessments, work they showed (writing, links, pictures, documents, voice), achievements earned, avatars changed, a student link opened on a new device, text stopped by the kind words check (a count only) and Super Speakers points (one line a day). Only students you teach now are listed, and only for modules that are on.
+
+On the **Notifications** page:
+
+- Lines are grouped by student. Filter with **Show** (**All** or **New only**), **Kind** and **Class**. A short piece of the student's text is shown where there is one; text that was hidden, deleted or stopped never appears.
+- **Open** takes you to the right page with the class and the student chosen (their goals, their achievements, the report…). **Mark as read** marks one student's lines; **Mark all as read** (or **Mark these as read** with a filter on) marks the rest.
+- The **Settings** tab: **What to show under the bell** (tick the kinds you want) and the **Daily email**: **Send me a daily email** after the hour you choose. The email says only how many new things are waiting; **Name the students in the email** adds each student's name with a count. It never contains what students wrote. The email needs an email address on your account and a school that sends email; the tab tells you when one is missing.
 
 ## Students and importing a student list
 
@@ -287,10 +368,11 @@ Files are read on the school's own server only. Photos are read with text recogn
 
 ## Other teacher pages
 
-- **Attendance**: any day of your classes, with notes and lesson exceptions; who recorded what.
-- **Lesson topics**: the weekly plan (up to 3 topics a day) and your own topics with icons.
-- **Routines**: your routines and their stages, and the routine for each class. A running lesson keeps its routine.
-- **Counters**, **Daily Assistant**, **Secret Students**, **Grouping**: the settings and history of these modules.
+- **Attendance** (Today): any day of your classes, with notes and lesson exceptions; who recorded what.
+- **Lesson topics** (Class setup → Lesson tools): the weekly plan (up to 3 topics a day) and your own topics with icons.
+- **Routines** (Class setup → Lesson tools): your routines and their stages, and the routine for each class. A running lesson keeps its routine.
+- **Counters**, **Daily Assistant**, **Secret Students**, **Grouping** (Class setup → Lesson tools): the settings and history of these modules.
+- **AI tools** (in **Profile and PIN**, only when your administrator switched AI tools on): personal tokens and connected AI apps. See the [AI tools guide](ai-tools.md).
 
 ## Getting help
 

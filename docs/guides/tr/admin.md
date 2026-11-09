@@ -82,11 +82,32 @@ Sayfanın beş sekmesi vardır: **Modüller**, **Fotoğraf ve medya**, **Varsay�
 - **Öğretmen modülleri**: burada kapatılan modüller bütün öğretmenlerden gizlenir. Diğerlerini öğretmenler sınıf ve ders bazında açar ya da kapatır.
 - **Okul geneli modüller**: **Süper Konuşmacılar** (varsayılan olarak kapalı). Bkz. [Süper Konuşmacılar kılavuzu](super-speakers.md).
 - **Fotoğraf, ses ve belgeler**: **Öğrenci fotoğrafları**, **Fotoğraf kanıtı** ve **Ses kaydı kanıtı** **izinler doğrulanana kadar kapalıdır**. Bunları ancak okul velilerin iznini ve KVKK kapsamındaki tutumunu netleştirdikten sonra açın. **Belge kanıtı** (metin, bağlantı ve belgeler) varsayılan olarak açıktır ve kapatılabilir.
-- **Varsayılan hedefler**: **Arşivle** (her satırın sağında) bir varsayılan kategoriyi ya da hedefi bütün sınıflardan kaldırır (öğrencilerin hâlihazırdaki hedefleri korunur); **Geri getir** geri getirir. Öğretmenler de bir varsayılanı yalnızca kendi sınıflarında gizleyebilir.
+- **Varsayılan hedefler**: **Arşivle** (her satırın sağında) bir varsayılan kategoriyi ya da hedefi bütün sınıflardan kaldırır (öğrencilerin hâlihazırdaki hedefleri korunur); **Geri getir** geri getirir. Öğretmenler de bir varsayılanı yalnızca kendi sınıflarında gizleyebilir. Aynı sekmede, öğrencilerin yazmaya başlamak için dokunabildiği **Varsayılan cümle başlangıçları** da bulunur (bkz. Öğretmen kılavuzu, "Cümle başlangıçları"): **Arşivle** bir başlangıcı okuldaki bütün sınıflardan kaldırır.
 - **Varsayılan başarılar**: hazır bir başarıyı bütün sınıflar için arşivleyin ya da geri getirin. Aynı adı taşıyan başarılar düzeylerini de gösterir (örneğin "· Bronz"). Verilmiş başarılar korunur.
 - **Nazik sözcükler**: bütün okul için **Engellenen sözcükler** ve **İzin verilen sözcükler** (satır başına bir; izin verilen sözcük her zaman kazanır) ve bir hedefin ne kadar uzun olması gerektiği (**Bir hedefte en az sözcük**, varsayılan 3, ve **Bir hedefte en az harf**, varsayılan 12).
 
 *Bir modülü kapatmak onu gizler ama tüm verilerini korur.*
+
+## Temalar
+
+![Tema içe aktarmak](../img/tr/admin-themes.png)
+
+Tema; sınıf ekranının, öğrenci sayfalarının ve Süper Konuşmacılar panosunun renklerini, yazılarını, biçimlerini, maskotunu, resimlerini, seslerini ve kutlamalarını belirler. **Temalar** sayfası **Hazır temalar**'ı (**Önizle** ile) ve okulunuzun içe aktardığı temaları listeler. Öğretmenler sınıfları için temayı Sınıf ayarları'ndan seçer; siz de **Sınıflar** sayfasından ve Süper Konuşmacılar panosu için seçebilirsiniz.
+
+Yeni bir tema bir **tema paketi** olarak gelir: tek bir JSON dosyası; örneğin tema kılavuzundan yararlanarak bir yapay zekâ asistanıyla ya da bir meslektaşınızın hazırladığı. Paket yalnızca renkler, boyutlar ve çizimler içerir, asla program içermez; Sınıf Pusulası her parçasını denetler.
+
+1. **Tema içe aktar** altında **Tema dosyası (.json)**'nı seçin ya da metnini **Tema paketi (JSON)** kutusuna yapıştırın ve **Paketi denetle**'ye basın.
+2. **Denetim sonucu** hataları (örneğin arka planı üzerinde okunamayacak kadar soluk bir yazı rengi: dosyada ya da metin kutusunda düzeltip yeniden denetleyin) ve **Notlar**'ı listeler. Henüz hiçbir şey kaydedilmemiştir.
+3. Önizlemeye bakın: **Sınıf ekranı**, **Öğrenci sayfası**, **Süper Konuşmacılar panosu**, **Kutlama** (**Kutlamayı oynat**), maskot ve resimler, **Sesler** ve **Karşıtlık** (her renk çifti oranıyla).
+4. **Taslak olarak kaydet**. Taslak yalnızca önizlenebilir. Beğendiğinizde listede **Aç**'a basın: öğretmenler temayı artık seçebilir. **Kayıtlı "…" temasının yerine koy** aynı anahtarla zaten kayıtlı bir temayı günceller.
+
+Listede: **Kapat** temayı yeni seçimlerden kaldırır (onu kullanan sınıflar seçimlerini korur ve tema yeniden açılınca tekrar gösterir), **Dışa aktar** paketini paylaşmak ya da değiştirmek için indirir, **Sil** bir onaydan sonra temayı kaldırır; onu kullanan sınıflar ve pano varsayılan temaya geçer. En çok 30 tema içe aktarılabilir. Her değişiklik denetim kaydına geçer.
+
+Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bir tema) depodaki `docs/THEMING.md` dosyasındadır; yapay zekâ araçları da onu okuyabilir ([Yapay zekâ araçları](ai-tools.md)).
+
+## Yapay zekâ araçları
+
+**Yapay zekâ araçları** (yönetim menüsü) öğretmenlerin Claude gibi bir yapay zekâ asistanını Sınıf Pusulası'na bağlamasını sağlar. Varsayılan olarak kapalıdır; öğrenci adları da siz okulun KVKK sorumlusuyla birlikte aksine karar verene kadar okulda kalır. Ayrıntıların hepsi [Yapay zekâ araçları kılavuzu](ai-tools.md)'ndadır.
 
 ## Hava durumu
 

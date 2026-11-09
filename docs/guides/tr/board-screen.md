@@ -18,6 +18,8 @@
 
 Pano 1920×1080 ve 1280×720 ekranlara kaydırma gerekmeden sığar. Fare imleci kendiliğinden gizlenir.
 
+Okulunuz Süper Konuşmacılar'a kendi web adresini verdiyse (örneğin `speakers.` ile başlayan bir adres), pano bağlantısı bu adresle başlar. Yönetici böyle bir adresi açtığında yeni pano bağlantısını ekranda bir kez açın; eski bağlantı bir giriş sayfasında takılabilir ([Süper Konuşmacılar kılavuzu](super-speakers.md#kendi-web-adresi-isteğe-bağlı)).
+
 ## Panoda neler görünür
 
 - Başlık ve **… haftası**. Her hafta, yöneticinin belirlediği zamanda (normalde Pazartesi 00:00) sıfırdan başlar; önceki haftalar geçmişte saklanır.

@@ -12,4 +12,8 @@ Set up a school in Class Compass. The full [Administrator guide](admin.md) expla
 
 Then check **Maintenance** regularly: backup status and warnings. Restoring a backup is done on the server (see `docs/OPERATIONS.md`).
 
-Optional: switch on **Super Speakers**, the school-wide English points board ([Super Speakers guide](super-speakers.md)).
+Optional:
+
+- **Super Speakers**, the school-wide English points board ([Super Speakers guide](super-speakers.md)).
+- **Themes**: import a theme package, preview it and enable it for teachers ([Themes](admin.md#themes)).
+- **AI tools**: let teachers connect an AI assistant; student names stay inside the school by default ([AI tools guide](ai-tools.md)).

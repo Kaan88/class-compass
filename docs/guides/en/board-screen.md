@@ -18,6 +18,8 @@ The **board** shows this week's Super Speakers on a big screen, for example in t
 
 The board fits 1920×1080 and 1280×720 screens without scrolling. The mouse pointer hides by itself.
 
+If your school gave Super Speakers a web address of its own (for example one that starts with `speakers.`), the board link starts with that address. When the administrator switches such an address on, open the new board link on the screen once; the old link may stop at a sign-in page ([Super Speakers guide](super-speakers.md#its-own-web-address-optional)).
+
 ## What the board shows
 
 - The title and **Week of …**. Every week starts fresh at the time the administrator set (normally Monday 00:00); earlier weeks are kept in the history.

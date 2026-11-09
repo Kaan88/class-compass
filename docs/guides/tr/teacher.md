@@ -52,7 +52,20 @@ PIN'inizi mi unuttunuz? **Profil ve PIN**'de şifrenizle yeni bir PIN belirleyin
 
 ![Öğretmen menüsü](../img/tr/teacher-menu.png)
 
-Öğretmen menüsü, öğretmen alanının başlangıç sayfasıdır. **Sınıf ekranını aç** (ya da **Sınıf ekranına dön**) sizi ders ekranına götürür. Kutucuklar öğretmen alanının sayfalarını açar; burada yalnızca en az bir sınıfınızda açık olan modüllerin sayfaları görünür. **Yardım** bu kılavuzları açar. Öğretmen alanının diğer sayfalarında üstteki bağlantı satırı bütün sayfaları açar; telefonda ya da tablette bu tek bir **Sayfa** listesidir.
+Öğretmen menüsü, öğretmen alanının başlangıç sayfasıdır ve üç bölümden oluşur:
+
+- **Sınıf ekranını aç** (ya da **Sınıf ekranına dön**) sizi ders ekranına götürür.
+- **Bugün**: her gün kullandığınız sayfalar: **Yoklama**, **Ödevler**, **Hedefler**, **Raporlar** ve **Bildirimler** (zil simgesi; yanında yeni bildirimlerin sayısı yazar, bkz. [Bildirimler](#bildirimler)).
+- **Sınıf kurulumu**: bir kez ayarlayıp arada bir değiştirdiğiniz her şey için tek bir kutucuk. Üç sekmeli bir sayfa açar:
+  - **Sınıflar ve öğrenciler**: **Sınıf ayarları**, **Öğrenciler**, **Öğrenci listesi aktar**, **Öğrenci bağlantıları**, **Avatarlar**.
+  - **Ders araçları**: **Ders konuları**, **Rutinler**, **Sayaçlar**, **Günün Yardımcısı**, **Gizli Öğrenciler**, **Gruplar**.
+  - **Başarılar ve nazik sözcükler**: **Başarılar**, **Nazik sözcük denetimi**.
+
+Altta **Profil ve PIN**, **Yardım** (bu kılavuzlar), **Bu cihazda sınıf modundan çık** (yalnızca sınıf modunda) ve **Çıkış yap** bulunur.
+
+Bütün sınıflarınızda kapalı olan bir modülün sayfaları menüde görünmez. Böyle bir sayfayı eski bir yer iminden açarsanız sayfa modülün kapalı olduğunu söyler ve **Sınıf ayarlarını aç** düğmesini gösterir; hiçbir şey silinmemiştir. Öğretmen alanının diğer sayfalarında üstteki bağlantı satırı (zil simgesiyle birlikte) sayfaları açar; telefonda ya da tablette bu tek bir **Sayfa** listesidir.
+
+![Sınıf kurulumu](../img/tr/setup-hub.png)
 
 ## Dersi başlatmak ve bitirmek
 
@@ -62,7 +75,7 @@ PIN'inizi mi unuttunuz? **Profil ve PIN**'de şifrenizle yeni bir PIN belirleyin
 2. Birden fazla sınıfa ya da derse giriyorsanız üstteki sınıfa dokunun, örneğin **3-A · İngilizce**. Etkin sınıf ve ders her zaman üstte yazar; böylece hiçbir şey yanlış sınıfa kaydedilmez.
 3. **Dersi başlat**'a basın. Adımlar açık olan modüllere göre değişir:
    - **Yoklama**: siz değiştirmedikçe herkes "Var" sayılır. Bir öğrenciye dokunarak Yok, Geç, İzinli ve Var arasında geçiş yapın.
-   - **Bugünün yardımcısı**: bugün kimin yardım edeceği.
+   - **Bugünün yardımcısı**: bugün kimin yardım edeceği ve görevleri. Yardımcının şimdiden yaptığı görevleri işaretleyin (örneğin "Sınıfın düzenlenmesine yardım et"); işaretler ders başladığında kaydedilir.
    - **Bugünün konusu**: dersin odağı (Dinleme, Okuma, Kelime bilgisi, Dil bilgisi, Yazma, Konuşma, Sesletim ya da kendi konularınız). **Ders konuları**'ndaki haftalık plan bir öneri getirir; değiştirebilirsiniz.
    - **Rutin**: bu dersin rutinini seçin.
 4. **Derse başla**'ya basın.
@@ -76,7 +89,7 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
 **Dersi bitir**'e basın. Modüllere göre şu adımlardan geçersiniz:
 
 - **Gizli Öğrenciler**: gizli öğrencileri açıklayın ve sonuçlarını kaydedin (bkz. [Gizli Öğrenci](#gizli-öğrenci)).
-- **Yardımcıya teşekkür**.
+- **Yardımcıya teşekkür**: yardımcının bugün yaptığı görevleri işaretleyin, sonra ona teşekkür edin.
 - **Aferin!**: bu derste kazanılan otomatik başarılar; yalnızca sınıf bunu Başarılar'da seçtiyse.
 - **Değerlendirme**: **Ders nasıl geçti?** (Zordu, İdare eder, İyi, Harika) ve kendiniz için isteğe bağlı bir not.
 
@@ -95,22 +108,47 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
   - **Sınıf dili**: yalnızca sınıf iki dil kullanıyorsa; ekranı iki dil arasında değiştirir.
   - **Boyut**: **Küçük**, **Normal** ya da **Büyük**. Sınıfın arkasından okunabilen boyutu seçin; ekran ayrıca kendini görüntü alanına uydurur. Seçim bu cihazda hatırlanır.
   - **Bu cihazda sesler**.
+  - **Yerleşimi düzenle** (bkz. [Yerleşimi düzenlemek](#yerleşimi-düzenlemek)).
+  - **Ses kontrolü** (bkz. [Sesler ve kutlamalar](#sesler-ve-kutlamalar)).
 - **Öğretmen alanı** (PIN'inizi sorar).
 
-**Ana sütunda** **Bugünün odağı** (dersin konusu, **Değiştir** ile), **öğrenci kartları** ve onların altında modül panelleri (sayaçlar, yardımcı, gizli öğrenciler, gruplar, ödev, başarılar) bulunur. **Öğrencileri göster** / **Öğrencileri gizle** kartları açıp kapatır.
+Üst çubuğun altındaki ders panosu yukarıdan aşağıya şu kutulardan oluşur:
 
-**Sağ sütunda** rutin ve zamanlayıcı yer alır. **Yoklama** ve **Dersi bitir** her zaman bu sütunun altında kalır; sütun ekrandan uzunsa kendi içinde kayar.
+1. **Geniş bir satır**: bütün aşamaları görünen **rutin** ve yanında büyük bir **zamanlayıcı**.
+2. **Bugünün odağı** (dersin konusu, **Değiştir** ile) ve **sınıf çubuğu** (sayaç).
+3. Bütün genişliği kaplayan **öğrenci kartları**. Üstlerindeki **Öğrencileri gizle** / **Öğrencileri göster** kartları katlar (örneğin tahtada bir şey gösterirken).
+4. **Ders araçları**: altta büyük düğmelerden oluşan bir satır: **Yoklama**, **Günün Yardımcısı**, **Gizli Öğrenciler**, **Gruplar**, **Ödevler** ve **Başarılar**. Bir düğme kendi panelini tam ekran açar; siz paneli **Kapat** düğmesiyle (ya da Esc tuşuyla) kapatana kadar alttaki pano bekler. Bir panelde yaptığınız işlerin mesajları ve **Geri al** düğmesi panelin içinde görünür. Bir düğmenin üstündeki küçük sayı sınıfla ilgili bir şeyi sayar, örneğin seçilen gizli öğrencileri; özel hiçbir şey göstermez. **Dersi bitir** her zaman satırın sonunda kalır.
 
-Kısa mesajlar (örneğin **Ders başladı**) sol altta kısa bir süre görünür. **Geri al** içeren mesajlar biraz daha uzun kalır.
+Modülü bu sınıfta kapalı olan bir kutu hiç görünmez; boşalan yeri yanındaki kutular alır. Kısa mesajlar (örneğin **Ders başladı: 3-A · İngilizce**) sol altta kısa bir süre görünür. **Geri al** içeren mesajlar biraz daha uzun kalır.
+
+**Klavyeyle** (örneğin projeksiyona bağlı bir dizüstü bilgisayarda): Sekme (Tab) tuşu kutudan kutuya ve içlerindeki düğmelere geçer, Enter ya da boşluk tuşu düğmeye basar, Esc tam ekran paneli kapatır.
+
+### Yerleşimi düzenlemek
+
+![Yerleşimi düzenle](../img/tr/layout-editor.png)
+
+Panodaki kutuları kendiniz taşıyıp boyutlarını değiştirebilirsiniz; örneğin zamanlayıcıyı büyütebilir ya da sayaçları ders araçları satırına alabilirsiniz:
+
+1. **Ekran** → **Yerleşimi düzenle**. Yerleşim size ait olduğu için PIN'iniz sorulur.
+2. Bir kutuyu tutamağından başka bir yere sürükleyin; **Ders araçları** satırına bırakırsanız orada bir düğme olur. İki kutunun arasındaki çizgiyi sürükleyerek genişliklerini ya da yüksekliklerini değiştirin. Ya da bir kutuyu seçip üstündeki düğmeleri kullanın (**…: sola taşı**, **Daha geniş**, **Daha uzun**, **Ders araçlarına taşı**, **Kutu olarak göster**…). Klavyeyle: Enter kutuyu alır, ok tuşları taşır, Shift ile birlikte ok tuşları boyutunu değiştirir, Enter bırakır, Esc vazgeçer.
+3. **Geri al** son değişikliği geri alır. **Şunun için kaydet** altında **Bu sınıf** ya da **Tüm sınıflarım**'ı seçip **Kaydet**'e basın. **Varsayılana dön** varsayılan yerleşimi geri getirir; **Vazgeç** kaydetmeden çıkar.
+
+Kaydettiğiniz ya da vazgeçtiğiniz anda öğretmen alanı yeniden kilitlenir. Yerleşimi düzenlemek için geniş bir ekran gerekir; dar bir pencerede düğmenin altında **Daha geniş bir ekran gerekir.** yazar. Bir sınıf için kaydettiğiniz yerleşim, tüm sınıflarınız için kaydettiğinizin önüne geçer.
+
+### Sınıf ekranında öğrenci kartı
+
+![Sınıf ekranında bir öğrencinin kartı](../img/tr/classroom-card.png)
+
+Öğrenci kartındaki **ada** dokunduğunuzda sınıfın da görebileceği küçük bir kart açılır: **Son başarılar**, **Bu hafta Süper Konuşmacılar** (öğrencinin kendi puanı), **Günün yardımcısı** (bu dönem kaç gün) ve **Sayaçlar** (yalnızca hatırlatma kutuları açıkken). Kart yalnızca olumlu şeyler gösterir: devam, ödev, hedef, not, seviye ya da başka öğrencilerle karşılaştırma asla yer almaz ve istatistiklere bağlantı yoktur. Öğrenci kartındaki **+** düğmesi eskisi gibi bir hatırlatma sayar. İstatistikler yalnızca öğretmen alanındadır (bkz. [Öğrenci istatistikleri](#öğrenci-istatistikleri)).
 
 ### Rutin ve zamanlayıcı
 
-- **Rutin**: o anki aşama (**Şimdi · aşama 2 / 6**). **Sonraki aşama** ve **Önceki aşama** düğmelerini kullanın ya da bir aşamaya dokunun.
-- **Zamanlayıcı**: 1, 3, 5, 10 ya da 15 dakikayı seçin ya da **Rakam tuşları** ile bir süre yazın (1 3 0, 1:30 demektir). **Başlat**, **Duraklat** ve **Sıfırla**. Süre dolduğunda sınıfın **Sınıf ayarları** → **Süre bittiğinde** bölümünde seçtiği çalar.
+- **Rutin**: o anki aşama (**Şimdi · aşama 2 / 6**); rutinin bütün aşamaları görünür. **Sonraki aşama** ve **Önceki aşama** düğmelerini kullanın ya da bir aşamaya dokunun.
+- **Zamanlayıcı**: 1, 3, 5, 10 ya da 15 dakikayı seçin ya da **Süre ayarla** ile rakam tuşlarından bir süre yazın (1 3 0, 1:30 demektir). **Başlat**, **Duraklat** ve **Sıfırla**. Süre dolduğunda sınıfın **Sınıf ayarları** → **Süre bittiğinde** bölümünde seçtiği çalar.
 
 ### Ders sırasında yoklama
 
-**Yoklama** bugünün listesini açar. Bir değişiklik normalde **tüm gün** için geçerlidir ve sınıfın diğer öğretmenleriyle paylaşılır. Gün içinde geç gelen ya da erken ayrılan bir öğrenci için **Yalnızca bu ders için** kutusunu işaretleyin. **Diğer herkes burada** kalanları doldurur. Önceki günler ve derse özel durumlar öğretmen alanındaki **Yoklama** sayfasındadır.
+**Yoklama** (ders araçları satırında) bugünün listesini açar. Bir değişiklik normalde **tüm gün** için geçerlidir ve sınıfın diğer öğretmenleriyle paylaşılır. Gün içinde geç gelen ya da erken ayrılan bir öğrenci için **Yalnızca bu ders için** kutusunu işaretleyin. **Diğer herkes burada** kalanları doldurur. Önceki günler ve derse özel durumlar öğretmen alanındaki **Yoklama** sayfasındadır.
 
 ### Sayaçlar
 
@@ -122,7 +160,7 @@ Her öğrenci kartında öğrencinin sayısı ve bir **+** düğmesi görünür.
 
 ![Grup ekranı](../img/tr/group-screen.png)
 
-**Grup seç**'e (gruplar zaten gösteriliyorsa **Grupları aç**'a) basın. Tam ekran grup ekranı grup seçeneklerini gösterir; dört varsayılan seçenek Aslanlar, Kartallar, Yunuslar ve Kaplanlar'dır ve her biri Grup 1'den Grup 5'e kadar gruplar verir.
+Ders araçları satırındaki **Gruplar**'a basın (Gruplar panonuzda bir kutuysa **Grup seç**'e, gruplar zaten gösteriliyorsa **Grupları aç**'a). Tam ekran grup ekranı grup seçeneklerini gösterir; dört varsayılan seçenek Aslanlar, Kartallar, Yunuslar ve Kaplanlar'dır ve her biri Grup 1'den Grup 5'e kadar gruplar verir.
 
 - Bir seçeneğe dokunarak o gün sınıfta olan öğrenciler için gruplar oluşturun. Gelmeyen öğrenciler yalnızca bu derste dışarıda kalır.
 - **Karıştır** yeni gruplar oluşturur; **Karıştırmayı geri al** öncekileri geri getirir.
@@ -137,11 +175,11 @@ Seviyeler, eşleşme kuralları ("birlikte çalışmalı / çalışmamalı") ve 
 
 ### Günün Yardımcısı
 
-Yardımcı paneli bugünün yardımcısını ve görevlerini işaret kutularıyla gösterir. Yardımcı "Yok" olarak işaretlenirse sıradaki öğrenci kendiliğinden görevi alır. **Gizle** / **Asistanı göster** paneli bu ders için gizler; varsayılanı **Günün Yardımcısı** sayfasında belirlersiniz (**Ayarlar**: okul günleri, görevler, **Derslerde asistan panelini göster**). **Hafta** sekmesinde **Bu haftayı planla**, planı **Duyur**, iki günü yer değiştir ya da bir gün için **Yardımcıyı ata**; **Geçmiş** sıraları gösterir.
+**Günün Yardımcısı** (ders araçları satırında) bugünün yardımcısını ve görevlerini işaret kutularıyla gösterir; başlangıç ekranında işaretledikleriniz burada da işaretlidir. Yardımcı "Yok" olarak işaretlenirse sıradaki öğrenci kendiliğinden görevi alır. **Gizle** / **Asistanı göster** paneli bu ders için gizler; varsayılanı **Günün Yardımcısı** sayfasında belirlersiniz (**Ayarlar**: okul günleri, görevler, **Derslerde asistan panelini göster**). **Hafta** sekmesinde **Bu haftayı planla**, planı **Duyur**, iki günü yer değiştir ya da bir gün için **Yardımcıyı ata**; **Geçmiş** sıraları gösterir.
 
 ### Gizli Öğrenci
 
-1. Ders sırasında **Gizli öğrencileri seç**'e basın. Sınıf Pusulası derste olan öğrencilerden seçer (varsayılan 2; **Gizli Öğrenciler** sayfasında 1 ile 10 arası). Dersin sonuna kadar kimse, siz bile, kimin seçildiğini göremez. **Yeniden seç** onları geri koyar ve yenilerini seçer.
+1. Ders sırasında **Gizli Öğrenciler**'i açıp **Gizli öğrencileri seç**'e basın. Sınıf Pusulası derste olan öğrencilerden seçer (varsayılan 2; **Gizli Öğrenciler** sayfasında 1 ile 10 arası). Dersin sonuna kadar kimse, siz bile, kimin seçildiğini göremez. **Yeniden seç** onları geri koyar ve yenilerini seçer.
 2. **Dersi bitir** sırasında **Gizli öğrencileri açıkla**'ya basın. Davul sesli kısa bir geri sayım çalar (**Hemen göster** bunu atlar).
 3. **Sizin kaydınız** altında her biri için bir sonuç kaydedin: **Hedefe ulaştı**, **Çalışmaya devam** ya da **Değerlendirilmedi**; isterseniz bir not ekleyin.
 4. **{name} için kutlama** o öğrenci için kutlamayı oynatır.
@@ -150,7 +188,7 @@ Seçilen öğrenci derste yoksa yerine başkası seçilir; gelmeyen öğrencinin
 
 ### Başarılar: derste başarı vermek
 
-1. Başarılar panelindeki **Başarı ver**'e basın.
+1. **Başarılar**'ı açıp **Başarı ver**'e basın.
 2. **Kim alıyor?**: öğrencileri işaretleyin ya da **Tüm sınıf**'ı seçin.
 3. **Bir başarı seçin**. Başarı, adlar ve avatarlarla kısa bir kutlama için **Ekranda kutla**'yı işaretleyin.
 4. **N öğrenciye ver**'e basın.
@@ -159,7 +197,7 @@ Başarıyı verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Ger
 
 ### Derste ödev
 
-**Sınıf ekranında kontrole izin ver** açıksa (Ödevler → Ayarlar; varsayılan olarak kapalı) ödev paneli bu hafta teslim edilecek ödevleri, her biri için bir **Kontrol et** düğmesiyle gösterir. **Kapat** kontrol listesinin başlığının yanındadır. Özel notlar sınıf ekranında hiçbir zaman görünmez.
+**Sınıf ekranında kontrole izin ver** açıksa (Ödevler → Ayarlar; varsayılan olarak kapalı) **Ödevler** paneli bu hafta teslim edilecek ödevleri, her biri için bir **Kontrol et** düğmesiyle gösterir. **Kapat** kontrol listesinin başlığının yanındadır. Özel notlar sınıf ekranında hiçbir zaman görünmez.
 
 ### Sesler ve kutlamalar
 
@@ -196,6 +234,17 @@ Başarıyı verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Ger
 - **Öğrenci sayfasında gizle** bir öğrencinin hedefini, kaydını ya da kanıtını onun sayfasından gizler (örneğin bir yanlışlıktan sonra). Öğrencinin yazdıkları olduğu gibi saklanır ve değişiklik kayda geçer.
 
 **Kategoriler ve hazır hedefler** sekmesinde okulun varsayılan kategorileri ve hedefleri ile sizinkiler bulunur. **Arşivle** bir varsayılanı yalnızca sizin sınıflarınızda gizler (diğer öğretmenler etkilenmez); **Geri getir** geri getirir. "Okul tarafından arşivlendi" yazanları yönetici arşivlemiştir. **Sonuç adları**, bir hedefi değerlendirirken kullandığınız dört adı belirler.
+
+### Cümle başlangıçları
+
+![Hedefler kitaplığında cümle başlangıçları](../img/tr/goals-starters.png)
+
+Öğrenciler kendi sayfalarında yazmaya başlamak için bir **cümle başlangıcına** dokunabilir, örneğin "___ konusunda daha iyi olmak istiyorum." Başlangıç kutuya yerleşir, ___ seçili gelir ve öğrenci onun yerine kendi sözcüklerini yazar. Hiç değiştirilmeden gönderilen bir başlangıç kaydedilmez; öğrenciden cümlesini bitirmesi istenir.
+
+**Cümle başlangıçları** listesi **Kategoriler ve hazır hedefler** sekmesindedir. Sınıf Pusulası'nda öğrencilerin yazdığı her yer için İngilizce ve Türkçe hazır başlangıçlar vardır (**Öğrencilerin gördüğü yer**: yeni hedefte kendi sözcükleri ve çalışma fikirleri, "Nasıl gidiyor?", "Öğrendiğim bir şey", "Kendime not" ve "Çalışmamı göster" adımları).
+
+- **Yeni cümle başlangıcı**: öğrencilerin nerede göreceğini, isterseniz yalnızca hangi kategorideki hedefler için olduğunu seçin; başlangıcı İngilizce ve/veya Türkçe yazın, öğrencinin yazacağı yere ___ koyun ve **Cümle başlangıcı ekle**'ye basın. Sınıf Pusulası, ___ yerine bir sözcük konduğunda başlangıcın nazik ve gerçek bir cümle olup olmadığını denetler.
+- **Arşivle** hazır bir başlangıcı yalnızca sizin sınıflarınızda gizler; **Geri getir** geri getirir. Yöneticinin arşivlediği başlangıçlar bütün okulda kaldırılmıştır.
 
 Bir öğrenci kaba bir sözcük ya da anlamsız bir şey yazdığında Sınıf Pusulası nazikçe değiştirmesini ister ve metni kaydetmez. Bkz. [Nazik sözcük denetimi](#nazik-sözcük-denetimi).
 
@@ -263,11 +312,43 @@ Başarılar çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri 
 
 ![Raporlar](../img/tr/reports.png)
 
-**Raporlar** sayfasında **Sınıf ve ders**'i, **Süre**'yi (**Gün**, **Hafta**, **Ay**, **Dönem**, **Öğretim yılı** ya da **Özel**) ve isterseniz tek bir **Öğrenci**'yi seçin (bu durumda onun **Zaman çizelgesi** de görünür). Bölümler modülleri izler: genel bakış, yoklama, sayaçlar, ödev, hedefler ve beceriler, değerlendirmeler, yardımcı, Gizli Öğrenciler, gruplama, başarılar ve konular.
+**Raporlar** sayfasında **Sınıf ve ders**'i, **Süre**'yi (**Gün**, **Hafta**, **Ay**, **Dönem**, **Öğretim yılı** ya da **Özel**) ve isterseniz tek bir **Öğrenci**'yi seçin (bu durumda onun **Zaman çizelgesi** de görünür). Bölümler modülleri izler: genel bakış, yoklama, sayaçlar, ödev, hedefler ve beceriler, değerlendirmeler, yardımcı, Gizli Öğrenciler, gruplama, başarılar, Süper Konuşmacılar ve konular. Her bölüm başlığından katlanabilir; **Tüm bölümleri aç** ve **Tüm bölümleri kapat** bunu bütün bölümler için yapar.
+
+### Rapor görünümleri
+
+![Bir rapor görünümünü özelleştirmek](../img/tr/report-views.png)
+
+**Görünüm**, raporda hangi bölümlerin görüneceğini belirler; böylece rapor yalnızca gerekeni gösterir:
+
+- Hazır görünümler: **Her şey**, **Yoklama ve ödevler**, **Hedefler ve düşünceler**, **Sınıf araçları**, **Başarılar ve Süper Konuşmacılar** ve **Öğrenci özeti** (her alanda öğrenci başına bir satır).
+- **Özelleştir** bölümleri ve tablolarını listeler; göstermek istediklerinizi işaretleyin. Görünümün adının yanında "(değiştirildi, kaydedilmedi)" yazar. **Yeni görünüm olarak kaydet…** seçiminizi bir adla saklar (en çok 30 görünüm); **Değişiklikleri “…” görünümüne kaydet** kendi görünümünüzü günceller; **Değişiklikleri geri al** eski hâline döndürür; **Görünümü sil** yalnızca kaydedilmiş seçimi siler, rapor verisini asla. Görünüm yalnızca bölüm seçimini saklar; sınıfı, öğrenciyi ya da süreyi saklamaz.
+- **Varsayılan yap**: ★ işaretli görünüm Raporlar sayfasında ilk açılan görünüm olur; giriş yaptığınız her cihazda.
+
+Sayfanın adresi sınıfı, öğrenciyi, görünümü ve süreyi her zaman içerir. Bu yüzden bir yer imi ya da başka bir sayfadan gelen bağlantı (örneğin bir öğrencinin istatistiklerindeki **Raporun tamamını aç** ya da bir bildirimdeki **Aç**) aynı raporu yeniden açar.
 
 - Her sayı neyin içinden olduğunu söyler. "Girilmedi", kimsenin kaydetmediği anlamına gelir ve hiçbir zaman 0 sayılmaz. Genel bir puan yoktur.
 - Her tablonun altındaki **CSV** tabloyu elektronik tablo için indirir; **Yazdır** raporu A4'e basar.
 - Yalnızca kendi sınıflarınızı ve derslerinizi görürsünüz, önceki yıllardakileri de; sona eren bir görevlendirme yalnızca o dersi verdiğiniz günleri kapsar.
+
+## Öğrenci istatistikleri
+
+![Bir öğrencinin istatistikleri](../img/tr/student-stats.png)
+
+Öğretmen alanında bir öğrencinin **adı** hemen her yerde istatistiklerini açar: **Öğrenciler**, **Yoklama**, **Öğrenci bağlantıları**, **Avatarlar**, **Ödevler**, **Günün Yardımcısı**, **Gizli Öğrenciler**, **Nazik sözcük denetimi** sayfalarında ve her rapor tablosunda. Adın zaten başka bir işi olduğu yerlerde (**Hedefler** ve **Başarılar** sayfalarında öğrenciyi açar) yanındaki küçük **… için istatistikler** düğmesi istatistikleri açar.
+
+İstatistik panelinde sınıf ve ders (öğrenci birden fazla sınıfınızdaysa başkasını seçebilirsiniz), bir süre, kısa bölümler hâlinde **Öğrenci özeti** raporu ve **Son olaylar** bulunur. **Raporun tamamını aç** o öğrenci için Raporlar sayfasını açar. Bu paneli yalnızca siz görürsünüz; sınıf ekranında asla gösterilmez. Orada bir ad yalnızca olumlu şeylerin yer aldığı küçük kartı açar (bkz. [Sınıf ekranında öğrenci kartı](#sınıf-ekranında-öğrenci-kartı)).
+
+## Bildirimler
+
+![Bildirimler](../img/tr/notifications.png)
+
+Öğretmen menüsündeki ve bağlantı satırındaki **zil**, öğrencilerinizin kendi sayfalarında yaptığı yeni şeylerin sayısını gösterir: yeni ya da değiştirilmiş hedefler, ulaşılan hedefler, düşünceler, notlar, öz değerlendirmeler, gösterdikleri çalışmalar (yazı, bağlantı, resim, belge, ses), kazanılan başarılar, değiştirilen avatarlar, bir öğrenci bağlantısının yeni bir cihazda açılması, nazik sözcük denetiminin durdurduğu metinler (yalnızca sayı) ve Süper Konuşmacılar puanları (günde bir satır). Yalnızca şu an ders verdiğiniz öğrenciler ve açık olan modüller yer alır.
+
+**Bildirimler** sayfasında:
+
+- Satırlar öğrenciye göre gruplanır. **Göster** (**Tümü** ya da **Yalnızca yeniler**), **Tür** ve **Sınıf** ile süzün. Varsa öğrencinin yazdığından kısa bir parça görünür; gizlenen, silinen ya da durdurulan metin asla görünmez.
+- **Aç** sizi doğru sayfaya, sınıf ve öğrenci seçili olarak götürür (öğrencinin hedefleri, başarıları, rapor…). **Okundu say** bir öğrencinin satırlarını okundu sayar; **Tümünü okundu say** (süzgeç açıkken **Bunları okundu say**) kalanları.
+- **Ayarlar** sekmesi: **Zilin altında neler görünsün** (istediğiniz türleri işaretleyin) ve **Günlük e-posta**: seçtiğiniz saatten sonra **Bana günlük e-posta gönder**. E-posta yalnızca kaç yeni şey beklediğini söyler; **E-postada öğrencilerin adlarını yaz** her öğrencinin adını sayısıyla birlikte ekler. Öğrencilerin yazdıkları e-postada asla yer almaz. Günlük e-posta için hesabınızda bir e-posta adresi olmalı ve okul e-posta gönderebilmelidir; biri eksikse sekme bunu söyler.
 
 ## Öğrenciler ve öğrenci listesi aktarma
 
@@ -287,10 +368,11 @@ Dosyalar yalnızca okulun kendi sunucusunda okunur. Fotoğraflar metin tanıma i
 
 ## Öğretmen alanının diğer sayfaları
 
-- **Yoklama**: sınıflarınızın herhangi bir günü, notlar ve derse özel durumlarla; kimin neyi kaydettiği.
-- **Ders konuları**: haftalık plan (günde en fazla 3 konu) ve simgeli kendi konularınız.
-- **Rutinler**: rutinleriniz ve aşamaları ile her sınıfın rutini. Süren bir ders kendi rutiniyle devam eder.
-- **Sayaçlar**, **Günün Yardımcısı**, **Gizli Öğrenciler**, **Gruplar**: bu modüllerin ayarları ve geçmişi.
+- **Yoklama** (Bugün): sınıflarınızın herhangi bir günü, notlar ve derse özel durumlarla; kimin neyi kaydettiği.
+- **Ders konuları** (Sınıf kurulumu → Ders araçları): haftalık plan (günde en fazla 3 konu) ve simgeli kendi konularınız.
+- **Rutinler** (Sınıf kurulumu → Ders araçları): rutinleriniz ve aşamaları ile her sınıfın rutini. Süren bir ders kendi rutiniyle devam eder.
+- **Sayaçlar**, **Günün Yardımcısı**, **Gizli Öğrenciler**, **Gruplar** (Sınıf kurulumu → Ders araçları): bu modüllerin ayarları ve geçmişi.
+- **Yapay zekâ araçları** (**Profil ve PIN** içinde; yalnızca yöneticiniz yapay zekâ araçlarını açtıysa): kişisel anahtarlar ve bağlı yapay zekâ uygulamaları. Bkz. [Yapay zekâ araçları kılavuzu](ai-tools.md).
 
 ## Yardım
 

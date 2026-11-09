@@ -82,11 +82,32 @@ The page has five tabs: **Modules**, **Photos and media**, **Default goals**, **
 - **Teacher modules**: modules switched off here are hidden for every teacher. Teachers switch the others on or off per class and subject.
 - **School-wide modules**: **Super Speakers** (off by default). See the [Super Speakers guide](super-speakers.md).
 - **Photos, audio and documents**: **Student photos**, **Photo evidence** and **Audio evidence** stay **off until consent is confirmed**. Turn them on only after the school has confirmed consent and its KVKK position. **Document evidence** (text, links and documents) is on by default and can be switched off.
-- **Default goals**: **Archive** (at the right of each row) removes a default category or goal from every class (goals students already have are kept); **Restore** brings it back. Teachers can also hide a default for their own classes only.
+- **Default goals**: **Archive** (at the right of each row) removes a default category or goal from every class (goals students already have are kept); **Restore** brings it back. Teachers can also hide a default for their own classes only. The same tab holds the **Default sentence starters** that students can tap to begin writing (see the Teacher guide, "Sentence starters"): **Archive** removes a starter from every class at the school.
 - **Default achievements**: archive a built-in achievement for every class, or restore it. Achievements with the same name show their tier (for example "· Bronze"). Achievements already given are kept.
 - **Kind words**: **Blocked words** and **Allowed words** for the whole school (one per line; an allowed word wins), and how long a goal must be (**Words a goal needs at least**, default 3, and **Letters a goal needs at least**, default 12).
 
 *Turning a module off hides it but keeps all of its data.*
+
+## Themes
+
+![Importing a theme](../img/en/admin-themes.png)
+
+A theme sets the colours, letters, shapes, mascot, pictures, sounds and celebrations of the classroom screen, the student pages and the Super Speakers board. **Themes** lists the **Built-in themes** (with **Preview**) and the themes your school imported. Teachers choose a theme for their classes in Class settings; you choose one in **Classes** and for the Super Speakers board.
+
+A new theme comes as a **theme package**: one JSON file, for example made with an AI assistant from the theming guide or by a colleague. A package holds only colours, sizes and drawings, never programs, and Class Compass checks every part of it.
+
+1. Under **Import a theme**, choose the **Theme file (.json)** or paste its text into **Theme package (JSON)**, and press **Check package**.
+2. **Check result** lists the errors (for example text that is too pale to read on its background: fix them in the file, or in the text box, and check again) and **Notes**. Nothing is saved yet.
+3. Look at the preview: **Classroom screen**, **Student page**, **Super Speakers board**, **Celebration** (**Play the celebration**), the mascot and pictures, **Sounds** and **Contrast** (every colour pair with its ratio).
+4. **Save as draft**. A draft can only be previewed. When you are happy, press **Enable** in the list: teachers can then choose the theme. **Replace the saved theme "…"** updates a theme that already exists with the same key.
+
+In the list: **Disable** hides a theme from new choices (classes that use it keep their choice and show it again when you enable it), **Export** downloads its package to share or change, and **Delete** removes it after a confirmation; classes and the board that used it move to the default theme. Up to 30 imported themes. Every change is in the audit log.
+
+The full technical description (every colour, the limits, the drawing rules, a worked example) is `docs/THEMING.md` in the repository; the AI tools can read it too ([AI tools](ai-tools.md)).
+
+## AI tools
+
+**AI tools** (administration menu) lets teachers connect an AI assistant such as Claude to Class Compass. It is off by default, and student names stay inside the school until you, with the school's KVKK contact, decide otherwise. Everything about it is in the [AI tools guide](ai-tools.md).
 
 ## Weather
 
