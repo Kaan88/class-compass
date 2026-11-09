@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as M from '../../shared/contracts/mcp.ts';
+import * as O from '../../shared/contracts/oauth.ts';
 import { READ_SCOPES, type AiPrivacyMode, type McpScope } from '../../shared/mcp.ts';
 import { call } from '../lib/api.ts';
 import { copyText, showManualCopy } from '../lib/clipboard.ts';
@@ -163,6 +164,50 @@ function CreateTokenDialog({ isOpen, onClose, me, data, onCreated }: { isOpen: b
 
 export const statusText = (t: ReturnType<typeof useI18n>['t'], s: M.AiToken['status']) => t(`aiTools.status.${s}` as const);
 
+/**
+ * Connected apps (S14h2, D-160): apps that connected through the consent page (claude.ai, Claude
+ * Desktop, Claude Code). Disconnect ends the connection with its access and refresh tokens at once.
+ */
+export function ConnectionsTable({ rows, onDisconnect, admin = false }: { rows: Array<M.AiConnection & { userName?: string; userRole?: 'admin' | 'teacher' }>; onDisconnect: (r: M.AiConnection) => void; admin?: boolean }) {
+  const { t } = useI18n();
+  const fmt = useDateFormat();
+  return (
+    <DataTable
+      stack
+      caption={admin ? t('aiTools.admin.connections') : t('aiTools.connections')}
+      rows={rows}
+      rowKey={(r) => r.id}
+      emptyText={t('aiTools.noConnections')}
+      columns={[
+        ...(admin ? [{ key: 'user', header: t('aiTools.admin.account'), render: (r: (typeof rows)[number]) => `${r.userName ?? ''} (${t(r.userRole === 'admin' ? 'role.admin' : 'role.teacher')})` }] : []),
+        { key: 'app', header: t('aiTools.app'), stackRole: 'title' as const, render: (r) => r.clientName },
+        { key: 'host', header: t('aiTools.sendsTo'), render: (r) => <code>{r.redirectHost}</code> },
+        { key: 'scopes', header: t('aiTools.scopes'), render: (r) => r.scopes.map((s) => t(`aiTools.scope.${s}` as const)).join(', ') },
+        { key: 'privacy', header: t('aiTools.privacy'), render: (r) => t(`aiTools.mode.${r.privacy}` as const) },
+        { key: 'status', header: t('aiTools.statusHeader'), render: (r) => statusText(t, r.status) },
+        { key: 'expires', header: t('aiTools.expiresOn'), render: (r) => fmt.format(r.expiresAt) },
+        { key: 'used', header: t('aiTools.lastUsed'), render: (r) => (r.lastUsedAt ? fmt.format(r.lastUsedAt) : t('aiTools.never')) },
+        {
+          key: 'actions',
+          header: t('common.actions'),
+          render: (r) =>
+            r.status === 'active' ? (
+              <InlineConfirmButton
+                variant="danger-outline"
+                message={t('aiTools.disconnectConfirm', { name: r.clientName })}
+                confirmLabel={t('aiTools.disconnect')}
+                cancelLabel={t('common.cancel')}
+                onConfirm={() => onDisconnect(r)}
+              >
+                {t('aiTools.disconnect')}
+              </InlineConfirmButton>
+            ) : null,
+        },
+      ]}
+    />
+  );
+}
+
 /** Profile → AI tools (teachers and administrators). */
 export function AiToolsSection({ me }: { me: Me }) {
   const { t } = useI18n();
@@ -231,6 +276,13 @@ export function AiToolsSection({ me }: { me: Me }) {
               },
             ]}
           />
+          <h3 className="cc-h3" style={{ margin: 0 }}>
+            {t('aiTools.connections')}
+          </h3>
+          <p className="cc-muted" style={{ margin: 0 }}>
+            {t('aiTools.connectionsIntro')}
+          </p>
+          <ConnectionsTable rows={data.connections} onDisconnect={(r) => void run(() => call(O.revokeAiConnection, { connectionId: r.id }), { success: t('aiTools.disconnected'), invalidate: [AI_ACCOUNT_KEY] })} />
           <CreateTokenDialog isOpen={creating} onClose={() => setCreating(false)} me={me} data={data} onCreated={setSecret} />
           <SecretDialog value={secret} url={data.url} onClose={() => setSecret(null)} />
         </>

@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import type { z } from 'zod';
 import * as M from '../../../shared/contracts/mcp.ts';
+import * as O from '../../../shared/contracts/oauth.ts';
 import { AI_NEVER_SHARED, AI_STUDENT_DATA_CATEGORIES, MCP_TOKEN_MAX_DAYS } from '../../../shared/mcp.ts';
 import { call } from '../../lib/api.ts';
 import { errorText } from '../../lib/errors.ts';
@@ -12,10 +13,90 @@ import { showToast } from '../../lib/toast.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { ConfirmDestructive } from '../../ui/Dialog.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
-import { Select, Toggle } from '../../ui/Fields.tsx';
+import { Button } from '../../ui/Button.tsx';
+import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { InlineConfirmButton } from '../../ui/InlineConfirm.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
-import { AI_ACCOUNT_KEY, AI_ADMIN_KEY, DAY_CHOICES, statusText, useDateFormat } from '../AiTools.tsx';
+import { AI_ACCOUNT_KEY, AI_ADMIN_KEY, ConnectionsTable, DAY_CHOICES, statusText, useDateFormat } from '../AiTools.tsx';
+
+/**
+ * OAuth (S14h2, D-160): the hosts an AI app's https redirect address may use (loopback is always
+ * allowed). One host per line; saved as typed, audited.
+ */
+function RedirectHosts({ hosts }: { hosts: string[] }) {
+  const { t } = useI18n();
+  const run = useRun();
+  const [text, setText] = useState(hosts.join('\n'));
+  const list = text
+    .split(/[\s,]+/u)
+    .map((h) => h.trim())
+    .filter(Boolean);
+  return (
+    <section className="cc-card cc-stack" aria-labelledby="ai-hosts">
+      <h2 id="ai-hosts" className="cc-h2">
+        {t('aiTools.admin.redirectHosts')}
+      </h2>
+      <p className="cc-muted" style={{ margin: 0 }}>
+        {t('aiTools.admin.redirectHostsIntro')}
+      </p>
+      <form
+        className="cc-stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void run(() => call(O.setOAuthRedirectHosts, { hosts: list }), { success: t('aiTools.admin.saved'), invalidate: [AI_ADMIN_KEY] });
+        }}
+      >
+        <TextField label={t('aiTools.admin.redirectHostsLabel')} description={t('aiTools.admin.redirectHostsHint')} value={text} onChange={setText} />
+        <div>
+          <Button type="submit" variant="primary">
+            {t('aiTools.admin.saveHosts')}
+          </Button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+/** Registered AI apps (S14h2): registrations and metadata documents, with Revoke (which ends their connections). */
+function ClientsTable({ rows }: { rows: M.OAuthClientView[] }) {
+  const { t } = useI18n();
+  const run = useRun();
+  const fmt = useDateFormat();
+  return (
+    <DataTable
+      stack
+      caption={t('aiTools.admin.clients')}
+      rows={rows}
+      rowKey={(r) => r.id}
+      emptyText={t('aiTools.admin.noClients')}
+      columns={[
+        { key: 'name', header: t('aiTools.app'), stackRole: 'title', render: (r) => r.name },
+        { key: 'kind', header: t('aiTools.admin.clientKind'), render: (r) => t(r.kind === 'cimd' ? 'aiTools.admin.kind.cimd' : 'aiTools.admin.kind.dcr') },
+        { key: 'hosts', header: t('aiTools.sendsTo'), render: (r) => r.redirectHosts.join(', ') },
+        { key: 'status', header: t('aiTools.statusHeader'), render: (r) => statusText(t, r.status) },
+        { key: 'connections', header: t('aiTools.admin.activeConnections'), render: (r) => String(r.activeConnections) },
+        { key: 'created', header: t('aiTools.admin.registered'), render: (r) => fmt.format(r.createdAt), sortValue: (r) => r.createdAt },
+        { key: 'used', header: t('aiTools.lastUsed'), render: (r) => (r.lastUsedAt ? fmt.format(r.lastUsedAt) : t('aiTools.never')) },
+        {
+          key: 'actions',
+          header: t('common.actions'),
+          render: (r) =>
+            r.status === 'revoked' ? null : (
+              <InlineConfirmButton
+                variant="danger-outline"
+                message={t('aiTools.admin.revokeClientConfirm', { name: r.name })}
+                confirmLabel={t('aiTools.revoke')}
+                cancelLabel={t('common.cancel')}
+                onConfirm={() => void run(() => call(O.adminRevokeOAuthClient, { clientRowId: r.id }), { success: t('aiTools.revoked'), invalidate: [AI_ADMIN_KEY] })}
+              >
+                {t('aiTools.revoke')}
+              </InlineConfirmButton>
+            ),
+        },
+      ]}
+    />
+  );
+}
 
 /** Admin → AI tools: the switches (student data needs a typed confirmation), the lifetime cap, every token. */
 export function AiToolsAdminPage() {
@@ -106,6 +187,13 @@ export function AiToolsAdminPage() {
               },
             ]}
           />
+          <ConnectionsTable
+            admin
+            rows={data.connections}
+            onDisconnect={(r) => void run(() => call(O.adminRevokeAiConnection, { connectionId: r.id }), { success: t('aiTools.disconnected'), invalidate: [AI_ADMIN_KEY] })}
+          />
+          <ClientsTable rows={data.clients} />
+          <RedirectHosts key={data.redirectHosts.join(' ')} hosts={data.redirectHosts} />
           <ConfirmDestructive
             isOpen={confirming}
             onOpenChange={setConfirming}

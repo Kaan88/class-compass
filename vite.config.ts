@@ -81,6 +81,9 @@ export default defineConfig({
       '/healthz': 'http://127.0.0.1:3210',
       // The AI tools endpoint (S14h1, D-160), so the address shown on Profile → AI tools works in development.
       '/mcp': { target: 'http://127.0.0.1:3210', changeOrigin: false },
+      // OAuth for AI apps (S14h2, D-160). Only the server's endpoints: /oauth/consent is a page of this client.
+      '^/oauth/(register|authorize|token|revoke)': { target: 'http://127.0.0.1:3210', changeOrigin: false },
+      '^/\\.well-known/oauth-': { target: 'http://127.0.0.1:3210', changeOrigin: false },
     },
   },
 });

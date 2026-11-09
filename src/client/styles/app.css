@@ -5931,6 +5931,32 @@ html[data-cursor='off'] * {
   margin: 0;
   padding-inline-start: 1.25rem;
 }
+/* OAuth consent page (S14h2, D-160): the app's own name as plain text, the return host prominent. */
+.cc-oauth {
+  max-width: 40rem;
+}
+.cc-oauth__app {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.cc-oauth__host {
+  margin: 0;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--cc-radius-sm);
+  border: 2px solid var(--cc-border-strong);
+  background: var(--cc-surface-2);
+}
+.cc-oauth__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
 
 /* S14e3 (carried over from S14a): on a phone at a large text size no page scrolls sideways. Long words
    break (headings keep their rem size, so they still grow with the text size), rows and fields

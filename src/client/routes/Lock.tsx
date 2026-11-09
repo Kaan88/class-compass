@@ -20,17 +20,23 @@ import { DisplayBanner } from '../ui/Layout.tsx';
 import { ThemeIllustration } from '../ui/Mascot.tsx';
 import { PinPad } from '../ui/PinPad.tsx';
 
-/** Neutral lock screen: app name, lock icon, PIN pad. Nothing about the page behind it (PIN-2/3). */
-export function LockScreen() {
+/**
+ * Neutral lock screen: app name, lock icon, PIN pad. Nothing about the page behind it (PIN-2/3).
+ * `stay` (the OAuth consent page, S14h2): after the PIN the same page shows again instead of the
+ * teacher menu; that page shows nothing about students, only what an AI app asks for.
+ */
+export function LockScreen({ stay = false }: { stay?: boolean }) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const router = useRouter();
   const me = useMe();
   const { unlock, busy, lockedOut, padError, signOutWarning } = usePinUnlock({
-    before: () => setMenuFirst(true), // PIN-4: the menu comes first, whatever URL was requested
+    before: () => {
+      if (!stay) setMenuFirst(true); // PIN-4: the menu comes first, whatever URL was requested
+    },
     onRefused: () => setMenuFirst(false),
     onUnlocked: async () => {
-      await navigate({ to: '/teacher' });
+      if (!stay) await navigate({ to: '/teacher' });
       await router.invalidate();
     },
   });
@@ -69,6 +75,37 @@ function IdleRelock() {
     return () => timer.stop();
   }, [qc]);
   return null;
+}
+
+/**
+ * The OAuth consent page's gate (S14h2, D-160): the PIN lock screen while locked (the consent is an
+ * `account` action, 423 on the server), then the page itself, with the classroom banner and idle relock
+ * in classroom mode. No menu-first step: the page holds no student data and must not lose its request.
+ */
+export function ConsentGate({ children }: { children: ReactNode }) {
+  const me = useMe();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const locked = isLocked(me);
+  useLayoutEffect(() => {
+    if (locked) {
+      purgeSensitive(qc);
+      clearSensitiveToasts();
+    }
+  }, [locked, qc]);
+  if (!me) return null;
+  if (locked) return <LockScreen stay />;
+  return (
+    <>
+      {me.classroomMode ? (
+        <>
+          <DisplayBanner onLock={() => void lockNow(qc)} onClassroom={() => void navigate({ to: '/classroom' })} />
+          <IdleRelock />
+        </>
+      ) : null}
+      {children}
+    </>
+  );
 }
 
 export function SensitiveGate({ children }: { children: ReactNode }) {

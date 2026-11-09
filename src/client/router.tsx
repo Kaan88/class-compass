@@ -10,6 +10,7 @@ import { AdminHome, AdminLayout } from './routes/admin/Admin.tsx';
 import { ChangePasswordPage, LoginPage, ResetPasswordPage } from './routes/Auth.tsx';
 import { ClassroomPage } from './routes/Classroom.tsx';
 import { InvitePage, SignInLinkPage } from './routes/SignIn.tsx';
+import { OAuthConsentPage, type ConsentSearch } from './routes/OAuthConsent.tsx';
 import { homeFor, requireSession, type RouterContext } from './routes/guards.ts';
 import { NotFoundPage, RootLayout } from './routes/Root.tsx';
 import { allTeacherPages } from './modules/registry.ts';
@@ -152,6 +153,26 @@ const helpRoute = createRoute({
   component: HelpPage,
 });
 
+/**
+ * OAuth consent for AI apps (S14h2, D-160): `?request=<id>` needs a session (sign-in first, then back
+ * here through `next`) and the PIN unlock in classroom mode (ConsentGate); `?error=<code>` is the page
+ * the authorize step shows instead of redirecting anywhere.
+ */
+const oauthConsentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/oauth/consent',
+  validateSearch: (s: Record<string, unknown>): ConsentSearch => ({
+    request: typeof s.request === 'string' ? s.request : undefined,
+    error: typeof s.error === 'string' ? s.error : undefined,
+  }),
+  beforeLoad: async ({ context, location, search }) => {
+    if (!search.error) await requireSession({ context, location });
+  },
+  component: function OAuthConsentRoute() {
+    return <OAuthConsentPage search={oauthConsentRoute.useSearch()} />;
+  },
+});
+
 /** Component catalog: signed-in users only; fictional data only. */
 const catalogRoute = createRoute({ getParentRoute: () => rootRoute, path: '/dev/catalog', beforeLoad: requireSession, component: CatalogPage });
 
@@ -166,6 +187,7 @@ const routeTree = rootRoute.addChildren([
   teacherRoute.addChildren([teacherIndex, teacherPage]),
   adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminSpeakers, adminThemes, adminAiTools, adminMaintenance, adminAudit, adminProfile]),
   helpRoute,
+  oauthConsentRoute,
   catalogRoute,
 ]);
 
