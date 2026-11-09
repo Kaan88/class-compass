@@ -292,6 +292,13 @@ export const GroupingLessonState = z.object({
 });
 export type GroupingLessonState = z.infer<typeof GroupingLessonState>;
 
+/**
+ * S14c (D-150): the `grouping.move` target "Not in a group". It takes the student out of every group of
+ * the lesson (they show under "Not in a group" until the teacher places them). Group ids are UUIDs or
+ * `extra-<n>`, so this name never collides with a group.
+ */
+export const UNPLACED = 'UNPLACED';
+
 /** Classroom commands (POST /api/commands), lesson-scoped (LES-4). */
 export const GroupingCommands = {
   /** Use a saved arrangement in this lesson; absent students are left out for this lesson only (GRP-5). */
@@ -302,7 +309,7 @@ export const GroupingCommands = {
   'grouping.shuffle': z.object({ contextId: Id, lessonId: Id }),
   /** S13a: bring back an earlier grouping of this lesson (Shuffle's undo). */
   'grouping.restore': z.object({ contextId: Id, lessonId: Id, groupingId: Id }),
-  /** S13a: move one present student to another group of the lesson's groups (tap or drag). */
+  /** S13a: move one present student to another group of the lesson's groups (tap or drag); S14c: `toGroupId` `UNPLACED` takes them out of every group. */
   'grouping.move': z.object({ contextId: Id, lessonId: Id, studentId: Id, toGroupId: z.string().min(1).max(64) }),
   /** S13a: save the lesson's groups into the option (absent students keep their saved group). */
   'grouping.saveToOption': z.object({ contextId: Id, lessonId: Id }),

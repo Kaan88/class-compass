@@ -20,6 +20,7 @@ import type * as C from '../../../shared/contracts/grouping.ts';
 import {
   DEFAULT_ARRANGEMENTS,
   groupName,
+  UNPLACED,
   type GroupInput,
   type GroupTemplate,
   type GroupingLessonState,
@@ -521,6 +522,8 @@ export function restoreGrouping(ctx: RequestContext, p: z.infer<(typeof C.Groupi
  * 'grouping.move' (S13a): one student into another group of the lesson's groups (tap a student, tap a
  * group; or drag). Only students of the class who are here now; a student in no group yet (a late
  * arrival) is placed. Applies to this lesson at once; 'grouping.saveToOption' keeps it for later.
+ * S14c (D-150): the target `UNPLACED` takes the student out of every group ("Not in a group"); their
+ * role in the old group goes with them, like any move.
  */
 export function moveInGrouping(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.move']>, meta: CommandMeta) {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
@@ -528,13 +531,15 @@ export function moveInGrouping(ctx: RequestContext, p: z.infer<(typeof C.Groupin
   const live = requireLive(ctx.db, lesson.id);
   if (!presentStudents(ctx.db, lesson).some((st) => st.id === p.studentId)) throw new AppError('CONFLICT', 'This student is not here in this lesson', { reason: 'STUDENT_NOT_PRESENT' });
   const groups = live.effectiveGroupsJson;
-  if (!groups.some((g) => g.id === p.toGroupId)) throw new AppError('NOT_FOUND', 'Group not found', { reason: 'GROUP_NOT_FOUND' });
+  const unplace = p.toGroupId === UNPLACED;
+  if (!unplace && !groups.some((g) => g.id === p.toGroupId)) throw new AppError('NOT_FOUND', 'Group not found', { reason: 'GROUP_NOT_FOUND' });
   const from = groups.find((g) => g.memberIds.includes(p.studentId))?.id ?? null;
-  if (from === p.toGroupId) return { moved: false, from };
+  if (unplace ? from === null : from === p.toGroupId) return { moved: false, from };
+  const into = (g: GroupJson) => !unplace && g.id === p.toGroupId;
   const next = groups.map((g) => ({
     ...g,
-    memberIds: g.id === p.toGroupId ? [...g.memberIds.filter((x) => x !== p.studentId), p.studentId] : g.memberIds.filter((x) => x !== p.studentId),
-    roles: g.id === p.toGroupId ? g.roles : g.roles.filter((r) => r.studentId !== p.studentId),
+    memberIds: into(g) ? [...g.memberIds.filter((x) => x !== p.studentId), p.studentId] : g.memberIds.filter((x) => x !== p.studentId),
+    roles: into(g) ? g.roles : g.roles.filter((r) => r.studentId !== p.studentId),
   }));
   const unsatisfied = evaluateRules(next.map((g) => g.memberIds), domainRules(ruleRows(ctx.db, context.id)), { byHand: true }) as UnsatisfiedJson[];
   ctx.db.update(lessonGroupings).set({ effectiveGroupsJson: next, unsatisfiedJson: unsatisfied }).where(eq(lessonGroupings.id, live.id)).run();
@@ -547,6 +552,8 @@ export function moveInGrouping(ctx: RequestContext, p: z.infer<(typeof C.Groupin
  * 'grouping.saveToOption' (S13a): the lesson's groups become the option's saved groups. Students away
  * in this lesson keep the group they had in the option; groups made only for the lesson are added.
  * Bumps the option's version (audited); the option keeps its type, so Shuffle still works.
+ * S14c (D-150): what the screen shows is saved, so a student here now who is under "Not in a group"
+ * (taken out with `UNPLACED`, or a late arrival not placed yet) is saved in no group.
  */
 export function saveGroupingToOption(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.saveToOption']>, meta: CommandMeta) {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
@@ -556,9 +563,10 @@ export function saveGroupingToOption(ctx: RequestContext, p: z.infer<(typeof C.G
   const tpl = ctx.db.select().from(groupTemplates).where(eq(groupTemplates.id, live.templateId)).get();
   if (!tpl || tpl.archivedAt !== null) throw new AppError('NOT_FOUND', 'Arrangement not found', { reason: 'ARRANGEMENT_NOT_FOUND' });
   const inLesson = new Set(live.effectiveGroupsJson.flatMap((g) => g.memberIds));
+  const here = new Set(presentStudents(ctx.db, lesson).map((st) => st.id));
   const saved: GroupJson[] = tpl.groupsJson.map((g) => {
     const lessonGroup = live.effectiveGroupsJson.find((x) => x.id === g.id);
-    const keep = g.memberIds.filter((x) => !inLesson.has(x));
+    const keep = g.memberIds.filter((x) => !inLesson.has(x) && !here.has(x));
     const members = [...(lessonGroup?.memberIds ?? []), ...keep];
     const set = new Set(members);
     return { ...g, memberIds: members, roles: [...(lessonGroup?.roles ?? []), ...g.roles.filter((r) => keep.includes(r.studentId))].filter((r) => set.has(r.studentId)) };
