@@ -237,9 +237,10 @@ Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, m
   - [ ] Checked on Sare's MacBook, a 1280×720 projector and a touch panel
   - [ ] Default layout (reminder boxes on, D-143) meets D-139 at 1280×720 and D-103 at 1440×900; "known gap until S14b" in `e2e/classroom-layout.spec.ts` becomes a normal guard
 - [ ] S14b Assistant duty ticks on the Start Lesson and End Lesson screens (D-149)
-- [ ] S14d Student page: home tiles and short steps, screens in the query string, simpler words (D-151)
+- [x] S14d Student page: home tiles and short steps, screens in the query string, simpler words (D-151): home with subject switch (remembered per device) and tiles; New goal, How is it going? (faces 1–5, "Something I learned", "Note to myself"), Show my work (`EvidenceAdder layout="steps"`), My goals with in-page delete confirmations (`ui/InlineConfirm.tsx`), achievements, homework, avatar; focus on each screen's h1; hints on save; student bundle gzip budget in `npm run build` (`scripts/student-budget.ts`); `e2e/student-page.spec.ts` (375×812, EN, TR, two subjects, axe per screen, deep-link reload, token never a screen) and the student groups in `e2e/button-groups.spec.ts`
   - [ ] Tried on a low-end Android phone and an iPhone (tiles, steps, back button, reload, camera and voice)
-- [ ] S14d Sentence starters: built-in EN/TR, teacher and admin lists, `STARTER_UNFINISHED` text check (D-152)
+- [x] S14d Sentence starters: built-in EN/TR (six per kind), teacher list in Goals → library tab, admin list in Admin → Modules → Goals, hide per teacher / archive per school, `STARTER_UNFINISHED` text check on the server, chips that fill the box and select the blank (D-152; migration `text_starters`)
+  - [ ] Starter wording read through by Sare and tried with a few children
 - [x] S14g Theme packages: shared validators, safe SVG tree, admin Themes page with import, preview, export, enable (D-158)
   - Open theme keys checked by `assertThemeUsable` (classes, class display, Super Speakers board), reads fall back to the default theme, delete moves classes and the board to the default; worked example `docs/examples/ocean.theme.json`; tests: sanitiser fuzz and injection list, validators, CSS injection, server lifecycle and permissions, `e2e/theme-packages.spec.ts` (bad contrast → fix → enable → class uses it → axe → delete falls back)
   - [ ] The worked example theme imported and previewed on the classroom display
