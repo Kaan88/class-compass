@@ -14,7 +14,8 @@
  *   (WCAG 2.5.7).
  *
  * Save (this class or all my classes), Cancel, Reset, inactivity and hiding the page all end the
- * editor and lock the teacher area again (`lockNow`), so the PIN unlock never outlives the editor.
+ * editor and lock the teacher area again (`lockNow`); so does the editor leaving the screen, or never
+ * reaching it (`layoutClient`), so the PIN unlock never outlives the editor.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type Ref } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -34,12 +35,9 @@ import { IconCheck, IconChevronDown, IconChevronUp, IconMinus, IconMove, IconNex
 import type { ClassroomContext } from '../../types.ts';
 import { BoardRows } from './Board.tsx';
 import { boxLabelKey } from './Box.tsx';
-import { isLayoutEditing, resetLayout, saveLayout, setLayoutEditing } from './layoutClient.ts';
+import { editorMounted, resetLayout, saveLayout, setLayoutEditing } from './layoutClient.ts';
 
 const ARROWS: Record<string, KeyboardMove> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
-
-/** Editors mounted right now: the last one to go away while the editor is still "open" closes and locks. */
-let mounted = 0;
 
 type Drag =
   | { kind: 'move'; key: BoxKey; start: ClassroomLayout; x: number; y: number; moved: boolean }
@@ -47,6 +45,18 @@ type Drag =
   | { kind: 'h'; row: number; start: ClassroomLayout; y: number; unit: number };
 
 const rowBoxes = (l: ClassroomLayout) => l.rows.flatMap((r) => r.boxes.map((b) => b.key)).filter((k) => !BOX_CATALOGUE[k].fixed);
+
+/**
+ * The box that takes over the keyboard tab stop when `key` leaves the rows (put in the dock): the next
+ * box after it in `before`'s reading order that is still in a row, else the one before it, else the first.
+ */
+export function nextRowBox(before: ClassroomLayout, after: ClassroomLayout, key: BoxKey): BoxKey | null {
+  const now = rowBoxes(after);
+  const order = rowBoxes(before);
+  const i = order.indexOf(key);
+  const candidates = i < 0 ? [] : [...order.slice(i + 1), ...order.slice(0, i).reverse()];
+  return candidates.find((k) => now.includes(k)) ?? now[0] ?? null;
+}
 
 export function LayoutEditor({
   initial,
@@ -117,27 +127,37 @@ export function LayoutEditor({
   const finishRef = useRef(finish);
   finishRef.current = finish;
 
+  // On screen for this class: the PIN unlock lasts only while an editor is mounted (layoutClient).
+  useLayoutEffect(() => editorMounted(context.id), [context.id]);
   useEffect(() => {
-    mounted += 1;
     const idle = createIdleTimer({ ms: CLIENT_IDLE_LOCK_MS, onIdle: () => void finishRef.current() });
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') void finishRef.current();
     };
     document.addEventListener('visibilitychange', onVisibility);
+    // Gone while still open (another class, the lesson ended, a narrow window): layoutClient closes
+    // the editor and locks once no editor for the class is on screen.
     return () => {
       idle.stop();
       document.removeEventListener('visibilitychange', onVisibility);
-      mounted -= 1;
-      // Gone while still open (another class, the lesson ended, a narrow window): close and lock.
-      // Deferred, so React's development double mount does not count as leaving.
-      setTimeout(() => {
-        if (mounted === 0 && isLayoutEditing()) {
-          setLayoutEditing(null);
-          void lockNow(qc).catch(() => undefined);
-        }
-      }, 0);
     };
-  }, [qc]);
+  }, []);
+
+  /**
+   * The roving tab stop and the toolbar's box: the selected box while it is in a row, otherwise (it
+   * went to the dock: its button, a drag, Undo) the first box in a row, so a keyboard user can always
+   * reach a move handle (WCAG 2.1.1).
+   */
+  const current: BoxKey | null = findBox(draft, selected) ? selected : (rowBoxes(draft)[0] ?? null);
+  /** `key` leaves the rows: the next box takes the selection, and the focus when `key` had it. */
+  const handOver = (before: ClassroomLayout, after: ClassroomLayout, key: BoxKey, hadFocus: boolean) => {
+    if (findBox(after, key)) return;
+    const next = nextRowBox(before, after, key);
+    if (!next) return;
+    setSelected(next);
+    if (hadFocus) refocus.current = next;
+  };
+  const focusIn = (key: BoxKey) => Boolean(document.activeElement?.closest(`[data-testid="layout-frame-${key}"]`));
 
   // Keep keyboard focus on the moved box (its frame is re-created in its new row).
   useLayoutEffect(() => {
@@ -177,6 +197,7 @@ export function LayoutEditor({
     if (!prev) return;
     setHistory((h) => h.slice(0, -1));
     setPicked(null);
+    if (current) handOver(draftRef.current, prev, current, false);
     setDraft(prev);
     setAnnounce(t('board.editor.undone'));
   };
@@ -295,8 +316,10 @@ export function LayoutEditor({
     if (d.kind === 'move') {
       if (cancelled || !d.moved) return;
       const next = dropTarget(d.start, d.key, e.clientX, e.clientY);
-      if (next !== d.start) commit(next, describe(next, d.key));
-      else setAnnounce(t('board.editor.noRoom'));
+      if (next !== d.start) {
+        const hadFocus = focusIn(d.key);
+        if (commit(next, describe(next, d.key))) handOver(d.start, next, d.key, hadFocus);
+      } else setAnnounce(t('board.editor.noRoom'));
       return;
     }
     if (cancelled) {
@@ -334,13 +357,13 @@ export function LayoutEditor({
     const box = r.boxes[index]!;
     const isPicked = picked?.key === key;
     return (
-      <div className="cc-layout-frame" data-selected={selected === key ? '' : undefined} data-picked={isPicked ? '' : undefined} data-testid={`layout-frame-${key}`}>
+      <div className="cc-layout-frame" data-selected={current === key ? '' : undefined} data-picked={isPicked ? '' : undefined} data-testid={`layout-frame-${key}`}>
         <div className="cc-layout-frame__bar">
           <button
             type="button"
             className="cc-layout-frame__handle"
             data-handle={key}
-            tabIndex={selected === key ? 0 : -1}
+            tabIndex={current === key ? 0 : -1}
             aria-pressed={isPicked}
             aria-describedby="cc-layout-help"
             aria-label={t('board.editor.handle', { name: name(key) })}
@@ -357,7 +380,16 @@ export function LayoutEditor({
           </button>
           <span className="cc-layout-frame__size">{t('board.editor.size', { w: box.w, h: r.h })}</span>
           {BOX_CATALOGUE[key].dock ? (
-            <Button size="small" onPress={() => commit(toDock(draftRef.current, key), t('board.editor.docked', { name: name(key) }))} data-testid={`layout-to-dock-${key}`}>
+            <Button
+              size="small"
+              onPress={() => {
+                const before = draftRef.current;
+                const next = toDock(before, key);
+                // The pressed button goes away with its frame: the focus moves to the next box's handle.
+                if (commit(next, t('board.editor.docked', { name: name(key) }))) handOver(before, next, key, true);
+              }}
+              data-testid={`layout-to-dock-${key}`}
+            >
               {t('board.editor.toDock')}
             </Button>
           ) : null}
@@ -437,7 +469,7 @@ export function LayoutEditor({
     </div>
   );
 
-  const sel = findBox(draft, selected) ? selected : null;
+  const sel = current;
   const step = (fn: (l: ClassroomLayout, k: BoxKey, d: KeyboardMove) => ClassroomLayout, dir: KeyboardMove) => {
     if (!sel) return;
     const next = fn(draftRef.current, sel, dir);

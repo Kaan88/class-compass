@@ -8,7 +8,7 @@
 import 'fake-indexeddb/auto';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LessonBoard } from '../../src/client/modules/lessons/board/Board.tsx';
 import { isLayoutEditing, layoutKey, setLayoutEditing } from '../../src/client/modules/lessons/board/layoutClient.ts';
 import { lessonKey, rosterKey } from '../../src/client/modules/lessons/lessonClient.ts';
@@ -17,10 +17,24 @@ import { toDock } from '../../src/domain/classroomLayout.ts';
 import { cloneLayout, DEFAULT_LAYOUT, type ClassroomLayout } from '../../src/shared/classroomLayout.ts';
 import type { LessonState } from '../../src/shared/contracts/lessons.ts';
 
-afterEach(() => {
+// The relock is observed, not sent (no server here).
+const lockNow = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('../../src/client/lib/session.ts', async (importOriginal) => ({ ...(await importOriginal<object>()), lockNow }));
+
+afterEach(async () => {
   setLayoutEditing(null);
   cleanup();
+  // Let the unmounted editors' checks run before the next test.
+  await new Promise((r) => setTimeout(r, 10));
+  lockNow.mockClear();
+  Reflect.deleteProperty(window, 'matchMedia');
 });
+
+const tick = () => act(async () => {
+  await new Promise((r) => setTimeout(r, 10));
+});
+/** The handles that are a tab stop (the roving tabindex has exactly one). */
+const tabStops = () => [...document.querySelectorAll<HTMLElement>('[data-handle]')].filter((h) => h.tabIndex === 0).map((h) => h.dataset.handle);
 
 const ctx = (modules: ClassroomContext['modules']): ClassroomContext => ({ id: 'ctx-board-1', classId: 'cls-1', className: '3-A', subjectName: { en: 'English' }, timezone: 'Europe/Istanbul', modules });
 const lesson = {
@@ -161,9 +175,69 @@ describe('classroom board (D-148)', () => {
       </QueryClientProvider>,
     );
     expect(screen.queryByTestId('layout-editor')).toBeNull();
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 10));
-    });
+    await tick();
     expect(isLayoutEditing()).toBe(false);
+    expect(lockNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('a box put in the dock hands the tab stop and the focus to the next box; Undo of "Show as box" leaves a tab stop too (WCAG 2.1.1)', async () => {
+    setLayoutEditing('ctx-board-1');
+    renderBoard(ctx({ routines: true, counters: true }), null);
+    const counters = document.querySelector<HTMLElement>('[data-handle="counters"]')!;
+    act(() => counters.focus());
+    expect(tabStops()).toEqual(['counters']);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('layout-to-dock-counters'));
+    });
+    expect(document.querySelector('[data-handle="counters"]')).toBeNull();
+    expect(tabStops()).toHaveLength(1);
+    expect(document.activeElement?.getAttribute('data-handle')).toBe(tabStops()[0]);
+    expect(screen.getByTestId('layout-box-controls')).toBeTruthy();
+    // "Show as box" selects the counter; Undo puts it back in the dock: some handle is still a tab stop.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('layout-from-dock-counters'));
+    });
+    expect(tabStops()).toEqual(['counters']);
+    await act(async () => {
+      fireEvent.click(within(screen.getByTestId('layout-editor')).getByRole('button', { name: 'Undo' }));
+    });
+    expect(document.querySelector('[data-handle="counters"]')).toBeNull();
+    expect(tabStops()).toHaveLength(1);
+    expect(screen.getByTestId('layout-box-controls')).toBeTruthy();
+    expect(lockNow).not.toHaveBeenCalled();
+  });
+
+  it('the PIN unlock never outlives the editor: opened with no lesson board on screen, it closes and relocks (PIN-1)', async () => {
+    setLayoutEditing('ctx-board-1');
+    await tick();
+    expect(isLayoutEditing()).toBe(false);
+    expect(lockNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('opened while the window is too narrow for the editor, it closes and relocks (PIN-1)', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }),
+    });
+    renderBoard(ctx({}), null);
+    act(() => setLayoutEditing('ctx-board-1'));
+    expect(screen.queryByTestId('layout-editor')).toBeNull();
+    await tick();
+    expect(isLayoutEditing()).toBe(false);
+    expect(lockNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('an editor on screen keeps the unlock; Cancel closes it and relocks once', async () => {
+    setLayoutEditing('ctx-board-1');
+    renderBoard(ctx({}), null);
+    await tick();
+    expect(isLayoutEditing()).toBe(true);
+    expect(lockNow).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(within(screen.getByTestId('layout-editor')).getByRole('button', { name: 'Cancel' }));
+    });
+    await tick();
+    expect(screen.queryByTestId('layout-editor')).toBeNull();
+    expect(lockNow).toHaveBeenCalledTimes(1);
   });
 });

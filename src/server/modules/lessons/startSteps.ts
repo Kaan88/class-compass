@@ -56,6 +56,7 @@ export function runStartSteps(ctx: RequestContext, lesson: LessonRow, inputs: Re
     if (!parsed.success) throw new AppError('VALIDATION', `Invalid input for start step ${step.key}`, { reason: 'START_STEP_INVALID', step: step.key });
     const r = step.apply(ctx, lesson, parsed.data, info);
     if (r?.dutiesDropped) notes.dutiesDropped = (notes.dutiesDropped ?? 0) + r.dutiesDropped;
+    if (r?.dutiesSkipped) notes.dutiesSkipped = (notes.dutiesSkipped ?? 0) + r.dutiesSkipped;
   }
   return notes;
 }

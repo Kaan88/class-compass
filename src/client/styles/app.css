@@ -2066,6 +2066,64 @@ html:has(.cc-classroom) {
 .cc-lesson-box .cc-routine__now-label {
   font-size: 0.95rem;
 }
+/* In a routine box at least 40rem wide (the default board from 1024 px) the chips keep to one line of
+   chips (D-148, D-099): the line is a grid whose columns share the room fairly (every chip gets an
+   equal share, a chip that needs less keeps its full size and gives the rest to the others), and a
+   chip narrower than its name puts it on two lines inside the chip (two lines fit in the touch height,
+   so the chip is no taller); only a single word wider than its chip is cut with an ellipsis (the name
+   stays the chip's accessible name, and the stage now is in big type above). So longer stage names (a
+   Turkish class) never add a chip line that takes a card row from the student grid. In a box under
+   60rem (the default board up to about 1500 px) the chips are a little tighter and the "now" word
+   gives way to the current chip's frame (the head says which stage is now). In a box narrower than
+   40rem the chips wrap. */
+@container (min-width: 40rem) {
+  .cc-lesson-box .cc-stepper {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, max-content);
+  }
+  .cc-lesson-box .cc-stepper > li {
+    min-width: 0;
+    display: flex;
+  }
+  .cc-lesson-box .cc-stepper__btn.cc-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+    text-align: start;
+  }
+  .cc-lesson-box .cc-stepper__num,
+  .cc-lesson-box .cc-stepper__mark {
+    flex: none;
+  }
+  .cc-lesson-box .cc-stepper__name {
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+}
+@container (min-width: 40rem) and (max-width: 60rem) {
+  .cc-lesson-box .cc-stepper {
+    gap: 0.3rem;
+  }
+  .cc-lesson-box .cc-stepper__btn.cc-btn {
+    padding-inline: 0.3rem 0.45rem;
+    gap: 0.25rem;
+    font-size: 0.88rem;
+  }
+  .cc-lesson-box .cc-stepper__num {
+    min-width: 1.4rem;
+    height: 1.4rem;
+  }
+  .cc-lesson-box .cc-stepper__mark {
+    display: none;
+  }
+}
 /* The timer in its box: digits sized by the box with Start / Reset beside them, presets under them. */
 .cc-lesson-box .cc-timer {
   display: grid;

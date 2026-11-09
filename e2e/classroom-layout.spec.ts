@@ -7,7 +7,8 @@
  * 2. Fit with the per-student reminder boxes on (the default since D-143): all 19 cards of 3-A on
  *    screen at Normal on 1440x900 and at every width from 1440 up (D-103), and every routine chip,
  *    End lesson, Attendance, the timer's Start and the class counter fully in view at every listed
- *    display, 1280x720 included (D-139). This closes the S14a "known gap" (D-143).
+ *    display, 1280x720 included (D-139). This closes the S14a "known gap" (D-143). The same holds
+ *    with Turkish as the class language (longer stage names and counter words, D-099).
  * 3. Compact / Normal / Large on this device; the timer keypad; the assistant panel in the dock (hide
  *    and show for this lesson); the class language mode.
  * 4. Customise layout: PIN dialog, keyboard and mouse edits, "Put in dock" / "Show as a box", resize,
@@ -197,8 +198,14 @@ test('module combinations x themes: the board holds (no overlap, no empty box, n
   }
 });
 
-test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Normal from 1440x900 up, and the routine, timer Start, counter, Attendance and End lesson in view everywhere', async ({ page, browser }) => {
-  test.setTimeout(300_000);
+/** The board's button names in the class language. */
+const BOARD_LABELS = {
+  en: { next: 'Next stage', start: 'Start', attendance: 'Attendance', end: 'End lesson' },
+  tr: { next: 'Sonraki aşama', start: 'Başlat', attendance: 'Yoklama', end: 'Dersi bitir' },
+} as const;
+
+test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Normal from 1440x900 up, and the routine, timer Start, counter, Attendance and End lesson in view everywhere, in English and Turkish', async ({ page, browser }) => {
+  test.setTimeout(420_000);
   mkdirSync('test-results/fit', { recursive: true });
   await login(page, 'english');
   await ensurePin(page);
@@ -218,41 +225,51 @@ test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Nor
     // 2026-11-09 with the board: 14 at 1366x768 and 1280x720, 12 at 1280x800 where the larger text
     // leaves room for six columns instead of seven).
     const FLOOR: Record<string, number> = { '1280x720': 14, '1280x800': 12, '1366x768': 14 };
-    for (const boxes of [true, false]) {
+    const runs: Array<{ boxes: boolean; lang: 'en' | 'tr' }> = [
+      { boxes: true, lang: 'en' },
+      { boxes: false, lang: 'en' },
+      { boxes: true, lang: 'tr' },
+    ];
+    for (const { boxes, lang } of runs) {
       await setReminderBoxes(office, ctx.id, boxes);
+      expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
+      const L = BOARD_LABELS[lang];
       for (const vp of VIEWPORTS) {
+        const run = `${vp.name}${lang === 'en' ? '' : ` ${lang}`}`;
         const { ctx: c, p } = await onDevice(browser, page, vp);
         try {
           await openClassroom(p);
           await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'normal');
+          await expect(p.getByRole('button', { name: L.end, exact: true })).toBeVisible();
           await expect(p.locator('.cc-student-card')).toHaveCount(19);
           if (boxes) await expect(p.locator('.cc-student-card__add').first()).toBeVisible();
           const facts = await layoutFacts(p);
-          await p.screenshot({ path: `test-results/fit/${vp.name}-normal${boxes ? '-boxes' : ''}.png` });
-          expect(facts.hScroll, vp.name).toBe(false);
-          expect(facts.overlaps, vp.name).toEqual([]);
+          await p.screenshot({ path: `test-results/fit/${vp.name}-normal${boxes ? '-boxes' : ''}${lang === 'en' ? '' : `-${lang}`}.png` });
+          expect(facts.hScroll, run).toBe(false);
+          expect(facts.overlaps, run).toEqual([]);
           // Everything but the student grid is on screen without scrolling (D-139, D-148).
           const chips = p.getByTestId('routine-stages').getByRole('listitem');
           await expect(chips).toHaveCount(6);
-          for (let i = 0; i < 6; i += 1) await expect(chips.nth(i), `${vp.name}: stage ${i + 1}`).toBeInViewport({ ratio: 1 });
-          await expect(p.getByRole('button', { name: 'Next stage' }), vp.name).toBeInViewport({ ratio: 1 });
-          await expect(p.getByTestId('timer').getByRole('button', { name: 'Start', exact: true }), vp.name).toBeInViewport({ ratio: 1 });
-          await expect(p.getByTestId('counter-bar').first(), vp.name).toBeInViewport({ ratio: 1 });
-          await expect(p.getByRole('button', { name: 'Attendance', exact: true }), vp.name).toBeInViewport({ ratio: 1 });
-          await expect(p.getByRole('button', { name: 'End lesson', exact: true }), vp.name).toBeInViewport({ ratio: 1 });
+          for (let i = 0; i < 6; i += 1) await expect(chips.nth(i), `${run}: stage ${i + 1}`).toBeInViewport({ ratio: 1 });
+          await expect(p.getByRole('button', { name: L.next }), run).toBeInViewport({ ratio: 1 });
+          await expect(p.getByTestId('timer').getByRole('button', { name: L.start, exact: true }), run).toBeInViewport({ ratio: 1 });
+          await expect(p.getByTestId('counter-bar').first(), run).toBeInViewport({ ratio: 1 });
+          await expect(p.getByRole('button', { name: L.attendance, exact: true }), run).toBeInViewport({ ratio: 1 });
+          await expect(p.getByRole('button', { name: L.end, exact: true }), run).toBeInViewport({ ratio: 1 });
           // The top bar is one row (the quote of the day stays on it from 1200 px), not three.
           const bar = await p.locator('.cc-classroom-bar').evaluate((e) => e.getBoundingClientRect().height);
-          expect(bar, `${vp.name}: top bar height`).toBeLessThan(vp.height * 0.15);
+          expect(bar, `${run}: top bar height`).toBeLessThan(vp.height * 0.15);
           const visible = await cardsOnScreen(p);
-          test.info().annotations.push({ type: 'cards on screen', description: `${vp.name}${boxes ? ' with reminder boxes' : ''}: ${visible}` });
-          if (vp.width >= 1440) expect(visible, `${vp.name}: cards on screen${boxes ? ' with reminder boxes' : ''}`).toBe(19);
-          else expect(visible, `${vp.name}: cards on screen`).toBeGreaterThanOrEqual(FLOOR[vp.name] ?? 0);
+          test.info().annotations.push({ type: 'cards on screen', description: `${run}${boxes ? ' with reminder boxes' : ''}: ${visible}` });
+          if (vp.width >= 1440) expect(visible, `${run}: cards on screen${boxes ? ' with reminder boxes' : ''}`).toBe(19);
+          else expect(visible, `${run}: cards on screen`).toBeGreaterThanOrEqual(FLOOR[vp.name] ?? 0);
         } finally {
           await c.close();
         }
       }
     }
     await setReminderBoxes(office, ctx.id, true);
+    expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false })).status).toBe(200);
 
     // Compact / Normal / Large on this device: the cards change size and the choice survives a reload.
     const { ctx: c, p } = await onDevice(browser, page, VIEWPORTS[3]!);
@@ -283,6 +300,7 @@ test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Nor
   } finally {
     // The device contexts shared this session; it is not used again, so no PIN unlock.
     await endActiveLessons(page);
+    await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false });
     for (const m of original) await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
     await officeCtx.close();
   }

@@ -88,9 +88,10 @@ export function checkDuty(ctx: RequestContext, p: z.infer<(typeof AssistantComma
 /**
  * Start Lesson step 'assistant' (S14b, D-149): the duties ticked (and unticked) on the start screen
  * for the assistant the screen showed. Applied only if that student is still today's assistant after
- * the start-screen attendance (an absence moves the turn, D-065); otherwise every tick is dropped and
- * counted in the start result (`dutiesDropped`). A responsibility removed meanwhile is dropped too.
- * Runs on a resumed lesson as well (per-day data).
+ * the start-screen attendance (an absence moves the turn, D-065); otherwise every change (tick or
+ * untick) is dropped and counted in the start result as `dutiesDropped`. A change for a responsibility
+ * removed meanwhile is left out and counted apart as `dutiesSkipped`, so the classroom can name the
+ * right reason. Runs on a resumed lesson as well (per-day data).
  */
 export function assistantStartStep(ctx: RequestContext, lesson: LessonRow, data: z.infer<typeof AssistantStartStepInput>, info: { opId: string }): StartStepNotes {
   const ctxRow = assertOwnsContext(ctx, lesson.contextId);
@@ -98,13 +99,13 @@ export function assistantStartStep(ctx: RequestContext, lesson: LessonRow, data:
   if (!wanted.length) return {};
   const { today, studentId } = todaysAssistant(ctx, ctxRow);
   if (!studentId || studentId !== data.studentId || lesson.localDate !== today) return { dutiesDropped: wanted.length };
-  let dropped = 0;
+  let skipped = 0;
   for (const [responsibilityId, checked] of wanted) {
     if (!liveResponsibility(ctx.db, ctxRow.id, responsibilityId)) {
-      dropped += 1;
+      skipped += 1;
       continue;
     }
     setDutyCheck(ctx, ctxRow, today, studentId, responsibilityId, checked, info.opId, newId());
   }
-  return dropped ? { dutiesDropped: dropped } : {};
+  return skipped ? { dutiesSkipped: skipped } : {};
 }

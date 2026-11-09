@@ -209,13 +209,15 @@ export const StartLessonResult = z.object({
   /** Start-screen entries not written because the record changed in the meantime (D-053). */
   attendanceKept: z.number().int().optional(),
   /**
-   * Duty ticks from the start screen that were not recorded because today's assistant changed in the
-   * meantime (attendance moved the turn, S14b, D-149).
+   * Duty changes (ticks and unticks) from the start screen that were not recorded because today's
+   * assistant changed in the meantime (attendance moved the turn, S14b, D-149).
    */
   dutiesDropped: z.number().int().optional(),
+  /** Duty changes from the start screen left out because the responsibility was removed meanwhile (D-149). */
+  dutiesSkipped: z.number().int().optional(),
 });
 /** What a Start Lesson step may report back in the start result (S14b). */
-export type StartStepNotes = { dutiesDropped?: number };
+export type StartStepNotes = { dutiesDropped?: number; dutiesSkipped?: number };
 
 /** The core End Lesson step (LES-3): how did the lesson go? */
 export const ReflectionStepInput = z.object({ rating: z.number().int().min(1).max(4).nullable().default(null), note: z.string().trim().max(500).nullable().default(null) });

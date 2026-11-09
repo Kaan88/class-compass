@@ -70,8 +70,11 @@ function revealIn(el: HTMLElement | null, item: Element) {
 
 /**
  * The routine on the classroom board (S14b, D-148): name, the current stage in big type, Previous /
- * Next, and every stage as a chip that wraps (no sideways strip). When a teacher's own layout makes
- * the box too small for all chips, the box scrolls and the current chip is kept in view.
+ * Next, and every stage as a chip (no sideways strip). In a box at least 40rem wide the chips keep to
+ * one line and a chip that does not fit shortens its name with an ellipsis (its full name is its
+ * accessible name), so long stage names (Turkish) never take a second line from the student grid; in
+ * a narrower box they wrap. When a teacher's own layout makes the box too small for all chips, the box
+ * scrolls and the current chip is kept in view.
  */
 function RoutineStepper({ lesson }: DashboardSlotProps) {
   const { t, locale } = useI18n();
@@ -130,7 +133,7 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
                 <span className="cc-stepper__num" aria-hidden="true">
                   {state === 'done' ? <IconCheck /> : i + 1}
                 </span>
-                <span>{pickText(s.name, locale)}</span>
+                <span className="cc-stepper__name">{pickText(s.name, locale)}</span>
                 {state === 'current' ? <span className="cc-stepper__mark">{t('routine.current')}</span> : null}
               </Button>
             </li>

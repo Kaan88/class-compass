@@ -161,6 +161,19 @@ describe('assistant duty ticks on the Start Lesson screen (D-149, AST-6)', () =>
     await endLesson(s.teacherA, ctx(), r.result.lessonId);
   });
 
+  it('a change for a responsibility removed meanwhile is counted apart (dutiesSkipped), not as an assistant change', async () => {
+    const t = await today();
+    const [r1, r2, ...rest] = t.responsibilities;
+    // The teacher removes r2 from the list after the start screen loaded it.
+    await ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/assistant/settings`, { responsibilities: [r1, ...rest].map((r: any) => ({ id: r.id, label: r.label })) }));
+    const r = await cmd(s.teacherA, 'lesson.start', { contextId: ctx(), othersPresent: true, steps: { assistant: { studentId: t.assistant.id, check: [r1.id, r2.id] } } });
+    expect(r.ok).toBe(true);
+    expect(r.result.dutiesDropped).toBeUndefined();
+    expect(r.result.dutiesSkipped).toBe(1);
+    expect((await today()).checked).toEqual([r1.id]);
+    await endLesson(s.teacherA, ctx(), r.result.lessonId);
+  });
+
   it('module off: the step does not run; an input the schema refuses fails the start with START_STEP_INVALID', async () => {
     const t = await today();
     const [r1] = t.responsibilities;

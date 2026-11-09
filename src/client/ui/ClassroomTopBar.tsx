@@ -29,7 +29,8 @@ import { topBarSlots, type TopBarSlotKey } from '../modules/classroomHooks.ts';
 import type { ClassroomContext } from '../modules/types.ts';
 import { playEvent, SELF_UNLOCK_ATTR, sounds, useSoundStatus, type SoundSnapshot, type SoundStatus } from '../themes/index.tsx';
 import { Button } from './Button.tsx';
-import { setLayoutEditing, useWideEnough } from '../modules/lessons/board/layoutClient.ts';
+import { lockNow } from '../lib/session.ts';
+import { isWideEnough, setLayoutEditing, useWideEnough } from '../modules/lessons/board/layoutClient.ts';
 import { IconCopy, IconLayout, IconSettings, IconSound, IconSoundOff } from './icons.tsx';
 import { PinDialog } from './PinDialog.tsx';
 
@@ -184,6 +185,15 @@ export function ClassroomTopBar({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const wide = useWideEnough();
+  /**
+   * The PIN was accepted: open the editor only where it can show (a lesson board of this class, a wide
+   * enough window); otherwise lock again at once, so the unlock never outlives the editor (PIN-1). If the
+   * board goes away in the same moment, layoutClient relocks when no editor appears.
+   */
+  const onUnlocked = () => {
+    if (context && canCustomise && isWideEnough()) setLayoutEditing(context.id);
+    else void lockNow().catch(() => undefined);
+  };
   return (
     <header className="cc-topbar cc-classroom-bar" aria-label={t('classroom.activeClass')}>
       <div className="cc-classroom-bar__class">
@@ -270,7 +280,7 @@ export function ClassroomTopBar({
         </DialogTrigger>
         {tools}
       </div>
-      {pinOpen ? <PinDialog isOpen onOpenChange={setPinOpen} title={t('board.customise')} hint={t('board.pinHint')} onUnlocked={() => (context ? setLayoutEditing(context.id) : undefined)} /> : null}
+      {pinOpen ? <PinDialog isOpen onOpenChange={setPinOpen} title={t('board.customise')} hint={t('board.pinHint')} onUnlocked={onUnlocked} /> : null}
     </header>
   );
 }
