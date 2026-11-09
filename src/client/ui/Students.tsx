@@ -147,7 +147,7 @@ export function StudentCard({
       <Avatar name={student.fullName} id={student.id} hue={student.avatarHue} initials={student.initials} photoUrl={student.photoUrl} photoAllowed={Boolean(student.photoUrl)} />
       {onOpen ? (
         <RACButton className="cc-student-card__name cc-student-card__name-btn" aria-haspopup="dialog" onPress={onOpen} data-testid="student-card-name">
-          {student.fullName}
+          <span className="cc-student-card__name-text">{student.fullName}</span>
         </RACButton>
       ) : (
         <div className="cc-student-card__name">{student.fullName}</div>

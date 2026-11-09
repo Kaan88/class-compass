@@ -802,6 +802,13 @@ html:has(.cc-lesson-board) .cc-toaster {
 .cc-student-card__name-btn[data-pressed] {
   text-decoration-style: solid;
 }
+/* The text sits in its own span so it can shrink below its longest word and wrap like the plain name:
+   a bare text run in the flex button would keep its min-content width and spill under the + button. */
+.cc-student-card__name-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .cc-student-card__meta {
   grid-area: meta;
   align-self: start;
