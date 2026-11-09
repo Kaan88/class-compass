@@ -2,8 +2,8 @@
  * Static checks of the deployment files (D-018, ENG-5). Docker is not run here (not installed on the
  * development machine); these tests lint what can be checked without it.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, posix } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = join(import.meta.dirname, '..', '..');
@@ -51,6 +51,149 @@ describe('.dockerignore', () => {
     const ignore = read('.dockerignore').split(/\r?\n/u);
     for (const p of ['.env', '.env.*', 'data/', 'uploads/', 'backups/', '*.db', '*.sqlite', 'node_modules', '.git', 'app.env', 'tunnel.env', 'deploy/*.env']) expect(ignore, p).toContain(p);
     expect(ignore).toContain('!.env.example');
+  });
+});
+
+/**
+ * The build context and the image layout (S14i). Until S14h1 `.dockerignore` left out all of `docs/`,
+ * so `vite build` in the image found no guides for Help (`import.meta.glob` at build time) and Help
+ * was empty in every image. These checks follow Docker's `.dockerignore` rules (patterns relative to
+ * the context root, `*` within one path part, `**` across parts, a pattern also covers everything
+ * under a matching folder, the last matching pattern wins, `!` re-includes).
+ */
+function ignoreRules(text: string) {
+  return text
+    .split(/\r?\n/u)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'))
+    .map((l) => {
+      const include = l.startsWith('!');
+      const pattern = (include ? l.slice(1) : l).replace(/^\/+|\/+$/gu, '');
+      const source = pattern
+        .split('/')
+        .map((part) => (part === '**' ? '.*' : part.replace(/[.+^${}()|[\]\\]/gu, '\\$&').replace(/\*/gu, '[^/]*').replace(/\?/gu, '[^/]')))
+        .join('/')
+        .replace(/\.\*\//gu, '(?:.*/)?');
+      return { include, re: new RegExp(`^${source}$`, 'u') };
+    });
+}
+const rules = ignoreRules(read('.dockerignore'));
+/** Whether `rel` (a path relative to the repository root, forward slashes) is in the Docker build context. */
+function inContext(rel: string): boolean {
+  const parts = rel.split('/');
+  let ignored = false;
+  for (const r of rules) {
+    for (let n = 1; n <= parts.length; n += 1) {
+      if (r.re.test(parts.slice(0, n).join('/'))) {
+        ignored = !r.include;
+        break;
+      }
+    }
+  }
+  return !ignored;
+}
+const filesIn = (dir: string, ext: string): string[] =>
+  readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? filesIn(`${dir}/${e.name}`, ext) : e.name.endsWith(ext) ? [`${dir}/${e.name}`] : []));
+
+/** COPY lines of the runtime stage that take files from the build context: [sources, destination]. */
+function runtimeCopies(): Array<{ sources: string[]; dest: string }> {
+  const df = read('Dockerfile');
+  const runtime = df.slice(df.indexOf('AS runtime'));
+  expect(runtime).toMatch(/^WORKDIR \/app$/mu);
+  return runtime
+    .split(/\r?\n/u)
+    .filter((l) => l.startsWith('COPY ') && !l.includes('--from='))
+    .map((l) => {
+      const parts = l.split(/\s+/u).slice(1).filter((p) => !p.startsWith('--'));
+      return { sources: parts.slice(0, -1), dest: parts[parts.length - 1]! };
+    });
+}
+/** Where a repository file lands in the runtime image (absolute), or null when no COPY brings it. */
+function imagePathOf(rel: string): string | null {
+  for (const { sources, dest } of runtimeCopies()) {
+    const destAbs = posix.resolve('/app', dest);
+    const destIsDir = dest.endsWith('/') || sources.length > 1;
+    for (const src of sources) {
+      const s = src.replace(/^\.\//u, '').replace(/\/$/u, '');
+      if (rel === s) return destIsDir ? posix.join(destAbs, posix.basename(s)) : destAbs;
+      if (rel.startsWith(`${s}/`)) return posix.join(destAbs, rel.slice(s.length + 1));
+    }
+  }
+  return null;
+}
+
+describe('Docker build context and image layout (S14i)', () => {
+  it('the .dockerignore matcher follows Docker rules', () => {
+    expect(inContext('.env')).toBe(false);
+    expect(inContext('.env.example')).toBe(true);
+    expect(inContext('data/app.db')).toBe(false);
+    expect(inContext('docs/ROADMAP.md')).toBe(false);
+    expect(inContext('docs/design/x.md')).toBe(false);
+    expect(inContext('tests/scripts/docker.test.ts')).toBe(false);
+    expect(inContext('src/server/main.ts')).toBe(true);
+  });
+
+  it('the build stage gets everything `npm run build` reads: entries, vite config and its imports, client sources, the guides and their pictures for Help', () => {
+    const df = read('Dockerfile');
+    const build = df.slice(df.indexOf('AS build'), df.indexOf('AS runtime'));
+    expect(build).toMatch(/^COPY \. \.$/mu);
+    expect(build).toContain('npm run build');
+    const needed = ['package.json', 'package-lock.json', 'vite.config.ts', 'index.html', 'student.html', 'scorer.html', 'board.html', 'scripts/student-budget.ts', 'scripts/prepare-ocr.ts'];
+    for (const m of read('vite.config.ts').matchAll(/from '(\.\/[^']+)'/gu)) needed.push(m[1]!.slice(2));
+    for (const m of read('package.json').matchAll(/node (scripts\/[\w-]+\.ts)/gu)) needed.push(m[1]!);
+    // Help bundles the guides at build time (src/client/help/guides.ts).
+    const help = read('src/client/help/guides.ts');
+    expect(help).toContain("import.meta.glob<string>('../../../docs/guides/*/*.md'");
+    expect(help).toContain("import.meta.glob<string>('../../../docs/guides/img/*/*.png'");
+    const guides = [...filesIn('docs/guides/en', '.md'), ...filesIn('docs/guides/tr', '.md')];
+    const pictures = filesIn('docs/guides/img', '.png');
+    expect(guides.length).toBeGreaterThan(15);
+    expect(pictures.length).toBeGreaterThan(50);
+    needed.push(...guides, ...pictures, ...filesIn('src/client', '.tsx'), ...filesIn('src/shared', '.ts'));
+    for (const f of needed) {
+      expect(existsSync(join(ROOT, f)), `${f} exists`).toBe(true);
+      expect(inContext(f), `${f} is in the build context`).toBe(true);
+    }
+  });
+
+  it('every COPY source of the Dockerfile is in the build context', () => {
+    for (const { sources } of runtimeCopies()) for (const s of sources) expect(inContext(s.replace(/^\.\//u, '').replace(/\/$/u, '')), s).toBe(true);
+  });
+
+  it('the runtime image has every file the server reads at run time, at the path the server reads it from', () => {
+    // Paths the server resolves from its own source location (keep in sync with the code they name).
+    const fromSource = (file: string, pattern: RegExp) => {
+      const m = pattern.exec(read(file));
+      expect(m, file).not.toBeNull();
+      return posix.normalize(posix.join(posix.dirname(file), m![1]!));
+    };
+    expect(fromSource('src/server/modules/mcp/resources.ts', /const DOCS = path\.resolve\([^,]+, '([^']+)'\)/u)).toBe('docs');
+    expect(fromSource('src/server/db/client.ts', /MIGRATIONS_DIR = path\.resolve\([^,]+, '([^']+)'\)/u)).toBe('drizzle');
+    expect(fromSource('src/server/ops/version.ts', /const ROOT = path\.resolve\([^,]+, '([^']+)'\)/u)).toBe('.');
+    expect(fromSource('src/server/app.ts', /CLIENT_DIST = path\.resolve\([^,]+, '([^']+)'\)/u)).toBe('dist/client');
+
+    const runtimeFiles = [
+      'package.json',
+      'src/server/main.ts',
+      'src/server/cli.ts',
+      'src/server/backupLoop.ts',
+      'drizzle/meta/_journal.json',
+      ...filesIn('drizzle', '.sql'),
+      // AI tools resources (S14h1, D-160): the guides' Markdown and the theming guide, read from docs/.
+      ...filesIn('docs/guides/en', '.md'),
+      ...filesIn('docs/guides/tr', '.md'),
+      'docs/THEMING.md',
+      ...filesIn('src/server', '.ts'),
+      ...filesIn('src/shared', '.ts'),
+      ...filesIn('src/domain', '.ts'),
+    ];
+    for (const f of runtimeFiles) {
+      expect(inContext(f), `${f} is in the build context`).toBe(true);
+      expect(imagePathOf(f), `${f} is copied into the runtime image`).toBe(`/app/${f}`);
+    }
+    const df = read('Dockerfile');
+    expect(df).toMatch(/^COPY --from=build \S+ \/app\/dist\/client \.\/dist\/client$/mu);
+    expect(df).toMatch(/^CMD \["node", "src\/server\/main\.ts"\]$/mu);
   });
 });
 

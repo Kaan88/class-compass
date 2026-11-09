@@ -5,7 +5,8 @@
  * Reads the built `dist/client/student.html` and adds up the gzip size of everything the page loads
  * before it can render: the entry script, every `modulepreload` chunk and the stylesheets (lazy chunks
  * such as Help are not counted; they load only when used). Fails (exit code 1) when the total or the
- * page's own entry chunk is over budget. Run by `npm run build` after `vite build`.
+ * page's own entry chunk is over budget, or when a loaded file carries the AI tool metadata of the
+ * shared contracts (server-only, S14i). Run by `npm run build` after `vite build`.
  *
  *   node scripts/student-budget.ts            check against the budget
  *   node scripts/student-budget.ts --report   print every file and its size too
@@ -44,6 +45,18 @@ export function studentFiles(dir: string): BudgetFile[] {
   return out;
 }
 
+/**
+ * Server-only data that must never reach the student page (S14i): the AI tool metadata on the shared
+ * contracts (`mcp: {scope, tool, description, …}`, D-160), which `scripts/stripMcp.ts` removes from
+ * client builds. Returns the loaded files that still carry it.
+ */
+export function serverOnlyLeftovers(dir: string, files: readonly BudgetFile[]): string[] {
+  return files
+    .filter((f) => f.path.endsWith('.js'))
+    .filter((f) => /\bmcp:\{(?:scope|tool|readOnly|description|cost):/u.test(readFileSync(join(dir, f.path), 'utf8')))
+    .map((f) => `${f.path} carries AI tool metadata (mcp: {…}) from a shared contract; is scripts/stripMcp.ts in vite.config.ts?`);
+}
+
 export function checkBudget(files: readonly BudgetFile[], budget: { total: number; entry: number } = STUDENT_BUDGET): string[] {
   const problems: string[] = [];
   const total = files.reduce((n, f) => n + f.gzip, 0);
@@ -66,7 +79,7 @@ if (isMain) {
   const entry = files.filter((f) => f.entry).reduce((n, f) => n + f.gzip, 0);
   if (process.argv.includes('--report')) for (const f of [...files].sort((a, b) => b.gzip - a.gzip)) console.log(`${String(f.gzip).padStart(8)}  ${f.path}${f.entry ? '  (entry)' : ''}`);
   console.log(`student page: ${(total / 1000).toFixed(1)} kB gzip (budget ${STUDENT_BUDGET.total / 1000} kB), entry ${(entry / 1000).toFixed(1)} kB (budget ${STUDENT_BUDGET.entry / 1000} kB)`);
-  const problems = checkBudget(files);
+  const problems = [...checkBudget(files), ...serverOnlyLeftovers(dir, files)];
   for (const p of problems) console.error(`student-budget: ${p}`);
   if (problems.length) process.exit(1);
 }
