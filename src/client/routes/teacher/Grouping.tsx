@@ -30,6 +30,7 @@ import { UNPLACED } from '../../../shared/contracts/grouping.ts';
 import { Tabs } from '../../ui/Tabs.tsx';
 import { GroupPicto, OptionPicto } from '../../ui/pictos.tsx';
 import { StudentDnd, StudentDropList } from '../../ui/StudentDnd.tsx';
+import { StudentName, StudentStatsButton } from '../../ui/StudentName.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'grouping'] as const;
@@ -60,7 +61,7 @@ function UnsatisfiedList({ tpl, names }: { tpl: GroupTemplate; names: Map<string
 }
 
 /** Teacher view of the groups: like the display, plus each student's level (teacher-only, GRP-7). */
-function TeacherGroups({ tpl, byId }: { tpl: GroupTemplate; byId: Map<string, Student> }) {
+function TeacherGroups({ tpl, contextId, byId }: { tpl: GroupTemplate; contextId: string; byId: Map<string, Student> }) {
   const { t, locale } = useI18n();
   return (
     <ul className="cc-groups">
@@ -79,7 +80,7 @@ function TeacherGroups({ tpl, byId }: { tpl: GroupTemplate; byId: Map<string, St
               const role = g.roles.find((r) => r.studentId === id);
               return (
                 <li key={id} className="cc-row">
-                  <span>{s?.fullName ?? t('grouping.leftClass')}</span>
+                  {s ? <StudentName id={id} name={s.fullName} contextId={contextId} /> : <span>{t('grouping.leftClass')}</span>}
                   {s?.level ? <span className="cc-chip">{t('grouping.levelChip', { level: s.level })}</span> : null}
                   {role ? <span className="cc-chip">{pickText(role.label, locale)}</span> : null}
                 </li>
@@ -281,7 +282,7 @@ function TemplateCard({ tpl, contextId, byId }: { tpl: GroupTemplate; contextId:
         <Editor tpl={tpl} contextId={contextId} byId={byId} onDone={() => setEditing(false)} />
       ) : (
         <>
-          <TeacherGroups tpl={tpl} byId={byId} />
+          <TeacherGroups tpl={tpl} contextId={contextId} byId={byId} />
           <UnsatisfiedList tpl={tpl} names={names} />
           <div className="cc-row">
             {!tpl.archived ? (
@@ -421,6 +422,8 @@ function LevelsTab({ contextId }: { contextId: string }) {
         {q.data.students.map((s) => (
           <li key={s.id} className="cc-row">
             <TextField label={t('grouping.levelFor', { name: s.fullName })} value={draft[s.id] ?? s.level ?? ''} onChange={(v) => setDraft({ ...draft, [s.id]: v })} />
+            {/* The name is the field's label here, so statistics have their own button (D-154). */}
+            <StudentStatsButton id={s.id} name={s.fullName} contextId={contextId} />
           </li>
         ))}
       </ul>

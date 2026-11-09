@@ -3,6 +3,7 @@
  * - Teacher area: a name on the Students page opens the statistics drawer (class+subject, period,
  *   the Student overview report, latest events); axe on the drawer; "Open full report" opens the
  *   reports page with the student, the class+subject and the Student overview view preselected.
+ *   Grouping: names in an arrangement open the drawer, the levels list has a statistics button.
  *   Where the name already opens something (Goals), a separate statistics button does it.
  * - Classroom: a name on a student card opens the positive-only classroom card (no statistics link,
  *   nothing teacher-only); the name and + targets do not overlap; axe on the card.
@@ -73,6 +74,26 @@ test('a name in the teacher area opens the statistics drawer; Open full report p
   const cellName = (await cell.innerText()).trim();
   await cell.click();
   await expect(page.getByTestId('student-stats').getByRole('heading', { name: `${cellName}: statistics` })).toBeVisible();
+  await page.getByTestId('student-stats').getByTestId('dialog-close').click();
+  await expect(page.getByTestId('student-stats')).toHaveCount(0);
+
+  // Grouping: a name in an arrangement opens the drawer; the levels list (the name is the field's
+  // label) has a separate statistics button.
+  const grouping = await api(page, 'GET', `/api/teacher/contexts/${ctx.id}/grouping`);
+  if (!(grouping.body.templates as unknown[]).length) await api(page, 'POST', `/api/teacher/contexts/${ctx.id}/grouping/use-defaults`, { contextId: ctx.id });
+  await page.goto('/teacher/grouping');
+  const gp = page.getByTestId('grouping-page');
+  await gp.getByLabel('Class', { exact: true }).selectOption({ label: '3-A · English' });
+  const member = gp.getByTestId('arrangement').first().getByTestId('student-name').first();
+  const memberName = (await member.innerText()).trim();
+  await member.click();
+  await expect(page.getByTestId('student-stats').getByRole('heading', { name: `${memberName}: statistics` })).toBeVisible();
+  await expect(page.getByTestId('student-stats').getByLabel('Class and subject', { exact: true }).locator('option:checked')).toContainText('3-A · English');
+  await page.getByTestId('student-stats').getByTestId('dialog-close').click();
+  await expect(page.getByTestId('student-stats')).toHaveCount(0);
+  await gp.getByRole('tab', { name: 'Levels' }).click();
+  await gp.getByRole('button', { name: `Statistics for ${student.fullName}` }).click();
+  await expect(page.getByTestId('student-stats').getByRole('heading', { name: `${student.fullName}: statistics` })).toBeVisible();
   await page.getByTestId('student-stats').getByTestId('dialog-close').click();
   await expect(page.getByTestId('student-stats')).toHaveCount(0);
 
