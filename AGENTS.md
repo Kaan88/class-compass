@@ -118,4 +118,4 @@ The main development machine runs Windows 11 with Node 26, Git Bash and PowerShe
 - SQLite files can be locked by a running dev server or test: stop it before deleting `data/` or `data-test/`.
 - Playwright needs the Chromium build: `npx playwright install chromium` once.
 - Git worktrees for parallel work live under `.claude/worktrees/` (ignored); each one needs its own `npm ci`. Do not link `node_modules` between worktrees: removing a worktree can delete the linked folder.
-- Docker is not installed on the development machine; images are built on the test machine (OPERATIONS → "Test VM install" and "Test server on the mini PC").
+- Docker is not installed on the development machine; images are built on the server that runs them (OPERATIONS → "Oracle server").
