@@ -15,13 +15,13 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 /**
- * Budgets in gzip bytes (D-151). Measured on 2026-11-09: 396 kB in total before S14d and 404 kB after
- * it (React 64 kB, the UI primitives 52 kB, Zod 56 kB, TanStack 36 kB, the whole EN+TR dictionary
- * 93 kB, which every stage's strings make larger, the shared app chunk 34 kB, the stylesheet 17 kB),
- * and 16 kB → 19 kB for the student entry itself. The budgets leave about 9 % and 35 % room. Raise a
- * budget only with a DECISIONS entry that says why.
+ * Budgets in gzip bytes (D-151). Measured on 2026-11-09: 396 kB in total before S14d, 404 kB after it
+ * and 417 kB with S14g's theme packages (React 64 kB, the UI primitives 52 kB, Zod 56 kB, TanStack
+ * 36 kB, the whole EN+TR dictionary 98 kB, which every stage's strings make larger, the shared app
+ * chunk 41 kB, the stylesheet 17 kB), and 16 kB → 19 kB for the student entry itself. The budgets
+ * leave about 10 % and 35 % room. Raise a budget only with a DECISIONS entry that says why.
  */
-export const STUDENT_BUDGET = { total: 440_000, entry: 26_000 } as const;
+export const STUDENT_BUDGET = { total: 460_000, entry: 26_000 } as const;
 
 export interface BudgetFile {
   path: string;
