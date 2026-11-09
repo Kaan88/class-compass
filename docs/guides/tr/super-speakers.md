@@ -67,12 +67,18 @@ Süper Konuşmacılar puanları rozet dersinin sınıf raporunda ve öğrenci za
 
 Sunucu yöneticisi Süper Konuşmacılar'a kendine ait bir web adresi verebilir (örneğin okulun adresinin başına `speakers.` eklenerek; OPERATIONS.md, "Super Speakers on its own hostname"). Bu adreste yalnızca puanlayıcı uygulaması ve pano açılır; böylece ana adres ek bir giriş istese bile pano ekranları ve telefonlar onu açabilir. Uygulamanın geri kalanı bu adreste açılmaz.
 
+Bu özellik açılmadan önce:
+
+- Her puanlayıcıdan uygulamayı bir kez internet bağlantısıyla açmasını ve telefonunda bekleyen puan olmadığını (işaret görünmediğini) kontrol etmesini isteyin. Hâlâ bekleyen puanlar kaybolmaz: uygulama bir sonraki kez internet bağlantısıyla açıldığında önce bu puanları gönderir, ancak ondan sonra yeni adrese geçer. Önceden kontrol etmek bu beklemeyi önler.
+- Yeni bağlantıları göndermeye hazır olun (yeni adres açılır açılmaz **Bağlantılar** sekmesinde görünürler).
+
 Bu özellik açıldığında:
 
-- **Bağlantılar** sekmesi yeni adresleri gösterir, yeni QR kodlar da bu adresleri kullanır. Bağlantıların kendisi değişmez: ana adres çalıştığı sürece eski bağlantılar ve basılı QR kodlar yeni adrese yönlendirilir. QR kodları uygun bir zamanda yeniden basın.
-- **Pano ekranları**: her ekranda pano bağlantısını bir kez daha açın (**Bağlantılar** sekmesinden kopyalayın). Yalnızca sayfası yenilenen bir ekranda "Bu pano bağlantısı artık çalışmıyor" yazar.
-- **Puanlayıcılar**: puanlayıcı bağlantılarını yeniden açarlar. Uygulamayı ana ekrana eklemişlerse eski Süper Konuşmacılar simgesini silip yeni sayfadan yeniden eklerler; iPhone'da yeni bir kodla yeniden eşleştirirler.
-- Puanlar, geçmiş, ayarlar ve bağlantılar değişmez.
+- **Bağlantılar** sekmesi yeni adresleri gösterir, yeni QR kodlar da bu adresleri kullanır. Her bağlantının gizli kısmı aynı kalır.
+- Eski bağlantılar ve basılı QR kodlar yalnızca ana adresi hâlâ açabilen cihazlarda yeni adrese yönlendirilir. Ana adres ek bir giriş istiyorsa (yeni adresin nedeni de budur), bu girişi yapmamış bir pano ekranı ya da telefon o girişte kalır ve Süper Konuşmacılar'a hiç ulaşamaz. Bu yüzden **yeni bağlantıları yeni adres açıldığında gönderin ve QR kodları o anda yeniden basın**; sonraya bırakmayın.
+- **Pano ekranları**: her ekranda yeni pano bağlantısını açın (**Bağlantılar** sekmesinden kopyalayın). Yalnızca sayfası yenilenen bir ekranda "Bu pano bağlantısı artık çalışmıyor" yazar.
+- **Puanlayıcılar**: yeni puanlayıcı bağlantılarını açarlar. Uygulamayı ana ekrana eklemişlerse eski Süper Konuşmacılar simgesini silip yeni sayfadan yeniden eklerler; iPhone'da yeni bir kodla yeniden eşleştirirler.
+- Puanlar, geçmiş, ayarlar ve bağlantıların gizli kısmı değişmez.
 
 ## Bilmekte yarar var
 

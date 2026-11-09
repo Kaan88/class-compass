@@ -24,6 +24,12 @@ export const SCORER_PAGE_PATH = '/p';
 /** The installed app's start URL (manifest `start_url`): never carries a token. */
 export const SCORER_APP_PATH = '/p/app';
 export const BOARD_PAGE_PATH = '/board';
+/**
+ * Set by the scorer app (path `/p`, not secret, value `1`) while awards wait in its outbox (D-157).
+ * While Super Speakers has its own origin, the main host then still serves `/p` and `/p/app` instead
+ * of redirecting, so the queue in this origin's IndexedDB can be sent before the app moves itself.
+ */
+export const SCORER_QUEUE_COOKIE = 'cc_scorer_queue';
 export const scorerLinkUrl = (origin: string, token: string) => `${new URL(origin).origin}${SCORER_PAGE_PATH}#${token}`;
 export const boardLinkUrl = (origin: string, token: string) => `${new URL(origin).origin}${BOARD_PAGE_PATH}#${token}`;
 

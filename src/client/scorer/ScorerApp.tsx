@@ -40,6 +40,7 @@ import { NeedsAttentionTray, SaveStateBadge, Toaster } from '../ui/Feedback.tsx'
 import { IconGlobe, IconPlus, IconUndo, IconX } from '../ui/icons.tsx';
 import { Avatar } from '../ui/Students.tsx';
 import { ThemeBackdrop, ThemeIllustration } from '../ui/Mascot.tsx';
+import type { createQueueMover } from './move.ts';
 import { scorerOutbox, useScorerOutboxStatus } from './outbox.ts';
 import { AndroidSteps, IosSteps } from './InstallPictures.tsx';
 import { liveCount, todayAwards, type Today } from './today.ts';
@@ -347,7 +348,9 @@ function AwardsToday({ today, onUndo, timezone }: { today: Today; onUndo: (a: Sc
   );
 }
 
-function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: boolean; welcome: boolean; onLeave: () => void }) {
+type QueueMover = ReturnType<typeof createQueueMover>;
+
+function Scorer({ me, installed, welcome, onLeave, mover }: { me: ScorerMe; installed: boolean; welcome: boolean; onLeave: () => void; mover: QueueMover | null }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const students = useQuery({ queryKey: STUDENTS_KEY, queryFn: () => call(scorerStudents, {}), staleTime: 5 * 60_000 });
@@ -406,6 +409,26 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
       live = false;
     };
   }, [status, me.id]);
+  // Super Speakers on its own origin (D-157, move.ts): the queue cookie keeps the main host serving
+  // this app while awards wait here; once this link's queue is empty (read from the outbox itself, so
+  // the moment before the owner is set never counts as empty) the app may move to the new origin.
+  useEffect(() => {
+    if (!mover) return;
+    if (status.pending > 0) {
+      mover.queued();
+      return;
+    }
+    if (status.sending) return;
+    let live = true;
+    void scorerOutbox()
+      .all()
+      .then((ops) => {
+        if (live && !ops.some((o) => o.ownerId === me.id && o.state === 'pending')) void mover.drained();
+      });
+    return () => {
+      live = false;
+    };
+  }, [status, me.id, mover]);
   // Rows the server list now holds need no local copy.
   useEffect(() => {
     const server = awards.data?.today;
@@ -607,7 +630,7 @@ function Scorer({ me, installed, welcome, onLeave }: { me: ScorerMe; installed: 
 // ---------------------------------------------------------------- shell
 type OpenState = OpenResult | 'opening' | 'none';
 
-export function ScorerApp({ token, installed }: { token: string | null; installed: boolean }) {
+export function ScorerApp({ token, installed, mover = null }: { token: string | null; installed: boolean; mover?: QueueMover | null }) {
   const qc = useQueryClient();
   const [state, setState] = useState<OpenState>(token ? 'opening' : 'none');
   const [attempt, setAttempt] = useState(0);
@@ -650,7 +673,7 @@ export function ScorerApp({ token, installed }: { token: string | null; installe
     const unauth = me.error instanceof ApiError && me.error.status === 401;
     body = unauth ? installed ? <PairPage onPaired={() => void qc.invalidateQueries({ queryKey: ME_KEY })} /> : <Gone installed={false} /> : <TryAgain onRetry={() => void me.refetch()} />;
   } else if (!me.data) body = null;
-  else body = <Scorer me={me.data} installed={installed} welcome={state === 'ok'} onLeave={() => void leave()} />;
+  else body = <Scorer me={me.data} installed={installed} welcome={state === 'ok'} onLeave={() => void leave()} mover={mover} />;
   return (
     <I18nProvider locale={locale}>
       <ThemeBackdrop />

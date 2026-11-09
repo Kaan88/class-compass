@@ -38,5 +38,6 @@ No signal? Keep tapping. The points wait on your phone (the badge shows how many
 - Only students of the classes taking part can get points. There are no minus points.
 - **Sign out on this phone** ends the session on this phone. Your link keeps working.
 - "This scorer link no longer works": the administrator made a new link or switched it off. Ask for your new link.
-- If your administrator says Super Speakers has moved to its own web address, open your scorer link again. If the app is on your home screen, remove the old icon and add it again from the new page (iPhone: pair it again).
+- If your administrator says Super Speakers will move to its own web address, open the app once with a connection before the move and check that no points are waiting (no badge). Points still waiting on your phone are not lost: the app sends them first the next time you open it with a connection, and only then goes to the new address.
+- After the move, open your scorer link again (the new one, if your administrator sends it). If the app is on your home screen, remove the old icon and add it again from the new page (iPhone: pair it again).
 - **Help** at the bottom of the app opens this guide.

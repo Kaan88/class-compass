@@ -67,12 +67,18 @@ The **Board now** tab shows the board as it is at the moment, without needing a 
 
 The server administrator can give Super Speakers a web address of its own (for example `speakers.` in front of the school's address; OPERATIONS.md, "Super Speakers on its own hostname"). That address shows only the scorer app and the board, so board screens and phones can open it even when the main address asks for an extra sign-in. Nothing else of the app opens there.
 
+Before it is switched on:
+
+- Ask every scorer to open the app once with a connection and check that no points are waiting on their phone (no badge). Points that are still waiting are not lost: the app sends them first the next time it is opened with a connection, and only then goes to the new address. Checking beforehand avoids the wait.
+- Have the new links ready to send (they appear under **Links** as soon as the new address is switched on).
+
 When it is switched on:
 
-- **Links** shows the new addresses, and new QR codes use them. The links themselves stay the same: old links and printed QR codes are forwarded to the new address as long as the main address works. Reprint the QR codes when convenient.
-- **Board screens**: open the board link once more on each screen (copy it from **Links**). A screen that only reloads shows "This board link no longer works".
-- **Scorers**: they open their scorer link again. If they put the app on their home screen, they remove the old Super Speakers icon and add it again from the new page; on an iPhone they pair again with a new code.
-- Points, history, settings and links are not changed.
+- **Links** shows the new addresses, and new QR codes use them. The secret part of each link stays the same.
+- Old links and printed QR codes are forwarded to the new address only on devices that can still open the main address. If the main address asks for an extra sign-in (the reason for the new address), a board screen or a phone that is not signed in stops at that sign-in and never reaches Super Speakers. So **send the new links and reprint the QR codes when the new address is switched on**, not later.
+- **Board screens**: open the new board link on each screen (copy it from **Links**). A screen that only reloads shows "This board link no longer works".
+- **Scorers**: they open their new scorer link. If they put the app on their home screen, they remove the old Super Speakers icon and add it again from the new page; on an iPhone they pair again with a new code.
+- Points, history, settings and the links' secret part are not changed.
 
 ## Good to know
 

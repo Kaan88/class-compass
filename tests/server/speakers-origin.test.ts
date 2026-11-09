@@ -7,7 +7,9 @@
  * - host routing while split: the speakers host serves only the scorer app, the board, their assets
  *   and API and /healthz (404 for everything else, never the main app's page); the main host answers
  *   /p, /p/app and /board with a 308 (path and query kept, not cached) and serves the kill-switch
- *   scorer service worker;
+ *   scorer service worker; the raw Host header decides, so no X-Forwarded-Host value (trusted proxy
+ *   or not) opens the main app on the speakers host; a device with queued scorer awards (queue cookie)
+ *   still gets the scorer app on the main host so the queue is sent before it moves;
  * - scorer and board links (and so their QR codes) use the speakers origin;
  * - with SPEAKERS_ORIGIN unset nothing changes.
  * Fictional data only.
@@ -18,7 +20,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Endpoint } from '../../src/shared/contracts/define.ts';
 import { loadConfig, resolveOrigins } from '../../src/server/config.ts';
 import { originClassOf, registeredEndpoints } from '../../src/server/lib/http.ts';
-import { normalizeHost, SCORER_SW_KILL_SWITCH, speakersHostAllows } from '../../src/server/lib/speakersHost.ts';
+import { isSpeakersHost, normalizeHost, SCORER_SW_KILL_SWITCH, speakersHostAllows } from '../../src/server/lib/speakersHost.ts';
+import { SCORER_QUEUE_COOKIE } from '../../src/shared/contracts/superSpeakers.ts';
 import { Client, makeEnv, TEST_ORIGIN, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok } from '../school-fixture.ts';
 
@@ -79,8 +82,21 @@ describe('configuration (D-157)', () => {
       ['https://user:pw@speakers.example.org', /user name/u],
       ['http://speakers.example.org', /same scheme/u],
       ['https://school.example.org:8443', /different hostname/u],
+      // The same name spelled with a trailing dot (a dotted name is refused outright).
+      ['https://school.example.org.', /dot/u],
+      ['https://speakers.example.org.', /dot/u],
     ];
     for (const [value, why] of bad) expect(() => loadConfig({ ...base, SPEAKERS_ORIGIN: value }), value).toThrow(why);
+    // PUBLIC_ORIGIN with the trailing dot and SPEAKERS_ORIGIN without it are the same hostname too.
+    expect(() => resolveOrigins('https://school.example.org.', 'https://school.example.org')).toThrow(/different hostname/u);
+  });
+
+  it('stores the hosts the way the host routing compares them', () => {
+    const o = resolveOrigins('https://school.example.org.:443', 'https://Speakers.Example.org:443/');
+    expect(o).toMatchObject({ mainHost: 'school.example.org', speakersHost: 'speakers.example.org', split: true });
+    expect(isSpeakersHost(o, { host: 'school.example.org' })).toBe(false);
+    expect(isSpeakersHost(o, { host: 'school.example.org.' })).toBe(false);
+    expect(isSpeakersHost(o, { host: 'speakers.example.org.' })).toBe(true);
   });
 
   it('is recomputed from test overrides', async () => {
@@ -232,12 +248,56 @@ describe('host routing while split (D-157)', () => {
     expect((await raw(env, 'GET', '/boards', MAIN_HOST)).statusCode).not.toBe(308);
   });
 
-  it('honours the forwarded host only behind a trusted proxy', async () => {
-    env = await makeEnv({ SPEAKERS_ORIGIN: SPEAKERS, TRUST_PROXY: true });
-    expect((await raw(env, 'GET', '/login', '127.0.0.1:3210', { 'x-forwarded-host': SPEAKERS_HOST })).statusCode).toBe(404);
-    await env.app.close();
-    env = await makeEnv({ SPEAKERS_ORIGIN: SPEAKERS, TRUST_PROXY: false });
-    expect((await raw(env, 'GET', '/board', '127.0.0.1:3210', { 'x-forwarded-host': SPEAKERS_HOST })).statusCode).toBe(308);
+  it('a spoofed X-Forwarded-Host never opens the main app on the speakers host, even behind a trusted proxy', async () => {
+    for (const TRUST_PROXY of [true, false]) {
+      env = await makeEnv({ SPEAKERS_ORIGIN: SPEAKERS, TRUST_PROXY });
+      for (const fwd of [MAIN_HOST, 'anything', `${SPEAKERS_HOST}, ${MAIN_HOST}`, `${MAIN_HOST}, evil.example.com`]) {
+        const h = { 'x-forwarded-host': fwd };
+        for (const url of ['/login', '/', '/api/auth/me', '/api/admin/speakers']) {
+          const r = await raw(env, 'GET', url, SPEAKERS_HOST, h);
+          expect(r.statusCode, `${TRUST_PROXY} ${fwd} ${url}`).toBe(404);
+          expect(r.body).not.toContain('<div id="root">');
+        }
+        const login = await raw(env, 'POST', '/api/auth/login', SPEAKERS_HOST, { ...h, origin: TEST_ORIGIN, 'content-type': 'application/json' }, { login: 'x', password: 'y' });
+        expect(login.statusCode, `${TRUST_PROXY} ${fwd} login`).toBe(404);
+        expect(login.json().error.code).toBe('NOT_FOUND');
+        // The speakers allow-list itself still works with the header present.
+        expect((await raw(env, 'GET', '/api/scorer/me', SPEAKERS_HOST, h)).statusCode).toBe(401);
+      }
+      await env.app.close();
+      env = null;
+    }
+  });
+
+  it('a forwarded speakers host can only narrow a request to the speakers allow-list', async () => {
+    for (const TRUST_PROXY of [true, false]) {
+      env = await makeEnv({ SPEAKERS_ORIGIN: SPEAKERS, TRUST_PROXY });
+      for (const fwd of [SPEAKERS_HOST, `${MAIN_HOST}, ${SPEAKERS_HOST}`, 'SPEAKERS.localhost:5173']) {
+        expect((await raw(env, 'GET', '/login', '127.0.0.1:3210', { 'x-forwarded-host': fwd })).statusCode, fwd).toBe(404);
+        expect((await raw(env, 'GET', '/api/auth/me', MAIN_HOST, { 'x-forwarded-host': fwd })).statusCode, fwd).toBe(404);
+      }
+      // Without the header the main host is the main app.
+      expect((await raw(env, 'GET', '/api/auth/me', MAIN_HOST)).statusCode).toBe(401);
+      await env.app.close();
+      env = null;
+    }
+  });
+
+  it('a device with queued awards (scorer queue cookie) gets the scorer app on the main host, never the board', async () => {
+    env = await makeEnv({ SPEAKERS_ORIGIN: SPEAKERS });
+    for (const url of ['/p', '/p/app', '/p/app?source=pwa']) {
+      const r = await raw(env, 'GET', url, MAIN_HOST, { cookie: `${SCORER_QUEUE_COOKIE}=1` });
+      expect(r.statusCode, url).not.toBe(308);
+      expect(r.headers.location, url).toBeUndefined();
+      // The probe the app sends once its queue is empty and the cookie is gone.
+      expect((await raw(env, 'HEAD', '/p', MAIN_HOST)).statusCode).toBe(308);
+    }
+    expect((await raw(env, 'GET', '/board', MAIN_HOST, { cookie: `${SCORER_QUEUE_COOKIE}=1` })).statusCode).toBe(308);
+    for (const cookie of [`${SCORER_QUEUE_COOKIE}=0`, `${SCORER_QUEUE_COOKIE}=`, 'other=1']) expect((await raw(env, 'GET', '/p/app', MAIN_HOST, { cookie })).statusCode, cookie).toBe(308);
+    // The queued app on the main host can still send its outbox there (the scorer API stays on the main host).
+    expect((await raw(env, 'GET', '/api/scorer/me', MAIN_HOST, { cookie: `${SCORER_QUEUE_COOKIE}=1` })).statusCode).toBe(401);
+    // The cookie changes nothing on the speakers host.
+    expect((await raw(env, 'GET', '/login', SPEAKERS_HOST, { cookie: `${SCORER_QUEUE_COOKIE}=1` })).statusCode).toBe(404);
   });
 
   it('the main host serves a kill-switch scorer service worker', async () => {

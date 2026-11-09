@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { z } from 'zod';
+import { normalizeHost } from './lib/speakersHost.ts';
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -88,7 +89,8 @@ export function loginRateLimitMax(e: { NODE_ENV: string; CC_TEST_LOGIN_RATE_LIMI
 /**
  * The origins the server answers for (S14f, D-157). `main` is PUBLIC_ORIGIN's origin; `speakers` is
  * SPEAKERS_ORIGIN's origin, or `main` when it is unset. `split` is true only when Super Speakers has a
- * hostname of its own; the hosts are lower-case `host[:port]` as browsers send them in `Host`.
+ * hostname of its own; the hosts are `normalizeHost` spellings (lower case, no default port, no
+ * trailing dot), the same rule the host routing applies to the `Host` header.
  */
 export interface Origins {
   main: string;
@@ -101,13 +103,18 @@ export interface Origins {
 /**
  * Work out the origins and refuse invalid combinations (D-157): SPEAKERS_ORIGIN must be a bare
  * http(s) origin (no path, query, fragment or credentials), use the same scheme as PUBLIC_ORIGIN and
- * have a hostname of its own (cookies are separated by hostname, not by port). Equal to PUBLIC_ORIGIN
+ * have a hostname of its own (cookies are separated by hostname, not by port; `school.example.org.`
+ * is the same name as `school.example.org`, and a trailing dot is refused). Equal to PUBLIC_ORIGIN
  * counts as unset.
  */
 export function resolveOrigins(publicOrigin: string, speakersOrigin?: string | undefined): Origins {
   const main = new URL(publicOrigin);
   const mainOrigin = main.origin;
-  if (!speakersOrigin) return { main: mainOrigin, speakers: mainOrigin, mainHost: main.host, speakersHost: main.host, split: false };
+  // Hosts are stored the way the host routing compares them (normalizeHost: lower case, no default
+  // port, no trailing dot), so the refusal below and the request hook apply the same rule.
+  const mainHost = normalizeHost(main.host);
+  const unsplit: Origins = { main: mainOrigin, speakers: mainOrigin, mainHost, speakersHost: mainHost, split: false };
+  if (!speakersOrigin) return unsplit;
   const refuse = (why: string): never => {
     throw new Error(`Invalid configuration: SPEAKERS_ORIGIN ${why}`);
   };
@@ -120,10 +127,12 @@ export function resolveOrigins(publicOrigin: string, speakersOrigin?: string | u
   if (sp.protocol !== 'https:' && sp.protocol !== 'http:') refuse('must start with https:// (or http:// for local testing)');
   if (sp.username || sp.password) refuse('must not contain a user name or password');
   if ((sp.pathname !== '/' && sp.pathname !== '') || sp.search || sp.hash) refuse('must be an origin only, like https://speakers.example.org (no path, query or #)');
-  if (sp.origin === mainOrigin) return { main: mainOrigin, speakers: mainOrigin, mainHost: main.host, speakersHost: main.host, split: false };
+  if (sp.origin === mainOrigin) return unsplit;
+  if (sp.hostname.endsWith('.')) refuse('must not end its hostname with a dot');
   if (sp.protocol !== main.protocol) refuse(`must use the same scheme as PUBLIC_ORIGIN (${main.protocol}//)`);
-  if (sp.hostname === main.hostname) refuse('must use a different hostname from PUBLIC_ORIGIN (a different port is not enough)');
-  return { main: mainOrigin, speakers: sp.origin, mainHost: main.host, speakersHost: sp.host, split: true };
+  const bareName = (h: string) => h.replace(/\.$/u, '');
+  if (bareName(sp.hostname) === bareName(main.hostname)) refuse('must use a different hostname from PUBLIC_ORIGIN (a different port is not enough)');
+  return { main: mainOrigin, speakers: sp.origin, mainHost, speakersHost: normalizeHost(sp.host), split: true };
 }
 
 export type Config = z.infer<typeof EnvSchema> & {

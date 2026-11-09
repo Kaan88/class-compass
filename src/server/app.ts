@@ -15,7 +15,7 @@ import { registerModules } from './modules/index.ts';
 import { ensureSchoolDefaults } from './modules/school/defaults.ts';
 import { MAX_UPLOAD_BYTES } from './modules/files/storage.ts';
 import { STUDENT_PAGE_PATH } from '../shared/contracts/links.ts';
-import { BOARD_PAGE_PATH, SCORER_APP_PATH, SCORER_PAGE_PATH } from '../shared/contracts/superSpeakers.ts';
+import { BOARD_PAGE_PATH, SCORER_APP_PATH, SCORER_PAGE_PATH, SCORER_QUEUE_COOKIE } from '../shared/contracts/superSpeakers.ts';
 
 const CLIENT_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist/client');
 /** Built HTML of the student page entry (vite input `student.html`). */
@@ -103,12 +103,15 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
   if (origins.split) {
     app.addHook('onRequest', async (req, reply) => {
       const path = pathOf(req.url);
-      if (isSpeakersHost(origins, req.host)) {
+      // The raw Host header decides, never `req.host` (it follows X-Forwarded-Host behind a trusted
+      // proxy, which a client can send): a forwarded host can only narrow to the speakers allow-list.
+      if (isSpeakersHost(origins, req.headers)) {
         if (speakersHostAllows(path)) return;
         return notFound(req, reply);
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return;
-      if (movedToSpeakers(path)) return reply.redirect(speakersRedirect(origins, req.url), 308);
+      // A scorer device with awards still queued opens the app here, sends them, then moves itself.
+      if (movedToSpeakers(path, req.cookies[SCORER_QUEUE_COOKIE] === '1')) return reply.redirect(speakersRedirect(origins, req.url), 308);
       if (path === '/scorer-sw.js') return reply.type('text/javascript; charset=utf-8').send(SCORER_SW_KILL_SWITCH);
     });
   }
@@ -153,7 +156,7 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
 
   app.setNotFoundHandler((req, reply) => {
     // The speakers host never falls back to the main app's page (D-157).
-    if (req.url.startsWith('/api/') || isSpeakersHost(origins, req.host)) return notFound(req, reply);
+    if (req.url.startsWith('/api/') || isSpeakersHost(origins, req.headers)) return notFound(req, reply);
     if (fs.existsSync(path.join(CLIENT_DIST, 'index.html'))) return reply.sendFile('index.html');
     return reply.status(404).send('Client not built. Run `npm run build` or use `npm run dev`.');
   });
