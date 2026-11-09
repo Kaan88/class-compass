@@ -1,6 +1,6 @@
 # Operations: Setup, Testing, Backup, Restore, Deployment
 
-Status: development setup, testing, demo seed and account recovery are implemented (S0–S2). Backups, restore, exports and the school-year rollover are implemented and tested (S11). The Docker image, compose file and deployment steps below are written and statically checked, but **have not been run yet**: Docker is not installed on the development machine and no VPS deployment has been done (ROADMAP S11).
+Status: development setup, testing, demo seed and account recovery are implemented (S0–S2). Backups, restore, exports and the school-year rollover are implemented and tested (S11). The Docker image and compose file have been built and run on test machines only (the test VM on 2026-11-08, the test server on the owner's mini PC since 2026-11-09, below); Docker is not installed on the development machine, and no VPS or production deployment has been done (ROADMAP S11).
 
 ## Development setup
 1. Node 26, Git.
@@ -141,8 +141,14 @@ A throwaway LAN-only DietPi VM (Docker 29.9, Compose 5.7, Debian buildx 0.13) ru
 - **Build context.** `.dockerignore` leaves out every output, secret and data pattern of `.gitignore` (S14i review), including `usability-shots/` (the usability crawl output, over a gigabyte): a build from a checkout that ran the crawl sends none of it to Docker. `tests/scripts/docker.test.ts` fails when a `.gitignore` pattern has no matching `.dockerignore` rule.
 - **Known gap.** Backup and verify runs recorded after the snapshot are rolled back by the restore, so Maintenance shows "never" for them until the next run (the file list still shows the backup). Fix planned in S13 housekeeping.
 
+## Test server on the mini PC (2026-11-09)
+test.sareteacher.com moved from the test VM to the owner's mini PC (Ubuntu 24.04, Docker 29, user in the `docker` group, no passwordless sudo). It is a test install behind Cloudflare Access with fictional demo data only; **test access does not authorise a production go-live**.
+- **Layout.** `~/Docker/stacks/cc-test`: `docker-compose.yml` from the example, `app.env` (mode 600), `.env` with `APP_TAG`, `data/` (uid 10001), one source folder per deployed commit (`app-<sha>`, unpacked from `git archive <sha>`), and `faketime/Dockerfile`. The app joins the owner's existing `cloudflared_default` network with the alias `cc-test-app`; test.sareteacher.com is a route on the owner's existing tunnel to `http://cc-test-app:3210`. Never print compose files of the tunnel stack without redacting `--token` values.
+- **School-day clock (test only).** A derived image `class-compass:<tag>-faketime` (`FROM class-compass:<tag>` plus `libfaketime`) and `docker-compose.override.yml` (`LD_PRELOAD`, `FAKETIME: "+<seconds>s"`, `FAKETIME_DONT_FAKE_MONOTONIC=1`) shift the app clock so the demo is on a school morning; the clock keeps ticking from there. To re-point it: `FAKETIME` = the wanted instant in epoch seconds minus `date -u +%s` on the host, then `docker compose up -d --no-build app`. Never use faketime outside this test server.
+- **Upgrade (as done for `6c1c2f3`).** Unpack the new commit into `app-<sha>`; `docker build -t class-compass:0.1.0-<sha> app-<sha>` (the build log shows the student page budget line); point `faketime/Dockerfile` at the new tag and build `class-compass:0.1.0-<sha>-faketime`; `docker compose exec -T app node src/server/cli.ts backup:create`; keep copies of `.env` and the override; set `APP_TAG` (and the clock if wanted); `docker compose up -d --no-build app`. The app snapshots the database before migrating. Check `/healthz` inside the container, the migration count against `drizzle/`, the log for errors, and that the public address still answers with the Cloudflare Access sign-in. Rollback: section "5. Upgrade and rollback" below, with the old `-faketime` tag.
+
 ## Deployment on a VPS (S11, D-018): written, not yet performed
-Docker is not installed on the development machine, so the image has not been built or run yet. Follow these steps on the VM and record the results. **Test access does not authorise a production go-live** (ROADMAP).
+Docker is not installed on the development machine; the image has been built and run on the test VM and the test server only (above and below), never on a VPS. Follow these steps on the VPS and record the results. **Test access does not authorise a production go-live** (ROADMAP).
 
 ### 1. Prerequisites and inspection (change nothing yet)
 - Debian 12 or Ubuntu 22.04+ VM, at least 2 vCPU / 2 GB RAM / 20 GB disk, outbound HTTPS, SSH with keys.
