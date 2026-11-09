@@ -502,9 +502,12 @@ test('Customise layout: PIN, keyboard and mouse edits, save per class (relocks: 
     expect((await rowsOf(d))[0]).toBe('routine:8 core.timer:4');
     expect((await api(d, 'DELETE', '/api/teacher/classroom-layout', { contextId: ctxA.id, applyTo: 'all' })).status).toBe(423);
   } finally {
-    await api(d, 'POST', '/api/auth/pin/unlock', { pin: PIN });
-    await api(d, 'DELETE', '/api/teacher/classroom-layout', { contextId: ctxA.id, applyTo: 'all' });
-    await api(d, 'POST', '/api/auth/lock');
+    // Only after a failure is a layout left behind (PIN unlocks are rate-limited: no unlock otherwise).
+    if ((await layoutOf(ctxA.id)).source !== 'default' || (await layoutOf(ctxB.id)).source !== 'default') {
+      await api(d, 'POST', '/api/auth/pin/unlock', { pin: PIN });
+      await api(d, 'DELETE', '/api/teacher/classroom-layout', { contextId: ctxA.id, applyTo: 'all' });
+      await api(d, 'POST', '/api/auth/lock');
+    }
     await endActiveLessons(page);
     for (const m of original) await api(page, 'PUT', `/api/teacher/contexts/${ctxA.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
     await displayCtx.close();
