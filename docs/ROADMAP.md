@@ -220,10 +220,10 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 
 ## S14 Classroom feedback round 2 (owner/teacher feedback 2026-11-08/09)
 Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, migrations 0017 to 0022. Waves: W1 S14a, S14f, S14e1 · W2 S14b, S14d, S14g · W3 S14c, S14e2 · W4 S14e3 · W5 S14h · W6 S14i.
-- [ ] S14a Quick fixes: per-student counters on by default (D-143), "badges" → "achievements" in EN and TR with a guard test (D-144), evidence buttons that never overflow plus `e2e/button-groups.spec.ts` (D-147)
-- [ ] S14a Sound: WebAudio unlock kept armed until the context runs, louder cues, "Sound is off · Turn sound on" chip, Test sound and diagnostics, new lesson/timer/group/achievement events (D-145)
+- [x] S14a Quick fixes: per-student counters on by default (D-143), "badges" → "achievements" in EN and TR with a guard test (D-144), evidence buttons that never overflow plus `e2e/button-groups.spec.ts` (D-147; also menu tiles, topic choices, group options, reflection, attendance statuses). With the boxes on, 16 cards fit at 1440×900 (19 from 1920×1080); the 18–20 target with boxes comes with S14b's board
+- [x] S14a Sound: WebAudio unlock kept armed until the context runs, louder cues, "Sound is off · Turn sound on" chip, Test sound and diagnostics, new lesson/timer/group/achievement events (D-145; `groupMove` is declared and played from S14c)
   - [ ] Heard by the owner on the MacBook (Safari and Chrome) and on the classroom speakers; iPad silent switch
-- [ ] S14a Avatars: recognisable dinosaurs and mythical creatures (rex, stegosaur, long-neck, unicorn, dragon, phoenix), Turkish names (D-146)
+- [x] S14a Avatars: recognisable dinosaurs and mythical creatures (rex, stegosaur, long-neck, unicorn, dragon, phoenix), Turkish names (D-146)
   - [ ] Sare and a few children name each redrawn species
 - [x] S14f Super Speakers on its own origin: optional `SPEAKERS_ORIGIN`, CSRF by endpoint, host routing with 308s, links and QR codes, service-worker kill switch, OPERATIONS for a second hostname (D-157). No deployment
   - [ ] Second hostname set up (tunnel, Cloudflare settings, Access Bypass) and checked with a TV and a phone: only when the owner creates a hostname (OPERATIONS → "Super Speakers on its own hostname")

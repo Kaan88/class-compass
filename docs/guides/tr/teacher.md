@@ -166,6 +166,7 @@ Başarıyı verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Ger
 - **Sınıf ayarları** → **Sınıf ekranı**: **Tema**, **Ses düzeyi** ve **Dene** ile **Sesler**, **Animasyonlar**, **Günün sözü** ve **Süre bittiğinde**: **“Time’s up!” de** (bilgisayar İngilizce söyler; bilgisayarda İngilizce ses yoksa zil çalar), **Kendi kaydım**, **Zil** ya da **Sessiz**.
 - **Kendi kaydım**: **Profil ve PIN** → **Süre doldu kaydım** bölümünde en fazla 5 saniyelik bir kayıt yapın ya da bir ses dosyası seçin.
 - **Bu cihazda sesler** (sınıf ekranının üst çubuğu → **Ekran**) yalnızca bu cihazın sesini kapatır.
+- Tarayıcılar sesi ancak biri ekrana dokunduktan ya da bir tuşa bastıktan sonra çalar. O zamana kadar üst çubukta **Ses kapalı · Sesi aç** görünür; ona dokunun (herhangi bir dokunuş da olur), kısa bir deneme sesi çalar. Yine de bir şey duymuyorsanız **Ekran** → **Ses kontrolü**'nü açın: neyin eksik olduğunu söyler (sınıf ya da bu cihaz için sesler kapalı, ses düzeyi 0, tarayıcı dokunuş bekliyor), **Son ses**'i gösterir, **Sesi dene** düğmesi vardır ve **Tanılama bilgisini kopyala** ayrıntıları Sınıf Pusulası'yla ilgilenen kişiye göndermeniz için kopyalar. Bilgisayarın kendi ses düzeyini ve hoparlörünü de kontrol edin.
 - Kutlamalar yalnızca siz ekranda bir şey yaptığınızda çalar (açıklanan bir Gizli Öğrenci, **Ekranda kutla**), kendiliğinden asla. Hareketin azaltılmasını isteyen bir cihazda hareketsiz, sakin bir sürüm gösterilir.
 
 ## Ödev kontrolü

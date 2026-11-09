@@ -2,7 +2,8 @@
 
 How the classroom looks and sounds, and how to change it safely. Written so an AI agent can make a
 new theme, a new sound cue or a new celebration in one pass. Decisions: D-070 (theme registry),
-D-105 (teachers choose their class display), D-110 (sound packs, SoundManager, celebrations).
+D-105 (teachers choose their class display), D-110 (sound packs, SoundManager, celebrations),
+D-145 (unlock, loudness, sound status), D-146 (redrawn creatures).
 For adding a theme step by step (scaffold, checklist) see [EXTENDING.md](EXTENDING.md#add-a-theme).
 
 ## The model in one paragraph
@@ -43,6 +44,7 @@ switches (animations, sounds), the device sound switch, the class volume and the
 
 - **Add a badge icon:** add the key to `BADGE_ICONS` (`src/shared/achievements.ts`) and its 24×24 single-path glyph to `GLYPHS` (`src/client/achievements/icons.tsx`); the Record type and `tests/client/avatars-badges.test.tsx` make sure every key has a distinct glyph. Draw it yourself in the same line style (round caps, 1.8 stroke); never copy an icon set.
 - **Add an avatar part:** add the option to `PERSON_PARTS` / `CREATURE_PARTS` (and `OPTION_NAMES` in EN and TR for the accessible name) in `src/shared/avatars.ts`, then draw it in `AvatarArt.tsx` with `var(--cc-avatar-*)` colours only, no ids, filters or `<image>`. The server validates specs against the same catalogue, so an unknown value is refused until it is added there. An option can unlock with a default badge through `AVATAR_UNLOCKS`.
+- **Creature faces (S14a, D-146):** `SPECIES_FACE` in `AvatarArt.tsx` says where each species' eyes go (centre, height, spacing, size), which mouth it has (`person`, `beak`, `snout`, `muzzle`, `jaw`) and where a hat sits; the unicorn's horn is drawn over the hat. A new species gets an entry there (a species without one gets the front-facing default) and a body in `CreatureBody` that is more than one plain ellipse (test-enforced: every species has its own outline). Darker parts of a creature use `Shade` (the body colour under a thin ink layer), so they follow the chosen colour.
 - Theme-specific icon variants, frames or extra avatar families are not supported yet (ROADMAP S13c); a theme changes badges and avatars through the tokens above.
 
 ## Sound
@@ -64,6 +66,12 @@ switches (animations, sounds), the device sound switch, the class volume and the
 | `timeUp` | the timer ends and the class chose "chime" (or as the fallback) | 4 |
 | `softChime` | the end of a celebration or reveal show with reduced motion or animations off | 2 |
 | `fanfare`, `clapping`, `fireworks` | the end of the reveal show, celebrations (full motion only) | 4 |
+| `lessonStart` | Begin lesson pressed (S14a) | 3 |
+| `lessonEnd` | Save and end lesson pressed (S14a) | 3 |
+| `timerStart` | the lesson timer is started (S14a) | 2 |
+| `achievementGiven` | an achievement given in class without the celebration (S14a) | 3 |
+| `soundTest` | **Test sound** in the Display popover, the "Turn sound on" chip (S14a) | 2 |
+| `groupMove` | a student moved to another group (declared in S14a, played from S14c) | 1 |
 
 ### Making a pack
 
@@ -91,16 +99,34 @@ celebration: { colors: ['accent', 'deco-1', 'deco-2', 'deco-3', 'success'] },
 - With an explicit display state (previews, "Try" buttons): `playThemeSound(display, theme, name)`.
 
 All three go through the **SoundManager** (`src/client/themes/soundManager.ts`): one AudioContext,
-unlocked on the first tap or key press (`installSoundUnlock()` in `main.tsx`), the class volume on a
-master gain, mute when the class or device switch is off, priorities with ducking (a louder cue
-lowers quieter ones to 30 %, a quiet cue under a loud one starts at 30 %), taps closer than 50 ms
-merged. Never create an `AudioContext` or call `speechSynthesis` from a component.
+the class volume on a master gain, mute when the class or device switch is off, priorities with
+ducking (a louder cue lowers quieter ones to 30 %, a quiet cue under a loud one starts at 30 %), taps
+closer than 50 ms merged. Never create an `AudioContext` or call `speechSynthesis` from a component.
+
+### Unlock, loudness and status (S14a, D-145)
+
+- **Unlock.** Browsers start WebAudio only from a user gesture. `installSoundUnlock()` (in each
+  `main.tsx`) listens to `pointerdown`, `pointerup`, `touchend`, `click` and `keydown` and keeps
+  listening until the context really runs; it arms again when the browser suspends or interrupts the
+  context or the page is shown again. `sounds.unlocked` is the context state, never a guess. A control
+  that unlocks audio in its own press handler carries `data-unlocks-sound` (`SELF_UNLOCK_ATTR`).
+- **Loudness.** Master (class volume, squared curve) → compressor (−24 dB, ratio 6, hard knee; the
+  browser adds about +12 dB makeup) → makeup ×2.2 → speakers. Notes stay ≤ 0.3 each. A tap at volume 80
+  must peak between −12 and −6 dBFS and no cue may reach 0 dBFS at volume 100: `outputPeakDb(peak,
+  volume)` models it and `tests/client/themes.test.tsx` checks every theme's pack. A theme that makes
+  its taps much quieter or its chords much louder fails there; change `gain` in `makeSoundPack`.
+- **Status.** `useSoundStatus()` (from `themes/index.tsx`) returns `running`, `locked`, `unavailable`,
+  `mutedClass`, `mutedDevice` or `volumeZero` plus a snapshot (context state, last cue). The classroom
+  top bar shows "Sound is off · Turn sound on" for `locked` and `mutedDevice`, and the Display popover
+  has the Sound check with **Test sound** and **Copy diagnostics**. Use the hook for any other screen
+  that must say why it is silent; do not read the AudioContext yourself.
 
 ### Time's up
 
 `modules/lessons/timeUp.ts`: `planTimeUp(setting, can)` decides voice / clip / chime / none
 (fallbacks: no English voice → chime, no clip → chime, sounds off → none); `announceTimeUp()` plays
-it. The teacher's clip is fetched ahead with `preloadTimeUp()` when the class is opened.
+it. The voice list is cached and refreshed on `voiceschanged` (`currentVoices()`), because browsers
+fill it late. The teacher's clip is fetched ahead with `preloadTimeUp()` when the class is opened.
 
 ## Celebration
 

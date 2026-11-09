@@ -166,6 +166,7 @@ If **Allow checking on the classroom screen** is on (Homework → Settings; off 
 - **Class settings** → **Classroom display**: **Theme**, **Sounds** with **Volume** and **Try**, **Animations**, **Quote of the day** and **When the timer ends**: **Say "Time's up!"** (spoken in English by the computer; the chime plays if it has no English voice), **My own recording**, **Chime** or **Silent**.
 - **My own recording**: in **Profile and PIN** → **My time's-up recording**, record up to 5 seconds or choose a sound file.
 - **Sounds on this device** (classroom top bar → **Display**) mutes this device only.
+- Browsers play sound only after someone has tapped the screen or pressed a key. Until then the top bar shows **Sound is off · Turn sound on**; tap it (any tap works) and a short test sound plays. If you still hear nothing, open **Display** → **Sound check**: it says what is wrong (sounds off for the class or this device, volume 0, the browser waiting for a tap), shows the **Last sound**, has **Test sound**, and **Copy diagnostics** copies the details for whoever looks after Class Compass. Also check the computer's own volume and speakers.
 - Celebrations play only after you do something on the screen (a revealed Secret Student, **Celebrate on the display**), never by themselves. A device that asks for reduced motion gets a calm version without movement.
 
 ## Homework checking
