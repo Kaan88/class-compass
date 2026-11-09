@@ -17,7 +17,9 @@ export const assistantManifest = defineServerModule({
   lessonState: [assistantLessonState],
   endSteps: [assistantEndStep],
   commands: assistantCommands,
-  reports: [{ key: 'assistant', order: 70, build: assistantSection }],
+  reports: [
+    { key: 'assistant', order: 70, meta: { title: 'report.section.assistant', tables: [{ key: 'students', title: 'report.assistant.byStudent' }] }, build: assistantSection },
+  ],
   timeline: [{ key: 'assistant', order: 70, build: assistantTimeline }],
   // Absence carry-forward and same-day correction (D-065, D-068).
   attendanceListeners: [onAttendanceChange],

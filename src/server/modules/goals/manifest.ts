@@ -19,8 +19,23 @@ export const goalsManifest = defineServerModule({
   policyKey: 'goals',
   routes: registerGoalRoutes,
   reports: [
-    { key: 'goals', order: 50, build: goalsReportSection },
-    { key: 'studentReflections', order: 61, build: studentReflectionsSection },
+    {
+      key: 'goals',
+      order: 50,
+      meta: {
+        title: 'report.section.goals',
+        tables: [
+          { key: 'categories', title: 'report.goals.byCategory' },
+          { key: 'teacherAssessment', title: 'report.goals.teacherAssessment' },
+          { key: 'selfAssessment', title: 'report.goals.selfAssessment' },
+          { key: 'students', title: 'report.goals.byStudent' },
+          { key: 'activity', title: 'report.goals.activity' },
+          { key: 'confidenceHistory', title: 'report.goals.confidenceHistory' },
+        ],
+      },
+      build: goalsReportSection,
+    },
+    { key: 'studentReflections', order: 61, meta: { title: 'report.section.studentReflections', tables: [{ key: 'students', title: 'report.reflections.byStudent' }] }, build: studentReflectionsSection },
   ],
   timeline: [{ key: 'goals', order: 50, build: goalsTimeline }],
   studentPage: [{ key: 'goals', order: 10, build: goalsSection }],

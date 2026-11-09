@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { safeFileName, toCsv, type CsvDelimiter, type CsvValue } from '../../../domain/csv.ts';
 import type { Report, ReportSection, ReportTable, TimelineEvent } from '../../../shared/contracts/reports.ts';
 import { pickText, translate, type Locale } from '../../../shared/i18n/index.ts';
+import { parseSectionsParam, tableMatches, type SectionFilter } from '../../../shared/reportViews.ts';
 import { reportCellText, reportLabelText } from '../../../shared/reportText.ts';
 import { enrolments } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
@@ -17,20 +18,29 @@ import { getSchoolSettings } from '../school/policy.ts';
 import { key } from './cells.ts';
 import { buildScope, type Viewer } from './scope.ts';
 
-type Input = { contextId: string; from?: string | undefined; to?: string | undefined; studentId?: string | undefined };
+type Input = { contextId: string; from?: string | undefined; to?: string | undefined; studentId?: string | undefined; sections?: string | undefined };
 
 const studentOut = (s: { id: string; fullName: string; deactivatedAt: number | null }) => ({ id: s.id, fullName: s.fullName, active: s.deactivatedAt === null });
 
-export function sectionsFor(ctx: RequestContext, scope: ReportScope): ReportSection[] {
+/**
+ * The sections of the report. S14e1 (D-153): with a filter (a report view), a section that was not
+ * requested is not built at all, and of a requested section only the requested tables are kept
+ * (matched through the section's catalogue `meta`; `perItem` tables by their key prefix).
+ */
+export function sectionsFor(ctx: RequestContext, scope: ReportScope, filter: SectionFilter | null = null): ReportSection[] {
   const out: ReportSection[] = [];
   for (const c of reportContributions(ctx.db, scope.context.id)) {
+    if (filter && !filter.has(c.key)) continue;
     const data = c.build(ctx, scope);
-    if (data) out.push({ ...data, module: c.module });
+    if (!data) continue;
+    const wanted = filter?.get(c.key) ?? null;
+    const tables = wanted ? data.tables.filter((t) => c.meta.tables.some((m) => wanted.has(m.key) && tableMatches(m, t.key))) : data.tables;
+    out.push({ ...data, tables, module: c.module });
   }
   return out;
 }
 
-export function buildReport(ctx: RequestContext, input: Input, viewer: Viewer): Report {
+export function buildReport(ctx: RequestContext, input: Input, viewer: Viewer, filter: SectionFilter | null = parseSectionsParam(input.sections)): Report {
   const { scope, info } = buildScope(ctx, input.contextId, viewer, input);
   // The student filter lists everyone in the class during the period, even when one is chosen.
   const everyone = input.studentId ? buildScope(ctx, input.contextId, viewer, { from: scope.from, to: scope.to }).scope.students : scope.students;
@@ -42,7 +52,7 @@ export function buildReport(ctx: RequestContext, input: Input, viewer: Viewer): 
     student: scope.studentId ? studentOut(scope.students[0]!) : null,
     students: everyone.map(studentOut),
     generatedAt: ctx.now(),
-    sections: sectionsFor(ctx, scope),
+    sections: sectionsFor(ctx, scope, filter),
   };
 }
 

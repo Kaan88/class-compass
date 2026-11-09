@@ -128,6 +128,11 @@ export function registerModules(app: FastifyInstance, deps: AppDeps) {
   for (const m of SERVER_MODULES) m.routes?.(app, deps);
 }
 
+/** Every registered report section, whatever is switched on (the catalogue of saved views, S14e1). */
+export const allReportContributions = (): readonly Registered<ReportContribution>[] => {
+  installModules();
+  return reports;
+};
 /** Report sections of the modules enabled for `contextId`, in order (a disabled module's section is never served). */
 export const reportContributions = (db: Db, contextId: string): Registered<ReportContribution>[] => enabledContributions(reports, db, contextId);
 /** S10 hook: student page sections of the modules enabled for `contextId`, in order. */

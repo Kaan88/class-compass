@@ -13,7 +13,21 @@ export const homeworkManifest = defineServerModule({
   key: 'homework',
   policyKey: 'homework',
   routes: registerHomeworkRoutes,
-  reports: [{ key: 'homework', order: 40, build: homeworkReportSection }],
+  reports: [
+    {
+      key: 'homework',
+      order: 40,
+      meta: {
+        title: 'report.section.homework',
+        tables: [
+          { key: 'assignments', title: 'report.homework.byAssignment' },
+          { key: 'students', title: 'report.homework.byStudent' },
+          { key: 'outstanding', title: 'report.homework.outstandingList' },
+        ],
+      },
+      build: homeworkReportSection,
+    },
+  ],
   timeline: [{ key: 'homework', order: 40, build: homeworkTimeline }],
   studentPage: [{ key: 'homework', order: 20, build: homeworkSection }],
   config: { schema: homeworkConfigSchema, defaults: { statuses: DEFAULT_HOMEWORK_STATUSES, checkingInClassroom: false } },

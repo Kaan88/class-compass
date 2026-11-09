@@ -12,7 +12,22 @@ export const countersManifest = defineServerModule({
   commands: counterCommands,
   // Counter bars and weekly counts ride on the polled lesson state (D-045, CNT-2/3).
   lessonState: [countersLessonState],
-  reports: [{ key: 'counters', order: 30, build: countersSection }],
+  reports: [
+    {
+      key: 'counters',
+      order: 30,
+      // One set of tables per counter (`lessons-<counterId>` …).
+      meta: {
+        title: 'report.section.counters',
+        tables: [
+          { key: 'lessons', title: 'report.counters.perLesson', perItem: true },
+          { key: 'weeks', title: 'report.counters.perWeek', perItem: true },
+          { key: 'students', title: 'report.counters.perStudent', perItem: true },
+        ],
+      },
+      build: countersSection,
+    },
+  ],
   timeline: [{ key: 'counters', order: 30, build: countersTimeline }],
   // S13a: the English-reminder boxes on student cards are hidden unless the teacher shows them.
   config: { schema: z.object({ showReminderBoxes: z.boolean() }), defaults: { showReminderBoxes: false } },

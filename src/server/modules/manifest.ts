@@ -21,6 +21,7 @@ import type { StudentRow } from './students/service.ts';
 import type { lessons } from '../db/schema.ts';
 import type { ReportSectionData, TimelineEvent } from '../../shared/contracts/reports.ts';
 import type { StudentPageSection } from '../../shared/contracts/goals.ts';
+import type { MessageKey } from '../../shared/i18n/index.ts';
 
 type LessonRow = typeof lessons.$inferSelect;
 
@@ -61,7 +62,29 @@ export interface ReportScope {
 export interface ReportContribution {
   key: string;
   order: number;
+  /**
+   * S14e1 (D-153): what the section can contain, for the report catalogue and saved views (the
+   * Customise tree). `title` is the section's title; `tables` lists every table `build` may return,
+   * by key (`perItem`: one table per item, keyed `<key>-<id>`, e.g. one per counter). Test-enforced
+   * against the tables the sections actually produce.
+   */
+  meta: ReportSectionMeta;
+  /**
+   * Called only when the section is requested (`ReportInput.sections`); the reports module then
+   * keeps only the requested tables.
+   */
   build: (ctx: RequestContext, scope: ReportScope) => ReportSectionData | null;
+}
+
+export interface ReportTableMeta {
+  key: string;
+  title: MessageKey;
+  perItem?: boolean;
+}
+
+export interface ReportSectionMeta {
+  title: MessageKey;
+  tables: readonly ReportTableMeta[];
 }
 
 /** A module's events in one student's timeline (RPT-1): only records the teacher may see. */

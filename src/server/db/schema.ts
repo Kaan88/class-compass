@@ -1466,3 +1466,40 @@ export const superSpeakersSettings = sqliteTable('super_speakers_settings', {
   updatedAt: integer('updated_at').notNull(),
   updatedBy: text('updated_by'),
 });
+
+// ---------------------------------------------------------------- report views & user settings (S14e1, D-153)
+/**
+ * Saved report views ("templates", S14e1, D-153): a name and the sections/tables to show
+ * (`ReportViewSpec`, shared/reportViews.ts). Personal to the account and to where it was saved
+ * (`viewer`: teacher area or admin area); never a class, a student or a period, so no student data.
+ * At most MAX_REPORT_VIEWS per account; deleted for good (a personal preference, not history).
+ */
+export const reportViews = sqliteTable(
+  'report_views',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id),
+    viewer: text('viewer', { enum: ['teacher', 'admin'] }).notNull(),
+    name: text('name').notNull(),
+    specJson: text('spec_json', { mode: 'json' }).$type<{ sections: Array<{ key: string; tables: string[] | null }> }>().notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('report_views_user_idx').on(t.userId, t.viewer)],
+);
+
+/**
+ * Small per-account settings that follow the user across devices (S14e1, D-153), one row per
+ * (account, key). Keys and their value schemas are registered in `server/lib/userSettings.ts` (the
+ * only reader and writer): the default report view now, the notification settings later (S14e3).
+ */
+export const userSettings = sqliteTable(
+  'user_settings',
+  {
+    userId: text('user_id').notNull().references(() => users.id),
+    key: text('key').notNull(),
+    valueJson: text('value_json', { mode: 'json' }).$type<unknown>().notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.key] })],
+);

@@ -9,6 +9,19 @@ export const attendanceManifest = defineServerModule({
   policyKey: 'attendance',
   routes: registerAttendanceRoutes,
   commands: attendanceCommands,
-  reports: [{ key: 'attendance', order: 20, build: attendanceSection }],
+  reports: [
+    {
+      key: 'attendance',
+      order: 20,
+      meta: {
+        title: 'report.section.attendance',
+        tables: [
+          { key: 'students', title: 'report.attendance.byStudent' },
+          { key: 'weeks', title: 'report.attendance.byWeek' },
+        ],
+      },
+      build: attendanceSection,
+    },
+  ],
   timeline: [{ key: 'attendance', order: 20, build: attendanceTimeline }],
 });

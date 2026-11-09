@@ -12,9 +12,9 @@ export const lessonsManifest = defineServerModule({
   commands: lessonCommands,
   endSteps: [reflectionStep],
   reports: [
-    { key: 'overview', order: 10, build: overviewSection },
-    { key: 'lessonTopics', order: 15, build: lessonTopicsSection },
-    { key: 'lessonReflections', order: 60, build: lessonReflectionsSection },
+    { key: 'overview', order: 10, meta: { title: 'report.section.overview', tables: [{ key: 'lessonsPerWeek', title: 'report.overview.perWeek' }] }, build: overviewSection },
+    { key: 'lessonTopics', order: 15, meta: { title: 'report.section.lessonTopics', tables: [{ key: 'topics', title: 'report.topics.perTopic' }] }, build: lessonTopicsSection },
+    { key: 'lessonReflections', order: 60, meta: { title: 'report.section.lessonReflections', tables: [{ key: 'lessons', title: 'report.reflections.lessons' }] }, build: lessonReflectionsSection },
   ],
   timeline: [{ key: 'lessonTopics', order: 10, build: lessonTopicsTimeline }],
 });

@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { weekdayOf } from '../../src/domain/dates.ts';
 import { lessons, schoolSettings, students, teachingContexts } from '../../src/server/db/schema.ts';
 import { privateNotesCount } from '../../src/server/modules/goals/history.ts';
+import { allReportContributions } from '../../src/server/modules/index.ts';
+import { tableMatches } from '../../src/shared/reportViews.ts';
 import { isModuleAvailable, isModuleEnabled } from '../../src/server/modules/school/modules.ts';
 import { buildBoard } from '../../src/server/modules/superSpeakers/service.ts';
 import { urlWords } from '../../src/server/modules/textChecks/service.ts';
@@ -131,6 +133,17 @@ describe('seed:demo-history', () => {
     const keys = report.sections.map((s: any) => s.key);
     for (const k of ['overview', 'attendance', 'counters', 'homework', 'goals', 'lessonReflections', 'assistant', 'secretStudents', 'groupingHistory']) expect(keys, k).toContain(k);
     expect(report.sections.every((s: any) => s.tables.length + s.metrics.length > 0)).toBe(true);
+    // S14e1 (D-153): with weeks of history in every module, each produced section and table is in
+    // the report catalogue (`ReportContribution.meta`), so saved views can name it.
+    const catalogue = allReportContributions();
+    for (const c of contexts) {
+      const r = await ok(english.get(`/api/teacher/contexts/${c.id}/report?from=2026-09-01&to=2026-11-08`));
+      for (const sec of r.sections as Array<{ key: string; tables: Array<{ key: string }> }>) {
+        const meta = catalogue.find((x) => x.key === sec.key)?.meta;
+        expect(meta, sec.key).toBeTruthy();
+        for (const t of sec.tables) expect(meta!.tables.some((m) => tableMatches(m, t.key)), `${sec.key}.${t.key}`).toBe(true);
+      }
+    }
     const kid = report.students[0];
     const timeline = await ok(english.get(`/api/teacher/contexts/${c3a.id}/students/${kid.id}/timeline`));
     expect(JSON.stringify(timeline).length).toBeGreaterThan(500);

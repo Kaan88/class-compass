@@ -27,7 +27,21 @@ export const achievementsManifest = defineServerModule({
   commands: achievementsCommands,
   endSteps: [achievementsEndStep],
   activityListeners: [onActivity],
-  reports: [{ key: 'achievements', order: 90, build: achievementsSection }],
+  reports: [
+    {
+      key: 'achievements',
+      order: 90,
+      meta: {
+        title: 'report.section.achievements',
+        tables: [
+          { key: 'students', title: 'report.achievements.byStudent' },
+          { key: 'categories', title: 'report.achievements.byCategory' },
+          { key: 'teachers', title: 'report.achievements.byTeacher' },
+        ],
+      },
+      build: achievementsSection,
+    },
+  ],
   timeline: [{ key: 'achievements', order: 90, build: achievementsTimeline }],
   studentPage: [{ key: 'achievements', order: 30, build: studentSection }],
   config: { schema: achievementsConfigSchema, defaults: DEFAULT_SETTINGS },

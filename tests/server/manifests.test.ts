@@ -135,9 +135,10 @@ describe('report and student-page hooks serve enabled modules only (CFG-2, ACC-1
     installModules();
     const build = () => ({ key: 'x', title: { raw: 'x' }, metrics: [], tables: [], notes: [] });
     const none = () => null;
+    const meta = { title: 'report.section.overview', tables: [] } as const;
     const fake = [
-      defineServerModule({ key: 'fakeCore', policyKey: null, reports: [{ key: 'core', order: 20, build }], studentPage: [{ key: 'homework', order: 20, build: none }] }),
-      defineServerModule({ key: 'fakeSecret', policyKey: 'secretStudents', reports: [{ key: 'secret', order: 10, build }], studentPage: [{ key: 'goals', order: 10, build: none }] }),
+      defineServerModule({ key: 'fakeCore', policyKey: null, reports: [{ key: 'core', order: 20, meta, build }], studentPage: [{ key: 'homework', order: 20, build: none }] }),
+      defineServerModule({ key: 'fakeSecret', policyKey: 'secretStudents', reports: [{ key: 'secret', order: 10, meta, build }], studentPage: [{ key: 'goals', order: 10, build: none }] }),
     ];
     const c = collectContributions(fake);
     expect(c.reports.map((r) => [r.key, r.module])).toEqual([

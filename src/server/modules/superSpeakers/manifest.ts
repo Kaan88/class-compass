@@ -22,6 +22,19 @@ export const superSpeakersManifest = defineServerModule({
     setDisplayResolver(resolveDisplay);
     registerSpeakersRoutes(app, deps);
   },
-  reports: [{ key: 'superSpeakers', order: 95, build: speakersReportSection }],
+  reports: [
+    {
+      key: 'superSpeakers',
+      order: 95,
+      meta: {
+        title: 'speakers.report.title',
+        tables: [
+          { key: 'students', title: 'speakers.history.byStudent' },
+          { key: 'weeks', title: 'speakers.report.byWeek' },
+        ],
+      },
+      build: speakersReportSection,
+    },
+  ],
   timeline: [{ key: 'superSpeakers', order: 95, build: speakersTimeline }],
 });

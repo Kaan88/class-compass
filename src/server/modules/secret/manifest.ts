@@ -20,7 +20,9 @@ export const secretManifest = defineServerModule({
   lessonState: [secretLessonState],
   endSteps: [secretEndStep],
   // Revealed rounds only (SEC-3).
-  reports: [{ key: 'secretStudents', order: 71, build: secretSection }],
+  reports: [
+    { key: 'secretStudents', order: 71, meta: { title: 'report.section.secret', tables: [{ key: 'students', title: 'report.secret.byStudent' }] }, build: secretSection },
+  ],
   timeline: [{ key: 'secretStudents', order: 71, build: secretTimeline }],
   // A chosen student marked absent is replaced silently inside the attendance write (D-064).
   attendanceListeners: [onAttendanceChange],
