@@ -36,7 +36,11 @@ backups/
 # Not needed in the image
 e2e/
 tests/
-docs/
+# Docs: only the user guides (bundled into Help at build time) and the AI tools resources (S14h1).
+docs/*
+!docs/guides/
+!docs/THEMING.md
+!docs/theme-package.schema.json
 .claude/
 .vscode/
 .idea/

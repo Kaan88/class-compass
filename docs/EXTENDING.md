@@ -64,6 +64,29 @@ by `app.ts` with `no-store`. Super Speakers pages may be served on their own ori
 The list order in `SERVER_MODULES` is the registration order, which matters for hooks that run in
 sequence.
 
+### Offering a module's data to AI tools (S14h1, D-160, D-161)
+
+AI tools (`/mcp`) get a module's data only through its contracts:
+
+1. Add `mcp: { scope, tool, description, readOnly, cost? }` to a `classroom`, `teacher` or `admin`
+   endpoint in `src/shared/contracts/<m>.ts` (registered with `route()`). `scope` is one of
+   `MCP_SCOPES` (`src/shared/mcp.ts`): teacher scopes for teacher endpoints, `settings:admin`,
+   `themes:write` or `school:read` for admin endpoints. `tool` is a unique snake_case name.
+   `description` is for an AI client: what the tool returns, what it changes, what is withheld.
+   Reports and other heavy reads set `cost` (5); the default is 1.
+2. Mark the output schema: every string field that could hold personal data gets
+   `.meta(pii(kind))` (`none`, `label`, `teacherText`, `staffName`, `studentName`,
+   `studentInitials`, `studentText`, `authoredText`, or a kind that never leaves: `note`, `level`,
+   `file`, `secret`, `linkToken`). Ids, keys and dates (`id`, `…Id`, `key`, `…On`, `date`, `from`,
+   `to`, `status`, `timezone`, `today`) need no mark. A whole object or array can be marked at once.
+3. `npm run check`: `tests/server/mcp-privacy.test.ts` checks the marks, calls the new tool (add its
+   arguments to `argsFor` there when its required fields are not plain ids) and scans the result for
+   marker names and student texts in pseudonymous mode.
+
+A tool that combines several endpoints is a hand-written tool in `src/server/modules/mcp/tools.ts`
+(`handTool({...})`, calling endpoints with `callEndpoint` so their checks run). Never expose
+exports, erasure, backups, credentials, link tokens or files.
+
 ### Client manifest (`defineClientModule`)
 
 | Field | What it does |
@@ -94,6 +117,7 @@ Ordering is deterministic: lists are sorted by `order`, then by `key`. Orders mu
 - [ ] Tests: HTTP behaviour, permissions (`permissions.test.ts` covers new endpoints automatically), audit, replay. Name requirement IDs in the tests.
 - [ ] ROADMAP: add the boxes and tick only what is done. Add DECISIONS entries for new patterns.
 - [ ] A demo history generator (below), so the test VM shows the module with weeks of data.
+- [ ] Optional: endpoints useful to AI tools opt in with `mcp: {...}` and mark their output with `pii()` (above).
 - [ ] Teacher pages set `group`, `setupTab` and `module` (S14e3). If students do something a teacher should hear about: a `notify()` call and a notification category (S14e3, D-155).
 
 ## Demo history generators

@@ -46,6 +46,10 @@ COPY --chown=root:root package.json package-lock.json ./
 COPY --from=deps --chown=root:root /app/node_modules ./node_modules
 COPY --chown=root:root src ./src
 COPY --chown=root:root drizzle ./drizzle
+# AI tools resources (S14h1, D-160): the user guides' Markdown, the theming guide and the package schema.
+COPY --chown=root:root docs/guides/en ./docs/guides/en
+COPY --chown=root:root docs/guides/tr ./docs/guides/tr
+COPY --chown=root:root docs/THEMING.md docs/theme-package.schema.json ./docs/
 COPY --chown=root:root scripts/prepare-ocr.ts ./scripts/prepare-ocr.ts
 COPY --from=build --chown=root:root /app/dist/client ./dist/client
 COPY --from=build --chown=root:root /out/ocr /opt/class-compass/ocr

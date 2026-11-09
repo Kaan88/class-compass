@@ -15,6 +15,7 @@ Bu kılavuzlar Sınıf Pusulası'nı okulda kullananlar içindir. Her kılavuz a
 | Super Speakers: administrators | [Super Speakers guide](en/super-speakers.md) | [Süper Konuşmacılar kılavuzu](tr/super-speakers.md) |
 | Super Speakers: scorers (one page, also the scorer's quick start) | [Scorer guide](en/scorer.md) | [Puanlayıcı kılavuzu](tr/scorer.md) |
 | Super Speakers: board screen (one page) | [Board screen setup](en/board-screen.md) | [Pano ekranı kurulumu](tr/board-screen.md) |
+| Teachers and administrators: AI tools (MCP, personal tokens, what leaves the school) | [AI tools](en/ai-tools.md) | [Yapay zekâ araçları](tr/ai-tools.md) |
 | Students: quick start | [Quick start for students](en/quick-start-student.md) | [Öğrenciler için hızlı başlangıç](tr/quick-start-student.md) |
 | Students and parents | [Students and parents guide](en/student.md) | [Öğrenciler ve veliler kılavuzu](tr/student.md) |
 

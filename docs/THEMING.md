@@ -419,9 +419,14 @@ console.log(report.errors, report.warnings);
 Fix every error (the `path` says where; contrast errors give the ratio and the minimum). Never put
 real people or a real school in a package. Enabling a theme stays a human action on Admin → Themes.
 
-**MCP theme tools arrive with S14h.** The planned tools are `theme_schema`, `validate_theme`,
-`import_theme_draft` (saves a draft only; enabling stays a human action) and `export_theme`, all
-calling the same shared validator. They do not exist yet; until then use the admin page.
+**MCP theme tools (S14h1, D-160).** An AI assistant connected to `/mcp` with a personal token
+(`docs/guides/en/ai-tools.md`) has `theme_schema` (the package JSON Schema and the built-in keys),
+`validate_theme` (the same `validateThemePackage` report; nothing is saved), `import_theme_draft`
+(administrators with the `themes:write` scope: saves a **draft** only; enabling stays a human action
+on Admin → Themes after the preview) and `export_theme` (an imported theme's package; built-in
+themes are exported from the admin page). This guide is the resource `classcompass://docs/theming`
+and the schema `classcompass://themes/package-schema`; the prompt `design_theme` walks through the
+checklist above.
 
 ## Sound
 
