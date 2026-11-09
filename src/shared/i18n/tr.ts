@@ -1684,6 +1684,7 @@ export const tr = {
   'reportViews.section': '{title} (bölümün tamamı)',
   'reportViews.noSections': 'En az bir bölüm seçin.',
   'reportViews.changed': 'Değişti, henüz kaydedilmedi.',
+  'reportViews.viewChanged': '{name} (değiştirildi, kaydedilmedi)',
   'reportViews.saveAs': 'Yeni görünüm olarak kaydet…',
   'reportViews.saveAsTitle': 'Yeni görünüm olarak kaydet',
   'reportViews.name': 'Görünümün adı',

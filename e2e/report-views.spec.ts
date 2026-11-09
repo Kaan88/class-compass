@@ -45,6 +45,8 @@ test('save a customised view, make it the default, fold a section, reload, print
   await tree.locator('li', { has: page.getByLabel('Attendance (whole section)') }).getByLabel('By week').uncheck();
   await expect.poll(() => sectionKeys(page)).toEqual(['overview', 'attendance']);
   await expect(page.getByText('Changed, not saved yet.')).toBeVisible();
+  // The header (printed too) says the sections are no longer the saved view's.
+  await expect(page.getByTestId('report-view-name')).toHaveText('View: Attendance & homework (changed, not saved)');
   await page.getByRole('button', { name: 'Save as new view…' }).click();
   const dialog = page.getByRole('dialog', { name: 'Save as a new view' });
   await dialog.getByLabel('Name of the view').fill('Monday check');
@@ -52,6 +54,7 @@ test('save a customised view, make it the default, fold a section, reload, print
   await expect(dialog).toBeHidden();
   await expect(viewSelect.locator('option:checked')).toHaveText('Monday check');
   await expect(page).toHaveURL(/view=[0-9a-f-]{36}/u);
+  await expect(page.getByTestId('report-view-name')).toHaveText('View: Monday check');
   const attendance = page.locator('details[data-section="attendance"]');
   await expect(attendance.getByRole('heading', { name: 'By student' })).toBeVisible();
   await expect(attendance.getByRole('heading', { name: 'By week' })).toHaveCount(0);
@@ -65,6 +68,8 @@ test('save a customised view, make it the default, fold a section, reload, print
   await attendance.locator('summary').click();
   await expect(attendance).not.toHaveAttribute('open', '');
   await expect(attendance.getByRole('heading', { name: 'By student' })).toBeHidden();
+  // The details' toggle event (which stores the fold) is queued after the click; wait for it before reloading.
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('cc.reports.folded.teacher') ?? '')).toContain('attendance');
 
   // Reload: the view, the default and the fold stay. Without a view in the URL the default opens.
   await page.reload();
@@ -88,6 +93,16 @@ test('save a customised view, make it the default, fold a section, reload, print
   await expect(confirm).toBeHidden();
   await expect(viewSelect.locator('option:checked')).toHaveText('Everything ★ default');
   expect((await api(page, 'GET', '/api/teacher/report-views')).body).toMatchObject({ views: [], defaultView: 'builtin:everything' });
+});
+
+test('a mistyped or cut-off date in the link opens the default period instead of breaking the page', async ({ page }) => {
+  await login(page, 'english');
+  await ensurePin(page);
+  for (const search of ['period=week&from=garbage', 'period=month&from=2026-11', 'period=custom&from=x&to=2026-13-45']) {
+    await page.goto(`/teacher/reports?${search}`);
+    await expect(page.getByTestId('report')).toBeVisible();
+    await expect(page.getByLabel('Period', { exact: true }).locator('option:checked')).toHaveText(search.startsWith('period=week') ? 'Week' : search.startsWith('period=month') ? 'Month' : 'Custom');
+  }
 });
 
 test('the admin "By class and subject" tab opens from a deep link with the chosen view', async ({ page }) => {

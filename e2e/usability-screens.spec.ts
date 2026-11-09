@@ -452,7 +452,7 @@ async function teacherExtras(page: Page, p: string, base: Omit<ShotSpec, 'state'
     }
     case 'reports': {
       await chooseClass(page);
-      await page.getByLabel(nm('Period')).first().selectOption({ label: (await page.getByLabel(nm('Period')).first().locator('option').allInnerTexts()).find((o) => /month|ay/iu.test(o))! }).catch(() => undefined);
+      await page.getByLabel(nm('Period')).first().selectOption({ label: (await page.getByLabel(nm('Period')).first().locator('option').allInnerTexts()).find((o) => /^(month|ay)$/iu.test(o.trim()))! }).catch(() => undefined);
       await page.waitForTimeout(1000);
       await S('class-month');
       const student = page.getByLabel(nm('Student')).first();

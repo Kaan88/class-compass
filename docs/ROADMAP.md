@@ -229,6 +229,7 @@ Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, m
   - [ ] Second hostname set up (tunnel, Cloudflare settings, Access Bypass) and checked with a TV and a phone: only when the owner creates a hostname (OPERATIONS → "Super Speakers on its own hostname")
   - [ ] On a real phone: an installed scorer app with awards queued offline before the switch sends them on the main hostname and then moves to the speakers hostname (covered by unit tests only)
 - [x] S14e1 Report views: section catalogue, saved views with a default star, built-in views, Customise tree, collapsible sections, deep links (D-153)
+  - Review fixes: a deep link with a date that is not a real day opens the default period; the header (printed too) marks a view with unsaved changes. Verified on the S14e1 tip with `npm run check`, `npm run build`, the full `npx playwright test` (both projects) and `npm run usability:screens` for the teacher and admin areas (report pages reviewed at 375, 768 and 1366 px, EN and TR). The full screen set and the docs screenshots are left to S14i
 - [ ] S14b Classroom board: wide routine + timer row, counter bar, full-width student grid, bottom dock with full-screen panel views; every routine stage visible (D-148)
   - [ ] Customise layout (PIN-gated drag and resize on a 12×12 grid, keyboard and pointer, this class or all classes, relock on save)
   - [ ] Checked on Sare's MacBook, a 1280×720 projector and a touch panel

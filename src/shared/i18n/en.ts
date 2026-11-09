@@ -1686,6 +1686,7 @@ export const en = {
   'reportViews.section': '{title} (whole section)',
   'reportViews.noSections': 'Choose at least one section.',
   'reportViews.changed': 'Changed, not saved yet.',
+  'reportViews.viewChanged': '{name} (changed, not saved)',
   'reportViews.saveAs': 'Save as new view…',
   'reportViews.saveAsTitle': 'Save as a new view',
   'reportViews.name': 'Name of the view',

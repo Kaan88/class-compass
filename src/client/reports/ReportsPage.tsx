@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { PERIOD_PRESETS, presetRange, type PeriodPreset } from '../../domain/periods.ts';
 import * as R from '../../shared/contracts/reports.ts';
+import { isIsoDate } from '../../shared/dates.ts';
 import { formatDay, pickText, type MessageKey } from '../../shared/i18n/index.ts';
 import {
   BUILTIN_VIEW_IDS,
@@ -75,12 +76,20 @@ export interface ReportLink {
 }
 const LINK_KEYS = ['contextId', 'studentId', 'view', 'period', 'from', 'to'] as const;
 
-/** The link's parameters from a URL search (anything else is ignored). */
+/** A date from a link, or '' when it is missing or not a real 'YYYY-MM-DD' day (a typed or cut-off link). */
+const linkDate = (v: string | undefined) => (v && isIsoDate(v) ? v : '');
+
+/**
+ * The link's parameters from a URL search (anything else is ignored). `from` and `to` are kept only
+ * when they are real dates, so a mistyped link opens the default period instead of breaking the page.
+ */
 export function linkFromSearch(search: Readonly<Record<string, unknown>>): ReportLink {
   const out: ReportLink = {};
   for (const k of LINK_KEYS) {
     const v = search[k];
-    if (typeof v === 'string' && v) out[k] = v;
+    if (typeof v !== 'string' || !v) continue;
+    if ((k === 'from' || k === 'to') && !linkDate(v)) continue;
+    out[k] = v;
   }
   return out;
 }
@@ -228,8 +237,9 @@ export function ReportsPage({ viewer, link: linkProp, onLinkChange }: { viewer: 
   const contextId = list.find((c) => c.id === link.contextId)?.id ?? list[0]?.id ?? '';
   const info = list.find((c) => c.id === contextId);
   const preset: PeriodPreset = (PERIOD_PRESETS as readonly string[]).includes(link.period ?? '') ? (link.period as PeriodPreset) : 'year';
-  const anchor = preset !== 'custom' && preset !== 'year' ? (link.from ?? '') : '';
-  const custom = preset === 'custom' ? { from: link.from ?? '', to: link.to ?? '' } : { from: '', to: '' };
+  // Dates are checked again here: a link may also come from another screen, not only the URL.
+  const anchor = preset !== 'custom' && preset !== 'year' ? linkDate(link.from) : '';
+  const custom = preset === 'custom' ? { from: linkDate(link.from), to: linkDate(link.to) } : { from: '', to: '' };
   const studentId = link.studentId ?? '';
 
   const range = useMemo(() => {
@@ -459,7 +469,8 @@ export function ReportsPage({ viewer, link: linkProp, onLinkChange }: { viewer: 
               {t('report.ui.header', { from: formatDay(data.from, locale), to: formatDay(data.to, locale), teacher: data.context.teacherName, year: data.context.year.name })}
             </p>
             <p className="cc-muted" data-testid="report-view-name">
-              {t('reportViews.view')}: {nameOf(selectedRef)}
+              {/* Printed too: a customised, unsaved choice of sections must not carry the view's name alone. */}
+              {t('reportViews.view')}: {changed ? t('reportViews.viewChanged', { name: nameOf(selectedRef) }) : nameOf(selectedRef)}
             </p>
             <p className="cc-print-only cc-muted">{t('report.ui.generated', { at: new Date(data.generatedAt).toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-GB') })}</p>
             {data.context.classNames.some((n) => n !== data.context.className) ? <p className="cc-muted">{t('report.ui.renamedClass', { names: data.context.classNames.join(', '), now: data.context.className })}</p> : null}
