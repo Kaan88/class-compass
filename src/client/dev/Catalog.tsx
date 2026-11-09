@@ -14,6 +14,7 @@ import { showToast, showUndoToast } from '../lib/toast.ts';
 import { useMe } from '../lib/session.ts';
 import { Button, BigButton, IconButton } from '../ui/Button.tsx';
 import { ConfirmDestructive, DialogActions, Modal } from '../ui/Dialog.tsx';
+import { InlineConfirmButton } from '../ui/InlineConfirm.tsx';
 import { Alert, EmptyState, NeedsAttentionTray, SaveStateBadge } from '../ui/Feedback.tsx';
 import { Select, TextArea, TextField, Toggle } from '../ui/Fields.tsx';
 import { IconBook, IconLock, IconPlus, IconSettings, IconUndo } from '../ui/icons.tsx';
@@ -130,6 +131,10 @@ function Everything() {
             {t('catalog.openConfirm')}
           </Button>
         </div>
+        {/* S14d (D-151): the in-page confirmation used on the student page. */}
+        <InlineConfirmButton message={t('student.confirm.delete')} confirmLabel={t('student.confirm.yes')} cancelLabel={t('student.confirm.no')} onConfirm={() => undefined}>
+          {t('student.delete')}
+        </InlineConfirmButton>
         <Alert kind="warning">{t('catalog.sampleWarning')}</Alert>
         <NeedsAttentionTray items={[{ id: 'x', title: t('catalog.sampleAction'), detail: t('error.CLASS_ARCHIVED') }]} onRetry={() => undefined} onDismiss={() => undefined} />
         <Modal isOpen={modal} onOpenChange={setModal} title={t('catalog.openDialog')}>

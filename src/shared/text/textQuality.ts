@@ -13,11 +13,14 @@
  *    and repeated short pieces ("asdasd"), words without vowels, very long unknown words, repeated
  *    words ("yes yes yes", "I will I will"), a goal without a content word, and too few recognised
  *    EN/TR words (our own word lists with simple suffix stripping, so "okuyacağım" counts as real).
+ * 3. Unfinished starter (S14d, D-152): the sentence starter's blank (`___`) is still there, or the text
+ *    is only a starter (`STARTER_UNFINISHED`). Never counted as a blocked attempt.
  *
  * The result names a reason only; the message shown to the child is the i18n key
  * `textCheck.<REASON>` with a kind-specific example. The matched word is never stored or logged.
  */
 import { BUILTIN_ALLOW, RISKY_EN, RISKY_PHRASES, RISKY_TR, type RiskyEntry } from './riskyWords.ts';
+import { isUnfinishedStarter } from './starters.ts';
 import { foldForSearch, lowerTr } from './turkish.ts';
 import { EN_WORDS } from './wordsEn.ts';
 import { TR_WORDS } from './wordsTr.ts';
@@ -25,7 +28,7 @@ import { TR_WORDS } from './wordsTr.ts';
 export const TEXT_KINDS = ['goal', 'reflection', 'note', 'selfAssessment', 'evidenceText', 'linkTitle', 'practiceChoice'] as const;
 export type TextKind = (typeof TEXT_KINDS)[number];
 
-export const TEXT_REASONS = ['BLOCKED_WORD', 'TOO_SHORT', 'REPEATED_CHARS', 'SYMBOLS', 'SHOUTING', 'KEYBOARD_MASH', 'LONG_WORD', 'FEW_VOWELS', 'REPEATED_WORDS', 'UNKNOWN_WORDS'] as const;
+export const TEXT_REASONS = ['BLOCKED_WORD', 'TOO_SHORT', 'REPEATED_CHARS', 'SYMBOLS', 'SHOUTING', 'KEYBOARD_MASH', 'LONG_WORD', 'FEW_VOWELS', 'REPEATED_WORDS', 'UNKNOWN_WORDS', 'STARTER_UNFINISHED'] as const;
 export type TextReason = (typeof TEXT_REASONS)[number];
 
 /** School-wide limits (admin settings). */
@@ -224,13 +227,16 @@ const vowelRatio = (w: string) => {
 };
 
 /**
- * Check one piece of student text. `limits` are the school's goal limits; `lists` the extra words.
+ * Check one piece of student text. `limits` are the school's goal limits; `lists` the extra words;
+ * `starters` the sentence starters offered to the student (S14d: a text that is only a starter is not
+ * finished; a blank `___` left in the text is caught without the list too).
  * Empty optional text (a link without a title) is fine: callers only check text that was written.
  */
-export function checkStudentText(text: string, kind: TextKind, opts: { limits?: TextLimits; lists?: WordLists } = {}): TextCheckResult {
+export function checkStudentText(text: string, kind: TextKind, opts: { limits?: TextLimits; lists?: WordLists; starters?: readonly string[] } = {}): TextCheckResult {
   const t = text.normalize('NFC').trim();
   if (!t) return kind === 'linkTitle' || kind === 'practiceChoice' ? { ok: true } : { ok: false, reason: 'TOO_SHORT' };
   if (findRiskyWord(t, opts.lists)) return { ok: false, reason: 'BLOCKED_WORD' };
+  if (isUnfinishedStarter(t, opts.starters ?? [])) return { ok: false, reason: 'STARTER_UNFINISHED' };
 
   const rule = KIND_RULES[kind];
   const limits = opts.limits ?? DEFAULT_TEXT_LIMITS;

@@ -12,6 +12,7 @@ import { integer, primaryKey, real, sqliteTable, text, uniqueIndex, index } from
 import { DEFAULT_SOUND_VOLUME, DEFAULT_WEATHER, TIME_UP_SOUNDS } from '../../shared/classDisplay.ts';
 import { FILE_KINDS } from '../../shared/contracts/files.ts';
 import { IMPORT_SOURCE_TYPES, type ImportFlag } from '../../shared/contracts/import.ts';
+import { STARTER_KINDS } from '../../shared/text/starters.ts';
 
 export type LocalizedText = { en?: string; tr?: string };
 
@@ -1027,6 +1028,31 @@ export const goalPresets = sqliteTable(
 );
 
 /**
+ * Sentence starters (S14d, D-152): short beginnings a student taps to start writing ("I want to get
+ * better at ___."). `kind` says where they are offered (`STARTER_KINDS`); the blank is `___`.
+ * Built-ins have fixed ids, no subject and no creator (seeded by `ensureStarterDefaults`); a teacher
+ * adds starters for one subject (optionally one goal category). Archived, never deleted: a default by
+ * an administrator for the school (`archivedAt`) or by a teacher for their own classes
+ * (`default_item_archives`, kind 'starter').
+ */
+export const textStarters = sqliteTable(
+  'text_starters',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind', { enum: STARTER_KINDS }).notNull(),
+    subjectId: text('subject_id').references(() => subjects.id),
+    categoryId: text('category_id').references(() => skillCategories.id),
+    text: text('text', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdBy: text('created_by').references(() => users.id),
+    archivedAt: integer('archived_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('text_starters_subject_idx').on(t.subjectId, t.kind)],
+);
+
+/**
  * A student's goal in one subject (GOL-2). `authorType`/`authorId` say who wrote it (a teacher or the
  * student through the personal link); students may edit and delete only goals they wrote (GOL-5).
  * `labelSnapshot` keeps the category name as it was (DAT-6). Deleted = `deletedAt` (kept for audit).
@@ -1196,9 +1222,9 @@ export const studentLinks = sqliteTable(
   ],
 );
 
-export const DEFAULT_ITEM_KINDS = ['preset', 'category', 'achievement'] as const;
+export const DEFAULT_ITEM_KINDS = ['preset', 'category', 'achievement', 'starter'] as const;
 /**
- * Default goal presets, skill categories and (S13c) achievements a teacher archived for their own classes (S13b2, D-116).
+ * Default goal presets, skill categories, (S13c) achievements and (S14d) sentence starters a teacher archived for their own classes (S13b2, D-116).
  * A default archived school-wide by an administrator uses the row's own `archivedAt` instead.
  */
 export const defaultItemArchives = sqliteTable(

@@ -294,7 +294,12 @@ for (const lang of ['en', 'tr'] as const) {
         await expect(page.getByTestId('student-page')).toBeVisible();
         await page.waitForTimeout(800);
         await shot(page, lang, 'student-page');
-        await shot(page, lang, 'student-goals', { from: 'h2.cc-student__subject' });
+        // S14d (D-151): home tiles; "My goals" and "My avatar" are screens of their own.
+        await page.getByTestId('student-tile-goals').click();
+        await expect(page.getByTestId('student-goals')).toBeVisible();
+        await shot(page, lang, 'student-goals', { from: '#student-screen-title' });
+        await page.getByTestId('student-back').click();
+        await page.getByTestId('student-tile-avatar').click();
         await page.getByTestId('avatar-change').click();
         await expect(page.getByTestId('avatar-creator')).toBeVisible();
         await page.getByTestId('avatar-tab-make').click();

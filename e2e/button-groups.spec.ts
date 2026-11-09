@@ -5,10 +5,11 @@
  * - every button (and label) is at least as wide as its content: scrollWidth ≤ clientWidth + 1;
  * - no button sticks out of its group or off the screen;
  * - a grid has no empty tracks (auto-fill would leave holes and squeeze the buttons).
- * Covered: evidence kinds and the confidence picker (student page), the teacher menu grid and the
- * attendance status segments (teacher area), the topic choices (Start Lesson), the group options
- * (group screen) and the lesson reflection (End Lesson). Later stages add the dock and the student
- * home tiles here. Fictional demo data only; the class language and profile language are put back.
+ * Covered: the student page's home tiles, subject switch, New goal categories, evidence kinds and
+ * How is it going? faces (S14d), the teacher menu grid and the attendance status segments (teacher
+ * area), the topic choices (Start Lesson), the group options (group screen) and the lesson reflection
+ * (End Lesson). S14b adds the dock here. Fictional demo data only; the class language and profile
+ * language are put back.
  */
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -116,23 +117,39 @@ test('choice buttons fit at 375/768/1280 px, in English and Turkish, at 100 % an
 
       // ------------------------------------------------ student page (the class language)
       // A fresh device each time: the student page remembers its language per device.
+      // S14d (D-151): the home tiles and subject switch, the category tiles of New goal, the evidence
+      // kinds of Show my work and the faces of How is it going?.
       const phone = await newPage(browser);
-      await phone.page.goto(link);
-      await expect(phone.page.getByTestId('student-page')).toBeVisible();
-      await expect(phone.page.locator('html')).toHaveAttribute('lang', lang);
-      await checkAll(phone.page, '.cc-evidence-modes', `${lang} evidence kinds`);
-      // The confidence picker belongs to a self-assessment about a goal: give the student a goal once.
-      const english = phone.page.getByRole('region', { name: lang === 'en' ? 'English' : 'İngilizce', exact: true });
-      if (!(await english.getByTestId('reflection-form').count())) {
-        // Runs in the English pass first, so the English demo names apply.
-        await english.getByLabel(T('student.category')).selectOption({ label: 'Reading' });
-        await english.getByLabel(T('student.chooseGoal')).selectOption({ label: 'I will read a short book every week.' });
-        await english.getByRole('button', { name: T('student.addGoalButton') }).click();
+      const sp = phone.page;
+      await sp.goto(link);
+      await expect(sp.getByTestId('student-page')).toBeVisible();
+      await expect(sp.locator('html')).toHaveAttribute('lang', lang);
+      await sp.getByRole('group', { name: T('student.home.subject') }).getByRole('button', { name: lang === 'en' ? 'English' : 'İngilizce', exact: true }).click();
+      await checkAll(sp, '.cc-student-tiles', `${lang} student home tiles`);
+      await checkAll(sp, '.cc-student__subjects', `${lang} student subject switch`);
+      await sp.getByRole('link', { name: T('student.tile.newGoal') }).click();
+      await checkAll(sp, '.cc-student-choices', `${lang} new goal categories`);
+      await sp.getByTestId('student-back').click();
+      await sp.getByRole('link', { name: T('student.tile.showMyWork') }).click();
+      await checkAll(sp, '.cc-evidence-modes', `${lang} evidence kinds`);
+      await sp.getByTestId('student-back').click();
+      // The faces belong to a goal: give the student a goal once (the English pass runs first).
+      await sp.getByRole('link', { name: T('student.tile.howIsItGoing') }).click();
+      await expect(sp.locator('#student-screen-title')).toHaveText(T('student.tile.howIsItGoing'));
+      if (await sp.getByRole('button', { name: T('student.tile.newGoal') }).count()) {
+        await sp.getByRole('button', { name: T('student.tile.newGoal') }).click();
+        await sp.getByRole('button', { name: 'Reading' }).click();
+        await sp.getByRole('button', { name: 'I will read a short book every week.' }).click();
+        await sp.getByRole('button', { name: T('student.newGoal.save') }).click();
+        await expect(sp.getByTestId('student-goal').first()).toBeVisible();
+        // Back after a finished flow goes to where it started: How is it going?
+        await sp.getByTestId('student-back').click();
+        await expect(sp.locator('#student-screen-title')).toHaveText(T('student.tile.howIsItGoing'));
       }
-      const form = english.getByTestId('reflection-form');
-      await expect(form).toBeVisible();
-      await form.getByLabel(T('student.reflectionKind')).selectOption('self_assessment');
-      await checkAll(phone.page, '.cc-confidence-picker .cc-row', `${lang} confidence picker`);
+      await sp.locator('.cc-student-choices--list .cc-student-choice').first().click();
+      await expect(sp.locator('.cc-student-faces')).toBeVisible();
+      await checkAll(sp, '.cc-student-faces', `${lang} how-is-it-going faces`);
+      await checkAll(sp, '.cc-student-choices', `${lang} how-is-it-going kinds`);
       await phone.ctx.close();
 
       // ------------------------------------------------ classroom (the class language)

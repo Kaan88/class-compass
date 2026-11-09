@@ -11,12 +11,13 @@
  *   student sees what the teacher of that class+subject sees; goals keep their label snapshot (DAT-6).
  */
 import { and, eq, inArray, isNull, or, type SQL } from 'drizzle-orm';
-import { DEFAULT_GOAL_OUTCOMES, OutcomeSet, type Category, type GoalLibrary, type OutcomeDef, type Preset } from '../../../shared/contracts/goals.ts';
+import { DEFAULT_GOAL_OUTCOMES, OutcomeSet, type Category, type GoalLibrary, type OutcomeDef, type Preset, type Starter } from '../../../shared/contracts/goals.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import type { TopicIcon } from '../../../shared/lessons.ts';
 import type { Db } from '../../db/client.ts';
 import { defaultItemArchives, goalPresets, skillCategories } from '../../db/schema.ts';
 import { moduleConfig } from '../school/modules.ts';
+import { defaultStarters, ensureStarterDefaults, starterDto, startersFor } from './starters.ts';
 
 export type CategoryRow = typeof skillCategories.$inferSelect;
 export type PresetRow = typeof goalPresets.$inferSelect;
@@ -86,19 +87,23 @@ export function ensureGoalDefaults(db: Db, now: number): void {
       db.insert(goalPresets).values({ id: p.id, categoryId: c.id, subjectId: null, text: p.text, createdBy: null, archivedAt: null, createdAt: now, updatedAt: now }).onConflictDoNothing().run();
     }
   });
+  // S14d (D-152): the built-in sentence starters come with the goal defaults.
+  ensureStarterDefaults(db, now);
 }
 
-/** Defaults hidden by these teachers for their own classes (D-116). */
+/** Defaults hidden by these teachers for their own classes (D-116; sentence starters since S14d, D-152). */
 export interface HiddenDefaults {
   categories: ReadonlySet<string>;
   presets: ReadonlySet<string>;
+  starters: ReadonlySet<string>;
 }
-export const NOTHING_HIDDEN: HiddenDefaults = { categories: new Set(), presets: new Set() };
+export const NOTHING_HIDDEN: HiddenDefaults = { categories: new Set(), presets: new Set(), starters: new Set() };
 
 export function hiddenDefaultsOf(db: Db, teacherIds: readonly string[]): HiddenDefaults {
   if (!teacherIds.length) return NOTHING_HIDDEN;
   const rows = db.select().from(defaultItemArchives).where(inArray(defaultItemArchives.userId, [...teacherIds])).all();
-  return { categories: new Set(rows.filter((r) => r.kind === 'category').map((r) => r.itemId)), presets: new Set(rows.filter((r) => r.kind === 'preset').map((r) => r.itemId)) };
+  const of = (kind: string) => new Set(rows.filter((r) => r.kind === kind).map((r) => r.itemId));
+  return { categories: of('category'), presets: of('preset'), starters: of('starter') };
 }
 
 /**
@@ -161,6 +166,7 @@ export function libraryFor(db: Db, contextId: string, subjectId: string, teacher
   return {
     categories: categoriesFor(db, subjectId, teacherIds, includeArchived).map((c) => categoryDto(c, hidden)),
     presets: presetsFor(db, subjectId, teacherIds, includeArchived).map((p) => presetDto(p, hidden)),
+    starters: startersFor(db, subjectId, teacherIds, includeArchived).map((s) => starterDto(s, hidden)),
     outcomes: outcomesOf(db, contextId),
   };
 }
@@ -178,11 +184,12 @@ export function studentChoices(db: Db, subjectId: string, teacherIds: readonly s
   };
 }
 
-/** Every default category and preset with its school-wide state (admin, D-116). */
-export function defaultLibrary(db: Db): { categories: Category[]; presets: Preset[] } {
+/** Every default category, preset and (S14d) sentence starter with its school-wide state (admin, D-116). */
+export function defaultLibrary(db: Db): { categories: Category[]; presets: Preset[]; starters: Starter[] } {
   return {
     categories: db.select().from(skillCategories).where(isNull(skillCategories.createdBy)).all().sort((a, b) => a.sortOrder - b.sortOrder).map((c) => categoryDto(c)),
     presets: db.select().from(goalPresets).where(isNull(goalPresets.createdBy)).all().sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)).map((p) => presetDto(p)),
+    starters: defaultStarters(db, NOTHING_HIDDEN),
   };
 }
 

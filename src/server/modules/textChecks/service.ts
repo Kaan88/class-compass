@@ -23,6 +23,7 @@ import { AppError, notFound } from '../../lib/errors.ts';
 import { assertModuleEnabled, mergeModuleConfig, moduleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, getClass, isClassWritable, getSchoolSettings, todayFor } from '../school/policy.ts';
 import { rosterRows } from '../students/service.ts';
+import { starterTextsFor } from '../goals/starters.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
@@ -55,10 +56,14 @@ export interface StudentTextTarget {
   teacherIds: readonly string[];
 }
 
-/** Throws 400 with `reason: TEXT_<REASON>` (and `textReason`) when the text does not pass. */
+/**
+ * Throws 400 with `reason: TEXT_<REASON>` (and `textReason`) when the text does not pass. The sentence
+ * starters of the subject (S14d, D-152) are passed in, so a starter sent unchanged or with its blank
+ * is refused (`TEXT_STARTER_UNFINISHED`); like every reason but a blocked word, it is not counted.
+ */
 export function assertStudentText(ctx: RequestContext, target: StudentTextTarget, text: string | null | undefined, kind: TextKind): void {
   if (text === null || text === undefined) return;
-  const res = checkStudentText(text, kind, { limits: limitsOf(ctx.db), lists: wordListsFor(ctx.db, target.teacherIds) });
+  const res = checkStudentText(text, kind, { limits: limitsOf(ctx.db), lists: wordListsFor(ctx.db, target.teacherIds), starters: starterTextsFor(ctx.db, target.subjectId, target.teacherIds) });
   if (res.ok) return;
   throw new AppError('VALIDATION', res.reason === 'BLOCKED_WORD' ? 'Please use kind words' : 'Please write real words and a little more', {
     reason: `TEXT_${res.reason}`,

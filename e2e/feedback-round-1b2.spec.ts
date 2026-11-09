@@ -10,7 +10,7 @@
  * - The admin archives a default goal for the whole school and restores it (D-116).
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import jsQRImport from 'jsqr';
 import sharp from 'sharp';
 import { en } from '../src/shared/i18n/en.ts';
@@ -76,6 +76,28 @@ async function setMedia(browser: Browser, on: boolean) {
         ).status,
       ).toBe(200);
   });
+}
+
+/**
+ * The English "Show my work" screen (S14d, D-151: EvidenceAdder in steps). Returns the form and the
+ * screen's address (going there again starts at step 1).
+ */
+async function showMyWork(p: Page): Promise<{ form: Locator; workUrl: string }> {
+  await expect(p.getByTestId('student-page')).toBeVisible();
+  const subjects = p.getByRole('group', { name: 'My subject' });
+  if (await subjects.count()) await subjects.getByRole('button', { name: 'English', exact: true }).click();
+  await p.getByRole('link', { name: 'Show my work' }).click();
+  const form = p.getByTestId('evidence-form');
+  await expect(form).toHaveAttribute('data-step', 'how');
+  return { form, workUrl: p.url() };
+}
+/** Step 1 → the kind; step 2 (only when the student has goals) → "For all my learning". */
+async function chooseKind(form: Locator, kind: string) {
+  await expect(form).toHaveAttribute('data-step', 'how');
+  await form.getByRole('button', { name: kind, exact: true }).click();
+  await expect(form).not.toHaveAttribute('data-step', 'how');
+  if ((await form.getAttribute('data-step')) === 'goal') await form.getByRole('button', { name: 'For all my learning' }).click();
+  await expect(form.getByRole('button', { name: /^(Save my work|Add \d+ items)$/u })).toBeVisible();
 }
 
 /**
@@ -335,18 +357,18 @@ test('evidence: only text, link and document while the media flags are off; pict
   try {
     const p = await desk.newPage();
     await p.goto(url);
-    const english = p.getByRole('region', { name: 'English', exact: true });
-    const form = english.getByTestId('evidence-form');
-    const modes = form.getByRole('group', { name: 'What kind of evidence?' }).getByRole('button');
+    // S14d (D-151): "Show my work" in steps (how → which goal → the work); one upload pipeline.
+    const { form, workUrl } = await showMyWork(p);
+    const modes = form.getByRole('group', { name: 'How do you want to show it?' }).getByRole('button');
     await expect(modes).toHaveText(['Write', 'Add a link', 'Add a document']);
 
     await setMedia(browser, true);
     await p.reload();
     await expect(modes).toHaveText(['Write', 'Add a link', 'Add a picture', 'Take a picture', 'Add a document', 'Record my voice', 'Add a voice file']);
-    const list = english.getByRole('region', { name: 'My evidence' });
+    const list = p.getByTestId('student-evidence');
 
     // Two pictures from files at once: each becomes its own evidence item with the caption.
-    await form.getByRole('button', { name: 'Add a picture' }).click();
+    await chooseKind(form, 'Add a picture');
     const png = await sharp({
       create: {
         width: 3000,
@@ -375,6 +397,7 @@ test('evidence: only text, link and document while the media flags are off; pict
     await p.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
 
     // A HEIC picture gets a friendly explanation instead of an upload.
+    await chooseKind(form, 'Add a picture');
     await form.getByLabel('Choose pictures').setInputFiles({
       name: 'IMG_0001.HEIC',
       mimeType: 'image/heic',
@@ -383,7 +406,8 @@ test('evidence: only text, link and document while the media flags are off; pict
     await expect(form.getByText(/HEIC pictures cannot be used here/u)).toBeVisible();
 
     // Take a picture with the (fake) camera: shutter, retake, use photo.
-    await form.getByRole('button', { name: 'Take a picture' }).click();
+    await p.goto(workUrl);
+    await chooseKind(form, 'Take a picture');
     const shutter = form.getByRole('button', { name: 'Take the picture' });
     await expect(shutter).toBeEnabled();
     await shutter.click();
@@ -392,42 +416,42 @@ test('evidence: only text, link and document while the media flags are off; pict
     await form.getByRole('button', { name: 'Use this picture' }).click();
     await expect(form.getByTestId('evidence-pending').getByRole('listitem')).toHaveCount(1);
     await form.getByLabel('A few words about it (optional)').fill('Taken in class');
-    await form.getByRole('button', { name: 'Add evidence' }).click();
+    await form.getByRole('button', { name: 'Save my work' }).click();
     await expect(list.locator('[data-kind="picture"]').filter({ hasText: 'Taken in class' })).toHaveCount(1);
 
     // A document.
-    await form.getByRole('button', { name: 'Add a document' }).click();
+    await chooseKind(form, 'Add a document');
     await form.getByLabel('Choose documents').setInputFiles({
       name: 'book-review.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('A fictional book review.\n'),
     });
-    await form.getByRole('button', { name: 'Add evidence' }).click();
+    await form.getByRole('button', { name: 'Save my work' }).click();
     await expect(list.locator('[data-kind="file"]').filter({ hasText: 'book-review.txt' })).toBeVisible();
 
     // Record my voice with the (fake) microphone: timer, stop, playback, add.
-    await form.getByRole('button', { name: 'Record my voice' }).click();
+    await chooseKind(form, 'Record my voice');
     await form.getByRole('button', { name: 'Record', exact: true }).click();
     await expect(form.getByTestId('voice-timer')).toContainText('of 5:00');
     await p.waitForTimeout(1200);
     await form.getByRole('button', { name: 'Stop' }).click();
     await expect(form.getByLabel('Your recording')).toBeVisible();
     await form.getByLabel('A few words about it (optional)').fill('Me reading aloud');
-    await form.getByRole('button', { name: 'Add evidence' }).click();
+    await form.getByRole('button', { name: 'Save my work' }).click();
     await expect(list.locator('[data-kind="audio"]').filter({ hasText: 'Me reading aloud' })).toBeVisible();
 
     // A voice file.
-    await form.getByRole('button', { name: 'Add a voice file' }).click();
+    await chooseKind(form, 'Add a voice file');
     await form.getByLabel('Choose a voice file').setInputFiles({
       name: 'song.wav',
       mimeType: 'audio/wav',
       buffer: silentWav(),
     });
     await form.getByLabel('A few words about it (optional)').fill('Our class song');
-    await form.getByRole('button', { name: 'Add evidence' }).click();
+    await form.getByRole('button', { name: 'Save my work' }).click();
     await expect(list.locator('[data-kind="audio"]').filter({ hasText: 'Our class song' })).toBeVisible();
-    // The goals area with every kind of evidence (success toasts still fading in are not part of it).
-    expect(await seriousViolations(p, '[data-testid="student-goals"]')).toEqual([]);
+    // The work list with every kind of evidence (success toasts still fading in are not part of it).
+    expect(await seriousViolations(p, '[data-testid="student-evidence"]')).toEqual([]);
 
     // The teacher sees every item; the server downscaled the pictures to 2048 px.
     const detail = (await api(page, 'GET', `/api/teacher/contexts/${ctx.id}/students/${student.id}/goals`)).body as {
@@ -466,13 +490,15 @@ test('the evidence area on a phone passes axe with every choice on, and the teac
   try {
     const p = await phone.newPage();
     await p.goto(url);
-    const english = p.getByRole('region', { name: 'English', exact: true });
-    const form = english.getByTestId('evidence-form');
-    await expect(form.getByRole('group', { name: 'What kind of evidence?' }).getByRole('button')).toHaveCount(7);
+    const { form, workUrl } = await showMyWork(p);
+    await expect(form.getByRole('group', { name: 'How do you want to show it?' }).getByRole('button')).toHaveCount(7);
+    expect(await seriousViolations(p, '[data-testid="evidence-form"]')).toEqual([]);
     // On a phone "Take a picture" opens the system camera through a capture input.
-    await form.getByRole('button', { name: 'Take a picture' }).click();
+    await chooseKind(form, 'Take a picture');
     await expect(form.getByLabel('Open the camera')).toHaveAttribute('capture', 'environment');
-    await form.getByRole('button', { name: 'Record my voice' }).click();
+    expect(await seriousViolations(p, '[data-testid="evidence-form"]')).toEqual([]);
+    await p.goto(workUrl);
+    await chooseKind(form, 'Record my voice');
     await expect(form.getByText('You can record for up to 5 minutes.')).toBeVisible();
     expect(await seriousViolations(p, '[data-testid="evidence-form"]')).toEqual([]);
     const width = await p.evaluate(() => document.documentElement.scrollWidth);
@@ -488,8 +514,8 @@ test('the evidence area on a phone passes axe with every choice on, and the teac
         })
       ).status,
     ).toBe(200);
-    await p.reload();
-    const item = english.getByRole('region', { name: 'My evidence' }).getByRole('listitem').filter({ hasText: 'Reading list from class' });
+    await p.goto(workUrl);
+    const item = p.getByTestId('student-evidence').getByRole('listitem').filter({ hasText: 'Reading list from class' });
     await expect(item.getByText('Teacher', { exact: true })).toBeVisible();
     await expect(item.getByRole('button', { name: 'Delete' })).toHaveCount(0);
   } finally {

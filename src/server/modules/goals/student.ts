@@ -28,6 +28,8 @@ import { getYear } from '../school/policy.ts';
 import { assertNoRiskyWords, assertStudentText, limitsOf, recordBlockedAttempts, urlWords } from '../textChecks/service.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type EvidenceRow, type GoalRow } from './dto.ts';
 import { categoryUsable, getCategory, getPreset, hiddenDefaultsOf, inScope, outcomesOf, presetUsable, studentChoices } from './library.ts';
+import { studentStarters } from './starters.ts';
+import { classLocales, studentPageLanguage } from '../../../shared/classLanguage.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
@@ -44,6 +46,9 @@ export function goalsSection(ctx: RequestContext, input: StudentPageInput): Stud
   const sc = scope.contexts.find((c) => c.context.id === context.id);
   // The class's teacher may have archived some defaults for their classes (D-116).
   const choices = studentChoices(ctx.db, subjectId, teacherIds, context.teacherId);
+  // Sentence starters (S14d, D-152) in the languages of the student page (D-117), as the page shows them.
+  const locales = classLocales(studentPageLanguage(scope.classes[0] ?? input.cls));
+  const starters = studentStarters(ctx.db, subjectId, teacherIds, hiddenDefaultsOf(ctx.db, [context.teacherId]), new Set(choices.categories.map((c) => c.id)), locales);
   return {
     // Items a teacher hid (S13c moderation) are left out of the student page.
     goals: goalDtos(
@@ -61,6 +66,7 @@ export function goalsSection(ctx: RequestContext, input: StudentPageInput): Stud
     outcomes: outcomesOf(ctx.db, context.id),
     canWrite: sc ? canWriteIn(ctx, sc) : false,
     textLimits: limitsOf(ctx.db),
+    starters,
   };
 }
 

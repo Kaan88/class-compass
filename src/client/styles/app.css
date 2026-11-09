@@ -3026,36 +3026,196 @@ html:has(.cc-classroom) {
   font-size: 1.6rem;
   overflow-wrap: anywhere;
 }
-.cc-student__subject {
-  font-size: 1.7rem;
-  padding-top: 0.5rem;
-  border-top: var(--cc-border-width-strong) solid var(--cc-border);
-  /* Room for the sticky subject bar when jumped to. */
-  scroll-margin-top: 7rem;
-}
-.cc-student__subject:focus-visible {
-  outline: 3px solid var(--cc-focus);
-  outline-offset: 2px;
-}
-/* Sticky jump bar between subjects (S13 usability): every subject visible, wrapping when needed. */
-.cc-student__jump {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  padding: 0.5rem 0;
-  background: var(--cc-bg);
-  border-bottom: var(--cc-border-width) solid var(--cc-border);
-}
-.cc-student__jump .cc-btn {
-  flex-shrink: 0;
-}
 .cc-student__gone {
   align-items: center;
   text-align: center;
   margin-top: 2rem;
+}
+/* S14d (D-151): the home screen's subject switch and tiles, and the short-step screens. Tiles and
+   choice buttons follow D-147: auto-fit tracks no wider than the screen, labels that wrap. */
+.cc-student__subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cc-student__subjects .cc-btn {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.cc-student-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.75rem;
+}
+.cc-student-tiles > li {
+  display: flex;
+  min-width: 0;
+}
+.cc-student-tile {
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  gap: 0.5rem;
+  min-height: 8rem;
+  padding: 0.75rem;
+  font-size: 1.2rem;
+}
+.cc-student-tile svg {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+.cc-student-tile__label {
+  min-width: 0;
+  max-width: 100%;
+}
+.cc-student-tile__new {
+  font-size: 0.9rem;
+}
+.cc-student-tile:focus-visible {
+  outline: var(--cc-border-width-strong) solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-student__nav {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.cc-student__title,
+.cc-student__who .cc-h1 {
+  scroll-margin-top: 1rem;
+}
+.cc-student__title:focus-visible,
+.cc-student__who .cc-h1:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-student__step {
+  margin: 0;
+  font-weight: 700;
+  color: var(--cc-text-muted);
+}
+.cc-student-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.6rem;
+}
+.cc-student-choices--list {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cc-student-choice {
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--cc-touch-big);
+  padding: 0.75rem;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.25;
+  gap: 0.35rem;
+  font-size: 1.1rem;
+}
+.cc-student-choices--list .cc-student-choice {
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: start;
+  gap: 0.75rem;
+}
+.cc-student-choice svg,
+.cc-student-choice .cc-picto {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+}
+.cc-student-choice__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Five faces in one row on a phone, labels under them (they wrap at 200 % text). */
+.cc-student-faces {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 3.6rem), 1fr));
+  gap: 0.4rem;
+}
+.cc-student-faces .cc-student-choice {
+  padding-inline: 0.15rem;
+  font-size: 1rem;
+}
+.cc-student-faces .cc-student-choice svg {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+.cc-student-picked {
+  gap: 0.5rem;
+  margin: 0;
+}
+.cc-student-picked svg {
+  width: 2rem;
+  height: 2rem;
+}
+.cc-student-ideas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0.4rem;
+}
+.cc-student-idea {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding-inline-end: 0.2rem;
+}
+.cc-evidence-steps__question {
+  padding: 0;
+  margin-bottom: 0.5rem;
+}
+/* S14d (D-152): sentence starter chips above a text box. */
+.cc-starters {
+  gap: 0.5rem;
+}
+.cc-starters__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.cc-starters__title {
+  font-weight: 700;
+}
+.cc-starters__chip {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+/* S14d (D-151): an in-page "Are you sure?" instead of window.confirm. */
+.cc-inline-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: var(--cc-border-width-strong) solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface-2);
+}
+.cc-inline-confirm__message {
+  margin: 0;
+  font-weight: 700;
+}
+.cc-inline-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cc-inline-confirm__actions .cc-btn {
+  min-width: 0;
+  white-space: normal;
+}
+.cc-inline-confirm__wrap:has(> .cc-inline-confirm) {
+  flex-basis: 100%;
 }
 .cc-student .cc-input,
 .cc-student .cc-select {

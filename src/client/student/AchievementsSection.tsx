@@ -37,21 +37,29 @@ export const EARNED_FIRST = 4;
 /** Celebrations already shown this visit (StrictMode and re-renders must not repeat them). */
 const celebrated = new Set<string>();
 
-export function AchievementsSection({ data, subjectId }: { data: StudentAchievementsSection; subjectId: string }) {
+/**
+ * New achievements are celebrated when the page opens, on any screen (S14d: the achievements are now
+ * behind a tile, D-151), once per visit; then the page tells the server they were seen.
+ */
+export function useCelebrateNewAchievements(items: ReadonlyArray<{ subjectId: string; data: StudentAchievementsSection }>) {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
-  const fresh = data.earned.filter((b) => b.isNew && !celebrated.has(`${subjectId}:${b.id}`));
+  const fresh = items.flatMap(({ subjectId, data }) => data.earned.filter((b) => b.isNew && !celebrated.has(`${subjectId}:${b.id}`)).map((b) => ({ subjectId, b })));
   const sent = useRef(false);
   useEffect(() => {
     if (!fresh.length) return;
-    for (const b of fresh) celebrated.add(`${subjectId}:${b.id}`);
-    const first = fresh[0]!;
+    for (const { subjectId, b } of fresh) celebrated.add(`${subjectId}:${b.id}`);
+    const first = fresh[0]!.b;
     celebrate(fresh.length === 1 ? t('achievements.newBadge', { name: pickText(first.name, locale) }) : t('achievements.newBadges', { count: fresh.length }));
     if (!sent.current) {
       sent.current = true;
       void call(studentSeenAchievements, {}).then(() => qc.invalidateQueries({ queryKey: STUDENT_PAGE_KEY }));
     }
-  }, [fresh, t, locale, qc, subjectId]);
+  }, [fresh, t, locale, qc]);
+}
+
+export function AchievementsSection({ data, subjectId, titleId }: { data: StudentAchievementsSection; subjectId: string; titleId?: string }) {
+  const { t, locale } = useI18n();
   // Every badge still to earn is shown (a student who has not started sees what to work towards):
   // the closest first, then the rest behind "Show all".
   const ratio = (b: (typeof data.locked)[number]) => (b.progress ? b.progress.current / b.progress.target : 0);
@@ -62,10 +70,12 @@ export function AchievementsSection({ data, subjectId }: { data: StudentAchievem
   // New badges always stay in view, even when there are more than EARNED_FIRST.
   const earned = showEarned ? data.earned : data.earned.filter((b, i) => i < EARNED_FIRST || b.isNew);
   return (
-    <section className="cc-stack" aria-labelledby={`badges-${subjectId}`} data-testid="student-achievements">
-      <h3 id={`badges-${subjectId}`} className="cc-h2">
-        {t('achievements.myBadges')}
-      </h3>
+    <section className="cc-stack" aria-labelledby={titleId ?? `badges-${subjectId}`} data-testid="student-achievements">
+      {titleId ? null : (
+        <h3 id={`badges-${subjectId}`} className="cc-h2">
+          {t('achievements.myBadges')}
+        </h3>
+      )}
       {data.level ? (
         <p className="cc-card cc-row cc-level" data-testid="student-level">
           <strong>{pickText(data.level.name, locale)}</strong>
@@ -98,7 +108,7 @@ export function AchievementsSection({ data, subjectId }: { data: StudentAchievem
       ) : null}
       {locked.length ? (
         <>
-          <h4 className="cc-h3">{t('achievements.almostThere')}</h4>
+          {titleId ? <h2 className="cc-h3">{t('achievements.almostThere')}</h2> : <h4 className="cc-h3">{t('achievements.almostThere')}</h4>}
           <ul className="cc-badge-list">
             {next.map((b) => {
               const p = b.progress;

@@ -7,8 +7,14 @@
  * Pictures are scaled down to 2048 px and re-encoded as JPEG on the device first (`lib/images.ts`).
  * A picture chosen under "Add a document" is sent as a picture, so it follows the photo flag and gets
  * the server's metadata removal. Each file becomes its own evidence item with the same caption.
+ *
+ * Two layouts (S14d, D-151): `form` (the teacher Goals page: everything at once) and `steps` (the
+ * student's "Show my work": 1 how → 2 which goal, where "For all my learning" stands for no goal →
+ * 3 the work and a few words, with sentence starters). The steps can follow the page address (`step`,
+ * `onStep`); a step whose earlier choice was lost (a reload) goes back to the first step. Both use
+ * the same upload pipeline. Text hints are shown when Save is pressed (`check`), never while typing.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ACCEPT_HINT } from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
 import type { EvidenceKind } from '../../../shared/contracts/goals.ts';
@@ -56,6 +62,11 @@ const MODE_ICON: Record<EvidenceMode, () => React.JSX.Element> = {
 
 type Pending = { key: number; blob: Blob; name: string; kind: UploadKind; preview: string | null };
 
+/** The text check on Save: a hint to show, and whether the words may be sent anyway (a blocked word is, so it is counted). */
+export type EvidenceCheck = (text: string, kind: EvidenceHintKind) => { hint?: string; send: boolean };
+/** Sentence starters above the words box (student page): written evidence or a caption, for the chosen goal ('' = none). */
+export type EvidenceStarters = (args: { kind: 'evidence' | 'caption'; goalId: string; value: string; onChange: (v: string) => void; target: RefObject<HTMLTextAreaElement | null> }) => ReactNode;
+
 export function EvidenceAdder({
   goals,
   media,
@@ -63,7 +74,12 @@ export function EvidenceAdder({
   upload,
   add,
   run,
-  hint,
+  check,
+  layout = 'form',
+  step: stepProp,
+  onStep,
+  onDone,
+  starters,
 }: {
   goals: Array<{ id: string; label: string }>;
   media: EvidenceMedia;
@@ -72,8 +88,15 @@ export function EvidenceAdder({
   add: (input: NewEvidence) => Promise<unknown>;
   /** Runs the save with the caller's toast and refresh; resolves to a falsy value on failure. */
   run: (fn: () => Promise<unknown>, success: string) => Promise<unknown>;
-  /** Live text hints (the student page, D-123): the words of the evidence or caption, and a link's address. */
-  hint?: (text: string, kind: EvidenceHintKind) => string | undefined;
+  /** Text hints when Save is pressed (the student page, D-123): the words or caption, and a link's address. */
+  check?: EvidenceCheck;
+  layout?: 'form' | 'steps';
+  /** `steps` only: the current step from the page address, and how to change it. */
+  step?: number;
+  onStep?: (n: number, replace?: boolean) => void;
+  /** `steps` only: after a save, instead of going back to step 1 (the page leaves the step entries behind). */
+  onDone?: () => void;
+  starters?: EvidenceStarters;
 }) {
   const { t, locale } = useI18n();
   const modes = evidenceModes(media);
@@ -85,6 +108,8 @@ export function EvidenceAdder({
   const [recording, setRecording] = useState<Blob | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [hints, setHints] = useState<{ body?: string; url?: string }>({});
+  const words = useRef<HTMLTextAreaElement>(null);
   const nextKey = useRef(1);
   const previews = useRef(new Set<string>());
   useEffect(
@@ -94,6 +119,20 @@ export function EvidenceAdder({
     [],
   );
   const current = modes.includes(mode) ? mode : 'text';
+
+  // ---- steps (student page): 1 how → 2 which goal (only when there are goals) → last: the work.
+  const [localStep, setLocalStep] = useState(1);
+  const [picked, setPicked] = useState({ mode: false, goal: false });
+  const steps = layout === 'steps';
+  const goalStep = goals.length > 0;
+  const workStep = goalStep ? 3 : 2;
+  const asked = stepProp ?? localStep;
+  // A step whose earlier choice is not known here (the page was reloaded there) starts again.
+  const step = !steps ? 0 : asked >= 2 && !picked.mode ? 1 : asked >= workStep && goalStep && !picked.goal ? 2 : Math.min(asked, workStep);
+  const toStep = (n: number, replace = false) => (onStep ? onStep(n, replace) : setLocalStep(n));
+  useEffect(() => {
+    if (steps && step !== asked) toStep(step, true);
+  });
 
   const push = (items: Array<Omit<Pending, 'key' | 'preview'>>) =>
     setPending((p) => {
@@ -158,9 +197,17 @@ export function EvidenceAdder({
     setUrl('');
     setRecording(null);
     setNotice(null);
+    setHints({});
   };
   const save = async () => {
     const common = { ...(goalId ? { goalId } : {}), ...(body.trim() ? { body: body.trim() } : {}) };
+    if (check) {
+      const b = body.trim() ? check(body.trim(), current === 'text' ? 'evidenceText' : 'linkTitle') : undefined;
+      const u = current === 'link' && url.trim() ? check(url.trim(), 'url') : undefined;
+      setHints({ body: b?.hint, url: u?.hint });
+      if (b && !b.send) words.current?.focus();
+      if ((b && !b.send) || (u && !u.send)) return;
+    }
     setBusy(true);
     try {
       const ok = await run(async () => {
@@ -178,7 +225,15 @@ export function EvidenceAdder({
         }
         return true;
       }, t('student.toast.evidenceAdded'));
-      if (ok) reset();
+      if (ok) {
+        reset();
+        if (steps) {
+          setPicked({ mode: false, goal: false });
+          setGoalId('');
+          if (onDone) onDone();
+          else toStep(1, true);
+        }
+      }
     } finally {
       setBusy(false);
     }
@@ -199,34 +254,101 @@ export function EvidenceAdder({
     );
   };
 
-  return (
-    <div className="cc-card cc-stack" data-testid="evidence-form">
-      <fieldset className="cc-field">
-        <legend className="cc-field__label">{t('student.evidenceKind')}</legend>
-        <div className="cc-evidence-modes">
-          {modes.map((m) => {
-            const Icon = MODE_ICON[m];
-            return (
+  const modeButtons = (legend: string) => (
+    <fieldset className="cc-field">
+      <legend className={steps ? 'cc-h2 cc-evidence-steps__question' : 'cc-field__label'}>{legend}</legend>
+      <div className="cc-evidence-modes">
+        {modes.map((m) => {
+          const Icon = MODE_ICON[m];
+          return (
+            <Button
+              key={m}
+              size="big"
+              variant={current === m && (!steps || picked.mode) ? 'primary' : 'secondary'}
+              aria-pressed={current === m && (!steps || picked.mode)}
+              className="cc-evidence-mode"
+              onPress={() => {
+                setMode(m);
+                setNotice(null);
+                setHints({});
+                if (steps) {
+                  setPicked((p) => ({ ...p, mode: true }));
+                  toStep(2);
+                }
+              }}
+            >
+              <Icon />
+              <span className="cc-evidence-mode__label">{t(`evidence.mode.${m}`)}</span>
+            </Button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+  const stepCount = (n: number) => <p className="cc-student__step">{t('student.step', { n, total: workStep })}</p>;
+
+  if (steps && step === 1)
+    return (
+      <div className="cc-card cc-stack cc-evidence-steps" data-testid="evidence-form" data-step="how">
+        {stepCount(1)}
+        {modeButtons(t('student.work.how'))}
+      </div>
+    );
+  if (steps && step === 2 && goalStep)
+    return (
+      <div className="cc-card cc-stack cc-evidence-steps" data-testid="evidence-form" data-step="goal">
+        {stepCount(2)}
+        <fieldset className="cc-field">
+          <legend className="cc-h2 cc-evidence-steps__question">{t('student.work.which')}</legend>
+          <div className="cc-student-choices cc-student-choices--list">
+            {[{ id: '', label: t('student.work.all') }, ...goals].map((g) => (
               <Button
-                key={m}
-                size="big"
-                variant={current === m ? 'primary' : 'secondary'}
-                aria-pressed={current === m}
-                className="cc-evidence-mode"
+                key={g.id || 'all'}
+                className="cc-student-choice cc-student-choice--wide"
+                variant={picked.goal && goalId === g.id ? 'primary' : 'secondary'}
+                aria-pressed={picked.goal && goalId === g.id}
                 onPress={() => {
-                  setMode(m);
-                  setNotice(null);
+                  setGoalId(g.id);
+                  setPicked((p) => ({ ...p, goal: true }));
+                  toStep(3);
                 }}
               >
-                <Icon />
-                <span className="cc-evidence-mode__label">{t(`evidence.mode.${m}`)}</span>
+                <span className="cc-student-choice__label">{g.label}</span>
               </Button>
-            );
-          })}
-        </div>
-      </fieldset>
-      <Select label={t('student.evidenceGoal')} items={[{ id: '', label: t('student.noGoalLink') }, ...goals]} value={goalId} onChange={setGoalId} description={chosenGoalHint(goals, goalId)} />
-      {current === 'link' ? <TextField label={t('student.linkUrl')} description={t('student.linkHint')} type="url" value={url} onChange={setUrl} errorMessage={urlOk ? (hint?.(url, 'url') ?? null) : t('student.linkInvalid')} /> : null}
+            ))}
+          </div>
+        </fieldset>
+      </div>
+    );
+
+  const wordsKind = current === 'text' ? 'evidence' : 'caption';
+  return (
+    <div className={steps ? 'cc-card cc-stack cc-evidence-steps' : 'cc-card cc-stack'} data-testid="evidence-form" data-step={steps ? 'work' : undefined}>
+      {steps ? (
+        <>
+          {stepCount(workStep)}
+          <h2 className="cc-h2 cc-evidence-steps__question">{t(`evidence.mode.${current}`)}</h2>
+          {goalStep ? <p className="cc-muted">{goalId ? t('student.forGoal', { goal: goals.find((g) => g.id === goalId)?.label ?? '' }) : t('student.work.all')}</p> : null}
+        </>
+      ) : (
+        <>
+          {modeButtons(t('student.evidenceKind'))}
+          <Select label={t('student.evidenceGoal')} items={[{ id: '', label: t('student.noGoalLink') }, ...goals]} value={goalId} onChange={setGoalId} description={chosenGoalHint(goals, goalId)} />
+        </>
+      )}
+      {current === 'link' ? (
+        <TextField
+          label={t('student.linkUrl')}
+          description={t('student.linkHint')}
+          type="url"
+          value={url}
+          onChange={(v) => {
+            setUrl(v);
+            setHints((h) => ({ ...h, url: undefined }));
+          }}
+          errorMessage={urlOk ? (hints.url ?? null) : t('student.linkInvalid')}
+        />
+      ) : null}
       {current === 'picture' ? fileInput('picture', t('evidence.choosePictures'), `${ACCEPT_HINT.image},image/heic,image/heif,.heic,.heif`, true) : null}
       {current === 'camera' ? <CameraCapture idPrefix={idPrefix} onPhoto={(b) => void prepareImage(b).then((blob) => push([{ blob, name: 'photo.jpg', kind: 'image' }]))} /> : null}
       {current === 'document' ? fileInput('document', t('evidence.chooseDocuments'), media.photos ? `${ACCEPT_HINT.document},${ACCEPT_HINT.image}` : ACCEPT_HINT.document, true) : null}
@@ -248,18 +370,34 @@ export function EvidenceAdder({
           ))}
         </ul>
       ) : null}
+      {starters
+        ? starters({
+            kind: wordsKind,
+            goalId,
+            value: body,
+            onChange: (v) => {
+              setBody(v);
+              setHints((h) => ({ ...h, body: undefined }));
+            },
+            target: words,
+          })
+        : null}
       <TextArea
         label={current === 'text' ? t('student.evidenceWords') : t('student.evidenceCaption')}
         rows={3}
         value={body}
-        onChange={setBody}
+        onChange={(v) => {
+          setBody(v);
+          setHints((h) => ({ ...h, body: undefined }));
+        }}
         maxLength={2000}
-        errorMessage={hint?.(body, current === 'text' ? 'evidenceText' : 'linkTitle')}
+        errorMessage={hints.body}
+        inputRef={words}
       />
       <div>
-        <Button variant="primary" isDisabled={!valid || busy} onPress={() => void save()}>
+        <Button variant="primary" size={steps ? 'big' : 'md'} isDisabled={!valid || busy} onPress={() => void save()}>
           <IconPlus />
-          {fileMode && pending.length > 1 ? t('evidence.addMany', { count: pending.length }) : t('student.addEvidence')}
+          {fileMode && pending.length > 1 ? t('evidence.addMany', { count: pending.length }) : steps ? t('student.work.save') : t('student.addEvidence')}
         </Button>
       </div>
     </div>

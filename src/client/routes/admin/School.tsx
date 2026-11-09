@@ -4,6 +4,7 @@
  * teaching assignments, module & media policies.
  */
 import { AchievementDefaultsSection, TextChecksAdminSection } from './StudentContentAdmin.tsx';
+import { AdminStarters } from '../../modules/goals/StartersLibrary.tsx';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from '@tanstack/react-router';
@@ -819,7 +820,7 @@ function GoalDefaultsSection() {
   const q = useQuery({ queryKey: K.goalDefaults, queryFn: () => call(G.adminGoalDefaults, {}) });
   const qc = useQueryClient();
   const d = q.data;
-  const toggle = (kind: 'category' | 'preset', itemId: string, archived: boolean) =>
+  const toggle = (kind: (typeof G.DEFAULT_ITEM_KINDS)[number], itemId: string, archived: boolean) =>
     void run(() => call(G.adminArchiveGoalDefault, { kind, itemId, archived }), { success: t('save.saved') }).then((r) => r && qc.setQueryData(K.goalDefaults, r));
   const button = (kind: 'category' | 'preset', item: { id: string; archived: boolean }, label: string) => (
     <Button size="small" className="cc-admin-list__action" aria-label={`${item.archived ? t('goals.restore') : t('goals.archive')}: ${label}`} onPress={() => toggle(kind, item.id, !item.archived)}>
@@ -865,6 +866,8 @@ function GoalDefaultsSection() {
           );
         })}
       </ul>
+      {/* S14d (D-152): the built-in sentence starters, archived the same way. */}
+      {d ? <AdminStarters starters={d.starters} toggle={(id, archived) => toggle('starter', id, archived)} /> : null}
     </section>
   );
 }

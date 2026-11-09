@@ -7,11 +7,13 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/goals.ts';
-import { OutcomeSet, type Category, type Evidence, type Feedback, type Goal, type GoalLibrary, type Preset, type PrivateNote, type TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
+import { OutcomeSet, type Category, type DEFAULT_ITEM_KINDS, type Evidence, type Feedback, type Goal, type GoalLibrary, type Preset, type PrivateNote, type Starter, type StarterKind, type TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
+import { fillBlank, hasBlank, normaliseStarter, STARTER_SAMPLE, STARTER_TEXT_KIND } from '../../../shared/text/starters.ts';
+import { checkStudentText, findRiskyWord } from '../../../shared/text/textQuality.ts';
 import { initials, normaliseName } from '../../../shared/text/turkish.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { tx } from '../../db/client.ts';
-import { defaultItemArchives, evidence, files, goalEntries, goalPresets, goals, skillCategories, students, subjects, teacherAssessments, teacherFeedback, teachingContexts } from '../../db/schema.ts';
+import { defaultItemArchives, evidence, files, goalEntries, goalPresets, goals, skillCategories, students, subjects, teacherAssessments, teacherFeedback, teachingContexts, textStarters } from '../../db/schema.ts';
 import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
@@ -22,7 +24,9 @@ import { assertClassWritable, assertOwnsContext, getClass, type ClassRow, type C
 import { assertMediaAllowed, deleteFileRow } from '../files/service.ts';
 import { liveClassIdsOf, rosterRows } from '../students/service.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type GoalRow } from './dto.ts';
-import { categoryDto, defaultLibrary, getCategory, getPreset, hiddenDefaultsOf, inScope, libraryFor, outcomesOf, presetDto, type HiddenDefaults } from './library.ts';
+import { categoryDto, defaultLibrary, getCategory, getPreset, hiddenDefaultsOf, inScope, libraryFor, NOTHING_HIDDEN, outcomesOf, presetDto, type HiddenDefaults } from './library.ts';
+import { getStarter, starterDto } from './starters.ts';
+import { limitsOf, wordListsFor } from '../textChecks/service.ts';
 import { addPrivateNote, deletePrivateNote, myPrivateNotes } from './private.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -338,7 +342,7 @@ export function createCategory(ctx: RequestContext, input: In<typeof C.createCat
  * D-116): a row in `default_item_archives`; the default itself and other teachers are unaffected.
  * Defaults cannot be renamed by teachers. Returns the viewer's state of the item.
  */
-function setDefaultHidden(ctx: RequestContext, kind: 'category' | 'preset', itemId: string, archived: boolean | undefined, renamed: boolean): HiddenDefaults {
+function setDefaultHidden(ctx: RequestContext, kind: (typeof DEFAULT_ITEM_KINDS)[number], itemId: string, archived: boolean | undefined, renamed: boolean): HiddenDefaults {
   const userId = requireUser(ctx).id;
   if (renamed) throw new AppError('FORBIDDEN', 'Default items belong to the school and cannot be renamed', { reason: 'DEFAULT_ITEM_READ_ONLY' });
   if (archived !== undefined) {
@@ -347,11 +351,14 @@ function setDefaultHidden(ctx: RequestContext, kind: 'category' | 'preset', item
     if (archived && !had) ctx.db.insert(defaultItemArchives).values({ userId, kind, itemId, archivedAt: ctx.now() }).run();
     if (!archived && had) ctx.db.delete(defaultItemArchives).where(where).run();
     if (archived !== had) {
-      audit(ctx.db, ctx.actor, { action: archived ? 'goal_default.hide' : 'goal_default.show', entity: kind === 'category' ? 'skill_category' : 'goal_preset', entityId: itemId, after: { scope: 'teacher' } }, ctx.now());
+      audit(ctx.db, ctx.actor, { action: archived ? 'goal_default.hide' : 'goal_default.show', entity: DEFAULT_ENTITY[kind], entityId: itemId, after: { scope: 'teacher' } }, ctx.now());
     }
   }
   return hiddenDefaultsOf(ctx.db, [userId]);
 }
+
+/** The audit record type of each kind of default item. */
+const DEFAULT_ENTITY = { category: 'skill_category', preset: 'goal_preset', starter: 'text_starter' } as const satisfies Record<(typeof DEFAULT_ITEM_KINDS)[number], string>;
 
 export function updateCategory(ctx: RequestContext, input: In<typeof C.updateCategory>): Category {
   return tx(ctx.db, () => {
@@ -396,6 +403,60 @@ export function updatePreset(ctx: RequestContext, input: In<typeof C.updatePrese
     ctx.db.update(goalPresets).set(patch).where(eq(goalPresets.id, p.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal_preset.update', entity: 'goal_preset', entityId: p.id, after: { textChanged: Boolean(input.text), archived: input.archived } }, ctx.now());
     return presetDto(getPreset(ctx.db, p.id)!);
+  });
+}
+
+// ---------------------------------------------------------------- sentence starters (S14d, D-152)
+/**
+ * A teacher's starter text, per language: stored with every blank written `___`; it needs a blank, no
+ * risky word, and must pass the student text checks once a sample word fills the blank (a starter is
+ * meant to be lengthened, so "too short" alone is accepted). Returns the cleaned text.
+ */
+function cleanStarterText(ctx: RequestContext, kind: StarterKind, text: LocalizedTextValue): LocalizedTextValue {
+  const lists = wordListsFor(ctx.db, [requireUser(ctx).id]);
+  const out: LocalizedTextValue = {};
+  for (const lang of ['en', 'tr'] as const) {
+    const raw = text[lang]?.trim();
+    if (!raw) continue;
+    const t = normaliseStarter(raw);
+    if (!hasBlank(t)) throw invalid('Put ___ where the student writes', { reason: 'STARTER_NEEDS_BLANK', lang });
+    const res = findRiskyWord(t, lists) ? ({ ok: false, reason: 'BLOCKED_WORD' } as const) : checkStudentText(fillBlank(t, STARTER_SAMPLE[lang]), STARTER_TEXT_KIND[kind], { limits: limitsOf(ctx.db), lists });
+    if (!res.ok && res.reason !== 'TOO_SHORT') throw invalid('Students could not use this starter', { reason: 'STARTER_INVALID', textReason: res.reason, lang });
+    out[lang] = t;
+  }
+  return out;
+}
+
+export function createStarter(ctx: RequestContext, input: In<typeof C.createStarter>): Starter {
+  return tx(ctx.db, () => {
+    const s = scopeOf(ctx, input.contextId);
+    assertClassWritable(ctx.db, s.cls);
+    let categoryId: string | null = null;
+    if (input.categoryId) {
+      const cat = getCategory(ctx.db, input.categoryId);
+      if (!cat || !inScope(cat, s.context.subjectId, teacherIdsOf(s))) throw notFound('Category');
+      categoryId = cat.id;
+    }
+    const now = ctx.now();
+    const row = { id: newId(), kind: input.kind, subjectId: s.context.subjectId, categoryId, text: cleanStarterText(ctx, input.kind, input.text), sortOrder: 1000, createdBy: requireUser(ctx).id, archivedAt: null, createdAt: now, updatedAt: now };
+    ctx.db.insert(textStarters).values(row).run();
+    audit(ctx.db, ctx.actor, { action: 'text_starter.create', entity: 'text_starter', entityId: row.id, after: { kind: row.kind, subjectId: row.subjectId, categoryId } }, now);
+    return starterDto(row, NOTHING_HIDDEN);
+  });
+}
+
+export function updateStarter(ctx: RequestContext, input: In<typeof C.updateStarter>): Starter {
+  return tx(ctx.db, () => {
+    const st = getStarter(ctx.db, input.starterId);
+    if (st && st.createdBy === null) return starterDto(st, setDefaultHidden(ctx, 'starter', st.id, input.archived, Boolean(input.text)));
+    if (!st || st.createdBy !== requireUser(ctx).id) throw notFound('Starter');
+    assertLibraryWritable(ctx, st.subjectId, 'Starter');
+    const patch: Partial<typeof textStarters.$inferInsert> = { updatedAt: ctx.now() };
+    if (input.text) patch.text = cleanStarterText(ctx, st.kind, input.text);
+    if (input.archived !== undefined) patch.archivedAt = input.archived ? ctx.now() : null;
+    ctx.db.update(textStarters).set(patch).where(eq(textStarters.id, st.id)).run();
+    audit(ctx.db, ctx.actor, { action: 'text_starter.update', entity: 'text_starter', entityId: st.id, after: { textChanged: Boolean(input.text), archived: input.archived } }, ctx.now());
+    return starterDto(getStarter(ctx.db, st.id)!, NOTHING_HIDDEN);
   });
 }
 
@@ -489,15 +550,15 @@ export async function deleteEvidence(ctx: RequestContext, evidenceId: string): P
 // ---------------------------------------------------------------- school-wide defaults (admin, D-116)
 export const adminDefaults = (ctx: RequestContext) => defaultLibrary(ctx.db);
 
-/** An administrator archives a default category or preset for every class, or restores it. */
+/** An administrator archives a default category, preset or (S14d) sentence starter for every class, or restores it. */
 export function adminArchiveDefault(ctx: RequestContext, input: In<typeof C.adminArchiveGoalDefault>) {
   return tx(ctx.db, () => {
-    const table = input.kind === 'category' ? skillCategories : goalPresets;
-    const row = ctx.db.select().from(table).where(eq(table.id, input.itemId)).get();
-    if (!row || row.createdBy !== null) throw notFound(input.kind === 'category' ? 'Category' : 'Preset goal');
+    const table = input.kind === 'category' ? skillCategories : input.kind === 'preset' ? goalPresets : textStarters;
+    const row = ctx.db.select({ id: table.id, createdBy: table.createdBy, archivedAt: table.archivedAt }).from(table).where(eq(table.id, input.itemId)).get();
+    if (!row || row.createdBy !== null) throw notFound(input.kind === 'category' ? 'Category' : input.kind === 'preset' ? 'Preset goal' : 'Starter');
     if ((row.archivedAt !== null) !== input.archived) {
       ctx.db.update(table).set({ archivedAt: input.archived ? ctx.now() : null, updatedAt: ctx.now() }).where(eq(table.id, row.id)).run();
-      audit(ctx.db, ctx.actor, { action: input.archived ? 'goal_default.archive' : 'goal_default.restore', entity: input.kind === 'category' ? 'skill_category' : 'goal_preset', entityId: row.id, after: { scope: 'school' } }, ctx.now());
+      audit(ctx.db, ctx.actor, { action: input.archived ? 'goal_default.archive' : 'goal_default.restore', entity: DEFAULT_ENTITY[input.kind], entityId: row.id, after: { scope: 'school' } }, ctx.now());
     }
     return defaultLibrary(ctx.db);
   });

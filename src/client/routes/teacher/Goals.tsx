@@ -5,7 +5,7 @@
  *   outcomes, feedback the student sees, evidence, and PRIVATE notes (lock icon, never shown to the
  *   student or anyone else, GOL-6).
  * - Library: the default categories and presets plus this teacher's own; own items are archived for
- *   everyone, defaults only for this teacher's classes (S13b2, D-116).
+ *   everyone, defaults only for this teacher's classes (S13b2, D-116). S14d (D-152): sentence starters.
  * - Settings: outcome labels (also the module's panel on the class settings page).
  * S13a: goal categories are also the lesson topics (D-101); a student's goals and evidence can be
  * filtered by topic.
@@ -23,6 +23,7 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { EvidenceAdder } from '../../modules/goals/EvidenceAdder.tsx';
+import { TeacherStarters } from '../../modules/goals/StartersLibrary.tsx';
 import { ConfidenceChip, EntryLine, EvidenceView, FeedbackLine, GoalSummary, whenText } from '../../modules/goals/shared.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
@@ -365,7 +366,7 @@ function LibraryTab({ contextId }: { contextId: string }) {
   const opts = { invalidate: [ALL] };
   const liveCats = lib.categories.filter((c) => !c.archived);
   const pc = presetCat || liveCats[0]?.id || '';
-  const archivedCount = lib.categories.filter((c) => c.archived).length + lib.presets.filter((p) => p.archived).length;
+  const archivedCount = lib.categories.filter((c) => c.archived).length + lib.presets.filter((p) => p.archived).length + lib.starters.filter((s) => s.archived).length;
   const cats = showArchived ? lib.categories : liveCats;
   // Archive / restore: own items through their own row; defaults hide only for this teacher (D-116).
   // A default the school archived can be restored only by an administrator.
@@ -462,6 +463,7 @@ function LibraryTab({ contextId }: { contextId: string }) {
           </Button>
         </div>
       </section>
+      <TeacherStarters contextId={contextId} starters={lib.starters} categories={lib.categories} showArchived={showArchived} run={(fn) => run(fn, opts)} />
     </div>
   );
 }

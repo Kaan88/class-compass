@@ -40,17 +40,19 @@ export function homeworkVisibleCount(assignments: Array<{ dueOn: string }>, toda
   return Math.max(HOMEWORK_FIRST, open);
 }
 
-export function HomeworkSection({ data, subjectId }: { data: StudentHomeworkSection; subjectId: string }) {
+export function HomeworkSection({ data, subjectId, titleId }: { data: StudentHomeworkSection; subjectId: string; titleId?: string }) {
   const { t, locale } = useI18n();
   const [showAll, setShowAll] = useState(false);
   const first = homeworkVisibleCount(data.assignments, localToday());
   const shown = showAll ? data.assignments : data.assignments.slice(0, first);
   const older = data.assignments.length - first;
   return (
-    <section className="cc-stack" aria-labelledby={`homework-${subjectId}`} data-testid="student-homework">
-      <h3 id={`homework-${subjectId}`} className="cc-h2">
-        {t('student.myHomework')}
-      </h3>
+    <section className="cc-stack" aria-labelledby={titleId ?? `homework-${subjectId}`} data-testid="student-homework">
+      {titleId ? null : (
+        <h3 id={`homework-${subjectId}`} className="cc-h2">
+          {t('student.myHomework')}
+        </h3>
+      )}
       {data.assignments.length === 0 ? <p className="cc-muted">{t('student.noHomework')}</p> : null}
       <ul className="cc-stack">
         {shown.map((a) => {

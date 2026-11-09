@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type ReactNode, type Ref } from 'react';
 import { FieldError, Input, Label, Switch, Text, TextArea as RACTextArea, TextField as RACTextField, type TextFieldProps as RACTextFieldProps } from 'react-aria-components';
 import { useI18n } from '../lib/i18n.tsx';
 
@@ -27,12 +27,15 @@ export function TextField({ label, description, errorMessage, placeholder, class
   );
 }
 
-/** Labelled multi-line text input (pasted lists, notes). Same field chrome as TextField. */
-export function TextArea({ label, description, errorMessage, placeholder, rows = 8, className = '', ...rest }: TextFieldProps & { rows?: number }) {
+/**
+ * Labelled multi-line text input (pasted lists, notes). Same field chrome as TextField. `inputRef`
+ * reaches the textarea itself (S14d: a sentence starter selects its blank).
+ */
+export function TextArea({ label, description, errorMessage, placeholder, rows = 8, className = '', inputRef, ...rest }: TextFieldProps & { rows?: number; inputRef?: Ref<HTMLTextAreaElement> }) {
   return (
     <RACTextField {...rest} isInvalid={Boolean(errorMessage) || rest.isInvalid} className={`cc-field ${className}`}>
       <Label className="cc-field__label">{label}</Label>
-      <RACTextArea className="cc-input cc-textarea" placeholder={placeholder} rows={rows} />
+      <RACTextArea ref={inputRef} className="cc-input cc-textarea" placeholder={placeholder} rows={rows} />
       {description ? (
         <Text slot="description" className="cc-field__hint">
           {description}

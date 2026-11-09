@@ -1012,48 +1012,81 @@ async function studentRun(browser: Browser, dev: Device, lang: Locale, url: stri
     await page.waitForTimeout(1000);
     await S('page', 'default');
     if (!full) return;
-    const region = page.getByTestId('student-goals').first();
+    // S14d (D-151): home tiles and short steps. Each tile is opened from the home screen.
+    const home = async () => {
+      await page.goto(new URL(page.url()).pathname);
+      await expect(page.getByTestId('student-page')).toBeVisible();
+    };
+    const tile = (en: string) => page.getByRole('link', { name: nm(en, false) }).first();
 
-    await step(`student goals form ${where}`, async () => {
-      const cat = region.getByLabel(nm('What do you want to get better at?'));
-      const opts = await cat.locator('option').allInnerTexts();
-      if (opts.length > 1) await cat.selectOption({ index: 1 });
+    await step(`student new goal ${where}`, async () => {
+      await tile('New goal').click();
+      await page.waitForTimeout(400);
+      await S('new-goal', 'step-1-categories');
+      await page.locator('.cc-student-choices .cc-student-choice').first().click();
       await page.waitForTimeout(300);
-      await region.getByLabel(nm('Choose a goal')).selectOption({ index: 1 }).catch(() => undefined);
-      await region.getByLabel(nm('How will I practise?')).fill('Library book, bedtime').catch(() => undefined);
-      await S('goals', 'new-goal-filled');
+      await S('new-goal', 'step-2-goals');
+      const own = page.getByRole('button', { name: nm('My own words') });
+      if (await own.count()) await own.click();
+      const chip = page.getByTestId('sentence-starters').getByRole('button').first();
+      if (await chip.count()) await chip.click();
+      await page.waitForTimeout(300);
+      await S('new-goal', 'step-2-own-words-starters');
     });
 
-    await step(`student reflection ${where}`, async () => {
-      const form = region.getByTestId('reflection-form');
-      await form.getByLabel(nm('Which goal?')).selectOption({ index: 1 }).catch(() => undefined);
-      await form.getByLabel(nm('My words')).fill('I read two pages without help.');
-      await form.getByRole('button', { name: /4/u }).first().click();
-      await form.scrollIntoViewIfNeeded();
-      await S('reflections', 'filled-confidence-4');
+    await step(`student how is it going ${where}`, async () => {
+      await home();
+      await tile('How is it going?').click();
+      const first = page.locator('.cc-student-choices--list .cc-student-choice').first();
+      if (!(await first.count())) return miss(`student how is it going: no goal ${where}`);
+      await first.click();
+      await page.waitForTimeout(300);
+      await S('how-is-it-going', 'step-2-faces');
+      await page.getByTestId('how-face-4').click();
+      await page.getByTestId('sentence-starters').getByRole('button').first().click();
+      await page.keyboard.type(lang === 'tr' ? 'her gün okudum' : 'I read every day');
+      await page.waitForTimeout(300);
+      await S('how-is-it-going', 'step-3-starter-filled');
     });
 
     await step(`student evidence adder ${where}`, async () => {
-      const form = region.getByTestId('evidence-form');
-      const buttons = form.getByRole('group', { name: nm('What kind of evidence?') }).getByRole('button');
+      await home();
+      await tile('Show my work').click();
+      const form = page.getByTestId('evidence-form');
+      await expect(form).toHaveAttribute('data-step', 'how');
+      const workUrl = page.url();
+      await S('evidence-adder', 'step-1-kinds');
+      const buttons = form.locator('.cc-evidence-modes').getByRole('button');
       const n = await buttons.count();
       if (n < 7) miss(`student evidence adder shows ${n} of 7 kinds ${where}`);
       for (let i = 0; i < n; i++) {
+        await page.goto(workUrl);
+        await expect(form).toHaveAttribute('data-step', 'how');
         const b = buttons.nth(i);
         const text = (await b.innerText()).trim();
         await b.click();
+        if ((await form.getAttribute('data-step')) === 'goal') {
+          if (i === 0) await S('evidence-adder', 'step-2-which-goal');
+          await form.locator('.cc-student-choice').first().click();
+        }
         await page.waitForTimeout(700);
-        await form.scrollIntoViewIfNeeded();
         await S('evidence-adder', `mode-${slug(keyOf(text) ?? text).replace(/^evidence-mode-/u, '')}`);
       }
     });
 
+    await step(`student my goals ${where}`, async () => {
+      await home();
+      await tile('My goals').click();
+      await page.waitForTimeout(400);
+      await S('goals', 'my-goals');
+    });
+
     await step(`student achievements ${where}`, async () => {
-      // A fresh page, so the goal and evidence forms filled above do not show in this picture.
-      await page.reload();
-      await expect(page.getByTestId('student-page')).toBeVisible();
+      await home();
+      const t = tile('My achievements');
+      if (!(await t.count())) return miss(`student achievements: no tile ${where}`);
+      await t.click();
       const ach = page.getByTestId('student-achievements').first();
-      await ach.scrollIntoViewIfNeeded();
       // The state is "every badge": open both lists (earned and still to earn) when they are folded.
       for (const id of ['student-badges-earned-all', 'student-badges-all']) {
         const all = ach.getByTestId(id);
@@ -1065,6 +1098,8 @@ async function studentRun(browser: Browser, dev: Device, lang: Locale, url: stri
     });
 
     await step(`student avatar creator ${where}`, async () => {
+      await home();
+      await tile('My avatar').click();
       await page.getByTestId('avatar-change').first().click();
       const creator = page.getByTestId('avatar-creator');
       await expect(creator).toBeVisible();

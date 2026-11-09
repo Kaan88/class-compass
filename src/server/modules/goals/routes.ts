@@ -13,7 +13,7 @@ const STUDENT_UPLOAD_RATE = { max: 20, timeWindow: '1 minute' };
 const ok = { ok: true as const };
 
 export function registerGoalRoutes(app: FastifyInstance, deps: AppDeps) {
-  // Default skill categories and preset goals (GOL-1), created once with fixed ids.
+  // Default skill categories, preset goals (GOL-1) and sentence starters (S14d), created once with fixed ids.
   ensureGoalDefaults(deps.db, deps.now());
 
   // Teacher area (PIN-gated in classroom mode).
@@ -43,6 +43,8 @@ export function registerGoalRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.updateCategory, (ctx, input) => teacher.updateCategory(ctx, input));
   route(app, deps, C.createPreset, (ctx, input) => teacher.createPreset(ctx, input));
   route(app, deps, C.updatePreset, (ctx, input) => teacher.updatePreset(ctx, input));
+  route(app, deps, C.createStarter, (ctx, input) => teacher.createStarter(ctx, input));
+  route(app, deps, C.updateStarter, (ctx, input) => teacher.updateStarter(ctx, input));
   route(app, deps, C.adminGoalDefaults, (ctx) => teacher.adminDefaults(ctx));
   route(app, deps, C.adminArchiveGoalDefault, (ctx, input) => teacher.adminArchiveDefault(ctx, input));
   route(app, deps, C.goalSettings, (ctx, input) => teacher.getSettings(ctx, input.contextId));

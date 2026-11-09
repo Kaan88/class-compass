@@ -16,6 +16,7 @@ import { LocalizedText, Ok, endpoint } from './define.ts';
 import { StudentAchievementsSection } from './achievements.ts';
 import { StudentAvatarInfo } from './avatars.ts';
 import { Id, IsoDate, QueryBool, RequiredLocalizedText, Theme } from './school.ts';
+import { STARTER_KINDS } from '../text/starters.ts';
 
 export const GOAL_STATUSES = ['active', 'achieved', 'archived'] as const;
 export const GoalStatus = z.enum(GOAL_STATUSES);
@@ -154,7 +155,28 @@ export type Evidence = z.infer<typeof Evidence>;
 export const PrivateNote = z.object({ id: z.string(), body: z.string(), createdAt: z.number(), updatedAt: z.number() });
 export type PrivateNote = z.infer<typeof PrivateNote>;
 
-export const GoalLibrary = z.object({ categories: z.array(Category), presets: z.array(Preset), outcomes: z.array(OutcomeDef) });
+/**
+ * A sentence starter (S14d, D-152) as teachers and administrators see it: a built-in default or a
+ * teacher's own (for one subject, optionally one goal category). The blank is `___`.
+ */
+export const StarterKind = z.enum(STARTER_KINDS);
+export type StarterKind = z.infer<typeof StarterKind>;
+export const Starter = z.object({
+  id: z.string(),
+  kind: StarterKind,
+  /** Offered with goals of this category only (teacher starters); null = everywhere. */
+  categoryId: z.string().nullable(),
+  text: LocalizedText,
+  custom: z.boolean(),
+  archived: z.boolean(),
+  schoolArchived: z.boolean(),
+});
+export type Starter = z.infer<typeof Starter>;
+/** A starter on the student page: only what is offered there, in the student page's language(s). */
+export const StudentStarter = z.object({ id: z.string(), kind: StarterKind, categoryId: z.string().nullable(), text: LocalizedText });
+export type StudentStarter = z.infer<typeof StudentStarter>;
+
+export const GoalLibrary = z.object({ categories: z.array(Category), presets: z.array(Preset), starters: z.array(Starter), outcomes: z.array(OutcomeDef) });
 export type GoalLibrary = z.infer<typeof GoalLibrary>;
 
 const StudentSummary = z.object({ id: z.string(), fullName: z.string(), initials: z.string(), avatarHue: z.number().int() });
@@ -294,24 +316,45 @@ export const updatePreset = endpoint({
   output: Preset,
 });
 /**
+ * A teacher's own sentence starter for their subject (S14d, D-152). Each language's text needs the
+ * blank `___` and must pass the student text checks once a sample word fills it.
+ */
+export const createStarter = endpoint({
+  method: 'POST',
+  path: '/api/teacher/contexts/:contextId/starters',
+  access: 'teacher',
+  input: z.object({ contextId: Id, kind: StarterKind, categoryId: Id.nullable().optional(), text: RequiredLocalizedText }),
+  output: Starter,
+});
+/** Change or archive an own starter; for a default, `archived` hides it for this teacher's classes only (D-116). */
+export const updateStarter = endpoint({
+  method: 'PATCH',
+  path: '/api/teacher/starters/:starterId',
+  access: 'teacher',
+  input: z.object({ starterId: Id, text: RequiredLocalizedText.optional(), archived: z.boolean().optional() }),
+  output: Starter,
+});
+/**
  * Default categories and presets school-wide (S13b2, D-116): an administrator archives a default for
  * every class or restores it. (Teachers archive a default for their own classes with updateCategory /
  * updatePreset, like their own items.)
  */
-export const DEFAULT_ITEM_KINDS = ['category', 'preset'] as const;
+export const DEFAULT_ITEM_KINDS = ['category', 'preset', 'starter'] as const;
+/** S14d (D-152): the built-in sentence starters are archived the same way. */
+const GoalDefaults = z.object({ categories: z.array(Category), presets: z.array(Preset), starters: z.array(Starter) });
 export const adminGoalDefaults = endpoint({
   method: 'GET',
   path: '/api/admin/goal-defaults',
   access: 'admin',
   input: z.object({}),
-  output: z.object({ categories: z.array(Category), presets: z.array(Preset) }),
+  output: GoalDefaults,
 });
 export const adminArchiveGoalDefault = endpoint({
   method: 'PUT',
   path: '/api/admin/goal-defaults/:kind/:itemId',
   access: 'admin',
   input: z.object({ kind: z.enum(DEFAULT_ITEM_KINDS), itemId: Id, archived: z.boolean() }),
-  output: z.object({ categories: z.array(Category), presets: z.array(Preset) }),
+  output: GoalDefaults,
 });
 
 export const goalSettings = endpoint({
@@ -341,6 +384,8 @@ export const StudentGoalsSection = z.object({
   canWrite: z.boolean(),
   /** The school's goal length limits, so the live hints agree with the server (D-123). Word lists are never sent. */
   textLimits: z.object({ minGoalWords: z.number().int(), minGoalLetters: z.number().int() }),
+  /** Sentence starters offered here (S14d, D-152), in the student page's language(s) only. */
+  starters: z.array(StudentStarter),
 });
 export type StudentGoalsSection = z.infer<typeof StudentGoalsSection>;
 

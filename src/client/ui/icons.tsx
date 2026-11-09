@@ -244,11 +244,14 @@ export const IconMinus = () => (
     <path d="M6 12h12" />
   </Icon>
 );
-/** Reflection faces 1 (tough) … 4 (great): the mouth curve changes; always shown with a text label. */
-export const IconFace = ({ level }: { level: 1 | 2 | 3 | 4 }) => (
+/**
+ * Reflection faces 1 (tough) … 4 (great): the mouth curve changes; always shown with a text label.
+ * Level 5 (S14d, the student's "How is it going?" 1–5) is the big smile with happy, closed eyes.
+ */
+export const IconFace = ({ level }: { level: 1 | 2 | 3 | 4 | 5 }) => (
   <Icon>
     <circle cx="12" cy="12" r="9" />
-    <path d="M9 10h.01M15 10h.01" />
+    {level === 5 ? <path d="M7.8 10.2c.8-1 2-1 2.8 0M13.4 10.2c.8-1 2-1 2.8 0" /> : <path d="M9 10h.01M15 10h.01" />}
     {level === 1 ? <path d="M8.5 16.5c2-2 5-2 7 0" /> : level === 2 ? <path d="M9 15.5h6" /> : level === 3 ? <path d="M9 14.5c1.5 1.5 4.5 1.5 6 0" /> : <path d="M8 14c2 3 6 3 8 0z" />}
   </Icon>
 );

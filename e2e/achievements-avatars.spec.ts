@@ -65,15 +65,18 @@ test('a badge given in class shows the moment on the display and a celebration o
     try {
       const seen = p.waitForResponse((r) => r.url().endsWith('/api/student/achievements/seen'));
       await p.goto(link);
-      const english = p.getByRole('region', { name: 'English', exact: true });
-      const earned = english.getByTestId('student-badge').filter({ hasText: badgeName });
-      await expect(earned).toBeVisible();
+      // Celebrated on the home screen (S14d: achievements sit behind a tile, D-151).
       await expect(p.getByTestId('celebration')).toBeVisible();
+      const subjects = p.getByRole('group', { name: 'My subject' });
+      if (await subjects.count()) await subjects.getByRole('button', { name: 'English', exact: true }).click();
+      await p.getByRole('link', { name: /^My achievements/u }).click();
+      const earned = p.getByTestId('student-badge').filter({ hasText: badgeName });
+      await expect(earned).toBeVisible();
       // Seen once: no celebration on the next visit.
       expect((await seen).status()).toBe(200);
       await p.reload();
-      await expect(english.getByTestId('student-badge').filter({ hasText: badgeName })).toBeVisible();
-      await expect(english.getByTestId('student-badge').filter({ hasText: badgeName })).not.toHaveAttribute('data-new', /.*/);
+      await expect(p.getByTestId('student-badge').filter({ hasText: badgeName })).toBeVisible();
+      await expect(p.getByTestId('student-badge').filter({ hasText: badgeName })).not.toHaveAttribute('data-new', /.*/);
     } finally {
       await phone.close();
     }
@@ -94,6 +97,7 @@ test('a student chooses an avatar on the phone and it appears on their classroom
   const p = await phone.newPage();
   try {
     await p.goto(await studentLinkUrl(page, ctx.classId, student.id));
+    await p.getByRole('link', { name: 'My avatar' }).click();
     const panel = p.getByTestId('student-avatar');
     await panel.getByTestId('avatar-change').click();
     const creator = p.getByTestId('avatar-creator');

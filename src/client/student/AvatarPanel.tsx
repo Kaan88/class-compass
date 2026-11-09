@@ -96,7 +96,8 @@ function setPart(spec: AvatarSpecValue, key: string, value: string): AvatarSpecV
   return { ...spec, [key]: value } as AvatarSpecValue;
 }
 
-export function AvatarPanel({ info, name }: { info: StudentAvatarInfo; name: string }) {
+/** `titleId`: the screen's h1 names the panel (S14d "My avatar" screen), so the panel has no heading of its own. */
+export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; name: string; titleId?: string }) {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -129,13 +130,15 @@ export function AvatarPanel({ info, name }: { info: StudentAvatarInfo; name: str
     if (ok.length) change(setPart(draft, p.key, ok[Math.floor(Math.random() * ok.length)]!));
   };
   return (
-    <section className="cc-card cc-stack cc-avatar-panel" aria-labelledby="my-avatar" data-testid="student-avatar">
+    <section className="cc-card cc-stack cc-avatar-panel" aria-labelledby={titleId ?? 'my-avatar'} data-testid="student-avatar">
       <div className="cc-row">
-        {current ? <AvatarArt spec={current} size={64} title={describeAvatar(current, locale)} /> : null}
+        {current ? <AvatarArt spec={current} size={titleId ? 96 : 64} title={describeAvatar(current, locale)} /> : null}
         <div className="cc-stack">
-          <h2 id="my-avatar" className="cc-h2">
-            {t('avatar.title')}
-          </h2>
+          {titleId ? null : (
+            <h2 id="my-avatar" className="cc-h2">
+              {t('avatar.title')}
+            </h2>
+          )}
           {info.locked ? <p className="cc-muted">{t('avatar.lockedByTeacher')}</p> : null}
         </div>
         {!info.locked ? (
