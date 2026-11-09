@@ -63,6 +63,17 @@ Süper Konuşmacılar puanları rozet dersinin sınıf raporunda ve öğrenci za
 
 **Panonun şu anki hali** sekmesi, bir pano ekranına gerek kalmadan panoyu o anki hâliyle gösterir.
 
+## Kendi web adresi (isteğe bağlı)
+
+Sunucu yöneticisi Süper Konuşmacılar'a kendine ait bir web adresi verebilir (örneğin okulun adresinin başına `speakers.` eklenerek; OPERATIONS.md, "Super Speakers on its own hostname"). Bu adreste yalnızca puanlayıcı uygulaması ve pano açılır; böylece ana adres ek bir giriş istese bile pano ekranları ve telefonlar onu açabilir. Uygulamanın geri kalanı bu adreste açılmaz.
+
+Bu özellik açıldığında:
+
+- **Bağlantılar** sekmesi yeni adresleri gösterir, yeni QR kodlar da bu adresleri kullanır. Bağlantıların kendisi değişmez: ana adres çalıştığı sürece eski bağlantılar ve basılı QR kodlar yeni adrese yönlendirilir. QR kodları uygun bir zamanda yeniden basın.
+- **Pano ekranları**: her ekranda pano bağlantısını bir kez daha açın (**Bağlantılar** sekmesinden kopyalayın). Yalnızca sayfası yenilenen bir ekranda "Bu pano bağlantısı artık çalışmıyor" yazar.
+- **Puanlayıcılar**: puanlayıcı bağlantılarını yeniden açarlar. Uygulamayı ana ekrana eklemişlerse eski Süper Konuşmacılar simgesini silip yeni sayfadan yeniden eklerler; iPhone'da yeni bir kodla yeniden eşleştirirler.
+- Puanlar, geçmiş, ayarlar ve bağlantılar değişmez.
+
 ## Bilmekte yarar var
 
 - Puanlar yalnızca artı yöndedir (+1). Eksi puan yoktur.

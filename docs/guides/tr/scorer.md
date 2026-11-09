@@ -38,4 +38,5 @@ Böylece bağlantı zayıfken bile tek dokunuşla puan verebilirsiniz. Alttaki *
 - Yalnızca katılan sınıfların öğrencileri puan alabilir. Eksi puan yoktur.
 - **Bu telefonda oturumu kapat** bu telefondaki oturumu bitirir. Bağlantınız çalışmaya devam eder.
 - "Bu puanlayıcı bağlantısı artık çalışmıyor": yönetici yeni bir bağlantı oluşturmuş ya da bağlantıyı kapatmıştır. Yeni bağlantınızı isteyin.
+- Yöneticiniz Süper Konuşmacılar'ın kendi web adresine taşındığını söylerse puanlayıcı bağlantınızı yeniden açın. Uygulama ana ekranınızdaysa eski simgeyi silip yeni sayfadan yeniden ekleyin (iPhone'da yeniden eşleştirin).
 - Uygulamanın altındaki **Yardım** bu kılavuzu açar.

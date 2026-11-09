@@ -225,7 +225,8 @@ Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, m
   - [ ] Heard by the owner on the MacBook (Safari and Chrome) and on the classroom speakers; iPad silent switch
 - [ ] S14a Avatars: recognisable dinosaurs and mythical creatures (rex, stegosaur, long-neck, unicorn, dragon, phoenix), Turkish names (D-146)
   - [ ] Sare and a few children name each redrawn species
-- [ ] S14f Super Speakers on its own origin: optional `SPEAKERS_ORIGIN`, CSRF by endpoint, host routing with 308s, links and QR codes, service-worker kill switch, OPERATIONS for a second hostname (D-157). No deployment
+- [x] S14f Super Speakers on its own origin: optional `SPEAKERS_ORIGIN`, CSRF by endpoint, host routing with 308s, links and QR codes, service-worker kill switch, OPERATIONS for a second hostname (D-157). No deployment
+  - [ ] Second hostname set up (tunnel, Cloudflare settings, Access Bypass) and checked with a TV and a phone: only when the owner creates a hostname (OPERATIONS → "Super Speakers on its own hostname")
 - [ ] S14e1 Report views: section catalogue, saved views with a default star, built-in views, Customise tree, collapsible sections, deep links (D-153)
 - [ ] S14b Classroom board: wide routine + timer row, counter bar, full-width student grid, bottom dock with full-screen panel views; every routine stage visible (D-148)
   - [ ] Customise layout (PIN-gated drag and resize on a 12×12 grid, keyboard and pointer, this class or all classes, relock on save)

@@ -27,6 +27,6 @@ Pano 1920×1080 ve 1280×720 ekranlara kaydırma gerekmeden sığar. Fare imleci
 
 ## Bir sorun varsa
 
-- **Bu pano bağlantısı artık çalışmıyor**: yönetici yeni bir bağlantı oluşturmuş ya da bağlantıyı kapatmıştır. Yeni pano bağlantısını isteyin.
+- **Bu pano bağlantısı artık çalışmıyor**: yönetici yeni bir bağlantı oluşturmuş, bağlantıyı kapatmış ya da Süper Konuşmacılar kendi web adresine taşınmıştır. Pano bağlantısını isteyip yeniden açın.
 - Puanlar yerine kısa bir bilgi notu: Süper Konuşmacılar şu anda kapalı.
 - Uzun süre **Panoya bağlanılıyor…** yazıyorsa: o bilgisayarın ağ bağlantısını kontrol edin.

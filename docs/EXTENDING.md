@@ -41,7 +41,7 @@ screens), add an access class in `define.ts` (`ACCESS_CLASSES`), a cookie and a 
 `lib/http.ts`, and extend `tests/server/permissions.test.ts` so a session of the new class is proven
 to reach only its own endpoints (see D-128). A separate client entry (its own HTML file, like
 `scorer.html` and `board.html`) goes into `vite.config.ts` (`input` and the dev rewrite) and is served
-by `app.ts` with `no-store`.
+by `app.ts` with `no-store`. Super Speakers pages may be served on their own origin (S14f, D-157): a new scorer or board endpoint goes under `/api/scorer…` / `/api/board…` (the CSRF origin class follows the path), and a new page or file they need goes into the speakers-host allow-list in `src/server/lib/speakersHost.ts`.
 
 ### Server manifest (`defineServerModule`)
 

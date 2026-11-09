@@ -63,6 +63,17 @@ Super Speakers points also appear in the class report and the student timeline o
 
 The **Board now** tab shows the board as it is at the moment, without needing a board screen.
 
+## Its own web address (optional)
+
+The server administrator can give Super Speakers a web address of its own (for example `speakers.` in front of the school's address; OPERATIONS.md, "Super Speakers on its own hostname"). That address shows only the scorer app and the board, so board screens and phones can open it even when the main address asks for an extra sign-in. Nothing else of the app opens there.
+
+When it is switched on:
+
+- **Links** shows the new addresses, and new QR codes use them. The links themselves stay the same: old links and printed QR codes are forwarded to the new address as long as the main address works. Reprint the QR codes when convenient.
+- **Board screens**: open the board link once more on each screen (copy it from **Links**). A screen that only reloads shows "This board link no longer works".
+- **Scorers**: they open their scorer link again. If they put the app on their home screen, they remove the old Super Speakers icon and add it again from the new page; on an iPhone they pair again with a new code.
+- Points, history, settings and links are not changed.
+
 ## Good to know
 
 - Points are positive only (+1). There are no minus points.

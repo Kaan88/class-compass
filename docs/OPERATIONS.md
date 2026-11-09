@@ -146,6 +146,39 @@ Docker is not installed on the development machine, so the image has not been bu
 - **Super Speakers board (S12, D-134).** The board's live stream `/api/board/events` is Server-Sent Events. The app sends `Content-Type: text/event-stream`, `Cache-Control: no-store, no-transform` and `X-Accel-Buffering: no` and a heartbeat comment every `SPEAKERS_HEARTBEAT_MS` (default 25 000 ms; keep it well under Cloudflare's ~100 s idle timeout). Cloudflare passes `text/event-stream` through unbuffered when caching is bypassed for the hostname (above) and nothing transforms the response: keep Rocket Loader and email obfuscation off (above), and do not put a Cloudflare Worker, compression rule or response buffering (an Enterprise setting) in front of `/api/board/events`. If the stream is cut anyway, the board falls back to polling every 10 s and reconnects with backoff; the corner indicator then says "Reconnecting…". Check after deploy: open a board link, give a point from a scorer link, and see the board change within a few seconds.
 - **Scorer app (S12, D-135).** `/p`, `/p/app`, `/board` and `/scorer-sw.js` are served with `no-store`; the service worker caches only the app shell. Scorer and board links live in the fragment, so tunnel logs never see them.
 
+### 3a. Super Speakers on its own hostname (optional; S14f, D-157)
+Written, not yet performed: no second hostname exists yet. Do this only when the owner has chosen one.
+
+**Why.** A board TV or a teacher's phone cannot get through a Cloudflare Access sign-in. With `SPEAKERS_ORIGIN` set, Super Speakers gets a hostname of its own (for example `speakers.<domain>`) that serves **only** the scorer app (`/p`, `/p/app`, `/p/*`), the board (`/board`), their built files (`/assets/*`), the scorer service worker (`/scorer-sw.js`), their API (`/api/scorer…`, `/api/board…`) and `/healthz`. Everything else answers 404 there (the teacher, admin and student pages and their API, and the main app's page). So that hostname alone can get an Access **Bypass**, while the main hostname stays behind Access. Scorer and board links stay protected by their 256-bit tokens (D-128).
+
+**What changes in the app** (only while `SPEAKERS_ORIGIN` is set):
+- New scorer and board links, the addresses on Admin → Super Speakers → **Links** and their QR codes use the speakers hostname.
+- The main hostname answers `/p`, `/p/app` and `/board` with a **308** to the speakers hostname (path and query kept; browsers keep the `#` part, so old links and printed QR codes keep working while the main hostname forwards them). The 308 is sent with `no-store`, so browsers do not remember it after a rollback.
+- The main hostname serves a "kill-switch" `/scorer-sw.js`: a phone that installed the scorer app on the main hostname drops its cached copy at the next update check and is sent to the new address. The speakers hostname serves the normal worker (shell cache `cc-scorer-shell-v2`).
+- CSRF: `/api/scorer…` and `/api/board…` accept requests from the main and the speakers origin; every other endpoint only from the main origin.
+- With `SPEAKERS_ORIGIN` unset (or empty, or equal to `PUBLIC_ORIGIN`) nothing of this happens: everything stays on `PUBLIC_ORIGIN`, exactly as before.
+
+**Steps**
+1. Choose the hostname. It must be a different **hostname** from `PUBLIC_ORIGIN` (a different port is refused: cookies are not separated by port) and use the same scheme (`https://`).
+2. **Tunnel.** In Cloudflare Zero Trust → Networks → Tunnels → this tunnel → **Public hostnames**, add the second hostname with the **same service** as the main one (`http://app:3210`, or `http://127.0.0.1:<port>` on a shared tunnel). Do not set an "HTTP Host Header" override for either hostname: the app tells them apart by the `Host` header (with `TRUST_PROXY=true` it also honours `X-Forwarded-Host`).
+3. **Per-hostname Cloudflare settings**, exactly as for the main hostname (section 3): a Cache Rule "bypass cache" that covers the speakers hostname (it carries the board's live stream `/api/board/events`); Web Analytics / Real User Monitoring injection off; Rocket Loader and email obfuscation off; "Always Use HTTPS" on; no Worker, compression rule or response buffering in front of `/api/board/events` (D-134).
+4. **Access Bypass** (only if the main hostname is behind Cloudflare Access): in Zero Trust → Access → Applications, add a self-hosted application for the speakers hostname (the whole hostname, no path) with one policy, action **Bypass**, include **Everyone**. Check that no wider application (for example `*.<domain>`) with a stricter policy applies to it instead; the main hostname keeps its own Allow policy. Then a TV and a phone reach the board and the scorer app without an Access sign-in, and nothing else is reachable on that hostname.
+5. **App.** Add `SPEAKERS_ORIGIN=https://speakers.<domain>` to `app.env` (origin only: no path, no trailing text) and run `docker compose up -d app`. The app refuses to start with an invalid value and says why in `docker compose logs app` (not a URL, a path or query, another scheme than `PUBLIC_ORIGIN`, the same hostname).
+6. **Check:**
+   - `curl -sI https://speakers.<domain>/healthz` → `200`; `curl -sI https://speakers.<domain>/` and `…/login` → `404`;
+   - `curl -sI https://<main>/board` → `308` with `location: https://speakers.<domain>/board`;
+   - `curl -s https://<main>/scorer-sw.js | head -1` → the "moved to its own address" comment;
+   - Admin → Super Speakers → **Links** shows the new addresses; open a board link on a screen, give a point from a scorer link, and see the board change within a few seconds;
+   - from a phone on mobile data (not signed in to Access): the scorer link opens; `https://speakers.<domain>/admin` is 404.
+7. **Tell the users** (the Super Speakers administrator guide has the same list):
+   - board screens: open the board link once more (copy it from **Links**; the old link is forwarded too). A screen that only reloads shows "This board link no longer works", because its session belonged to the old address;
+   - scorers: open the scorer link again; on the home screen, remove the old Super Speakers icon and add it again from the new page (iPhone: pair again with a new code);
+   - printed QR codes keep working while the main hostname forwards them; reprint them when convenient.
+
+**Rollback.** First remove the Access Bypass application and the speakers public hostname from the tunnel, **then** remove `SPEAKERS_ORIGIN` from `app.env` and run `docker compose up -d app`. In that order: once the variable is gone the app no longer knows the speakers hostname and would treat it like the main one, so a Bypass left on it would expose the whole app without Access. Screens and phones then open their links on the main hostname again (the links show the main address again).
+
+**Local try (optional).** Chromium resolves `*.localhost` to this computer, so a built server can be tried with `PUBLIC_ORIGIN=http://localhost:3210` and `SPEAKERS_ORIGIN=http://speakers.localhost:3210` (`npm run build`, then `npm start`). Development (`npm run dev`) and the e2e suite leave it unset; `tests/server/speakers-origin.test.ts` covers the behaviour with `Host` headers.
+
 ### 4. First administrator, mail, backups
 - `docker compose exec app node src/server/cli.ts admin:create --login <login> --name "<Name>"` (the password is read from the terminal, so it does not land in shell history). Sign in at `https://<subdomain>.sareteacher.com` and set a PIN in the profile (needed for Maintenance actions).
 - SMTP (optional, D-015): `SMTP_HOST`, `SMTP_PORT` (587 STARTTLS or 465), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` in `app.env`; `docker compose up -d app` applies them. Without SMTP, administrators reset passwords.

@@ -27,6 +27,6 @@ The board fits 1920×1080 and 1280×720 screens without scrolling. The mouse poi
 
 ## If something is wrong
 
-- **This board link no longer works**: the administrator made a new link or switched it off. Ask for the new board link.
+- **This board link no longer works**: the administrator made a new link or switched it off, or Super Speakers moved to its own web address. Ask for the board link and open it again.
 - A short notice instead of points: Super Speakers is switched off at the moment.
 - **Connecting to the board…** for a long time: check the network of that computer.
