@@ -1836,8 +1836,8 @@ export const oauthCodes = sqliteTable(
 
 /**
  * Refresh tokens (`ccmcpr_…`, only the HMAC stored). Each use rotates it (`rotatedAt` set, a new row
- * issued); presenting a rotated one again revokes the whole connection. They live as long as the
- * connection.
+ * issued); presenting a rotated one again revokes the whole connection, unless it is a concurrent retry
+ * (rotated under 30 seconds ago, successor unused). They live as long as the connection.
  */
 export const oauthRefreshTokens = sqliteTable(
   'oauth_refresh_tokens',

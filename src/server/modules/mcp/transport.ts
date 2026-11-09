@@ -39,7 +39,7 @@ const BATCH_VERSION = '2025-03-26';
 /** Most messages in one batch (a bigger batch is refused as a whole, so one request cannot flood the call log). */
 export const BATCH_MAX = 50;
 const SESSION_IDLE_MS = 60 * 60 * 1000;
-const SESSIONS_PER_TOKEN = 20;
+const SESSIONS_PER_CONNECTION = 20;
 
 export const RPC = { PARSE: -32700, INVALID_REQUEST: -32600, METHOD_NOT_FOUND: -32601, INVALID_PARAMS: -32602, INTERNAL: -32603, SERVER: -32000, RESOURCE_NOT_FOUND: -32002 } as const;
 
@@ -58,9 +58,14 @@ class RpcFailure extends Error {
   }
 }
 
+/**
+ * A session belongs to the connection (`familyId`: a personal token's own id, or an OAuth connection),
+ * not to one access token, so it survives the hourly OAuth refresh; the rate limit is per connection
+ * too (S14h2 review: concurrent refreshes may give one connection several live access tokens).
+ */
 interface Session {
   id: string;
-  tokenId: string;
+  familyId: string;
   version: string;
   lastSeen: number;
 }
@@ -161,7 +166,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
     const sid = req.headers['mcp-session-id'];
     if (typeof sid !== 'string' || !sid) return reply.status(400).send(fail(null, { code: RPC.INVALID_REQUEST, message: 'Mcp-Session-Id header required' }));
     const s = sessions.get(sid);
-    if (!s || s.tokenId !== ctx.mcp!.tokenId) return reply.status(404).send(fail(null, { code: RPC.INVALID_REQUEST, message: 'Session not found' }));
+    if (!s || s.familyId !== ctx.mcp!.familyId) return reply.status(404).send(fail(null, { code: RPC.INVALID_REQUEST, message: 'Session not found' }));
     sessions.delete(sid);
     return reply.status(204).send();
   });
@@ -177,7 +182,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
     if (typeof accept === 'string' && accept && !/application\/json|\*\/\*|application\/\*/u.test(accept)) {
       return reply.status(406).send(fail(null, { code: RPC.INVALID_REQUEST, message: 'Accept must include application/json' }));
     }
-    const wait = limiter.exhausted(principal.tokenId, now);
+    const wait = limiter.exhausted(principal.familyId, now);
     if (wait !== null) {
       log.record(now, { tokenId: principal.tokenId, userId: user.id, method: 'http', status: 'rate_limited', errorCode: 'RATE_LIMITED', durationMs: 0, bytes: 0 });
       return reply.status(429).header('Retry-After', String(wait)).send(fail(null, { code: RPC.SERVER, message: 'Too many requests for this token', data: { code: 'RATE_LIMITED' } }));
@@ -198,9 +203,9 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
       const params = isRecord(m.params) ? m.params : {};
       const asked = typeof params.protocolVersion === 'string' ? params.protocolVersion : '';
       const version = (SUPPORTED_PROTOCOL_VERSIONS as readonly string[]).includes(asked) ? asked : LATEST_PROTOCOL_VERSION;
-      const mine = [...sessions.values()].filter((s) => s.tokenId === principal.tokenId).sort((a, b) => a.lastSeen - b.lastSeen);
-      while (mine.length >= SESSIONS_PER_TOKEN) sessions.delete(mine.shift()!.id);
-      session = { id: newId(), tokenId: principal.tokenId, version, lastSeen: now };
+      const mine = [...sessions.values()].filter((s) => s.familyId === principal.familyId).sort((a, b) => a.lastSeen - b.lastSeen);
+      while (mine.length >= SESSIONS_PER_CONNECTION) sessions.delete(mine.shift()!.id);
+      session = { id: newId(), familyId: principal.familyId, version, lastSeen: now };
       sessions.set(session.id, session);
       const result = {
         protocolVersion: version,
@@ -208,7 +213,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
         serverInfo: { name: 'class-compass', title: 'Class Compass', version: appVersion() },
         instructions: INSTRUCTIONS,
       };
-      limiter.take(principal.tokenId, now, 1);
+      limiter.take(principal.familyId, now, 1);
       const out = ok(m.id, result);
       const text = JSON.stringify(out);
       log.record(now, { tokenId: principal.tokenId, userId: user.id, method: 'initialize', status: 'ok', durationMs: deps.now() - now, bytes: Buffer.byteLength(text) });
@@ -218,7 +223,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
     const sid = req.headers['mcp-session-id'];
     if (typeof sid !== 'string' || !sid) return reply.status(400).send(fail(null, { code: RPC.INVALID_REQUEST, message: 'Mcp-Session-Id header required (initialize first)' }));
     const found = sessions.get(sid);
-    if (!found || found.tokenId !== principal.tokenId) return reply.status(404).send(fail(null, { code: RPC.INVALID_REQUEST, message: 'Session not found; initialize again' }));
+    if (!found || found.familyId !== principal.familyId) return reply.status(404).send(fail(null, { code: RPC.INVALID_REQUEST, message: 'Session not found; initialize again' }));
     session = found;
     session.lastSeen = now;
     const pv = req.headers['mcp-protocol-version'];
@@ -270,7 +275,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
         if (method === 'tools/call') label = `tools/call:${tool?.name ?? '?'}`;
         if (method === 'prompts/get') label = `prompts/get:${PROMPTS.find((p) => p.name === params.name)?.name ?? '?'}`;
         if (!/^[a-z/_]+$/u.test(method)) label = '?';
-        if (limited || !limiter.take(principal.tokenId, started, tool?.cost ?? 1)) {
+        if (limited || !limiter.take(principal.familyId, started, tool?.cost ?? 1)) {
           if (limited) {
             responses.push(fail(m.id, { code: RPC.SERVER, message: 'Too many requests for this token; wait a minute', data: { code: 'RATE_LIMITED' } }));
             continue;

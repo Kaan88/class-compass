@@ -8,8 +8,9 @@
  * switch, revokeAllUserMcpTokens and the logs. Fictional data only.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { auditEvents, mcpTokens, oauthClients, oauthGrants, oauthRequests } from '../../src/server/db/schema.ts';
+import { OAUTH_UNUSED_CLIENTS_MAX } from '../../src/shared/mcp.ts';
 import { isPublicAddress } from '../../src/server/modules/mcp/oauth/cimd.ts';
 import { checkRedirectUri, isOurResource, matchRedirectUri } from '../../src/server/modules/mcp/oauth/redirects.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
@@ -67,6 +68,13 @@ const get = async (url: string, headers: Record<string, string> = {}) => {
   return { status: r.statusCode, body, headers: r.headers };
 };
 const reasonOf = (r: { body: any }) => r.body?.error?.details?.reason;
+/** A signed-in teacher on an address of its own (authorize allows 60 calls a minute per address). */
+const teacherOnFreshIp = async () => {
+  const c = new Client(env);
+  c.ip = freshIp();
+  await c.login('ayse.teacher');
+  return c;
+};
 const ORIGIN = () => env.config.origins.main;
 
 describe('redirect address and resource rules (unit)', () => {
@@ -232,6 +240,58 @@ describe('with AI tools on', () => {
         expect(a.location).toBe('/oauth/consent?error=UNKNOWN_CLIENT');
       } finally {
         env.clock.advance(-31 * DAY);
+      }
+    });
+
+    it('an authorize call without a consent does not keep a registration alive (S14h2 review)', async () => {
+      const t = await teacherOnFreshIp();
+      const clientId = await registerOk(env);
+      env.clock.advance(20 * DAY);
+      try {
+        expect((await authorize(t, authParams(env, clientId, pkce().challenge))).location).toMatch(/^\/oauth\/consent\?request=/u);
+        expect(env.db.select().from(oauthClients).where(eq(oauthClients.clientId, clientId)).get()!.lastUsedAt).toBeNull();
+        env.clock.advance(11 * DAY);
+        expect((await authorize(t, authParams(env, clientId, pkce().challenge))).location).toBe('/oauth/consent?error=UNKNOWN_CLIENT');
+      } finally {
+        env.clock.advance(-31 * DAY);
+      }
+    });
+
+    it('a flood of unused registrations never stops new ones: the oldest unused one makes room (S14h2 review)', async () => {
+      const t = await teacherOnFreshIp();
+      const connected = await connectApp(env, t);
+      const unused = and(eq(oauthClients.kind, 'dcr'), isNull(oauthClients.revokedAt), sql`not exists (select 1 from ${oauthGrants} g where g.client_row_id = ${oauthClients.id})`);
+      const count = () => env.db.select({ n: sql<number>`count(*)` }).from(oauthClients).where(unused).get()!.n;
+      const t0 = env.clock.t;
+      const flood = Array.from({ length: Math.max(0, OAUTH_UNUSED_CLIENTS_MAX - count()) }, (_, i) => ({
+        id: `flood-${i}`,
+        clientId: `ccc_flood_${i}`,
+        kind: 'dcr' as const,
+        name: `Flood ${i}`,
+        redirectUrisJson: [LOOPBACK],
+        createdAt: t0 - 60_000 - i * 1000,
+        lastUsedAt: null,
+        metadataFetchedAt: null,
+        revokedAt: null,
+        revokedBy: null,
+      }));
+      if (flood.length) env.db.insert(oauthClients).values(flood).run();
+      try {
+        expect(count()).toBe(OAUTH_UNUSED_CLIENTS_MAX);
+        const oldest = env.db.select().from(oauthClients).where(unused).orderBy(oauthClients.createdAt).get()!;
+        const fresh = await registerOk(env);
+        expect(count()).toBe(OAUTH_UNUSED_CLIENTS_MAX);
+        expect(env.db.select().from(oauthClients).where(eq(oauthClients.id, oldest.id)).get()).toBeUndefined();
+        // The new registration works; an app with a connection was never a candidate.
+        expect((await authorize(t, authParams(env, fresh, pkce().challenge))).location).toMatch(/^\/oauth\/consent\?request=/u);
+        expect((await refresh(env, connected.clientId, connected.refresh)).status).toBe(200);
+        // The administrator's list shows apps that were used before registrations nobody used.
+        const clients = (await ok(s.admin.get('/api/admin/ai-tools'))).clients as Array<{ clientId: string }>;
+        expect(clients.findIndex((c) => c.clientId === connected.clientId)).toBeGreaterThanOrEqual(0);
+        expect(clients.findIndex((c) => c.clientId === connected.clientId)).toBeLessThan(clients.findIndex((c) => c.clientId === fresh));
+      } finally {
+        env.db.delete(oauthRequests).where(sql`${oauthRequests.clientRowId} like 'flood-%'`).run();
+        env.db.delete(oauthClients).where(sql`${oauthClients.id} like 'flood-%'`).run();
       }
     });
   });
@@ -529,6 +589,54 @@ describe('with AI tools on', () => {
       expect((await refresh(env, b.clientId, b.refresh)).body.error).toBe('invalid_grant');
     });
 
+    it('concurrent refreshes with one token (parallel requests of one client) all work; the connection lives on (S14h2 review)', async () => {
+      const t = await teacherOnFreshIp();
+      const app = await connectApp(env, t);
+      const [a, b] = await Promise.all([refresh(env, app.clientId, app.refresh), refresh(env, app.clientId, app.refresh)]);
+      expect([a.status, b.status]).toEqual([200, 200]);
+      // A third retry inside the grace window, while the successors are still unused.
+      env.clock.advance(20_000);
+      try {
+        const c = await refresh(env, app.clientId, app.refresh);
+        expect(c.status).toBe(200);
+        for (const tok of [a.body.access_token, b.body.access_token, c.body.access_token]) {
+          const mcp = new Mcp(env, tok);
+          await mcp.init();
+          expect((await mcp.call('list_my_classes')).isError).toBe(false);
+        }
+        const fam = (tok: string) => env.db.select().from(mcpTokens).where(eq(mcpTokens.prefix, tok.slice(0, 10))).get()!.familyId;
+        expect(new Set([fam(a.body.access_token), fam(b.body.access_token), fam(c.body.access_token)]).size).toBe(1);
+        // The client keeps one of them and refreshes normally: its siblings and the original are superseded.
+        const d = await refresh(env, app.clientId, c.body.refresh_token);
+        expect(d.status).toBe(200);
+        // Now the original comes back (its successor was used): a copy, the whole connection ends.
+        const reuse = await refresh(env, app.clientId, app.refresh);
+        expect(reuse.body.error).toBe('invalid_grant');
+        expect((await refresh(env, app.clientId, d.body.refresh_token)).body.error).toBe('invalid_grant');
+        expect((await new Mcp(env, d.body.access_token).raw('POST', { jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(401);
+      } finally {
+        env.clock.advance(-20_000);
+      }
+    });
+
+    it('a rotated refresh token presented after the 30-second grace window ends the connection', async () => {
+      const t = await teacherOnFreshIp();
+      const app = await connectApp(env, t);
+      const r1 = await refresh(env, app.clientId, app.refresh);
+      expect(r1.status).toBe(200);
+      env.clock.advance(31_000);
+      try {
+        const late = await refresh(env, app.clientId, app.refresh);
+        expect(late.status).toBe(400);
+        expect(late.body.error).toBe('invalid_grant');
+        expect((await refresh(env, app.clientId, r1.body.refresh_token)).body.error).toBe('invalid_grant');
+        expect((await new Mcp(env, r1.body.access_token).raw('POST', { jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(401);
+        expect(env.db.select().from(auditEvents).where(eq(auditEvents.action, 'oauth.connection_end')).all().some((x) => String(x.afterJson).includes('refresh_reuse'))).toBe(true);
+      } finally {
+        env.clock.advance(-31_000);
+      }
+    });
+
     it('a refresh can narrow the scopes but never widen them', async () => {
       const app = await connectApp(env, s.teacherA);
       expect((await refresh(env, app.clientId, app.refresh, { scope: 'classes:read goals:write' })).body.error).toBe('invalid_scope');
@@ -689,6 +797,30 @@ describe('with AI tools on', () => {
         expect((await authorize(s.teacherA, authParams(env, 'https://claude.ai/c.json', challenge))).location).toBe('/oauth/consent?error=CLIENT_METADATA');
       } finally {
         cimdDoc = keep;
+      }
+    });
+
+    it('an administrator’s revoke of a metadata-document app lasts past the 30-day clean-up (S14h2 review)', async () => {
+      const t = await teacherOnFreshIp();
+      const url = 'https://claude.ai/oauth/revoked-test-client';
+      const params = () => authParams(env, url, pkce().challenge, { redirect_uri: 'http://localhost:41000/callback' });
+      expect((await authorize(t, params())).location).toMatch(/^\/oauth\/consent\?request=/u);
+      const row = env.db.select().from(oauthClients).where(eq(oauthClients.clientId, url)).get()!;
+      await ok(s.admin.post(`/api/admin/ai-tools/clients/${row.id}/revoke`));
+      expect((await authorize(t, params())).location).toBe('/oauth/consent?error=CLIENT_METADATA');
+      env.clock.advance(31 * DAY + 2 * 60 * 60_000);
+      try {
+        expect((await authorize(t, params())).location).toBe('/oauth/consent?error=CLIENT_METADATA');
+        expect(env.db.select().from(oauthClients).where(eq(oauthClients.clientId, url)).get()!.revokedAt).not.toBeNull();
+        env.clock.advance(100 * DAY);
+        expect((await authorize(t, params())).location).toBe('/oauth/consent?error=CLIENT_METADATA');
+        const admin = new Client(env);
+        admin.ip = freshIp();
+        await admin.login('root.admin');
+        const listed = (await ok(admin.get('/api/admin/ai-tools'))).clients.find((c: { clientId: string }) => c.clientId === url);
+        expect(listed).toMatchObject({ kind: 'cimd', status: 'revoked' });
+      } finally {
+        env.clock.advance(-(131 * DAY + 2 * 60 * 60_000));
       }
     });
   });

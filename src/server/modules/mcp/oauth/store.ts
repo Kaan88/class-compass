@@ -10,7 +10,7 @@
 import { and, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AdminAiConnection, AiConnection, OAuthClientView } from '../../../../shared/contracts/mcp.ts';
-import { DEFAULT_OAUTH_REDIRECT_HOSTS, MCP_SCOPES, OAUTH_CLIENT_UNUSED_DAYS, type McpScope } from '../../../../shared/mcp.ts';
+import { DEFAULT_OAUTH_REDIRECT_HOSTS, MCP_SCOPES, OAUTH_CLIENT_UNUSED_DAYS, OAUTH_UNUSED_CLIENTS_MAX, type McpScope } from '../../../../shared/mcp.ts';
 import type { Db } from '../../../db/client.ts';
 import { mcpTokens, oauthClients, oauthCodes, oauthGrants, oauthRequests, schoolSettings, users } from '../../../db/schema.ts';
 import type { AppDeps } from '../../../lib/context.ts';
@@ -55,6 +55,11 @@ export function clientUsable(db: Db, c: ClientRow, now: number): boolean {
     .get();
 }
 
+/**
+ * Mark a registration as used. Only a real use counts (an allowed consent, a code exchange, a refresh):
+ * an unauthenticated authorize call never keeps a registration alive (S14h2 review: otherwise anyone
+ * could keep a flood of registrations from expiring).
+ */
 export const touchClient = (db: Db, c: ClientRow, now: number) => {
   if (c.lastUsedAt === null || now - c.lastUsedAt > 60_000) db.update(oauthClients).set({ lastUsedAt: now }).where(eq(oauthClients.id, c.id)).run();
 };
@@ -257,13 +262,17 @@ export function adminConnections(db: Db, now: number, capDays: number): AdminAiC
   return rows.map((r) => ({ ...connectionView(r.g, now, capDays, used), userId: r.g.userId, userName: r.userName, userRole: r.userRole }));
 }
 
-/** Registered apps (not revoked, or revoked in the last 90 days), newest first. */
+/**
+ * Registered apps (not revoked, revoked in the last 90 days, or a revoked metadata-document app, which
+ * stays revoked for good), newest first; apps that were ever used and metadata-document apps come
+ * before registrations nobody used, so a flood of unused registrations never hides them.
+ */
 export function clientViews(db: Db, now: number): OAuthClientView[] {
   const rows = db
     .select()
     .from(oauthClients)
-    .where(or(isNull(oauthClients.revokedAt), gt(oauthClients.revokedAt, now - 90 * DAY)))
-    .orderBy(desc(oauthClients.createdAt))
+    .where(or(isNull(oauthClients.revokedAt), gt(oauthClients.revokedAt, now - 90 * DAY), eq(oauthClients.kind, 'cimd')))
+    .orderBy(sql`case when ${oauthClients.kind} = 'cimd' or ${oauthClients.lastUsedAt} is not null then 0 else 1 end`, desc(oauthClients.createdAt))
     .limit(500)
     .all();
   const live = new Map(
@@ -289,11 +298,38 @@ export function clientViews(db: Db, now: number): OAuthClientView[] {
 }
 
 // ---------------------------------------------------------------- housekeeping
+const neverConnected = sql`not exists (select 1 from ${oauthGrants} g where g.client_row_id = ${oauthClients.id})`;
+
+/**
+ * Room for one more dynamic registration. Registrations that never got a connection count against
+ * OAUTH_UNUSED_CLIENTS_MAX; when the limit is reached the oldest of them (and its waiting requests) is
+ * removed instead of refusing everyone (S14h2 review: a flood of registrations must not stop the school
+ * from connecting). Registrations with a connection, metadata-document apps and revoked ones are never
+ * removed here. Call inside a transaction.
+ */
+export function makeRoomForRegistration(db: Db, now: number) {
+  const unused = and(eq(oauthClients.kind, 'dcr'), isNull(oauthClients.revokedAt), gt(oauthClients.createdAt, now - OAUTH_CLIENT_UNUSED_DAYS * DAY), neverConnected);
+  const n = db.select({ n: sql<number>`count(*)` }).from(oauthClients).where(unused).get()?.n ?? 0;
+  if (n < OAUTH_UNUSED_CLIENTS_MAX) return;
+  const ids = db
+    .select({ id: oauthClients.id })
+    .from(oauthClients)
+    .where(unused)
+    .orderBy(oauthClients.createdAt)
+    .limit(n - OAUTH_UNUSED_CLIENTS_MAX + 1)
+    .all()
+    .map((r) => r.id);
+  db.delete(oauthRequests).where(inArray(oauthRequests.clientRowId, ids)).run();
+  db.delete(oauthClients).where(inArray(oauthClients.id, ids)).run();
+}
+
 let lastPrune = 0;
 /**
  * At most hourly: delete registrations that expired without ever getting a connection, and requests
  * and codes older than a day (they are single use and short-lived; connections and their tokens are
- * kept for the lists, the call log and the audit trail).
+ * kept for the lists, the call log and the audit trail). A revoked registration stays while the admin
+ * list shows it (90 days); a revoked metadata-document app stays for good, because its client id is a
+ * stable address that would otherwise come back unrevoked at its next authorize step (S14h2 review).
  */
 export function pruneOAuth(db: Db, now: number) {
   if (now - lastPrune < HOUR && now >= lastPrune) return;
@@ -304,7 +340,8 @@ export function pruneOAuth(db: Db, now: number) {
     .where(
       and(
         lt(sql`coalesce(${oauthClients.lastUsedAt}, ${oauthClients.createdAt})`, now - OAUTH_CLIENT_UNUSED_DAYS * DAY),
-        sql`not exists (select 1 from ${oauthGrants} g where g.client_row_id = ${oauthClients.id})`,
+        or(isNull(oauthClients.revokedAt), and(eq(oauthClients.kind, 'dcr'), lt(oauthClients.revokedAt, now - 90 * DAY))),
+        neverConnected,
         sql`not exists (select 1 from ${oauthRequests} r where r.client_row_id = ${oauthClients.id})`,
       ),
     )

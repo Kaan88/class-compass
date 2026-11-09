@@ -13,7 +13,8 @@
  *   app with `state`. The request waits in `oauth_requests` for the consent page (`/oauth/consent`).
  * - `/oauth/token`: `authorization_code` (60-second single-use codes bound to the client, account,
  *   redirect address and PKCE challenge; a reused code ends the connection) and `refresh_token`
- *   (rotated on every use; a reused one ends the connection). Access tokens last an hour and never
+ *   (rotated on every use; a reused one ends the connection, unless it is a concurrent retry: rotated
+ *   less than 30 seconds ago and its successor not yet rotated). Access tokens last an hour and never
  *   outlive the consent. Client authentication `none`; errors as RFC 6749 JSON, `no-store`.
  * - `/oauth/revoke`: RFC 7009. A refresh token ends its connection; an access token ends itself.
  *
@@ -22,10 +23,10 @@
  */
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import * as O from '../../../../shared/contracts/oauth.ts';
 import type { OAuthPageError } from '../../../../shared/contracts/oauth.ts';
-import { MCP_SCOPES, MCP_TOKEN_PREFIX, OAUTH_ACCESS_TOKEN_SECONDS, OAUTH_PATHS, OAUTH_REFRESH_PREFIX, OAUTH_REQUEST_MINUTES, OAUTH_WELL_KNOWN, type McpScope } from '../../../../shared/mcp.ts';
+import { MCP_SCOPES, MCP_TOKEN_PREFIX, OAUTH_ACCESS_TOKEN_SECONDS, OAUTH_PATHS, OAUTH_REFRESH_PREFIX, OAUTH_REFRESH_REUSE_GRACE_SECONDS, OAUTH_REQUEST_MINUTES, OAUTH_WELL_KNOWN, type McpScope } from '../../../../shared/mcp.ts';
 import { tx } from '../../../db/client.ts';
 import { mcpTokens, oauthClients, oauthCodes, oauthGrants, oauthRefreshTokens, oauthRequests, users } from '../../../db/schema.ts';
 import { audit } from '../../../lib/audit.ts';
@@ -35,11 +36,9 @@ import { AppError } from '../../../lib/errors.ts';
 import { contextFor, recordEndpoint } from '../../../lib/http.ts';
 import { aiSettings } from '../tokens.ts';
 import { checkRedirectUri, isOurResource, matchRedirectUri, mcpResource } from './redirects.ts';
-import { cleanClientName, ClientMetadataError, grantExpiry, grantLive, pruneOAuth, redirectHosts, resolveClient, revokeGrants, touchClient, type ClientRow, type GrantRow } from './store.ts';
+import { cleanClientName, ClientMetadataError, grantExpiry, grantLive, makeRoomForRegistration, pruneOAuth, redirectHosts, resolveClient, revokeGrants, touchClient, type ClientRow, type GrantRow } from './store.ts';
 
 const SYSTEM = { type: 'system' as const, id: null };
-/** Live registrations at most (a flood of registrations is refused, not stored). */
-export const OAUTH_CLIENTS_MAX = 500;
 const STATE_MAX = 512;
 const FORM_MAX_BYTES = 16 * 1024;
 
@@ -136,6 +135,24 @@ function issueTokens(deps: AppDeps, grant: GrantRow, client: ClientRow, scopes: 
   };
 }
 
+type RefreshRow = typeof oauthRefreshTokens.$inferSelect;
+
+/**
+ * Is this rotated refresh token a concurrent retry rather than a copy? Yes when it was rotated less
+ * than OAUTH_REFRESH_REUSE_GRACE_SECONDS ago and no refresh token issued after it has been rotated since
+ * (its successor is still unused). Such a retry gets tokens of the same connection (D-160 S14h2 review:
+ * the SDK client refreshes once per concurrent request after the hourly access token expired).
+ */
+function concurrentRetry(deps: AppDeps, rt: RefreshRow, now: number): boolean {
+  if (rt.rotatedAt === null || now < rt.rotatedAt || now - rt.rotatedAt > OAUTH_REFRESH_REUSE_GRACE_SECONDS * 1000) return false;
+  const laterUsed = deps.db
+    .select({ id: oauthRefreshTokens.id })
+    .from(oauthRefreshTokens)
+    .where(and(eq(oauthRefreshTokens.grantId, rt.grantId), isNotNull(oauthRefreshTokens.rotatedAt), sql`rowid > (select rowid from ${oauthRefreshTokens} where id = ${rt.id})`))
+    .get();
+  return !laterUsed;
+}
+
 /** End a connection because a code or refresh token was misused (audited as the system). */
 function endForMisuse(deps: AppDeps, grantId: string, reason: 'code_reuse' | 'code_misuse' | 'refresh_reuse' | 'refresh_misuse', now: number) {
   tx(deps.db, () => {
@@ -226,8 +243,6 @@ export function registerOAuthProtocol(app: FastifyInstance, deps: AppDeps) {
         const c = checkRedirectUri(u, allowed);
         if (!c.ok) return oauthError(reply, 400, 'invalid_redirect_uri', `Redirect address not allowed (${c.reason}): use https on a host the school allows, or http on 127.0.0.1, [::1] or localhost`);
       }
-      const live = deps.db.select({ n: sql<number>`count(*)` }).from(oauthClients).where(isNull(oauthClients.revokedAt)).get()?.n ?? 0;
-      if (live >= OAUTH_CLIENTS_MAX) return oauthError(reply, 429, 'temporarily_unavailable', 'Too many registered apps; ask the administrator');
       const row: ClientRow = {
         id: newId(),
         clientId: `ccc_${randomToken(18)}`,
@@ -240,7 +255,10 @@ export function registerOAuthProtocol(app: FastifyInstance, deps: AppDeps) {
         revokedAt: null,
         revokedBy: null,
       };
-      deps.db.insert(oauthClients).values(row).run();
+      tx(deps.db, () => {
+        makeRoomForRegistration(deps.db, now);
+        deps.db.insert(oauthClients).values(row).run();
+      });
       return noStore(reply)
         .status(201)
         .type('application/json')
@@ -307,7 +325,7 @@ export function registerOAuthProtocol(app: FastifyInstance, deps: AppDeps) {
           decidedAt: null,
         })
         .run();
-      touchClient(deps.db, client, now);
+      // No touchClient here: an unauthenticated authorize call is not a use of the registration.
       reply.setCookie(cookieName, nonce, { path: '/', httpOnly: true, sameSite: 'lax', secure: deps.config.isProd, maxAge: OAUTH_REQUEST_MINUTES * 60 });
       return noStore(reply).redirect(`${OAUTH_PATHS.consent}?request=${encodeURIComponent(id)}`, 303);
     });
@@ -366,8 +384,9 @@ export function registerOAuthProtocol(app: FastifyInstance, deps: AppDeps) {
         if (!raw.startsWith(OAUTH_REFRESH_PREFIX) || raw.length > 200) return oauthError(reply, 400, 'invalid_grant', 'Unknown refresh token');
         const rt = deps.db.select().from(oauthRefreshTokens).where(eq(oauthRefreshTokens.tokenHash, tokenHash(deps.config.SECRET_PEPPER, raw))).get();
         if (!rt) return oauthError(reply, 400, 'invalid_grant', 'Unknown refresh token');
-        if (rt.rotatedAt !== null) {
-          // A rotated refresh token came back: it was copied. End the whole connection (OAuth 2.1 §4.3.1).
+        if (rt.rotatedAt !== null && !concurrentRetry(deps, rt, now)) {
+          // A rotated refresh token came back after the grace window (or after its successor was used): it
+          // was copied. End the whole connection (OAuth 2.1 §4.3.1).
           endForMisuse(deps, rt.grantId, 'refresh_reuse', now);
           return oauthError(reply, 400, 'invalid_grant', 'The refresh token was already used');
         }
@@ -385,13 +404,19 @@ export function registerOAuthProtocol(app: FastifyInstance, deps: AppDeps) {
           scopes = asked as McpScope[];
         }
         const out = tx(deps.db, () => {
-          const rotated = deps.db
-            .update(oauthRefreshTokens)
-            .set({ rotatedAt: now })
-            .where(and(eq(oauthRefreshTokens.id, rt.id), isNull(oauthRefreshTokens.rotatedAt)))
-            .run().changes;
-          if (rotated !== 1) return null;
-          deps.db.update(oauthGrants).set({ lastRefreshAt: now }).where(eq(oauthGrants.id, grant.id)).run();
+          const cur = deps.db.select().from(oauthRefreshTokens).where(eq(oauthRefreshTokens.id, rt.id)).get();
+          if (!cur) return null;
+          if (cur.rotatedAt === null) {
+            // A normal rotation supersedes this token and any sibling a concurrent retry was given.
+            deps.db
+              .update(oauthRefreshTokens)
+              .set({ rotatedAt: now })
+              .where(and(eq(oauthRefreshTokens.grantId, grant.id), isNull(oauthRefreshTokens.rotatedAt)))
+              .run();
+            deps.db.update(oauthGrants).set({ lastRefreshAt: now }).where(eq(oauthGrants.id, grant.id)).run();
+          } else if (!concurrentRetry(deps, cur, now)) {
+            return null;
+          }
           return issueTokens(deps, grant, client, scopes, now, s0.mcpTokenMaxDays);
         });
         if (!out) {

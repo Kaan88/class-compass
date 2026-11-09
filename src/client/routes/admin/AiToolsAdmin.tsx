@@ -14,14 +14,15 @@ import { useRun } from '../../lib/useRun.ts';
 import { ConfirmDestructive } from '../../ui/Dialog.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { Button } from '../../ui/Button.tsx';
-import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
+import { Select, TextArea, Toggle } from '../../ui/Fields.tsx';
 import { InlineConfirmButton } from '../../ui/InlineConfirm.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { AI_ACCOUNT_KEY, AI_ADMIN_KEY, ConnectionsTable, DAY_CHOICES, statusText, useDateFormat } from '../AiTools.tsx';
 
 /**
  * OAuth (S14h2, D-160): the hosts an AI app's https redirect address may use (loopback is always
- * allowed). One host per line; saved as typed, audited.
+ * allowed). One host per line in a multi-line field (a single-line input would drop the line breaks
+ * and run the hosts together); spaces and commas also separate hosts. Saved as typed, audited.
  */
 function RedirectHosts({ hosts }: { hosts: string[] }) {
   const { t } = useI18n();
@@ -46,7 +47,7 @@ function RedirectHosts({ hosts }: { hosts: string[] }) {
           void run(() => call(O.setOAuthRedirectHosts, { hosts: list }), { success: t('aiTools.admin.saved'), invalidate: [AI_ADMIN_KEY] });
         }}
       >
-        <TextField label={t('aiTools.admin.redirectHostsLabel')} description={t('aiTools.admin.redirectHostsHint')} value={text} onChange={setText} />
+        <TextArea label={t('aiTools.admin.redirectHostsLabel')} description={t('aiTools.admin.redirectHostsHint')} value={text} onChange={setText} rows={4} />
         <div>
           <Button type="submit" variant="primary">
             {t('aiTools.admin.saveHosts')}

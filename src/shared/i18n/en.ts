@@ -3426,7 +3426,7 @@ export const en = {
   'error.OAUTH_OTHER_BROWSER': 'This connection was started in another browser. Start connecting again from the AI app, in this browser.',
   'error.SCOPE_REQUIRED': 'Choose at least one permission.',
   'error.TOO_MANY_CONNECTIONS': 'You already have the most connected apps allowed. Disconnect one you no longer use in Profile → AI tools first.',
-  'error.INVALID_HOST': 'Each entry must be a host name such as claude.ai: no https://, no path, no * and no localhost.',
+  'error.INVALID_HOST': 'Each line must be a host name such as claude.ai: no https://, no path, no * and no localhost.',
   'oauth.title': 'Connect an AI app',
   'oauth.errorTitle': 'The AI app could not connect',
   'oauth.pageError.MCP_DISABLED': 'AI tools are switched off at this school, so no AI app can connect.',
@@ -3476,7 +3476,7 @@ export const en = {
   'aiTools.admin.redirectHosts': 'Allowed hosts for AI apps',
   'aiTools.admin.redirectHostsIntro': 'An AI app may send people back only to an https address on one of these hosts, or to an address on the person’s own computer (localhost, for Claude Code). claude.ai is the host for claude.ai and Claude Desktop.',
   'aiTools.admin.redirectHostsLabel': 'Hosts',
-  'aiTools.admin.redirectHostsHint': 'Host names only, separated by spaces or commas, for example: claude.ai',
+  'aiTools.admin.redirectHostsHint': 'One host name per line, for example: claude.ai',
   'aiTools.admin.saveHosts': 'Save hosts',
 } as const;
 

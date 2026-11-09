@@ -66,6 +66,8 @@ export async function seedUser(env: TestEnv, role: 'admin' | 'teacher', login: s
 /** Minimal cookie-jar client that behaves like a same-origin browser fetch. */
 export class Client {
   cookies = new Map<string, string>();
+  /** The client's address (rate limits are per address); the inject default when unset. */
+  ip: string | undefined;
   private env: TestEnv;
   constructor(env: TestEnv) {
     this.env = env;
@@ -75,7 +77,7 @@ export class Client {
     // Same-origin like a browser on the app's own page (TEST_ORIGIN unless the test set PUBLIC_ORIGIN).
     const headers: Record<string, string> = { origin: this.env.config.origins.main, 'x-cc-csrf': '1', ...extraHeaders };
     if (this.cookies.size) headers.cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
-    const res = await this.env.app.inject({ method: method as 'GET', url, headers, ...(body !== undefined ? { payload: body as object } : {}) });
+    const res = await this.env.app.inject({ method: method as 'GET', url, headers, ...(this.ip ? { remoteAddress: this.ip } : {}), ...(body !== undefined ? { payload: body as object } : {}) });
     for (const c of res.cookies as Array<{ name: string; value: string; maxAge?: number }>) {
       if (c.value === '' || c.maxAge === 0) this.cookies.delete(c.name);
       else this.cookies.set(c.name, c.value);

@@ -26,7 +26,7 @@ import { assertReauth } from '../../auth/service.ts';
 import { aiSettings } from '../tokens.ts';
 import { browserHash, oauthBrowserCookie, redirectWith } from './protocol.ts';
 import { normaliseAllowedHost, redirectHostOf, LOOPBACK_HOSTS } from './redirects.ts';
-import { clientUsable, redirectHosts, revokeGrants, type ClientRow } from './store.ts';
+import { clientUsable, redirectHosts, revokeGrants, touchClient, type ClientRow } from './store.ts';
 
 type RequestRow = typeof oauthRequests.$inferSelect;
 type In<E extends { input: z.ZodType }> = z.infer<E['input']>;
@@ -143,6 +143,8 @@ export async function decide(ctx: RequestContext, input: In<typeof O.decideOAuth
       .insert(oauthCodes)
       .values({ id: newId(), codeHash: tokenHash(ctx.config.SECRET_PEPPER, code), grantId, clientRowId: client.id, userId: user.id, redirectUri: r.redirectUri, codeChallenge: r.codeChallenge, resource: r.resource, createdAt: now, expiresAt: now + OAUTH_CODE_SECONDS * 1000, usedAt: null })
       .run();
+    // An allowed consent is a real use of the registration (an unauthenticated authorize call is not).
+    touchClient(ctx.db, client, now);
     audit(ctx.db, ctx.actor, { action: 'oauth.connect', entity: 'oauth_grant', entityId: grantId, after: { client: client.name, redirectHost, scopes, privacy, expiresAt: now + days * DAY } }, now);
   });
   return { redirectTo: redirectWith(r.redirectUri, { code, state: r.state, iss: origin }) };

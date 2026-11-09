@@ -161,9 +161,18 @@ test('Admin → AI tools: registered apps, connections and the allowed hosts (au
     await app.getByRole('button', { name: 'Revoke' }).click();
     await page.getByTestId('inline-confirm').getByRole('button', { name: 'Revoke' }).click();
     await expect(page.getByRole('row', { name: /Admin list app \(E2E\)/u })).toContainText('Revoked');
-    await page.getByRole('textbox', { name: 'Hosts' }).fill('claude.ai connectors.example.org');
+    await page.getByRole('textbox', { name: 'Hosts' }).fill('claude.ai\nconnectors.example.org');
     await page.getByRole('button', { name: 'Save hosts' }).click();
     await expect.poll(async () => (await api(page, 'GET', '/api/admin/ai-tools')).body.redirectHosts).toEqual(['claude.ai', 'connectors.example.org']);
+    // The saved list comes back one host per line (a single-line field ran them together), and an edit keeps them apart.
+    await page.reload();
+    const hosts = page.getByRole('textbox', { name: 'Hosts' });
+    await expect(hosts).toHaveValue('claude.ai\nconnectors.example.org');
+    await hosts.press('Control+End');
+    await hosts.pressSequentially('\nmore.example.org');
+    await page.getByRole('button', { name: 'Save hosts' }).click();
+    await expect.poll(async () => (await api(page, 'GET', '/api/admin/ai-tools')).body.redirectHosts).toEqual(['claude.ai', 'connectors.example.org', 'more.example.org']);
+    await expect(page.getByRole('textbox', { name: 'Hosts' })).toHaveValue('claude.ai\nconnectors.example.org\nmore.example.org');
   } finally {
     expect((await api(page, 'PUT', '/api/admin/ai-tools/redirect-hosts', { hosts: ['claude.ai'] })).status).toBe(200);
     expect((await api(page, 'PUT', '/api/admin/ai-tools', { mcpEnabled: false })).status).toBe(200);

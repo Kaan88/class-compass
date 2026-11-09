@@ -36,7 +36,7 @@ Open **AI tools** in the administration menu.
 - **Tokens at this school** lists every token (never its secret) with its account, permissions, privacy and last use. **Revoke** stops one at once. Changes on this page are in the audit log.
 - **Connected apps at this school** lists every app a teacher or administrator connected through the consent page (claude.ai, Claude Desktop, Claude Code), with **Disconnect**.
 - **Registered AI apps** lists the apps that registered themselves with Class Compass. Anyone can register an app; it can do nothing until a person allows it on the consent page. **Revoke** ends all connections of that app. Registrations nobody uses disappear after 30 days.
-- **Allowed hosts for AI apps**: the hosts an app may send people back to after the consent page. `claude.ai` (for claude.ai and Claude Desktop) is on the list from the start; addresses on the person's own computer (Claude Code) are always allowed. Add a host only for an AI tool your school has agreed to use.
+- **Allowed hosts for AI apps**: the hosts an app may send people back to after the consent page. `claude.ai` (for claude.ai and Claude Desktop) is on the list from the start; addresses on the person's own computer (Claude Code) are always allowed. Write one host per line. Add a host only for an AI tool your school has agreed to use.
 
 Switching AI tools off disconnects every connected app.
 

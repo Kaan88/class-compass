@@ -36,7 +36,7 @@ Yönetim menüsünde **Yapay zekâ araçları**’nı açın.
 - **Okuldaki anahtarlar** her anahtarı (gizli değerini asla göstermeden) hesabı, izinleri, gizlilik ayarı ve son kullanımıyla listeler. **İptal et** bir anahtarı hemen durdurur. Bu sayfadaki değişiklikler denetim kaydına yazılır.
 - **Bu okuldaki bağlı uygulamalar**, öğretmenlerin ve yöneticilerin izin sayfası üzerinden bağladığı her uygulamayı (claude.ai, Claude Desktop, Claude Code) **Bağlantıyı kes** düğmesiyle listeler.
 - **Kayıtlı yapay zekâ uygulamaları**, Sınıf Pusulası’na kendini kaydeden uygulamaları listeler. Herkes bir uygulama kaydedebilir; ancak bir kişi izin sayfasında izin vermedikçe uygulama hiçbir şey yapamaz. **İptal et**, o uygulamanın bütün bağlantılarını sona erdirir. Kimsenin kullanmadığı kayıtlar 30 gün sonra kaybolur.
-- **Yapay zekâ uygulamaları için izinli adresler**: bir uygulamanın, izin sayfasından sonra kullanıcıları geri gönderebileceği sunucular. `claude.ai` (claude.ai ve Claude Desktop için) baştan listededir; kişinin kendi bilgisayarındaki adreslere (Claude Code) her zaman izin verilir. Yalnızca okulunuzun kullanmayı kabul ettiği bir yapay zekâ aracı için sunucu ekleyin.
+- **Yapay zekâ uygulamaları için izinli adresler**: bir uygulamanın, izin sayfasından sonra kullanıcıları geri gönderebileceği sunucular. `claude.ai` (claude.ai ve Claude Desktop için) baştan listededir; kişinin kendi bilgisayarındaki adreslere (Claude Code) her zaman izin verilir. Her satıra bir sunucu adı yazın. Yalnızca okulunuzun kullanmayı kabul ettiği bir yapay zekâ aracı için sunucu ekleyin.
 
 Yapay zekâ araçlarını kapatmak, bütün bağlı uygulamaların bağlantısını keser.
 

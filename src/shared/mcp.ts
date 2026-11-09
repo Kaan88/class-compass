@@ -124,6 +124,15 @@ export const OAUTH_CLIENT_UNUSED_DAYS = 30;
 /** Refresh tokens: `ccmcpr_` + 256 random bits (never accepted on `/mcp`). */
 export const OAUTH_REFRESH_PREFIX = 'ccmcpr_';
 /**
+ * A refresh token that was rotated less than this long ago may be presented again while its successor
+ * is still unused: concurrent requests of one client (the SDK refreshes per request, with no lock) each
+ * refresh with the same token after the access token expired. Such a retry gets tokens of the same
+ * connection instead of ending it (like Okta's grace period and Auth0's reuse interval; D-160 S14h2 review).
+ */
+export const OAUTH_REFRESH_REUSE_GRACE_SECONDS = 30;
+/** Registrations that never got a connection, at most; a new one then replaces the oldest of them. */
+export const OAUTH_UNUSED_CLIENTS_MAX = 500;
+/**
  * Hosts an https redirect address may use by default: claude.ai, the callback host Anthropic documents
  * for claude.ai, Claude Desktop, mobile and Cowork (`https://claude.ai/api/mcp/auth_callback`) and the
  * host of Claude Code's Client ID Metadata Document (verified 2026-11-09). Loopback addresses

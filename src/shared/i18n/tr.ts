@@ -3455,7 +3455,7 @@ export const tr = {
   'oauth.allow': 'İzin ver',
   'oauth.afterwards': 'Uygulama, bir saat geçerli olan ve yukarıdaki sürenin sonuna kadar yenilenen bir anahtar alır; bağlantıyı kesmediğiniz sürece.',
   'aiTools.connections': 'Bağlı uygulamalar',
-  'aiTools.connectionsIntro': 'claude.ai, Claude Desktop ve Claude Code gibi uygulamalar, izin verdiğiniz bir sayfa üzerinden bağlanır. Bağlantıyı kes, uygulamayı hemen durdurur.',
+  'aiTools.connectionsIntro': 'claude.ai, Claude Desktop ve Claude Code gibi uygulamalar, izin verdiğiniz bir sayfa üzerinden bağlanır. “Bağlantıyı kes” düğmesi uygulamayı hemen durdurur.',
   'aiTools.noConnections': 'Bağlı uygulama yok.',
   'aiTools.app': 'Uygulama',
   'aiTools.sendsTo': 'Döndüğü adres',
@@ -3474,6 +3474,6 @@ export const tr = {
   'aiTools.admin.redirectHosts': 'Yapay zekâ uygulamaları için izinli adresler',
   'aiTools.admin.redirectHostsIntro': 'Bir yapay zekâ uygulaması kullanıcıları yalnızca bu sunuculardan birindeki bir https adresine ya da kişinin kendi bilgisayarındaki bir adrese (Claude Code için localhost) geri gönderebilir. claude.ai ve Claude Desktop için sunucu claude.ai’dir.',
   'aiTools.admin.redirectHostsLabel': 'Sunucular',
-  'aiTools.admin.redirectHostsHint': 'Yalnızca sunucu adları, boşluk ya da virgülle ayrılmış; örneğin: claude.ai',
+  'aiTools.admin.redirectHostsHint': 'Her satıra bir sunucu adı yazın; örneğin: claude.ai',
   'aiTools.admin.saveHosts': 'Sunucuları kaydet',
 } as const satisfies Messages;

@@ -233,6 +233,31 @@ describe('SDK client OAuth flow (S14h2, D-160)', () => {
     await c2.close();
   });
 
+  it('parallel tool calls after the access token expired refresh concurrently and keep the connection (S14h2 review)', async () => {
+    // The SDK refreshes once per request that got a 401, with no lock: both requests present the same
+    // refresh token. The second is a concurrent retry inside the grace window, not a copied token.
+    const provider = new TestProvider(os.teacherA);
+    const { client } = await connectWith(provider);
+    expect((await client.callTool({ name: 'list_my_classes', arguments: {} })).isError).toBe(false);
+    // The access token stops working mid-session (as at its hourly expiry; the clock stays put so the MCP
+    // session itself does not time out): every request in flight gets 401 invalid_token.
+    const endAccess = async () => {
+      const r = await fetch(`${origin}/oauth/revoke`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: provider.saved!.access_token, client_id: provider.info!.client_id }) });
+      expect(r.status).toBe(200);
+    };
+    const before = provider.saved!.refresh_token;
+    await endAccess();
+    const call = () => client.callTool({ name: 'list_my_classes', arguments: {} });
+    const [a, b, c] = await Promise.all([call(), call(), call()]);
+    expect([a.isError, b.isError, c.isError]).toEqual([false, false, false]);
+    expect(provider.saved!.refresh_token).not.toBe(before);
+    // The connection lives on: later calls and the next refresh still work.
+    expect((await call()).isError).toBe(false);
+    await endAccess();
+    expect((await call()).isError).toBe(false);
+    await client.close();
+  });
+
   it('uses a Client ID Metadata Document when the provider offers one (on an allowed host)', async () => {
     const url = 'https://claude.ai/oauth/sdk-conformance-client';
     const provider = new TestProvider(os.teacherA, url);
