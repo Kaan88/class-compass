@@ -12,5 +12,5 @@ export const assistantClientManifest = defineClientModule({
   startSteps: [assistantStartStep],
   endSteps: [assistantEndStepUi],
   invalidations: [assistantInvalidation],
-  teacherPages: [{ key: 'assistant', path: 'assistant', labelKey: 'teacher.assistant', Icon: IconStar, order: 70, Component: AssistantPage }],
+  teacherPages: [{ key: 'assistant', path: 'assistant', labelKey: 'teacher.assistant', Icon: IconStar, order: 70, group: 'setup', setupTab: 'lessons', module: 'assistant', Component: AssistantPage }],
 });

@@ -10,5 +10,5 @@ export const routinesClientManifest = defineClientModule({
   i18nNamespace: 'routines',
   dashboardSlots: [routineDashboardSlot],
   startSteps: [routineStartStep],
-  teacherPages: [{ key: 'routines', path: 'routines', labelKey: 'teacher.routines', Icon: IconList, order: 50, Component: RoutinesPage }],
+  teacherPages: [{ key: 'routines', path: 'routines', labelKey: 'teacher.routines', Icon: IconList, order: 50, group: 'setup', setupTab: 'lessons', module: 'routines', Component: RoutinesPage }],
 });

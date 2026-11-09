@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { rosterKey, routinesKey } from '../../src/client/modules/lessons/lessonClient.ts';
-import type { ClassroomContext } from '../../src/client/modules/types.ts';
+import { SETUP_TABS, type ClassroomContext } from '../../src/client/modules/types.ts';
 import { CLIENT_MODULES } from '../../src/client/modules/index.ts';
 import { BOX_CATALOGUE, BOX_KEYS, type BoxKey } from '../../src/shared/classroomLayout.ts';
 import {
@@ -24,6 +24,10 @@ import {
   endStepUis,
   initialStartValues,
   menuTeacherPages,
+  pageAvailable,
+  setupPages,
+  todayPages,
+  type MenuContexts,
   startStepsFor,
   useStartContributions,
 } from '../../src/client/modules/registry.ts';
@@ -80,11 +84,40 @@ describe('client module manifests', () => {
     const pages = allTeacherPages();
     expect(unique(pages.map((p) => p.path))).toBe(true);
     for (const p of pages) expect(p.path).toMatch(/^[a-z][a-z0-9-]*$/);
-    expect(pages.slice(0, 3).map((p) => p.key)).toEqual(['profile', 'classes', 'students']);
+    expect(pages.slice(0, 3).map((p) => p.key)).toEqual(['profile', 'setup', 'classes']);
+  });
+
+  it('teacher menu (S14e3, D-156): Today holds Attendance, Homework, Goals, Reports and Notifications; every other menu page is in a Class setup tab', () => {
+    expect(todayPages().map((p) => p.key)).toEqual(['attendance', 'homework', 'goals', 'reports', 'notifications']);
+    for (const p of menuTeacherPages()) {
+      expect(['today', 'setup'], p.key).toContain(p.group);
+      if (p.group === 'setup') expect(SETUP_TABS, p.key).toContain(p.setupTab);
+      else expect(p.setupTab, p.key).toBeUndefined();
+    }
+    expect(SETUP_TABS.flatMap((tab) => setupPages(undefined, tab)).map((p) => p.key).sort()).toEqual(setupPages().map((p) => p.key).sort());
+    for (const tab of SETUP_TABS) expect(setupPages([], tab).length, tab).toBeGreaterThan(0);
+    // A page's module is a context module of its own manifest (core pages have none).
+    for (const m of CLIENT_MODULES) for (const p of m.teacherPages ?? []) if (p.module) expect(CONTEXT_MODULES as readonly string[], p.key).toContain(p.module);
+    expect(allTeacherPages().find((p) => p.key === 'secret')?.module).toBe('secretStudents');
+  });
+
+  it('pages of a module that is off in every class+subject are hidden; loading or no classes hides nothing (D-156)', () => {
+    const on = { goals: true, homework: true, attendance: true, counters: true };
+    const off = { goals: false, homework: false, attendance: false, counters: false };
+    const keys = (cs?: MenuContexts) => menuTeacherPages(cs).map((p) => p.key);
+    expect(keys(undefined)).toEqual(keys([]));
+    expect(keys([{ modules: on }])).toContain('homework');
+    // Off in one class, on in another: still listed.
+    expect(keys([{ modules: off }, { modules: on }])).toContain('homework');
+    const hidden = keys([{ modules: off }, { modules: off }]);
+    for (const k of ['homework', 'goals', 'attendance', 'counters', 'routines', 'secret', 'assistant', 'grouping', 'achievements']) expect(hidden, k).not.toContain(k);
+    for (const k of ['reports', 'notifications', 'classes', 'students', 'topics', 'avatars', 'textChecks']) expect(hidden, k).toContain(k);
+    expect(pageAvailable({ module: 'homework' }, [{ modules: off }])).toBe(false);
+    expect(pageAvailable({ module: null }, [{ modules: off }])).toBe(true);
   });
 
   it('every teacher menu tile has its own icon, so the tiles can be scanned by icon (usability audit 2026-11)', () => {
-    const tiles = menuTeacherPages();
+    const tiles = [...menuTeacherPages(), ...allTeacherPages().filter((p) => p.key === 'setup')];
     expect(unique(tiles.map((p) => p.Icon)), tiles.map((p) => `${p.key}: ${p.Icon.name}`).join(', ')).toBe(true);
   });
 

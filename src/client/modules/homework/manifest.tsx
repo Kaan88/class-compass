@@ -9,6 +9,6 @@ export const homeworkClientManifest = defineClientModule({
   policyKey: 'homework',
   i18nNamespace: 'homework',
   dashboardSlots: [homeworkDashboardSlot],
-  teacherPages: [{ key: 'homework', path: 'homework', labelKey: 'teacher.homework', Icon: IconPencil, order: 100, Component: HomeworkPage }],
+  teacherPages: [{ key: 'homework', path: 'homework', labelKey: 'teacher.homework', Icon: IconPencil, order: 100, group: 'today', module: 'homework', Component: HomeworkPage }],
   settingsPanel: { Component: HomeworkSettingsPanel },
 });

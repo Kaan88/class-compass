@@ -7,5 +7,5 @@ export const textChecksClientManifest = defineClientModule({
   key: 'textChecks',
   policyKey: null,
   i18nNamespace: 'textCheck',
-  teacherPages: [{ key: 'textChecks', path: 'text-checks', labelKey: 'teacher.textChecks', Icon: IconShield, order: 150, Component: TextChecksPage }],
+  teacherPages: [{ key: 'textChecks', path: 'text-checks', labelKey: 'teacher.textChecks', Icon: IconShield, order: 150, group: 'setup', setupTab: 'progress', Component: TextChecksPage }],
 });

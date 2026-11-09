@@ -11,8 +11,10 @@ import { freshMe, ME_KEY, signOut, useMe, type Me } from '../../lib/session.ts';
 import { Button, BigButton, buttonClass } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
-import { menuTeacherPages } from '../../modules/registry.ts';
-import { IconBoard } from '../../ui/icons.tsx';
+import { pageAvailable, setupPages, todayPages } from '../../modules/registry.ts';
+import type { TeacherPage, TeacherPageSearch } from '../../modules/types.ts';
+import { Bell } from '../../modules/notifications/Bell.tsx';
+import { IconBoard, IconSliders } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
 import { SignInMethodSection } from '../SignIn.tsx';
@@ -20,6 +22,9 @@ import { TimeUpClipSection } from './ClassDisplay.tsx';
 import * as School from '../../../shared/contracts/school.ts';
 import { SensitiveGate } from '../Lock.tsx';
 import { StudentStatsProvider } from '../../ui/StudentName.tsx';
+
+/** The notifications page key: the bell stands for it in the navigation and on the menu (S14e3). */
+const NOTIFICATIONS_PAGE = 'notifications';
 
 export function TeacherLayout() {
   const { t } = useI18n();
@@ -48,20 +53,67 @@ export function TeacherLayout() {
   );
 }
 
+/** The teacher's class+subjects (classroom-safe list, shared query); undefined while loading. */
+export function useTeacherContexts(): School.MyContext[] | undefined {
+  const q = useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
+  return q.data?.contexts;
+}
+/** What the menu needs to hide the pages of modules that are off everywhere (S14e3, D-156). */
+export const useMenuContexts = useTeacherContexts;
+
 /**
- * Teacher navigation (usability audit 2026-11): a row of links on wide screens and one "Page" list
- * below 52rem, where 20 links took the whole first screen of a phone. The menu page shows only the
- * title bar, because its tiles are the navigation.
+ * A teacher page from a manifest (the `/teacher/$page` route). A page whose module is off in every
+ * class+subject of the teacher shows an empty state that points to Class settings (S14e3, D-156); its
+ * address keeps working.
+ */
+export function TeacherPageView({ page, search }: { page: TeacherPage; search: TeacherPageSearch }) {
+  const { t } = useI18n();
+  const contexts = useMenuContexts();
+  if (!pageAvailable(page, contexts)) {
+    return (
+      <main className="cc-page cc-stack" data-testid="module-off-page">
+        <h1 className="cc-h1">{t(page.labelKey)}</h1>
+        <EmptyState
+          title={t('teacher.moduleOff.title', { page: t(page.labelKey) })}
+          body={t('teacher.moduleOff.body')}
+          action={
+            <Link to="/teacher/$page" params={{ page: 'classes' }} className={buttonClass('primary')}>
+              {t('teacher.moduleOff.action')}
+            </Link>
+          }
+        />
+      </main>
+    );
+  }
+  const Page = page.Component;
+  return <Page search={search} />;
+}
+
+/**
+ * Teacher navigation (usability audit 2026-11; S14e3, D-156): on wide screens a row of links (Menu,
+ * the "Today" pages, Class setup, Profile, Help) and the notifications bell; below 52rem one "Page"
+ * list (which also lists the setup pages) and the bell. The menu page shows only the title bar and the
+ * bell, because its tiles are the navigation. Pages of modules that are off everywhere are left out.
  */
 function TeacherNav() {
   const { t } = useI18n();
   const me = useMe();
   const navigate = useNavigate();
+  const contexts = useMenuContexts();
   const path = useRouterState({ select: (s) => s.location.pathname }).replace(/\/+$/u, '');
-  const pages = menuTeacherPages();
+  const today = todayPages(contexts);
+  const setup = setupPages(contexts);
   const onMenu = path === '/teacher';
   const current = path.startsWith('/teacher/') ? path.slice('/teacher/'.length).split('/')[0]! : '';
-  const items = [{ id: '', label: t('teacher.menu') }, ...pages.map((p) => ({ id: p.path, label: t(p.labelKey) })), { id: '#help', label: t('help.link') }];
+  const inSetup = current === 'setup' || setup.some((p) => p.path === current);
+  const items = [
+    { id: '', label: t('teacher.menu') },
+    ...today.map((p) => ({ id: p.path, label: t(p.labelKey) })),
+    { id: 'setup', label: t('teacher.setup') },
+    ...setup.map((p) => ({ id: p.path, label: `${t('teacher.setup')}: ${t(p.labelKey)}` })),
+    { id: 'profile', label: t('teacher.profile') },
+    { id: '#help', label: t('help.link') },
+  ];
   return (
     <nav className="cc-topbar cc-teacher-nav" aria-label={t('teacher.nav')}>
       <span className="cc-topbar__title">{t('app.name')}</span>
@@ -71,11 +123,20 @@ function TeacherNav() {
             <Link to="/teacher" activeOptions={{ exact: true }}>
               {t('teacher.menu')}
             </Link>
-            {pages.map((p) => (
-              <Link key={p.key} to="/teacher/$page" params={{ page: p.path }}>
-                {t(p.labelKey)}
-              </Link>
-            ))}
+            {/* The bell stands for the notifications page. */}
+            {today
+              .filter((p) => p.key !== NOTIFICATIONS_PAGE)
+              .map((p) => (
+                <Link key={p.key} to="/teacher/$page" params={{ page: p.path }}>
+                  {t(p.labelKey)}
+                </Link>
+              ))}
+            <Link to="/teacher/$page" params={{ page: 'setup' }} data-section={inSetup ? 'current' : undefined}>
+              {t('teacher.setup')}
+            </Link>
+            <Link to="/teacher/$page" params={{ page: 'profile' }}>
+              {t('teacher.profile')}
+            </Link>
             <Link to="/help" search={{ guide: 'teacher', lang: me?.locale }} data-testid="help-link">
               {t('help.link')}
             </Link>
@@ -83,7 +144,7 @@ function TeacherNav() {
           <div className="cc-teacher-nav__select">
             <Select
               label={t('teacher.page')}
-              value={pages.some((p) => p.path === current) ? current : ''}
+              value={items.some((i) => i.id === current) ? current : ''}
               onChange={(id) => {
                 if (id === '#help') void navigate({ to: '/help', search: { guide: 'teacher', lang: me?.locale } });
                 else if (id === '') void navigate({ to: '/teacher' });
@@ -94,16 +155,23 @@ function TeacherNav() {
           </div>
         </>
       )}
+      <Bell />
     </nav>
   );
 }
 
-/** The first thing shown after unlocking (PIN-4). Nothing sensitive is displayed here. */
+/**
+ * The first thing shown after unlocking (PIN-4; S14e3, D-156): Open classroom, the "Today" tiles
+ * (the notifications tile carries the unread count), one Class setup tile, then a small row with
+ * Profile, Help, Leave classroom mode and Sign out. Nothing sensitive is displayed here besides the
+ * count, which is behind the PIN gate like the menu itself.
+ */
 export function TeacherMenu() {
   const { t } = useI18n();
   const me = useMe();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const contexts = useMenuContexts();
   useEffect(() => setMenuFirst(false), []);
   if (!me) return null;
   return (
@@ -121,15 +189,36 @@ export function TeacherMenu() {
         <IconBoard />
         {me.classroomMode ? t('teacher.backToClassroom') : t('teacher.openClassroom')}
       </BigButton>
-      <div className="cc-menu-grid">
-        {menuTeacherPages().map((p) => (
-          <Link key={p.key} to="/teacher/$page" params={{ page: p.path }} className="cc-menu-tile">
-            <p.Icon />
-            {t(p.labelKey)}
-          </Link>
-        ))}
+      <section className="cc-stack" aria-labelledby="menu-today">
+        <h2 id="menu-today" className="cc-h2">
+          {t('teacher.today')}
+        </h2>
+        <div className="cc-menu-grid" data-testid="menu-today">
+          {todayPages(contexts).map((p) =>
+            p.key === NOTIFICATIONS_PAGE ? (
+              <Bell key={p.key} tile />
+            ) : (
+              <Link key={p.key} to="/teacher/$page" params={{ page: p.path }} className="cc-menu-tile">
+                <p.Icon />
+                {t(p.labelKey)}
+              </Link>
+            ),
+          )}
+        </div>
+      </section>
+      <div className="cc-menu-grid" data-testid="menu-setup">
+        <Link to="/teacher/$page" params={{ page: 'setup' }} className="cc-menu-tile">
+          <IconSliders />
+          {t('teacher.setup')}
+        </Link>
       </div>
       <div className="cc-row">
+        <Link to="/teacher/$page" params={{ page: 'profile' }} className={buttonClass('secondary')}>
+          {t('teacher.profile')}
+        </Link>
+        <Link to="/help" search={{ guide: 'quick-start-teacher', lang: me.locale }} className={buttonClass('secondary')}>
+          {t('help.link')}
+        </Link>
         {me.classroomMode ? (
           <Button
             onPress={async () => {
@@ -140,9 +229,6 @@ export function TeacherMenu() {
             {t('teacher.leaveClassroomMode')}
           </Button>
         ) : null}
-        <Link to="/help" search={{ guide: 'quick-start-teacher', lang: me.locale }} className={buttonClass('secondary')}>
-          {t('help.link')}
-        </Link>
         <Button
           variant="ghost"
           onPress={async () => {

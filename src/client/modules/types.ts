@@ -142,10 +142,17 @@ export interface StudentCardAddon {
 /** Search parameters of a teacher page URL (`/teacher/<path>?a=b`), as strings. */
 export type TeacherPageSearch = Readonly<Record<string, string | undefined>>;
 
+/** Where a menu page is listed (S14e3, D-156): the menu's "Today" group, or the Class setup hub. */
+export type TeacherPageGroup = 'today' | 'setup';
+/** The tab of the Class setup hub a setup page is listed under. */
+export type SetupTab = 'classes' | 'lessons' | 'progress';
+export const SETUP_TABS: readonly SetupTab[] = ['classes', 'lessons', 'progress'];
+
 /**
  * A teacher-area page: the route `/teacher/<path>` (inside the PIN gate) plus, unless `menu` is
- * false, a menu tile and nav link. A sub-page reached from another page (e.g. counter history) sets
- * `menu: false`.
+ * false, a tile and nav link in its `group` (S14e3, D-156): "Today" pages are tiles on the teacher
+ * menu, setup pages are tiles in the Class setup hub (`/teacher/setup`, one tab per `setupTab`). A
+ * sub-page reached from another page (e.g. counter history) sets `menu: false`.
  */
 export interface TeacherPage {
   key: string;
@@ -157,6 +164,16 @@ export interface TeacherPage {
   order: number;
   /** false = route only, no menu tile or nav link. */
   menu?: boolean;
+  /** Menu pages: the "Today" group or the Class setup hub (test-enforced for every menu page). */
+  group?: TeacherPageGroup;
+  /** Setup pages: the hub's tab (test-enforced). */
+  setupTab?: SetupTab;
+  /**
+   * The module the page belongs to (null/absent = core). Its tile and link are hidden while the module
+   * is off in every class+subject of the teacher, and the page itself then shows an empty state; the
+   * URL keeps working.
+   */
+  module?: ContextModule | null;
   Component: ComponentType<{ search: TeacherPageSearch }>;
 }
 

@@ -7,5 +7,5 @@ export const avatarsClientManifest = defineClientModule({
   key: 'avatars',
   policyKey: null,
   i18nNamespace: 'avatar',
-  teacherPages: [{ key: 'avatars', path: 'avatars', labelKey: 'teacher.avatars', Icon: IconAvatar, order: 140, Component: AvatarsPage }],
+  teacherPages: [{ key: 'avatars', path: 'avatars', labelKey: 'teacher.avatars', Icon: IconAvatar, order: 140, group: 'setup', setupTab: 'classes', Component: AvatarsPage }],
 });

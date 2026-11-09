@@ -7,5 +7,5 @@ export const linksClientManifest = defineClientModule({
   key: 'links',
   policyKey: null,
   i18nNamespace: 'links',
-  teacherPages: [{ key: 'studentLinks', path: 'student-links', labelKey: 'teacher.studentLinks', Icon: IconLink, order: 37, Component: StudentLinksPage }],
+  teacherPages: [{ key: 'studentLinks', path: 'student-links', labelKey: 'teacher.studentLinks', Icon: IconLink, order: 37, group: 'setup', setupTab: 'classes', Component: StudentLinksPage }],
 });

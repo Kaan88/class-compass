@@ -211,7 +211,7 @@ a {
     white-space: nowrap;
   }
   .cc-menu-grid--compact {
-    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
     gap: 0.5rem;
   }
   .cc-menu-grid--compact .cc-menu-tile {
@@ -745,11 +745,11 @@ html:has(.cc-lesson-board) .cc-toaster {
 }
 .cc-student-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
   gap: 0.75rem;
 }
 .cc-student-grid[data-density='compact'] {
-  grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14.5rem), 1fr));
   gap: 0.5rem;
 }
 .cc-student-card {
@@ -1420,7 +1420,7 @@ html:has(.cc-lesson-board) .cc-toaster {
 /* Theme choices: equal tiles in one row (or a column on phones), never uneven rows. */
 .cc-theme-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
 }
 .cc-theme-grid .cc-theme-option {
   min-width: 0;
@@ -2614,11 +2614,11 @@ html:has(.cc-classroom) {
 }
 .cc-att-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
   gap: 0.6rem;
 }
 .cc-att-grid[data-density='compact'] {
-  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr));
   gap: 0.4rem;
 }
 .cc-att-item.cc-btn {
@@ -3010,7 +3010,7 @@ html:has(.cc-classroom) {
   padding: 0;
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
 }
 .cc-reveal__card {
   display: flex;
@@ -3112,7 +3112,7 @@ html:has(.cc-classroom) {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
   gap: 0.75rem;
 }
 .cc-group {
@@ -3187,7 +3187,7 @@ html:has(.cc-classroom) {
   }
 }
 .cc-groups--screen {
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
 }
 .cc-group--colour {
   --cc-group-colour: var(--cc-counter-accent);
@@ -4208,13 +4208,13 @@ li > .cc-admin-list {
 }
 .cc-report-filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 0.75rem;
   align-items: end;
 }
 .cc-report-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
   gap: 0.5rem;
   margin: 0;
 }
@@ -4390,7 +4390,7 @@ li > .cc-admin-list {
 }
 .cc-maint-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 0.75rem;
 }
 @media print {
@@ -4766,7 +4766,7 @@ li > .cc-admin-list {
 }
 .cc-avatar-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 3.5rem), 1fr));
   gap: 0.5rem;
   list-style: none;
   margin: 0;
@@ -4822,7 +4822,7 @@ li > .cc-admin-list {
 }
 .cc-badge-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
   gap: 0.6rem;
   list-style: none;
   margin: 0;
@@ -4923,7 +4923,7 @@ li > .cc-admin-list {
 }
 .cc-badge-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
   gap: 0.5rem;
 }
 .cc-badge-choice {
@@ -4949,7 +4949,7 @@ li > .cc-admin-list {
 }
 .cc-achievements-students {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
   gap: 0.4rem;
 }
 .cc-achievement-moment {
@@ -5775,4 +5775,172 @@ html[data-cursor='off'] * {
 }
 .cc-guide .cc-table-wrap {
   margin: 0.75em 0;
+}
+
+/* ------------------------------------------------------------------ S14e3 teacher menu and notifications (D-155, D-156) */
+/* The Class setup link stays marked on every setup page (the hub and the pages it lists). */
+.cc-nav a[data-section='current'] {
+  background: var(--cc-accent-soft);
+  border-color: var(--cc-accent);
+}
+/* The bell: an icon link with the unread count, at the end of the teacher navigation. */
+.cc-bell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: var(--cc-touch);
+  min-width: var(--cc-touch);
+  justify-content: center;
+  padding: 0 0.6rem;
+  border-radius: var(--cc-radius-sm);
+  border: var(--cc-border-width) solid var(--cc-border);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  text-decoration: none;
+  flex: none;
+}
+.cc-bell[data-status='active'] {
+  background: var(--cc-accent-soft);
+  border-color: var(--cc-accent);
+}
+.cc-bell .cc-icon {
+  color: var(--cc-icon-accent);
+}
+.cc-bell__count {
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  border: var(--cc-border-width) solid var(--cc-accent);
+  background: var(--cc-accent-soft);
+  color: var(--cc-text);
+  font-weight: 750;
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+}
+.cc-bell-tile__label {
+  min-width: 0;
+}
+.cc-bell-tile .cc-bell__count {
+  margin-left: auto;
+}
+/* The notifications page: one card per student, one line per notification. */
+.cc-notifications__filters {
+  align-items: flex-end;
+}
+.cc-notifications__filters > .cc-field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.cc-notifications__filters .cc-select {
+  width: 100%;
+}
+.cc-notifications__head {
+  justify-content: space-between;
+}
+.cc-notifications__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-notifications__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.cc-notifications__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border-radius: var(--cc-radius-sm);
+  border: var(--cc-border-width) solid var(--cc-border);
+  min-width: 0;
+}
+.cc-notifications__item[data-read='false'] {
+  border-color: var(--cc-accent);
+  background: var(--cc-accent-soft);
+}
+.cc-notifications__what {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* "New" is a word, not only the coloured border. */
+.cc-notifications__new {
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  border: var(--cc-border-width) solid var(--cc-accent);
+  background: var(--cc-surface);
+  font-size: 0.85em;
+  font-weight: 750;
+}
+.cc-notifications__snippet {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-style: italic;
+}
+.cc-notifications__meta {
+  justify-content: space-between;
+}
+.cc-notifications__meta > .cc-muted {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* S14e3 (carried over from S14a): on a phone at a large text size no page scrolls sideways. Long words
+   break, rows and fields shrink, headings and card padding follow the screen width, and wide tables
+   scroll inside their own box (.cc-table-wrap). e2e/button-groups.spec.ts checks every page of the
+   teacher menu at 375 px with 200 % text, in English and Turkish. */
+@media (max-width: 40rem) {
+  .cc-page {
+    overflow-wrap: break-word;
+    padding-inline: 0.75rem;
+  }
+  .cc-page .cc-h1 {
+    font-size: min(2rem, 10vw);
+  }
+  .cc-page .cc-h2 {
+    font-size: min(1.4rem, 8vw);
+  }
+  .cc-page .cc-card {
+    padding: min(1.25rem, 4vw);
+  }
+  .cc-page .cc-btn,
+  .cc-page .cc-switch,
+  .cc-page .cc-field__label,
+  .cc-page .cc-field__hint,
+  .cc-page .cc-h1,
+  .cc-page .cc-h2,
+  .cc-page .cc-h3,
+  .cc-page summary,
+  .cc-page .cc-att-chip {
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  .cc-page .cc-btn {
+    max-width: 100%;
+    text-align: center;
+  }
+  .cc-page .cc-att-chip {
+    white-space: normal;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .cc-page .cc-switch {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .cc-page .cc-switch > span:not(.cc-switch__track) {
+    min-width: 0;
+  }
+  .cc-page .cc-row > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .cc-page .cc-select,
+  .cc-page .cc-input {
+    max-width: 100%;
+  }
 }

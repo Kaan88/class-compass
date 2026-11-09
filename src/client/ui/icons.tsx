@@ -395,3 +395,19 @@ export const IconAvatar = () => (
     <path d="M8.5 14.5c2 2 5 2 7 0" />
   </Icon>
 );
+/** Notifications (S14e3, D-155). */
+export const IconBell = () => (
+  <Icon>
+    <path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z" />
+    <path d="M10 21a2 2 0 0 0 4 0" />
+  </Icon>
+);
+/** The Class setup hub (S14e3, D-156). */
+export const IconSliders = () => (
+  <Icon>
+    <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" />
+    <circle cx="15" cy="6" r="2" />
+    <circle cx="9" cy="12" r="2" />
+    <circle cx="17" cy="18" r="2" />
+  </Icon>
+);

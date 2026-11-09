@@ -90,7 +90,9 @@ test('Lock button and a 423 swap straight to the lock screen', async ({ page }) 
   await page.getByLabel('Enter your PIN').fill(PIN);
   await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByTestId('teacher-menu')).toBeVisible();
-  await page.getByRole('link', { name: 'Class settings' }).first().click();
+  // Class settings is in the Class setup hub (S14e3, D-156).
+  await page.getByTestId('menu-setup').getByRole('link', { name: 'Class setup' }).click();
+  await page.getByTestId('setup-hub').getByRole('link', { name: 'Class settings' }).click();
   // The module switch (the teacher menu also has a Homework link since S8).
   const toggle = page.locator('.cc-switch', { has: page.getByRole('switch', { name: 'Homework', exact: true }) });
   await expect(toggle).toBeVisible();
@@ -106,7 +108,9 @@ test('Lock button and a 423 swap straight to the lock screen', async ({ page }) 
   await page.getByLabel('Enter your PIN').fill(PIN);
   await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByTestId('teacher-menu')).toBeVisible();
-  await page.getByRole('link', { name: 'Class settings' }).first().click();
+  // Class settings is in the Class setup hub (S14e3, D-156).
+  await page.getByTestId('menu-setup').getByRole('link', { name: 'Class setup' }).click();
+  await page.getByTestId('setup-hub').getByRole('link', { name: 'Class settings' }).click();
   await expect(toggle).toBeVisible();
 
   await api(page, 'POST', '/api/auth/lock', {});

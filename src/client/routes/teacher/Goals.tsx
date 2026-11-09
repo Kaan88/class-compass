@@ -23,6 +23,7 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { EvidenceAdder } from '../../modules/goals/EvidenceAdder.tsx';
+import type { TeacherPageSearch } from '../../modules/types.ts';
 import { TeacherStarters } from '../../modules/goals/StartersLibrary.tsx';
 import { ConfidenceChip, EntryLine, EvidenceView, FeedbackLine, GoalSummary, whenText } from '../../modules/goals/shared.tsx';
 import { Button } from '../../ui/Button.tsx';
@@ -514,16 +515,20 @@ export function GoalsSettingsPanel({ contextId }: { contextId: string }) {
   );
 }
 
-function ClassGoals({ contextId }: { contextId: string }) {
-  const [studentId, setStudentId] = useState<string | null>(null);
+function ClassGoals({ contextId, initialStudentId }: { contextId: string; initialStudentId?: string | undefined }) {
+  const [studentId, setStudentId] = useState<string | null>(initialStudentId ?? null);
   return studentId ? <StudentGoals contextId={contextId} studentId={studentId} onBack={() => setStudentId(null)} /> : <Overview contextId={contextId} onOpen={setStudentId} />;
 }
 
-export function GoalsPage() {
+/**
+ * Goals in the teacher area. Deep link (S14e3, notifications): `?contextId=&studentId=` opens that
+ * class+subject and the student's goals.
+ */
+export function GoalsPage({ search = {} }: { search?: TeacherPageSearch }) {
   const { t, locale } = useI18n();
   const contexts = useQuery({ queryKey: CONTEXTS_KEY, queryFn: () => call(School.myContexts, {}) });
   const list = contexts.data?.contexts ?? [];
-  const [picked, setPicked] = useState('');
+  const [picked, setPicked] = useState(search.contextId ?? '');
   const ctx = list.find((c) => c.id === picked) ?? list[0];
   return (
     <main className="cc-page cc-stack" data-testid="goals-page">
@@ -538,7 +543,7 @@ export function GoalsPage() {
             key={ctx.id}
             label={t('teacher.goals')}
             items={[
-              { id: 'students', label: t('goals.tab.students'), content: <ClassGoals contextId={ctx.id} /> },
+              { id: 'students', label: t('goals.tab.students'), content: <ClassGoals contextId={ctx.id} initialStudentId={ctx.id === search.contextId ? search.studentId : undefined} /> },
               { id: 'library', label: t('goals.tab.library'), content: <LibraryTab contextId={ctx.id} /> },
               { id: 'settings', label: t('goals.tab.settings'), content: <GoalsSettingsPanel contextId={ctx.id} /> },
             ]}

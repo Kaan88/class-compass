@@ -8,8 +8,9 @@
  * Covered: the student page's home tiles, subject switch, New goal categories, evidence kinds and
  * How is it going? faces (S14d), the teacher menu grid and the attendance status segments (teacher
  * area), the topic choices (Start Lesson), the group options (group screen, opened from the board's
- * dock), the board's dock itself (S14b) and the lesson reflection (End Lesson). Fictional demo data
- * only; the class language and profile language are put back.
+ * dock), the board's dock itself (S14b) and the lesson reflection (End Lesson). S14e3: no page of the
+ * teacher menu scrolls sideways at 375 px with 200 % text (second test). Fictional demo data only; the
+ * class language and profile language are put back.
  */
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
@@ -109,7 +110,7 @@ test('choice buttons fit at 375/768/1280 px, in English and Turkish, at 100 % an
       // ------------------------------------------------ teacher area (the teacher's own language)
       expect((await api(office.page, 'PATCH', '/api/auth/preferences', { locale: lang })).status).toBe(200);
       await office.page.goto('/teacher');
-      await expect(office.page.locator('.cc-menu-grid')).toBeVisible();
+      await expect(office.page.getByTestId('menu-today')).toBeVisible();
       await checkAll(office.page, '.cc-menu-grid', `${lang} teacher menu`);
       await office.page.goto('/teacher/attendance');
       await expect(office.page.locator('.cc-att-set__statuses').first()).toBeVisible();
@@ -190,4 +191,63 @@ test('choice buttons fit at 375/768/1280 px, in English and Turkish, at 100 % an
     await office.ctx.close();
     await display.ctx.close();
   }
+});
+
+/**
+ * S14e3 (carried over from S14a): no page of the teacher menu scrolls sideways on a phone (375 px)
+ * at 200 % text, in English and Turkish. The pages are read from the menu itself (the Today tiles,
+ * the Class setup tile and every tab of the Class setup hub), so a new page is covered automatically.
+ */
+test('no teacher menu page scrolls sideways at 375 px with 200 % text', async ({ page }) => {
+  test.setTimeout(300_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/teacher');
+  await expect(page.getByTestId('teacher-menu')).toBeVisible();
+  const hrefs = new Set<string>(['/teacher']);
+  const tilesOf = (scope: ReturnType<Page['getByTestId']>) => scope.locator('a.cc-menu-tile').evaluateAll((els) => els.map((e) => e.getAttribute('href')!));
+  for (const h of await tilesOf(page.getByTestId('teacher-menu'))) hrefs.add(h);
+  await page.goto('/teacher/setup');
+  const tabs = page.getByTestId('setup-hub').getByRole('tab');
+  for (let i = 0; i < (await tabs.count()); i++) {
+    await tabs.nth(i).click();
+    await expect(tabs.nth(i)).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tabpanel').locator('a.cc-menu-tile').first()).toBeVisible();
+    for (const h of await tilesOf(page.getByRole('tabpanel'))) hrefs.add(h);
+  }
+  expect(hrefs.size).toBeGreaterThan(15);
+  const problems: string[] = [];
+  try {
+    for (const lang of LANGS) {
+      expect((await api(page, 'PATCH', '/api/auth/preferences', { locale: lang })).status).toBe(200);
+      for (const href of hrefs) {
+        await page.goto(href);
+        await expect(page.locator('main h1').first()).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        await page.evaluate(() => document.documentElement.style.setProperty('--cc-text-scale', '2'));
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        const wide = await page.evaluate(() => {
+          const vw = document.documentElement.clientWidth;
+          if (document.documentElement.scrollWidth <= vw + 1) return null;
+          // The outermost elements that stick out, to name the cause in the failure.
+          // (Content inside a box that scrolls or clips sideways, like a wide table's wrapper, does not count.)
+          const clipped = (el: HTMLElement) => {
+            for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (getComputedStyle(p).overflowX !== 'visible') return true;
+            return false;
+          };
+          const out = [...document.querySelectorAll<HTMLElement>('body, body *')]
+            .filter((el) => el.getBoundingClientRect().right > vw + 1 && el.getClientRects().length > 0 && !clipped(el))
+            .filter((el) => [...el.children].every((c) => (c as HTMLElement).getBoundingClientRect().right <= vw + 1 || clipped(c as HTMLElement)) || el.children.length === 0)
+            .slice(0, 4)
+            .map((el) => `${el.tagName.toLowerCase()}.${[...el.classList].join('.')} ${Math.round(el.getBoundingClientRect().right)}px`);
+          return `${document.documentElement.scrollWidth}px wide: ${out.join(', ')}`;
+        });
+        if (wide) problems.push(`${lang} ${href}: ${wide}`);
+      }
+    }
+  } finally {
+    await api(page, 'PATCH', '/api/auth/preferences', { locale: 'en' });
+  }
+  expect(problems, 'pages that scroll sideways at 375 px, 200 % text').toEqual([]);
 });

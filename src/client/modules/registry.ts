@@ -6,7 +6,8 @@
 import { registerInvalidation } from '../lib/outbox-client.ts';
 import { CLIENT_MODULES } from './index.ts';
 import { availableBoxes, type BoxKey } from '../../shared/classroomLayout.ts';
-import type { ClassroomContext, ClientModuleManifest, DashboardSlot, EndStepUi, StartLessonContribution, StartStep, StudentCardAddon, TeacherPage } from './types.ts';
+import type { ClassroomContext, ClientModuleManifest, DashboardSlot, EndStepUi, SetupTab, StartLessonContribution, StartStep, StudentCardAddon, TeacherPage } from './types.ts';
+import type { ContextModule } from '../../shared/modules.ts';
 
 export type { ClassroomContext, StudentCardExtras } from './types.ts';
 
@@ -21,8 +22,28 @@ const enabled = (ctx: ClassroomContext, m: ClientModuleManifest['policyKey']) =>
 export const allDashboardSlots = (): DashboardSlot[] => byOrder(all((m) => m.dashboardSlots));
 export const allStartSteps = (): StartStep[] => byOrder(all((m) => m.startSteps));
 export const allTeacherPages = (): TeacherPage[] => byOrder(all((m) => m.teacherPages));
-/** Pages with a menu tile and nav link (sub-pages with `menu: false` are routes only). */
-export const menuTeacherPages = (): TeacherPage[] => allTeacherPages().filter((p) => p.menu !== false);
+
+/** What the teacher menu needs to know about the teacher's class+subjects: which modules are on. */
+export type MenuContexts = ReadonlyArray<{ modules: Partial<Record<ContextModule, boolean>> }>;
+
+/**
+ * Is the page's module on in at least one of the teacher's class+subjects (S14e3, D-156)? Core pages
+ * always are. While the contexts are still loading (`undefined`) every page counts as available, so
+ * nothing flickers away and back, and so does a teacher without any class+subject (the pages then say
+ * there are no classes yet, as before).
+ */
+export const pageAvailable = (p: Pick<TeacherPage, 'module'>, contexts: MenuContexts | undefined): boolean =>
+  !p.module || !contexts?.length || contexts.some((c) => c.modules[p.module!] === true);
+
+/**
+ * Pages with a menu tile and nav link (sub-pages with `menu: false` are routes only), without the
+ * pages of modules that are off in all of the teacher's class+subjects (when `contexts` is given).
+ */
+export const menuTeacherPages = (contexts?: MenuContexts): TeacherPage[] => allTeacherPages().filter((p) => p.menu !== false && pageAvailable(p, contexts));
+/** The menu's "Today" group. */
+export const todayPages = (contexts?: MenuContexts): TeacherPage[] => menuTeacherPages(contexts).filter((p) => p.group === 'today');
+/** The Class setup hub's pages, optionally of one tab. */
+export const setupPages = (contexts?: MenuContexts, tab?: SetupTab): TeacherPage[] => menuTeacherPages(contexts).filter((p) => p.group === 'setup' && (!tab || p.setupTab === tab));
 const cardAddons = (): StudentCardAddon[] => all((m) => m.studentCardAddons);
 
 /** The dashboard slots of the modules enabled for this class+subject (core slots always). */

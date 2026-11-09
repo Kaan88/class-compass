@@ -77,31 +77,34 @@ export function TopicsPage() {
               {t('lesson.topic.weeklyPlan')}
             </h2>
             <p className="cc-muted">{t('lesson.topic.weeklyPlanHint', { count: MAX_LESSON_TOPICS })}</p>
-            <table className="cc-table cc-topic-plan" data-testid="topic-plan">
-              <thead>
-                <tr>
-                  <th scope="col">{t('lesson.topic.day')}</th>
-                  <th scope="col">{t('lesson.topic.topics')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {DAYS.map((d) => (
-                  <tr key={d}>
-                    <th scope="row">{t(`weekday.${Number(d) % 7}` as MessageKey)}</th>
-                    <td>
-                      <div className="cc-row" role="group" aria-label={t(`weekday.${Number(d) % 7}` as MessageKey)}>
-                        {topics.map((tp) => (
-                          <Button key={tp.id} size="small" aria-pressed={(current[d] ?? []).includes(tp.id)} onPress={() => toggle(d, tp.id)}>
-                            <TopicPicto icon={tp.icon} size="1.2em" />
-                            {pickText(tp.name, locale)}
-                          </Button>
-                        ))}
-                      </div>
-                    </td>
+            {/* A narrow screen scrolls the plan inside its box, never the page (S14e3). */}
+            <div className="cc-table-wrap">
+              <table className="cc-table cc-topic-plan" data-testid="topic-plan">
+                <thead>
+                  <tr>
+                    <th scope="col">{t('lesson.topic.day')}</th>
+                    <th scope="col">{t('lesson.topic.topics')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {DAYS.map((d) => (
+                    <tr key={d}>
+                      <th scope="row">{t(`weekday.${Number(d) % 7}` as MessageKey)}</th>
+                      <td>
+                        <div className="cc-row" role="group" aria-label={t(`weekday.${Number(d) % 7}` as MessageKey)}>
+                          {topics.map((tp) => (
+                            <Button key={tp.id} size="small" aria-pressed={(current[d] ?? []).includes(tp.id)} onPress={() => toggle(d, tp.id)}>
+                              <TopicPicto icon={tp.icon} size="1.2em" />
+                              {pickText(tp.name, locale)}
+                            </Button>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <div className="cc-row">
               <Button
                 variant="primary"

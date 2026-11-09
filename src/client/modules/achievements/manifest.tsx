@@ -15,5 +15,5 @@ export const achievementsClientManifest = defineClientModule({
   dashboardSlots: [achievementsDashboardSlot],
   endSteps: [achievementsEndStepUi],
   invalidations: [achievementsInvalidation],
-  teacherPages: [{ key: 'achievements', path: 'achievements', labelKey: 'teacher.achievements', Icon: IconTrophy, order: 115, Component: AchievementsPage }],
+  teacherPages: [{ key: 'achievements', path: 'achievements', labelKey: 'teacher.achievements', Icon: IconTrophy, order: 115, group: 'setup', setupTab: 'progress', module: 'achievements', Component: AchievementsPage }],
 });

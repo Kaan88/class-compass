@@ -10,7 +10,7 @@ export const secretClientManifest = defineClientModule({
   i18nNamespace: 'secret',
   dashboardSlots: [secretDashboardSlot],
   endSteps: [secretEndStepUi],
-  teacherPages: [{ key: 'secret', path: 'secret', labelKey: 'teacher.secret', Icon: IconMask, order: 80, Component: SecretPage }],
+  teacherPages: [{ key: 'secret', path: 'secret', labelKey: 'teacher.secret', Icon: IconMask, order: 80, group: 'setup', setupTab: 'lessons', module: 'secretStudents', Component: SecretPage }],
   settingsPanel: { Component: SecretSettingsPanel },
   invalidations: [secretInvalidation],
 });

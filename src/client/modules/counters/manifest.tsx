@@ -25,7 +25,7 @@ export const countersClientManifest = defineClientModule({
   dashboardSlots: [countersDashboardSlot],
   studentCardAddons: [countersCardAddon],
   teacherPages: [
-    { key: 'counters', path: 'counters', labelKey: 'teacher.counters', Icon: IconTally, order: 60, Component: CountersPage },
+    { key: 'counters', path: 'counters', labelKey: 'teacher.counters', Icon: IconTally, order: 60, group: 'setup', setupTab: 'lessons', module: 'counters', Component: CountersPage },
     // Reached from the counters page (`?counterId=` preselects a counter); no menu tile of its own.
     {
       key: 'counterHistory',
@@ -34,6 +34,7 @@ export const countersClientManifest = defineClientModule({
       Icon: IconCalendar,
       order: 65,
       menu: false,
+      module: 'counters',
       Component: CounterHistoryRoute,
     },
   ],

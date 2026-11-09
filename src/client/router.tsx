@@ -14,7 +14,7 @@ import { homeFor, requireSession, type RouterContext } from './routes/guards.ts'
 import { NotFoundPage, RootLayout } from './routes/Root.tsx';
 import { allTeacherPages } from './modules/registry.ts';
 import type { TeacherPageSearch } from './modules/types.ts';
-import { ProfilePage, TeacherLayout, TeacherMenu } from './routes/teacher/Teacher.tsx';
+import { ProfilePage, TeacherLayout, TeacherMenu, TeacherPageView } from './routes/teacher/Teacher.tsx';
 
 /*
  * Administration screens and the component catalogue are code-split (D-038): they are only used on
@@ -101,8 +101,8 @@ const teacherPage = createRoute({
     const search = teacherPage.useSearch();
     const found = allTeacherPages().find((p) => p.path === page);
     if (!found) return <NotFoundPage />;
-    const Page = found.Component;
-    return <Page key={page} search={search} />;
+    // A page whose module is off in all the teacher's classes shows an empty state (S14e3, D-156).
+    return <TeacherPageView key={page} page={found} search={search} />;
   },
 });
 

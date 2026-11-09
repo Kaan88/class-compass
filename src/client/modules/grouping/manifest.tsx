@@ -17,7 +17,7 @@ export const groupingClientManifest = defineClientModule({
   policyKey: 'grouping',
   i18nNamespace: 'grouping',
   dashboardSlots: [groupsDashboardSlot],
-  teacherPages: [{ key: 'grouping', path: 'grouping', labelKey: 'teacher.grouping', Icon: IconGroups, order: 90, Component: GroupingPage }],
+  teacherPages: [{ key: 'grouping', path: 'grouping', labelKey: 'teacher.grouping', Icon: IconGroups, order: 90, group: 'setup', setupTab: 'lessons', module: 'grouping', Component: GroupingPage }],
   invalidations: [groupingInvalidation],
   settingsPanel: { Component: GroupingSettingsPanel },
 });

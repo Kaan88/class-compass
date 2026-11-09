@@ -10,6 +10,6 @@ export const goalsClientManifest = defineClientModule({
   key: 'goals',
   policyKey: 'goals',
   i18nNamespace: 'goals',
-  teacherPages: [{ key: 'goals', path: 'goals', labelKey: 'teacher.goals', Icon: IconTarget, order: 110, Component: GoalsPage }],
+  teacherPages: [{ key: 'goals', path: 'goals', labelKey: 'teacher.goals', Icon: IconTarget, order: 110, group: 'today', module: 'goals', Component: GoalsPage }],
   settingsPanel: { Component: GoalsSettingsPanel },
 });

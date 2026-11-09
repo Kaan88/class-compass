@@ -17,6 +17,6 @@ export const lessonsClientManifest = defineClientModule({
   endSteps: [reflectionStepUi],
   startSteps: [topicStartStep],
   dashboardSlots: [focusDashboardSlot],
-  teacherPages: [{ key: 'topics', path: 'topics', labelKey: 'teacher.topics', Icon: IconBook, order: 45, Component: TopicsPage }],
+  teacherPages: [{ key: 'topics', path: 'topics', labelKey: 'teacher.topics', Icon: IconBook, order: 45, group: 'setup', setupTab: 'lessons', Component: TopicsPage }],
   invalidations: [lessonInvalidation],
 });
