@@ -384,7 +384,7 @@ test('evidence: only text, link and document while the media flags are off; pict
       { name: 'poster-two.png', mimeType: 'image/png', buffer: png },
     ]);
     await expect(form.getByTestId('evidence-pending').getByRole('listitem')).toHaveCount(2);
-    await form.getByLabel('A few words about it (optional)').fill('My two posters');
+    await form.getByLabel('A few words (you can skip this)').fill('My two posters');
     await form.getByRole('button', { name: 'Add 2 items' }).click();
     await expect(list.locator('[data-kind="picture"]').filter({ hasText: 'My two posters' })).toHaveCount(2);
     // Tap a picture to see it large.
@@ -415,7 +415,7 @@ test('evidence: only text, link and document while the media flags are off; pict
     await form.getByRole('button', { name: 'Take the picture' }).click();
     await form.getByRole('button', { name: 'Use this picture' }).click();
     await expect(form.getByTestId('evidence-pending').getByRole('listitem')).toHaveCount(1);
-    await form.getByLabel('A few words about it (optional)').fill('Taken in class');
+    await form.getByLabel('A few words (you can skip this)').fill('Taken in class');
     await form.getByRole('button', { name: 'Save my work' }).click();
     await expect(list.locator('[data-kind="picture"]').filter({ hasText: 'Taken in class' })).toHaveCount(1);
 
@@ -436,7 +436,7 @@ test('evidence: only text, link and document while the media flags are off; pict
     await p.waitForTimeout(1200);
     await form.getByRole('button', { name: 'Stop' }).click();
     await expect(form.getByLabel('Your recording')).toBeVisible();
-    await form.getByLabel('A few words about it (optional)').fill('Me reading aloud');
+    await form.getByLabel('A few words (you can skip this)').fill('Me reading aloud');
     await form.getByRole('button', { name: 'Save my work' }).click();
     await expect(list.locator('[data-kind="audio"]').filter({ hasText: 'Me reading aloud' })).toBeVisible();
 
@@ -447,7 +447,7 @@ test('evidence: only text, link and document while the media flags are off; pict
       mimeType: 'audio/wav',
       buffer: silentWav(),
     });
-    await form.getByLabel('A few words about it (optional)').fill('Our class song');
+    await form.getByLabel('A few words (you can skip this)').fill('Our class song');
     await form.getByRole('button', { name: 'Save my work' }).click();
     await expect(list.locator('[data-kind="audio"]').filter({ hasText: 'Our class song' })).toBeVisible();
     // The work list with every kind of evidence (success toasts still fading in are not part of it).

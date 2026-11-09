@@ -41,6 +41,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL,
+    // A click or fill on a label that no longer exists fails fast instead of waiting for the test timeout.
+    actionTimeout: 20_000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     locale: 'en-GB',

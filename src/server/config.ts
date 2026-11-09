@@ -39,6 +39,12 @@ const EnvSchema = z.object({
    * always ignored in production (see `loginRateLimitMax`).
    */
   CC_TEST_LOGIN_RATE_LIMIT: z.coerce.number().int().min(1).max(10_000).optional(),
+  /**
+   * Test-only override of the PIN unlock rate limit (requests per minute per address) for the e2e
+   * server, whose suite unlocks the PIN many times from one address. Honoured only when NODE_ENV=test
+   * (see `pinUnlockRateLimitMax`). Wrong PINs are still counted per session by the auth service.
+   */
+  CC_TEST_PIN_RATE_LIMIT: z.coerce.number().int().min(1).max(10_000).optional(),
   /** Upload quotas in MB (STU-8): all files of one student, and all files on the server. */
   UPLOAD_STUDENT_QUOTA_MB: z.coerce.number().int().min(1).max(100_000).default(100),
   UPLOAD_GLOBAL_QUOTA_MB: z.coerce.number().int().min(1).max(10_000_000).default(10_240),
@@ -84,6 +90,14 @@ export const LOGIN_RATE_LIMIT_MAX = 20;
  */
 export function loginRateLimitMax(e: { NODE_ENV: string; CC_TEST_LOGIN_RATE_LIMIT?: number | undefined }): number {
   return e.NODE_ENV === 'test' && e.CC_TEST_LOGIN_RATE_LIMIT !== undefined ? e.CC_TEST_LOGIN_RATE_LIMIT : LOGIN_RATE_LIMIT_MAX;
+}
+
+/** PIN unlock attempts per minute per address. */
+export const PIN_UNLOCK_RATE_LIMIT_MAX = 15;
+
+/** The PIN unlock rate limit to use; like the sign-in limit, the e2e override applies only under NODE_ENV=test. */
+export function pinUnlockRateLimitMax(e: { NODE_ENV: string; CC_TEST_PIN_RATE_LIMIT?: number | undefined }): number {
+  return e.NODE_ENV === 'test' && e.CC_TEST_PIN_RATE_LIMIT !== undefined ? e.CC_TEST_PIN_RATE_LIMIT : PIN_UNLOCK_RATE_LIMIT_MAX;
 }
 
 /**
@@ -147,6 +161,8 @@ export type Config = z.infer<typeof EnvSchema> & {
   smtpEnabled: boolean;
   /** Effective sign-in attempts per minute per address (20 except under NODE_ENV=test with the override). */
   loginRateLimit: number;
+  /** Effective PIN unlock attempts per minute per address (15 except under NODE_ENV=test with the override). */
+  pinUnlockRateLimit: number;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Partial<Config> = {}): Config {
@@ -174,6 +190,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
     isProd: e.NODE_ENV === 'production',
     smtpEnabled: e.SMTP_HOST.length > 0 || (e.NODE_ENV === 'test' && Boolean(e.CC_TEST_MAIL_DIR)),
     loginRateLimit: loginRateLimitMax(e),
+    pinUnlockRateLimit: pinUnlockRateLimitMax(e),
     ...overrides,
   };
 }

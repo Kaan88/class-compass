@@ -34,6 +34,8 @@ Object.assign(process.env, {
   CC_DEMO_PASSWORD: process.env.E2E_PASSWORD ?? 'e2e-only-Passw0rd!',
   // The suite signs in many times; the override is honoured only under NODE_ENV=test (config.ts).
   CC_TEST_LOGIN_RATE_LIMIT: '1000',
+  // The suite also unlocks the PIN many times from one address (same rule: NODE_ENV=test only).
+  CC_TEST_PIN_RATE_LIMIT: '1000',
   CC_TEST_MAIL_DIR: mailDir,
   // No network in tests: the weather service is unreachable, so the widget stays hidden (D-106).
   WEATHER_API_URL: 'http://127.0.0.1:9/v1/forecast',

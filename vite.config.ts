@@ -23,6 +23,10 @@ const studentPageInDev = (): Plugin => ({
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), studentPageInDev()],
+  // `.env` belongs to the Node server (`--env-file-if-exists=.env`) and sets NODE_ENV=development for
+  // local runs. Vite must not read it: a NODE_ENV from `.env` makes `vite build` emit React's
+  // development build (twice the size; caught by the S14d student budget). The client uses no VITE_ vars.
+  envDir: false,
   build: {
     outDir: 'dist/client',
     emptyOutDir: true,

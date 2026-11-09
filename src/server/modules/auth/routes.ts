@@ -75,7 +75,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     deps,
     C.unlockPin,
     async (ctx, input) => ({ unlockedUntil: await svc.unlockPin(ctx, requireUser(ctx), ctx.session!, input.pin) }),
-    { rateLimit: { max: 15, timeWindow: '1 minute' } },
+    { rateLimit: { max: deps.config.pinUnlockRateLimit, timeWindow: '1 minute' } },
   );
 
   route(app, deps, C.lockNow, (ctx) => {
