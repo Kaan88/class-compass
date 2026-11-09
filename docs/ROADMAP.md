@@ -218,6 +218,35 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] E2E: admin creates links in the UI; a phone scorer searches "isik", gives +1, undoes; the 1920×1080 board updates live without reload; placeholder after the weekly rollover (test clock)
 - [x] Review fixes (D-129/D-130/D-131/D-133 refined): valid pairing codes pair from a shared school address (wrong codes limited per address, school-wide guard ends codes after 100 wrong ones); pairing codes never exported; offline points dated at the tap (up to 4 days) and the rate limit measured on tap times; "My awards today" derived from the outbox (refused awards and undos never shown as done, retries once); weekly history tables built from whole weeks; board messages configurable
 
+## S14 Classroom feedback round 2 (owner/teacher feedback 2026-11-08/09)
+Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, migrations 0017 to 0022. Waves: W1 S14a, S14f, S14e1 · W2 S14b, S14d, S14g · W3 S14c, S14e2 · W4 S14e3 · W5 S14h · W6 S14i.
+- [ ] S14a Quick fixes: per-student counters on by default (D-143), "badges" → "achievements" in EN and TR with a guard test (D-144), evidence buttons that never overflow plus `e2e/button-groups.spec.ts` (D-147)
+- [ ] S14a Sound: WebAudio unlock kept armed until the context runs, louder cues, "Sound is off · Turn sound on" chip, Test sound and diagnostics, new lesson/timer/group/achievement events (D-145)
+  - [ ] Heard by the owner on the MacBook (Safari and Chrome) and on the classroom speakers; iPad silent switch
+- [ ] S14a Avatars: recognisable dinosaurs and mythical creatures (rex, stegosaur, long-neck, unicorn, dragon, phoenix), Turkish names (D-146)
+  - [ ] Sare and a few children name each redrawn species
+- [ ] S14f Super Speakers on its own origin: optional `SPEAKERS_ORIGIN`, CSRF by endpoint, host routing with 308s, links and QR codes, service-worker kill switch, OPERATIONS for a second hostname (D-157). No deployment
+- [ ] S14e1 Report views: section catalogue, saved views with a default star, built-in views, Customise tree, collapsible sections, deep links (D-153)
+- [ ] S14b Classroom board: wide routine + timer row, counter bar, full-width student grid, bottom dock with full-screen panel views; every routine stage visible (D-148)
+  - [ ] Customise layout (PIN-gated drag and resize on a 12×12 grid, keyboard and pointer, this class or all classes, relock on save)
+  - [ ] Checked on Sare's MacBook, a 1280×720 projector and a touch panel
+- [ ] S14b Assistant duty ticks on the Start Lesson and End Lesson screens (D-149)
+- [ ] S14d Student page: home tiles and short steps, screens in the query string, simpler words (D-151)
+  - [ ] Tried on a low-end Android phone and an iPhone (tiles, steps, back button, reload, camera and voice)
+- [ ] S14d Sentence starters: built-in EN/TR, teacher and admin lists, `STARTER_UNFINISHED` text check (D-152)
+- [ ] S14g Theme packages: shared validators, safe SVG tree, admin Themes page with import, preview, export, enable (D-158)
+  - [ ] The worked example theme imported and previewed on the classroom display
+- [ ] S14g AI guidelines: `AGENTS.md`, `CLAUDE.md`, generated token table and the full theming guide (D-159)
+- [ ] S14c Groups drag-and-drop in the teacher editor and the classroom group screen, with tap and keyboard fallbacks (D-150)
+  - [ ] Mouse, touch panel, iPad and Android drag, keyboard, VoiceOver
+- [ ] S14e2 Student name → stats: drawer in the teacher area; positive-only card on the classroom screen with no full-stats link (D-154)
+- [ ] S14e3 Notifications: in-app bell and page, categories, optional daily digest (counts only) (D-155)
+  - [ ] Digest received in a real mailbox in EN and TR
+- [ ] S14e3 Teacher menu: Today group, one Class setup hub, pages of switched-off modules hidden (D-156)
+- [ ] S14h MCP: `/mcp` endpoint, personal tokens, OAuth 2.1 with consent page, scopes, audit, KVKK switch off by default with pseudonyms (D-160, D-161)
+  - [ ] Claude Code with a token and the claude.ai/Desktop connector over OAuth against the test server, fictional data only until the owner and the KVKK contact approve
+- [ ] S14i Closing: guides EN and TR, `npm run docs:screenshots`, usability crawl reviewed, full verification
+
 ## User documentation (after S12)
 Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in the app under Help (D-137). Index and screenshot command: `docs/guides/README.md`.
 - [x] Teacher guide (EN, TR): sign-in, PIN and classroom lock, teacher menu, start and end a lesson, classroom screen and every module panel, homework checking, goals and feedback, private notes, student links and cards, achievements and avatars, class settings, reports, importing a student list

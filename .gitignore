@@ -45,3 +45,6 @@ deploy/*.env
 data-test/
 *.db-wal
 *.db-shm
+
+# Agent worktrees (parallel stage runs)
+.claude/worktrees/
