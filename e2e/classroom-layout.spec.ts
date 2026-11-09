@@ -12,6 +12,8 @@
  *    (Turkish-only and English-only show no switch; two languages show it).
  * 4. Usability pass (D-139): End lesson and the class counter are on screen without scrolling at
  *    1920x1080 and 1280x720; size, language and sounds are in the top bar's Display popover.
+ * 5. Known gap until S14b: with the reminder boxes on (the default since D-143) D-139 and D-103 are not
+ *    met yet; a test pins that and tells S14b to turn it into a normal guard.
  */
 import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -190,8 +192,9 @@ test('density and auto-fit: no horizontal scroll on common displays; 19 students
     // default (D-143) and make each card taller: the second pass re-measures with them. The 18-20
     // target with the boxes on comes with the full-width grid of S14b (D-148).
     // Measured 2026-11-09 with the boxes on: 16 at 1440x900 and 1470x956, 12 at 1366x768 and 1280x800,
-    // all 19 from 1920x1080 up.
-    const BOXES_ON_FLOOR: Record<string, number> = { '1440x900': 16, '1470x956': 16, '1920x1080': 19, '2560x1440': 19 };
+    // all 19 from 1920x1080 up. These floors only stop the default (boxes on) from getting worse; the
+    // D-103 target itself is an open S14b item, and the test below that is expected to fail tracks it.
+    const BOXES_ON_FLOOR: Record<string, number> = { '1440x900': 16, '1470x956': 16, '1366x768': 12, '1280x800': 12, '1920x1080': 19, '2560x1440': 19 };
     for (const boxes of [false, true]) {
       await setReminderBoxes(office, ctx.id, boxes);
       for (const vp of VIEWPORTS) {
@@ -325,6 +328,65 @@ test('timer keypad, assistant panel hide/show, and the class language mode on th
   }
 });
 
+/**
+ * Known gap for S14b (S14a review): the default classroom (reminder boxes on since D-143) does not yet
+ * meet D-139 at 1280x720 (the class bar is under the fold) or D-103 at 1440x900 (16 of 19 cards). This
+ * test measures those targets on the default layout, so the gap cannot hide behind a non-default
+ * setting. It pins the gap rather than skipping it (a `test.fail` would also swallow a broken page):
+ * the page must load and the targets must still be missed. Once S14b's board (D-148) meets them, the
+ * last assertion fails with a message saying so, and S14b changes it to `expect(failures).toEqual([])`.
+ */
+test('known gap until S14b (D-139, D-103): the default layout with reminder boxes on keeps the class counter and all 19 cards on screen', async ({ page, browser }) => {
+  test.setTimeout(180_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  await endActiveLessons(page);
+  const ctx = await context3A(page);
+  const original = await modulesOf(page, ctx.id);
+  const officeCtx = await browser.newContext();
+  const office = await officeCtx.newPage();
+  await login(office, 'english');
+  try {
+    await setModules(page, ctx.id, MODULES, original);
+    await setReminderBoxes(office, ctx.id, true);
+    await startLesson(page, ctx.id);
+    const failures: string[] = [];
+    for (const vp of [
+      { name: '1280x720', width: 1280, height: 720, scale: 1 },
+      { name: '1440x900', width: 1440, height: 900, scale: 2 },
+    ]) {
+      const { ctx: c, p } = await onDevice(browser, page, vp);
+      try {
+        await openClassroom(p);
+        // The setup itself must hold, so a broken page never counts as the expected failure.
+        await expect(p.locator('.cc-student-card')).toHaveCount(19);
+        await expect(p.locator('.cc-student-card__add').first()).toBeVisible();
+        await expect(p.getByTestId('lesson-rail').getByRole('button', { name: 'End lesson' }), vp.name).toBeInViewport({ ratio: 1 });
+        const barInView = await p
+          .getByTestId('counter-bar')
+          .first()
+          .evaluate((e) => {
+            const r = e.getBoundingClientRect();
+            return r.height > 0 && r.top < window.innerHeight && r.bottom > 0;
+          });
+        if (!barInView) failures.push(`${vp.name}: class counter bar under the fold`);
+        const visible = await cardsOnScreen(p);
+        test.info().annotations.push({ type: 'known gap (S14b)', description: `${vp.name} with reminder boxes: ${visible} cards on screen, counter bar ${barInView ? 'in view' : 'under the fold'}` });
+        if (vp.width >= 1440 && visible < 18) failures.push(`${vp.name}: ${visible} cards on screen (target 18-20)`);
+      } finally {
+        await c.close();
+      }
+    }
+    // S14b: when this fails, the default layout meets D-139 and D-103: replace it with
+    // `expect(failures, 'D-139/D-103 targets on the default layout').toEqual([])`.
+    expect(failures.length, 'the S14a known gap is closed: make this test a normal guard (see the comment above it)').toBeGreaterThan(0);
+  } finally {
+    await endActiveLessons(page);
+    for (const m of original) await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
+    await officeCtx.close();
+  }
+});
+
 test('usability pass (D-139): End lesson and the class counter are on screen at 1920x1080 and 1280x720 without scrolling', async ({ page, browser }) => {
   test.setTimeout(180_000);
   await login(page, 'english');
@@ -340,6 +402,7 @@ test('usability pass (D-139): End lesson and the class counter are on screen at 
     await setModules(page, ctx.id, MODULES, original);
     // Checked without the per-student boxes (on by default since S14a, D-143): with them the cards are
     // taller and the class bar sits under the fold at 1280x720 until S14b moves it above the grid (D-148).
+    // The default (boxes on) is measured by the "known gap until S14b" test above, which S14b turns green.
     await setReminderBoxes(office, ctx.id, false);
     await startLesson(page, ctx.id);
     for (const vp of [

@@ -221,9 +221,11 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 ## S14 Classroom feedback round 2 (owner/teacher feedback 2026-11-08/09)
 Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, migrations 0017 to 0022. Waves: W1 S14a, S14f, S14e1 · W2 S14b, S14d, S14g · W3 S14c, S14e2 · W4 S14e3 · W5 S14h · W6 S14i.
 - [x] S14a Quick fixes: per-student counters on by default (D-143), "badges" → "achievements" in EN and TR with a guard test (D-144), evidence buttons that never overflow plus `e2e/button-groups.spec.ts` (D-147; also menu tiles, topic choices, group options, reflection, attendance statuses). With the boxes on, 16 cards fit at 1440×900 (19 from 1920×1080); the 18–20 target with boxes comes with S14b's board
+  - [ ] Not met by the default layout yet (open, for S14b): with the boxes on, D-139 fails at 1280×720 (class bar under the fold) and D-103 at 1440×900 (16 of 19 cards); pinned by "known gap until S14b" in `e2e/classroom-layout.spec.ts`
 - [x] S14a Sound: WebAudio unlock kept armed until the context runs, louder cues, "Sound is off · Turn sound on" chip, Test sound and diagnostics, new lesson/timer/group/achievement events (D-145; `groupMove` is declared and played from S14c)
   - [ ] Heard by the owner on the MacBook (Safari and Chrome) and on the classroom speakers; iPad silent switch
 - [x] S14a Avatars: recognisable dinosaurs and mythical creatures (rex, stegosaur, long-neck, unicorn, dragon, phoenix), Turkish names (D-146)
+- [x] S14a Review fixes: headphones, scarf, medal and backpack follow the side-view dinosaur heads and necks, the unicorn's scarf stays off its muzzle (D-146); boxes-on floors at every viewport and a test that pins the D-139/D-103 gap of the default layout for S14b (D-143)
   - [ ] Sare and a few children name each redrawn species
 - [x] S14f Super Speakers on its own origin: optional `SPEAKERS_ORIGIN`, CSRF by endpoint, host routing with 308s, links and QR codes, service-worker kill switch, OPERATIONS for a second hostname (D-157). No deployment
   - [ ] Second hostname set up (tunnel, Cloudflare settings, Access Bypass) and checked with a TV and a phone: only when the owner creates a hostname (OPERATIONS → "Super Speakers on its own hostname")
@@ -233,6 +235,7 @@ Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, m
 - [ ] S14b Classroom board: wide routine + timer row, counter bar, full-width student grid, bottom dock with full-screen panel views; every routine stage visible (D-148)
   - [ ] Customise layout (PIN-gated drag and resize on a 12×12 grid, keyboard and pointer, this class or all classes, relock on save)
   - [ ] Checked on Sare's MacBook, a 1280×720 projector and a touch panel
+  - [ ] Default layout (reminder boxes on, D-143) meets D-139 at 1280×720 and D-103 at 1440×900; "known gap until S14b" in `e2e/classroom-layout.spec.ts` becomes a normal guard
 - [ ] S14b Assistant duty ticks on the Start Lesson and End Lesson screens (D-149)
 - [ ] S14d Student page: home tiles and short steps, screens in the query string, simpler words (D-151)
   - [ ] Tried on a low-end Android phone and an iPhone (tiles, steps, back button, reload, camera and voice)

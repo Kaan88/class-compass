@@ -11,7 +11,9 @@
  * S14a (D-146): the dinosaurs and mythical creatures are redrawn so children can name them at a glance
  * (a T. rex with jaw and teeth, a stegosaur with plates, a long-necked dinosaur, a unicorn with muzzle
  * and spiral horn, a dragon with snout, horns and wings, a phoenix with beak and flame crest).
- * `SPECIES_FACE` places each species' eyes, mouth and hat; specs are unchanged (D-124).
+ * `SPECIES_FACE` places each species' eyes, mouth and hat, and (review fix) the head, neck and back
+ * anchors that put headphones, scarf, medal and backpack on the side-view dinosaurs and keep the
+ * unicorn's scarf off its muzzle; specs are unchanged (D-124).
  */
 import { memo } from 'react';
 import type { AvatarSpecValue, CreatureSpec, PersonSpec } from '../../shared/avatars.ts';
@@ -555,15 +557,29 @@ function Person({ s }: { s: PersonSpec }) {
  * (D-124): the same eyes, mouth and hat options, drawn where they belong on each animal.
  */
 type MouthStyle = 'person' | 'beak' | 'snout' | 'muzzle' | 'jaw';
+/**
+ * Where an accessory goes on a species (S14a review, D-146): the accessory's reference point (see
+ * `ACCESSORY_REF`) is moved to (x, y), scaled and, for a scarf around a slanting neck, turned. Without
+ * an anchor the accessory is drawn where it sits on a person (front view, head in the middle).
+ */
+interface Anchor {
+  x: number;
+  y: number;
+  scale: number;
+  /** Degrees; only the scarf turns with the neck, a medal always hangs straight down. */
+  rotate?: number;
+}
+type AnchorKind = 'head' | 'neck' | 'back';
 interface FaceSpot {
   eyes: { x: number; y: number; dx: number; scale: number };
   mouth: { style: MouthStyle; x: number; y: number; w: number };
   hat: { x: number; top: number; scale: number };
   overHat?: 'horn';
+  anchors?: Partial<Record<AnchorKind, Anchor>>;
 }
-const face = (eyes: Partial<FaceSpot['eyes']>, mouth: Partial<FaceSpot['mouth']>, hat: Partial<FaceSpot['hat']>, overHat?: 'horn'): FaceSpot => {
+const face = (eyes: Partial<FaceSpot['eyes']>, mouth: Partial<FaceSpot['mouth']>, hat: Partial<FaceSpot['hat']>, overHat?: 'horn', anchors?: FaceSpot['anchors']): FaceSpot => {
   const e = { x: 50, y: 50, dx: 9, scale: 1, ...eyes };
-  return { eyes: e, mouth: { style: 'person', x: 50, y: e.y + 11, w: 14, ...mouth }, hat: { x: 50, top: 22, scale: 1, ...hat }, overHat };
+  return { eyes: e, mouth: { style: 'person', x: 50, y: e.y + 11, w: 14, ...mouth }, hat: { x: 50, top: 22, scale: 1, ...hat }, overHat, anchors };
 };
 export const SPECIES_FACE: Readonly<Record<string, FaceSpot>> = {
   cat: face({}, {}, { top: 26 }),
@@ -573,17 +589,49 @@ export const SPECIES_FACE: Readonly<Record<string, FaceSpot>> = {
   apple: face({ y: 58 }, {}, {}),
   carrot: face({ y: 58 }, {}, {}),
   strawberry: face({ y: 58 }, {}, {}),
-  // Dinosaurs, seen from the side and facing right.
-  rex: face({ x: 71, y: 33, dx: 5, scale: 0.75 }, { style: 'jaw', x: 76, y: 44, w: 26 }, { x: 68, top: 20, scale: 0.7 }),
-  spikes: face({ x: 80, y: 57, dx: 4.5, scale: 0.6 }, { style: 'snout', x: 87, y: 64, w: 7 }, { x: 80, top: 45, scale: 0.55 }),
-  longNeck: face({ x: 67, y: 18, dx: 4, scale: 0.55 }, { style: 'snout', x: 74, y: 23, w: 6 }, { x: 66, top: 12, scale: 0.5 }),
-  // Mythical creatures, from the front.
-  unicorn: face({ y: 44 }, { style: 'muzzle', y: 74, w: 10 }, { top: 24 }, 'horn'),
+  // Dinosaurs, seen from the side and facing right: headphones on the head, a scarf round the slanting
+  // neck, a medal on the chest and a backpack on the back or flank.
+  rex: face({ x: 71, y: 33, dx: 5, scale: 0.75 }, { style: 'jaw', x: 76, y: 44, w: 26 }, { x: 68, top: 20, scale: 0.7 }, undefined, {
+    head: { x: 71, y: 36, scale: 0.62 },
+    neck: { x: 55, y: 57, scale: 0.6, rotate: 30 },
+    back: { x: 34, y: 66, scale: 0.85, rotate: -15 },
+  }),
+  spikes: face({ x: 80, y: 57, dx: 4.5, scale: 0.6 }, { style: 'snout', x: 87, y: 64, w: 7 }, { x: 80, top: 45, scale: 0.55 }, undefined, {
+    head: { x: 83, y: 58, scale: 0.45 },
+    neck: { x: 70, y: 63, scale: 0.5, rotate: 70 },
+    back: { x: 40, y: 60, scale: 0.85, rotate: 90 },
+  }),
+  longNeck: face({ x: 67, y: 18, dx: 4, scale: 0.55 }, { style: 'snout', x: 74, y: 23, w: 6 }, { x: 66, top: 12, scale: 0.5 }, undefined, {
+    head: { x: 68, y: 20, scale: 0.45 },
+    neck: { x: 62, y: 54, scale: 0.5, rotate: 20 },
+    back: { x: 38, y: 68, scale: 0.8, rotate: 90 },
+  }),
+  // Mythical creatures, from the front. The unicorn's long muzzle reaches the person's neck line, so its
+  // scarf and medal go lower, under the head.
+  unicorn: face({ y: 44 }, { style: 'muzzle', y: 74, w: 10 }, { top: 24 }, 'horn', { neck: { x: 50, y: 84, scale: 0.9 } }),
   dragon: face({ y: 46 }, { style: 'snout', y: 66, w: 14 }, { top: 26 }),
   phoenix: face({ y: 46, dx: 8 }, { style: 'beak', y: 54, w: 12 }, { top: 30 }),
 };
 const DEFAULT_FACE = face({}, {}, {});
 export const faceOf = (s: Pick<CreatureSpec, 'species'>): FaceSpot => SPECIES_FACE[s.species] ?? DEFAULT_FACE;
+
+/**
+ * Which anchor each accessory follows, and the point of the person drawing that lands on the anchor:
+ * the middle of the headphones, the middle of the scarf (the medal's ribbon hangs from the same neck
+ * line) and the middle of the backpack. Wand, ball and book are held at the side and stay put.
+ */
+export const ACCESSORY_ANCHOR: Readonly<Record<string, AnchorKind>> = { headphones: 'head', scarf: 'neck', medal: 'neck', backpack: 'back' };
+const ACCESSORY_REF: Readonly<Record<AnchorKind, { x: number; y: number }>> = { head: { x: 50, y: 44 }, neck: { x: 50, y: 73 }, back: { x: 25, y: 85 } };
+
+/** The SVG transform that puts an accessory on its species' anchor (none when the species has none). */
+export function accessoryTransform(species: string, accessory: string): string | undefined {
+  const kind = ACCESSORY_ANCHOR[accessory];
+  const a = kind ? SPECIES_FACE[species]?.anchors?.[kind] : undefined;
+  if (!kind || !a) return undefined;
+  const ref = ACCESSORY_REF[kind];
+  const turn = a.rotate && accessory !== 'medal' ? ` rotate(${a.rotate})` : '';
+  return `translate(${a.x} ${a.y})${turn} scale(${a.scale}) translate(${-ref.x} ${-ref.y})`;
+}
 
 /** Mouth options that show an open mouth on a snout or a jaw. */
 const OPEN = new Set(['grin', 'laugh', 'teeth', 'tongue']);
@@ -978,7 +1026,11 @@ function Creature({ s }: { s: CreatureSpec }) {
         <Hat kind={s.hat} colour={s.accentColor} top={h.top} />
       </g>
       {f.overHat === 'horn' ? <Horn /> : null}
-      <Accessory kind={s.accessory} colour={s.accentColor} />
+      {s.accessory !== 'none' ? (
+        <g data-part="accessory" transform={accessoryTransform(s.species, s.accessory)}>
+          <Accessory kind={s.accessory} colour={s.accentColor} />
+        </g>
+      ) : null}
     </g>
   );
 }

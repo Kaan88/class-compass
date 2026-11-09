@@ -8,7 +8,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { BadgeArt, GLYPHS } from '../../src/client/achievements/icons.tsx';
-import { AvatarArt } from '../../src/client/avatars/AvatarArt.tsx';
+import { AvatarArt, accessoryTransform, faceOf } from '../../src/client/avatars/AvatarArt.tsx';
 import { contrast } from '../../src/client/themes/contrast.ts';
 import { themeTokens } from '../../src/client/themes/css.ts';
 import { THEME_LIST } from '../../src/client/themes/registry.ts';
@@ -150,6 +150,61 @@ describe('recognisable creatures (S14a, D-146)', () => {
     expect(part('mythical', 'unicorn')).toBe('muzzle');
     expect(part('mythical', 'dragon')).toBe('snout');
     expect(part('animals', 'cat')).toBe('mouth');
+  });
+
+  /** Where a point of the person drawing lands after an SVG transform list (translate, rotate, scale). */
+  const apply = (transform: string | null | undefined, [x0, y0]: [number, number]): [number, number] => {
+    const ops = [...(transform ?? '').matchAll(/(translate|rotate|scale)\(([^)]*)\)/g)].map((m) => [m[1]!, m[2]!.trim().split(/[\s,]+/).map(Number)] as const);
+    let [x, y] = [x0, y0];
+    for (const [op, a] of ops.reverse()) {
+      if (op === 'translate') [x, y] = [x + a[0]!, y + (a[1] ?? 0)];
+      else if (op === 'scale') [x, y] = [x * a[0]!, y * (a[1] ?? a[0]!)];
+      else {
+        const r = (a[0]! * Math.PI) / 180;
+        [x, y] = [x * Math.cos(r) - y * Math.sin(r), x * Math.sin(r) + y * Math.cos(r)];
+      }
+    }
+    return [x, y];
+  };
+  const accessoryOf = (spec: CreatureSpec) => {
+    const svg = html(createElement(AvatarArt, { spec, size: 48 }));
+    const doc = new DOMParser().parseFromString(svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"'), 'image/svg+xml');
+    return doc.querySelector('[data-part="accessory"]');
+  };
+  const near = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+  it('headphones sit on the head and the scarf round the neck of the side-view dinosaurs (review fix, D-146)', () => {
+    // The headphones are drawn round (50, 44) and the scarf round (50, 73) on a person.
+    for (const { family, species } of ALL_SPECIES_SPECS) {
+      const f = faceOf({ species });
+      const phones = accessoryOf(base(family, species, { accessory: 'headphones' }));
+      expect(phones, species).not.toBeNull();
+      const transform = phones!.getAttribute('transform');
+      expect(transform ?? undefined, species).toBe(accessoryTransform(species, 'headphones'));
+      if (f.eyes.x === 50 && f.eyes.scale === 1) continue; // a front view: drawn as on a person
+      // A side view: the middle of the headphones lands on the head, next to the eyes, and smaller.
+      expect(near(apply(transform, [50, 44]), [f.eyes.x, f.eyes.y]), `${species} headphones`).toBeLessThanOrEqual(6);
+      expect(transform, species).toMatch(/scale\(0\.\d+\)/);
+      // The scarf and the medal move to the neck: between the head and the body, under the eyes.
+      for (const accessory of ['scarf', 'medal'] as const) {
+        const t = accessoryOf(base(family, species, { accessory }))!.getAttribute('transform');
+        const [x, y] = apply(t, [50, 73]);
+        expect(y, `${species} ${accessory}`).toBeGreaterThan(f.eyes.y);
+        expect(y, `${species} ${accessory}`).toBeLessThan(f.eyes.y + 40);
+        expect(Math.abs(x - f.eyes.x), `${species} ${accessory}`).toBeLessThan(20);
+        if (accessory === 'medal') expect(t, species).not.toContain('rotate'); // a medal hangs straight down
+      }
+    }
+    // Held things stay at the side for every species.
+    for (const accessory of ['wand', 'ball', 'book'] as const) expect(accessoryOf(base('dinosaurs', 'rex', { accessory }))!.getAttribute('transform')).toBeNull();
+  });
+
+  it("the unicorn's scarf and medal hang under its muzzle, not over its mouth (review fix, D-146)", () => {
+    const mouthY = faceOf({ species: 'unicorn' }).mouth.y;
+    for (const accessory of ['scarf', 'medal'] as const) {
+      const [, y] = apply(accessoryOf(base('mythical', 'unicorn', { accessory }))!.getAttribute('transform'), [50, 70]);
+      expect(y, accessory).toBeGreaterThan(mouthY + 3);
+    }
   });
 
   it('keeps every stored spec valid: the ready-made list and the catalogue did not change shape (D-124)', () => {
