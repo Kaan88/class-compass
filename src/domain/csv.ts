@@ -28,9 +28,12 @@ export function csvCell(value: CsvValue, delimiter: CsvDelimiter = ','): string 
   return s;
 }
 
+/** One CSV row without its line end (`toCsv` joins these with CRLF). */
+export const csvLine = (r: readonly CsvValue[], delimiter: CsvDelimiter = ','): string => r.map((v) => csvCell(v, delimiter)).join(delimiter);
+
 /** A whole CSV document: BOM, header row, data rows, CRLF line ends (what Excel expects). */
 export function toCsv(header: readonly CsvValue[], rows: readonly (readonly CsvValue[])[], delimiter: CsvDelimiter = ','): string {
-  const line = (r: readonly CsvValue[]) => r.map((v) => csvCell(v, delimiter)).join(delimiter);
+  const line = (r: readonly CsvValue[]) => csvLine(r, delimiter);
   return CSV_BOM + [line(header), ...rows.map(line)].join('\r\n') + '\r\n';
 }
 

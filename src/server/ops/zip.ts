@@ -2,7 +2,12 @@
  * Minimal ZIP writer for data exports (DAT-4, D-090): deflate for text, store for uploads (already
  * compressed images/documents), UTF-8 names, written to a file entry by entry. No ZIP64: an export
  * larger than 4 GiB is refused with EXPORT_TOO_LARGE (the backup, a tar file, has no such limit).
+ * `addStream` writes an entry piece by piece (S15a, D-162: big tables are never held in memory whole);
+ * its local header is written first and filled in when the entry ends, so the file is the same as
+ * with `add`.
  */
+import crypto from 'node:crypto';
+import { once } from 'node:events';
 import fsp from 'node:fs/promises';
 import zlib from 'node:zlib';
 import { AppError } from '../lib/errors.ts';
@@ -49,13 +54,7 @@ export class ZipWriter {
     this.offset += buf.length;
   }
 
-  /** Adds one entry. `compress` = deflate (text); otherwise stored as is. */
-  async add(name: string, data: Buffer, compress = true): Promise<void> {
-    const nameBuf = Buffer.from(name, 'utf8');
-    const crc = zlib.crc32(data) >>> 0;
-    const body = compress ? zlib.deflateRawSync(data, { level: 6 }) : data;
-    const method = compress ? 8 : 0;
-    const { date, time } = dosDateTime(this.mtime);
+  private localHeader(method: number, crc: number, compressed: number, size: number, nameLength: number, date: number, time: number): Buffer {
     const h = Buffer.alloc(30);
     h.writeUInt32LE(0x04034b50, 0);
     h.writeUInt16LE(20, 4);
@@ -64,15 +63,73 @@ export class ZipWriter {
     h.writeUInt16LE(time, 10);
     h.writeUInt16LE(date, 12);
     h.writeUInt32LE(crc, 14);
-    h.writeUInt32LE(body.length, 18);
-    h.writeUInt32LE(data.length, 22);
-    h.writeUInt16LE(nameBuf.length, 26);
+    h.writeUInt32LE(compressed, 18);
+    h.writeUInt32LE(size, 22);
+    h.writeUInt16LE(nameLength, 26);
     h.writeUInt16LE(0, 28);
+    return h;
+  }
+
+  /** Adds one entry. `compress` = deflate (text); otherwise stored as is. */
+  async add(name: string, data: Buffer, compress = true): Promise<void> {
+    const nameBuf = Buffer.from(name, 'utf8');
+    const crc = zlib.crc32(data) >>> 0;
+    const body = compress ? zlib.deflateRawSync(data, { level: 6 }) : data;
+    const method = compress ? 8 : 0;
+    const { date, time } = dosDateTime(this.mtime);
     const offset = this.offset;
-    await this.write(h);
+    await this.write(this.localHeader(method, crc, body.length, data.length, nameBuf.length, date, time));
     await this.write(nameBuf);
     await this.write(body);
     this.entries.push({ name: nameBuf, crc, method, compressed: body.length, size: data.length, offset, date, time });
+  }
+
+  /**
+   * Adds one deflated entry whose content `produce` hands over in pieces through `write` (each piece
+   * is compressed off the main thread and written before `write` resolves, so memory stays bounded).
+   * Returns the entry's size and SHA-256, as the manifest lists them.
+   */
+  async addStream(name: string, produce: (write: (piece: Buffer) => Promise<void>) => Promise<void>): Promise<{ size: number; sha256: string }> {
+    const nameBuf = Buffer.from(name, 'utf8');
+    const { date, time } = dosDateTime(this.mtime);
+    const offset = this.offset;
+    // Placeholder header, filled in below once the sizes and the checksum are known.
+    await this.write(this.localHeader(8, 0, 0, 0, nameBuf.length, date, time));
+    await this.write(nameBuf);
+    const bodyStart = this.offset;
+    const hash = crypto.createHash('sha256');
+    let crc = 0;
+    let size = 0;
+    const deflate = zlib.createDeflateRaw({ level: 6 });
+    let pending: Buffer[] = [];
+    deflate.on('data', (c: Buffer) => pending.push(c));
+    const flushOut = async () => {
+      const out = pending;
+      pending = [];
+      for (const c of out) await this.write(c);
+    };
+    try {
+      await produce(async (piece) => {
+        crc = zlib.crc32(piece, crc);
+        size += piece.length;
+        hash.update(piece);
+        if (!deflate.write(piece)) await once(deflate, 'drain');
+        await flushOut();
+      });
+      const ended = once(deflate, 'end');
+      deflate.end();
+      await ended;
+      await flushOut();
+    } finally {
+      deflate.destroy();
+    }
+    if (size > LIMIT) throw new AppError('CONFLICT', 'The export is larger than 4 GB; use a backup instead', { reason: 'EXPORT_TOO_LARGE' });
+    crc >>>= 0;
+    const compressed = this.offset - bodyStart;
+    const h = this.localHeader(8, crc, compressed, size, nameBuf.length, date, time);
+    await this.fd.write(h, 0, h.length, offset);
+    this.entries.push({ name: nameBuf, crc, method: 8, compressed, size, offset, date, time });
+    return { size, sha256: hash.digest('hex') };
   }
 
   async finish(): Promise<void> {

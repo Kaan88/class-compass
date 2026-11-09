@@ -15,7 +15,12 @@ import { openDatabase, runMigrations } from '../../src/server/db/client.ts';
 import type { AppDeps } from '../../src/server/lib/context.ts';
 import { DEFAULT_RETENTION, backupsToKeep } from '../../src/domain/retention.ts';
 import { createBackup, databaseInUse, LOCK_FILE, listBackups, recordRun, restoreBackup, RestoreRefused, verifyBackup, writeServerLock } from '../../src/server/ops/backup.ts';
-import { cleanupExpiredExports, EXPORT_TTL_MS } from '../../src/server/modules/maintenance/exports.ts';
+import { toCsv, type CsvValue } from '../../src/domain/csv.ts';
+import type { Db } from '../../src/server/db/client.ts';
+import { cleanupExpiredExports, EXPORT_BATCH_ROWS, EXPORT_TTL_MS, NEVER_EXPORTED, SECRET_COLUMN, streamTable, type Builder } from '../../src/server/modules/maintenance/exports.ts';
+import { exportablePrivateNotes, PRIVATE_NOTES_EXPORT_COLUMNS, PRIVATE_NOTES_TABLE } from '../../src/server/modules/goals/history.ts';
+import { exportableSelections, SELECTIONS_TABLE_NAME } from '../../src/server/modules/secret/service.ts';
+import { ZipWriter } from '../../src/server/ops/zip.ts';
 import { offsiteBackup, offsiteProblems, redact, repositoryKind, type ResticRunner } from '../../src/server/ops/restic.ts';
 import { tableCounts } from '../../src/server/ops/version.ts';
 import { Client, Clock, seedUser, type TestEnv } from '../helpers.ts';
@@ -291,6 +296,93 @@ describe('maintenance page and exports (OPS-3, DAT-4, DAT-5)', () => {
     expect(audits.map((a) => a.action)).toEqual(['export.full', 'export.download']);
   });
 
+  it('the streamed full export has exactly the tables, rows and bytes the one-read-per-table export had (S15a, D-162, DAT-4)', async () => {
+    const a = await addStudent(s.teacherA, s.c3a.id, { fullName: '=Işıl Çınar' });
+    const b = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Arda Yıldız' });
+    await ok(upload(s.teacherA, a.id, Buffer.from('A fictional poem\n'), 'poem.txt', 'text/plain'));
+    const l = await startLesson(s.teacherA, s.ctxA.id, { othersPresent: true });
+    expect((await cmd(s.teacherA, 'attendance.setDaily', { contextId: s.ctxA.id, lessonId: l, studentId: b.id, status: 'absent' })).ok).toBe(true);
+    await endLesson(s.teacherA, s.ctxA.id, l);
+    const expected = referenceTables(env.db);
+    const ready = await ok(s.admin.post('/api/admin/exports/full', { confirm: 'EXPORT' }));
+    const res = await env.app.inject({ method: 'GET', url: `/api/admin/exports/${ready.token}`, headers: { cookie: [...s.admin.cookies].map(([k, v]) => `${k}=${v}`).join('; ') } });
+    const entries = unzip(res.rawPayload);
+    const tables = Object.keys(entries).filter((n) => n.startsWith('tables/'));
+    expect(tables.sort()).toEqual([...expected.keys()].map((t) => `tables/${t}.csv`).sort());
+    for (const [t, csv] of expected) expect(entries[`tables/${t}.csv`]!.equals(csv), t).toBe(true);
+    const manifest = JSON.parse(entries['manifest.json']!.toString('utf8'));
+    expect(Object.keys(manifest.tables).sort()).toEqual([...expected.keys()].sort());
+    for (const f of manifest.files) expect(crypto.createHash('sha256').update(entries[f.name]!).digest('hex'), f.name).toBe(f.sha256);
+    expect(manifest.uploads).toEqual({ count: 1, missing: 0 });
+    expect(Object.keys(entries).filter((n) => n.startsWith('uploads/'))).toHaveLength(1);
+    // The snapshot connection is closed and leaves nothing behind.
+    expect(fs.readdirSync(path.join(path.dirname(env.config.dbPath), 'exports')).filter((n) => n.includes('snapshot'))).toEqual([]);
+  });
+
+  it('a big table is written in pieces with turns of the event loop in between, byte for byte as one piece (S15a, D-162)', async () => {
+    const rowsCount = EXPORT_BATCH_ROWS * 5 + 123;
+    let produced = 0;
+    function* rows() {
+      for (let i = 0; i < rowsCount; i++) {
+        produced += 1;
+        yield { id: `row-${i}`, text: i % 7 === 0 ? `=fictional, "quoted" ${i}` : `Kurgu satır ${i}`, n: i, pin_hash: 'never' };
+      }
+    }
+    const file = path.join(dir, 'piece.zip');
+    const b: Builder = { zip: await ZipWriter.create(file, env.clock.now()), files: [], tables: {} };
+    const seen: number[] = [];
+    let running = true;
+    const sample = () => {
+      seen.push(produced);
+      if (running) setImmediate(sample);
+    };
+    setImmediate(sample);
+    await streamTable(b, 'fictional', ['id', 'text', 'n', 'pin_hash'], rows());
+    running = false;
+    await b.zip.finish();
+    // Other work ran while the one table was being written, at least once per piece.
+    expect(seen.filter((n) => n > 0 && n < rowsCount).length).toBeGreaterThanOrEqual(5);
+    const entry = unzip(fs.readFileSync(file))['tables/fictional.csv']!;
+    const all = [...rows()];
+    expect(entry.equals(Buffer.from(toCsv(['id', 'text', 'n', 'pin_hash'], all.map((r) => [r.id, r.text, r.n, ''])), 'utf8'))).toBe(true);
+    expect(b.tables.fictional).toBe(rowsCount);
+    expect(b.files[0]).toEqual({ name: 'tables/fictional.csv', size: entry.length, sha256: crypto.createHash('sha256').update(entry).digest('hex') });
+  });
+
+  it('the full export is one consistent snapshot although the school keeps writing while it runs (S15a, D-162)', async () => {
+    const insert = env.db.$client.prepare("insert into audit_events (id, at, actor_type, action, entity) values (?, ?, 'system', 'fictional.bulk', 'fictional')");
+    env.db.$client.transaction(() => {
+      for (let i = 0; i < EXPORT_BATCH_ROWS * 4; i++) insert.run(`00000000-0000-7000-8000-${String(i).padStart(12, '0')}`, env.clock.now());
+    })();
+    // Each tick writes one audit row and one user setting in the same transaction (tables far apart in the export).
+    const tickAudit = env.db.$client.prepare("insert into audit_events (id, at, actor_type, action, entity, entity_id) values (?, ?, 'system', 'fictional.tick', 'fictional', ?)");
+    const tickSetting = env.db.$client.prepare("insert into user_settings (user_id, key, value_json, updated_at) values (?, ?, '1', ?)");
+    let ticks = 0;
+    let running = true;
+    const tick = () => {
+      if (!running) return;
+      ticks += 1;
+      env.db.$client.transaction(() => {
+        tickAudit.run(crypto.randomUUID(), env.clock.now(), `tick-${ticks}`);
+        tickSetting.run(s.adminUser.id, `fictional.tick.${ticks}`, env.clock.now());
+      })();
+      setImmediate(tick);
+    };
+    setImmediate(tick);
+    const ready = await ok(s.admin.post('/api/admin/exports/full', { confirm: 'EXPORT', includeUploads: false }));
+    running = false;
+    const res = await env.app.inject({ method: 'GET', url: `/api/admin/exports/${ready.token}`, headers: { cookie: [...s.admin.cookies].map(([k, v]) => `${k}=${v}`).join('; ') } });
+    const entries = unzip(res.rawPayload);
+    const ticksIn = (csv: string, re: RegExp) => [...csv.matchAll(re)].map((m) => Number(m[1])).sort((x, y) => x - y);
+    const auditTicks = ticksIn(entries['tables/audit_events.csv']!.toString('utf8'), /tick-(\d+)/gu);
+    const settingTicks = ticksIn(entries['tables/user_settings.csv']!.toString('utf8'), /fictional\.tick\.(\d+)/gu);
+    // Both tables stop at the same write, and writes kept coming after it (the export yielded).
+    expect(auditTicks).toEqual(settingTicks);
+    expect(auditTicks).toEqual(Array.from({ length: auditTicks.length }, (_, i) => i + 1));
+    expect(ticks).toBeGreaterThan(auditTicks.length + 3);
+    expect(entries['tables/audit_events.csv']!.toString('utf8').split('fictional.bulk').length - 1).toBe(EXPORT_BATCH_ROWS * 4);
+  });
+
   it('an export can be downloaded only by the administrator who prepared it, and an expired one is deleted without a download (D-090)', async () => {
     await seedUser(env, 'admin', 'second.admin');
     const other = new Client(env);
@@ -403,6 +495,36 @@ describe('school-year rollover (DAT-1, DAT-2)', () => {
     expect((env.db.$client.prepare('select count(*) as n from enrolments where student_id = ?').get(kid.id) as { n: number }).n).toBe(2);
   });
 });
+
+/**
+ * The full export's tables as the export before S15a wrote them (one `select *` per table, then one
+ * CSV): the reference the streamed export must match byte for byte.
+ */
+function referenceTables(db: Db): Map<string, Buffer> {
+  const cell = (v: unknown): CsvValue => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'number') return v;
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    if (typeof v === 'string') return v;
+    if (Buffer.isBuffer(v)) return v.toString('base64');
+    return JSON.stringify(v);
+  };
+  const csv = (columns: string[], rows: Array<Record<string, unknown>>) => Buffer.from(toCsv(columns, rows.map((r) => columns.map((c) => (SECRET_COLUMN.test(c) ? '' : cell(r[c]))))), 'utf8');
+  const out = new Map<string, Buffer>();
+  out.set(PRIVATE_NOTES_TABLE, csv([...PRIVATE_NOTES_EXPORT_COLUMNS], exportablePrivateNotes(db)));
+  const names = (db.$client.prepare("select name from sqlite_master where type = 'table' and name not like 'sqlite_%' order by name").all() as Array<{ name: string }>)
+    .map((r) => r.name)
+    .filter((n) => !(NEVER_EXPORTED as readonly string[]).includes(n) && n !== PRIVATE_NOTES_TABLE);
+  for (const t of names) {
+    const columns = (db.$client.prepare('select name from pragma_table_info(?)').all(t) as Array<{ name: string }>).map((c) => c.name);
+    const rows =
+      t === SELECTIONS_TABLE_NAME
+        ? exportableSelections(db).rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.replace(/[A-Z]/gu, (c) => `_${c.toLowerCase()}`), v])))
+        : (db.$client.prepare(`select * from "${t}"`).all() as Array<Record<string, unknown>>);
+    out.set(t, csv(columns, rows));
+  }
+  return out;
+}
 
 /** Tiny ZIP reader for the tests (stored + deflate). */
 function unzip(buf: Buffer): Record<string, Buffer> {

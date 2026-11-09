@@ -28,13 +28,14 @@ import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import type { FastifyReply } from 'fastify';
 import type { Config } from '../../config.ts';
-import { toCsv, type CsvValue } from '../../../domain/csv.ts';
+import { CSV_BOM, csvLine, toCsv, type CsvValue } from '../../../domain/csv.ts';
 import { FULL_EXPORT_CONFIRM, type ExportReady } from '../../../shared/contracts/maintenance.ts';
-import type { Db } from '../../db/client.ts';
+import { openReadSnapshot, type Db } from '../../db/client.ts';
 import { students, type GroupJson, type UnsatisfiedJson } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { randomToken } from '../../lib/crypto.ts';
+import { yieldToEventLoop } from '../../lib/yield.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { appVersion, levelText, migrationLevel } from '../../ops/version.ts';
 import { ZipWriter } from '../../ops/zip.ts';
@@ -83,7 +84,7 @@ function rowsCsv(columns: string[], rows: Array<Record<string, unknown>>): Buffe
   return Buffer.from(toCsv(columns, rows.map((r) => columns.map((c, i) => (blank[i] ? '' : cell(r[c]))))), 'utf8');
 }
 
-interface Builder {
+export interface Builder {
   zip: ZipWriter;
   files: Array<{ name: string; size: number; sha256: string }>;
   tables: Record<string, number>;
@@ -97,6 +98,43 @@ async function addEntry(b: Builder, name: string, data: Buffer, compress = true)
 async function addTable(b: Builder, table: string, columns: string[], rows: Array<Record<string, unknown>>) {
   b.tables[table] = rows.length;
   await addEntry(b, `tables/${table}.csv`, rowsCsv(columns, rows));
+}
+
+/** Rows per piece of a streamed table, and the longest the export works before it lets requests run. */
+export const EXPORT_BATCH_ROWS = 2000;
+const EXPORT_SLICE_MS = 25;
+
+/**
+ * One table as a CSV entry, read row by row and written in pieces (S15a, D-162): never the whole
+ * table in memory, and the event loop gets a turn at least every EXPORT_SLICE_MS (or
+ * EXPORT_BATCH_ROWS rows), so the classroom screens keep answering during a big export. The bytes are
+ * exactly those of `rowsCsv` over the same rows. `onRow` sees every row (the uploads list).
+ */
+export async function streamTable(b: Builder, table: string, columns: string[], rows: Iterable<Record<string, unknown>>, onRow?: (r: Record<string, unknown>) => void) {
+  const blank = columns.map((c) => SECRET_COLUMN.test(c));
+  let count = 0;
+  const name = `tables/${table}.csv`;
+  const entry = await b.zip.addStream(name, async (write) => {
+    let piece = CSV_BOM + csvLine(columns) + '\r\n';
+    let inPiece = 0;
+    let sliceStart = performance.now();
+    for (const r of rows) {
+      onRow?.(r);
+      piece += csvLine(columns.map((c, i) => (blank[i] ? '' : cell(r[c])))) + '\r\n';
+      count += 1;
+      inPiece += 1;
+      if (inPiece >= EXPORT_BATCH_ROWS || (inPiece % 64 === 0 && performance.now() - sliceStart > EXPORT_SLICE_MS)) {
+        await write(Buffer.from(piece, 'utf8'));
+        piece = '';
+        inPiece = 0;
+        await yieldToEventLoop();
+        sliceStart = performance.now();
+      }
+    }
+    await write(Buffer.from(piece, 'utf8'));
+  });
+  b.tables[table] = count;
+  b.files.push({ name, size: entry.size, sha256: entry.sha256 });
 }
 
 async function addUploads(ctx: RequestContext, b: Builder, fileRows: Array<Record<string, unknown>>): Promise<{ count: number; missing: number }> {
@@ -207,25 +245,34 @@ export async function fullExport(ctx: RequestContext, input: { confirm: string; 
   if (input.confirm.trim() !== FULL_EXPORT_CONFIRM) throw invalid(`Type ${FULL_EXPORT_CONFIRM} to confirm`, { reason: 'CONFIRMATION_MISMATCH' });
   const includeUploads = input.includeUploads ?? true;
   const ready = await prepare(ctx, `class-compass-export-${stamp(ctx.now())}.zip`, [], async (b) => {
-    let uploads = { count: 0, missing: 0 };
-    let hiddenSelections = 0;
-    // Private teacher notes (owner decision, D-114): included, through the goals module's helper.
-    const notes = exportablePrivateNotes(ctx.db);
-    await addTable(b, PRIVATE_NOTES_TABLE, [...PRIVATE_NOTES_EXPORT_COLUMNS], notes);
-    for (const t of tableNames(ctx.db)) {
-      const columns = columnsOf(ctx.db, t);
-      let rows: Array<Record<string, unknown>>;
-      if (t === SELECTIONS_TABLE_NAME) {
-        const sel = exportableSelections(ctx.db);
-        hiddenSelections = sel.hidden;
-        rows = sel.rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [snake(k), v])));
-      } else {
-        rows = ctx.db.$client.prepare(`select * from ${quote(t)}`).all() as Array<Record<string, unknown>>;
+    // Every table is read from one snapshot (S15a, D-162): the export yields between pieces, and the
+    // writes the school makes meanwhile must not leave it half old, half new.
+    const snap = await openReadSnapshot(ctx.db, path.join(exportsDir(ctx), `${randomToken(24)}.snapshot.db`));
+    try {
+      const db = snap.db;
+      let uploads = { count: 0, missing: 0 };
+      let hiddenSelections = 0;
+      // Private teacher notes (owner decision, D-114): included, through the goals module's helper.
+      const notes = exportablePrivateNotes(db);
+      await addTable(b, PRIVATE_NOTES_TABLE, [...PRIVATE_NOTES_EXPORT_COLUMNS], notes);
+      for (const t of tableNames(db)) {
+        const columns = columnsOf(db, t);
+        if (t === SELECTIONS_TABLE_NAME) {
+          const sel = exportableSelections(db);
+          hiddenSelections = sel.hidden;
+          await addTable(b, t, columns, sel.rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [snake(k), v]))));
+          continue;
+        }
+        // Only what the uploads need is kept of the files rows.
+        const liveFiles: Array<Record<string, unknown>> = [];
+        const keep = t === 'files' && includeUploads ? (r: Record<string, unknown>) => void (r.deleted_at === null && liveFiles.push({ storage_key: r.storage_key, thumb_storage_key: r.thumb_storage_key })) : undefined;
+        await streamTable(b, t, columns, db.$client.prepare(`select * from ${quote(t)}`).iterate() as Iterable<Record<string, unknown>>, keep);
+        if (keep) uploads = await addUploads(ctx, b, liveFiles);
       }
-      await addTable(b, t, columns, rows);
-      if (t === 'files' && includeUploads) uploads = await addUploads(ctx, b, rows.filter((r) => r.deleted_at === null));
+      return { kind: 'full', uploadsIncluded: includeUploads, uploads, secretStudentChoicesNotRevealed: hiddenSelections, privateNotesIncluded: notes.length };
+    } finally {
+      await snap.close();
     }
-    return { kind: 'full', uploadsIncluded: includeUploads, uploads, secretStudentChoicesNotRevealed: hiddenSelections, privateNotesIncluded: notes.length };
   });
   audit(ctx.db, ctx.actor, { action: 'export.full', entity: 'export', entityId: null, after: { fileName: ready.fileName, sizeBytes: ready.sizeBytes, includeUploads, privateNotesIncluded: true } }, ctx.now());
   return ready;

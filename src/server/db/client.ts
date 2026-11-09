@@ -25,6 +25,52 @@ export function runMigrations(db: Db): void {
   migrate(db, { migrationsFolder: MIGRATIONS_DIR });
 }
 
+export interface ReadSnapshot {
+  /** A read-only connection inside one read transaction: every query sees the database as it was when the snapshot was taken. */
+  db: Db;
+  close(): Promise<void>;
+}
+
+/**
+ * A consistent read-only view of the database for long reads that yield to the event loop (S15a,
+ * D-162: the full export). A database file gets its own read-only connection holding one read
+ * transaction: in WAL mode the server's connection keeps writing meanwhile, and the snapshot does not
+ * see those writes. An in-memory database (tests) cannot be opened twice, so it is first copied with
+ * SQLite's online backup to `tmpFile` (removed by `close`).
+ */
+export async function openReadSnapshot(db: Db, tmpFile: string): Promise<ReadSnapshot> {
+  const main = db.$client;
+  let file = main.name;
+  let copy: string | null = null;
+  if (main.memory) {
+    fs.mkdirSync(path.dirname(tmpFile), { recursive: true });
+    await main.backup(tmpFile);
+    file = copy = tmpFile;
+  }
+  const conn = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    conn.pragma('busy_timeout = 5000');
+    conn.exec('BEGIN');
+    // The first read starts the read transaction: the snapshot is taken here.
+    conn.prepare('select count(*) from sqlite_master').get();
+  } catch (err) {
+    conn.close();
+    if (copy) fs.rmSync(copy, { force: true });
+    throw err;
+  }
+  return {
+    db: drizzle(conn, { schema }) as Db,
+    async close() {
+      try {
+        if (conn.inTransaction) conn.exec('COMMIT');
+      } finally {
+        conn.close();
+        if (copy) for (const f of [copy, `${copy}-wal`, `${copy}-shm`, `${copy}-journal`]) fs.rmSync(f, { force: true });
+      }
+    },
+  };
+}
+
 /**
  * Run `fn` in a write transaction (BEGIN IMMEDIATE). better-sqlite3 is synchronous, so
  * services must not await inside `fn`.
