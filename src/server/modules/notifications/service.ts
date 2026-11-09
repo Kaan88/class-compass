@@ -23,8 +23,8 @@ import { evidence, goalEntries, goals, notifications, studentAchievements } from
 import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { getUserSetting, setUserSetting } from '../../lib/userSettings.ts';
-import { studentScope, type ScopeContext, type StudentScope } from '../links/scope.ts';
-import { isModuleEnabled } from '../school/modules.ts';
+import { teacherStudentScopes, type ScopeContext } from '../links/scope.ts';
+import { moduleEnabledLookup } from '../school/modules.ts';
 import { wordListsFor } from '../textChecks/service.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
@@ -38,29 +38,24 @@ const SCAN_MAX = 2000;
  * it is still active, otherwise the teacher's first current one for the student in that subject).
  */
 export function visibleRows(deps: Pick<AppDeps, 'db' | 'now'>, userId: string, rows: readonly NotificationRow[]): Array<{ row: NotificationRow; sc: ScopeContext; fullName: string }> {
-  const scopes = new Map<string, StudentScope | null>();
-  const moduleOn = new Map<string, boolean>();
   const out: Array<{ row: NotificationRow; sc: ScopeContext; fullName: string }> = [];
+  if (!rows.length) return out;
+  // The teacher's current access is read once per call (S15a, D-162): their active class+subjects,
+  // who is in those classes today and the module switches, a few queries in all. The rules are the
+  // ones `studentScope` applies per student (it used to be called once per student here).
+  const access = teacherStudentScopes(deps, userId);
+  const moduleOn = moduleEnabledLookup(
+    deps.db,
+    // Only the contexts a row can be shown in need their switches.
+    [...new Set(rows.flatMap((r) => (access.scopeOf(r.studentId)?.contexts ?? []).map((c) => c.context.id)))],
+  );
   for (const row of rows) {
-    if (!scopes.has(row.studentId)) {
-      let scope: StudentScope | null = null;
-      try {
-        scope = studentScope(deps, row.studentId);
-      } catch {
-        scope = null;
-      }
-      scopes.set(row.studentId, scope);
-    }
-    const scope = scopes.get(row.studentId);
+    const scope = access.scopeOf(row.studentId);
     if (!scope) continue;
     const module = CATEGORY_MODULE[row.category];
     const options = scope.contexts.filter((c) => {
-      if (c.context.teacherId !== userId) return false;
       if (row.subjectId !== null && c.subject.id !== row.subjectId) return false;
-      if (!module) return true;
-      const k = `${c.context.id}:${module}`;
-      if (!moduleOn.has(k)) moduleOn.set(k, isModuleEnabled(deps.db, c.context.id, module));
-      return moduleOn.get(k)!;
+      return !module || moduleOn(c.context.id, module);
     });
     if (!options.length) continue;
     out.push({ row, sc: options.find((c) => c.context.id === row.contextId) ?? options[0]!, fullName: scope.student.fullName });

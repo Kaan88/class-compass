@@ -3,7 +3,7 @@
  * teacher's per-context switch (default on). Disabling only flips flags: no data is ever deleted.
  * Later stages call `isModuleEnabled` before serving or accepting module data.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { z } from 'zod';
 import {
   CONTEXT_MODULES,
@@ -47,6 +47,26 @@ export function isModuleEnabled(db: Db, contextId: string, module: ModuleKey): b
     .where(and(eq(contextModules.contextId, contextId), eq(contextModules.module, module)))
     .get();
   return row?.enabled ?? true;
+}
+
+/**
+ * `isModuleEnabled` for many contexts at once (S15a, D-162): the admin availability and the
+ * teacher's switches of `contextIds` are read in two queries, then each answer follows exactly the
+ * same rules (unknown contexts fall back to "no row = enabled", as `isModuleEnabled` does).
+ */
+export function moduleEnabledLookup(db: Db, contextIds: readonly string[]): (contextId: string, module: ModuleKey) => boolean {
+  const available = getAvailability(db);
+  const switches = new Map<string, boolean>();
+  const ids = [...new Set(contextIds)];
+  for (let i = 0; i < ids.length; i += 500) {
+    const rows = db.select({ contextId: contextModules.contextId, module: contextModules.module, enabled: contextModules.enabled }).from(contextModules).where(inArray(contextModules.contextId, ids.slice(i, i + 500))).all();
+    for (const r of rows) switches.set(`${r.contextId}:${r.module}`, r.enabled);
+  }
+  return (contextId, module) => {
+    if (!available[module]) return false;
+    if (!isContextModule(module)) return true;
+    return switches.get(`${contextId}:${module}`) ?? true;
+  };
 }
 
 /** Throw FEATURE_DISABLED unless the module is usable in the context. */

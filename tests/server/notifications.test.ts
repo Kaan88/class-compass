@@ -10,11 +10,19 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import sharp from 'sharp';
+import { desc, eq } from 'drizzle-orm';
 import { v7 } from 'uuid';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultAchievementId } from '../../src/shared/achievements.ts';
-import { DEFAULT_ON, NOTIFICATION_CATEGORIES, snippetOf } from '../../src/shared/notifications.ts';
-import { runNotificationTick } from '../../src/server/modules/notifications/digest.ts';
+import { CATEGORY_MODULE, DEFAULT_ON, NOTIFICATION_CATEGORIES, snippetOf } from '../../src/shared/notifications.ts';
+import { purgeNotifications, runNotificationTick } from '../../src/server/modules/notifications/digest.ts';
+import { visibleRows, type NotificationRow } from '../../src/server/modules/notifications/service.ts';
+import { studentScope, type ScopeContext, type StudentScope } from '../../src/server/modules/links/scope.ts';
+import { isModuleEnabled } from '../../src/server/modules/school/modules.ts';
+import { tx } from '../../src/server/db/client.ts';
+import { notifications } from '../../src/server/db/schema.ts';
+import { notify } from '../../src/server/lib/notify.ts';
+import type { AppDeps } from '../../src/server/lib/context.ts';
 import { SERVER_MODULES } from '../../src/server/modules/index.ts';
 import { Client, FakeMailer, makeEnv, seedUser, type TestEnv } from '../helpers.ts';
 import { multipart } from '../import-fixtures.ts';
@@ -37,6 +45,30 @@ let adaPhone: Client;
 /** Mehmet also teaches English in 3-A (a co-teacher); Deniz teaches Mathematics in 3-A. */
 let ctxMehmetEn: { id: string };
 let deniz: Client;
+
+/** The access check as it was before S15a (one studentScope per student), kept as the reference the one-pass check must match. */
+function perStudentVisible(deps: Pick<AppDeps, 'db' | 'now'>, userId: string, rows: readonly NotificationRow[]): Array<{ row: NotificationRow; sc: ScopeContext; fullName: string }> {
+  const scopes = new Map<string, StudentScope | null>();
+  const out: Array<{ row: NotificationRow; sc: ScopeContext; fullName: string }> = [];
+  for (const row of rows) {
+    if (!scopes.has(row.studentId)) {
+      let scope: StudentScope | null = null;
+      try {
+        scope = studentScope(deps, row.studentId);
+      } catch {
+        scope = null;
+      }
+      scopes.set(row.studentId, scope);
+    }
+    const scope = scopes.get(row.studentId);
+    if (!scope) continue;
+    const module = CATEGORY_MODULE[row.category];
+    const options = scope.contexts.filter((c) => c.context.teacherId === userId && (row.subjectId === null || c.subject.id === row.subjectId) && (!module || isModuleEnabled(deps.db, c.context.id, module)));
+    if (!options.length) continue;
+    out.push({ row, sc: options.find((c) => c.context.id === row.contextId) ?? options[0]!, fullName: scope.student.fullName });
+  }
+  return out;
+}
 
 const list = async (c: Client, q = '') => (await ok(c.get(`/api/teacher/notifications${q}`))) as { items: any[]; unread: number; truncated: boolean };
 const rows = () => env.db.$client.prepare('select * from notifications order by created_at, id').all() as any[];
@@ -253,6 +285,60 @@ describe('recipient rules and access at read time', () => {
     expect((await list(s.teacherA)).items).toHaveLength(1);
     await ok(s.admin.post(`/api/admin/students/${ada.id}/deactivate`));
     expect((await list(s.teacherA)).items).toEqual([]);
+  });
+
+  it('many students across many classes: the one-pass access check gives what the per-student check gave, also after access is lost part-way (S15a, D-162)', async () => {
+    // Ayse teaches English in five more classes, five students each; Mehmet co-teaches one of them.
+    const classes = [s.c3a];
+    for (const name of ['4-A', '4-B', '4-C', '5-A', '5-B']) {
+      const cls = await ok(s.admin.post('/api/admin/classes', { schoolYearId: s.year.id, name, grade: Number(name[0]) }));
+      await ok(s.admin.post('/api/admin/teaching-contexts', { teacherId: s.ayse.id, classId: cls.id, subjectId: s.english.id }));
+      classes.push(cls);
+    }
+    const ctxMehmet4a = await ok(s.admin.post('/api/admin/teaching-contexts', { teacherId: s.mehmet.id, classId: classes[1]!.id, subjectId: s.english.id }));
+    const kids = new Map<string, Array<{ id: string }>>();
+    for (const cls of classes) {
+      const list = cls.id === s.c3a.id ? [ada, bora] : [];
+      for (let i = list.length; i < 5; i++) list.push(await addStudent(s.teacherA, cls.id, { fullName: `Kurgu ${cls.name} Öğrenci ${i + 1}` }));
+      kids.set(cls.id, list);
+    }
+    // Rows about every student in English, about the student as a whole, and in Mathematics.
+    await switchOn(s.teacherA, 'avatarChanged');
+    const all = [...kids.values()].flat();
+    tx(env.db, () => {
+      for (const k of all) {
+        notify(env.deps, { category: 'goalCreated', studentId: k.id, subjectId: s.english.id, entity: 'goal', entityId: v7() });
+        notify(env.deps, { category: 'avatarChanged', studentId: k.id, subjectId: null, entity: 'student', entityId: null });
+        notify(env.deps, { category: 'goalCreated', studentId: k.id, subjectId: s.maths.id, entity: 'goal', entityId: v7() });
+      }
+    });
+    const same = async (c: Client, userId: string) => {
+      const mine = env.db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.updatedAt), desc(notifications.id)).all();
+      const got = visibleRows(env.deps, userId, mine).map((v) => [v.row.id, v.sc.context.id, v.fullName]);
+      expect(got).toEqual(perStudentVisible(env.deps, userId, mine).map((v) => [v.row.id, v.sc.context.id, v.fullName]));
+      expect((await ok(c.get('/api/teacher/notifications/count'))).unread).toBe(got.length);
+      return got.length;
+    };
+    expect(await same(s.teacherA, s.ayse.id)).toBe(60); // a goal and an avatar line for each of 30 students
+    expect(await same(s.teacherB, s.mehmet.id)).toBe(10); // 3-A and 4-A, English only
+    // Access lost part-way: one class ended, Goals off in another, a student moved out today, one moving next week, one deactivated.
+    const ctx4b = (await ok(s.teacherA.get('/api/teacher/contexts'))).contexts.find((c: any) => c.classId === classes[2]!.id);
+    await ok(s.admin.post(`/api/admin/teaching-contexts/${ctx4b.id}/end`));
+    const ctx4c = (await ok(s.teacherA.get('/api/teacher/contexts'))).contexts.find((c: any) => c.classId === classes[3]!.id);
+    await ok(s.teacherA.put(`/api/teacher/contexts/${ctx4c.id}/modules/goals`, { enabled: false }));
+    const [m1, m2] = kids.get(classes[4]!.id)!;
+    await ok(s.admin.post('/api/admin/students/move', { studentIds: [m1!.id], toClassId: s.c3b.id }));
+    await ok(s.admin.post('/api/admin/students/move', { studentIds: [m2!.id], toClassId: s.c3b.id, date: '2026-11-16' }));
+    await ok(s.admin.post(`/api/admin/students/${kids.get(classes[5]!.id)![0]!.id}/deactivate`));
+    expect(await same(s.teacherA, s.ayse.id)).toBe(60 - 10 - 5 - 2 - 2); // the avatar lines of 4-C stay (no module)
+    const items = (await list(s.teacherA)).items;
+    expect(items.some((i) => i.context.classId === classes[2]!.id || (i.context.classId === classes[3]!.id && i.category === 'goalCreated') || i.student.id === m1!.id)).toBe(false);
+    expect(items.filter((i) => i.context.classId === classes[3]!.id).map((i) => i.category)).toEqual(Array(5).fill('avatarChanged'));
+    expect(items.some((i) => i.student.id === m2!.id)).toBe(true);
+    // Mehmet's 4-A is still his; his co-teaching does not show him Ayse's ended class.
+    expect(await same(s.teacherB, s.mehmet.id)).toBe(10);
+    await ok(s.admin.post(`/api/admin/teaching-contexts/${ctxMehmet4a.id}/end`));
+    expect(await same(s.teacherB, s.mehmet.id)).toBe(5);
   });
 
   it('hidden, deleted and taken-back items lose their snippet; a word blocked later is never shown', async () => {
@@ -504,6 +590,30 @@ describe('retention, erasure and exports (KVKK)', () => {
     expect(rows()).toHaveLength(2);
   });
 
+  it('the purge deletes in bounded chunks and lets other work run between them (S15a, D-162)', async () => {
+    const old = (n: number) => tx(env.db, () => {
+      for (let i = 0; i < n; i++) notify(env.deps, { category: 'goalCreated', studentId: ada.id, subjectId: s.english.id, entity: 'goal', entityId: v7() });
+    });
+    old(12); // 24 rows: Ayse's and Mehmet's
+    env.clock.advance(91 * DAY);
+    old(1);
+    const oldCount = () => (env.db.$client.prepare('select count(*) as n from notifications where created_at < ?').get(env.clock.now() - 90 * DAY) as { n: number }).n;
+    expect(oldCount()).toBe(24);
+    // Another task samples the table while the purge runs: it sees it part-way.
+    const seen: number[] = [];
+    let running = true;
+    const sample = () => {
+      seen.push(oldCount());
+      if (running) setImmediate(sample);
+    };
+    setImmediate(sample);
+    const purged = await purgeNotifications(env.deps, 5);
+    running = false;
+    expect(purged).toBe(24);
+    expect(rows()).toHaveLength(2);
+    expect(seen.filter((n) => n > 0 && n < 24).length).toBeGreaterThanOrEqual(3);
+  });
+
   it('erasing a student removes their notifications; the per-student export leaves them out, the full export has them', async () => {
     await addGoal();
     expect(rows()).toHaveLength(2);
@@ -528,6 +638,8 @@ describe('retention, erasure and exports (KVKK)', () => {
     expect(JSON.parse(one['manifest.json']!.toString('utf8')).neverExported.join(' ')).toContain('notifications');
     const full = unzip(await download((await ok(s.admin.post('/api/admin/exports/full', { confirm: 'EXPORT', includeUploads: false }))).token));
     expect(full['tables/notifications.csv']!.toString('utf8')).toContain(ada.id);
+    // The in-memory test database is exported from a backup copy (S15a, D-162), removed afterwards.
+    expect((await fsp.readdir(path.join(path.dirname(env.config.dbPath), 'exports'))).filter((n) => n.includes('snapshot'))).toEqual([]);
 
     await ok(s.admin.post(`/api/admin/students/${ada.id}/deactivate`));
     await ok(s.admin.post(`/api/admin/students/${ada.id}/erase`, { confirm: 'Ada Kurgu' }));

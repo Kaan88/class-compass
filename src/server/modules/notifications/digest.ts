@@ -14,14 +14,16 @@
  * A digest row (teacher, local day) is inserted BEFORE the mail goes out, so two ticks never send
  * twice; a failed send is recorded as `failed` and not retried that day (no SMTP hammering).
  */
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import { localDate } from '../../../domain/dates.ts';
 import { categoryOn, NOTIFICATION_CATEGORIES, type NotificationCategory } from '../../../shared/notifications.ts';
 import { translate, type Locale } from '../../../shared/i18n/index.ts';
+import { dateTimeFormat } from '../../../shared/intl.ts';
 import { sortByName } from '../../../shared/text/turkish.ts';
 import { notificationDigests, notifications, users } from '../../db/schema.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { getUserSetting } from '../../lib/userSettings.ts';
+import { yieldToEventLoop } from '../../lib/yield.ts';
 import { getSchoolSettings } from '../school/policy.ts';
 import { visibleRows } from './service.ts';
 
@@ -30,15 +32,32 @@ const DAY_MS = 24 * 3600_000;
 
 /** The hour of `ms` in timezone `tz` (0–23). */
 export function localHour(ms: number, tz: string): number {
-  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(ms));
+  const h = Number(dateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(ms));
   return Number.isFinite(h) ? h % 24 : 0;
 }
 
-/** Deletes notifications and digest records older than the retention period. */
-export function purgeNotifications(deps: Pick<AppDeps, 'db' | 'now' | 'config'>): number {
+/** Rows deleted per statement by the purge (S15a, D-162). */
+export const PURGE_BATCH = 500;
+
+/**
+ * Deletes notifications and digest records older than the retention period, at most `batch` rows per
+ * statement with a turn of the event loop in between (S15a, D-162): one statement over months of rows
+ * held the server for over a second. Returns the number of notifications deleted.
+ */
+export async function purgeNotifications(deps: Pick<AppDeps, 'db' | 'now' | 'config'>, batch = PURGE_BATCH): Promise<number> {
   const cutoff = deps.now() - deps.config.NOTIFICATION_RETENTION_DAYS * DAY_MS;
-  const n = deps.db.delete(notifications).where(lt(notifications.createdAt, cutoff)).run().changes;
-  deps.db.delete(notificationDigests).where(lt(notificationDigests.sentAt, cutoff)).run();
+  const chunked = async (table: typeof notifications | typeof notificationDigests, older: SQL): Promise<number> => {
+    let total = 0;
+    for (;;) {
+      const old = deps.db.select({ rowid: sql<number>`rowid` }).from(table).where(older).limit(batch).all();
+      if (!old.length) return total;
+      total += deps.db.delete(table).where(inArray(sql`rowid`, old.map((r) => r.rowid))).run().changes;
+      if (old.length < batch) return total;
+      await yieldToEventLoop();
+    }
+  };
+  const n = await chunked(notifications, lt(notifications.createdAt, cutoff));
+  await chunked(notificationDigests, lt(notificationDigests.sentAt, cutoff));
   return n;
 }
 
@@ -100,7 +119,7 @@ export function digestMail(locale: Locale, name: string, content: DigestContent,
 
 /** One tick: purge, then the digests that are due. Resolves when every due mail was tried. */
 export async function runNotificationTick(deps: AppDeps): Promise<{ purged: number; sent: number; empty: number; failed: number }> {
-  const purged = purgeNotifications(deps);
+  const purged = await purgeNotifications(deps);
   const result = { purged, sent: 0, empty: 0, failed: 0 };
   const mailer = deps.mailer;
   if (!mailer) return result;
@@ -114,6 +133,8 @@ export async function runNotificationTick(deps: AppDeps): Promise<{ purged: numb
     .where(and(eq(users.role, 'teacher'), isNull(users.disabledAt), isNotNull(users.email)))
     .all();
   for (const u of teachers) {
+    // One teacher at a time, with requests served in between (S15a, D-162).
+    await yieldToEventLoop();
     if (!u.email) continue;
     const settings = getUserSetting(deps.db, u.id, 'notifications.settings');
     if (!settings.digest.enabled || hour < settings.digest.hour) continue;
