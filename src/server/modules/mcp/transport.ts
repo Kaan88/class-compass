@@ -301,7 +301,8 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
         } catch (err) {
           if (err instanceof AppError) {
             const reason = (err.details as { reason?: unknown } | undefined)?.reason;
-            return { result: toolError(err.code, err.message, typeof reason === 'string' ? { reason } : {}), status: err.code === 'FORBIDDEN' ? 'denied' : 'error', errorCode: typeof reason === 'string' ? reason : err.code };
+            // An error message passes the gate too (pseudonymous mode replaces any name in it).
+            return { result: toolError(err.code, privateText(pe, err.message), typeof reason === 'string' ? { reason } : {}), status: err.code === 'FORBIDDEN' ? 'denied' : 'error', errorCode: typeof reason === 'string' ? reason : err.code };
           }
           if (err instanceof z.ZodError) return { result: toolError('INTERNAL', 'The result did not match its schema'), status: 'error', errorCode: 'OUTPUT_SCHEMA' };
           throw err;
