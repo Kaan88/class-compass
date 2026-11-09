@@ -521,9 +521,10 @@ const versionOf = (b: Omit<Board, 'version'>) => sha256(JSON.stringify(b)).slice
 export const boardVersion = (db: Db, now: number) => buildBoard(db, now).version;
 
 // ---------------------------------------------------------------- admin (SSP-4, SSP-10)
+/** Scorer and board links (and their QR codes) point at the Super Speakers origin: SPEAKERS_ORIGIN when set, else PUBLIC_ORIGIN (D-157). */
 function linkUrl(deps: Deps, purpose: string, id: string, cipher: string | null, make: (origin: string, token: string) => string): string | null {
   const token = openSecret(deps.config.SECRET_PEPPER, purpose, id, cipher);
-  return token ? make(deps.config.PUBLIC_ORIGIN, token) : null;
+  return token ? make(deps.config.origins.speakers, token) : null;
 }
 
 function scorerInfo(ctx: RequestContext, l: ScorerLinkRow, weekStart: string, weekEnd: string): ScorerLinkInfo {

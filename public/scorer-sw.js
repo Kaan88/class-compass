@@ -4,7 +4,8 @@
  * so the installed app opens without a connection. It never caches or answers API requests: student
  * lists and awards always come from the server, and awards made offline wait in the app's outbox.
  */
-const CACHE = 'cc-scorer-shell-v1';
+// v2 (S14f, D-157): a fresh shell on the Super Speakers origin; the main host's kill switch deletes every cc-scorer-shell-* cache.
+const CACHE = 'cc-scorer-shell-v2';
 const SHELL = ['/p/app', '/p/manifest.webmanifest', '/p/icon-192.png', '/p/icon-512.png'];
 
 self.addEventListener('install', (event) => {

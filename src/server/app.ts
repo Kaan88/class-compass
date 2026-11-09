@@ -10,6 +10,7 @@ import fastifyStatic from '@fastify/static';
 import type { AppDeps } from './lib/context.ts';
 import { AppError } from './lib/errors.ts';
 import { clientIp } from './lib/http.ts';
+import { isSpeakersHost, movedToSpeakers, pathOf, SCORER_SW_KILL_SWITCH, speakersHostAllows, speakersRedirect } from './lib/speakersHost.ts';
 import { registerModules } from './modules/index.ts';
 import { ensureSchoolDefaults } from './modules/school/defaults.ts';
 import { MAX_UPLOAD_BYTES } from './modules/files/storage.ts';
@@ -93,6 +94,25 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
     if (isStudentPagePath(req.url) || req.url.startsWith('/api/student/')) reply.header('Referrer-Policy', 'no-referrer');
   });
 
+  // Super Speakers on its own origin (S14f, D-157), only while SPEAKERS_ORIGIN is set: the speakers
+  // host serves only the scorer app, the board and their API; the main host moves those pages there
+  // and retires the old scorer service worker. Unset, no hook is installed and nothing changes.
+  const { origins } = deps.config;
+  const notFound = (req: FastifyRequest, reply: FastifyReply) =>
+    req.url.startsWith('/api/') ? reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } }) : reply.status(404).type('text/plain; charset=utf-8').send('Not found');
+  if (origins.split) {
+    app.addHook('onRequest', async (req, reply) => {
+      const path = pathOf(req.url);
+      if (isSpeakersHost(origins, req.host)) {
+        if (speakersHostAllows(path)) return;
+        return notFound(req, reply);
+      }
+      if (req.method !== 'GET' && req.method !== 'HEAD') return;
+      if (movedToSpeakers(path)) return reply.redirect(speakersRedirect(origins, req.url), 308);
+      if (path === '/scorer-sw.js') return reply.type('text/javascript; charset=utf-8').send(SCORER_SW_KILL_SWITCH);
+    });
+  }
+
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof AppError) {
       return reply.status(err.status).send({ error: { code: err.code, message: err.message, details: err.details } });
@@ -132,7 +152,8 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
   app.get(BOARD_PAGE_PATH, page(BOARD_HTML));
 
   app.setNotFoundHandler((req, reply) => {
-    if (req.url.startsWith('/api/')) return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Not found' } });
+    // The speakers host never falls back to the main app's page (D-157).
+    if (req.url.startsWith('/api/') || isSpeakersHost(origins, req.host)) return notFound(req, reply);
     if (fs.existsSync(path.join(CLIENT_DIST, 'index.html'))) return reply.sendFile('index.html');
     return reply.status(404).send('Client not built. Run `npm run build` or use `npm run dev`.');
   });

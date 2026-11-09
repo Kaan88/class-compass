@@ -144,6 +144,25 @@ export function isPinUnlocked(session: SessionRow, now: number): boolean {
 export interface AccessOptions {
   /** See Endpoint.allowWithTemporaryPassword. */
   allowWithTemporaryPassword?: boolean | undefined;
+  /** Which origins may send a mutating request (S14f, D-157); `route()` sets it from the endpoint path. Default `main`. */
+  originClass?: OriginClass | undefined;
+}
+
+/**
+ * Origin classes (S14f, D-157). The Super Speakers scorer app and board may run on their own origin
+ * (`SPEAKERS_ORIGIN`), so their endpoints (`/api/scorer…`, `/api/board…`) accept that origin as well
+ * as the main one; every other endpoint accepts only the main origin (PUBLIC_ORIGIN). The class comes
+ * from the endpoint's declared path when it is registered, never from the request. With
+ * SPEAKERS_ORIGIN unset both origins are the same, so nothing changes.
+ */
+export type OriginClass = 'main' | 'speakers';
+const SPEAKERS_API = /^\/api\/(?:scorer|board)(?:\/|$)/u;
+export const originClassOf = (endpointPath: string): OriginClass => (SPEAKERS_API.test(endpointPath) ? 'speakers' : 'main');
+
+/** The origins a mutating request of this class may come from. */
+export function allowedOrigins(deps: AppDeps, originClass: OriginClass): string[] {
+  const { main, speakers } = deps.config.origins;
+  return originClass === 'speakers' && speakers !== main ? [main, speakers] : [main];
 }
 
 function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext, opts: AccessOptions = {}): void {
@@ -197,8 +216,11 @@ function actorOf(user: UserRow | null, student: StudentPrincipal | null): Actor 
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-/** CSRF: same-origin fetches only. Custom header can't be sent cross-site without CORS. */
-function enforceCsrf(deps: AppDeps, req: FastifyRequest) {
+/**
+ * CSRF: same-origin fetches only. Custom header can't be sent cross-site without CORS. The Origin
+ * header, when present, must be one of the origins of the endpoint's origin class (D-157).
+ */
+function enforceCsrf(deps: AppDeps, req: FastifyRequest, originClass: OriginClass) {
   if (!MUTATING.has(req.method)) return;
   if (req.headers['x-cc-csrf'] !== '1') throw new AppError('CSRF', 'Missing CSRF header');
   const site = req.headers['sec-fetch-site'];
@@ -206,7 +228,7 @@ function enforceCsrf(deps: AppDeps, req: FastifyRequest) {
     throw new AppError('CSRF', 'Cross-site request rejected');
   }
   const origin = req.headers.origin;
-  if (typeof origin === 'string' && origin !== new URL(deps.config.PUBLIC_ORIGIN).origin) {
+  if (typeof origin === 'string' && !allowedOrigins(deps, originClass).includes(origin)) {
     throw new AppError('CSRF', 'Origin mismatch');
   }
 }
@@ -219,7 +241,7 @@ export type Handler<I extends z.ZodType, O extends z.ZodType> = (
 
 /** Build the per-request context and enforce access. Exported for non-JSON routes (files, CSV). */
 export function contextFor(deps: AppDeps, req: FastifyRequest, access: Access, opts: AccessOptions = {}): RequestContext {
-  enforceCsrf(deps, req);
+  enforceCsrf(deps, req, opts.originClass ?? 'main');
   // Student endpoints see ONLY the student session (studentId comes from it, STU-4/5); every other
   // endpoint sees only the teacher/admin session, so a browser holding both never mixes them.
   let ctx: RequestContext;
@@ -260,12 +282,13 @@ export function rawRoute<I extends z.ZodType, O extends z.ZodType>(
 ) {
   if (!ep.access) throw new Error(`Endpoint ${ep.method} ${ep.path} has no access class`);
   registeredEndpoints.push(ep as unknown as Endpoint);
+  const originClass = originClassOf(ep.path);
   app.route({
     method: ep.method,
     url: ep.path,
     config: opts.rateLimit ? { rateLimit: opts.rateLimit } : {},
     handler: async (req, reply) => {
-      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword });
+      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword, originClass });
       const raw = { ...((req.query as object) ?? {}), ...((req.params as object) ?? {}) };
       const parsed = ep.input.safeParse(raw);
       if (!parsed.success) throw new AppError('VALIDATION', 'Invalid input', z.treeifyError(parsed.error));
@@ -286,12 +309,13 @@ export function route<I extends z.ZodType, O extends z.ZodType>(
 ) {
   if (!ep.access) throw new Error(`Endpoint ${ep.method} ${ep.path} has no access class`);
   registeredEndpoints.push(ep as unknown as Endpoint);
+  const originClass = originClassOf(ep.path);
   app.route({
     method: ep.method,
     url: ep.path,
     config: opts.rateLimit ? { rateLimit: opts.rateLimit } : {},
     handler: async (req, reply) => {
-      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword });
+      const ctx = contextFor(deps, req, ep.access, { allowWithTemporaryPassword: ep.allowWithTemporaryPassword, originClass });
       const params = (req.params ?? {}) as Record<string, unknown>;
       const raw = ep.method === 'GET' ? { ...(req.query as object), ...params } : { ...((req.body as object) ?? {}), ...params };
       const parsed = ep.input.safeParse(raw);

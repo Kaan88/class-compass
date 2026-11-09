@@ -8,6 +8,13 @@ const EnvSchema = z.object({
   DATA_DIR: z.string().default('./data'),
   SECRET_PEPPER: z.string().min(16, 'SECRET_PEPPER must be at least 16 characters'),
   PUBLIC_ORIGIN: z.string().url().default('http://localhost:5173'),
+  /**
+   * Super Speakers on its own origin (S14f, D-157): optional, e.g. `https://speakers.example.org`.
+   * When set, the scorer app, the board and their API are served on this hostname (and links and QR
+   * codes point there), and the main hostname redirects `/p`, `/p/app` and `/board` to it. Unset (or
+   * empty, or equal to PUBLIC_ORIGIN) everything stays on PUBLIC_ORIGIN as before. See `resolveOrigins`.
+   */
+  SPEAKERS_ORIGIN: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   TRUST_PROXY: z
     .enum(['true', 'false'])
     .default('false')
@@ -78,7 +85,50 @@ export function loginRateLimitMax(e: { NODE_ENV: string; CC_TEST_LOGIN_RATE_LIMI
   return e.NODE_ENV === 'test' && e.CC_TEST_LOGIN_RATE_LIMIT !== undefined ? e.CC_TEST_LOGIN_RATE_LIMIT : LOGIN_RATE_LIMIT_MAX;
 }
 
+/**
+ * The origins the server answers for (S14f, D-157). `main` is PUBLIC_ORIGIN's origin; `speakers` is
+ * SPEAKERS_ORIGIN's origin, or `main` when it is unset. `split` is true only when Super Speakers has a
+ * hostname of its own; the hosts are lower-case `host[:port]` as browsers send them in `Host`.
+ */
+export interface Origins {
+  main: string;
+  speakers: string;
+  mainHost: string;
+  speakersHost: string;
+  split: boolean;
+}
+
+/**
+ * Work out the origins and refuse invalid combinations (D-157): SPEAKERS_ORIGIN must be a bare
+ * http(s) origin (no path, query, fragment or credentials), use the same scheme as PUBLIC_ORIGIN and
+ * have a hostname of its own (cookies are separated by hostname, not by port). Equal to PUBLIC_ORIGIN
+ * counts as unset.
+ */
+export function resolveOrigins(publicOrigin: string, speakersOrigin?: string | undefined): Origins {
+  const main = new URL(publicOrigin);
+  const mainOrigin = main.origin;
+  if (!speakersOrigin) return { main: mainOrigin, speakers: mainOrigin, mainHost: main.host, speakersHost: main.host, split: false };
+  const refuse = (why: string): never => {
+    throw new Error(`Invalid configuration: SPEAKERS_ORIGIN ${why}`);
+  };
+  let sp: URL;
+  try {
+    sp = new URL(speakersOrigin);
+  } catch {
+    return refuse('is not a valid URL');
+  }
+  if (sp.protocol !== 'https:' && sp.protocol !== 'http:') refuse('must start with https:// (or http:// for local testing)');
+  if (sp.username || sp.password) refuse('must not contain a user name or password');
+  if ((sp.pathname !== '/' && sp.pathname !== '') || sp.search || sp.hash) refuse('must be an origin only, like https://speakers.example.org (no path, query or #)');
+  if (sp.origin === mainOrigin) return { main: mainOrigin, speakers: mainOrigin, mainHost: main.host, speakersHost: main.host, split: false };
+  if (sp.protocol !== main.protocol) refuse(`must use the same scheme as PUBLIC_ORIGIN (${main.protocol}//)`);
+  if (sp.hostname === main.hostname) refuse('must use a different hostname from PUBLIC_ORIGIN (a different port is not enough)');
+  return { main: mainOrigin, speakers: sp.origin, mainHost: main.host, speakersHost: sp.host, split: true };
+}
+
 export type Config = z.infer<typeof EnvSchema> & {
+  /** Main and Super Speakers origins (S14f, D-157), from PUBLIC_ORIGIN and SPEAKERS_ORIGIN. */
+  origins: Origins;
   dbPath: string;
   uploadsDir: string;
   backupsDir: string;
@@ -101,8 +151,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
     throw new Error('Refusing to start in production with the example SECRET_PEPPER');
   }
   const dataDir = path.resolve(e.DATA_DIR);
+  // Computed after the overrides, so a test that overrides PUBLIC_ORIGIN or SPEAKERS_ORIGIN gets
+  // matching (and validated) origins.
+  const origins =
+    overrides.origins ?? resolveOrigins(overrides.PUBLIC_ORIGIN ?? e.PUBLIC_ORIGIN, 'SPEAKERS_ORIGIN' in overrides ? overrides.SPEAKERS_ORIGIN : e.SPEAKERS_ORIGIN);
   return {
     ...e,
+    origins,
     dbPath: path.join(dataDir, 'class-compass.db'),
     uploadsDir: path.join(dataDir, 'uploads'),
     backupsDir: e.BACKUP_DIR ? path.resolve(e.BACKUP_DIR) : path.join(dataDir, 'backups'),
