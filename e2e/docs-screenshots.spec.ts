@@ -186,11 +186,11 @@ for (const lang of ['en', 'tr'] as const) {
       await tp.waitForTimeout(1000);
       await shot(tp, lang, 'classroom');
 
-      // Groups: choose an option, then the full-screen group screen.
-      const groups = tp.getByTestId('groups-panel');
+      // Groups: from the board's dock (S14b) the full-screen group screen; choose an option.
+      const groups = tp.getByTestId('dock-groups');
       if (await groups.count()) {
-        await groups.getByRole('button').first().click();
-        const screen = tp.getByTestId('group-screen');
+        await groups.click();
+        const screen = tp.getByTestId('dock-view-groups');
         await expect(screen).toBeVisible();
         const option = screen.getByTestId('group-options').getByRole('button').first();
         if (await option.count()) await option.click();

@@ -17,7 +17,7 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { dismissToast, showUndoToast } from '../../lib/toast.ts';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
-import { IconFlag, IconPlus, IconUndo } from '../../ui/icons.tsx';
+import { IconFlag, IconPlus, IconTally, IconUndo } from '../../ui/icons.tsx';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { CounterBar } from '../../ui/Students.tsx';
 import { classLabel } from '../lessons/labels.ts';
@@ -215,7 +215,20 @@ function CountersSlot({ context, lesson }: { context: ClassroomContext; lesson: 
   );
 }
 
-export const countersDashboardSlot: DashboardSlot = { key: 'counters', module: 'counters', order: 10, Component: CountersSlot };
+/** Dock badge: the first class bar as "3 / 10" (the number the class sees on the bar anyway). */
+function useCountersBadge(context: ClassroomContext) {
+  const q = useLessonState(context.id);
+  const bar = (q.data?.data.counters?.counters ?? []).find((c) => c.scope !== 'student');
+  return bar ? `${bar.barValue} / ${bar.barSegments}` : null;
+}
+
+export const countersDashboardSlot: DashboardSlot = {
+  key: 'counters',
+  module: 'counters',
+  order: 10,
+  dock: { Icon: IconTally, label: 'module.counters', useBadge: useCountersBadge },
+  Component: CountersSlot,
+};
 
 // ---------------------------------------------------------------- student cards
 const PICK_KEY = 'cc.cardCounter.';

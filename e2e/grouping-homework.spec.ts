@@ -11,7 +11,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
-import { api, ensurePin, login, PIN } from './helpers.ts';
+import { api, closeDock, ensurePin, login, openDock, PIN } from './helpers.ts';
 
 async function endActiveLessons(page: Page) {
   const active = await api(page, 'GET', '/api/classroom/lessons/active');
@@ -75,14 +75,13 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
 
     await page.goto('/classroom');
     await page.getByRole('button', { name: /3-A · English/ }).click();
-    const panel = page.getByTestId('groups-panel');
-    await expect(panel).toBeVisible();
-    await expect(panel.getByText('No groups are shown in this lesson.')).toBeVisible();
+    // Groups are a button in the board's dock (S14b, D-148), without a badge while no groups are shown.
+    await expect(page.getByTestId('dock-groups')).toBeVisible();
+    await expect(page.getByTestId('dock-groups').locator('.cc-dock__badge')).toHaveCount(0);
 
-    // Two taps: Choose groups → an option on the full-screen group screen (GRP-5, D-098).
-    await panel.getByRole('button', { name: 'Choose groups' }).click();
-    const screen = page.getByTestId('group-screen');
-    await expect(screen).toBeVisible();
+    // Two taps: Groups → an option on the full-screen group screen (GRP-5, D-098).
+    const screen = await openDock(page, 'groups');
+    await expect(screen.getByText('Choose an option above')).toBeVisible();
     await expect(screen.getByTestId('group-options').getByRole('button')).toHaveCount(4);
     await screen.getByTestId('group-options').getByRole('button', { name: /Dolphins/ }).click();
     const cards = screen.getByTestId('group-card');
@@ -103,7 +102,7 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     const sizes = () => cards.evaluateAll((els) => els.map((e) => e.querySelectorAll('.cc-group__members > li').length));
     const first = await sizes();
     expect(Math.max(...first) - Math.min(...first)).toBeLessThanOrEqual(1);
-    await axe(page, '[data-testid="group-screen"]');
+    await axe(page, '[data-testid="dock-view-groups"]');
 
     // Shuffle makes new groups; Undo brings the previous ones back.
     const membersOf = () => cards.evaluateAll((els) => els.map((e) => [...e.querySelectorAll('[data-student-id]')].map((m) => m.getAttribute('data-student-id')).join(',')).join('|'));
@@ -137,11 +136,18 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     await screen.getByRole('button', { name: 'Save to option' }).click();
     await expect(screen.getByTestId('group-move-hint')).toHaveText('The groups are saved in this option for next time.');
     await page.reload();
-    await expect(page.getByTestId('groups-panel').locator('.cc-group-chip')).toHaveCount(5);
-    await page.getByTestId('groups-panel').getByRole('button', { name: 'Open groups' }).click();
+    // The dock badge counts the groups in use.
+    await expect(page.getByTestId('dock-groups').locator('.cc-dock__badge')).toHaveText('5');
+    await openDock(page, 'groups');
     await expect(screen.getByTestId('group-member')).toHaveCount(17);
     await expect.poll(membersOf).toBe(afterMoves);
-    if (await page.getByTestId('homework-panel').count()) await axe(page, '[data-testid="homework-panel"]');
+    await closeDock(page, 'groups');
+    if (await page.getByTestId('dock-homework').count()) {
+      await openDock(page, 'homework');
+      await axe(page, '[data-testid="dock-view-homework"]');
+      await closeDock(page, 'homework');
+    }
+    await openDock(page, 'groups');
 
     // No level anywhere on the display or in any classroom response (GRP-7).
     expect(await page.evaluate(() => document.body.innerText)).not.toContain('LVLE2E');
@@ -151,8 +157,8 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
 
     // Hide groups.
     await screen.getByRole('button', { name: 'Hide groups' }).click();
-    await screen.getByRole('button', { name: 'Close' }).click();
-    await expect(page.getByTestId('groups-panel').getByText('No groups are shown in this lesson.')).toBeVisible();
+    await closeDock(page, 'groups');
+    await expect(page.getByTestId('dock-groups').locator('.cc-dock__badge')).toHaveCount(0);
   } finally {
     // Put the demo data back: clear the two absences, restore the levels, end the lesson.
     if (lessonId) {

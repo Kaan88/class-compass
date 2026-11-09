@@ -1,9 +1,9 @@
 /**
  * Client module manifest types (SX, D-069; ARCHITECTURE §2). Each folder under `src/client/modules/`
  * has ONE `manifest.tsx` that lists what the module contributes to the app:
- * - classroom: dashboard slots (stage / actions / panels), Start Lesson steps (each adds its part
- *   of the 'lesson.start' command), End Lesson step screens (matching the server's steps by key),
- *   student-card add-ons;
+ * - classroom: dashboard slots (boxes or dock buttons of the classroom board, S14b), Start Lesson
+ *   steps (each adds its part of the 'lesson.start' command), End Lesson step screens (matching the
+ *   server's steps by key), student-card add-ons;
  * - teacher area: menu entries + their routes (PIN-gated inside TeacherLayout), a class settings panel;
  * - outbox: which queries to refresh after the module's commands;
  * - i18n: the key namespace its strings live under (test-enforced in en + tr).
@@ -32,20 +32,43 @@ export interface ClassroomContext {
 }
 
 /**
- * Where a dashboard slot is shown (S13a layout: the student grid is the main area, a side rail holds
- * the rest): `top` above the student grid (e.g. today's focus), `stage` at the top of the rail before
- * the timer (e.g. the routine stepper), `actions` in the button row before End Lesson (e.g. the
- * attendance button), `panels` (default) in the rail below them.
+ * How a dashboard slot is shown on the classroom board (S14b, D-148): as a box in a row of the board,
+ * or inside the full-screen view that its dock button opens.
  */
-export type DashboardRegion = 'top' | 'stage' | 'actions' | 'panels';
+export type SlotPresentation = 'box' | 'dock';
+
+export interface DashboardSlotProps {
+  context: ClassroomContext;
+  lesson: LessonState;
+  presentation: SlotPresentation;
+}
+
+/**
+ * The slot's button in the board's dock (S14b): icon, label and an optional short badge (a hook,
+ * called on every render of the button). A badge is shown to the class, so it never carries a
+ * sensitive count (no levels, no Secret Student identities, no private data).
+ */
+export interface DockSpec {
+  Icon: ComponentType;
+  label: MessageKey;
+  useBadge?: (context: ClassroomContext, lesson: LessonState) => string | null;
+}
 
 export interface DashboardSlot {
+  /**
+   * The slot's box on the classroom board: a key of `BOX_CATALOGUE` (`shared/classroomLayout.ts`,
+   * test-enforced), which holds its default place (row or dock) and minimum size.
+   */
   key: string;
   module: ContextModule | null;
   order: number;
-  region?: DashboardRegion;
+  /**
+   * With a dock spec the dock shows a button that opens the slot in a full-screen view; without one
+   * the slot renders its own control in the dock (the attendance button and its dialog).
+   */
+  dock?: DockSpec;
   /** May render nothing (null) when it has nothing to show for this lesson. */
-  Component: ComponentType<{ context: ClassroomContext; lesson: LessonState }>;
+  Component: ComponentType<DashboardSlotProps>;
 }
 
 /** What a Start Lesson step may add to the one 'lesson.start' command (everything but the context). */
@@ -69,7 +92,9 @@ export interface StartStep<V = unknown> {
    * Optional React hook: what this step adds to 'lesson.start' and whether "Begin" may be pressed
    * (e.g. false while the step's data is loading). It is called on every Start Lesson render for every
    * registered step, with `enabled` false when the module is off (then it must contribute nothing),
-   * so the number of hook calls never changes. Contributions are merged in step order.
+   * so the number of hook calls never changes. Contributions are merged in step order; `steps`
+   * (the inputs of server start steps, S14b) is merged key by key, so two modules never overwrite
+   * each other's part.
    */
   useContribution?: (context: ClassroomContext, value: V, enabled: boolean) => { input: StartLessonContribution; ready: boolean };
 }

@@ -1,6 +1,7 @@
 /**
  * Groups on the classroom display (DSH-8, GRP-5..7, UX-8; redesigned in S13a, D-098):
- * - a small panel in the dashboard rail shows whether groups are in use and opens the group screen;
+ * - a small panel on the board shows whether groups are in use and opens the group screen; from the
+ *   board's dock (S14b) the group screen opens directly;
  * - the full-screen group screen: the class's options as big buttons with their icon (Lions, Eagles,
  *   Dolphins, Tigers …), Shuffle (with undo), colour cards "Group N" + number icon + member count,
  *   the lesson timer, and moving students by tap (tap a student, then the group) or drag and drop.
@@ -24,12 +25,12 @@ import { queryClient } from '../../lib/queryClient.ts';
 import { BigButton, Button } from '../../ui/Button.tsx';
 import { Modal } from '../../ui/Dialog.tsx';
 import { PanelHead } from '../../ui/Layout.tsx';
-import { IconCheck, IconSwap, IconUndo, IconUsers, IconX } from '../../ui/icons.tsx';
+import { IconCheck, IconGroups, IconSwap, IconUndo, IconUsers, IconX } from '../../ui/icons.tsx';
 import { GroupPicto, OptionPicto } from '../../ui/pictos.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { LessonTimer } from '../lessons/LessonTimer.tsx';
 import { lessonKey, useLessonState, type LessonQueryData } from '../lessons/lessonClient.ts';
-import type { ClassroomContext, DashboardSlot } from '../types.ts';
+import type { ClassroomContext, DashboardSlot, DashboardSlotProps } from '../types.ts';
 import { playEvent } from '../../themes/index.tsx';
 
 const arrangementsKey = (contextId: string) => ['classroom', 'grouping', 'arrangements', contextId] as const;
@@ -65,9 +66,14 @@ function patchMove(contextId: string, studentId: string, toGroupId: string) {
 
 const display = (name: string, upper: boolean) => (upper ? name.toLocaleUpperCase('tr-TR') : name);
 
-function GroupScreen({ context, lesson, st, isOpen, onOpenChange }: { context: ClassroomContext; lesson: LessonState; st: GroupingLessonState; isOpen: boolean; onOpenChange: (v: boolean) => void }) {
+/**
+ * The group screen itself: options, Shuffle (with undo), the group cards and moving students. Shown in
+ * its own full-screen dialog from the panel, or directly in the board's dock view (S14b), whose
+ * dialog already has a Close button (`onClose` absent).
+ */
+function GroupScreenBody({ context, lesson, st, onClose }: { context: ClassroomContext; lesson: LessonState; st: GroupingLessonState; onClose?: () => void }) {
   const { t, locale } = useI18n();
-  const q = useQuery({ queryKey: arrangementsKey(context.id), queryFn: () => call(G.classroomArrangements, { contextId: context.id }), enabled: isOpen });
+  const q = useQuery({ queryKey: arrangementsKey(context.id), queryFn: () => call(G.classroomArrangements, { contextId: context.id }) });
   const [picked, setPicked] = useState<string | null>(null);
   // Undo of the last Shuffle lives on the screen itself: the toast area is outside the modal (inert).
   const [undoTo, setUndoTo] = useState<string | null>(null);
@@ -137,8 +143,7 @@ function GroupScreen({ context, lesson, st, isOpen, onOpenChange }: { context: C
   );
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange} title={t('grouping.title')} size="full" testId="group-screen">
-      <div className="cc-group-screen">
+      <div className="cc-group-screen" data-testid={onClose ? undefined : 'group-screen'}>
         <div className="cc-group-screen__bar">
           <div className="cc-row" role="group" aria-label={t('grouping.options')} data-testid="group-options">
             {(q.data?.arrangements ?? []).map((a) => (
@@ -172,9 +177,11 @@ function GroupScreen({ context, lesson, st, isOpen, onOpenChange }: { context: C
                 </Button>
               </>
             ) : null}
-            <Button size="big" variant="primary" onPress={() => onOpenChange(false)}>
-              {t('common.close')}
-            </Button>
+            {onClose ? (
+              <Button size="big" variant="primary" onPress={onClose}>
+                {t('common.close')}
+              </Button>
+            ) : null}
           </div>
         </div>
         <div className="cc-group-screen__body">
@@ -246,6 +253,14 @@ function GroupScreen({ context, lesson, st, isOpen, onOpenChange }: { context: C
           </div>
         </div>
       </div>
+  );
+}
+
+function GroupScreen({ context, lesson, st, isOpen, onOpenChange }: { context: ClassroomContext; lesson: LessonState; st: GroupingLessonState; isOpen: boolean; onOpenChange: (v: boolean) => void }) {
+  const { t } = useI18n();
+  return (
+    <Modal isOpen={isOpen} onOpenChange={onOpenChange} title={t('grouping.title')} size="full" testId="group-screen">
+      <GroupScreenBody context={context} lesson={lesson} st={st} onClose={() => onOpenChange(false)} />
     </Modal>
   );
 }
@@ -263,11 +278,13 @@ function GroupChip({ group, colour }: { group: DisplayGroup; colour: string }) {
   );
 }
 
-function GroupsSlot({ context, lesson }: { context: ClassroomContext; lesson: LessonState }) {
+function GroupsSlot({ context, lesson, presentation }: DashboardSlotProps) {
   const { t } = useI18n();
   const st = useLessonState(context.id).data?.data.grouping ?? null;
   const [open, setOpen] = useState(false);
   if (!st) return null;
+  // In the dock view (S14b) the group screen is the view: no second full-screen dialog over it.
+  if (presentation === 'dock') return <GroupScreenBody context={context} lesson={lesson} st={st} />;
   return (
     <section className="cc-card cc-stack cc-groups-panel" aria-labelledby="cc-groups-title" data-testid="groups-panel">
       <PanelHead id="cc-groups-title" title={t('grouping.title')}>
@@ -290,4 +307,16 @@ function GroupsSlot({ context, lesson }: { context: ClassroomContext; lesson: Le
   );
 }
 
-export const groupsDashboardSlot: DashboardSlot = { key: 'grouping', module: 'grouping', order: 60, Component: GroupsSlot };
+/** Dock badge: how many groups are in use ("4"), nothing while no groups are shown. */
+function useGroupsBadge(context: ClassroomContext) {
+  const st = useLessonState(context.id).data?.data.grouping ?? null;
+  return st?.applied ? String(st.groups.length) : null;
+}
+
+export const groupsDashboardSlot: DashboardSlot = {
+  key: 'groups',
+  module: 'grouping',
+  order: 60,
+  dock: { Icon: IconGroups, label: 'grouping.title', useBadge: useGroupsBadge },
+  Component: GroupsSlot,
+};

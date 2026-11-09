@@ -24,12 +24,12 @@ import { showToast, showUndoToast } from '../../lib/toast.ts';
 import { celebrate } from '../../themes/Celebration.tsx';
 import { playEvent } from '../../themes/index.tsx';
 import { BigButton, Button } from '../../ui/Button.tsx';
-import { IconStar } from '../../ui/icons.tsx';
+import { IconStar, IconTrophy } from '../../ui/icons.tsx';
 import { PanelHead } from '../../ui/Layout.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { awaitCommand, useLessonRoster } from '../lessons/lessonClient.ts';
-import { endStepUi, type ClassroomContext, type DashboardSlot } from '../types.ts';
+import { endStepUi, type DashboardSlot, type DashboardSlotProps } from '../types.ts';
 
 export const achievementsKey = (contextId: string, lessonId?: string) => ['classroom', 'achievements', contextId, lessonId ?? null] as const;
 
@@ -58,8 +58,16 @@ const NAMED_MAX = 3;
 /** How long the moment waits for the server's list of awarded students before showing the chosen ones. */
 const MOMENT_WAIT_MS = 2500;
 
-function AchievementsSlot({ context, lesson }: { context: ClassroomContext; lesson: LessonState }) {
+function AchievementsSlot({ context, lesson, presentation }: DashboardSlotProps) {
   const { t, locale } = useI18n();
+  // In the board's full-screen dock view the toasts are under the (inert) page: notes and Undo are
+  // shown in the panel instead (S14b, D-148). The panel's own list of this lesson's awards has Undo.
+  const [note, setNote] = useState<{ text: string; kind: 'info' | 'success' | 'error' } | null>(null);
+  const inView = presentation === 'dock';
+  const notify = (message: string, kind: 'info' | 'success' | 'error', scope?: 'classroom') => {
+    if (inView) setNote({ text: message, kind });
+    else showToast({ message, kind, ...(scope ? { scope } : {}) });
+  };
   const q = useClassroomAchievements(context.id, lesson.id);
   const roster = useLessonRoster(context.id, lesson.id).data?.students ?? [];
   const [open, setOpen] = useState(false);
@@ -86,7 +94,7 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
       void queryClient.invalidateQueries({ queryKey: ['classroom', 'achievements', context.id] });
       return r as { studentIds?: string[]; awardIds?: string[] } | undefined;
     });
-    saved.catch(() => showToast({ message: t('achievements.awardFailed'), kind: 'error', scope: 'classroom' }));
+    saved.catch(() => notify(t('achievements.awardFailed'), 'error', 'classroom'));
     // The moment names only the students who were actually awarded (not those who already had the
     // badge). While offline the server's answer may not come quickly: then the chosen students are shown.
     const answer = await Promise.race([saved.catch(() => null), new Promise<'later'>((res) => setTimeout(() => res('later'), MOMENT_WAIT_MS))]);
@@ -94,7 +102,7 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
     const awarded = answer !== 'later' && answer?.studentIds ? answer.studentIds : studentIds;
     const awardIds = answer !== 'later' && answer?.awardIds ? answer.awardIds : [];
     if (!awarded.length) {
-      showToast({ message: t('achievements.alreadyHad'), kind: 'info', scope: 'classroom' });
+      notify(t('achievements.alreadyHad'), 'info', 'classroom');
       return;
     }
     if (!withMoment) {
@@ -122,7 +130,8 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
     const b = badgeOf(id);
     const who = studentIds.length <= NAMED_MAX ? studentIds.map(nameOf).join(', ') : t('achievements.studentCount', { count: studentIds.length });
     const message = t('achievements.givenTo', { badge: b ? pickText(b.name, locale) : '', who });
-    if (awardIds.length) showUndoToast(message, () => undo(awardIds), { scope: 'classroom' });
+    if (inView) setNote({ text: message, kind: 'success' });
+    else if (awardIds.length) showUndoToast(message, () => undo(awardIds), { scope: 'classroom' });
     else showToast({ message, kind: 'success', scope: 'classroom' });
   };
 
@@ -136,10 +145,10 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
       .enqueue('achievements.undo', { contextId: context.id, lessonId: lesson.id, awardIds }, { contextId: context.id, lessonId: lesson.id })
       .then((opId) => awaitCommand(opId))
       .then(() => {
-        showToast({ message: t('achievements.undone'), kind: 'success' });
+        notify(t('achievements.undone'), 'success');
         return queryClient.invalidateQueries({ queryKey: ['classroom', 'achievements', context.id] });
       })
-      .catch(() => showToast({ message: t('achievements.undoFailed'), kind: 'error' }));
+      .catch(() => notify(t('achievements.undoFailed'), 'error'));
   };
 
   const undoable = data.lessonAwards.filter((a) => a.undoable);
@@ -152,6 +161,11 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
           {t('achievements.give')}
         </BigButton>
       </PanelHead>
+      {inView ? (
+        <p className={note?.kind === 'error' ? 'cc-field__error' : 'cc-muted'} role="status" data-testid="achievements-note">
+          {note?.text ?? ''}
+        </p>
+      ) : null}
       {undoable.length ? (
         <ul className="cc-stack" aria-label={t('achievements.thisLesson')}>
           {undoable.map((a) => {
@@ -241,7 +255,7 @@ function AchievementsSlot({ context, lesson }: { context: ClassroomContext; less
   );
 }
 
-export const achievementsDashboardSlot: DashboardSlot = { key: 'achievements', module: 'achievements', order: 130, Component: AchievementsSlot };
+export const achievementsDashboardSlot: DashboardSlot = { key: 'achievements', module: 'achievements', order: 130, dock: { Icon: IconTrophy, label: 'achievements.title' }, Component: AchievementsSlot };
 
 /** End Lesson "Well done!" (item 7): only shown when the class chose it; nothing is saved. */
 function WellDoneStep({ lesson }: { lesson: LessonState }) {

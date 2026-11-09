@@ -13,8 +13,10 @@ import { describe, expect, it } from 'vitest';
 import { rosterKey, routinesKey } from '../../src/client/modules/lessons/lessonClient.ts';
 import type { ClassroomContext } from '../../src/client/modules/types.ts';
 import { CLIENT_MODULES } from '../../src/client/modules/index.ts';
+import { BOX_CATALOGUE, BOX_KEYS, type BoxKey } from '../../src/shared/classroomLayout.ts';
 import {
   allDashboardSlots,
+  availableBoxKeys,
   allStartSteps,
   allTeacherPages,
   byOrder,
@@ -106,18 +108,28 @@ describe('classroom pieces come from the manifests (D-069): no module is hard-co
     expect(startStepsFor(ctx({})).map((s) => s.key)).toEqual(['topics']);
   });
 
-  it('dashboard regions: routine stepper beside the timer, attendance before End Lesson, module panels', () => {
-    expect(dashboardSlotsFor(allOn, 'stage').map((s) => s.key)).toEqual(['routine']);
-    expect(dashboardSlotsFor(allOn, 'actions').map((s) => s.key)).toEqual(['attendance']);
-    expect(dashboardSlotsFor(allOn, 'panels').map((s) => s.key)).toEqual(['counters', 'assistant', 'secret']);
-    expect([...dashboardSlotsFor(ctx({}), 'stage'), ...dashboardSlotsFor(ctx({}), 'actions'), ...dashboardSlotsFor(ctx({}), 'panels')]).toEqual([]);
-    // The top region holds the core "Today's focus" strip (S13a), on with every module off.
-    expect(dashboardSlotsFor(ctx({}), 'top').map((s) => s.key)).toEqual(['topics']);
+  it('board boxes (S14b, D-148): every slot key is a box of the catalogue; the board gets the enabled ones', () => {
+    for (const s of allDashboardSlots()) {
+      expect(BOX_KEYS as readonly string[], s.key).toContain(s.key);
+      expect(BOX_CATALOGUE[s.key as BoxKey].core, s.key).toBe(false);
+      // A slot that can be a dock button needs its button (icon + label), except a slot that is its own
+      // dock control (attendance: no dock spec, never a box).
+      const spec = BOX_CATALOGUE[s.key as BoxKey];
+      if (spec.dock && spec.row) expect(s.dock, s.key).toBeTruthy();
+      if (s.dock) expect(inBoth(s.dock.label), s.dock.label).toBe(true);
+    }
+    // Every module box of the catalogue is some module's slot (no dead keys).
+    for (const k of BOX_KEYS) if (!BOX_CATALOGUE[k].core) expect(allDashboardSlots().map((s) => s.key), k).toContain(k);
+    expect(dashboardSlotsFor(allOn).map((s) => s.key)).toEqual(['focus', 'counters', 'assistant', 'secret', 'attendance', 'routine']);
+    // "Today's focus" is core (S13a): on with every module off.
+    expect(dashboardSlotsFor(ctx({})).map((s) => s.key)).toEqual(['focus']);
+    expect([...availableBoxKeys(ctx({}))].sort()).toEqual(['core.dock', 'core.students', 'core.timer', 'focus']);
   });
 
   it('the lesson screens and the router name no module (no hard-coded attendance, routine or counter pieces)', () => {
     const src = (f: string) => readFileSync(join(MODULES_DIR, '..', f), 'utf8');
-    for (const f of ['modules/lessons/StartLesson.tsx', 'modules/lessons/Dashboard.tsx']) {
+    const board = readdirSync(join(MODULES_DIR, 'lessons', 'board')).map((f) => `modules/lessons/board/${f}`);
+    for (const f of ['modules/lessons/StartLesson.tsx', ...board]) {
       expect(src(f), f).not.toMatch(/modules\.(attendance|routines|counters|assistant|secretStudents)|useRoutines|AttendanceList|routineTemplateId/);
     }
     expect(src('router.tsx')).not.toMatch(/counter-history|CounterHistory|routes\/teacher\/(?!Teacher)/);
@@ -153,8 +165,44 @@ describe('classroom pieces come from the manifests (D-069): no module is hard-co
     expect(picked.input.routineTemplateId).toBe('tpl-other');
 
     // A switched-off module adds nothing (its hook still runs, so the hook count never changes).
-    const off = renderHook(() => useStartContributions(ctx({ assistant: true }), values), { wrapper }).result.current;
+    const off = renderHook(() => useStartContributions(ctx({ secretStudents: true }), values), { wrapper }).result.current;
     expect(off).toEqual({ input: {}, ready: true });
+  });
+
+  it('two modules\' server start steps are merged key by key into lesson.start `steps` (S14b, D-149)', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    qc.setQueryData(rosterKey('ctx-1', null), { localDate: '2026-11-09', attendanceEnabled: true, students: [] });
+    qc.setQueryData(['classroom', 'assistant', 'today', 'ctx-1'], {
+      localDate: '2026-11-09',
+      schoolDay: true,
+      assistant: { id: 'stu-a', fullName: 'Ada Example', initials: 'AE', avatarHue: 10 },
+      responsibilities: [
+        { id: 'r1', label: { en: 'Board' } },
+        { id: 'r2', label: { en: 'Books' } },
+      ],
+      thanked: false,
+      checked: ['r2'],
+      showPanel: true,
+    });
+    const values = { ...initialStartValues(), assistant: { studentId: 'stu-a', ticks: { r1: true, r2: false } } };
+    const r = renderHook(() => useStartContributions(allOn, values), { wrapper }).result.current;
+    expect(r.ready).toBe(true);
+    expect(r.input.steps).toEqual({ assistant: { studentId: 'stu-a', check: ['r1'], uncheck: ['r2'] } });
+    expect(r.input.othersPresent).toBe(true);
+    // Nothing changed against what is recorded: no step input at all.
+    const same = renderHook(() => useStartContributions(allOn, { ...values, assistant: { studentId: 'stu-a', ticks: { r2: true } } }), { wrapper }).result.current;
+    expect(same.input.steps).toBeUndefined();
+  });
+
+  it('every server Start Lesson step has a client start step with the same key and module (D-149)', () => {
+    const client = new Map(allStartSteps().map((s) => [s.key, s]));
+    const server = SERVER_MODULES.flatMap((m) => m.startSteps ?? []);
+    expect(server.length).toBeGreaterThan(0);
+    for (const s of server) {
+      expect(client.get(s.key)?.module, s.key).toBe(s.module);
+      expect(client.get(s.key)?.useContribution, s.key).toBeTruthy();
+    }
   });
 
   it('Begin waits while the attendance roster is loading', () => {

@@ -41,6 +41,28 @@ export async function ensurePin(page: Page) {
   expect(r.status).toBe(200);
 }
 
+/** Panels that live in the classroom board's dock by default (S14b, D-148). */
+export type DockPanel = 'assistant' | 'secret' | 'groups' | 'homework' | 'achievements' | 'counters' | 'routine' | 'focus';
+
+/**
+ * Open a panel from the classroom board's dock (S14b, D-148): its button opens the panel full screen.
+ * Returns the view (a dialog); close it with `closeDock`.
+ */
+export async function openDock(page: Page, panel: DockPanel) {
+  await page.getByTestId(`dock-${panel}`).click();
+  const view = page.getByTestId(`dock-view-${panel}`);
+  await expect(view).toBeVisible();
+  // The dialog fades in: measuring (axe, positions) waits until it has finished.
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
+  return view;
+}
+
+export async function closeDock(page: Page, panel: DockPanel) {
+  const view = page.getByTestId(`dock-view-${panel}`);
+  await view.getByTestId('dialog-close').click();
+  await expect(view).toHaveCount(0);
+}
+
 /** Visible text of the whole document (what a pupil could read on the display). */
 export const bodyText = (page: Page) => page.evaluate(() => document.body.innerText);
 

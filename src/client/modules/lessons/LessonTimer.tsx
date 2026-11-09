@@ -157,7 +157,7 @@ export function LessonTimer({ lesson, compact = false }: { lesson: LessonState; 
           {t('timer.done')}
         </p>
       ) : null}
-      <div className="cc-row">
+      <div className="cc-row cc-timer__actions">
         {timer.running && !finished ? (
           <Button
             size="big"
@@ -195,7 +195,7 @@ export function LessonTimer({ lesson, compact = false }: { lesson: LessonState; 
           {t('timer.reset')}
         </Button>
       </div>
-      <div className="cc-row" role="group" aria-label={t('timer.presets')}>
+      <div className="cc-row cc-timer__presets" role="group" aria-label={t('timer.presets')}>
         {PRESETS_MIN.map((m) => (
           <Button
             key={m}

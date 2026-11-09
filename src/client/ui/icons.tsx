@@ -138,6 +138,19 @@ export const IconSwap = () => (
     <path d="M7 7h13l-4-4M17 17H4l4 4" />
   </Icon>
 );
+/** Move handle of a box in the classroom layout editor (S14b): four arrows. */
+export const IconMove = () => (
+  <Icon>
+    <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
+  </Icon>
+);
+/** "Customise layout" (S14b): a board of tiles. */
+export const IconLayout = () => (
+  <Icon>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 9h18M12 9v12" />
+  </Icon>
+);
 export const IconBackspace = () => (
   <Icon>
     <path d="M21 5H9l-6 7 6 7h12z" />

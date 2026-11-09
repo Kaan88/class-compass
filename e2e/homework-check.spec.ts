@@ -5,7 +5,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { api, ensurePin, login, PIN } from './helpers.ts';
+import { api, ensurePin, login, openDock, PIN } from './helpers.ts';
 
 async function endActiveLessons(page: Page) {
   const active = await api(page, 'GET', '/api/classroom/lessons/active');
@@ -94,9 +94,11 @@ test('classroom checking dialog: selected students and "mark the rest" apply', a
     started = r.body.results[0].ok === true;
     await page.goto('/classroom');
     await page.getByRole('button', { name: /3-A · English/ }).first().click();
-    const panel = page.getByTestId('homework-panel');
+    // Homework is a button in the board's dock (S14b): it opens the panel full screen.
+    const view = await openDock(page, 'homework');
+    const panel = view.getByTestId('homework-panel');
     await panel.getByRole('button', { name: `Check ${title}` }).click();
-    const dialog = page.getByRole('dialog');
+    const dialog = page.getByRole('dialog').filter({ has: page.getByTestId('homework-check') });
     const grid = dialog.getByTestId('homework-check');
     const rows = grid.getByTestId('homework-row');
     await expect(rows).toHaveCount(19);

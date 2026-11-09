@@ -25,7 +25,8 @@ import { setDisplay, useDisplay } from '../lib/display.ts';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
 import { useOutboxStatus } from '../lib/outbox-client.ts';
 import { useMe } from '../lib/session.ts';
-import { classLabel, LessonDashboard } from '../modules/lessons/Dashboard.tsx';
+import { LessonBoard } from '../modules/lessons/board/Board.tsx';
+import { classLabel } from '../modules/lessons/labels.ts';
 import { EndLessonFlow, LessonSummaryView, type EndDraft } from '../modules/lessons/EndLesson.tsx';
 import { serverNow, useActiveLessons, useLessonState, useServerOffset } from '../modules/lessons/lessonClient.ts';
 import { emptyStartDraft, StartLessonFlow, type StartDraft } from '../modules/lessons/StartLesson.tsx';
@@ -216,7 +217,7 @@ function ClassroomScreen({
         />
       );
     }
-    if (lesson) return <LessonDashboard key={active.id} context={active} lesson={lesson} onEnd={() => setMode(active.id, { kind: 'ending', lessonId: lesson.id, draft: null })} />;
+    if (lesson) return <LessonBoard key={active.id} context={active} lesson={lesson} onEnd={() => setMode(active.id, { kind: 'ending', lessonId: lesson.id, draft: null })} />;
     if (mode.kind === 'starting') {
       const contextId = active.id;
       return (
@@ -270,6 +271,8 @@ function ClassroomScreen({
         onDensity={setDensity}
         onLocale={onLocale}
         settings={<Toggle label={t('classroom.sounds')} isSelected={display.deviceSounds} onChange={(v) => setDisplay({ deviceSounds: v })} />}
+        // Customise layout (S14b, D-148): only while the board of a running lesson is on screen.
+        canCustomise={Boolean(lesson && active) && mode.kind !== 'ending' && mode.kind !== 'summary'}
         tools={tools}
       />
       <main className="cc-page cc-page--wide cc-stack cc-classroom__main">

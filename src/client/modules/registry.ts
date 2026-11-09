@@ -5,7 +5,8 @@
  */
 import { registerInvalidation } from '../lib/outbox-client.ts';
 import { CLIENT_MODULES } from './index.ts';
-import type { ClassroomContext, ClientModuleManifest, DashboardRegion, DashboardSlot, EndStepUi, StartLessonContribution, StartStep, StudentCardAddon, TeacherPage } from './types.ts';
+import { availableBoxes, type BoxKey } from '../../shared/classroomLayout.ts';
+import type { ClassroomContext, ClientModuleManifest, DashboardSlot, EndStepUi, StartLessonContribution, StartStep, StudentCardAddon, TeacherPage } from './types.ts';
 
 export type { ClassroomContext, StudentCardExtras } from './types.ts';
 
@@ -24,8 +25,12 @@ export const allTeacherPages = (): TeacherPage[] => byOrder(all((m) => m.teacher
 export const menuTeacherPages = (): TeacherPage[] => allTeacherPages().filter((p) => p.menu !== false);
 const cardAddons = (): StudentCardAddon[] => all((m) => m.studentCardAddons);
 
-export const dashboardSlotsFor = (ctx: ClassroomContext, region: DashboardRegion = 'panels') =>
-  allDashboardSlots().filter((s) => (s.region ?? 'panels') === region && enabled(ctx, s.module));
+/** The dashboard slots of the modules enabled for this class+subject (core slots always). */
+export const dashboardSlotsFor = (ctx: ClassroomContext) => allDashboardSlots().filter((s) => enabled(ctx, s.module));
+/** The slot behind a board box key (S14b), or undefined for a core box or a module that is off. */
+export const slotForBox = (ctx: ClassroomContext, key: BoxKey) => dashboardSlotsFor(ctx).find((s) => s.key === key);
+/** The board boxes available in this class+subject: the core boxes and the enabled modules' slots (S14b, D-148). */
+export const availableBoxKeys = (ctx: ClassroomContext) => availableBoxes(dashboardSlotsFor(ctx).map((s) => s.key));
 export const startStepsFor = (ctx: ClassroomContext) => allStartSteps().filter((s) => enabled(ctx, s.module));
 
 /** Initial values of every registered Start Lesson step, by key. */
@@ -43,7 +48,9 @@ export function useStartContributions(ctx: ClassroomContext, values: Readonly<Re
     const on = enabled(ctx, s.module);
     const r = s.useContribution(ctx, values[s.key], on);
     if (!on) continue;
-    input = { ...input, ...r.input };
+    // `steps` holds one entry per server start step: merged key by key (S14b), never replaced.
+    const steps = input.steps || r.input.steps ? { ...input.steps, ...r.input.steps } : undefined;
+    input = { ...input, ...r.input, ...(steps ? { steps } : {}) };
     ready &&= r.ready;
   }
   return { input, ready };

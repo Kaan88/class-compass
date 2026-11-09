@@ -691,8 +691,9 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
     });
 
     await step(`classroom group screen ${where}`, async () => {
-      await d.getByTestId('groups-panel').getByRole('button').first().click();
-      const screen = d.getByTestId('group-screen');
+      // Groups open from the board's dock (S14b): the dock view is the group screen.
+      await d.getByTestId('dock-groups').click();
+      const screen = d.getByTestId('dock-view-groups');
       await expect(screen).toBeVisible();
       await S('group-screen', 'opened');
       const option = screen.getByTestId('group-options').getByRole('button').first();
@@ -706,12 +707,13 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
         await S('group-screen', 'member-picked-to-move');
       }
       await d.keyboard.press('Escape');
-      await d.keyboard.press('Escape');
+      if (await screen.isVisible()) await d.keyboard.press('Escape');
       await expect(screen).toBeHidden();
       await S('dashboard', 'groups-chosen');
     });
 
     await step(`classroom assistant ${where}`, async () => {
+      await d.getByTestId('dock-assistant').click();
       const panel = d.getByTestId('assistant-panel');
       await expect(panel).toBeVisible();
       const duty = panel.getByTestId('assistant-duties').getByRole('checkbox').first();
@@ -720,16 +722,20 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
       await d.getByTestId('assistant-hide').click();
       await S('assistant', 'hidden');
       await d.getByTestId('assistant-show').click();
+      await d.getByTestId('dock-view-assistant').getByTestId('dialog-close').click();
     });
 
     await step(`classroom secret students ${where}`, async () => {
+      await d.getByTestId('dock-secret').click();
       const panel = d.getByTestId('secret-panel');
       await panel.getByRole('button', { name: nm('Choose secret students') }).click();
       await expect(panel.getByTestId('secret-count')).toBeVisible();
       await S('secret-student', 'chosen');
+      await d.getByTestId('dock-view-secret').getByTestId('dialog-close').click();
     });
 
     await step(`classroom badge and celebrate ${where}`, async () => {
+      await d.getByTestId('dock-achievements').click();
       const panel = d.getByTestId('achievements-panel');
       await panel.getByTestId('achievements-give').click();
       const dialog = d.getByTestId('achievements-dialog');
@@ -750,11 +756,13 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
       await expect(d.getByTestId('celebration')).toBeHidden({ timeout: 15_000 }).catch(() => undefined);
       await moment.getByTestId('achievements-moment-close').click();
       await S('dashboard', 'after-badge-undo-offered');
+      await d.getByTestId('dock-view-achievements').getByTestId('dialog-close').click();
     });
 
     await step(`classroom homework checking dialog ${where}`, async () => {
+      await d.getByTestId('dock-homework').click();
       await d.getByTestId('homework-panel').getByRole('button', { name: new RegExp(esc(hwTitle), 'u') }).first().click();
-      const dialog = d.getByRole('dialog');
+      const dialog = d.getByRole('dialog').filter({ has: d.getByTestId('homework-check') });
       const grid = dialog.getByTestId('homework-check');
       await expect(grid).toBeVisible();
       await S('homework-check', 'dialog');
@@ -763,6 +771,7 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
       await S('homework-check', 'two-selected');
       await dialog.getByRole('button', { name: nm('Close') }).first().click().catch(() => d.keyboard.press('Escape'));
       await expect(grid).toBeHidden();
+      await d.getByTestId('dock-view-homework').getByTestId('dialog-close').click();
     });
 
     // End Lesson: secret reveal, celebrate one, "Well done", save, summary.

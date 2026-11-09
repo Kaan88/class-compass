@@ -1,28 +1,30 @@
 /**
- * S13a classroom screen (feedback round 1, 2026-11-07). Fictional demo data only; every setting this
- * file changes (modules, class theme, class language, density) is put back afterwards.
- * 1. Bug 1b: the layout holds with modules switched off. A matrix of module combinations (all on, all
- *    off, counters only, groups+homework+assistant, and each module off on its own) x themes at
- *    1920x1080: no horizontal page scroll, the rail and the main area never overlap, and no empty
- *    panel is left behind. Screenshots go to test-results/layout/.
- * 2. Density and auto-fit (D-103): no horizontal scroll at 1440x900, 1470x956, 1366x768, 1280x800,
- *    1920x1080, 2560x1440 and a 4K display at 150% and 200% scaling; at Normal on 1440x900 all 19
- *    student cards of 3-A are on screen without scrolling. Compact/Normal/Large is kept per device.
- * 3. The timer keypad (mm:ss), the assistant panel hide/show, and the class language mode
- *    (Turkish-only and English-only show no switch; two languages show it).
- * 4. Usability pass (D-139): End lesson and the class counter are on screen without scrolling at
- *    1920x1080 and 1280x720; size, language and sounds are in the top bar's Display popover.
- * 5. Known gap until S14b: with the reminder boxes on (the default since D-143) D-139 and D-103 are not
- *    met yet; a test pins that and tells S14b to turn it into a normal guard.
+ * The classroom board (S14b, D-148; replaces the S13a rail of D-103/D-139). Fictional demo data only;
+ * every setting this file changes (modules, class theme, class language, density, layouts) is put back.
+ * 1. Module combinations x themes (13 x 3) at 1920x1080: facts over the board's boxes (`[data-box]`):
+ *    no horizontal page scroll, no two boxes overlap, no empty or overflowing box, and a module that
+ *    is off has neither a box nor a dock button. Screenshots go to test-results/layout/.
+ * 2. Fit with the per-student reminder boxes on (the default since D-143): all 19 cards of 3-A on
+ *    screen at Normal on 1440x900 and at every width from 1440 up (D-103), and every routine chip,
+ *    End lesson, Attendance, the timer's Start and the class counter fully in view at every listed
+ *    display, 1280x720 included (D-139). This closes the S14a "known gap" (D-143).
+ * 3. Compact / Normal / Large on this device; the timer keypad; the assistant panel in the dock (hide
+ *    and show for this lesson); the class language mode.
+ * 4. Customise layout: PIN dialog, keyboard and mouse edits, "Put in dock" / "Show as a box", resize,
+ *    save for this class (kept after a reload, the other classes unchanged), the teacher area locked
+ *    again after saving (423), "All my classes", Reset; axe on edit mode and on every dock view.
  */
 import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { api, ensurePin, login } from './helpers.ts';
+import { api, closeDock, ensurePin, login, openDock, PIN, type DockPanel } from './helpers.ts';
 
 const MODULES = ['routines', 'attendance', 'counters', 'secretStudents', 'assistant', 'grouping', 'homework', 'goals', 'achievements'] as const;
 type Module = (typeof MODULES)[number];
 const THEMES = ['explorer', 'animals', 'classroom'] as const;
+/** The board box (dashboard slot key) of each module that has one. */
+const BOX_OF: Partial<Record<Module, string>> = { routines: 'routine', attendance: 'attendance', counters: 'counters', secretStudents: 'secret', assistant: 'assistant', grouping: 'groups', homework: 'homework', achievements: 'achievements' };
 
 async function endActiveLessons(page: Page) {
   const active = await api(page, 'GET', '/api/classroom/lessons/active');
@@ -33,10 +35,11 @@ async function endActiveLessons(page: Page) {
   }
 }
 
-async function context3A(page: Page) {
-  const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; classId: string; className: string; subjectName: { en: string } }>;
-  return mine.find((c) => c.className === '3-A' && c.subjectName.en === 'English')!;
+type Ctx = { id: string; classId: string; className: string; subjectName: { en: string } };
+async function contexts(page: Page) {
+  return (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Ctx[];
 }
+const context3A = async (page: Page) => (await contexts(page)).find((c) => c.className === '3-A' && c.subjectName.en === 'English')!;
 
 type ModuleSetting = { module: string; enabled: boolean; config: Record<string, unknown> | null };
 const modulesOf = async (page: Page, contextId: string) => (await api(page, 'GET', `/api/teacher/contexts/${contextId}/modules`)).body.modules as ModuleSetting[];
@@ -49,18 +52,7 @@ async function setModules(page: Page, contextId: string, on: readonly Module[], 
   }
 }
 
-/**
- * The classroom display runs in its own browser context (its own session), so the teacher session that
- * changes settings through the API never enters classroom mode and needs no PIN unlock (rate-limited).
- */
-async function displayPage(browser: Browser) {
-  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, hasTouch: true });
-  const p = await ctx.newPage();
-  await login(p, 'english');
-  return { ctx, p };
-}
-
-/** Per-student reminder boxes on the cards: on by default since S14a (D-143). Returns the previous config. */
+/** Per-student reminder boxes on the cards: on by default since S14a (D-143). Returns the previous setting. */
 async function setReminderBoxes(page: Page, contextId: string, on: boolean) {
   const m = (await modulesOf(page, contextId)).find((x) => x.module === 'counters')!;
   const r = await api(page, 'PUT', `/api/teacher/contexts/${contextId}/modules/counters`, { enabled: m.enabled, config: { ...(m.config ?? {}), showReminderBoxes: on } });
@@ -73,28 +65,80 @@ async function startLesson(page: Page, contextId: string) {
   expect(r.body.results[0].ok).toBe(true);
 }
 
-async function openClassroom(page: Page) {
+async function openClassroom(page: Page, cls = '3-A') {
   await page.goto('/classroom');
-  await page.getByRole('button', { name: /3-A · (English|İngilizce)/ }).first().click();
+  await page.getByRole('button', { name: new RegExp(`${cls} · (English|İngilizce)`, 'u') }).first().click();
   await expect(page.getByTestId('lesson-dashboard')).toBeVisible();
 }
 
-/** Layout facts measured in the page: horizontal scroll, rail/main overlap, empty or overflowing panels. */
+/**
+ * The classroom display runs in its own browser context (its own session), so the teacher session that
+ * changes settings through the API never enters classroom mode and needs no PIN unlock.
+ */
+async function displayPage(browser: Browser, viewport = { width: 1920, height: 1080 }) {
+  const ctx = await browser.newContext({ viewport, hasTouch: true });
+  const p = await ctx.newPage();
+  await login(p, 'english');
+  return { ctx, p };
+}
+
+async function axe(page: Page, selector: string) {
+  const r = await new AxeBuilder({ page }).include(selector).analyze();
+  expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`), selector).toEqual([]);
+}
+
+/** Facts measured over the board's boxes: page scroll, overlapping, empty, overflowing or off-screen boxes. */
 async function layoutFacts(page: Page) {
   return page.evaluate(() => {
     const se = document.scrollingElement!;
-    const rail = document.querySelector('[data-testid="lesson-rail"]')!.getBoundingClientRect();
-    const main = document.querySelector('.cc-lesson-layout__main')!.getBoundingClientRect();
-    const apart = rail.right <= main.left + 1 || main.right <= rail.left + 1 || rail.bottom <= main.top + 1 || main.bottom <= rail.top + 1;
-    // The module panels sit in their own grid under the student cards (D-139): each panel is a block.
-    const blocks = [...document.querySelectorAll('[data-testid="lesson-rail"] > *, .cc-lesson-layout__main > :not(.cc-lesson-panels), .cc-lesson-panels > *')] as HTMLElement[];
-    const empty = blocks.filter((e) => e.getBoundingClientRect().height < 4 || !e.innerText.trim()).map((e) => e.className || e.tagName);
-    const overflowing = blocks.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.className || e.tagName);
-    return { hScroll: se.scrollWidth > se.clientWidth + 1, overlap: !apart, empty, overflowing };
+    const boxes = [...document.querySelectorAll<HTMLElement>('[data-box]')].filter((b) => b.getClientRects().length > 0);
+    const rects = boxes.map((b) => ({ key: b.dataset.box!, r: b.getBoundingClientRect() }));
+    const overlaps: string[] = [];
+    for (let i = 0; i < rects.length; i += 1)
+      for (let j = i + 1; j < rects.length; j += 1) {
+        const a = rects[i]!.r;
+        const b = rects[j]!.r;
+        const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (w > 1 && h > 1) overlaps.push(`${rects[i]!.key} / ${rects[j]!.key}`);
+      }
+    const empty = boxes.filter((b) => b.getBoundingClientRect().height < 4 || !b.innerText.trim()).map((b) => b.dataset.box);
+    const overflowing = boxes.filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => b.dataset.box);
+    const offScreen = rects.filter(({ r }) => r.left < -1 || r.right > window.innerWidth + 1).map(({ key }) => key);
+    return { hScroll: se.scrollWidth > se.clientWidth + 1, overlaps, empty, overflowing, offScreen };
   });
 }
 
-test('bug 1b: the classroom layout holds for module combinations x themes (no empty panels, no overlap, no horizontal scroll)', async ({ page, browser }) => {
+const VIEWPORTS: Array<{ name: string; width: number; height: number; scale: number }> = [
+  { name: '1280x720', width: 1280, height: 720, scale: 1 },
+  { name: '1280x800', width: 1280, height: 800, scale: 1 },
+  { name: '1366x768', width: 1366, height: 768, scale: 1 },
+  { name: '1440x900', width: 1440, height: 900, scale: 2 },
+  { name: '1470x956', width: 1470, height: 956, scale: 2 },
+  { name: '1920x1080', width: 1920, height: 1080, scale: 1 },
+  { name: '2560x1440', width: 2560, height: 1440, scale: 1 },
+  // A 3840x2160 (4K) display at 150% and 200% operating-system scaling.
+  { name: '4k-150', width: 2560, height: 1440, scale: 1.5 },
+  { name: '4k-200', width: 1920, height: 1080, scale: 2 },
+];
+
+/** Cards fully on screen: inside the window AND inside the student grid's scroll box (not hidden under it). */
+async function cardsOnScreen(page: Page) {
+  return page.evaluate(() => {
+    const box = document.querySelector('[data-box="core.students"] > .cc-lesson-box__body')!.getBoundingClientRect();
+    return [...document.querySelectorAll('.cc-student-card')].filter((e) => {
+      const r = e.getBoundingClientRect();
+      return r.top >= Math.max(0, box.top) - 0.5 && r.bottom <= Math.min(window.innerHeight, box.bottom) + 0.5 && r.left >= 0 && r.right <= window.innerWidth + 0.5;
+    }).length;
+  });
+}
+
+async function onDevice(browser: Browser, page: Page, vp: (typeof VIEWPORTS)[number]) {
+  const ctx = await browser.newContext({ storageState: await page.context().storageState(), viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.scale, hasTouch: true });
+  return { ctx, p: await ctx.newPage() };
+}
+
+test('module combinations x themes: the board holds (no overlap, no empty box, no horizontal scroll, no box of a module that is off)', async ({ page, browser }) => {
   test.setTimeout(900_000);
   mkdirSync('test-results/layout', { recursive: true });
   await login(page, 'english');
@@ -113,9 +157,9 @@ test('bug 1b: the classroom layout holds for module combinations x themes (no em
     ['all-off', []],
     ['counters-only', ['counters']],
     ['groups-homework-assistant', ['grouping', 'homework', 'assistant']],
-    // Each module switched off on its own (bug 1b: "each one off").
     ...MODULES.map((m): [string, readonly Module[]] => [`without-${m}`, MODULES.filter((x) => x !== m)]),
   ];
+  expect(combos).toHaveLength(13);
   try {
     for (const theme of THEMES) {
       expect((await api(admin, 'PATCH', `/api/admin/classes/${ctx.classId}`, { theme })).status).toBe(200);
@@ -126,13 +170,20 @@ test('bug 1b: the classroom layout holds for module combinations x themes (no em
         await expect(d.locator('html')).toHaveAttribute('data-theme', theme);
         // "Today's focus" when the lesson has a topic, otherwise only the quiet "Choose a topic" action.
         await expect(d.getByTestId(/^todays-focus(-empty)?$/)).toBeVisible();
+        await expect(d.getByRole('button', { name: 'End lesson', exact: true })).toBeInViewport({ ratio: 1 });
         const facts = await layoutFacts(d);
-        await d.screenshot({ path: `test-results/layout/${name}-${theme}.png`, fullPage: true });
-        expect(facts, `${name} / ${theme}`).toEqual({ hScroll: false, overlap: false, empty: [], overflowing: [] });
-        // With every module off the rail still holds the timer and End Lesson, nothing else.
+        await d.screenshot({ path: `test-results/layout/${name}-${theme}.png` });
+        expect(facts, `${name} / ${theme}`).toEqual({ hScroll: false, overlaps: [], empty: [], overflowing: [], offScreen: [] });
+        // A module that is off leaves neither a box nor a dock button.
+        for (const m of MODULES) {
+          const key = BOX_OF[m];
+          if (!key || on.includes(m)) continue;
+          await expect(d.locator(`[data-box="${key}"]`), `${name}: ${key}`).toHaveCount(0);
+          await expect(d.getByTestId(`dock-${key}`), `${name}: dock ${key}`).toHaveCount(0);
+        }
         if (name === 'all-off') {
-          await expect(d.getByTestId('lesson-rail').locator('.cc-card')).toHaveCount(1);
-          await expect(d.getByTestId('groups-panel')).toHaveCount(0);
+          // The timer, the student grid, today's focus and the dock with End lesson remain.
+          expect(await d.locator('[data-box]').evaluateAll((els) => els.filter((e) => e.getClientRects().length).map((e) => (e as HTMLElement).dataset.box).sort())).toEqual(['core.dock', 'core.students', 'core.timer', 'focus']);
         }
         await endActiveLessons(page);
       }
@@ -146,56 +197,28 @@ test('bug 1b: the classroom layout holds for module combinations x themes (no em
   }
 });
 
-const VIEWPORTS: Array<{ name: string; width: number; height: number; scale: number }> = [
-  { name: '1440x900', width: 1440, height: 900, scale: 2 },
-  { name: '1470x956', width: 1470, height: 956, scale: 2 },
-  { name: '1366x768', width: 1366, height: 768, scale: 1 },
-  { name: '1280x800', width: 1280, height: 800, scale: 1 },
-  { name: '1920x1080', width: 1920, height: 1080, scale: 1 },
-  { name: '2560x1440', width: 2560, height: 1440, scale: 1 },
-  // A 3840x2160 (4K) display at 150% and 200% operating-system scaling.
-  { name: '4k-150', width: 2560, height: 1440, scale: 1.5 },
-  { name: '4k-200', width: 1920, height: 1080, scale: 2 },
-];
-
-async function cardsOnScreen(page: Page) {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('.cc-student-card')].filter((e) => {
-      const r = e.getBoundingClientRect();
-      return r.top >= 0 && r.bottom <= window.innerHeight + 0.5 && r.left >= 0 && r.right <= window.innerWidth + 0.5;
-    }).length,
-  );
-}
-
-async function onDevice(browser: Browser, page: Page, vp: (typeof VIEWPORTS)[number]) {
-  const ctx = await browser.newContext({ storageState: await page.context().storageState(), viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.scale, hasTouch: true });
-  return { ctx, p: await ctx.newPage() };
-}
-
-test('density and auto-fit: no horizontal scroll on common displays; 19 students fit at Normal on 1440x900', async ({ page, browser }) => {
-  test.setTimeout(240_000);
+test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Normal from 1440x900 up, and the routine, timer Start, counter, Attendance and End lesson in view everywhere', async ({ page, browser }) => {
+  test.setTimeout(300_000);
   mkdirSync('test-results/fit', { recursive: true });
   await login(page, 'english');
   await ensurePin(page);
   await endActiveLessons(page);
   const ctx = await context3A(page);
+  const original = await modulesOf(page, ctx.id);
   // Settings go through a second session: the display devices share `page`'s session, which is in
   // classroom mode (PIN-locked for teacher-area calls) once the classroom is open.
   const officeCtx = await browser.newContext();
   const office = await officeCtx.newPage();
   await login(office, 'english');
-  const counters = await setReminderBoxes(office, ctx.id, false);
-  await startLesson(page, ctx.id);
   try {
-    // The owner's target (D-103): 18-20 students without scrolling at Normal on a 1440x900 laptop,
-    // measured with the cards as they were then (no per-student boxes). Since S14a the boxes are on by
-    // default (D-143) and make each card taller: the second pass re-measures with them. The 18-20
-    // target with the boxes on comes with the full-width grid of S14b (D-148).
-    // Measured 2026-11-09 with the boxes on: 16 at 1440x900 and 1470x956, 12 at 1366x768 and 1280x800,
-    // all 19 from 1920x1080 up. These floors only stop the default (boxes on) from getting worse; the
-    // D-103 target itself is an open S14b item, and the test below that is expected to fail tracks it.
-    const BOXES_ON_FLOOR: Record<string, number> = { '1440x900': 16, '1470x956': 16, '1366x768': 12, '1280x800': 12, '1920x1080': 19, '2560x1440': 19 };
-    for (const boxes of [false, true]) {
+    await setModules(office, ctx.id, MODULES, original);
+    await setReminderBoxes(office, ctx.id, true);
+    await startLesson(page, ctx.id);
+    // Below 1440 the grid scrolls inside its box; these floors keep it from getting worse (measured
+    // 2026-11-09 with the board: 14 at 1366x768 and 1280x720, 12 at 1280x800 where the larger text
+    // leaves room for six columns instead of seven).
+    const FLOOR: Record<string, number> = { '1280x720': 14, '1280x800': 12, '1366x768': 14 };
+    for (const boxes of [true, false]) {
       await setReminderBoxes(office, ctx.id, boxes);
       for (const vp of VIEWPORTS) {
         const { ctx: c, p } = await onDevice(browser, page, vp);
@@ -207,23 +230,35 @@ test('density and auto-fit: no horizontal scroll on common displays; 19 students
           const facts = await layoutFacts(p);
           await p.screenshot({ path: `test-results/fit/${vp.name}-normal${boxes ? '-boxes' : ''}.png` });
           expect(facts.hScroll, vp.name).toBe(false);
-          expect(facts.overlap, vp.name).toBe(false);
+          expect(facts.overlaps, vp.name).toEqual([]);
+          // Everything but the student grid is on screen without scrolling (D-139, D-148).
+          const chips = p.getByTestId('routine-stages').getByRole('listitem');
+          await expect(chips).toHaveCount(6);
+          for (let i = 0; i < 6; i += 1) await expect(chips.nth(i), `${vp.name}: stage ${i + 1}`).toBeInViewport({ ratio: 1 });
+          await expect(p.getByRole('button', { name: 'Next stage' }), vp.name).toBeInViewport({ ratio: 1 });
+          await expect(p.getByTestId('timer').getByRole('button', { name: 'Start', exact: true }), vp.name).toBeInViewport({ ratio: 1 });
+          await expect(p.getByTestId('counter-bar').first(), vp.name).toBeInViewport({ ratio: 1 });
+          await expect(p.getByRole('button', { name: 'Attendance', exact: true }), vp.name).toBeInViewport({ ratio: 1 });
+          await expect(p.getByRole('button', { name: 'End lesson', exact: true }), vp.name).toBeInViewport({ ratio: 1 });
+          // The top bar is one row (the quote of the day stays on it from 1200 px), not three.
+          const bar = await p.locator('.cc-classroom-bar').evaluate((e) => e.getBoundingClientRect().height);
+          expect(bar, `${vp.name}: top bar height`).toBeLessThan(vp.height * 0.15);
           const visible = await cardsOnScreen(p);
           test.info().annotations.push({ type: 'cards on screen', description: `${vp.name}${boxes ? ' with reminder boxes' : ''}: ${visible}` });
-          if (!boxes && (vp.name === '1440x900' || vp.width >= 1440)) expect(visible, `${vp.name}: cards on screen`).toBe(19);
-          if (boxes && BOXES_ON_FLOOR[vp.name]) expect(visible, `${vp.name}: cards on screen with reminder boxes`).toBeGreaterThanOrEqual(BOXES_ON_FLOOR[vp.name]!);
+          if (vp.width >= 1440) expect(visible, `${vp.name}: cards on screen${boxes ? ' with reminder boxes' : ''}`).toBe(19);
+          else expect(visible, `${vp.name}: cards on screen`).toBeGreaterThanOrEqual(FLOOR[vp.name] ?? 0);
         } finally {
           await c.close();
         }
       }
     }
-    await setReminderBoxes(office, ctx.id, false);
+    await setReminderBoxes(office, ctx.id, true);
 
     // Compact / Normal / Large on this device: the cards change size and the choice survives a reload.
-    const { ctx: c, p } = await onDevice(browser, page, VIEWPORTS[0]!);
+    const { ctx: c, p } = await onDevice(browser, page, VIEWPORTS[3]!);
     try {
       await openClassroom(p);
-      const size = () => p.locator('.cc-student-card').first().evaluate((e) => e.getBoundingClientRect().height);
+      const size = () => p.locator('.cc-student-card').first().evaluate((e) => e.getBoundingClientRect().width * e.getBoundingClientRect().height);
       const normal = await size();
       const control = p.getByTestId('density-control');
       const openSettings = async () => {
@@ -233,14 +268,12 @@ test('density and auto-fit: no horizontal scroll on common displays; 19 students
       await control.getByRole('button', { name: 'Large' }).click();
       await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'large');
       await expect.poll(size).toBeGreaterThan(normal);
-      await p.screenshot({ path: 'test-results/fit/1440x900-large.png' });
       await p.reload();
       await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'large');
       await openSettings();
       await control.getByRole('button', { name: 'Compact' }).click();
       await expect.poll(size).toBeLessThan(normal);
       expect((await layoutFacts(p)).hScroll).toBe(false);
-      await p.screenshot({ path: 'test-results/fit/1440x900-compact.png' });
       await openSettings();
       await control.getByRole('button', { name: 'Normal' }).click();
       await expect(control.getByRole('button', { name: 'Normal' })).toHaveAttribute('aria-pressed', 'true');
@@ -248,14 +281,14 @@ test('density and auto-fit: no horizontal scroll on common displays; 19 students
       await c.close();
     }
   } finally {
-    // The device contexts shared this session; it is not used again, so no PIN unlock (rate-limited).
+    // The device contexts shared this session; it is not used again, so no PIN unlock.
     await endActiveLessons(page);
-    await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/counters`, { enabled: counters.enabled, config: counters.config });
+    for (const m of original) await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
     await officeCtx.close();
   }
 });
 
-test('timer keypad, assistant panel hide/show, and the class language mode on the classroom screen', async ({ page, browser }) => {
+test('timer keypad, the assistant panel in the dock (hide/show), and the class language mode on the classroom screen', async ({ page, browser }) => {
   test.setTimeout(180_000);
   await login(page, 'english');
   await ensurePin(page);
@@ -282,21 +315,28 @@ test('timer keypad, assistant panel hide/show, and the class language mode on th
     await expect(keypad).toHaveCount(0);
     await expect(timer.getByTestId('timer-digits')).toContainText('1:30');
 
-    // Assistant panel: hide for this lesson, show again (kept by the server across a reload).
-    const assistant = d.getByTestId('assistant-panel');
+    // Assistant panel (in the dock by default): duty ticks, hide for this lesson, show again.
+    let view = await openDock(d, 'assistant');
+    const assistant = view.getByTestId('assistant-panel');
     await expect(assistant).toBeVisible();
     if (await assistant.getByTestId('assistant-duties').count()) {
       const box = assistant.getByTestId('assistant-duties').getByRole('checkbox').first();
       await box.check();
+      await closeDock(d, 'assistant');
+      // The dock badge counts the duties done today.
+      await expect(d.getByTestId('dock-assistant').locator('.cc-dock__badge')).toContainText('1 /');
       await d.reload();
-      await expect(d.getByTestId('assistant-duties').getByRole('checkbox').first()).toBeChecked();
+      view = await openDock(d, 'assistant');
+      await expect(view.getByTestId('assistant-duties').getByRole('checkbox').first()).toBeChecked();
     }
-    await d.getByTestId('assistant-hide').click();
-    await expect(d.getByTestId('assistant-panel')).toHaveCount(0);
+    await view.getByTestId('assistant-hide').click();
+    await expect(view.getByTestId('assistant-panel')).toHaveCount(0);
+    await closeDock(d, 'assistant');
     await d.reload();
-    await expect(d.getByTestId('assistant-show')).toBeVisible();
-    await d.getByTestId('assistant-show').click();
-    await expect(d.getByTestId('assistant-panel')).toBeVisible();
+    view = await openDock(d, 'assistant');
+    await view.getByTestId('assistant-show').click();
+    await expect(view.getByTestId('assistant-panel')).toBeVisible();
+    await closeDock(d, 'assistant');
 
     // English only (the default): English labels, no language switch.
     await expect(d.locator('[data-testid="classroom-shell"]')).toHaveAttribute('lang', 'en');
@@ -308,6 +348,7 @@ test('timer keypad, assistant panel hide/show, and the class language mode on th
     await expect(d.locator('[data-testid="classroom-shell"]')).toHaveAttribute('lang', 'tr');
     await expect(d.getByTestId('class-language-switch')).toHaveCount(0);
     await expect(d.getByTestId('timer').getByRole('button', { name: 'Süre ayarla' })).toBeVisible();
+    await expect(d.getByRole('button', { name: 'Dersi bitir', exact: true })).toBeInViewport({ ratio: 1 });
 
     // Two languages: the switch is there and changes the screen language.
     await setLanguage('en', true);
@@ -328,109 +369,144 @@ test('timer keypad, assistant panel hide/show, and the class language mode on th
   }
 });
 
-/**
- * Known gap for S14b (S14a review): the default classroom (reminder boxes on since D-143) does not yet
- * meet D-139 at 1280x720 (the class bar is under the fold) or D-103 at 1440x900 (16 of 19 cards). This
- * test measures those targets on the default layout, so the gap cannot hide behind a non-default
- * setting. It pins the gap rather than skipping it (a `test.fail` would also swallow a broken page):
- * the page must load and the targets must still be missed. Once S14b's board (D-148) meets them, the
- * last assertion fails with a message saying so, and S14b changes it to `expect(failures).toEqual([])`.
- */
-test('known gap until S14b (D-139, D-103): the default layout with reminder boxes on keeps the class counter and all 19 cards on screen', async ({ page, browser }) => {
-  test.setTimeout(180_000);
-  await login(page, 'english');
-  await ensurePin(page);
-  await endActiveLessons(page);
-  const ctx = await context3A(page);
-  const original = await modulesOf(page, ctx.id);
-  const officeCtx = await browser.newContext();
-  const office = await officeCtx.newPage();
-  await login(office, 'english');
-  try {
-    await setModules(page, ctx.id, MODULES, original);
-    await setReminderBoxes(office, ctx.id, true);
-    await startLesson(page, ctx.id);
-    const failures: string[] = [];
-    for (const vp of [
-      { name: '1280x720', width: 1280, height: 720, scale: 1 },
-      { name: '1440x900', width: 1440, height: 900, scale: 2 },
-    ]) {
-      const { ctx: c, p } = await onDevice(browser, page, vp);
-      try {
-        await openClassroom(p);
-        // The setup itself must hold, so a broken page never counts as the expected failure.
-        await expect(p.locator('.cc-student-card')).toHaveCount(19);
-        await expect(p.locator('.cc-student-card__add').first()).toBeVisible();
-        await expect(p.getByTestId('lesson-rail').getByRole('button', { name: 'End lesson' }), vp.name).toBeInViewport({ ratio: 1 });
-        const barInView = await p
-          .getByTestId('counter-bar')
-          .first()
-          .evaluate((e) => {
-            const r = e.getBoundingClientRect();
-            return r.height > 0 && r.top < window.innerHeight && r.bottom > 0;
-          });
-        if (!barInView) failures.push(`${vp.name}: class counter bar under the fold`);
-        const visible = await cardsOnScreen(p);
-        test.info().annotations.push({ type: 'known gap (S14b)', description: `${vp.name} with reminder boxes: ${visible} cards on screen, counter bar ${barInView ? 'in view' : 'under the fold'}` });
-        if (vp.width >= 1440 && visible < 18) failures.push(`${vp.name}: ${visible} cards on screen (target 18-20)`);
-      } finally {
-        await c.close();
-      }
-    }
-    // S14b: when this fails, the default layout meets D-139 and D-103: replace it with
-    // `expect(failures, 'D-139/D-103 targets on the default layout').toEqual([])`.
-    expect(failures.length, 'the S14a known gap is closed: make this test a normal guard (see the comment above it)').toBeGreaterThan(0);
-  } finally {
-    await endActiveLessons(page);
-    for (const m of original) await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
-    await officeCtx.close();
-  }
-});
+/** Box keys of each row of the board, as "key:w". */
+const rowsOf = (p: Page) => p.locator('.cc-lesson-row:not([data-dock-row])').evaluateAll((els) => els.map((e) => [...e.querySelectorAll<HTMLElement>(':scope > .cc-lesson-box')].map((b) => `${b.dataset.box}:${b.dataset.w}`).join(' ')));
+const dockOf = (p: Page) => p.getByTestId('lesson-dock').evaluate((e) => [...e.querySelectorAll<HTMLElement>('[data-testid^="dock-"]')].map((b) => b.dataset.testid!.slice(5)));
 
-test('usability pass (D-139): End lesson and the class counter are on screen at 1920x1080 and 1280x720 without scrolling', async ({ page, browser }) => {
-  test.setTimeout(180_000);
+async function openEditor(p: Page) {
+  await p.getByTestId('classroom-settings').click();
+  await p.getByTestId('customise-layout').click();
+  const dialog = p.getByTestId('pin-dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Enter your PIN').fill(PIN);
+  await dialog.getByLabel('Enter your PIN').press('Enter');
+  await expect(p.getByTestId('layout-editor')).toBeVisible();
+}
+
+test('Customise layout: PIN, keyboard and mouse edits, save per class (relocks: 423), all my classes, reset; axe on edit mode and every dock view', async ({ page, browser }) => {
+  test.setTimeout(240_000);
   await login(page, 'english');
   await ensurePin(page);
   await endActiveLessons(page);
-  const ctx = await context3A(page);
-  const original = await modulesOf(page, ctx.id);
-  // A second session for settings (the display devices put `page`'s session in classroom mode).
-  const officeCtx = await browser.newContext();
-  const office = await officeCtx.newPage();
-  await login(office, 'english');
+  const all = await contexts(page);
+  const ctxA = all.find((c) => c.className === '3-A' && c.subjectName.en === 'English')!;
+  const ctxB = all.find((c) => c.id !== ctxA.id)!;
+  const original = await modulesOf(page, ctxA.id);
+  const { ctx: displayCtx, p: d } = await displayPage(browser, { width: 1440, height: 900 });
+  const layoutOf = async (contextId: string) => (await api(d, 'GET', `/api/classroom/layout?contextId=${contextId}`)).body as { source: string; layout: unknown };
   try {
-    await setModules(page, ctx.id, MODULES, original);
-    // Checked without the per-student boxes (on by default since S14a, D-143): with them the cards are
-    // taller and the class bar sits under the fold at 1280x720 until S14b moves it above the grid (D-148).
-    // The default (boxes on) is measured by the "known gap until S14b" test above, which S14b turns green.
-    await setReminderBoxes(office, ctx.id, false);
-    await startLesson(page, ctx.id);
-    for (const vp of [
-      { name: '1920x1080', width: 1920, height: 1080, scale: 1 },
-      { name: '1280x720', width: 1280, height: 720, scale: 1 },
-    ]) {
-      const { ctx: c, p } = await onDevice(browser, page, vp);
-      try {
-        await openClassroom(p);
-        await expect(p.getByTestId('counter-bar').first()).toBeVisible();
-        const end = p.getByTestId('lesson-rail').getByRole('button', { name: 'End lesson' });
-        await expect(end, vp.name).toBeInViewport({ ratio: 1 });
-        await expect(p.getByRole('button', { name: 'Attendance' }), vp.name).toBeInViewport({ ratio: 1 });
-        await expect(p.getByTestId('counter-bar').first(), vp.name).toBeInViewport();
-        // On a 1080p display the timer's Start is also visible without scrolling the rail.
-        if (vp.height >= 1080) await expect(p.getByTestId('lesson-rail').getByRole('button', { name: 'Start', exact: true }), vp.name).toBeInViewport({ ratio: 1 });
-        // The top bar is one row (plus the quote of the day on narrower displays), not three.
-        const bar = await p.locator('.cc-classroom-bar').evaluate((e) => e.getBoundingClientRect().height);
-        expect(bar, `${vp.name}: top bar height`).toBeLessThan(vp.height * 0.15);
-        expect((await layoutFacts(p)).hScroll, vp.name).toBe(false);
-        await p.screenshot({ path: `test-results/fit/${vp.name}-usability.png` });
-      } finally {
-        await c.close();
-      }
+    await setModules(page, ctxA.id, MODULES, original);
+    await startLesson(page, ctxA.id);
+    await startLesson(page, ctxB.id);
+    await openClassroom(d);
+
+    // Every dock view: full screen, axe-clean, closes back to the board.
+    for (const panel of ['assistant', 'secret', 'groups', 'homework', 'achievements'] as DockPanel[]) {
+      await openDock(d, panel);
+      await axe(d, `[data-testid="dock-view-${panel}"]`);
+      await closeDock(d, panel);
     }
+
+    // The editor needs the PIN; edit mode passes axe.
+    await openEditor(d);
+    await axe(d, '[data-testid="lesson-dashboard"]');
+    expect(await rowsOf(d)).toEqual(['routine:8 core.timer:4', 'focus:4 counters:8', 'core.students:12']);
+
+    // Keyboard: pick the timer up, move it left, put it down; Shift+arrows resize.
+    const timerHandle = d.locator('[data-handle="core.timer"]');
+    await timerHandle.focus();
+    await d.keyboard.press('Enter');
+    await expect(d.getByTestId('layout-announce')).toContainText('Timer picked up');
+    await d.keyboard.press('ArrowLeft');
+    await d.keyboard.press('Enter');
+    await expect(d.getByTestId('layout-announce')).toHaveText('Timer put down.');
+    await expect(d.locator('[data-handle="core.timer"]')).toBeFocused();
+    await d.keyboard.press('Shift+ArrowRight');
+    expect((await rowsOf(d))[0]).toBe('core.timer:5 routine:7');
+    // Escape cancels a move that was not put down.
+    await d.keyboard.press('Enter');
+    await d.keyboard.press('ArrowDown');
+    expect((await rowsOf(d))[0]).toBe('routine:12');
+    await d.keyboard.press('Escape');
+    expect((await rowsOf(d))[0]).toBe('core.timer:5 routine:7');
+
+    // Mouse: drag the counter's handle onto the dock; "Show as a box" brings groups onto the board.
+    const handle = d.locator('[data-handle="counters"]');
+    const from = (await handle.boundingBox())!;
+    const dock = (await d.getByTestId('layout-dock').boundingBox())!;
+    await d.mouse.move(from.x + 12, from.y + 12);
+    await d.mouse.down();
+    await d.mouse.move(from.x + 40, from.y + 60, { steps: 4 });
+    await d.mouse.move(dock.x + dock.width / 2, dock.y + dock.height / 2, { steps: 8 });
+    await d.mouse.up();
+    await expect(d.locator('[data-dock-item="counters"]')).toHaveCount(1);
+    await d.getByTestId('layout-from-dock-groups').click();
+    // Width by the splitter: drag the timer's right edge a few columns to the left.
+    const split = d.getByTestId('layout-wsplit-core.timer');
+    const sb = (await split.boundingBox())!;
+    await d.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+    await d.mouse.down();
+    await d.mouse.move(sb.x - 200, sb.y + sb.height / 2, { steps: 6 });
+    await d.mouse.up();
+    const edited = await rowsOf(d);
+    expect(edited[0]).toMatch(/^core\.timer:[34] routine:(8|9)$/u);
+    expect(edited.join(' ')).toContain('groups:');
+    expect(edited.join(' ')).not.toContain('counters:');
+    // Undo goes back one step at a time.
+    await d.getByTestId('layout-editor').getByRole('button', { name: 'Undo' }).click();
+    expect((await rowsOf(d))[0]).toBe('core.timer:5 routine:7');
+    await d.getByTestId('layout-editor').getByRole('button', { name: 'Undo' }).click();
+    expect((await rowsOf(d)).join(' ')).not.toContain('groups:');
+
+    // Save for this class: the editor closes, the teacher area is locked again (423), the layout stays.
+    await d.getByTestId('layout-save').click();
+    await expect(d.getByTestId('layout-editor')).toHaveCount(0);
+    await expect(d.getByTestId('toast').filter({ hasText: 'Layout saved for this class' })).toBeVisible();
+    expect((await api(d, 'PUT', '/api/teacher/classroom-layout', { contextId: ctxA.id, applyTo: 'class', layout: {} })).status).toBe(423);
+    const saved = await rowsOf(d);
+    expect(saved[0]).toBe('core.timer:5 routine:7');
+    expect(await dockOf(d)).toContain('counters');
+    await d.reload();
+    await expect(d.getByTestId('lesson-dashboard')).toBeVisible();
+    expect(await rowsOf(d)).toEqual(saved);
+    expect((await layoutOf(ctxA.id)).source).toBe('class');
+    // Another class keeps the default.
+    expect((await layoutOf(ctxB.id)).source).toBe('default');
+
+    // All my classes: the other class shows it too.
+    await openEditor(d);
+    await d.getByTestId('layout-scope').getByRole('button', { name: 'All my classes' }).click();
+    await d.getByTestId('layout-save').click();
+    await expect(d.getByTestId('layout-editor')).toHaveCount(0);
+    expect((await layoutOf(ctxB.id)).source).toBe('all');
+    await openClassroom(d, ctxB.className);
+    expect((await rowsOf(d))[0]).toBe('core.timer:5 routine:7');
+
+    // Reset (all my classes, after a confirmation): the default board everywhere, locked again.
+    await openEditor(d);
+    await d.getByTestId('layout-scope').getByRole('button', { name: 'All my classes' }).click();
+    await d.getByTestId('layout-editor').getByRole('button', { name: 'Reset' }).click();
+    await d.getByTestId('layout-reset-confirm').click();
+    await expect(d.getByTestId('layout-editor')).toHaveCount(0);
+    expect((await layoutOf(ctxA.id)).source).toBe('default');
+    expect((await layoutOf(ctxB.id)).source).toBe('default');
+    expect((await rowsOf(d))[0]).toBe('routine:8 core.timer:4');
+    expect((await api(d, 'DELETE', '/api/teacher/classroom-layout', { contextId: ctxA.id, applyTo: 'all' })).status).toBe(423);
+
+    // Cancel also locks again and keeps nothing.
+    await openEditor(d);
+    await d.locator('[data-handle="core.timer"]').focus();
+    await d.keyboard.press('Shift+ArrowRight');
+    await d.getByTestId('layout-editor').getByRole('button', { name: 'Cancel' }).click();
+    await expect(d.getByTestId('layout-editor')).toHaveCount(0);
+    expect((await rowsOf(d))[0]).toBe('routine:8 core.timer:4');
+    expect((await api(d, 'DELETE', '/api/teacher/classroom-layout', { contextId: ctxA.id, applyTo: 'all' })).status).toBe(423);
   } finally {
+    await api(d, 'POST', '/api/auth/pin/unlock', { pin: PIN });
+    await api(d, 'DELETE', '/api/teacher/classroom-layout', { contextId: ctxA.id, applyTo: 'all' });
+    await api(d, 'POST', '/api/auth/lock');
     await endActiveLessons(page);
-    for (const m of original) await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
-    await officeCtx.close();
+    for (const m of original) await api(page, 'PUT', `/api/teacher/contexts/${ctxA.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
+    await displayCtx.close();
   }
 });

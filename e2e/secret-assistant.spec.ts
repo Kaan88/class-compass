@@ -7,7 +7,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
-import { api, ensurePin, login, PIN } from './helpers.ts';
+import { api, closeDock, ensurePin, login, openDock, PIN } from './helpers.ts';
 
 async function endActiveLessons(page: Page) {
   const active = await api(page, 'GET', '/api/classroom/lessons/active');
@@ -56,6 +56,8 @@ test('secret students: draw, refresh, nothing leaks before the reveal, reveal an
     expect(started.body.results[0].ok).toBe(true);
     await page.goto('/classroom');
     await page.getByRole('button', { name: /3-A · English/ }).click();
+    // Secret Students are a button in the board's dock (S14b): it opens the panel full screen.
+    await openDock(page, 'secret');
     const panel = page.getByTestId('secret-panel');
     await expect(panel).toBeVisible();
 
@@ -64,13 +66,22 @@ test('secret students: draw, refresh, nothing leaks before the reveal, reveal an
     await expect(panel.getByTestId('secret-count')).toHaveText('2 secret students chosen');
     const panelText = async () => panel.innerText();
     for (const s of roster) expect(await panelText()).not.toContain(s.fullName);
+    await closeDock(page, 'secret');
+    // The dock badge is a count only (D-064).
+    await expect(page.getByTestId('dock-secret').locator('.cc-dock__badge')).toHaveText('2');
 
     // Refresh: the round is still there, still without names (SEC-3).
     await page.reload();
+    await openDock(page, 'secret');
     await expect(page.getByTestId('secret-count')).toHaveText('2 secret students chosen');
     await axe(page, '[data-testid="secret-panel"]');
-    if (await page.getByTestId('assistant-panel').count()) await axe(page, '[data-testid="assistant-panel"]');
     for (const s of roster) expect(await page.getByTestId('secret-panel').innerText()).not.toContain(s.fullName);
+    await closeDock(page, 'secret');
+    if (await page.getByTestId('dock-assistant').count()) {
+      await openDock(page, 'assistant');
+      await axe(page, '[data-testid="dock-view-assistant"]');
+      await closeDock(page, 'assistant');
+    }
     // Nothing in the DOM marks a student as chosen (no attribute or hidden text).
     const html = await page.content();
     expect(html).not.toMatch(/secret-(selected|chosen)|data-secret/);

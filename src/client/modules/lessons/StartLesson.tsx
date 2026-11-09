@@ -63,6 +63,7 @@ export function StartLessonFlow({
       if (result && !result.started) showToast({ message: t('lesson.toast.resumed', { cls: label }), scope: 'classroom' });
       else showToast({ message: t('lesson.toast.started', { cls: label }), kind: 'success', scope: 'classroom' });
       if (result?.attendanceKept) showToast({ message: t('lesson.toast.attendanceKept', { cls: label, count: result.attendanceKept }), kind: 'error', durationMs: 12_000, scope: 'classroom' });
+      if (result?.dutiesDropped) showToast({ message: t('lesson.toast.dutiesDropped', { cls: label, count: result.dutiesDropped }), kind: 'error', durationMs: 12_000, scope: 'classroom' });
       onStarted(result?.lessonId ?? opId);
     } catch {
       setError(t('lesson.startFailed'));

@@ -7,7 +7,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { api, ensurePin, login, studentLinkUrl } from './helpers.ts';
+import { api, closeDock, ensurePin, login, openDock, studentLinkUrl } from './helpers.ts';
 
 async function context3A(page: Page) {
   const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; classId: string; className: string; subjectName: { en: string } }>;
@@ -38,7 +38,9 @@ test('a badge given in class shows the moment on the display and a celebration o
   try {
     await page.goto('/classroom');
     await page.getByRole('button', { name: /3-A · English/ }).click();
-    const panel = page.getByTestId('achievements-panel');
+    // Achievements are a button in the board's dock (S14b): it opens the panel full screen.
+    const view = await openDock(page, 'achievements');
+    const panel = view.getByTestId('achievements-panel');
     await expect(panel).toBeVisible();
     await panel.getByTestId('achievements-give').click();
     const dialog = page.getByTestId('achievements-dialog');
@@ -54,11 +56,11 @@ test('a badge given in class shows the moment on the display and a celebration o
     await expect(moment).toBeVisible();
     await expect(moment.getByTestId('achievements-moment-names')).toContainText(student.fullName);
     await moment.getByTestId('achievements-moment-close').click();
-    // Undo is offered at once in a note that is always on screen (D-139) ...
-    const note = page.getByTestId('toast').filter({ hasText: badgeName });
-    await expect(note.getByRole('button', { name: 'Undo' })).toBeInViewport();
-    // ... and stays offered for 10 minutes on the panel.
-    await expect(panel.getByTestId('achievements-undo')).toBeVisible();
+    // In the dock view the note is in the panel (the page under the full-screen view is inert) ...
+    await expect(panel.getByTestId('achievements-note')).toContainText(badgeName);
+    // ... and Undo stays offered for 10 minutes on the panel (D-139).
+    await expect(panel.getByTestId('achievements-undo')).toBeInViewport();
+    await closeDock(page, 'achievements');
 
     const phone = await phoneOf(browser);
     const p = await phone.newPage();

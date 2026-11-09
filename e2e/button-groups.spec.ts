@@ -7,14 +7,14 @@
  * - a grid has no empty tracks (auto-fill would leave holes and squeeze the buttons).
  * Covered: the student page's home tiles, subject switch, New goal categories, evidence kinds and
  * How is it going? faces (S14d), the teacher menu grid and the attendance status segments (teacher
- * area), the topic choices (Start Lesson), the group options (group screen) and the lesson reflection
- * (End Lesson). S14b adds the dock here. Fictional demo data only; the class language and profile
- * language are put back.
+ * area), the topic choices (Start Lesson), the group options (group screen, opened from the board's
+ * dock), the board's dock itself (S14b) and the lesson reflection (End Lesson). Fictional demo data
+ * only; the class language and profile language are put back.
  */
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { translate, type Locale, type MessageKey } from '../src/shared/i18n/index.ts';
-import { api, ensurePin, login, studentLinkUrl } from './helpers.ts';
+import { api, ensurePin, login, openDock, studentLinkUrl } from './helpers.ts';
 
 const WIDTHS = [375, 768, 1280] as const;
 const SCALES = [1, 2] as const;
@@ -167,13 +167,16 @@ test('choice buttons fit at 375/768/1280 px, in English and Turkish, at 100 % an
       await d.getByRole('button', { name: /3-A · (English|İngilizce)/ }).first().click();
       await expect(d.getByTestId('lesson-dashboard')).toBeVisible();
 
-      const groups = d.getByTestId('groups-panel');
-      await expect(groups).toBeVisible();
-      await groups.getByRole('button', { name: T('grouping.choose') }).click();
-      await expect(d.getByTestId('group-options').getByRole('button').first()).toBeVisible();
+      // The board's dock (S14b, D-148): its buttons and End lesson fit, wrapping on narrow screens.
+      await expect(d.getByTestId('lesson-dock')).toBeVisible();
+      await checkAll(d, '.cc-dock', `${lang} lesson dock`);
+
+      // Groups open from the dock: the group screen is the dock view itself.
+      const groups = await openDock(d, 'groups');
+      await expect(groups.getByTestId('group-options').getByRole('button').first()).toBeVisible();
       await checkAll(d, '[data-testid="group-options"]', `${lang} group options`);
       await d.keyboard.press('Escape');
-      await expect(d.getByTestId('group-screen')).toHaveCount(0);
+      await expect(d.getByTestId('dock-view-groups')).toHaveCount(0);
 
       await d.getByRole('button', { name: T('lesson.end'), exact: true }).first().click();
       await expect(d.getByTestId('end-lesson').locator('.cc-reflect')).toBeVisible();

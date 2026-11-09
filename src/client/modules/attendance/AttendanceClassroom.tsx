@@ -1,7 +1,7 @@
 /**
  * Attendance on the classroom device (LES-1, ATT-2, ACC-8), contributed through the attendance
  * manifest (D-069): the Start Lesson step (everyone present by default; one tap per change), the
- * in-lesson attendance button + dialog (dashboard `actions` region) and the attendance chip + counts
+ * in-lesson attendance button + dialog (in the board's dock, S14b) and the attendance chip + counts
  * on the student grid (student-card add-on).
  */
 import { useRef, useState } from 'react';
@@ -160,7 +160,8 @@ function AttendanceAction({ context, lesson }: { context: ClassroomContext; less
   );
 }
 
-export const attendanceDashboardSlot: DashboardSlot = { key: 'attendance', module: 'attendance', order: 40, region: 'actions', Component: AttendanceAction };
+/** In the board's dock (S14b): no dock spec, the button and its dialog are the slot's own control. */
+export const attendanceDashboardSlot: DashboardSlot = { key: 'attendance', module: 'attendance', order: 40, Component: AttendanceAction };
 
 /** Attendance chip on each student card and the counts line beside the student heading. */
 function useAttendanceCards(context: ClassroomContext, lesson: LessonState, enabled: boolean) {

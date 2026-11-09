@@ -26,7 +26,7 @@ import { BigButton, Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { TextField, Toggle } from '../../ui/Fields.tsx';
-import { IconCheck, IconSync, IconUndo } from '../../ui/icons.tsx';
+import { IconCheck, IconMask, IconSync, IconUndo } from '../../ui/icons.tsx';
 import { motionMode, useThemeSound } from '../../themes/index.tsx';
 import { celebrate as startCelebration } from '../../themes/Celebration.tsx';
 import { revealCue, type RevealStep } from '../../themes/sequences.ts';
@@ -130,7 +130,19 @@ function SecretSlot({ context, lesson }: { context: ClassroomContext; lesson: Le
   );
 }
 
-export const secretDashboardSlot: DashboardSlot = { key: 'secret', module: 'secretStudents', order: 30, Component: SecretSlot };
+/** Dock badge: how many were chosen (a count only, never who; D-064). */
+function useSecretBadge(context: ClassroomContext) {
+  const st = useLessonState(context.id).data?.data.secret ?? null;
+  return st?.roundExists ? String(st.selectedCount) : null;
+}
+
+export const secretDashboardSlot: DashboardSlot = {
+  key: 'secret',
+  module: 'secretStudents',
+  order: 30,
+  dock: { Icon: IconMask, label: 'secret.title', useBadge: useSecretBadge },
+  Component: SecretSlot,
+};
 
 // ---------------------------------------------------------------- End Lesson: reveal + outcomes (SEC-5)
 type SecretStepValue = Record<string, never>;

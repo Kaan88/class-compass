@@ -17,7 +17,7 @@ import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
-import { IconCheck } from '../../ui/icons.tsx';
+import { IconBook, IconCheck } from '../../ui/icons.tsx';
 import { TopicPicto } from '../../ui/pictos.tsx';
 import { startStep, type ClassroomContext, type DashboardSlot, type StartStepProps } from '../types.ts';
 import { patchLesson, sendLessonCommand } from './lessonClient.ts';
@@ -155,4 +155,4 @@ export function FocusTopics({ topics, size = '1.8em' }: { topics: readonly Lesso
   );
 }
 
-export const focusDashboardSlot: DashboardSlot = { key: 'topics', module: null, order: 5, region: 'top', Component: TodaysFocus };
+export const focusDashboardSlot: DashboardSlot = { key: 'focus', module: null, order: 5, dock: { Icon: IconBook, label: 'lesson.topic.todaysFocus' }, Component: TodaysFocus };

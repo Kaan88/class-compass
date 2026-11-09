@@ -14,7 +14,7 @@ import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
-import { IconBook, IconCheck } from '../../ui/icons.tsx';
+import { IconBook, IconCheck, IconPencil } from '../../ui/icons.tsx';
 import { PanelHead } from '../../ui/Layout.tsx';
 import type { ClassroomContext, DashboardSlot } from '../types.ts';
 import { CheckGrid, type CheckActions } from './CheckGrid.tsx';
@@ -94,4 +94,4 @@ function HomeworkSlot({ context }: { context: ClassroomContext }) {
   );
 }
 
-export const homeworkDashboardSlot: DashboardSlot = { key: 'homework', module: 'homework', order: 70, Component: HomeworkSlot };
+export const homeworkDashboardSlot: DashboardSlot = { key: 'homework', module: 'homework', order: 70, dock: { Icon: IconPencil, label: 'homework.title' }, Component: HomeworkSlot };

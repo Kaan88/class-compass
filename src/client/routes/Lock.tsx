@@ -5,13 +5,11 @@
  * - After unlocking, the teacher menu is shown first (PIN-4) and a persistent banner says the area is
  *   visible on the classroom display (PIN-5). Inactivity relocks (PIN-7).
  */
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useNavigate, useRouter, useRouterState } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import * as Auth from '../../shared/contracts/auth.ts';
-import { ApiError, call } from '../lib/api.ts';
-import { errorText } from '../lib/errors.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { usePinUnlock } from '../lib/pinUnlock.ts';
 import { createIdleTimer, CLIENT_IDLE_LOCK_MS } from '../lib/idle.ts';
 import { setMenuFirst, useMenuFirstPending } from '../lib/menuFirst.ts';
 import { purgeSensitive } from '../lib/queryClient.ts';
@@ -22,69 +20,20 @@ import { DisplayBanner } from '../ui/Layout.tsx';
 import { ThemeIllustration } from '../ui/Mascot.tsx';
 import { PinPad } from '../ui/PinPad.tsx';
 
-function useCountdown(until: number | null): number {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!until) return;
-    setNow(Date.now());
-    const h = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(h);
-  }, [until]);
-  return until ? Math.max(0, Math.ceil((until - now) / 1000)) : 0;
-}
-
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-
 /** Neutral lock screen: app name, lock icon, PIN pad. Nothing about the page behind it (PIN-2/3). */
 export function LockScreen() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const router = useRouter();
   const me = useMe();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
-  const [signOutWarning, setSignOutWarning] = useState<number | null>(null);
-  const secondsLeft = useCountdown(lockedUntil);
-  const lockedOut = secondsLeft > 0;
-
-  async function unlock(pin: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      setMenuFirst(true); // PIN-4: the menu comes first, whatever URL was requested
-      await call(Auth.unlockPin, { pin });
-      setLockedUntil(null);
-      setSignOutWarning(null);
+  const { unlock, busy, lockedOut, padError, signOutWarning } = usePinUnlock({
+    before: () => setMenuFirst(true), // PIN-4: the menu comes first, whatever URL was requested
+    onRefused: () => setMenuFirst(false),
+    onUnlocked: async () => {
       await navigate({ to: '/teacher' });
       await router.invalidate();
-    } catch (err) {
-      setMenuFirst(false);
-      const details = (err instanceof ApiError ? err.details : undefined) as
-        | { reason?: string; retryAfterMs?: number; triesBeforePause?: number; attemptsBeforeSignOut?: number }
-        | undefined;
-      // From the first pause on, warn how many wrong PINs remain before the session is signed out.
-      const beforeSignOut = typeof details?.attemptsBeforeSignOut === 'number' ? details.attemptsBeforeSignOut : null;
-      if (err instanceof ApiError && err.code === 'PIN_LOCKED_OUT') {
-        // The server sends a RELATIVE wait; count down from when we received it, so a classroom PC
-        // whose clock is wrong neither re-enables the pad too early nor keeps it disabled (D-032).
-        setLockedUntil(Date.now() + Math.max(0, Number(details?.retryAfterMs ?? 0)));
-        setSignOutWarning(beforeSignOut);
-        // The countdown message is shown while the pause lasts; nothing stale remains after it.
-        setError(null);
-      } else if (details?.reason === 'WRONG_PIN') {
-        const left = Number(details.triesBeforePause ?? 0);
-        setError(left > 0 ? `${t('pin.wrong')} ${t('pin.triesLeft', { count: left })}` : t('pin.wrong'));
-        setSignOutWarning(left > 0 ? null : beforeSignOut);
-      } else {
-        setError(errorText(t, err));
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const padError = lockedOut ? `${t('pin.lockedOut')} ${t('pin.tryAgainIn', { time: mmss(secondsLeft) })}` : error;
+    },
+  });
 
   return (
     <main className="cc-lock" data-testid="lock-screen">

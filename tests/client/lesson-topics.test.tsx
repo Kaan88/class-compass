@@ -36,13 +36,13 @@ describe("Today's focus (S13a 7)", () => {
   const Focus = focusDashboardSlot.Component;
 
   it('shows the topic with its name when one is set', () => {
-    wrap(<Focus context={context} lesson={lesson(0, [listening])} />);
+    wrap(<Focus context={context} lesson={lesson(0, [listening])} presentation="box" />);
     expect(screen.getByTestId('todays-focus').textContent).toContain('Listening');
     expect(screen.getByText(en['lesson.topic.todaysFocus'])).toBeTruthy();
   });
 
   it('hides the focus strip when no topic is set and keeps only a small "Choose a topic" action', () => {
-    wrap(<Focus context={context} lesson={lesson(0, [])} />);
+    wrap(<Focus context={context} lesson={lesson(0, [])} presentation="box" />);
     expect(screen.queryByTestId('todays-focus')).toBeNull();
     expect(screen.queryByText(en['lesson.topic.todaysFocus'])).toBeNull();
     expect(screen.getByTestId('todays-focus-empty').textContent).toBe(en['lesson.topic.choose']);
@@ -53,15 +53,15 @@ describe('Learning goal routine stage (S13a 7)', () => {
   const Stepper = routineDashboardSlot.Component;
 
   it('shows the lesson topics on the Learning goal stage', () => {
-    wrap(<Stepper context={context} lesson={lesson(learningGoal, [listening])} />);
+    wrap(<Stepper context={context} lesson={lesson(learningGoal, [listening])} presentation="box" />);
     expect(screen.getByTestId('stage-focus').textContent).toContain('Listening');
   });
 
   it('shows nothing extra on other stages or when no topic is set', () => {
-    wrap(<Stepper context={context} lesson={lesson(0, [listening])} />);
+    wrap(<Stepper context={context} lesson={lesson(0, [listening])} presentation="box" />);
     expect(screen.queryByTestId('stage-focus')).toBeNull();
     cleanup();
-    wrap(<Stepper context={context} lesson={lesson(learningGoal, [])} />);
+    wrap(<Stepper context={context} lesson={lesson(learningGoal, [])} presentation="box" />);
     expect(screen.queryByTestId('stage-focus')).toBeNull();
   });
 });
