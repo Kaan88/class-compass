@@ -14,7 +14,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 
 ## S0 Spike & foundations
 - [x] Verify native deps on Windows (better-sqlite3, sharp, argon2) — Node 26 chosen (D-019)
-- [~] Verify native deps inside Docker on the VPS; tesseract.js `tur` + SheetJS (S9) — tesseract.js 7 (pinned `tur`/`eng` data), SheetJS 0.20.3 and sharp verified on Windows (Node 26) and through the test suite; the Docker/VPS check stays with S11
+- [x] Verify native deps inside Docker on the VPS (2026-11-09: the ARM image on the Oracle server read a fictional Turkish class list with the app's OCR in 1.5 s, 92–96 % confidence, Ö ğ ı ü ş kept, one Ç read as C, which the importer preview lets a teacher correct; sharp and node:sqlite work in the image); tesseract.js `tur` + SheetJS (S9) — tesseract.js 7 (pinned `tur`/`eng` data), SheetJS 0.20.3 and sharp verified on Windows (Node 26) and through the test suite; the Docker/VPS check stays with S11
 - [x] Repo skeleton, boundaries lint, Vitest, GitHub Actions (Ubuntu + Windows), CONVENTIONS.md
 - [x] Playwright setup; i18n/a11y/raw-colour lint rules — done in S3 (`tests/client/lint-rules.test.ts`, axe in e2e)
 - [x] Baseline migration, `/healthz`, redacted logging, CSP/security headers, robots/noindex
@@ -153,7 +153,8 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Test install on the LAN test VM (D-096): image built and run, demo data, sign-in, restore drill passed (OPERATIONS → Test VM install)
 - [x] `seed:demo-history`: weeks of fictional history for the test VM through the real commands and services, incl. achievements, avatars and Super Speakers (D-136; OPERATIONS → Test VM install)
 - [x] Isolated install behind Cloudflare Tunnel, on the owner's request (2026-11-09): the Oracle ARM server runs sareteacher.com (empty real school, own pepper, first admin via `admin:create`, hourly local backups plus the owner's nightly PBS backup) and test.sareteacher.com (moved from the mini PC with its data), both behind Cloudflare Access (OPERATIONS → "Oracle server")
-- [ ] First restore drill on the Oracle server; ENG-5 report
+- [x] First restore drill on the Oracle server (2026-11-09): the test site's latest backup restored into a scratch folder with the deployed image, verified, 76 tables and 25,566 rows equal to the live database, integrity ok; the drill command in OPERATIONS fixed (a read-only backup folder fails)
+- [ ] ENG-5 report
 - [ ] Not yet: e2e/axe for the Reports, Admin Reports and Maintenance pages, a print e2e; a school holiday calendar (coverage counts Monday–Friday)
 - [ ] Production go-live only with explicit owner authorisation (installed 2026-11-09 but still behind Cloudflare Access; opening it and adding real students needs the owner's decision and the school's KVKK sign-off)
 
@@ -299,9 +300,17 @@ Measured by the lead on 2026-11-09 with fictional schools on the development PC,
 - [x] Notification tick: the 90-day purge deletes in chunks of 500 with yields, the digest yields between teachers (tested); a safeguard: the cause of the one 1.2–1.5 s stall seen was not confirmed (the old purge of about 12k rows took about 0.1 s on the PC)
 - [x] Review fixes: Super Speakers (section and history), the attendance week table and the homework section group or batch their reads instead of re-scanning per week or reading per assignment; outputs compared byte for byte on the big school and pinned by tests (whole-year class report 112 → 80 ms, Super Speakers history 355 → 23 ms)
 - [x] D-162 (measurements, causes, fixes, the snapshot choice, server size), OPERATIONS "Server size", CONVENTIONS rule on Intl formatters and long jobs; `npm run check` 1,597 tests, `npm run build` student page 427.3 kB; e2e `notifications`, `admin`, `report-views`, `student-stats`: 14 passed, 1 skipped (phone-only test in the display project)
-- [ ] Re-measured on the intended server after deployment
-- [ ] The notification tick watched on the intended server after deployment (no stall over about 100 ms)
+- [x] Re-measured on the intended server after deployment (Oracle ARM, image 42788d4, 2026-11-09, the same scripts and fictional schools, the live sites running beside it). Big school, before S15a → now: notifications list 992 → 65 ms, bell count 483 → 22 ms, whole-year class report 315 → 181 ms (max 484 ms), five reports at once 436 → 323 ms; during a full export the classroom lesson state waited 1,659 → 100 ms (the export itself 4.9 s); RSS stays under 370 MB in process. Idle lesson state p50 19 ms, p99 38 ms
+- [ ] The notification tick watched on the intended server over a real school day (no stall over about 100 ms); not part of the 2026-11-09 run
 - [ ] A full lesson day on the real classroom display after deployment
+
+## Open points noted with the owner (2026-11-09)
+A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
+- [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site
+- [ ] **Owner decisions:** open sareteacher.com to the school (Access, KVKK sign-off before real students); off-site backups with restic (the nightly PBS backup covers the server today); a separate Super Speakers hostname; AI tools tried with Claude Code, claude.ai, Claude Desktop and MCP Inspector on fictional data (needs the Access bypass for the AI paths); split End Lesson into a class-facing and a teacher-only part (S13a); CI again after 2026-12-01
+- [ ] **Small product gaps** (above in S5–S13): teachers adding evidence from the Goals page; lesson goals per class; HTML-table `.xls` files; renaming default goal categories and students editing their own goal text; Turkish fields in the remaining label editors; an ordered level picker for grouping; a school holiday calendar for coverage; undo for a counter class reset; starting a lesson offline; a larger word list for the text check; theme-supplied badge and avatar art
+- [ ] **Missing automated checks:** a pixel-diff screenshot baseline, a 40-student grid, e2e/axe for Reports, Admin Reports and Maintenance, print e2e, mobile and axe for the Secret Students teacher pages, bfcache and inactivity relock e2e
+- [ ] **Boxes to re-check against S14 and the deployments** (some may be done): S8 moving a student between groups on the classroom screen and late arrivals (S14c), S13a Compact density, badges on the student cards and the size control (S14b), S0 native dependencies in Docker and S12 "through the real tunnel" (images now run on x86 and ARM behind the tunnel)
 
 ## User documentation (after S12)
 Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in the app under Help (D-137). Index and screenshot command: `docs/guides/README.md`.
