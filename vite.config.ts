@@ -44,7 +44,14 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             { name: 'vendor-data', test: /node_modules[\\/](zod|dexie)[\\/]/ },
-            { name: 'vendor-ui', test: /node_modules[\\/](react-aria|react-aria-components|react-stately|@react-aria|@react-stately|@react-types|@internationalized)[\\/]/ },
+            // S14c (D-150): split by the entries that use them, so the student page does not load what
+            // only the teacher app needs (react-aria's drag and drop and GridList for the group screens).
+            {
+              name: 'vendor-ui',
+              test: /node_modules[\\/](react-aria|react-aria-components|react-stately|@react-aria|@react-stately|@react-types|@internationalized)[\\/]/,
+              entriesAware: true,
+              entriesAwareMergeThreshold: 10_000,
+            },
             // S10: shared by the main app and the student page entry.
             { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
             { name: 'vendor-tanstack', test: /node_modules[\\/]@tanstack[\\/]/ },

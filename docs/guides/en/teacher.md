@@ -126,14 +126,14 @@ Press **Choose groups** (or **Open groups** when groups are already shown). The 
 
 - Tap an option to make groups for the students who are here. Absent students are left out for this lesson only.
 - **Shuffle** makes new groups; **Undo shuffle** brings the previous ones back.
-- To move a student, tap the name and then the new group, or drag the name onto a group.
+- To move a student, drag the name onto another group, or tap the name and then **Move here** on the new group. On a tablet, press and hold the name before you drag it. **Not in a group** under the groups takes a student out of the groups for this lesson. With a keyboard, go to a name, press the right arrow to reach its drag handle, press Enter, Tab to the group and press Enter again.
 - **Save to option** keeps these groups in the option for next time.
 - A student you tapped to move is highlighted, and **Cancel** next to the message puts them back.
 - The timer is on the group screen too.
 
 Levels, pair rules ("should / should not work together") and their notes are **never** shown on the classroom screen. You manage them on the **Grouping** page (tabs **Arrangements**, **Levels**, **Pair rules**). In Class settings you can show student names in capital letters on the group screen.
 
-**Edit groups** (Arrangements tab) shows the groups side by side. Tap a name, then a group in the bar **Move … to:** at the top (it stays in view while you scroll), or **Move here** on the group. **Group name and roles** under each group holds its English and Turkish name and the optional roles.
+**Edit groups** (Arrangements tab) shows the groups side by side. Drag a name onto another group or onto **Not in a group**, or tap a name and then **Move here** on the group. Nothing is saved until you press **Save**. **Group name and roles** under each group holds its English and Turkish name and the optional roles.
 
 ### Daily assistant
 

@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Fixed, test-only password of every demo account (see e2e/server.ts). Fictional data only. */
 export const PASSWORD = process.env.E2E_PASSWORD ?? 'e2e-only-Passw0rd!';
@@ -74,4 +74,24 @@ export async function studentLinkUrl(page: Page, classId: string, studentId: str
   const url = row?.link?.url;
   expect(url, 'the student has a working link').toBeTruthy();
   return url!;
+}
+
+/**
+ * Mouse drag-and-drop from `source` onto `target` (S14c, D-150) with both on screen first: the
+ * target is scrolled into view and the source must be visible too, so nothing scrolls while the
+ * button is down (a scroll mid-drag makes Chromium drag whatever is under the pointer then).
+ */
+export async function dragInView(page: Page, source: Locator, target: Locator) {
+  await target.scrollIntoViewIfNeeded();
+  await source.scrollIntoViewIfNeeded();
+  const vp = page.viewportSize()!;
+  const a = (await source.boundingBox())!;
+  const b = (await target.boundingBox())!;
+  const inView = (r: { x: number; y: number; width: number; height: number }) => r.y + r.height / 2 > 0 && r.y + r.height / 2 < vp.height && r.x + r.width / 2 > 0 && r.x + r.width / 2 < vp.width;
+  expect(inView(a) && inView(b), 'source and target are both on screen').toBe(true);
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(a.x + a.width / 2 + 8, a.y + a.height / 2 + 8, { steps: 3 });
+  await page.mouse.move(b.x + b.width / 2, b.y + Math.min(b.height / 2, 24), { steps: 12 });
+  await page.mouse.up();
 }

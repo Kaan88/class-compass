@@ -3209,19 +3209,12 @@ html:has(.cc-classroom) {
   color: var(--cc-text-muted);
   white-space: nowrap;
 }
+/* A name on the group screen (inside a StudentDnd row): avatar, name, role. */
 .cc-group-member {
-  width: 100%;
-  justify-content: flex-start;
-  padding: 0.2rem 0.5rem;
-}
-/* The student picked to move: filled with the accent colour, outlined, and named in the hint above. */
-.cc-group-member[aria-pressed='true'] {
-  outline: 3px solid var(--cc-focus);
-  outline-offset: 2px;
-  background: var(--cc-accent);
-  border-color: var(--cc-accent-strong);
-  color: var(--cc-accent-text);
-  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
 .cc-group-screen__hint {
   display: flex;
@@ -3237,49 +3230,15 @@ html:has(.cc-classroom) {
   font-weight: 800;
   font-size: 1.15rem;
 }
-.cc-group-member__drag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  cursor: grab;
-}
 .cc-group-member__name {
   overflow-wrap: anywhere;
   text-align: start;
 }
-.cc-group__here {
-  align-self: stretch;
-}
-/* Group editor in the teacher area (usability audit 2026-11): groups side by side, compact name
-   chips, a sticky "Move <name> to: [Group 1] [Group 2]…" bar, names and roles behind a disclosure. */
+/* Group editor in the teacher area (usability audit 2026-11): groups side by side, names and roles
+   behind a disclosure. S14c (D-150): names move with StudentDnd, the sticky move bar is gone. */
 .cc-groups--editor {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
   align-items: start;
-}
-.cc-group-editor__bar {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.5rem;
-  min-height: var(--cc-touch);
-  padding: 0.5rem 0;
-  background: var(--cc-surface);
-  border-bottom: 1px solid var(--cc-border);
-}
-.cc-group-editor__picked {
-  font-weight: 800;
-}
-.cc-group-editor__members {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
 }
 .cc-group-editor__member {
   display: inline-flex;
@@ -3288,19 +3247,117 @@ html:has(.cc-classroom) {
   gap: 0.25rem;
   min-width: 0;
 }
-.cc-group-editor__chip {
-  border-radius: 999px;
-  max-width: 100%;
-  white-space: nowrap;
-  text-align: start;
+/* Moving students between lists (S14c, D-150, ui/StudentDnd.tsx): one react-aria GridList per list.
+   A row is a full-width touch target; the picked row is filled and outlined and named in the hint;
+   while dragging, the list under the pointer is outlined and a "Drop here" line shows where it lands. */
+.cc-dnd {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
 }
-.cc-group-editor__chip[aria-pressed='true'] {
+.cc-dnd__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: var(--cc-touch);
+  padding: 0.15rem;
+  border: var(--cc-border-width) dashed transparent;
+  border-radius: var(--cc-radius-sm);
+  outline: none;
+}
+.cc-dnd__list[data-focus-visible] {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-dnd__list[data-drop-target] {
+  border-color: var(--cc-accent-strong);
+  background: var(--cc-accent-soft);
+}
+.cc-dnd__item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: var(--cc-touch);
+  padding: 0.2rem 0.5rem 0.2rem 0.1rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  cursor: grab;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  outline: none;
+}
+/* The drag handle: the keyboard and screen-reader way to start a drag (the whole row drags by pointer). */
+.cc-dnd__grip {
+  flex: none;
+  min-width: 2.25rem;
+  padding-inline: 0.25rem;
+  color: var(--cc-text-muted);
+}
+.cc-dnd__item[data-picked] .cc-dnd__grip {
+  color: inherit;
+}
+.cc-dnd__item[data-focus-visible] {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-dnd__item[data-picked] {
   outline: 3px solid var(--cc-focus);
   outline-offset: 2px;
   background: var(--cc-accent);
   border-color: var(--cc-accent-strong);
   color: var(--cc-accent-text);
   font-weight: 800;
+}
+.cc-dnd__item[data-picked] .cc-chip {
+  color: var(--cc-text);
+}
+.cc-dnd__item[data-dragging] {
+  opacity: 0.5;
+}
+.cc-dnd__item[data-drop-target] {
+  border-color: var(--cc-accent-strong);
+}
+/* Drop indicators sit between rows and take no room until they are the target. */
+.cc-dnd__indicator {
+  outline: none;
+}
+.cc-dnd__indicator[data-drop-target] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  border: var(--cc-border-width-strong) dashed var(--cc-accent-strong);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-accent-soft);
+  color: var(--cc-text);
+  font-weight: 700;
+}
+.cc-dnd__empty {
+  display: flex;
+  align-items: center;
+  min-height: var(--cc-touch);
+  padding: 0.25rem 0.5rem;
+  border: var(--cc-border-width) dashed var(--cc-border-strong);
+  border-radius: var(--cc-radius-sm);
+  color: var(--cc-text-muted);
+}
+.cc-dnd__empty[data-drop-target] {
+  border-color: var(--cc-accent-strong);
+  color: var(--cc-text);
+  font-weight: 700;
+}
+.cc-dnd__here {
+  align-self: stretch;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cc-dnd__item {
+    transition: background-color 120ms ease-out, border-color 120ms ease-out;
+  }
 }
 .cc-group-editor__role {
   display: flex;

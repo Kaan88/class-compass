@@ -3,7 +3,8 @@
  * 1. 3-A (19 students), 2 marked absent at the start: open the full-screen group screen and choose
  *    the Dolphins option (mixed, Group 1-5). The 17 present students are in groups, the absent ones
  *    are not, and no level (set just before in the teacher area) reaches the display or any
- *    classroom response (GRP-7). S13a: Shuffle with undo, tap-to-move, drag-and-drop, Save to option.
+ *    classroom response (GRP-7). S13a: Shuffle with undo, tap-to-move, drag-and-drop (react-aria lists
+ *    since S14c, D-150; more in grouping-dnd.spec.ts), Save to option.
  * 2. Teacher area: check a homework with "mark all remaining as Completed", then correct one student
  *    to Missing. Not-checked students are never counted as missing (HW-4).
  * Demo data is put back afterwards (attendance cleared, levels restored, the homework archived).
@@ -11,7 +12,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
-import { api, closeDock, ensurePin, login, openDock, PIN } from './helpers.ts';
+import { api, closeDock, dragInView, ensurePin, login, openDock, PIN } from './helpers.ts';
 
 async function endActiveLessons(page: Page) {
   const active = await api(page, 'GET', '/api/classroom/lessons/active');
@@ -99,7 +100,7 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     expect(text).not.toContain(absentA.fullName);
     expect(text).not.toContain(absentB.fullName);
     await expect(screen.getByTestId('group-member')).toHaveCount(17);
-    const sizes = () => cards.evaluateAll((els) => els.map((e) => e.querySelectorAll('.cc-group__members > li').length));
+    const sizes = () => cards.evaluateAll((els) => els.map((e) => e.querySelectorAll('[data-student-id]').length));
     const first = await sizes();
     expect(Math.max(...first) - Math.min(...first)).toBeLessThanOrEqual(1);
     await axe(page, '[data-testid="dock-view-groups"]');
@@ -118,8 +119,8 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     // Tap-to-move: tap a name, then "Move here" on another group; it applies at once.
     const firstMember = cards.nth(0).getByTestId('group-member').first();
     const movedId = (await firstMember.getAttribute('data-student-id'))!;
-    await cards.nth(0).getByRole('button', { name: /^Move / }).first().click();
-    await expect(screen.getByTestId('group-move-hint')).toContainText('Now tap the group for');
+    await firstMember.click();
+    await expect(screen.getByTestId('group-move-hint')).toContainText('Now tap “Move here” on the group for');
     await cards.nth(1).getByRole('button', { name: /^Move here: Group 2/ }).click();
     await expect(cards.nth(1).locator(`[data-student-id="${movedId}"]`)).toHaveCount(1);
     await expect(cards.nth(0).locator(`[data-student-id="${movedId}"]`)).toHaveCount(0);
@@ -127,7 +128,7 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
     // Drag-and-drop: drag a name onto another group.
     const dragged = cards.nth(2).getByTestId('group-member').first();
     const draggedId = (await dragged.getAttribute('data-student-id'))!;
-    await dragged.dragTo(cards.nth(3));
+    await dragInView(page, dragged, cards.nth(3).getByRole('grid'));
     await expect(cards.nth(3).locator(`[data-student-id="${draggedId}"]`)).toHaveCount(1);
     await expect(screen.getByTestId('group-member')).toHaveCount(17);
 
@@ -188,8 +189,8 @@ test('mixed groups for 19 students with 2 absent are shown on the display withou
   await lions.getByRole('button', { name: 'Edit' }).click();
   const editor = gp.getByTestId('grouping-editor');
   await editor.getByTestId('editor-member').first().click();
-  await expect(editor.getByTestId('editor-move-here').first()).toBeVisible();
-  await editor.getByRole('button', { name: 'Cancel' }).click();
+  await expect(editor.getByRole('button', { name: /^Move here: / }).first()).toBeVisible();
+  await editor.getByRole('button', { name: 'Cancel', exact: true }).click();
 });
 
 test('check homework with a bulk action, then correct one student', async ({ page }) => {

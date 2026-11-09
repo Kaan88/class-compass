@@ -23,6 +23,8 @@ import { Mascot, ThemeBackdrop, ThemeDecoration, ThemeIllustration } from '../ui
 import { PinPad } from '../ui/PinPad.tsx';
 import { AttendanceChip, Avatar, CounterBar, MetricCell, StudentCard, StudentGrid } from '../ui/Students.tsx';
 import { Tabs } from '../ui/Tabs.tsx';
+import { StudentDnd, StudentDropList } from '../ui/StudentDnd.tsx';
+import { UNPLACED } from '../../shared/contracts/grouping.ts';
 import { TEXT_SCALES } from '../routes/teacher/Teacher.tsx';
 import { ACHIEVEMENT_TIERS, BADGE_ICONS } from '../../shared/achievements.ts';
 import { READY_MADE } from '../../shared/avatars.ts';
@@ -192,6 +194,9 @@ function Everything() {
           <AttendanceChip status="late" lessonOnly />
         </div>
       </Section>
+      <Section title={t('catalog.studentDnd')}>
+        <DndDemo />
+      </Section>
       <Section title={t('catalog.counters')}>
         <CounterBar value={3} max={10} label={t('catalog.sampleCounter')} />
         <CounterBar value={10} max={10} label={t('catalog.sampleCounter')} />
@@ -289,6 +294,42 @@ export function CatalogPage() {
 }
 
 /** Every slot of the active theme: mascot poses and illustrations (THM-2), with the one-shot motions. */
+/** S14c (D-150): two groups and "Not in a group" with fictional names; drag, tap or keyboard. */
+function DndDemo() {
+  const { t } = useI18n();
+  const sample = sampleStudents(5);
+  const [lists, setLists] = useState<Record<string, string[]>>(() => ({ g1: [sample[0]!.id, sample[1]!.id], g2: [sample[2]!.id, sample[3]!.id], [UNPLACED]: [sample[4]!.id] }));
+  const [picked, setPicked] = useState<string | null>(null);
+  const name = (id: string) => sample.find((s) => s.id === id)?.fullName ?? id;
+  const onMove = (studentId: string, to: string) => {
+    setPicked(null);
+    setLists((ls) => Object.fromEntries(Object.entries(ls).map(([k, v]) => [k, k === to ? [...v.filter((x) => x !== studentId), studentId] : v.filter((x) => x !== studentId)])));
+  };
+  const title = (id: string, i: number) => (id === UNPLACED ? t('grouping.unplaced') : t('grouping.groupN', { n: i + 1 }));
+  return (
+    <StudentDnd picked={picked} onPick={setPicked} onMove={onMove}>
+      <div className="cc-groups cc-groups--editor" data-testid="catalog-dnd">
+        {Object.keys(lists).map((id, i) => (
+          <div key={id} className="cc-group">
+            <h4 className="cc-group__name">{title(id, i)}</h4>
+            <StudentDropList
+              id={id}
+              name={title(id, i)}
+              students={lists[id]!.map((s) => ({ id: s, name: name(s) }))}
+              renderStudent={(s) => (
+                <span className="cc-group-member">
+                  <Avatar name={s.name} id={s.id} size="sm" />
+                  <span className="cc-group-member__name">{s.name}</span>
+                </span>
+              )}
+            />
+          </div>
+        ))}
+      </div>
+    </StudentDnd>
+  );
+}
+
 function ThemeSlots({ anim }: { anim: number }) {
   const { t } = useI18n();
   const def = useTheme();

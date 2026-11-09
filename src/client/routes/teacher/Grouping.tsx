@@ -7,8 +7,10 @@
  * - Pair rules: should / should not work together, with a private note (GRP-4).
  * S13a (D-098): the four default options with icons, "Use the 4 default options" for older classes,
  * and the same tap-to-move editor as the group screen, plus the levels column (teacher-only).
+ * S14c (D-150): the editor moves names with `ui/StudentDnd.tsx` like the classroom group screen (drag
+ * onto a group or "Not in a group", tap then "Move here", keyboard); the sticky move bar is gone.
  */
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { orderedLevels } from '../../../domain/grouping.ts';
 import * as G from '../../../shared/contracts/grouping.ts';
@@ -24,8 +26,10 @@ import { Button } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconPlus, IconSync, IconUndo, IconX } from '../../ui/icons.tsx';
+import { UNPLACED } from '../../../shared/contracts/grouping.ts';
 import { Tabs } from '../../ui/Tabs.tsx';
 import { GroupPicto, OptionPicto } from '../../ui/pictos.tsx';
+import { StudentDnd, StudentDropList } from '../../ui/StudentDnd.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'grouping'] as const;
@@ -116,103 +120,105 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
   const run = useRun();
   const [groups, setGroups] = useState<Draft[]>(() => toDraft(tpl, (id) => byId.has(id)));
   const [copyName, setCopyName] = useState('');
-  // Tap a name, then "Move here" on a group (the same gesture as the classroom group screen, S13a).
+  // Tap a name, then "Move here" on a group, or drag it there (the classroom group screen's gestures, S14c).
   const [picked, setPicked] = useState<string | null>(null);
   const leftCount = tpl.groups.flatMap((g) => g.memberIds).filter((id) => !byId.has(id)).length;
   const placed = new Set(groups.flatMap((g) => g.memberIds));
   const unplaced = [...byId.values()].filter((s) => !placed.has(s.id));
-  const move = (studentId: string, to: number) => {
+  /** Into the group with id `to`, or out of every group with `UNPLACED` (a draft change until Save). */
+  const move = useCallback((studentId: string, to: string) => {
     setPicked(null);
-    setGroups((gs) => gs.map((g, i) => ({ ...g, memberIds: i === to ? [...g.memberIds.filter((x) => x !== studentId), studentId] : g.memberIds.filter((x) => x !== studentId) })));
+    setGroups((gs) => gs.map((g) => ({ ...g, memberIds: g.id === to ? [...g.memberIds.filter((x) => x !== studentId), studentId] : g.memberIds.filter((x) => x !== studentId) })));
+  }, []);
+  const asStudent = (id: string) => ({ id, name: byId.get(id)?.fullName ?? t('grouping.leftClass') });
+  const renderStudent = (s: { id: string; name: string }) => {
+    const level = byId.get(s.id)?.level;
+    return (
+      <span className="cc-group-editor__member">
+        <span>{s.name}</span>
+        {level ? (
+          <span className="cc-chip" data-testid="editor-level">
+            {t('grouping.levelChip', { level })}
+          </span>
+        ) : null}
+      </span>
+    );
   };
-  const levelChip = (id: string) => {
-    const level = byId.get(id)?.level;
-    return level ? <span className="cc-chip" data-testid="editor-level">{t('grouping.levelChip', { level })}</span> : null;
-  };
-  /** A compact, tappable name chip (not a full-width bar that looks like an empty field). */
-  const memberChip = (id: string, name: string) => (
-    <li key={id} className="cc-group-editor__member">
-      <Button size="small" className="cc-group-editor__chip" aria-pressed={picked === id} data-testid="editor-member" onPress={() => setPicked(picked === id ? null : id)}>
-        {name}
-      </Button>
-      {levelChip(id)}
-    </li>
-  );
   const patch = (i: number, fn: (g: Draft) => Draft) => setGroups((gs) => gs.map((g, j) => (j === i ? fn(g) : g)));
   const valid = groups.every((g) => g.name.en.trim() || g.name.tr.trim());
   const groupItems = groups.map((g, i) => ({ id: String(i), label: pickText(g.name, locale) || t('grouping.groupN', { n: i + 1 }) }));
   const pickedName = picked ? (byId.get(picked)?.fullName ?? t('grouping.leftClass')) : '';
-  const pickedGroup = picked ? groups.findIndex((g) => g.memberIds.includes(picked)) : -1;
   return (
     <div className="cc-stack" data-testid="grouping-editor">
       {leftCount ? <Alert kind="warning">{t('grouping.leftRemoved', { count: leftCount })}</Alert> : null}
-      {/* Sticky: after tapping a name, every group is one tap away, wherever the page is scrolled (D-098). */}
-      <div className="cc-group-editor__bar" role="status" data-testid="editor-move-bar">
+      <div className="cc-group-screen__hint">
+        <p className={picked ? 'cc-group-screen__picked' : 'cc-muted'} role="status" data-testid="editor-move-hint">
+          {picked ? t('grouping.tapGroupFor', { name: pickedName }) : t('grouping.editorTapHint')}
+        </p>
         {picked ? (
-          <>
-            <span className="cc-group-editor__picked">{t('grouping.moveNameTo', { name: pickedName })}</span>
-            {groups.map((g, i) =>
-              i === pickedGroup ? null : (
-                <Button key={g.id} size="small" variant="primary" data-testid="editor-move-here" onPress={() => move(picked, i)}>
-                  {groupItems[i]!.label}
-                </Button>
-              ),
-            )}
-            <Button size="small" variant="ghost" onPress={() => setPicked(null)}>
-              <IconX />
-              {t('grouping.cancelMove')}
-            </Button>
-          </>
-        ) : (
-          <span className="cc-muted">{t('grouping.editorTapHint')}</span>
-        )}
+          <Button size="small" variant="ghost" onPress={() => setPicked(null)}>
+            <IconX />
+            {t('grouping.cancelMove')}
+          </Button>
+        ) : null}
       </div>
-      {unplaced.length ? (
-        <fieldset className="cc-fieldset cc-stack" data-testid="grouping-unplaced">
-          <legend>{t('grouping.unplaced')}</legend>
-          <p className="cc-muted">{t('grouping.unplacedHint')}</p>
-          <ul className="cc-group-editor__members">{unplaced.map((s) => memberChip(s.id, s.fullName))}</ul>
-        </fieldset>
-      ) : null}
-      {/* Side by side like the arrangements (cc-groups), not one long form. */}
-      <ul className="cc-groups cc-groups--editor">
-        {groups.map((g, i) => (
-          <li key={g.id} className="cc-group cc-group-editor" aria-label={groupItems[i]!.label}>
-            <div className="cc-group__head">
-              <span className="cc-group__icon" aria-hidden="true">
-                <GroupPicto icon={g.icon} />
-              </span>
-              <span className="cc-group__name">{groupItems[i]!.label}</span>
-              <span className="cc-chip">{t('grouping.memberCount', { count: g.memberIds.length })}</span>
-            </div>
-            <ul className="cc-group-editor__members">{g.memberIds.map((id) => memberChip(id, byId.get(id)?.fullName ?? t('grouping.leftClass')))}</ul>
-            {picked && i !== pickedGroup ? (
-              <Button size="small" className="cc-group__here" onPress={() => move(picked, i)}>
-                {t('grouping.moveHere', { group: groupItems[i]!.label })}
-              </Button>
-            ) : null}
-            <details className="cc-disclosure">
-              <summary>{t('grouping.nameAndRoles')}</summary>
-              <div className="cc-stack">
-                <TextField label={t('grouping.groupNameEn')} value={g.name.en} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, en: v } }))} />
-                <TextField label={t('grouping.groupNameTr')} value={g.name.tr} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, tr: v } }))} />
-                {g.memberIds.map((id) => {
-                  const name = byId.get(id)?.fullName ?? t('grouping.leftClass');
-                  const role = g.roles[id] ?? { en: '', tr: '' };
-                  return (
-                    <fieldset key={id} className="cc-fieldset cc-group-editor__role">
-                      <legend>{name}</legend>
-                      <TextField label={t('grouping.roleEn', { name })} value={role.en} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, en: v } } }))} />
-                      <TextField label={t('grouping.roleTr', { name })} value={role.tr} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, tr: v } } }))} />
-                    </fieldset>
-                  );
-                })}
+      <StudentDnd picked={picked} onPick={setPicked} onMove={move}>
+        <section className="cc-fieldset cc-stack" aria-labelledby="cc-editor-unplaced" data-testid="grouping-unplaced">
+          <h3 id="cc-editor-unplaced" className="cc-h3">
+            {t('grouping.unplaced')}
+          </h3>
+          {unplaced.length ? <p className="cc-muted">{t('grouping.unplacedHint')}</p> : null}
+          <StudentDropList
+            id={UNPLACED}
+            name={t('grouping.unplaced')}
+            students={unplaced.map((s) => asStudent(s.id))}
+            renderStudent={renderStudent}
+            emptyText={t('grouping.unplacedEmpty')}
+            itemTestId="editor-member"
+          />
+        </section>
+        {/* Side by side like the arrangements (cc-groups), not one long form. */}
+        <ul className="cc-groups cc-groups--editor">
+          {groups.map((g, i) => (
+            <li key={g.id} className="cc-group cc-group-editor">
+              <div className="cc-group__head" aria-hidden="true">
+                <span className="cc-group__icon">
+                  <GroupPicto icon={g.icon} />
+                </span>
+                <span className="cc-group__name">{groupItems[i]!.label}</span>
+                <span className="cc-chip">{t('grouping.memberCount', { count: g.memberIds.length })}</span>
               </div>
-            </details>
-            {!(g.name.en.trim() || g.name.tr.trim()) ? <p className="cc-field__error">{t('grouping.nameNeeded')}</p> : null}
-          </li>
-        ))}
-      </ul>
+              <StudentDropList
+                id={g.id}
+                name={groupItems[i]!.label}
+                label={t('grouping.groupLabel', { name: groupItems[i]!.label, count: g.memberIds.length })}
+                students={g.memberIds.map(asStudent)}
+                renderStudent={renderStudent}
+                itemTestId="editor-member"
+              />
+              <details className="cc-disclosure">
+                <summary>{t('grouping.nameAndRoles')}</summary>
+                <div className="cc-stack">
+                  <TextField label={t('grouping.groupNameEn')} value={g.name.en} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, en: v } }))} />
+                  <TextField label={t('grouping.groupNameTr')} value={g.name.tr} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, tr: v } }))} />
+                  {g.memberIds.map((id) => {
+                    const name = byId.get(id)?.fullName ?? t('grouping.leftClass');
+                    const role = g.roles[id] ?? { en: '', tr: '' };
+                    return (
+                      <fieldset key={id} className="cc-fieldset cc-group-editor__role">
+                        <legend>{name}</legend>
+                        <TextField label={t('grouping.roleEn', { name })} value={role.en} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, en: v } } }))} />
+                        <TextField label={t('grouping.roleTr', { name })} value={role.tr} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, tr: v } } }))} />
+                      </fieldset>
+                    );
+                  })}
+                </div>
+              </details>
+              {!(g.name.en.trim() || g.name.tr.trim()) ? <p className="cc-field__error">{t('grouping.nameNeeded')}</p> : null}
+            </li>
+          ))}
+        </ul>
+      </StudentDnd>
       <p className="cc-muted">{t('grouping.roleHint')}</p>
       <div className="cc-row">
         <Button

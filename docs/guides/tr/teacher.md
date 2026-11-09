@@ -126,14 +126,14 @@ Her öğrenci kartında öğrencinin sayısı ve bir **+** düğmesi görünür.
 
 - Bir seçeneğe dokunarak o gün sınıfta olan öğrenciler için gruplar oluşturun. Gelmeyen öğrenciler yalnızca bu derste dışarıda kalır.
 - **Karıştır** yeni gruplar oluşturur; **Karıştırmayı geri al** öncekileri geri getirir.
-- Bir öğrenciyi taşımak için adına, sonra yeni grubuna dokunun ya da adı bir gruba sürükleyin.
+- Bir öğrenciyi taşımak için adını başka bir gruba sürükleyin ya da adına, sonra yeni gruptaki **Buraya taşı** düğmesine dokunun. Tablette sürüklemeden önce ada basılı tutun. Grupların altındaki **Grupta değil** bölümü öğrenciyi bu ders için gruplardan çıkarır. Klavyeyle bir ada gidin, sürükleme tutamacına sağ okla geçin, Enter'a basın, Sekme (Tab) ile gruba gidin ve yeniden Enter'a basın.
 - **Gelecek sefer için kaydet** bu grupları bir dahaki sefer için o seçeneğe kaydeder.
 - Taşımak için dokunduğunuz öğrenci renkli gösterilir; mesajın yanındaki **Vazgeç** seçimi bırakır.
 - Zamanlayıcı grup ekranında da vardır.
 
 Seviyeler, eşleşme kuralları ("birlikte çalışmalı / çalışmamalı") ve notları sınıf ekranında **hiçbir zaman** gösterilmez. Bunları **Gruplar** sayfasında (**Düzenler**, **Seviyeler**, **Eşleşme kuralları** sekmeleri) yönetirsiniz. Sınıf ayarlarında grup ekranında öğrenci adlarının büyük harfle gösterilmesini seçebilirsiniz.
 
-**Grupları düzenle** (Düzenler sekmesi) grupları yan yana gösterir. Bir ada, sonra üstteki **… şuraya taşınsın:** çubuğunda bir gruba (sayfayı kaydırsanız da görünür kalır) ya da gruptaki **Buraya taşı** düğmesine dokunun. Her grubun altındaki **Grup adı ve görevler** grubun İngilizce ve Türkçe adını ve isteğe bağlı görevleri içerir.
+**Grupları düzenle** (Düzenler sekmesi) grupları yan yana gösterir. Bir adı başka bir gruba ya da **Grupta değil** bölümüne sürükleyin veya bir ada, sonra gruptaki **Buraya taşı** düğmesine dokunun. **Kaydet**'e basana kadar hiçbir şey kaydedilmez. Her grubun altındaki **Grup adı ve görevler** grubun İngilizce ve Türkçe adını ve isteğe bağlı görevleri içerir.
 
 ### Günün Yardımcısı
 
