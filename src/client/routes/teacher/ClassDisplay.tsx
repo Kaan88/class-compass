@@ -49,7 +49,7 @@ export function ClassDisplaySection({ ctx, hasClip }: { ctx: School.MyContext; h
         {t('classDisplay.title')}
       </h2>
       <p className="cc-muted">{t('classDisplay.hint', { cls: ctx.className })}</p>
-      <ThemePicker label={t('classDisplay.theme')} value={ctx.theme} onChange={(theme: ThemeKey) => void save({ theme })} />
+      <ThemePicker label={t('classDisplay.theme')} value={ctx.chosenTheme} switchedOff={ctx.chosenTheme !== ctx.theme} onChange={(theme: ThemeKey) => void save({ theme })} />
       <Toggle label={t('classDisplay.sounds')} isSelected={ctx.soundsEnabled} onChange={(v) => void save({ soundsEnabled: v })} />
       <div className="cc-row" style={{ alignItems: 'flex-end' }}>
         <label className="cc-field">

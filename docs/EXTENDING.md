@@ -209,9 +209,10 @@ blocks (`Face`, `Arms`, `Scene`, `Sparkles`, `Confetti`, …) are in `src/client
 | Hook | Where | Use |
 |---|---|---|
 | `validateThemePackage(textOrValue)` | `src/shared/themePackage/validate.ts` | The one check of a package (server, admin page, MCP, tests). |
-| `assertThemeUsable(db, key)` / `effectiveTheme(db, key)` | `src/server/modules/themes/service.ts` | Before writing a theme key / when sending one to a screen. |
+| `assertThemeUsable(db, key)` / `effectiveTheme(db, key)` / `isThemeUsable(db, key)` | `src/server/modules/themes/service.ts` | Before writing a theme key / when sending one to a screen / with the stored key in an editor (`themeAvailable`), so a round trip keeps a switched-off choice. |
 | `themeOf(key)`, `pickerThemes()` | `src/client/themes/registry.ts` | Resolve a key (falls back to the default); list choosable themes. |
-| `registerThemePackage(pkg, status, key?)`, `loadThemePackage(key)`, `useAvailableThemes()` | `src/client/themes/custom.tsx` | Make a package a live theme or a preview; load the one the display needs; load the enabled ones for pickers. |
+| `registerThemePackage(pkg, status, key?)`, `loadThemePackage(key)`, `useAvailableThemes()` | `src/client/themes/custom.tsx` | Make a package a live theme or a preview; load the one the display needs and re-check it (ETag) so a replaced package appears; load the enabled ones for pickers. |
+| `<ThemePicker value switchedOff>`, `<ThemeNameLabel theme switchedOff>` | `src/client/ui/ThemePreview.tsx` | Choose a theme; `switchedOff` when the stored choice is an imported theme that is not enabled now. |
 | `useThemeLabels(def)`, `useThemeName(key)` | `src/client/themes/index.tsx` | A theme's names (imported themes carry their own). |
 | `<SvgTree nodes>` | `src/client/themes/SvgTree.tsx` | Draw sanitised package art. |
 | `themeSounds(params, overrides)` | `src/client/themes/soundPack.ts` | A built-in theme's sounds plus the parameters exported into packages. |

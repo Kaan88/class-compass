@@ -135,7 +135,13 @@ export const SchoolClass = z.object({
   schoolYearId: z.string(),
   name: z.string(),
   grade: z.number().int().nullable(),
+  /**
+   * The class's chosen theme as stored (D-158): the admin editor sends it back unchanged, so saving
+   * other fields never replaces an imported theme that is switched off for now.
+   */
   theme: Theme,
+  /** False while `theme` is an imported theme that is not enabled (screens then show the default theme). */
+  themeAvailable: z.boolean(),
   timezone: z.string().nullable(),
   soundsEnabled: z.boolean(),
   animationsEnabled: z.boolean(),
@@ -272,7 +278,10 @@ export const MyContext = z.object({
   className: z.string(),
   subjectId: z.string(),
   subjectName: LocalizedText,
+  /** The theme the screens show: the chosen one, or the default while an imported choice is switched off (D-158). */
   theme: Theme,
+  /** The class's chosen theme as stored; differs from `theme` only while that imported theme is not enabled. */
+  chosenTheme: Theme,
   timezone: z.string(),
   soundsEnabled: z.boolean(),
   animationsEnabled: z.boolean(),

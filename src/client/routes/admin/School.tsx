@@ -504,10 +504,13 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
         e.preventDefault();
         setError(null);
         const grade = d.grade.trim() === '' ? null : Number(d.grade);
+        // The theme goes only when it was changed: a class whose imported theme is switched off keeps
+        // that choice when other fields are saved (D-158).
+        const theme = cls && d.theme === cls.theme ? undefined : d.theme;
         const body = {
           name: d.name,
           grade,
-          theme: d.theme,
+          theme,
           timezone: d.timezone.trim() || null,
           soundsEnabled: d.soundsEnabled,
           animationsEnabled: d.animationsEnabled,
@@ -532,7 +535,7 @@ function ClassForm({ cls, years, onDone }: { cls?: SchoolClass; years: Year[]; o
         <TextField label={t('classes.name')} value={d.name} onChange={(v) => set({ name: v })} isRequired placeholder="3-A" />
         <TextField label={t('classes.grade')} description={t('classes.gradeHint')} placeholder="3" value={d.grade} onChange={(v) => set({ grade: v.replace(/\D/g, '') })} inputMode="numeric" />
       </div>
-      <ThemePicker label={t('classes.theme')} value={d.theme} onChange={(v) => set({ theme: v })} />
+      <ThemePicker label={t('classes.theme')} value={d.theme} onChange={(v) => set({ theme: v })} switchedOff={cls !== undefined && !cls.themeAvailable && d.theme === cls.theme} />
       {/* The large preview is folded away inside the dialog so the form's buttons stay close. */}
       <details className="cc-theme-details">
         <summary>{t('classes.themePreview')}</summary>
@@ -658,7 +661,7 @@ export function ClassesPage() {
           { key: 'name', header: t('classes.name'), sortValue: (c) => c.name, render: (c) => <strong>{c.name}</strong> },
           { key: 'year', header: t('classes.year'), sortValue: (c) => yearName(c.schoolYearId), render: (c) => yearName(c.schoolYearId) },
           { key: 'students', header: t('classes.students'), sortValue: (c) => c.studentCount, render: (c) => c.studentCount },
-          { key: 'theme', header: t('classes.theme'), render: (c) => <ThemeNameLabel theme={c.theme} /> },
+          { key: 'theme', header: t('classes.theme'), render: (c) => <ThemeNameLabel theme={c.theme} switchedOff={!c.themeAvailable} /> },
           { key: 'tz', header: t('classes.timezone'), render: (c) => c.timezone ?? t('classes.schoolTimezone') },
           {
             key: 'state',

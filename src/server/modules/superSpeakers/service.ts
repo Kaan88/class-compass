@@ -18,14 +18,14 @@ import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { generatedAvatar, type AvatarSpecValue } from '../../../shared/avatars.ts';
 import type * as C from '../../../shared/contracts/superSpeakers.ts';
-import { boardLinkUrl, scorerLinkUrl, PAIRING_CODE_TTL_MS, type AdminAward, type Board, type BoardMessages, type DisplayLinkInfo, type ScorerLinkInfo, type SpeakersSettings } from '../../../shared/contracts/superSpeakers.ts';
+import { boardLinkUrl, scorerLinkUrl, PAIRING_CODE_TTL_MS, type AdminAward, type Board, type BoardMessages, type DisplayLinkInfo, type ScorerLinkInfo, type SpeakersSettings, type SpeakersSettingsView } from '../../../shared/contracts/superSpeakers.ts';
 import { compareNames, initials } from '../../../shared/text/turkish.ts';
 import { localDate } from '../../../domain/dates.ts';
 import { classTotals, podium, totalsByStudent, weekRangeOf } from '../../../domain/speakers.ts';
 import { weekStartOf } from '../../../domain/counters.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { authAttempts, classes, displayLinks, enrolments, pointEvents, schoolYears, scorerLinks, scorerPairings, sessions, students, subjects, superSpeakersSettings, users } from '../../db/schema.ts';
-import { assertThemeUsable, effectiveTheme } from '../themes/service.ts';
+import { assertThemeUsable, effectiveTheme, isThemeUsable, themeRevision } from '../themes/service.ts';
 import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
@@ -84,8 +84,12 @@ export function ensureSettings(db: Db, now: number): void {
 /** The board messages as stored; an empty text means the built-in translated message (S12 review). */
 export const boardMessagesOf = (s: SettingsRow): BoardMessages => ({ placeholder: s.boardMessages?.placeholder ?? {}, waiting: s.boardMessages?.waiting ?? {} });
 
-/** The settings for a screen; with `db`, a theme package that is not enabled reads as the default theme (D-158). */
-export const settingsDto = (s: SettingsRow, db?: Db): SpeakersSettings => ({
+/**
+ * The stored settings (audit rows and the admin page). `theme` is the stored choice, so the admin form
+ * sends it back unchanged and never replaces an imported theme that is switched off for now (D-158);
+ * the board and the scorer read `effectiveTheme` instead.
+ */
+export const settingsDto = (s: SettingsRow): SpeakersSettings => ({
   weekStartsOn: s.weekStartsOn,
   participatingClassIds: s.participatingClassIds,
   undoWindowMinutes: s.undoWindowMinutes,
@@ -94,10 +98,12 @@ export const settingsDto = (s: SettingsRow, db?: Db): SpeakersSettings => ({
   boardTitle: s.boardTitle,
   boardMessages: boardMessagesOf(s),
   boardLanguage: s.boardLanguage,
-  theme: db ? effectiveTheme(db, s.theme) : s.theme,
+  theme: s.theme,
   boardSound: s.boardSound,
   badgeSubjectId: s.badgeSubjectId,
 });
+/** The admin page's view: the stored settings plus whether the chosen theme can be shown now. */
+const settingsView = (s: SettingsRow, db: Db): SpeakersSettingsView => ({ ...settingsDto(s), themeAvailable: isThemeUsable(db, s.theme) });
 
 export const schoolTimezone = (db: Db) => getSchoolSettings(db).timezone;
 export const isEnabled = (db: Db) => isModuleAvailable(db, MODULE);
@@ -479,7 +485,7 @@ export function buildBoard(db: Db, now: number): Board {
   const base = { enabled, title: s.boardTitle, messages: boardMessagesOf(s), language: s.boardLanguage, theme: effectiveTheme(db, s.theme), sound: s.boardSound, week, timezone: tz };
   if (!enabled) {
     const rest = { ...base, places: [], classes: [], updatedAt: null };
-    return { ...rest, version: versionOf(rest) };
+    return { ...rest, version: versionOf(rest, db) };
   }
   const rows = db
     .select()
@@ -515,10 +521,11 @@ export function buildBoard(db: Db, now: number): Board {
   }));
   const classList = participatingClasses(db, now, s);
   const rest = { ...base, places, classes: classTotals(classList, live.map((r) => ({ classId: r.classIdSnapshot }))), updatedAt };
-  return { ...rest, version: versionOf(rest) };
+  return { ...rest, version: versionOf(rest, db) };
 }
 
-const versionOf = (b: Omit<Board, 'version'>) => sha256(JSON.stringify(b)).slice(0, 20);
+// The theme package's revision is part of the version: a replaced package reaches an open board (D-158).
+const versionOf = (b: Omit<Board, 'version'>, db: Db) => sha256(JSON.stringify({ ...b, themeRev: themeRevision(db, b.theme) })).slice(0, 20);
 
 export const boardVersion = (db: Db, now: number) => buildBoard(db, now).version;
 
@@ -584,7 +591,7 @@ export function adminOverview(ctx: RequestContext) {
     .sort((a, b) => compareNames(a.name.en ?? a.name.tr ?? '', b.name.en ?? b.name.tr ?? ''));
   return {
     enabled: isEnabled(ctx.db),
-    settings: settingsDto(s, ctx.db),
+    settings: settingsView(s, ctx.db),
     badgeSubject: badgeSubject(ctx.db),
     subjects: subjectList,
     classes: currentClasses(ctx.db, now).map((c) => ({ id: c.id, name: c.name, participating: chosen === null || chosen.has(c.id) })),
@@ -606,7 +613,7 @@ export function adminOverview(ctx: RequestContext) {
   };
 }
 
-export function saveSettings(ctx: RequestContext, input: In<typeof C.setSpeakersSettings>): SpeakersSettings {
+export function saveSettings(ctx: RequestContext, input: In<typeof C.setSpeakersSettings>): SpeakersSettingsView {
   const user = requireUser(ctx);
   return tx(ctx.db, () => {
     const now = ctx.now();
@@ -632,7 +639,7 @@ export function saveSettings(ctx: RequestContext, input: In<typeof C.setSpeakers
     const after = getSettings(ctx.db);
     audit(ctx.db, ctx.actor, { action: 'speakers.settings', entity: 'super_speakers_settings', entityId: '1', before: settingsDto(before), after: settingsDto(after) }, now);
     notifyBoardChange();
-    return settingsDto(after, ctx.db);
+    return settingsView(after, ctx.db);
   });
 }
 

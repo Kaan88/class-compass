@@ -15,11 +15,23 @@ export interface AvatarTone {
 
 type Rgb = [number, number, number];
 
-/** `#rgb`, `#rrggbb` or `#rrggbbaa` → [r, g, b] 0..255 (alpha ignored; see `over`). */
+/**
+ * `#rgb`, `#rrggbb` or `#rrggbbaa` → [r, g, b] 0..255. The alpha channel is not part of the result:
+ * `contrastFailures` refuses a translucent colour in a pair instead (packages may use alpha only on
+ * `TRANSLUCENT_COLOR_TOKENS`, which are in no pair).
+ */
 export function parseHex(hex: string): Rgb {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6);
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as Rgb;
+}
+
+/** True unless the colour is `#rrggbbaa` / `#rgba` with an alpha below `ff`. */
+export function isOpaqueHex(hex: string): boolean {
+  const h = hex.replace('#', '');
+  if (h.length === 8) return h.slice(6).toLowerCase() === 'ff';
+  if (h.length === 4) return h[3]!.toLowerCase() === 'f';
+  return true;
 }
 
 export function hslToRgb(h: number, s: number, l: number): Rgb {
@@ -108,14 +120,24 @@ export interface ContrastFailure {
   min: number;
 }
 
+/**
+ * Contrast of a pair as the checks count it: a translucent colour shows whatever is under it, so its
+ * contrast cannot be guaranteed and counts as 1:1 (a failure).
+ */
+export const pairContrast = (fg: string, bg: string): number => (isOpaqueHex(fg) && isOpaqueHex(bg) ? contrast(fg, bg) : 1);
+
 /** Every failing pair of a theme's colours (empty = all pass). */
 export function contrastFailures(colors: ThemeColors, avatar: AvatarTone): ContrastFailure[] {
   const out: ContrastFailure[] = [];
   for (const p of CONTRAST_PAIRS) {
-    const ratio = contrast(colors[p.fg], colors[p.bg]);
+    const ratio = pairContrast(colors[p.fg], colors[p.bg]);
     if (ratio < p.min) out.push({ pair: `${p.fg} on ${p.bg} (${p.why})`, fg: p.fg, bg: p.bg, ratio: Math.round(ratio * 100) / 100, min: p.min });
   }
   // Avatars: initials on every hue. Big avatars carry large bold initials (3:1), small ones 4.5:1.
+  if (!isOpaqueHex(colors['avatar-text'])) {
+    out.push({ pair: 'avatar-text on avatar circles (translucent)', fg: 'avatar-text', bg: 'avatar circles', ratio: 1, min: AA });
+    return out;
+  }
   for (let hue = 0; hue < 360; hue += 5) {
     const big = contrast(colors['avatar-text'], hslToRgb(hue, avatar.saturation, avatar.lightness));
     if (big < AA_LARGE) out.push({ pair: `avatar-text on avatar hue ${hue}`, fg: 'avatar-text', bg: `avatar hue ${hue}`, ratio: Math.round(big * 100) / 100, min: AA_LARGE });

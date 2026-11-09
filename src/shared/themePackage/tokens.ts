@@ -132,6 +132,14 @@ export type ThemeColors = Record<ColorToken, string>;
 /** Tokens no theme (built-in or package) may change: printed QR codes scan best as pure black on white (D-120). */
 export const FIXED_COLOR_TOKENS = ['print-ink', 'print-paper'] as const satisfies readonly ColorToken[];
 export type FixedColorToken = (typeof FIXED_COLOR_TOKENS)[number];
+/**
+ * The only tokens that may be translucent (`#rrggbbaa`): layers drawn over other colours (dialog dim,
+ * shadows, avatar outlines). None of them is in a contrast pair or the avatar check, so every colour
+ * whose contrast is checked is opaque `#rrggbb` (test-enforced): a translucent text, surface or focus
+ * colour would pass the maths and still be unreadable on screen.
+ */
+export const TRANSLUCENT_COLOR_TOKENS = ['overlay', 'shadow-color', 'avatar-outline'] as const satisfies readonly ColorToken[];
+export const isTranslucentToken = (t: string): boolean => (TRANSLUCENT_COLOR_TOKENS as readonly string[]).includes(t);
 /** The colour tokens a theme package lists: every token except the fixed print colours. */
 export const PACKAGE_COLOR_TOKENS = COLOR_TOKENS.filter((t): t is Exclude<ColorToken, FixedColorToken> => !(FIXED_COLOR_TOKENS as readonly string[]).includes(t));
 export type PackageColorToken = (typeof PACKAGE_COLOR_TOKENS)[number];
@@ -243,7 +251,7 @@ export const TOKEN_DOCS: Record<ColorToken, TokenDoc> = {
   'danger-strong': { group: 'accent', use: 'Pressed destructive buttons.' },
   'danger-soft': { group: 'accent', use: 'Error alert background.' },
   'on-strong': { group: 'accent', use: 'Text on danger and success fills.' },
-  overlay: { group: 'page', use: 'Dim layer behind dialogs (may be translucent, #rrggbbaa).' },
+  overlay: { group: 'page', use: 'Dim layer behind dialogs (usually translucent, #rrggbbaa).' },
   'shadow-color': { group: 'page', use: 'Colour of card and dialog shadows (usually translucent).' },
   'display-banner-bg': { group: 'banner', use: 'Background of the "visible on the classroom display" banner.' },
   'display-banner-text': { group: 'banner', use: 'Text of the display banner (4.5:1 on its background).' },

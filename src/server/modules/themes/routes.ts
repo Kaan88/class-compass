@@ -15,5 +15,14 @@ export function registerThemeRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.disableCustomTheme, (ctx, input) => setThemeStatus(ctx, input.key, 'disabled'));
   route(app, deps, C.deleteCustomTheme, (ctx, input) => deleteTheme(ctx, input));
   route(app, deps, C.availableThemes, (ctx) => availableThemes(ctx));
-  route(app, deps, C.publicCustomTheme, (ctx, input) => publicTheme(ctx, input));
+  // Conditional GET (D-045): screens that show the theme re-check it cheaply and pick up a replaced package.
+  route(app, deps, C.publicCustomTheme, (ctx, input, { req, reply }) => {
+    const { etag, body } = publicTheme(ctx, input);
+    reply.header('ETag', etag);
+    if (req.headers['if-none-match'] === etag) {
+      reply.code(304).send();
+      return body;
+    }
+    return body;
+  });
 }

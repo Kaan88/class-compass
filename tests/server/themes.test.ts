@@ -10,9 +10,12 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { auditEvents, classes, customThemes } from '../../src/server/db/schema.ts';
 import { PACKAGE_LIMITS } from '../../src/shared/themePackage/limits.ts';
+import { onBoardChange } from '../../src/server/modules/superSpeakers/events.ts';
+import { buildBoard } from '../../src/server/modules/superSpeakers/service.ts';
 import { DEFAULT_THEME } from '../../src/shared/themes.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
-import { buildSchool, ok, type School } from '../school-fixture.ts';
+import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
+import { linkUrl, openLink } from '../student-helpers.ts';
 
 const OCEAN = readFileSync(join(import.meta.dirname, '..', '..', 'docs', 'examples', 'ocean.theme.json'), 'utf8');
 const ocean = () => JSON.parse(OCEAN) as Record<string, any>;
@@ -72,11 +75,55 @@ describe('validation (nothing is stored)', () => {
     expect(same.report.errors.map((e: any) => e.code)).toContain('MASCOT_POSES_SAME');
   });
 
-  it('only administrators may validate or manage themes (ACC-1)', async () => {
-    expect((await s.teacherA.post('/api/admin/themes/validate', { source: OCEAN })).status).toBe(403);
-    expect((await s.teacherA.post('/api/admin/themes', { source: OCEAN })).status).toBe(403);
-    expect((await s.teacherA.get('/api/admin/themes')).status).toBe(403);
-    expect((await new Client(env).get('/api/admin/themes')).status).toBe(401);
+  it('only administrators may validate or manage themes: every endpoint for every caller (ACC-1, review fix)', async () => {
+    await enabledOcean();
+    await ok(s.admin.post('/api/admin/themes', { source: withChanges(() => undefined, 'lagoon') }));
+    await ok(s.admin.post('/api/admin/themes', { source: withChanges(() => undefined, 'reef') }));
+    await ok(s.admin.post('/api/admin/themes/reef/enable'));
+    await ok(s.admin.post('/api/admin/themes/reef/disable'));
+    const ada = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Ada Kurgu' });
+    const student = await openLink(env, await linkUrl(s.teacherA, s.c3a.id, ada.id));
+    const callers: Record<string, Client> = { anonymous: new Client(env), student, teacher: s.teacherA, admin: s.admin };
+    const admin = { anonymous: 401, student: 401, teacher: 403 };
+    // [method, path, body, admin status]; every admin endpoint is refused to everyone else before it does anything.
+    const manage: Array<[string, string, unknown, number]> = [
+      ['GET', '/api/admin/themes', undefined, 200],
+      ['POST', '/api/admin/themes/validate', { source: OCEAN }, 200],
+      ['GET', '/api/admin/themes/ocean', undefined, 200],
+      ['POST', '/api/admin/themes', { source: withChanges(() => undefined, 'kelp') }, 200],
+      ['PUT', '/api/admin/themes/ocean', { source: OCEAN }, 200],
+      ['POST', '/api/admin/themes/lagoon/enable', undefined, 200],
+      ['POST', '/api/admin/themes/lagoon/disable', undefined, 200],
+      ['DELETE', '/api/admin/themes/lagoon', { confirm: 'lagoon' }, 200],
+    ];
+    for (const [method, path, body, adminStatus] of manage) {
+      for (const [who, expected] of Object.entries(admin)) {
+        expect((await callers[who]!.req(method, path, body)).status, `${who} ${method} ${path}`).toBe(expected);
+      }
+      expect((await s.admin.req(method, path, body)).status, `admin ${method} ${path}`).toBe(adminStatus);
+    }
+    expect(env.db.select().from(customThemes).all().map((r) => r.key).sort()).toEqual(['kelp', 'ocean', 'reef']);
+    // The pickers' list needs a signed-in account; the public package is enabled themes only.
+    expect((await callers.anonymous!.get('/api/themes/available')).status).toBe(401);
+    expect((await callers.student!.get('/api/themes/available')).status).toBe(401);
+    expect((await ok(s.teacherA.get('/api/themes/available'))).themes.map((t: any) => t.key)).toEqual(['ocean']);
+    expect((await ok(s.admin.get('/api/themes/available'))).themes.map((t: any) => t.key)).toEqual(['ocean']);
+    for (const c of Object.values(callers)) {
+      expect((await c.get('/api/themes/custom/ocean')).status).toBe(200);
+      expect((await c.get('/api/themes/custom/kelp')).status).toBe(404); // draft
+      expect((await c.get('/api/themes/custom/reef')).status).toBe(404); // disabled
+      expect((await c.get('/api/themes/custom/lagoon')).status).toBe(404); // deleted
+    }
+    // Admin endpoints on an unknown theme are 404, not 500.
+    for (const [method, path, body] of [
+      ['GET', '/api/admin/themes/nope', undefined],
+      ['PUT', '/api/admin/themes/nope', { source: withChanges(() => undefined, 'nope') }],
+      ['POST', '/api/admin/themes/nope/enable', undefined],
+      ['POST', '/api/admin/themes/nope/disable', undefined],
+      ['DELETE', '/api/admin/themes/nope', { confirm: 'nope' }],
+    ] as const) {
+      expect((await s.admin.req(method, path, body)).status, `${method} ${path}`).toBe(404);
+    }
   });
 });
 
@@ -162,9 +209,44 @@ describe('where a theme is used', () => {
     await enabledOcean();
     expect((await ok(s.admin.post('/api/admin/classes', { schoolYearId: year, name: '5-Z', theme: 'ocean' }))).theme).toBe('ocean');
     expect((await ok(s.admin.patch(`/api/admin/classes/${s.c3b.id}`, { theme: 'ocean' }))).theme).toBe('ocean');
-    // Unchanged fields of a class whose theme was disabled can still be saved.
+    // Unchanged fields of a class whose theme was disabled can still be saved; the admin sees the stored choice.
     await ok(s.admin.post('/api/admin/themes/ocean/disable'));
-    expect((await ok(s.admin.patch(`/api/admin/classes/${s.c3b.id}`, { name: '3-B' }))).theme).toBe(DEFAULT_THEME);
+    expect(await ok(s.admin.patch(`/api/admin/classes/${s.c3b.id}`, { name: '3-B' }))).toMatchObject({ theme: 'ocean', themeAvailable: false });
+  });
+
+  it('a disabled theme survives saving every other field of the class and the board as the admin pages send them (review fix, D-158)', async () => {
+    await ok(s.admin.put('/api/admin/module-policies/superSpeakers', { availability: 'enabled' }));
+    await enabledOcean();
+    await ok(s.admin.patch(`/api/admin/classes/${s.c3a.id}`, { theme: 'ocean' }));
+    await ok(s.admin.put('/api/admin/speakers/settings', { theme: 'ocean' }));
+    await ok(s.admin.post('/api/admin/themes/ocean/disable'));
+
+    // Screens show the default theme; the admin editor and the teacher picker see the stored choice.
+    const ctx = (await ok(s.teacherA.get('/api/teacher/contexts'))).contexts.find((c: any) => c.classId === s.c3a.id);
+    expect(ctx).toMatchObject({ theme: DEFAULT_THEME, chosenTheme: 'ocean' });
+    const cls = (await ok(s.admin.get('/api/admin/classes'))).classes.find((c: any) => c.id === s.c3a.id);
+    expect(cls).toMatchObject({ theme: 'ocean', themeAvailable: false });
+    const settings = (await ok(s.admin.get('/api/admin/speakers'))).settings;
+    expect(settings).toMatchObject({ theme: 'ocean', themeAvailable: false });
+    expect(buildBoard(env.db, env.clock.now()).theme).toBe(DEFAULT_THEME);
+
+    // Round trip: every editable field of the GET goes back (as a form that sends the whole record would).
+    const without = (o: Record<string, unknown>, keys: string[]) => Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k)));
+    const fields = without(cls, ['id', 'schoolYearId', 'themeAvailable', 'archived', 'yearArchived', 'studentCount', 'studentPageMainLanguage', 'studentPageSecondLanguageEnabled']);
+    await ok(s.admin.patch(`/api/admin/classes/${s.c3a.id}`, { ...fields, name: '3-A' }));
+    await ok(s.admin.put('/api/admin/speakers/settings', { ...without(settings, ['themeAvailable']), undoWindowMinutes: 7 }));
+    expect(env.db.select().from(classes).where(eq(classes.id, s.c3a.id)).get()!.theme).toBe('ocean');
+    expect((await ok(s.admin.get('/api/admin/themes'))).themes[0]).toMatchObject({ classCount: 1, board: true });
+
+    // Enabled again: the class and the board use it again.
+    await ok(s.admin.post('/api/admin/themes/ocean/enable'));
+    expect((await ok(s.teacherA.get('/api/teacher/contexts'))).contexts.find((c: any) => c.classId === s.c3a.id)).toMatchObject({ theme: 'ocean', chosenTheme: 'ocean' });
+    expect(buildBoard(env.db, env.clock.now()).theme).toBe('ocean');
+    expect((await ok(s.admin.get('/api/admin/speakers'))).settings).toMatchObject({ theme: 'ocean', themeAvailable: true, undoWindowMinutes: 7 });
+
+    // Choosing another theme on purpose still replaces it.
+    await ok(s.admin.post('/api/admin/themes/ocean/disable'));
+    expect((await ok(s.admin.patch(`/api/admin/classes/${s.c3a.id}`, { theme: DEFAULT_THEME }))).theme).toBe(DEFAULT_THEME);
   });
 
   it('the Super Speakers board: settings accept only usable themes; the board falls back and moves to the default on delete', async () => {
@@ -173,10 +255,61 @@ describe('where a theme is used', () => {
     await enabledOcean();
     expect((await ok(s.admin.put('/api/admin/speakers/settings', { theme: 'ocean' }))).theme).toBe('ocean');
     expect((await ok(s.admin.get('/api/admin/themes'))).themes[0].board).toBe(true);
+    expect(buildBoard(env.db, env.clock.now()).theme).toBe('ocean');
     await ok(s.admin.post('/api/admin/themes/ocean/disable'));
-    expect((await ok(s.admin.get('/api/admin/speakers'))).settings.theme).toBe(DEFAULT_THEME);
+    expect((await ok(s.admin.get('/api/admin/speakers'))).settings).toMatchObject({ theme: 'ocean', themeAvailable: false });
+    expect(buildBoard(env.db, env.clock.now()).theme).toBe(DEFAULT_THEME);
     await ok(s.admin.post('/api/admin/themes/ocean/enable'));
     expect((await ok(s.admin.req('DELETE', '/api/admin/themes/ocean', { confirm: 'ocean' }))).movedBoard).toBe(true);
-    expect((await ok(s.admin.get('/api/admin/speakers'))).settings.theme).toBe(DEFAULT_THEME);
+    expect((await ok(s.admin.get('/api/admin/speakers'))).settings).toMatchObject({ theme: DEFAULT_THEME, themeAvailable: true });
+  });
+
+  it('open boards hear about a change to their theme, and a replaced package changes the board version (review fix)', async () => {
+    await ok(s.admin.put('/api/admin/module-policies/superSpeakers', { availability: 'enabled' }));
+    await enabledOcean();
+    await ok(s.admin.put('/api/admin/speakers/settings', { theme: 'ocean' }));
+    let signals = 0;
+    const off = onBoardChange(() => signals++);
+    const settle = () => new Promise((r) => setImmediate(r));
+    try {
+      await settle();
+      signals = 0;
+      const v1 = buildBoard(env.db, env.clock.now()).version;
+      env.clock.advance(1000);
+      await ok(s.admin.put('/api/admin/themes/ocean', { source: withChanges((p) => (p.name.en = 'Deep ocean')) }));
+      await settle();
+      expect(signals).toBe(1);
+      expect(buildBoard(env.db, env.clock.now()).version).not.toBe(v1);
+      for (const step of ['disable', 'enable']) {
+        await ok(s.admin.post(`/api/admin/themes/ocean/${step}`));
+        await settle();
+      }
+      expect(signals).toBe(3);
+      // A theme the board does not use sends nothing.
+      await ok(s.admin.post('/api/admin/themes', { source: withChanges(() => undefined, 'lagoon') }));
+      await ok(s.admin.post('/api/admin/themes/lagoon/enable'));
+      await settle();
+      expect(signals).toBe(3);
+      await ok(s.admin.req('DELETE', '/api/admin/themes/ocean', { confirm: 'ocean' }));
+      await settle();
+      expect(signals).toBe(4);
+    } finally {
+      off();
+    }
+  });
+
+  it('the public package answers 304 to its ETag until the package is replaced (review fix)', async () => {
+    await enabledOcean();
+    const anon = new Client(env);
+    const first = await anon.get('/api/themes/custom/ocean');
+    expect(first.status).toBe(200);
+    const etag = String(first.headers.etag);
+    expect(etag).toMatch(/^"ocean-\d+"$/u);
+    expect((await anon.req('GET', '/api/themes/custom/ocean', undefined, { 'if-none-match': etag })).status).toBe(304);
+    env.clock.advance(1000);
+    await ok(s.admin.put('/api/admin/themes/ocean', { source: withChanges((p) => (p.name.en = 'Deep ocean')) }));
+    const again = await anon.req('GET', '/api/themes/custom/ocean', undefined, { 'if-none-match': etag });
+    expect(again.status).toBe(200);
+    expect(again.body.name.en).toBe('Deep ocean');
   });
 });

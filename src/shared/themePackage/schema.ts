@@ -14,7 +14,7 @@ import { ART_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS, SOUND_PARAM_LIMITS, STYLE_LI
 import { EASINGS, MOTION_PRESETS } from './motion.ts';
 import { FONT_PRESETS, SHADOW_PRESETS } from './presets.ts';
 import { SOUND_SCALES, SOUND_WAVES } from './sound.ts';
-import { COLOR_TOKENS, ILLUSTRATIONS, MASCOT_POSES, PACKAGE_COLOR_TOKENS, SOUND_EVENTS, type PackageColorToken } from './tokens.ts';
+import { COLOR_TOKENS, ILLUSTRATIONS, isTranslucentToken, MASCOT_POSES, PACKAGE_COLOR_TOKENS, SOUND_EVENTS, type PackageColorToken } from './tokens.ts';
 
 export const THEME_PACKAGE_FORMAT = 'class-compass-theme';
 export const THEME_PACKAGE_VERSION = 1;
@@ -35,10 +35,13 @@ const Labels = (max: number) => z.strictObject({ en: plainText(max), tr: plainTe
 
 export const ThemeSlug = z.string().regex(THEME_SLUG, 'a slug: 3-32 lower-case letters, digits and single hyphens, starting with a letter');
 export const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/u, '#rrggbb or #rrggbbaa');
+/** An opaque colour: every token except the translucent layers (`TRANSLUCENT_COLOR_TOKENS`). */
+export const OpaqueHexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/u, '#rrggbb (opaque; only overlay, shadow-color and avatar-outline may be translucent)');
+const colorSchemaOf = (t: PackageColorToken) => (isTranslucentToken(t) ? HexColor : OpaqueHexColor);
 
 export const PackageColors = z
-  .strictObject(Object.fromEntries(PACKAGE_COLOR_TOKENS.map((t) => [t, HexColor])) as Record<PackageColorToken, typeof HexColor>)
-  .describe('Every colour token except print-ink and print-paper (always black on white). See the token table in docs/THEMING.md.');
+  .strictObject(Object.fromEntries(PACKAGE_COLOR_TOKENS.map((t) => [t, colorSchemaOf(t)])) as Record<PackageColorToken, typeof HexColor>)
+  .describe('Every colour token except print-ink and print-paper (always black on white). Opaque #rrggbb, except overlay, shadow-color and avatar-outline (#rrggbb or #rrggbbaa). See the token table in docs/THEMING.md.');
 
 export const Typography = z.strictObject({
   body: z.enum(keysOf(FONT_PRESETS)).describe('Font preset of body text.'),
@@ -154,7 +157,7 @@ export type ThemePackage = z.infer<typeof ThemePackage>;
  * are ignored; the missing ones come from the base theme.
  */
 export const StoredThemePackage = ThemePackage.extend({
-  colors: z.object(Object.fromEntries(PACKAGE_COLOR_TOKENS.map((t) => [t, HexColor.optional()])) as Record<PackageColorToken, z.ZodOptional<typeof HexColor>>),
+  colors: z.object(Object.fromEntries(PACKAGE_COLOR_TOKENS.map((t) => [t, colorSchemaOf(t).optional()])) as Record<PackageColorToken, z.ZodOptional<typeof HexColor>>),
 });
 export type StoredThemePackage = z.infer<typeof StoredThemePackage>;
 export type ThemePackageSounds = NonNullable<ThemePackage['sounds']>;

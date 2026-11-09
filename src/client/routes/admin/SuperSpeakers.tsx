@@ -56,7 +56,7 @@ function useOverview() {
 function SettingsPanel({ data }: { data: C.SpeakersAdmin }) {
   const { t, locale } = useI18n();
   const run = useRun();
-  const [s, setS] = useState<C.SpeakersSettings>(data.settings);
+  const [s, setS] = useState<C.SpeakersSettingsView>(data.settings);
   useEffect(() => setS(data.settings), [data.settings]);
   const set = <K extends keyof C.SpeakersSettings>(k: K, v: C.SpeakersSettings[K]) => setS((o) => ({ ...o, [k]: v }));
   const all = s.participatingClassIds === null;
@@ -83,7 +83,10 @@ function SettingsPanel({ data }: { data: C.SpeakersAdmin }) {
         className="cc-card cc-stack"
         onSubmit={(e) => {
           e.preventDefault();
-          void run(() => call(C.setSpeakersSettings, s), { invalidate: [K.all], success: t('save.saved') });
+          // The theme goes only when it was changed: a board whose imported theme is switched off keeps
+          // that choice when other settings are saved (D-158).
+          const { themeAvailable: _available, theme, ...rest } = s;
+          void run(() => call(C.setSpeakersSettings, theme === data.settings.theme ? rest : { ...rest, theme }), { invalidate: [K.all], success: t('save.saved') });
         }}
         data-testid="speakers-settings"
       >
@@ -149,7 +152,7 @@ function SettingsPanel({ data }: { data: C.SpeakersAdmin }) {
           value={s.boardLanguage}
           onChange={(v) => set('boardLanguage', v === 'tr' ? 'tr' : 'en')}
         />
-        <ThemePicker label={t('speakers.admin.theme')} value={s.theme} onChange={(v) => set('theme', v)} />
+        <ThemePicker label={t('speakers.admin.theme')} value={s.theme} onChange={(v) => set('theme', v)} switchedOff={!data.settings.themeAvailable && s.theme === data.settings.theme} />
         <Toggle label={t('speakers.admin.sound')} description={t('speakers.admin.soundHint')} isSelected={s.boardSound} onChange={(v) => set('boardSound', v)} />
         <Select
           label={t('speakers.admin.badgeSubject')}

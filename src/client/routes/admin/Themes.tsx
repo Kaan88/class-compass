@@ -14,7 +14,7 @@ import * as Th from '../../../shared/contracts/themes.ts';
 import type { MessageKey } from '../../../shared/i18n/index.ts';
 import { translate } from '../../../shared/i18n/index.ts';
 import { DEFAULT_THEME } from '../../../shared/themes.ts';
-import { AA, contrast, CONTRAST_PAIRS } from '../../../shared/themePackage/contrast.ts';
+import { AA, CONTRAST_PAIRS, pairContrast } from '../../../shared/themePackage/contrast.ts';
 import { PACKAGE_LIMITS } from '../../../shared/themePackage/limits.ts';
 import { call } from '../../lib/api.ts';
 import { getDisplay } from '../../lib/display.ts';
@@ -226,7 +226,7 @@ function BoardSample() {
 
 function ContrastTable({ def }: { def: ThemeDefinition }) {
   const { t } = useI18n();
-  const rows = CONTRAST_PAIRS.map((p) => ({ ...p, ratio: Math.round(contrast(def.colors[p.fg], def.colors[p.bg]) * 100) / 100 }));
+  const rows = CONTRAST_PAIRS.map((p) => ({ ...p, ratio: Math.round(pairContrast(def.colors[p.fg], def.colors[p.bg]) * 100) / 100 }));
   return (
     <DataTable
       stack
@@ -542,7 +542,7 @@ export function ThemesPage() {
         isOpen={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={t('themes.delete.title', { name: deleting?.name[locale] ?? '' })}
-        description={t('themes.delete.description', { count: deleting?.classCount ?? 0, theme: translate(locale, `theme.${DEFAULT_THEME}`) })}
+        description={t(deleting?.board ? 'themes.delete.descriptionBoard' : 'themes.delete.description', { count: deleting?.classCount ?? 0, theme: translate(locale, `theme.${DEFAULT_THEME}`) })}
         confirmText={deleting?.key ?? ''}
         actionLabel={t('themes.action.delete')}
         onConfirm={async () => {

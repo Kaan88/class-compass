@@ -51,14 +51,22 @@ imported package. Writes go through `assertThemeUsable(db, key)` (built-in, or a
 **enabled**; else 400 `THEME_NOT_AVAILABLE`); reads go through `effectiveTheme(db, key)`, which gives
 `DEFAULT_THEME` for a package that is a draft, disabled or deleted. On the client `themeOf(key)` falls
 back the same way, and `installThemeStyles()` loads the package the display needs from
-`GET /api/themes/custom/:key` (public, enabled only, also served on the Super Speakers host). Deleting a
-package moves its classes and the board to `DEFAULT_THEME` (audited); disabling keeps their choice.
+`GET /api/themes/custom/:key` (public, enabled only, also served on the Super Speakers host). It
+re-checks that package with its ETag (304 when unchanged) when the display changes, when the page
+becomes visible and every five minutes, at most every 30 s, so a **replaced** package reaches open
+screens without a reload; the Super Speakers board also gets a change signal (its version includes the
+package's revision). Deleting a package moves its classes and the board to `DEFAULT_THEME` (audited);
+disabling keeps their choice. Editors therefore receive the **stored** choice: the admin class editor
+and the Super Speakers settings read `theme` as stored plus `themeAvailable`, the teacher's contexts
+carry `chosenTheme` next to the shown `theme`, and the pickers (`ThemePicker switchedOff`) say the
+choice is switched off instead of ticking the default. Forms send `theme` only when it was changed, and
+the server writes it only when it differs from the stored key, so saving other fields never replaces it.
 
 ## Slots and limits (test-enforced in `tests/client/themes.test.tsx` and by the package validator)
 
 | Slot | Rules |
 |---|---|
-| `colors` | Every `COLOR_TOKENS` entry, hex (`#rrggbb`, or `#rrggbbaa` for translucent ones). WCAG pairs from `shared/themePackage/contrast.ts` (AA body, AAA classroom text, 3:1 UI). Literals only in `base.ts` and `<theme>/tokens.ts` (or in a package). |
+| `colors` | Every `COLOR_TOKENS` entry, hex `#rrggbb`; only `overlay`, `shadow-color` and `avatar-outline` (`TRANSLUCENT_COLOR_TOKENS`, in no contrast pair) may be `#rrggbbaa`. A translucent colour in a pair counts as 1:1. WCAG pairs from `shared/themePackage/contrast.ts` (AA body, AAA classroom text, 3:1 UI). Literals only in `base.ts` and `<theme>/tokens.ts` (or in a package). |
 | `Mascot` | 100×100 SVG, poses `idle`, `cheer`, `thinking`, `celebrate`, `sleepy`, all different. Coloured with `var(--cc-mascot-*)`. |
 | `illustrations` | 200×140, decorative. The lock screen art must not hint at the page behind it. |
 | `motion` | `celebrate`, `threshold`: a preset from `shared/themePackage/motion.ts`, played once; `reduced` is the shared fade. |
@@ -138,7 +146,7 @@ Design the palette in this order; the validator and `tests/client/themes.test.ts
 | `text-muted` | Hints and secondary text (4.5:1 on bg, surface and surface-2). | on bg ≥ 4.5; on surface ≥ 4.5; on surface-2 ≥ 4.5 | `#4f4a3d` | `#45574a` | `#4a5170` |
 | `border` | Quiet dividers and card outlines (decorative, no contrast rule). | – | `#cdbf9f` | `#c4d8b8` | `#c9cfe0` |
 | `border-strong` | Borders of inputs and controls (3:1 on surface). | on surface ≥ 3 | `#5b5140` | `#47604a` | `#4a5170` |
-| `overlay` | Dim layer behind dialogs (may be translucent, #rrggbbaa). | – | `#14182b8c` | `#14182b8c` | `#14182b8c` |
+| `overlay` | Dim layer behind dialogs (usually translucent, #rrggbbaa). | – | `#14182b8c` | `#14182b8c` | `#14182b8c` |
 | `shadow-color` | Colour of card and dialog shadows (usually translucent). | – | `#14182b1f` | `#14182b1f` | `#14182b1f` |
 
 #### Accent, focus and status
@@ -309,7 +317,7 @@ preview, the MCP tools of S14h and the tests use it).
 | `key` | The slug classes store: 3–32 lower-case letters, digits and single hyphens, starting with a letter; never a built-in key; unique in the school |
 | `name`, `description`, `mascotName` | `{ "en": …, "tr": … }`, plain text (names ≤ 40 characters, description ≤ 160) |
 | `base` | A built-in theme: it supplies art the package leaves out, and colour tokens added to the app after the package was made |
-| `colors` | Every token of the table above except `print-ink` / `print-paper` |
+| `colors` | Every token of the table above except `print-ink` / `print-paper`; opaque `#rrggbb`, except `overlay`, `shadow-color` and `avatar-outline`, which may be `#rrggbbaa` |
 | `typography` | `body` and `display` font presets (`system`, `friendly`, `clean`, `playful`, `rounded`, `wide`, `book`), four weights, letter-spacing in em |
 | `shape` | `radiusRem`, `radiusSmRem`, `borderPx`, `borderStrongPx`, `shadow` and `shadowRaised` presets (`none`, `soft`, `paper`, `cushion`, `raised`, `floating`) |
 | `avatar`, `icons` | Avatar saturation and lightness (big and small initials); icon stroke width, linecap, linejoin |
@@ -354,7 +362,8 @@ client draws the resulting tree with `createElement` in `src/client/themes/SvgTr
 6. **Export** gives any theme as a package: an imported one exactly as stored, a built-in one with a
    new key (`<key>-copy`) and "(copy)" names, without art (its art comes from `base`).
 
-Checking the same key again offers **Replace the saved theme**, which keeps its status.
+Checking the same key again offers **Replace the saved theme**, which keeps its status. Open screens
+that show it pick up the new package within a few minutes (an open board usually at once); a reload is not needed.
 
 ### Worked example: `ocean`
 

@@ -188,12 +188,16 @@ export const SpeakersSettings = z.object({
   boardTitle: LocalizedText,
   boardMessages: BoardMessages,
   boardLanguage: Locale,
+  /** The board's chosen theme as stored (D-158); the board shows the default while an imported choice is switched off. */
   theme: Theme,
   boardSound: z.boolean(),
   /** The subject whose class+subjects receive the Super Speakers badges (null = the subject named "English"). */
   badgeSubjectId: z.string().nullable(),
 });
+/** The settings as the admin page reads them: plus whether the chosen theme can be shown now (D-158). */
+export const SpeakersSettingsView = SpeakersSettings.extend({ themeAvailable: z.boolean() });
 export type SpeakersSettings = z.infer<typeof SpeakersSettings>;
+export type SpeakersSettingsView = z.infer<typeof SpeakersSettingsView>;
 
 export const LinkInfo = z.object({
   id: z.string(),
@@ -211,7 +215,7 @@ export type DisplayLinkInfo = z.infer<typeof LinkInfo>;
 
 export const SpeakersAdmin = z.object({
   enabled: z.boolean(),
-  settings: SpeakersSettings,
+  settings: SpeakersSettingsView,
   /** The subject the badges use now (resolved), or null when there is none. */
   badgeSubject: z.object({ id: z.string(), name: LocalizedText }).nullable(),
   subjects: z.array(z.object({ id: z.string(), name: LocalizedText })),
@@ -225,7 +229,7 @@ export const SpeakersAdmin = z.object({
 });
 export type SpeakersAdmin = z.infer<typeof SpeakersAdmin>;
 export const speakersAdmin = endpoint({ method: 'GET', path: '/api/admin/speakers', access: 'admin', input: z.object({}), output: SpeakersAdmin });
-export const setSpeakersSettings = endpoint({ method: 'PUT', path: '/api/admin/speakers/settings', access: 'admin', input: SpeakersSettings.partial(), output: SpeakersSettings });
+export const setSpeakersSettings = endpoint({ method: 'PUT', path: '/api/admin/speakers/settings', access: 'admin', input: SpeakersSettings.partial(), output: SpeakersSettingsView });
 
 const Label = z.string().trim().min(1).max(80);
 export const createScorerLink = endpoint({

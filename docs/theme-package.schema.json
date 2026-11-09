@@ -98,83 +98,83 @@
       "properties": {
         "bg": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "surface": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "surface-2": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "text": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "text-muted": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "border": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "border-strong": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "accent": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "accent-strong": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "accent-soft": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "accent-text": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "focus": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "success": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "success-soft": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "warning": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "warning-soft": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "danger": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "danger-strong": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "danger-soft": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "on-strong": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "overlay": {
           "type": "string",
@@ -186,307 +186,307 @@
         },
         "display-banner-bg": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "display-banner-text": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "display-banner-border": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "level-0": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "level-1": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "level-2": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "level-3": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "level-edge-0": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "level-edge-1": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "level-edge-2": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "level-edge-3": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-accent": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-accent-edge": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-teal": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-teal-edge": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-plum": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-plum-edge": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-rust": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-rust-edge": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-leaf": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-leaf-edge": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-berry": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "counter-berry-edge": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "segment-on": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "segment-off": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-text": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "icon-accent": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "deco-1": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "deco-2": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "deco-3": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "pattern": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "mascot-body": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "mascot-belly": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "mascot-accent": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "mascot-ink": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "mascot-cheek": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "art-sky": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "art-ground": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "art-light": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-red": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-orange": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-yellow": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-green": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-teal": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-blue": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-navy": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-purple": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-pink": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-brown": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-grey": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-mint": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-1": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-2": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-3": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-4": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-5": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-6": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-7": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-8": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-9": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-10": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-11": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-skin-12": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-black": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-darkBrown": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-brown": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-auburn": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-ginger": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-blonde": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-lightBlonde": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-grey": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-white": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-blue": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-pink": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-hair-purple": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-ink": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-outline": {
           "type": "string",
@@ -494,35 +494,35 @@
         },
         "avatar-white": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "avatar-blush": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "badge-bronze": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "badge-silver": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "badge-gold": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "badge-plain": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "badge-ink": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         },
         "badge-shine": {
           "type": "string",
-          "pattern": "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$"
+          "pattern": "^#[0-9a-fA-F]{6}$"
         }
       },
       "required": [
@@ -635,7 +635,7 @@
         "badge-shine"
       ],
       "additionalProperties": false,
-      "description": "Every colour token except print-ink and print-paper (always black on white). See the token table in docs/THEMING.md."
+      "description": "Every colour token except print-ink and print-paper (always black on white). Opaque #rrggbb, except overlay, shadow-color and avatar-outline (#rrggbb or #rrggbbaa). See the token table in docs/THEMING.md."
     },
     "typography": {
       "type": "object",

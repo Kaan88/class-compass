@@ -87,10 +87,13 @@ export function allThemesCss(): string {
 
 let stopWatching: (() => void) | null = null;
 
+/** How often an open page re-checks the imported theme it shows (a conditional GET; 304 when unchanged). */
+const THEME_POLL_MS = 5 * 60_000;
+
 /**
  * Writes (or refreshes) the theme stylesheet in `<head>`. Called once at start-up (main.tsx) and by
- * tests. It then keeps the sheet current when an imported theme is registered, and loads the imported
- * theme the display asks for (`setDisplay({ theme })`), on every entry.
+ * tests. It then keeps the sheet current when an imported theme is registered, and loads (and
+ * re-checks) the imported theme the display asks for (`setDisplay({ theme })`), on every entry.
  */
 export function installThemeStyles(doc: Document = document): HTMLStyleElement {
   let el = doc.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null;
@@ -105,11 +108,20 @@ export function installThemeStyles(doc: Document = document): HTMLStyleElement {
       const sheet = doc.getElementById(STYLE_ELEMENT_ID);
       if (sheet) sheet.textContent = allThemesCss();
     });
-    const offDisplay = subscribeDisplay(() => void loadThemePackage(getDisplay().theme));
-    void loadThemePackage(getDisplay().theme);
+    const check = () => void loadThemePackage(getDisplay().theme);
+    const offDisplay = subscribeDisplay(check);
+    check();
+    // A replaced package reaches screens that stay open (classroom display, board) without a reload.
+    const onVisible = () => {
+      if (doc.visibilityState === 'visible') check();
+    };
+    doc.addEventListener('visibilitychange', onVisible);
+    const timer = setInterval(check, THEME_POLL_MS);
     stopWatching = () => {
       offThemes();
       offDisplay();
+      doc.removeEventListener('visibilitychange', onVisible);
+      clearInterval(timer);
     };
   }
   return el;

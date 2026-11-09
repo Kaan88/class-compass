@@ -32,7 +32,7 @@ import { emailResetEnabled } from '../../lib/mailer.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { contextModuleStates, getAvailability, mediaRecord, validateModuleConfig, type ContextModuleState } from './modules.ts';
 import { DEFAULT_THEME } from '../../../shared/themes.ts';
-import { assertThemeUsable, effectiveTheme } from '../themes/service.ts';
+import { assertThemeUsable, effectiveTheme, isThemeUsable } from '../themes/service.ts';
 import {
   assertClassWritable,
   assertOwnsContext,
@@ -283,7 +283,10 @@ export function classDto(deps: Pick<AppDeps, 'db' | 'now'>, c: ClassRow) {
     schoolYearId: c.schoolYearId,
     name: c.name,
     grade: c.grade,
-    theme: effectiveTheme(deps.db, c.theme),
+    // The stored choice (D-158): the admin editor sends it back unchanged, so saving other fields never
+    // replaces an imported theme that is switched off for now. Screens read `effectiveTheme`.
+    theme: c.theme,
+    themeAvailable: isThemeUsable(deps.db, c.theme),
     timezone: c.timezone,
     soundsEnabled: c.soundsEnabled,
     animationsEnabled: c.animationsEnabled,
@@ -513,6 +516,7 @@ export function myContexts(ctx: RequestContext) {
         subjectId: subject.id,
         subjectName: subject.name,
         theme: effectiveTheme(ctx.db, cls.theme),
+        chosenTheme: cls.theme,
         timezone: cls.timezone ?? schoolTz,
         soundsEnabled: cls.soundsEnabled,
         animationsEnabled: cls.animationsEnabled,

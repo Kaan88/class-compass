@@ -48,6 +48,15 @@ test('import a theme package (bad contrast → fix → enable), use it in a clas
     await expect(report.getByTestId('theme-report-errors').locator('li[data-code="CONTRAST"]').first()).toContainText('text-muted');
     await expect(admin.getByTestId('theme-save')).toHaveCount(0);
 
+    // 1b. Transparent text would pass the contrast maths but be unreadable: only the dim layer,
+    // shadows and avatar outlines may be translucent (review fix).
+    const ghost = JSON.parse(OCEAN) as { colors: Record<string, string> };
+    ghost.colors.text = '#0f243000';
+    await textarea.fill(JSON.stringify(ghost, null, 2));
+    await admin.getByRole('button', { name: 'Check package' }).click();
+    await expect(report.getByTestId('theme-report-errors').locator('li[data-code="SCHEMA"]').first()).toContainText('colors.text');
+    await expect(admin.getByTestId('theme-save')).toHaveCount(0);
+
     // 2. Fix it on the page and check again: no errors, a note about the base theme's art, a preview.
     await textarea.fill(OCEAN);
     await expect(admin.getByText('The text changed after the check.')).toBeVisible();
@@ -86,6 +95,26 @@ test('import a theme package (bad contrast → fix → enable), use it in a clas
     await expect(teacher.locator('html')).toHaveAttribute('data-theme', 'ocean');
     await expect.poll(() => teacher.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--cc-bg').trim())).toBe('#eef6f8');
     expect(await seriousViolations(teacher)).toEqual([]);
+
+    // 4b. Disabled for a while: the class shows the default theme but keeps its choice, even when the
+    // administrator saves the class in the class editor meanwhile (review fix); enabled again, it is back.
+    await row.getByRole('button', { name: 'Disable' }).click();
+    await expect(row).toContainText('Disabled');
+    const off = await api(teacher, 'GET', '/api/teacher/contexts');
+    expect((off.body.contexts as Array<{ classId: string; theme: string; chosenTheme: string }>).find((c) => c.classId === classId)).toMatchObject({ theme: DEFAULT_THEME, chosenTheme: 'ocean' });
+    await admin.goto('/admin/classes');
+    const classRow = admin.getByRole('row').filter({ hasText: 'ocean (switched off)' });
+    await expect(classRow).toHaveCount(1);
+    await classRow.getByRole('button', { name: 'Edit' }).click();
+    const editor = admin.getByRole('dialog');
+    await expect(editor.getByTestId('theme-picker-off')).toContainText('ocean');
+    await editor.getByRole('button', { name: 'Save' }).click();
+    await expect(editor).toHaveCount(0);
+    await admin.goto('/admin/themes');
+    await admin.getByTestId('theme-enable-ocean').click();
+    await expect(row).toContainText('Enabled');
+    const back = await api(teacher, 'GET', '/api/teacher/contexts');
+    expect((back.body.contexts as Array<{ classId: string; theme: string }>).find((c) => c.classId === classId)!.theme).toBe('ocean');
 
     // 5. Delete (typed confirmation): the class moves back to the default theme.
     await row.getByRole('button', { name: 'Delete' }).click();

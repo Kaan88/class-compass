@@ -24,6 +24,7 @@ import { classes, customThemes, superSpeakersSettings } from '../../db/schema.ts
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
+import { notifyBoardChange } from '../superSpeakers/events.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 type Row = typeof customThemes.$inferSelect;
@@ -151,6 +152,7 @@ export function replaceTheme(ctx: RequestContext, input: In<typeof C.replaceCust
       .where(eq(customThemes.key, input.key))
       .run();
     const after = rowOf(ctx.db, input.key);
+    notifyBoardIfUsing(ctx.db, input.key);
     audit(ctx.db, ctx.actor, { action: 'theme.replace', entity: 'custom_theme', entityId: input.key, before: auditOf(before, pkgOf(before)), after: auditOf(after, pkg) }, now);
     return summary(ctx.db, after);
   });
@@ -169,6 +171,7 @@ export function setThemeStatus(ctx: RequestContext, key: string, status: Exclude
     const now = ctx.now();
     ctx.db.update(customThemes).set({ status, updatedBy: user.id, updatedAt: now }).where(eq(customThemes.key, key)).run();
     const after = rowOf(ctx.db, key);
+    notifyBoardIfUsing(ctx.db, key);
     audit(ctx.db, ctx.actor, { action: status === 'enabled' ? 'theme.enable' : 'theme.disable', entity: 'custom_theme', entityId: key, before: { status: before.status }, after: { status, ...usage(ctx.db, key) } }, now);
     return summary(ctx.db, after);
   });
@@ -183,7 +186,10 @@ export function deleteTheme(ctx: RequestContext, input: In<typeof C.deleteCustom
     const moved = ctx.db.select({ id: classes.id }).from(classes).where(eq(classes.theme, input.key)).all().map((c) => c.id);
     if (moved.length) ctx.db.update(classes).set({ theme: DEFAULT_THEME, updatedAt: now }).where(inArray(classes.id, moved)).run();
     const board = ctx.db.select({ theme: superSpeakersSettings.theme }).from(superSpeakersSettings).where(eq(superSpeakersSettings.id, 1)).get()?.theme === input.key;
-    if (board) ctx.db.update(superSpeakersSettings).set({ theme: DEFAULT_THEME, updatedAt: now }).where(eq(superSpeakersSettings.id, 1)).run();
+    if (board) {
+      ctx.db.update(superSpeakersSettings).set({ theme: DEFAULT_THEME, updatedAt: now }).where(eq(superSpeakersSettings.id, 1)).run();
+      notifyBoardChange();
+    }
     ctx.db.delete(customThemes).where(eq(customThemes.key, input.key)).run();
     audit(
       ctx.db,
@@ -202,9 +208,26 @@ export function availableThemes(ctx: RequestContext) {
   return { themes: rows.map((r) => r.packageJson as z.infer<typeof C.availableThemes.output>['themes'][number]) };
 }
 
-/** One enabled package (public; drafts, disabled and unknown keys are 404). */
+/**
+ * One enabled package (public; drafts, disabled and unknown keys are 404) with its ETag, which changes
+ * whenever the package is replaced: open screens re-check it and pick up a replaced package (D-158).
+ */
 export function publicTheme(ctx: RequestContext, input: In<typeof C.publicCustomTheme>) {
   const r = ctx.db.select().from(customThemes).where(and(eq(customThemes.key, input.key), eq(customThemes.status, 'enabled'))).get();
   if (!r) throw new AppError('NOT_FOUND', 'Theme not found');
-  return r.packageJson as z.infer<typeof C.publicCustomTheme.output>;
+  return { etag: `"${r.key}-${r.updatedAt}"`, body: r.packageJson as z.infer<typeof C.publicCustomTheme.output> };
+}
+
+/**
+ * Revision of an enabled imported theme (its last change), or null for a built-in or unusable key.
+ * The board mixes it into its version, so a replaced package reaches an open board (D-158).
+ */
+export function themeRevision(db: Db, key: string): number | null {
+  if (isThemeKey(key)) return null;
+  return db.select({ at: customThemes.updatedAt }).from(customThemes).where(and(eq(customThemes.key, key), eq(customThemes.status, 'enabled'))).get()?.at ?? null;
+}
+
+/** Tells open Super Speakers boards to re-check when a change to `key` changes what they show. */
+function notifyBoardIfUsing(db: Db, key: string): void {
+  if (usage(db, key).board) notifyBoardChange();
 }
