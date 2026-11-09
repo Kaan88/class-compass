@@ -578,12 +578,15 @@ export function Importer({
   showCreator = false,
   classId,
   onClassChange,
+  onBatchOpenChange,
 }: {
   classes: ImporterClass[];
   tz: string;
   showCreator?: boolean;
   classId?: string;
   onClassChange?: (id: string) => void;
+  /** Told when a preview or report opens (true) or closes (false), so a caller can lock its own class choice. */
+  onBatchOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -592,10 +595,12 @@ export function Importer({
   const show = (b: Batch) => {
     qc.setQueryData([...KEY, 'batch', b.id], b);
     setBatchId(b.id);
+    onBatchOpenChange?.(true);
     void qc.invalidateQueries({ queryKey: [...KEY, 'list'] });
   };
   const close = () => {
     setBatchId(null);
+    onBatchOpenChange?.(false);
     void qc.invalidateQueries({ queryKey: [...KEY, 'list'] });
   };
   return (
@@ -612,7 +617,14 @@ export function Importer({
       ) : (
         <Start classes={classes} onCreated={show} {...(classId !== undefined ? { classId } : {})} {...(onClassChange ? { onClassChange } : {})} />
       )}
-      <History tz={tz} onOpen={setBatchId} showCreator={showCreator} />
+      <History
+        tz={tz}
+        onOpen={(id) => {
+          setBatchId(id);
+          onBatchOpenChange?.(true);
+        }}
+        showCreator={showCreator}
+      />
       <p className="cc-muted">
         <IconUsers /> {t('import.namesRule')}
       </p>

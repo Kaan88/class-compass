@@ -3,7 +3,7 @@
  * teacher page (`Importer`), but the administrator picks any class of an open school year and sees
  * which classes are still empty, so every class can be filled before teachers start.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as S from '../../../shared/contracts/school.ts';
 import { call } from '../../lib/api.ts';
@@ -21,7 +21,13 @@ export function AdminImportPage() {
   const settings = useQuery({ queryKey: [...ADMIN, 'settings'], queryFn: () => call(S.getSettings, {}) });
   const open = useMemo(() => (classes.data?.classes ?? []).filter((c) => !c.archived && !c.yearArchived), [classes.data]);
   const [classId, setClassId] = useState('');
+  const [busy, setBusy] = useState(false);
   const empty = open.filter((c) => c.studentCount === 0);
+  // The target is always a visible choice: start on the first empty class (or the first class).
+  const first = empty[0]?.id ?? open[0]?.id ?? '';
+  useEffect(() => {
+    if (first && !open.some((c) => c.id === classId)) setClassId(first);
+  }, [open, classId, first]);
   const items = open.map((c) => ({ id: c.id, name: c.name, label: t('admin.importClassLabel', { name: c.name, count: c.studentCount }) }));
   return (
     <main className="cc-page cc-stack" data-testid="admin-import-page">
@@ -39,6 +45,11 @@ export function AdminImportPage() {
               <Alert kind={empty.length ? 'warning' : 'success'}>
                 <span data-testid="admin-import-empty-count">{empty.length ? t('admin.importEmptyCount', { count: empty.length }) : t('admin.importAllFilled')}</span>
               </Alert>
+            ) : null}
+            {busy ? (
+              <p className="cc-muted" data-testid="admin-import-busy">
+                {t('admin.importBusy')}
+              </p>
             ) : null}
             <DataTable
               caption={t('admin.importClassesCaption')}
@@ -69,7 +80,7 @@ export function AdminImportPage() {
                   key: 'actions',
                   header: t('common.actions'),
                   render: (c) => (
-                    <Button size="small" onPress={() => setClassId(c.id)} isDisabled={classId === c.id}>
+                    <Button size="small" onPress={() => setClassId(c.id)} isDisabled={busy || classId === c.id}>
                       {t('admin.importChoose', { name: c.name })}
                     </Button>
                   ),
@@ -77,7 +88,7 @@ export function AdminImportPage() {
               ]}
             />
           </section>
-          <Importer classes={items} tz={settings.data?.timezone ?? 'UTC'} showCreator classId={classId} onClassChange={setClassId} />
+          <Importer classes={items} tz={settings.data?.timezone ?? 'UTC'} showCreator classId={classId} onClassChange={setClassId} onBatchOpenChange={setBusy} />
         </>
       )}
     </main>

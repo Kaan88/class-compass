@@ -3,7 +3,7 @@
  * Admin → Import students (S16a, D-163; IMP-1..7): open classes with their counts, empty classes
  * marked in words (not by colour only), the shared importer with the "By" column. Fictional data only.
  */
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminImportPage } from '../../src/client/routes/admin/ImportAdmin.tsx';
@@ -61,8 +61,21 @@ describe('admin student importer (S16a)', () => {
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('starts on the first empty class, shown as the chosen one (review fix)', async () => {
+    renderPage();
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Import into 3-A' }) as HTMLButtonElement).disabled).toBe(true));
+    expect((screen.getByRole('button', { name: 'Import into 3-B' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('locks the class buttons while an import is open and says why (review fix)', async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: en['import.open'] }));
+    await waitFor(() => expect(screen.getByTestId('admin-import-busy').textContent).toBe(en['admin.importBusy']));
+    expect((screen.getByRole('button', { name: 'Import into 3-B' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('has every new string in Turkish with singular and plural forms', () => {
-    for (const k of ['admin.import', 'admin.importTitle', 'admin.importIntro', 'admin.importEmptyCount_one', 'admin.importClassLabel_other', 'import.col.by'] as const) {
+    for (const k of ['admin.import', 'admin.importTitle', 'admin.importIntro', 'admin.importEmptyCount_one', 'admin.importClassLabel_other', 'admin.importBusy', 'import.col.by'] as const) {
       expect(tr[k]).toBeTruthy();
       expect(tr[k]).not.toBe(en[k]);
     }

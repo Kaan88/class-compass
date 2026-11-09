@@ -30,7 +30,10 @@ test('an administrator fills an empty class from a CSV and undoes it @mobile', a
     await expect(classRow).toContainText('Empty');
     await new AxeBuilder({ page }).include('[data-testid="admin-import-page"]').analyze().then((r) => expect(r.violations).toEqual([]));
 
-    await classRow.getByRole('button', { name: `Import into ${className}` }).click();
+    // The page starts on an empty class; choose ours unless it is already the chosen one.
+    const choose = classRow.getByRole('button', { name: `Import into ${className}` });
+    if (await choose.isEnabled()) await choose.click();
+    await expect(choose).toBeDisabled();
     await ap.getByLabel('Choose a file').setInputFiles({ name: 'sinif-listesi.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf8') });
     await ap.getByRole('button', { name: 'Read file' }).click();
     const preview = page.getByTestId('import-preview');
@@ -40,6 +43,7 @@ test('an administrator fills an empty class from a CSV and undoes it @mobile', a
     await preview.getByRole('button', { name: 'Confirm: add 3, link 0' }).click();
     const report = page.getByTestId('import-report');
     await expect(report.getByRole('status')).toContainText('3 added');
+    await expect(ap.getByTestId('admin-import-busy')).toBeVisible();
     await expect(classRow).toContainText('3');
     await expect(classRow).not.toContainText('Empty');
 

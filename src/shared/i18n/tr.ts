@@ -335,6 +335,7 @@ export const tr = {
   'admin.importEmptyCount_other': '{count} sınıfta henüz öğrenci yok.',
   'admin.importAllFilled': 'Tüm sınıflarda öğrenci var.',
   'admin.importChoose': '{name} sınıfına aktar',
+  'admin.importBusy': 'Başka bir sınıf seçmek için önce açık aktarımı bitirin ya da kapatın.',
   'admin.importClassLabel': '{name} ({count} öğrenci)',
   'admin.importClassLabel_one': '{name} ({count} öğrenci)',
   'admin.importClassLabel_other': '{name} ({count} öğrenci)',

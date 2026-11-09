@@ -337,6 +337,7 @@ export const en = {
   'admin.importEmptyCount_other': '{count} classes still have no students.',
   'admin.importAllFilled': 'Every class has students.',
   'admin.importChoose': 'Import into {name}',
+  'admin.importBusy': 'Finish or close the open import first to choose another class.',
   'admin.importClassLabel': '{name} ({count} students)',
   'admin.importClassLabel_one': '{name} ({count} student)',
   'admin.importClassLabel_other': '{name} ({count} students)',
