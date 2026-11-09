@@ -5891,6 +5891,47 @@ html[data-cursor='off'] * {
   overflow-wrap: anywhere;
 }
 
+/* ---------------------------------------------------------------- AI tools (S14h1, D-160) */
+.cc-ai-scopes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 0.25rem 1.25rem;
+}
+.cc-ai-scopes .cc-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-height: var(--cc-touch);
+  min-width: 0;
+}
+.cc-ai-scopes .cc-check input {
+  margin-top: 0.3rem;
+  flex: none;
+}
+.cc-ai-scopes .cc-check span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-ai-secret,
+.cc-ai-url {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  user-select: all;
+}
+.cc-ai-secret {
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--cc-radius-sm);
+  border: 2px dashed var(--cc-border-strong);
+  background: var(--cc-surface-2);
+}
+.cc-ai-categories {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
 /* S14e3 (carried over from S14a): on a phone at a large text size no page scrolls sideways. Long words
    break (headings keep their rem size, so they still grow with the text size), rows and fields
    shrink, card padding follows the screen width, and wide tables scroll inside their own box

@@ -62,7 +62,11 @@ export function AuditPage() {
         emptyText={audit.isLoading ? t('common.loading') : t('audit.none')}
         columns={[
           { key: 'at', header: t('audit.when'), render: (i) => fmt.format(i.at) },
-          { key: 'actor', header: t('audit.who'), render: (i) => i.actorName ?? t(i.actorType === 'system' ? 'audit.system' : 'audit.unknown') },
+          { key: 'actor', header: t('audit.who'), render: (i) => {
+              const who = i.actorName ?? t(i.actorType === 'system' ? 'audit.system' : 'audit.unknown');
+              return i.viaAiTool ? t('audit.viaAiTool', { name: who }) : who;
+            },
+          },
           { key: 'action', header: t('audit.action'), render: (i) => auditLabel(locale, 'action', i.action) },
           { key: 'entity', header: t('audit.entity'), render: (i) => auditLabel(locale, 'entity', i.entity) },
           {

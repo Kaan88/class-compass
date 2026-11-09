@@ -33,6 +33,7 @@ const AdminStudentsPage = lazyRouteComponent(() => import('./routes/admin/Studen
 const SuperSpeakersPage = lazyRouteComponent(() => import('./routes/admin/SuperSpeakers.tsx'), 'SuperSpeakersPage');
 const AuditPage = lazyRouteComponent(() => import('./routes/admin/Audit.tsx'), 'AuditPage');
 const ThemesPage = lazyRouteComponent(() => import('./routes/admin/Themes.tsx'), 'ThemesPage');
+const AiToolsAdminPage = lazyRouteComponent(() => import('./routes/admin/AiToolsAdmin.tsx'), 'AiToolsAdminPage');
 const MaintenancePage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'MaintenancePage');
 const AdminReportsPage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'AdminReportsPage');
 const CatalogPage = lazyRouteComponent(() => import('./dev/Catalog.tsx'), 'CatalogPage');
@@ -125,6 +126,7 @@ const adminStudents = createRoute({ getParentRoute: () => adminRoute, path: 'stu
 const adminSpeakers = createRoute({ getParentRoute: () => adminRoute, path: 'super-speakers', component: SuperSpeakersPage });
 const adminAudit = createRoute({ getParentRoute: () => adminRoute, path: 'audit', component: AuditPage });
 const adminThemes = createRoute({ getParentRoute: () => adminRoute, path: 'themes', component: ThemesPage });
+const adminAiTools = createRoute({ getParentRoute: () => adminRoute, path: 'ai-tools', component: AiToolsAdminPage });
 const adminReports = createRoute({
   getParentRoute: () => adminRoute,
   path: 'reports',
@@ -162,7 +164,7 @@ const routeTree = rootRoute.addChildren([
   changePasswordRoute,
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),
-  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminSpeakers, adminThemes, adminMaintenance, adminAudit, adminProfile]),
+  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminSpeakers, adminThemes, adminAiTools, adminMaintenance, adminAudit, adminProfile]),
   helpRoute,
   catalogRoute,
 ]);

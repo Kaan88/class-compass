@@ -2,7 +2,7 @@
 import type { MessageKey } from '../../shared/i18n/index.ts';
 
 /** Guides in the order the Help screen lists them. File name = id. */
-export const GUIDE_IDS = ['quick-start-teacher', 'teacher', 'quick-start-admin', 'admin', 'super-speakers', 'scorer', 'board-screen', 'quick-start-student', 'student'] as const;
+export const GUIDE_IDS = ['quick-start-teacher', 'teacher', 'quick-start-admin', 'admin', 'super-speakers', 'scorer', 'board-screen', 'ai-tools', 'quick-start-student', 'student'] as const;
 export type GuideId = (typeof GUIDE_IDS)[number];
 
 export const GUIDE_TITLE_KEYS: Record<GuideId, MessageKey> = {
@@ -13,6 +13,7 @@ export const GUIDE_TITLE_KEYS: Record<GuideId, MessageKey> = {
   'super-speakers': 'help.guide.superSpeakers',
   scorer: 'help.guide.scorer',
   'board-screen': 'help.guide.boardScreen',
+  'ai-tools': 'help.guide.aiTools',
   'quick-start-student': 'help.guide.quickStartStudent',
   student: 'help.guide.student',
 };

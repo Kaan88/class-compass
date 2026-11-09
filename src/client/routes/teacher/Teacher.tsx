@@ -22,6 +22,7 @@ import { TimeUpClipSection } from './ClassDisplay.tsx';
 import * as School from '../../../shared/contracts/school.ts';
 import { SensitiveGate } from '../Lock.tsx';
 import { StudentStatsProvider } from '../../ui/StudentName.tsx';
+import { AiToolsSection } from '../AiTools.tsx';
 
 /** The notifications page key: the bell stands for it in the navigation and on the menu (S14e3). */
 const NOTIFICATIONS_PAGE = 'notifications';
@@ -253,7 +254,7 @@ export function TeacherMenu() {
 
 export const TEXT_SCALES = [80, 90, 100, 115, 130, 150, 175, 200];
 
-/** Language, text size, PIN and password — each affects only this account (UX-4, THM-6, PIN-9). */
+/** Language, text size, PIN, password and AI tools tokens — each affects only this account (UX-4, THM-6, PIN-9, D-160). */
 export function ProfilePage() {
   const { t } = useI18n();
   const me = useMe();
@@ -307,6 +308,8 @@ export function ProfilePage() {
         </section>
       ) : null}
       <SignInMethodSection me={me} emailLinkEnabled={signInInfo.data?.emailLinkEnabled ?? false} />
+      {/* Personal tokens for AI tools (S14h1, D-160): behind the PIN gate, with re-authentication. */}
+      <AiToolsSection me={me} />
     </main>
   );
 }

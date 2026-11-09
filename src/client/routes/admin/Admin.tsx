@@ -6,7 +6,7 @@ import { signOut, useMe } from '../../lib/session.ts';
 import { Button, buttonClass } from '../../ui/Button.tsx';
 import { EmptyState } from '../../ui/Feedback.tsx';
 import { Select } from '../../ui/Fields.tsx';
-import { IconArchive, IconBook, IconCalendar, IconChart, IconDatabase, IconImage, IconKey, IconList, IconSettings, IconShield, IconStar, IconSwap, IconUser, IconUsers } from '../../ui/icons.tsx';
+import { IconArchive, IconBook, IconCalendar, IconChart, IconDatabase, IconGlobe, IconImage, IconKey, IconList, IconSettings, IconShield, IconStar, IconSwap, IconUser, IconUsers } from '../../ui/icons.tsx';
 import { SensitiveGate } from '../Lock.tsx';
 
 export const ADMIN = ['sensitive', 'admin'] as const;
@@ -23,6 +23,7 @@ const SECTIONS = [
   { to: '/admin/reports', key: 'admin.reports', icon: <IconChart /> },
   { to: '/admin/super-speakers', key: 'module.superSpeakers', icon: <IconStar /> },
   { to: '/admin/themes', key: 'admin.themes', icon: <IconImage /> },
+  { to: '/admin/ai-tools', key: 'admin.aiTools', icon: <IconGlobe /> },
   { to: '/admin/maintenance', key: 'admin.maintenance', icon: <IconDatabase /> },
   { to: '/admin/audit', key: 'admin.audit', icon: <IconList /> },
   { to: '/admin/profile', key: 'teacher.profile', icon: <IconUser /> },
