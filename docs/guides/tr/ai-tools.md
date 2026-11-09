@@ -34,8 +34,13 @@ Yönetim menüsünde **Yapay zekâ araçları**’nı açın.
 - **Öğrenci verisi yapay zekâ araçlarına**: varsayılan olarak kapalı. **Yalnızca okulunuzun KVKK sorumlusu onay verdikten** ve veli aydınlatma metni bunu belirttikten sonra açın. Açılan pencere okuldan nelerin çıkacağını listeler; onaylamak için `STUDENT DATA` yazın. Kapattığınızda bütün anahtarlar için hemen geçerli olur.
 - **Okuldan ne çıkar** bölümü, yukarıdaki listeyi geçerli ayara göre tekrarlar.
 - **Okuldaki anahtarlar** her anahtarı (gizli değerini asla göstermeden) hesabı, izinleri, gizlilik ayarı ve son kullanımıyla listeler. **İptal et** bir anahtarı hemen durdurur. Bu sayfadaki değişiklikler denetim kaydına yazılır.
+- **Bu okuldaki bağlı uygulamalar**, öğretmenlerin ve yöneticilerin izin sayfası üzerinden bağladığı her uygulamayı (claude.ai, Claude Desktop, Claude Code) **Bağlantıyı kes** düğmesiyle listeler.
+- **Kayıtlı yapay zekâ uygulamaları**, Sınıf Pusulası’na kendini kaydeden uygulamaları listeler. Herkes bir uygulama kaydedebilir; ancak bir kişi izin sayfasında izin vermedikçe uygulama hiçbir şey yapamaz. **İptal et**, o uygulamanın bütün bağlantılarını sona erdirir. Kimsenin kullanmadığı kayıtlar 30 gün sonra kaybolur.
+- **Yapay zekâ uygulamaları için izinli adresler**: bir uygulamanın, izin sayfasından sonra kullanıcıları geri gönderebileceği sunucular. `claude.ai` (claude.ai ve Claude Desktop için) baştan listededir; kişinin kendi bilgisayarındaki adreslere (Claude Code) her zaman izin verilir. Yalnızca okulunuzun kullanmayı kabul ettiği bir yapay zekâ aracı için sunucu ekleyin.
 
-Okulunuz Sınıf Pusulası’na Cloudflare Access üzerinden ulaşıyorsa, bilişim sorumlusunun `/mcp` adresini dışarıda bırakması gerekir (bkz. `docs/OPERATIONS.md`, "AI tools"): bir yapay zekâ aracı Cloudflare’e giriş yapamaz.
+Yapay zekâ araçlarını kapatmak, bütün bağlı uygulamaların bağlantısını keser.
+
+Okulunuz Sınıf Pusulası’na Cloudflare Access üzerinden ulaşıyorsa, bilişim sorumlusunun `/mcp` adresini, yapay zekâ uygulamalarının giriş adreslerini (`/oauth/…`) ve bulma adreslerini (`/.well-known/oauth-…`) dışarıda bırakması gerekir (bkz. `docs/OPERATIONS.md`, "AI tools"): bir yapay zekâ aracı Cloudflare’e giriş yapamaz.
 
 ## Kişisel anahtar oluşturma
 
@@ -64,13 +69,47 @@ Ardından Claude’a örneğin şunu sorun: "class-compass’ı kullan: 3-A İng
 
 İşe yarayan araçlar: **class_overview**, **class_report** (rapor büyükse birkaç bölüm isteyin), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** ve **set_topic_plan**, **create_homework**; temalar için **theme_schema**, **validate_theme** ve yöneticiler için **import_theme_draft** (taslak kaydeder; bir temayı etkinleştirmek **Temalar** sayfasında sizin kararınız olarak kalır). Hazır istekler (prompts): haftalık özet, hazır hedefler, konu planı, tema tasarımı.
 
-## claude.ai ve Claude Desktop (yakında)
+## claude.ai ve Claude Desktop
 
-> Bu bölüm henüz hazır değil. claude.ai ya da Claude Desktop’ı "özel bağlayıcı" olarak bağlamak, yapıştırılan bir anahtar yerine tarayıcıda bir giriş (OAuth) gerektirir; bu, yapay zekâ araçlarının bir sonraki aşamasıyla gelecek. O zamana kadar Claude Code’u kişisel bir anahtarla kullanın.
+claude.ai ve Claude Desktop, **özel bağlayıcı** (custom connector) olarak bağlanır. Anahtar yapıştırmazsınız: Claude sizi, izin verdiğiniz bir Sınıf Pusulası sayfasına (aşağıdaki "izin sayfası") gönderir. Denerken yalnızca kurgusal veriler kullanın ve yalnızca okulunuz Claude kullanmayı kabul ettiyse bağlayın.
+
+1. claude.ai’de **Customize → Connectors** bölümünü açın (Claude Desktop’ta: **Settings → Connectors**) ve **Add custom connector**’ı seçin. Team ve Enterprise planlarında bağlayıcıyı önce Claude kuruluşunun bir sahibinin (Owner) eklemesi gerekebilir.
+2. **Name**: örneğin "Sınıf Pusulası". **Remote MCP server URL**: okulunuzun adresi ve sonuna `/mcp`, tam olarak Profil → Yapay zekâ araçları bölümünde göründüğü gibi; örneğin `https://school.example.org/mcp`. Gelişmiş ayarları (client ID ve secret) boş bırakın.
+3. **Add**’e, ardından **Connect**’e basın. Bir tarayıcı penceresinde okulunuzun Sınıf Pusulası açılır. İstenirse giriş yapın; sınıf bilgisayarında önce PIN sorulur.
+4. İzin sayfasını okuyun, izinleri seçin ve şifrenizle **İzin ver**’e basın (aşağıya bakın). Tarayıcı claude.ai’ye döner ve bağlayıcı bağlı olarak görünür.
+5. Bir sohbette araçlar menüsünden bağlayıcıyı açın ve örneğin şunu sorun: "Sınıf Pusulası’nı kullan: 3-A İngilizce dersinin geçen haftasının kısa bir özetini çıkar."
+
+Bağlayıcılar Claude hesabınıza aittir; claude.ai’de eklenen bir bağlayıcı Claude Desktop’ta da görünür. Bağlantı sona erdiğinde (seçtiğiniz sürenin sonunda ya da bağlantıyı kestiğinizde) Claude yeniden bağlanmanızı ister.
+
+## Anahtar yerine girişle Claude Code
+
+Claude Code da aynı izin sayfası üzerinden giriş yapabilir; böylece bir anahtar kopyalamanız gerekmez:
+
+```
+claude mcp add --transport http class-compass https://school.example.org/mcp
+```
+
+Ardından Claude Code’u başlatın, `/mcp` yazın, **class-compass**’ı ve **Authenticate**’i seçin. Tarayıcınızda izin sayfası açılır; dönüş adresi kendi bilgisayarınızdadır (örneğin `localhost:43215`) ve sayfa bunu belirtir. **İzin ver**’den sonra tarayıcı terminale dönebileceğinizi söyler ve Claude Code bağlanmış olur. Kişisel anahtar (yukarıda) da çalışmaya devam eder; hangisini isterseniz onu kullanın.
+
+## İzin sayfası
+
+Bir yapay zekâ uygulaması bağlanmak istediğinde açılan sayfa sizin kararınızdır; lütfen okuyun:
+
+- **"Bu uygulama okulunuz tarafından denetlenmedi"**: herkes istediği adla bir uygulama yapabilir. Yalnızca bağlanmayı az önce kendiniz başlattıysanız devam edin. Sayfa birdenbire karşınıza çıktıysa (örneğin bir e-postadaki bağlantıdan), **İzin verme**’ye basın.
+- **Kim istiyor**: uygulamanın kendine verdiği ad. Bilgileri kendi adresinden gelen uygulamalarda sayfa o adresi de gösterir.
+- **İzin verirseniz tarayıcınız şu adrese geri döner**: erişimi alacak sunucu. claude.ai ve Claude Desktop için `claude.ai`’dir; Claude Code için kendi bilgisayarınızdaki bir adrestir (`localhost` ya da `127.0.0.1` ve bir sayı) ve sayfa, o bilgisayardaki herhangi bir programın bu erişimi alabileceği konusunda uyarır.
+- **Uygulama neler yapabilsin**: uygulamanın istediği izinler, hesabınızın yapabildikleriyle sınırlı olarak. İhtiyaç duyulmayanların işaretini kaldırın. Yönetici izinleri öğretmenlere hiç sunulmaz.
+- **Öğrenciler nasıl görünsün**: yöneticiniz öğrenci verisine izin vermedikçe takma adlar; izin verdiyse bir anahtarda olduğu gibi siz seçersiniz.
+- **Bağlantı süresi**: uygulamanın ne kadar süre bağlı kalabileceği (en fazla okulun izin verdiği kadar). Uygulama, bir saat geçerli olan ve bu süreye kadar yenilenen bir anahtar alır.
+- **İzin ver** için şifrenizi yeniden girmeniz gerekir (e-posta bağlantısıyla giriş yapan hesaplar önce yeniden giriş yapar). **İzin verme**, uygulamayı erişim vermeden geri gönderir.
+
+## Bir uygulamanın bağlantısını kesme
+
+**Profil → Yapay zekâ araçları → Bağlı uygulamalar**, bağladığınız uygulamaları listeler: uygulama, döndüğü adres, izinleri, öğrencilerin nasıl göründüğü, son kullanım ve bağlantının ne zamana kadar sürdüğü. **Bağlantıyı kes** uygulamayı hemen durdurur. Bağlantıyı Claude’da da kaldırabilirsiniz; ancak Sınıf Pusulası için geçerli olan, burada kesmektir.
 
 ## Bilmekte fayda var
 
 - Bir anahtar yalnızca `/mcp` adresinde çalışır, uygulamanın kendisinde asla; oturum açık bir tarayıcı da `/mcp` adresini kullanamaz.
 - Her anahtar dakikada yaklaşık 120 çağrı yapabilir; çok büyük yanıtlar, daha dar bir soru sorulmasını isteyen bir notla kısaltılır.
-- Bir hesap devre dışı bırakıldığında ya da parolası sıfırlandığında veya değiştirildiğinde bütün anahtarları kalıcı olarak iptal edilir (hesap yeniden etkinleştirilse de geri gelmez); sonra yenilerini oluşturun. Yönetici bir anahtarın en uzun geçerlilik süresini kısaltırsa var olan anahtarların süresi de kısalır.
+- Bir hesap devre dışı bırakıldığında ya da parolası sıfırlandığında veya değiştirildiğinde bütün anahtarları ve bağlı uygulamaları kalıcı olarak sona erer (hesap yeniden etkinleştirilse de geri gelmez); sonra yenilerini oluşturun. Yönetici bir anahtarın en uzun geçerlilik süresini kısaltırsa var olan anahtarların ve bağlantıların süresi de kısalır. Yönetici yapay zekâ araçlarını kapatırsa bütün bağlı uygulamaların bağlantısı kesilir (anahtarlar ise araçlar yeniden açılana kadar yalnızca çalışmaz).
 - Asistan, tıpkı sizin gibi yalnızca kendi sınıflarınızı ve öğrencilerinizi görür.

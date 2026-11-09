@@ -34,8 +34,13 @@ Open **AI tools** in the administration menu.
 - **Student data to AI tools**: off by default. Switch it on **only after your school's KVKK contact has agreed** and the parent privacy note says so. The dialog lists what would leave the school; type `STUDENT DATA` to confirm. Switching it off takes effect at once for every token.
 - **What leaves the school** repeats the list above for the current setting.
 - **Tokens at this school** lists every token (never its secret) with its account, permissions, privacy and last use. **Revoke** stops one at once. Changes on this page are in the audit log.
+- **Connected apps at this school** lists every app a teacher or administrator connected through the consent page (claude.ai, Claude Desktop, Claude Code), with **Disconnect**.
+- **Registered AI apps** lists the apps that registered themselves with Class Compass. Anyone can register an app; it can do nothing until a person allows it on the consent page. **Revoke** ends all connections of that app. Registrations nobody uses disappear after 30 days.
+- **Allowed hosts for AI apps**: the hosts an app may send people back to after the consent page. `claude.ai` (for claude.ai and Claude Desktop) is on the list from the start; addresses on the person's own computer (Claude Code) are always allowed. Add a host only for an AI tool your school has agreed to use.
 
-If your school reaches Class Compass through Cloudflare Access, the IT person must let `/mcp` through (see `docs/OPERATIONS.md`, "AI tools"): an AI tool cannot sign in to Cloudflare.
+Switching AI tools off disconnects every connected app.
+
+If your school reaches Class Compass through Cloudflare Access, the IT person must let `/mcp`, the sign-in addresses for AI apps (`/oauth/…`) and their discovery addresses (`/.well-known/oauth-…`) through (see `docs/OPERATIONS.md`, "AI tools"): an AI tool cannot sign in to Cloudflare.
 
 ## Make a personal token
 
@@ -64,13 +69,47 @@ Then ask Claude, for example: "Use class-compass: give me a short summary of las
 
 Useful tools: **class_overview**, **class_report** (ask for a few sections when a report is large), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** and **set_topic_plan**, **create_homework**; for themes **theme_schema**, **validate_theme** and, for administrators, **import_theme_draft** (it saves a draft; enabling a theme stays your decision on **Themes**). Ready-made requests (prompts): weekly summary, goal presets, topic plan, design a theme.
 
-## claude.ai and Claude Desktop (coming)
+## claude.ai and Claude Desktop
 
-> This part is not ready yet. Connecting claude.ai or Claude Desktop as a "custom connector" needs a sign-in in the browser (OAuth) instead of a token you paste; it comes with the next stage of the AI tools work. Until then use Claude Code with a personal token.
+claude.ai and Claude Desktop connect as a **custom connector**. You do not paste a token: Claude sends you to a Class Compass page where you allow it (the "consent page", below). Use only fictional data while you are trying it out, and only if your school has agreed to use Claude.
+
+1. In claude.ai open **Customize → Connectors** (in Claude Desktop: **Settings → Connectors**) and choose **Add custom connector**. On Team and Enterprise plans an Owner of the Claude organisation may have to add it first.
+2. **Name**: for example "Class Compass". **Remote MCP server URL**: your school's address followed by `/mcp`, exactly as Profile → AI tools shows it, for example `https://school.example.org/mcp`. Leave the advanced settings (client ID and secret) empty.
+3. Press **Add**, then **Connect**. A browser window opens your school's Class Compass. Sign in if you are asked; on a classroom computer the PIN is asked first.
+4. Read the consent page, choose the permissions and press **Allow** with your password (see below). The browser goes back to claude.ai and the connector shows as connected.
+5. In a chat, turn the connector on in the tools menu and ask, for example: "Use Class Compass: give me a short summary of last week in 3-A English."
+
+Connectors belong to your Claude account, so a connector added in claude.ai also appears in Claude Desktop. When the connection ends (after the time you chose, or when you disconnect it), Claude asks you to connect again.
+
+## Claude Code with a sign-in instead of a token
+
+Claude Code can sign in through the same consent page, so you do not have to copy a token:
+
+```
+claude mcp add --transport http class-compass https://school.example.org/mcp
+```
+
+Then start Claude Code, type `/mcp`, choose **class-compass** and **Authenticate**. Your browser opens the consent page; its return address is on your own computer (for example `localhost:43215`), which the page points out. After **Allow** the browser says you can go back to the terminal, and Claude Code is connected. A personal token (above) keeps working too; use whichever you prefer.
+
+## The consent page
+
+The page that opens when an AI app wants to connect is your decision, so read it:
+
+- **"This app is not checked by your school"**: anyone can make an app with any name. Continue only if you started connecting it yourself, just now. If the page appears out of the blue (for example from a link in an email), press **Do not allow**.
+- **Who is asking**: the name the app gave itself. For apps whose details come from their own address the page names that address too.
+- **If you allow, your browser goes back to**: the host that receives the access. For claude.ai and Claude Desktop it is `claude.ai`; for Claude Code it is an address on your own computer (`localhost` or `127.0.0.1` with a number), and the page warns that any program on that computer could receive it.
+- **What the app may do**: the permissions the app asked for, limited to what your account can do. Untick what it does not need. Permissions of administrators are never offered to teachers.
+- **Students are shown as**: pseudonyms, unless your administrator allows student data; then you choose, as for a token.
+- **Connected for**: how long the app may stay connected (at most what the school allows). The app gets a key that works for an hour at a time and is renewed until then.
+- **Allow** needs your password again (accounts that sign in with an email link sign in again first). **Do not allow** sends the app away without access.
+
+## Disconnect an app
+
+**Profile → AI tools → Connected apps** lists the apps you connected: the app, where it returns to, its permissions, how students are shown, when it was last used and until when it is connected. **Disconnect** stops it at once. You can also disconnect it in Claude, but disconnecting here is the one that counts for Class Compass.
 
 ## Good to know
 
 - A token works only at the `/mcp` address, never in the app itself, and a signed-in browser cannot use `/mcp`.
 - Each token may make about 120 calls a minute; very large answers are shortened with a note asking for a narrower question.
-- When an account is deactivated, or its password is reset or changed, all its tokens are revoked for good (reactivating the account does not bring them back): make new ones afterwards. When the administrator shortens the longest time a token may last, existing tokens are shortened too.
+- When an account is deactivated, or its password is reset or changed, all its tokens and connected apps are ended for good (reactivating the account does not bring them back): make new ones afterwards. When the administrator shortens the longest time a token may last, existing tokens and connections are shortened too. When the administrator switches AI tools off, every connected app is disconnected (tokens just stop working until AI tools are on again).
 - The assistant sees only your own classes and students, exactly like you do.
