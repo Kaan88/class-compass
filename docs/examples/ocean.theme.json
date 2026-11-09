@@ -1,0 +1,226 @@
+{
+  "format": "class-compass-theme",
+  "version": 1,
+  "key": "ocean",
+  "name": {
+    "en": "Ocean",
+    "tr": "Okyanus"
+  },
+  "description": {
+    "en": "Calm sea blues, sandy beaches and a friendly whale.",
+    "tr": "Sakin deniz mavileri, kumlu sahiller ve sevimli bir balina."
+  },
+  "mascotName": {
+    "en": "Dalga the whale",
+    "tr": "Balina Dalga"
+  },
+  "base": "classroom",
+  "colors": {
+    "bg": "#eef6f8",
+    "surface": "#ffffff",
+    "surface-2": "#dcedf2",
+    "text": "#0f2430",
+    "text-muted": "#3b5462",
+    "border": "#b6d0da",
+    "border-strong": "#3b5462",
+    "accent": "#0b6e8a",
+    "accent-strong": "#08566c",
+    "accent-soft": "#d3eef5",
+    "accent-text": "#ffffff",
+    "focus": "#a8480f",
+    "success": "#17733f",
+    "success-soft": "#dcf3e5",
+    "warning": "#8a5100",
+    "warning-soft": "#fff1d1",
+    "danger": "#b3261e",
+    "danger-strong": "#8c1d17",
+    "danger-soft": "#fde3e1",
+    "on-strong": "#ffffff",
+    "overlay": "#0f24308c",
+    "shadow-color": "#0f24301f",
+    "display-banner-bg": "#fff1d1",
+    "display-banner-text": "#14182b",
+    "display-banner-border": "#8a5100",
+    "level-0": "#dcedf2",
+    "level-1": "#fff1d1",
+    "level-2": "#ffd27a",
+    "level-3": "#fde3e1",
+    "level-edge-0": "#b6d0da",
+    "level-edge-1": "#8a5100",
+    "level-edge-2": "#6e3f00",
+    "level-edge-3": "#b3261e",
+    "counter-accent": "#0b6e8a",
+    "counter-accent-edge": "#08566c",
+    "counter-teal": "#1f6f5c",
+    "counter-teal-edge": "#175646",
+    "counter-plum": "#7a35a6",
+    "counter-plum-edge": "#642b88",
+    "counter-rust": "#c25a22",
+    "counter-rust-edge": "#6e3f00",
+    "counter-leaf": "#4f8a37",
+    "counter-leaf-edge": "#17733f",
+    "counter-berry": "#d6406a",
+    "counter-berry-edge": "#8c1d17",
+    "segment-on": "#0b6e8a",
+    "segment-off": "#dcedf2",
+    "avatar-text": "#ffffff",
+    "icon-accent": "#0b6e8a",
+    "deco-1": "#5fb8cf",
+    "deco-2": "#f2c86b",
+    "deco-3": "#ff8a7a",
+    "pattern": "#0b6e8a",
+    "mascot-body": "#2f8fb0",
+    "mascot-belly": "#e4f4f8",
+    "mascot-accent": "#f2a541",
+    "mascot-ink": "#0f2430",
+    "mascot-cheek": "#ff8a7a",
+    "art-sky": "#d6eef6",
+    "art-ground": "#f1e2bf",
+    "art-light": "#fff4cc",
+    "avatar-red": "#d9483b",
+    "avatar-orange": "#e8833a",
+    "avatar-yellow": "#f2c94c",
+    "avatar-green": "#4caf6a",
+    "avatar-teal": "#2a9d8f",
+    "avatar-blue": "#3b7dd8",
+    "avatar-navy": "#2c3e7a",
+    "avatar-purple": "#8a5cc2",
+    "avatar-pink": "#e46aa6",
+    "avatar-brown": "#8d5b3e",
+    "avatar-grey": "#8a93a6",
+    "avatar-mint": "#8fd6c0",
+    "avatar-skin-1": "#fde3cf",
+    "avatar-skin-2": "#f8d5b8",
+    "avatar-skin-3": "#f1c29a",
+    "avatar-skin-4": "#e8b07f",
+    "avatar-skin-5": "#d99a68",
+    "avatar-skin-6": "#c68652",
+    "avatar-skin-7": "#b07142",
+    "avatar-skin-8": "#965c35",
+    "avatar-skin-9": "#7d4a2a",
+    "avatar-skin-10": "#653a22",
+    "avatar-skin-11": "#4f2d1b",
+    "avatar-skin-12": "#3b2115",
+    "avatar-hair-black": "#1f1a17",
+    "avatar-hair-darkBrown": "#3e2a1f",
+    "avatar-hair-brown": "#6b4428",
+    "avatar-hair-auburn": "#8e3b22",
+    "avatar-hair-ginger": "#c4622d",
+    "avatar-hair-blonde": "#d9b45a",
+    "avatar-hair-lightBlonde": "#ecd796",
+    "avatar-hair-grey": "#9a9a9a",
+    "avatar-hair-white": "#ececec",
+    "avatar-hair-blue": "#3b6fd1",
+    "avatar-hair-pink": "#e07bb0",
+    "avatar-hair-purple": "#7d4fc0",
+    "avatar-ink": "#1d2033",
+    "avatar-outline": "#1d203340",
+    "avatar-white": "#ffffff",
+    "avatar-blush": "#f0807f",
+    "badge-bronze": "#c07a3f",
+    "badge-silver": "#a9b2c3",
+    "badge-gold": "#e5b631",
+    "badge-plain": "#6c8cd5",
+    "badge-ink": "#1d2033",
+    "badge-shine": "#ffffff"
+  },
+  "typography": {
+    "body": "system",
+    "display": "rounded",
+    "weightBody": 400,
+    "weightStrong": 700,
+    "weightHeading": 750,
+    "weightDisplay": 800,
+    "trackingBody": 0,
+    "trackingDisplay": 0.01
+  },
+  "shape": {
+    "radiusRem": 1.2,
+    "radiusSmRem": 0.7,
+    "borderPx": 2,
+    "borderStrongPx": 3,
+    "shadow": "soft",
+    "shadowRaised": "raised"
+  },
+  "avatar": {
+    "saturation": 55,
+    "lightness": 38,
+    "lightnessSmall": 28
+  },
+  "icons": {
+    "strokeWidth": 2.3,
+    "linecap": "round",
+    "linejoin": "round"
+  },
+  "decoOpacity": 0.3,
+  "patternOpacity": 0.07,
+  "motion": {
+    "celebrate": {
+      "preset": "sway",
+      "durationMs": 900,
+      "easing": "ease-in-out"
+    },
+    "threshold": {
+      "preset": "rise",
+      "durationMs": 700,
+      "easing": "ease-out"
+    }
+  },
+  "sounds": {
+    "root": 392,
+    "wave": "sine",
+    "scale": "pentatonic",
+    "gain": 0.1,
+    "tempo": 0.9,
+    "overrides": {
+      "timeUp": [
+        {
+          "freq": 392,
+          "at": 0,
+          "dur": 600,
+          "type": "sine",
+          "gain": 0.14
+        },
+        {
+          "freq": 523,
+          "at": 500,
+          "dur": 600,
+          "type": "sine",
+          "gain": 0.12
+        },
+        {
+          "freq": 659,
+          "at": 1000,
+          "dur": 900,
+          "type": "sine",
+          "gain": 0.11
+        }
+      ]
+    }
+  },
+  "celebration": {
+    "colors": [
+      "accent",
+      "deco-1",
+      "deco-2",
+      "deco-3"
+    ]
+  },
+  "art": {
+    "mascot": {
+      "idle": "<g><ellipse cx='50' cy='93' rx='26' ry='4' fill='var(--cc-mascot-ink)' opacity='0.12'/><path d='M76 58 Q90 42 96 50 Q89 57 95 68 Q86 63 76 66 Z' fill='var(--cc-mascot-body)'/><ellipse cx='48' cy='60' rx='34' ry='26' fill='var(--cc-mascot-body)'/><path d='M18 64 Q48 92 78 64 Q48 80 18 64 Z' fill='var(--cc-mascot-belly)'/><ellipse cx='30' cy='72' rx='9' ry='4' fill='var(--cc-mascot-body)' transform='rotate(-25 30 72)'/><circle cx='30' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><circle cx='66' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><circle cx='38' cy='52' r='3.2' fill='var(--cc-mascot-ink)'/><circle cx='58' cy='52' r='3.2' fill='var(--cc-mascot-ink)'/><path d='M42 62 Q48 67 54 62' stroke='var(--cc-mascot-ink)' stroke-width='2.2' fill='none' stroke-linecap='round'/></g>",
+      "cheer": "<g><ellipse cx='50' cy='93' rx='26' ry='4' fill='var(--cc-mascot-ink)' opacity='0.12'/><path d='M76 58 Q90 42 96 50 Q89 57 95 68 Q86 63 76 66 Z' fill='var(--cc-mascot-body)'/><ellipse cx='48' cy='60' rx='34' ry='26' fill='var(--cc-mascot-body)'/><path d='M18 64 Q48 92 78 64 Q48 80 18 64 Z' fill='var(--cc-mascot-belly)'/><ellipse cx='30' cy='72' rx='9' ry='4' fill='var(--cc-mascot-body)' transform='rotate(-25 30 72)'/><circle cx='30' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><circle cx='66' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><path d='M34 53 Q38 47 42 53' stroke='var(--cc-mascot-ink)' stroke-width='2.4' fill='none' stroke-linecap='round'/><path d='M54 53 Q58 47 62 53' stroke='var(--cc-mascot-ink)' stroke-width='2.4' fill='none' stroke-linecap='round'/><path d='M42 61 Q48 72 54 61 Z' fill='var(--cc-mascot-ink)'/><g fill='none' stroke='var(--cc-deco-1)' stroke-width='2.4' stroke-linecap='round'><path d='M48 34 Q46 24 40 20'/><path d='M48 34 Q50 24 56 20'/></g><circle cx='39' cy='18' r='2.5' fill='var(--cc-deco-1)'/><circle cx='57' cy='18' r='2.5' fill='var(--cc-deco-1)'/></g>",
+      "thinking": "<g><ellipse cx='50' cy='93' rx='26' ry='4' fill='var(--cc-mascot-ink)' opacity='0.12'/><path d='M76 58 Q90 42 96 50 Q89 57 95 68 Q86 63 76 66 Z' fill='var(--cc-mascot-body)'/><ellipse cx='48' cy='60' rx='34' ry='26' fill='var(--cc-mascot-body)'/><path d='M18 64 Q48 92 78 64 Q48 80 18 64 Z' fill='var(--cc-mascot-belly)'/><ellipse cx='30' cy='72' rx='9' ry='4' fill='var(--cc-mascot-body)' transform='rotate(-25 30 72)'/><circle cx='30' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><circle cx='66' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><circle cx='38' cy='50' r='2.6' fill='var(--cc-mascot-ink)'/><circle cx='58' cy='50' r='2.6' fill='var(--cc-mascot-ink)'/><path d='M44 63 L53 61' stroke='var(--cc-mascot-ink)' stroke-width='2.2' stroke-linecap='round'/><circle cx='76' cy='30' r='3' fill='var(--cc-mascot-belly)' stroke='var(--cc-mascot-ink)' stroke-width='1.5'/><circle cx='82' cy='21' r='4.5' fill='var(--cc-mascot-belly)' stroke='var(--cc-mascot-ink)' stroke-width='1.5'/><circle cx='89' cy='10' r='6' fill='var(--cc-mascot-belly)' stroke='var(--cc-mascot-ink)' stroke-width='1.5'/></g>",
+      "celebrate": "<g><ellipse cx='50' cy='93' rx='26' ry='4' fill='var(--cc-mascot-ink)' opacity='0.12'/><path d='M76 58 Q90 42 96 50 Q89 57 95 68 Q86 63 76 66 Z' fill='var(--cc-mascot-body)'/><ellipse cx='48' cy='60' rx='34' ry='26' fill='var(--cc-mascot-body)'/><path d='M18 64 Q48 92 78 64 Q48 80 18 64 Z' fill='var(--cc-mascot-belly)'/><ellipse cx='30' cy='72' rx='9' ry='4' fill='var(--cc-mascot-body)' transform='rotate(-25 30 72)'/><circle cx='30' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><circle cx='66' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><path d='M34 53 Q38 47 42 53' stroke='var(--cc-mascot-ink)' stroke-width='2.4' fill='none' stroke-linecap='round'/><path d='M54 53 Q58 47 62 53' stroke='var(--cc-mascot-ink)' stroke-width='2.4' fill='none' stroke-linecap='round'/><path d='M42 61 Q48 72 54 61 Z' fill='var(--cc-mascot-ink)'/><g fill='none' stroke='var(--cc-deco-1)' stroke-width='3' stroke-linecap='round'><path d='M48 34 Q46 18 36 14'/><path d='M48 34 Q50 18 60 14'/></g><circle cx='34' cy='12' r='2.5' fill='var(--cc-deco-1)'/><circle cx='62' cy='12' r='2.5' fill='var(--cc-deco-1)'/><path d='M16 25 L17.5 28.5 L21 30 L17.5 31.5 L16 35 L14.5 31.5 L11 30 L14.5 28.5 Z' fill='var(--cc-deco-2)'/><path d='M84 29 L85.5 32.5 L89 34 L85.5 35.5 L84 39 L82.5 35.5 L79 34 L82.5 32.5 Z' fill='var(--cc-deco-3)'/><path d='M24 9 L25.5 12.5 L29 14 L25.5 15.5 L24 19 L22.5 15.5 L19 14 L22.5 12.5 Z' fill='var(--cc-mascot-accent)'/></g>",
+      "sleepy": "<g><ellipse cx='50' cy='93' rx='26' ry='4' fill='var(--cc-mascot-ink)' opacity='0.12'/><path d='M76 58 Q90 42 96 50 Q89 57 95 68 Q86 63 76 66 Z' fill='var(--cc-mascot-body)'/><ellipse cx='48' cy='60' rx='34' ry='26' fill='var(--cc-mascot-body)'/><path d='M18 64 Q48 92 78 64 Q48 80 18 64 Z' fill='var(--cc-mascot-belly)'/><ellipse cx='30' cy='72' rx='9' ry='4' fill='var(--cc-mascot-body)' transform='rotate(-25 30 72)'/><circle cx='30' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><circle cx='66' cy='62' r='3.5' fill='var(--cc-mascot-cheek)' opacity='0.4'/><path d='M34 52 Q38 56 42 52' stroke='var(--cc-mascot-ink)' stroke-width='2.2' fill='none' stroke-linecap='round'/><path d='M54 52 Q58 56 62 52' stroke='var(--cc-mascot-ink)' stroke-width='2.2' fill='none' stroke-linecap='round'/><ellipse cx='48' cy='63' rx='2.2' ry='1.6' fill='var(--cc-mascot-ink)'/><path d='M70 24 L78 24 L70 32 L78 32' stroke='var(--cc-mascot-ink)' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/><path d='M82 13 L87 13 L82 18 L87 18' stroke='var(--cc-mascot-ink)' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></g>"
+    },
+    "illustrations": {
+      "startLesson": "<rect x='0' y='0' width='200' height='140' rx='12' fill='var(--cc-art-sky)'/><path d='M0 84 Q25 76 50 84 T100 84 T150 84 T200 84 L200 140 L0 140 Z' fill='var(--cc-deco-1)' opacity='0.55'/><path d='M0 100 Q25 92 50 100 T100 100 T150 100 T200 100 L200 140 L0 140 Z' fill='var(--cc-accent)' opacity='0.35'/><path d='M0 124 Q50 116 100 124 T200 124 L200 140 L0 140 Z' fill='var(--cc-art-ground)'/><circle cx='160' cy='34' r='16' fill='var(--cc-art-light)'/><circle cx='160' cy='34' r='10' fill='var(--cc-deco-2)'/><g transform='translate(70 52)'><path d='M0 30 L60 30 L50 42 L10 42 Z' fill='var(--cc-mascot-accent)'/><path d='M30 0 L30 30' stroke='var(--cc-mascot-ink)' stroke-width='2.5'/><path d='M32 2 L54 26 L32 26 Z' fill='var(--cc-surface)' stroke='var(--cc-mascot-ink)' stroke-width='1.5'/></g><circle cx='30' cy='60' r='4' fill='none' stroke='var(--cc-deco-1)' stroke-width='1.8'/><circle cx='40' cy='48' r='3' fill='none' stroke='var(--cc-deco-1)' stroke-width='1.8'/><circle cx='22' cy='44' r='2.5' fill='none' stroke='var(--cc-deco-1)' stroke-width='1.8'/>",
+      "endLesson": "<rect x='0' y='0' width='200' height='140' rx='12' fill='var(--cc-art-sky)'/><circle cx='150' cy='38' r='14' fill='var(--cc-art-light)'/><circle cx='156' cy='34' r='12' fill='var(--cc-art-sky)'/><path d='M0 96 Q50 86 100 96 T200 96 L200 140 L0 140 Z' fill='var(--cc-accent)' opacity='0.35'/><path d='M0 124 Q50 116 100 124 T200 124 L200 140 L0 140 Z' fill='var(--cc-art-ground)'/><g transform='translate(60 112)'><ellipse cx='0' cy='0' rx='10' ry='6' fill='var(--cc-deco-3)'/><path d='M8 0 L16 -6 L16 6 Z' fill='var(--cc-deco-3)'/><circle cx='-5' cy='-1' r='1.4' fill='var(--cc-mascot-ink)'/></g><g transform='translate(120 106)'><ellipse cx='0' cy='0' rx='10' ry='6' fill='var(--cc-deco-2)'/><path d='M8 0 L16 -6 L16 6 Z' fill='var(--cc-deco-2)'/><circle cx='-5' cy='-1' r='1.4' fill='var(--cc-mascot-ink)'/></g>",
+      "celebration": "<rect x='0' y='0' width='200' height='140' rx='12' fill='var(--cc-art-sky)'/><path d='M0 84 Q25 76 50 84 T100 84 T150 84 T200 84 L200 140 L0 140 Z' fill='var(--cc-deco-1)' opacity='0.55'/><path d='M0 100 Q25 92 50 100 T100 100 T150 100 T200 100 L200 140 L0 140 Z' fill='var(--cc-accent)' opacity='0.35'/><path d='M0 124 Q50 116 100 124 T200 124 L200 140 L0 140 Z' fill='var(--cc-art-ground)'/><circle cx='40' cy='40' r='6' fill='none' stroke='var(--cc-deco-1)' stroke-width='1.8'/><circle cx='60' cy='22' r='4' fill='none' stroke='var(--cc-deco-1)' stroke-width='1.8'/><circle cx='150' cy='30' r='7' fill='none' stroke='var(--cc-deco-1)' stroke-width='1.8'/><circle cx='172' cy='52' r='4' fill='none' stroke='var(--cc-deco-1)' stroke-width='1.8'/><circle cx='100' cy='18' r='5' fill='none' stroke='var(--cc-deco-1)' stroke-width='1.8'/><g transform='translate(70 92)'><ellipse cx='0' cy='0' rx='10' ry='6' fill='var(--cc-deco-3)'/><path d='M8 0 L16 -6 L16 6 Z' fill='var(--cc-deco-3)'/><circle cx='-5' cy='-1' r='1.4' fill='var(--cc-mascot-ink)'/></g><g transform='translate(130 98)'><ellipse cx='0' cy='0' rx='10' ry='6' fill='var(--cc-deco-2)'/><path d='M8 0 L16 -6 L16 6 Z' fill='var(--cc-deco-2)'/><circle cx='-5' cy='-1' r='1.4' fill='var(--cc-mascot-ink)'/></g><path d='M30 15 L31.5 18.5 L35 20 L31.5 21.5 L30 25 L28.5 21.5 L25 20 L28.5 18.5 Z' fill='var(--cc-deco-2)'/><path d='M180 13 L181.5 16.5 L185 18 L181.5 19.5 L180 23 L178.5 19.5 L175 18 L178.5 16.5 Z' fill='var(--cc-deco-3)'/>"
+    },
+    "decoration": "<g fill='none' stroke-linecap='round'><path d='M5 70 Q20 60 35 70 T65 70 T95 70' stroke='var(--cc-deco-1)' stroke-width='3'/><path d='M5 84 Q20 74 35 84 T65 84 T95 84' stroke='var(--cc-deco-3)' stroke-width='2.5'/><circle cx='62' cy='34' r='10' stroke='var(--cc-deco-1)' stroke-width='2.5'/><circle cx='80' cy='18' r='6' stroke='var(--cc-deco-2)' stroke-width='2.5'/><circle cx='40' cy='22' r='4' stroke='var(--cc-deco-1)' stroke-width='2'/></g>",
+    "pattern": "<g fill='none' stroke='var(--cc-pattern)' stroke-width='1'><circle cx='12' cy='14' r='4'/><circle cx='20' cy='6' r='2'/><path d='M0 44 Q15 36 30 44 T60 44'/></g>",
+    "patternSize": 60
+  }
+}

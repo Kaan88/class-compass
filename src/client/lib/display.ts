@@ -68,6 +68,12 @@ export function setDisplay(patch: Partial<DisplayState>) {
 
 export const getDisplay = () => state;
 
+/** Called after every display change (the theme loader fetches an imported theme the page needs, S14g). */
+export function subscribeDisplay(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
+}
+
 export function useDisplay(): DisplayState {
   return useSyncExternalStore(
     (fn) => {

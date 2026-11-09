@@ -37,8 +37,9 @@ interface Particle {
   born: number;
 }
 
-function tokenColors(tokens: readonly ColorToken[]): string[] {
-  const css = getComputedStyle(document.documentElement);
+/** Colour values of tokens where `el` is drawn (inside a theme preview they are the preview's). */
+function tokenColors(tokens: readonly ColorToken[], el: Element): string[] {
+  const css = getComputedStyle(el);
   const out = tokens.map((t) => css.getPropertyValue(`--cc-${t}`).trim()).filter(Boolean);
   return out.length ? out : ['currentColor'];
 }
@@ -50,7 +51,7 @@ function Fireworks({ colors }: { colors: readonly ColorToken[] }) {
     const canvas = ref.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
-    const palette = tokenColors(colors);
+    const palette = tokenColors(colors, canvas);
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const resize = () => {
       canvas.width = canvas.clientWidth * dpr;
@@ -112,6 +113,40 @@ function Stars({ colors }: { colors: readonly ColorToken[] }) {
         <circle key={i} cx={x} cy={y} r="1.6" style={{ fill: `var(--cc-${colors[i % colors.length]})` }} />
       ))}
     </svg>
+  );
+}
+
+/**
+ * The celebration inside a box, in the theme of the nearest ThemeProvider (Admin → Themes preview,
+ * S14g): the same mascot, motion, fireworks or still stars and sounds as the full-screen layer, for
+ * CELEBRATION_MS after `play` changes. Plays only from a button press (never on load).
+ */
+export function CelebrationPreview({ play }: { play: number }) {
+  const { t } = useI18n();
+  const display = useDisplay();
+  const theme = useTheme();
+  const [active, setActive] = useState(0);
+  const mode = motionMode(display);
+  useEffect(() => {
+    if (play === 0) return;
+    const m = motionMode(display);
+    const timers = celebrationCues(m).map((cue) => setTimeout(() => playThemeSound(display, theme, cue.event), cue.at));
+    setActive(play);
+    const h = setTimeout(() => setActive(0), CELEBRATION_MS);
+    return () => {
+      timers.forEach(clearTimeout);
+      clearTimeout(h);
+    };
+    // Only a new press starts it; display or theme changes do not replay it.
+  }, [play]);
+  return (
+    <div className={['cc-celebration-preview', mode === 'reduced' ? 'cc-motion-reduced' : ''].join(' ')} data-testid="celebration-preview" data-mode={mode}>
+      {active && mode === 'full' ? <Fireworks key={active} colors={theme.celebration.colors} /> : <Stars colors={theme.celebration.colors} />}
+      <div className="cc-celebration__mascot">
+        <Mascot key={active} pose="celebrate" size={140} motion={active && mode === 'full' ? 'celebrate' : undefined} />
+        <p className="cc-celebration-preview__message">{t('celebration.wellDone')}</p>
+      </div>
+    </div>
   );
 }
 

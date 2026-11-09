@@ -19,7 +19,7 @@ export function planTheme(ws: Workspace, key: string): void {
   if (!m) throw new Error(`THEME_KEYS not found in ${shared}`);
   const keys = [...m[1]!.matchAll(/'([^']+)'/g)].map((x) => x[1]!);
   if (keys.includes(key)) throw new Error(`Theme "${key}" already exists`);
-  const def = /export const DEFAULT_THEME: ThemeKey = '([^']+)';/.exec(ws.read(shared))?.[1];
+  const def = /export const DEFAULT_THEME: (?:Builtin)?ThemeKey = '([^']+)';/.exec(ws.read(shared))?.[1];
   if (!def) throw new Error(`DEFAULT_THEME not found in ${shared}`);
   const dir = `src/client/themes/${key}`;
   if (ws.exists(dir)) throw new Error(`${dir} already exists`);

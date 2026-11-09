@@ -3,9 +3,11 @@
  * `src/client/themes/<theme>/tokens.ts` (lint-enforced); everything else uses `var(--cc-*)`.
  * A theme spreads these values and overrides what makes it distinct.
  */
+import { FONT_PRESETS, SHADOW_PRESETS } from '../../shared/themePackage/presets.ts';
 import type { ThemeAvatar, ThemeColors, ThemeIcons, ThemeShape, ThemeTypography } from './types.ts';
 
-export const SYSTEM_FONTS = "system-ui, 'Segoe UI', Roboto, 'Noto Sans', sans-serif";
+/** Font stacks and shadows are named presets (S14g, D-158), shared with imported theme packages. */
+export const SYSTEM_FONTS = FONT_PRESETS.system;
 
 export const baseColors: ThemeColors = {
   bg: '#f7f8fc',
@@ -155,8 +157,8 @@ export const baseShape: ThemeShape = {
   radiusSm: '0.6rem',
   borderWidth: '2px',
   borderWidthStrong: '3px',
-  shadow: '0 2px 10px var(--cc-shadow-color)',
-  shadowRaised: '0 10px 30px var(--cc-shadow-color)',
+  shadow: SHADOW_PRESETS.soft,
+  shadowRaised: SHADOW_PRESETS.raised,
 };
 
 export const baseAvatar: ThemeAvatar = { saturation: 55, lightness: 38, lightnessSmall: 28 };

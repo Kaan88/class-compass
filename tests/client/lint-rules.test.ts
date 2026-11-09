@@ -11,7 +11,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
-import { DEFAULT_THEME, THEME_KEYS, type ThemeKey } from '../../src/shared/themes.ts';
+import { DEFAULT_THEME, THEME_KEYS, type BuiltinThemeKey } from '../../src/shared/themes.ts';
 import { themeTokens } from '../../src/client/themes/css.ts';
 import { THEMES } from '../../src/client/themes/registry.ts';
 
@@ -93,7 +93,7 @@ describe('theme lint (THM-3, THM-4)', () => {
   });
 
   it('every theme emits the same complete set of tokens (no theme can miss a slot)', () => {
-    const names = (k: ThemeKey) => themeTokens(THEMES[k]).map(([n]) => n);
+    const names = (k: BuiltinThemeKey) => themeTokens(THEMES[k]).map(([n]) => n);
     for (const k of THEME_KEYS) expect(names(k)).toEqual(names(DEFAULT_THEME));
   });
 });

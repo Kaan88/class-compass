@@ -1,4 +1,5 @@
 /** Clean colourful classroom: crisp white boards, bright blue, sunny yellow, grape. Colour literals live only here. */
+import { FONT_PRESETS } from '../../../shared/themePackage/presets.ts';
 import { baseAvatar, baseIcons, baseShape, baseTypography, themeColors } from '../base.ts';
 import type { ThemeAvatar, ThemeIcons, ThemeShape, ThemeTypography } from '../types.ts';
 
@@ -18,7 +19,7 @@ export const colors = themeColors({
   'art-light': '#fff7d6',
 });
 
-export const typography: ThemeTypography = { ...baseTypography, display: "'Segoe UI', system-ui, Roboto, sans-serif", weightDisplay: 800, trackingDisplay: '-0.005em' };
+export const typography: ThemeTypography = { ...baseTypography, display: FONT_PRESETS.clean, weightDisplay: 800, trackingDisplay: '-0.005em' };
 export const shape: ThemeShape = { ...baseShape };
 export const avatar: ThemeAvatar = { ...baseAvatar };
 export const icons: ThemeIcons = { ...baseIcons };

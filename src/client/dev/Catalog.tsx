@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
 import { setDisplay, useDisplay, type ThemeName } from '../lib/display.ts';
 import { ILLUSTRATIONS, MASCOT_POSES } from '../themes/types.ts';
-import { THEME_LIST, ThemeScope, useTheme, useThemeSound } from '../themes/index.tsx';
+import { THEME_LIST, ThemeScope, useTheme, useThemeName, useThemeSound } from '../themes/index.tsx';
 import { celebrate } from '../themes/Celebration.tsx';
 import { SOUND_EVENTS } from '../themes/types.ts';
 import { showToast, showUndoToast } from '../lib/toast.ts';
@@ -22,7 +22,6 @@ import { Mascot, ThemeBackdrop, ThemeDecoration, ThemeIllustration } from '../ui
 import { PinPad } from '../ui/PinPad.tsx';
 import { AttendanceChip, Avatar, CounterBar, MetricCell, StudentCard, StudentGrid } from '../ui/Students.tsx';
 import { Tabs } from '../ui/Tabs.tsx';
-import { themeLabelKey } from '../ui/ThemePreview.tsx';
 import { TEXT_SCALES } from '../routes/teacher/Teacher.tsx';
 import { ACHIEVEMENT_TIERS, BADGE_ICONS } from '../../shared/achievements.ts';
 import { READY_MADE } from '../../shared/avatars.ts';
@@ -339,7 +338,7 @@ function PanelTitle({ theme }: { theme: ThemeName }) {
   const { t, locale } = useI18n();
   return (
     <h2 className="cc-h2">
-      {t(themeLabelKey(theme))} · {locale === 'tr' ? t('language.tr') : t('language.en')}
+      {useThemeName(theme)} · {locale === 'tr' ? t('language.tr') : t('language.en')}
     </h2>
   );
 }

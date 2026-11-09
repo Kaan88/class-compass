@@ -12,15 +12,19 @@ export const TimeZone = z.string().refine(isValidTimeZone, 'Unknown timezone');
 export const RequiredLocalizedText = LocalizedText.refine((t) => Boolean(t.en?.trim() || t.tr?.trim()), 'Name required (English or Turkish)');
 
 import { CONTEXT_MODULES, MEDIA_MODULES, MODULE_KEYS } from '../modules.ts';
-import { THEME_KEYS } from '../themes.ts';
+import { THEME_KEYS, THEME_SLUG } from '../themes.ts';
 import { TIME_UP_SOUNDS } from '../classDisplay.ts';
 // Module and theme keys live in the shared catalogues (D-069, D-070); re-exported for existing imports.
 export { CONTEXT_MODULES, DEFAULT_AVAILABILITY, MEDIA_MODULES, MODULE_KEYS, type ContextModule, type MediaModule, type ModuleKey } from '../modules.ts';
 export const ContextModuleKey = z.enum(CONTEXT_MODULES);
 export const ModuleKeySchema = z.enum(MODULE_KEYS);
 
-/** A class theme: any key of the shared theme registry (D-070). */
-export const Theme = z.enum(THEME_KEYS);
+/**
+ * A theme key (D-070, D-158): a built-in key or the slug of an imported theme package. The contract
+ * only checks the shape; the server checks that it is usable (`assertThemeUsable`: built-in or
+ * enabled) before writing it, for classes and the Super Speakers board.
+ */
+export const Theme = z.union([z.enum(THEME_KEYS), z.string().regex(THEME_SLUG)]);
 export const Locale = z.enum(['en', 'tr']);
 
 export const TimeUpSound = z.enum(TIME_UP_SOUNDS);

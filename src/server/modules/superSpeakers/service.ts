@@ -25,6 +25,7 @@ import { classTotals, podium, totalsByStudent, weekRangeOf } from '../../../doma
 import { weekStartOf } from '../../../domain/counters.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { authAttempts, classes, displayLinks, enrolments, pointEvents, schoolYears, scorerLinks, scorerPairings, sessions, students, subjects, superSpeakersSettings, users } from '../../db/schema.ts';
+import { assertThemeUsable, effectiveTheme } from '../themes/service.ts';
 import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
@@ -83,7 +84,8 @@ export function ensureSettings(db: Db, now: number): void {
 /** The board messages as stored; an empty text means the built-in translated message (S12 review). */
 export const boardMessagesOf = (s: SettingsRow): BoardMessages => ({ placeholder: s.boardMessages?.placeholder ?? {}, waiting: s.boardMessages?.waiting ?? {} });
 
-export const settingsDto = (s: SettingsRow): SpeakersSettings => ({
+/** The settings for a screen; with `db`, a theme package that is not enabled reads as the default theme (D-158). */
+export const settingsDto = (s: SettingsRow, db?: Db): SpeakersSettings => ({
   weekStartsOn: s.weekStartsOn,
   participatingClassIds: s.participatingClassIds,
   undoWindowMinutes: s.undoWindowMinutes,
@@ -92,7 +94,7 @@ export const settingsDto = (s: SettingsRow): SpeakersSettings => ({
   boardTitle: s.boardTitle,
   boardMessages: boardMessagesOf(s),
   boardLanguage: s.boardLanguage,
-  theme: s.theme,
+  theme: db ? effectiveTheme(db, s.theme) : s.theme,
   boardSound: s.boardSound,
   badgeSubjectId: s.badgeSubjectId,
 });
@@ -344,7 +346,7 @@ export function scorerMe(ctx: RequestContext) {
   const s = requireScorer(ctx);
   const settings = getSettings(ctx.db);
   const tz = schoolTimezone(ctx.db);
-  return { id: s.scorerLinkId, label: s.label, locale: s.locale, enabled: isEnabled(ctx.db), undoWindowMinutes: settings.undoWindowMinutes, timezone: tz, today: localDate(ctx.now(), tz), theme: settings.theme };
+  return { id: s.scorerLinkId, label: s.label, locale: s.locale, enabled: isEnabled(ctx.db), undoWindowMinutes: settings.undoWindowMinutes, timezone: tz, today: localDate(ctx.now(), tz), theme: effectiveTheme(ctx.db, settings.theme) };
 }
 
 /** Every participating student for the in-memory search (SSP-6): names, class, avatar; numbers for search only. */
@@ -474,7 +476,7 @@ export function buildBoard(db: Db, now: number): Board {
   const tz = schoolTimezone(db);
   const week = weekRangeOf(now, tz, s.weekStartsOn);
   const enabled = isEnabled(db);
-  const base = { enabled, title: s.boardTitle, messages: boardMessagesOf(s), language: s.boardLanguage, theme: s.theme, sound: s.boardSound, week, timezone: tz };
+  const base = { enabled, title: s.boardTitle, messages: boardMessagesOf(s), language: s.boardLanguage, theme: effectiveTheme(db, s.theme), sound: s.boardSound, week, timezone: tz };
   if (!enabled) {
     const rest = { ...base, places: [], classes: [], updatedAt: null };
     return { ...rest, version: versionOf(rest) };
@@ -582,7 +584,7 @@ export function adminOverview(ctx: RequestContext) {
     .sort((a, b) => compareNames(a.name.en ?? a.name.tr ?? '', b.name.en ?? b.name.tr ?? ''));
   return {
     enabled: isEnabled(ctx.db),
-    settings: settingsDto(s),
+    settings: settingsDto(s, ctx.db),
     badgeSubject: badgeSubject(ctx.db),
     subjects: subjectList,
     classes: currentClasses(ctx.db, now).map((c) => ({ id: c.id, name: c.name, participating: chosen === null || chosen.has(c.id) })),
@@ -615,6 +617,7 @@ export function saveSettings(ctx: RequestContext, input: In<typeof C.setSpeakers
       const unknown = input.participatingClassIds.filter((id) => !known.has(id));
       if (unknown.length) throw invalid('Unknown or archived class', { reason: 'UNKNOWN_CLASS' });
     }
+    if (input.theme !== undefined && input.theme !== before.theme) assertThemeUsable(ctx.db, input.theme);
     if (input.badgeSubjectId) {
       const subj = ctx.db.select({ id: subjects.id }).from(subjects).where(eq(subjects.id, input.badgeSubjectId)).get();
       if (!subj) throw notFound('Subject');
@@ -629,7 +632,7 @@ export function saveSettings(ctx: RequestContext, input: In<typeof C.setSpeakers
     const after = getSettings(ctx.db);
     audit(ctx.db, ctx.actor, { action: 'speakers.settings', entity: 'super_speakers_settings', entityId: '1', before: settingsDto(before), after: settingsDto(after) }, now);
     notifyBoardChange();
-    return settingsDto(after);
+    return settingsDto(after, ctx.db);
   });
 }
 

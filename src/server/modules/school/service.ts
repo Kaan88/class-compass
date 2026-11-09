@@ -32,6 +32,7 @@ import { emailResetEnabled } from '../../lib/mailer.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { contextModuleStates, getAvailability, mediaRecord, validateModuleConfig, type ContextModuleState } from './modules.ts';
 import { DEFAULT_THEME } from '../../../shared/themes.ts';
+import { assertThemeUsable, effectiveTheme } from '../themes/service.ts';
 import {
   assertClassWritable,
   assertOwnsContext,
@@ -282,7 +283,7 @@ export function classDto(deps: Pick<AppDeps, 'db' | 'now'>, c: ClassRow) {
     schoolYearId: c.schoolYearId,
     name: c.name,
     grade: c.grade,
-    theme: c.theme,
+    theme: effectiveTheme(deps.db, c.theme),
     timezone: c.timezone,
     soundsEnabled: c.soundsEnabled,
     animationsEnabled: c.animationsEnabled,
@@ -324,6 +325,7 @@ export function createClass(ctx: RequestContext, input: In<typeof C.createClass>
     assertYearWritable(ctx.db, input.schoolYearId);
     const name = normaliseName(input.name);
     assertUniqueClassName(ctx.db, input.schoolYearId, name);
+    if (input.theme !== undefined) assertThemeUsable(ctx.db, input.theme);
     const now = ctx.now();
     const row: ClassRow = {
       id: newId(),
@@ -364,7 +366,10 @@ export function updateClass(ctx: RequestContext, input: In<typeof C.updateClass>
       assertUniqueClassName(ctx.db, c.schoolYearId, patch.name, c.id);
     }
     if (input.grade !== undefined) patch.grade = input.grade;
-    if (input.theme !== undefined) patch.theme = input.theme;
+    if (input.theme !== undefined && input.theme !== c.theme) {
+      assertThemeUsable(ctx.db, input.theme);
+      patch.theme = input.theme;
+    }
     if (input.timezone !== undefined) patch.timezone = input.timezone;
     if (input.soundsEnabled !== undefined) patch.soundsEnabled = input.soundsEnabled;
     if (input.animationsEnabled !== undefined) patch.animationsEnabled = input.animationsEnabled;
@@ -507,7 +512,7 @@ export function myContexts(ctx: RequestContext) {
         className: cls.name,
         subjectId: subject.id,
         subjectName: subject.name,
-        theme: cls.theme,
+        theme: effectiveTheme(ctx.db, cls.theme),
         timezone: cls.timezone ?? schoolTz,
         soundsEnabled: cls.soundsEnabled,
         animationsEnabled: cls.animationsEnabled,
@@ -526,7 +531,7 @@ export function myContexts(ctx: RequestContext) {
 }
 
 const DISPLAY_KEYS = ['theme', 'soundsEnabled', 'soundVolume', 'animationsEnabled', 'quoteEnabled', 'timeUpSound'] as const;
-const displayOf = (c: ClassRow) => ({ classId: c.id, theme: c.theme, soundsEnabled: c.soundsEnabled, soundVolume: c.soundVolume, animationsEnabled: c.animationsEnabled, quoteEnabled: c.quoteEnabled, timeUpSound: c.timeUpSound });
+const displayOf = (db: Db, c: ClassRow) => ({ classId: c.id, theme: effectiveTheme(db, c.theme), soundsEnabled: c.soundsEnabled, soundVolume: c.soundVolume, animationsEnabled: c.animationsEnabled, quoteEnabled: c.quoteEnabled, timeUpSound: c.timeUpSound });
 
 /**
  * Display settings of a class changed by one of its teachers (S13b, D-105; admins also use
@@ -540,12 +545,13 @@ export function setClassDisplay(ctx: RequestContext, input: In<typeof C.setClass
     assertClassWritable(ctx.db, c);
     const patch: Partial<ClassRow> = {};
     for (const k of DISPLAY_KEYS) if (input[k] !== undefined && input[k] !== c[k]) (patch as Record<string, unknown>)[k] = input[k];
+    if (patch.theme !== undefined) assertThemeUsable(ctx.db, patch.theme);
     if (Object.keys(patch).length) {
       ctx.db.update(classes).set({ ...patch, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
       const before = Object.fromEntries(Object.keys(patch).map((k) => [k, c[k as keyof ClassRow]]));
       audit(ctx.db, ctx.actor, { action: 'class.display', entity: 'class', entityId: c.id, before, after: patch }, ctx.now());
     }
-    return displayOf(getClass(ctx.db, c.id));
+    return displayOf(ctx.db, getClass(ctx.db, c.id));
   });
 }
 

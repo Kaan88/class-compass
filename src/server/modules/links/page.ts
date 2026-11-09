@@ -15,6 +15,7 @@ import { studentAvatarInfo } from '../avatars/service.ts';
 import { getMediaPolicy } from '../school/modules.ts';
 import { limitsOf } from '../textChecks/service.ts';
 import { studentScope } from './scope.ts';
+import { effectiveTheme } from '../themes/service.ts';
 
 export function studentPage(ctx: RequestContext): StudentPage {
   const { studentId } = requireStudent(ctx);
@@ -36,7 +37,7 @@ export function studentPage(ctx: RequestContext): StudentPage {
   return {
     student: { fullName: scope.student.fullName, initials: initials(scope.student.fullName), avatarHue: scope.student.avatarHue },
     className: scope.classes.length ? scope.classes.map((c) => c.name).join(', ') : null,
-    theme: scope.classes[0]?.theme ?? DEFAULT_THEME,
+    theme: scope.classes[0] ? effectiveTheme(ctx.db, scope.classes[0].theme) : DEFAULT_THEME,
     // The student-page language of the class (S13b2, D-117): the class mode unless the class gives its student pages their own.
     language: scope.classes[0] ? studentPageLanguage(scope.classes[0]) : DEFAULT_CLASS_LANGUAGE,
     media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments },

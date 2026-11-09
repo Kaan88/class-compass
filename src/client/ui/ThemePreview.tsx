@@ -1,14 +1,22 @@
-import { themeLabelKey as sharedThemeLabelKey, type ThemeKey } from '../../shared/themes.ts';
+import { useSyncExternalStore } from 'react';
+import { themeLabelKey as sharedThemeLabelKey, type BuiltinThemeKey, type ThemeKey } from '../../shared/themes.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { THEME_LIST, THEMES, ThemeProvider } from '../themes/index.tsx';
+import { pickerThemes, ThemeProvider, themeOf, useAvailableThemes, useThemeLabels, useThemeName } from '../themes/index.tsx';
+import { customThemesVersion, subscribeCustomThemes } from '../themes/registry.ts';
 import { Button } from './Button.tsx';
 import { IconCheck } from './icons.tsx';
 import { Mascot, ThemeDecoration, ThemeIllustration } from './Mascot.tsx';
 import { CounterBar, StudentCard } from './Students.tsx';
 
-/** i18n key of a theme's name (every registered theme has one, test-enforced). */
-export const themeLabelKey = (th: ThemeKey): MessageKey => sharedThemeLabelKey(th);
+/** i18n key of a built-in theme's name (every built-in theme has one, test-enforced). Imported themes: `useThemeName`. */
+export const themeLabelKey = (th: BuiltinThemeKey): MessageKey => sharedThemeLabelKey(th);
+
+/** The name of a class theme (built-in or imported) in the interface language. */
+export function ThemeNameLabel({ theme }: { theme: ThemeKey }) {
+  useAvailableThemes();
+  return <>{useThemeName(theme)}</>;
+}
 
 /** Fictional sample student used only in previews. */
 const SAMPLE = { id: 'sample-student-1', fullName: 'Ada Yıldız' };
@@ -16,15 +24,17 @@ const SAMPLE = { id: 'sample-student-1', fullName: 'Ada Yıldız' };
 /** Live preview of a class theme: same controls and meanings in every theme (THM-3). */
 export function ThemePreview({ theme, compact = false }: { theme: ThemeKey; compact?: boolean }) {
   const { t } = useI18n();
-  const def = THEMES[theme];
+  useSyncExternalStore(subscribeCustomThemes, customThemesVersion, customThemesVersion);
+  const def = themeOf(theme);
+  const labels = useThemeLabels(def);
   return (
-    <ThemeProvider theme={theme} className="cc-preview" testId={`theme-preview-${theme}`}>
+    <ThemeProvider theme={def.key} className="cc-preview" testId={`theme-preview-${def.key}`}>
       <ThemeDecoration size={compact ? 90 : 140} />
       <div className="cc-row">
         <Mascot size={compact ? 48 : 72} pose={compact ? 'idle' : 'cheer'} />
         <div>
-          <strong>{t(def.labelKey)}</strong>
-          {compact ? null : <p className="cc-muted" style={{ margin: 0 }}>{t(def.descriptionKey)}</p>}
+          <strong>{labels.name}</strong>
+          {compact ? null : <p className="cc-muted" style={{ margin: 0 }}>{labels.description}</p>}
         </div>
       </div>
       {compact ? null : (
@@ -42,16 +52,21 @@ export function ThemePreview({ theme, compact = false }: { theme: ThemeKey; comp
   );
 }
 
-/** Theme choice as a radio group; each option shows a small live preview. Lists every registered theme. */
+/**
+ * Theme choice as a radio group; each option shows a small live preview. Lists every built-in theme
+ * and the school's enabled imported themes (S14g, D-158).
+ */
 export function ThemePicker({ value, onChange, label }: { value: ThemeKey; onChange: (t: ThemeKey) => void; label: string }) {
   const { t } = useI18n();
+  useAvailableThemes();
+  useSyncExternalStore(subscribeCustomThemes, customThemesVersion, customThemesVersion);
   return (
     <div className="cc-field">
       <span className="cc-field__label" id="theme-picker-label">
         {label}
       </span>
       <div role="radiogroup" aria-labelledby="theme-picker-label" className="cc-swatch-row cc-theme-grid">
-        {THEME_LIST.map((def) => (
+        {pickerThemes().map((def) => (
           <button
             key={def.key}
             type="button"

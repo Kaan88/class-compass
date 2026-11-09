@@ -16,8 +16,12 @@ import type { Origins } from '../config.ts';
 
 /** Exact paths the speakers host serves. */
 const SPEAKERS_EXACT = new Set(['/p', '/p/app', '/board', '/scorer-sw.js', '/healthz', '/api/scorer', '/api/board']);
-/** Path prefixes the speakers host serves (the scorer manifest and icons, built assets, the two APIs). */
-const SPEAKERS_PREFIXES = ['/p/', '/assets/', '/api/scorer/', '/api/board/'];
+/**
+ * Path prefixes the speakers host serves (the scorer manifest and icons, built assets, the two APIs,
+ * and enabled imported theme packages, which the board and the scorer app draw with; S14g, D-158:
+ * public, read-only, no school data).
+ */
+const SPEAKERS_PREFIXES = ['/p/', '/assets/', '/api/scorer/', '/api/board/', '/api/themes/custom/'];
 /** Pages the main host moves to the speakers host. */
 const MOVED_PAGES = new Set(['/p', '/p/app', '/board']);
 

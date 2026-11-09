@@ -1397,6 +1397,168 @@ html:has(.cc-classroom) .cc-toaster {
   color: var(--cc-text);
   padding: 1rem;
 }
+/* ------------------------------------------------------------------ Admin → Themes (S14g, D-158) */
+.cc-theme-catalogue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+.cc-theme-catalogue > li {
+  min-width: 0;
+}
+.cc-theme-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: var(--cc-weight-strong);
+}
+.cc-theme-status[data-status='enabled'] {
+  color: var(--cc-success);
+}
+.cc-theme-issues {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  display: grid;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.cc-theme-preview-head {
+  justify-content: space-between;
+}
+/* The preview area takes the previewed theme's tokens (ThemeProvider sets data-theme). */
+.cc-theme-preview-area {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  border: var(--cc-border-width-strong) solid var(--cc-border-strong);
+  border-radius: var(--cc-radius);
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  font-family: var(--cc-font);
+  padding: 1rem;
+}
+.cc-theme-preview-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+}
+.cc-theme-preview-grid > * {
+  min-width: 0;
+}
+.cc-theme-sample {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  min-width: 0;
+  padding: 0.75rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-bg);
+}
+/* The theme's background pattern stays inside its sample instead of covering the page. */
+.cc-theme-sample .cc-backdrop {
+  position: absolute;
+  z-index: -1;
+}
+.cc-theme-sample__title {
+  font-family: var(--cc-font-display);
+  font-weight: var(--cc-weight-display);
+  letter-spacing: var(--cc-tracking-display);
+  font-size: 1.25rem;
+}
+.cc-theme-sample__tiles {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+}
+.cc-theme-sample__tiles .cc-menu-tile {
+  min-height: 3.5rem;
+  padding: 0.5rem 0.75rem;
+}
+.cc-theme-podium {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.5rem;
+  text-align: center;
+}
+.cc-theme-podium__place {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-theme-podium__step {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  border-radius: var(--cc-radius-sm) var(--cc-radius-sm) 0 0;
+  border: var(--cc-border-width) solid var(--cc-badge-ink);
+  color: var(--cc-badge-ink);
+  padding: 0.4rem 0.25rem;
+}
+.cc-theme-podium__place[data-place='1'] .cc-theme-podium__step {
+  background: var(--cc-badge-gold);
+  min-height: 5.5rem;
+}
+.cc-theme-podium__place[data-place='2'] .cc-theme-podium__step {
+  background: var(--cc-badge-silver);
+  min-height: 4.25rem;
+}
+.cc-theme-podium__place[data-place='3'] .cc-theme-podium__step {
+  background: var(--cc-badge-bronze);
+  min-height: 3.25rem;
+}
+.cc-theme-contrast__sample {
+  display: inline-block;
+  min-width: 3rem;
+  padding: 0.2rem 0.5rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  font-weight: var(--cc-weight-strong);
+  text-align: center;
+}
+.cc-theme-contrast__bar {
+  display: block;
+  height: 0.6rem;
+  border-radius: var(--cc-radius-sm);
+}
+.cc-theme-contrast__ok {
+  color: var(--cc-success);
+}
+.cc-theme-contrast__fail {
+  color: var(--cc-danger);
+}
+/* The celebration in a box (preview): the same mascot, stars and fireworks as the full screen. */
+.cc-celebration-preview {
+  position: relative;
+  overflow: clip;
+  min-height: 12rem;
+  display: grid;
+  place-items: end start;
+  padding: 0.75rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface);
+}
+.cc-celebration-preview .cc-celebration__mascot > :first-child {
+  max-width: 140px;
+}
+.cc-celebration-preview__message {
+  margin: 0;
+  font-family: var(--cc-font-display);
+  font-weight: var(--cc-weight-display);
+  font-size: 1.25rem;
+}
 .cc-catalog-panel {
   position: relative;
   isolation: isolate;

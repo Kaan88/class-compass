@@ -8,11 +8,12 @@ import type { ThemeKey } from '../../shared/themes.ts';
 import { getDisplay, motionAllowed, soundsAllowed, useDisplay, type DisplayState } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { animationName } from './css.ts';
-import { themeOf } from './registry.ts';
+import { customThemesVersion, subscribeCustomThemes, themeOf } from './registry.ts';
 import { SOUND_PRIORITY, soundStatus, sounds, type SoundSnapshot, type SoundStatus } from './soundManager.ts';
 import type { IllustrationName, MascotPose, MotionName, SoundEvent, ThemeDefinition } from './types.ts';
 
-export { THEME_LIST, THEMES, themeOf } from './registry.ts';
+export { THEME_LIST, THEMES, themeOf, pickerThemes, allThemeDefinitions } from './registry.ts';
+export { loadThemePackage, previewKey, registerThemePackage, useAvailableThemes } from './custom.tsx';
 export { installThemeStyles } from './css.ts';
 export type { IllustrationName, MascotPose, MotionName, SoundEvent, SoundName, ThemeDefinition } from './types.ts';
 export { sounds, installSoundUnlock, SELF_UNLOCK_ATTR, type SoundSnapshot, type SoundStatus } from './soundManager.ts';
@@ -23,6 +24,8 @@ export const ThemeScope = createContext<ThemeKey | null>(null);
 /** The theme that applies here: explicit > nearest ThemeScope > the document (class) theme. */
 export function useTheme(explicit?: ThemeKey): ThemeDefinition {
   const display = useDisplay();
+  // Re-render when an imported theme (S14g) arrives: until then `themeOf` gives the default theme.
+  useSyncExternalStore(subscribeCustomThemes, customThemesVersion, customThemesVersion);
   const scoped = useContext(ThemeScope);
   return themeOf(explicit ?? scoped ?? display.theme);
 }
@@ -196,8 +199,16 @@ export function ThemeBackdrop({ theme }: { theme?: ThemeKey }) {
   );
 }
 
-/** Name + description of a theme, for pickers. */
+/** Name + description of a theme, for pickers (an imported theme brings its own names, S14g). */
 export function useThemeLabels(def: ThemeDefinition) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const own = def.custom?.labels;
+  if (own) return { name: own.name[locale], description: own.description[locale], mascot: own.mascot[locale] };
   return { name: t(def.labelKey), description: t(def.descriptionKey), mascot: t(def.mascotNameKey) };
+}
+
+/** The name of the theme stored under `key` (falls back like `themeOf`). */
+export function useThemeName(key: ThemeKey): string {
+  useSyncExternalStore(subscribeCustomThemes, customThemesVersion, customThemesVersion);
+  return useThemeLabels(themeOf(key)).name;
 }

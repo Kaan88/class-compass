@@ -36,7 +36,9 @@ import { weatherManifest } from './weather/manifest.ts';
 import { achievementsManifest } from './achievements/manifest.ts';
 import { avatarsManifest } from './avatars/manifest.ts';
 import { textChecksManifest } from './textChecks/manifest.ts';
-import { superSpeakersManifest } from './superSpeakers/manifest.ts';
+
+import { superSpeakersManifest } from './superSpeakers/manifest.ts';
+import { themesManifest } from './themes/manifest.ts';
 
 export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   authManifest,
@@ -62,6 +64,7 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   avatarsManifest,
   textChecksManifest,
   superSpeakersManifest,
+  themesManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */

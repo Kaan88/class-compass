@@ -14,6 +14,9 @@ import { allThemesCss, animationName } from '../../src/client/themes/css.ts';
 import { THEME_LIST, THEMES } from '../../src/client/themes/registry.ts';
 import { soundLength } from '../../src/client/themes/sound.ts';
 import { NOTE_GAIN_CAP, outputPeakDb } from '../../src/client/themes/soundManager.ts';
+import { ART_LIMITS, MOTION_LIMITS, SOUND_LIMITS, STYLE_LIMITS } from '../../src/shared/themePackage/limits.ts';
+import { opacityTurns } from '../../src/shared/themePackage/motion.ts';
+import { soundPackProblems } from '../../src/shared/themePackage/sound.ts';
 import { ILLUSTRATIONS, MASCOT_POSES, MOTIONS, SOUND_EVENTS } from '../../src/client/themes/types.ts';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
@@ -34,9 +37,10 @@ describe('theme registry', () => {
     expect(isThemeKey(DEFAULT_THEME)).toBe(true);
   });
 
-  it('classes.theme validates against the shared key list', () => {
+  it('classes.theme accepts every built-in key and theme slugs only (S14g, D-158: usability is checked by the server)', () => {
     for (const k of THEME_KEYS) expect(Theme.safeParse(k).success).toBe(true);
-    expect(Theme.safeParse('neon').success).toBe(false);
+    expect(Theme.safeParse('ocean').success).toBe(true);
+    for (const bad of ['Neon', 'a', 'x--y', "x'] {", 'neon;', '-neon', 'a'.repeat(33)]) expect(Theme.safeParse(bad).success, bad).toBe(false);
   });
 
   it('every theme name, description and mascot name exists in en and tr', () => {
@@ -66,8 +70,8 @@ describe.each(THEME_LIST.map((d) => [d.key, d] as const))('theme %s', (_key, def
     expect(new Set(poses).size).toBe(MASCOT_POSES.length);
     for (const C of [def.Decoration, def.Pattern]) expect(RAW_COLOUR.test(svg(createElement(C)))).toBe(false);
     expect(def.patternSize).toBeGreaterThan(0);
-    expect(def.decoOpacity).toBeLessThanOrEqual(0.6);
-    expect(def.patternOpacity).toBeLessThanOrEqual(0.15);
+    expect(def.decoOpacity).toBeLessThanOrEqual(ART_LIMITS.decoOpacityMax);
+    expect(def.patternOpacity).toBeLessThanOrEqual(ART_LIMITS.patternOpacityMax);
   });
 
   it('motion: each animation plays once, briefly, with an opacity-only reduced variant and no flashing', () => {
@@ -75,17 +79,14 @@ describe.each(THEME_LIST.map((d) => [d.key, d] as const))('theme %s', (_key, def
     for (const m of MOTIONS) {
       const { full, reduced } = def.motion[m];
       for (const a of [full, reduced]) {
-        expect(a.durationMs).toBeGreaterThanOrEqual(150);
-        expect(a.durationMs).toBeLessThanOrEqual(1500);
+        expect(a.durationMs).toBeGreaterThanOrEqual(MOTION_LIMITS.minMs);
+        expect(a.durationMs).toBeLessThanOrEqual(MOTION_LIMITS.maxMs);
         expect(a.keyframes).not.toMatch(/infinite/);
       }
       expect(reduced.keyframes).not.toMatch(/transform|translate|scale|rotate/);
       expect(reduced.keyframes).toMatch(/opacity/);
       // No flashing (WCAG 2.3.1): opacity may change direction at most once.
-      const opacities = [...full.keyframes.matchAll(/opacity:\s*([\d.]+)/g)].map((x) => Number(x[1]));
-      let turns = 0;
-      for (let i = 2; i < opacities.length; i++) if (Math.sign(opacities[i]! - opacities[i - 1]!) * Math.sign(opacities[i - 1]! - opacities[i - 2]!) < 0) turns++;
-      expect(turns).toBeLessThanOrEqual(1);
+      expect(opacityTurns(full.keyframes)).toBeLessThanOrEqual(MOTION_LIMITS.maxOpacityTurns);
       expect(css).toContain(`@keyframes ${animationName(def.key, m, false)}`);
       expect(css).toContain(`@keyframes ${animationName(def.key, m, true)}`);
     }
@@ -93,18 +94,20 @@ describe.each(THEME_LIST.map((d) => [d.key, d] as const))('theme %s', (_key, def
 
   it('sounds are optional, complete (one cue per classroom event), short and gentle (S13b)', () => {
     if (def.sounds === null) return;
-    const long = new Set(['secretDrumroll', 'clapping', 'fireworks', 'fanfare', 'timeUp']);
+    const L = SOUND_LIMITS;
     for (const s of SOUND_EVENTS) {
       const spec = def.sounds[s];
       expect(spec.length, s).toBeGreaterThan(0);
-      expect(soundLength(spec), s).toBeLessThanOrEqual(long.has(s) ? 2500 : 1200);
+      expect(soundLength(spec), s).toBeLessThanOrEqual(L.longEvents.includes(s) ? L.longCueMaxMs : L.shortCueMaxMs);
       for (const n of spec) {
         expect(n.gain).toBeGreaterThan(0);
-        expect(n.gain).toBeLessThanOrEqual(0.3);
-        expect(n.freq).toBeGreaterThanOrEqual(150);
-        expect(n.freq).toBeLessThanOrEqual(n.type === 'noise' ? 5000 : 2500);
+        expect(n.gain).toBeLessThanOrEqual(L.noteGainCap);
+        expect(n.freq).toBeGreaterThanOrEqual(L.toneMinHz);
+        expect(n.freq).toBeLessThanOrEqual(n.type === 'noise' ? L.noiseMaxHz : L.toneMaxHz);
       }
     }
+    // The theme package validator uses the same check (S14g, D-158).
+    expect(soundPackProblems(def.sounds)).toEqual([]);
     // Firework colours are theme tokens (THM-3: no raw colours in components).
     expect(def.celebration.colors.length).toBeGreaterThanOrEqual(2);
     for (const c of def.celebration.colors) expect(def.colors[c]).toMatch(/^#[0-9a-f]{6}$/iu);
@@ -135,11 +138,11 @@ describe.each(THEME_LIST.map((d) => [d.key, d] as const))('theme %s', (_key, def
     const t = def.typography;
     for (const stack of [t.body, t.display]) expect(stack).toMatch(/(sans-serif|serif|system-ui|monospace)\s*$/);
     for (const w of [t.weightBody, t.weightStrong, t.weightHeading, t.weightDisplay]) {
-      expect(w).toBeGreaterThanOrEqual(400);
-      expect(w).toBeLessThanOrEqual(900);
+      expect(w).toBeGreaterThanOrEqual(STYLE_LIMITS.weight[0]);
+      expect(w).toBeLessThanOrEqual(STYLE_LIMITS.weight[1]);
     }
-    expect(def.icons.strokeWidth).toBeGreaterThanOrEqual(1.5);
-    expect(def.icons.strokeWidth).toBeLessThanOrEqual(3);
+    expect(def.icons.strokeWidth).toBeGreaterThanOrEqual(STYLE_LIMITS.iconStroke[0]);
+    expect(def.icons.strokeWidth).toBeLessThanOrEqual(STYLE_LIMITS.iconStroke[1]);
     for (const v of [def.shape.borderWidth, def.shape.borderWidthStrong]) expect(v).toMatch(/^\d+(\.\d+)?px$/);
   });
 });

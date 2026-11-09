@@ -1,6 +1,6 @@
 /** Explorer / adventure theme (THM-2): maps, compass, warm paper. One definition fills every slot. */
-import { FADE_IN } from '../motion.ts';
-import { makeSoundPack } from '../soundPack.ts';
+import { presetMotion } from '../motion.ts';
+import { themeSounds } from '../soundPack.ts';
 import type { ThemeDefinition } from '../types.ts';
 import { ExplorerDecoration, explorerIllustrations, ExplorerMascot, ExplorerPattern } from './art.tsx';
 import { avatar, colors, icons, shape, typography } from './tokens.ts';
@@ -24,22 +24,12 @@ export const explorerTheme: ThemeDefinition = {
   illustrations: explorerIllustrations,
   motion: {
     // A hop with a little wobble, like reaching the top of a hill.
-    celebrate: {
-      full: {
-        keyframes: '0% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-8%) rotate(-4deg); } 70% { transform: translateY(0) rotate(3deg); } 100% { transform: none; }',
-        durationMs: 900,
-        easing: 'ease-in-out',
-      },
-      reduced: FADE_IN,
-    },
+    celebrate: presetMotion('celebrate', { preset: 'hop', durationMs: 900, easing: 'ease-in-out' }),
     // Slides in from the side like a map being unrolled.
-    threshold: {
-      full: { keyframes: '0% { transform: translateX(-6%); opacity: 0; } 100% { transform: none; opacity: 1; }', durationMs: 600, easing: 'ease-out' },
-      reduced: FADE_IN,
-    },
+    threshold: presetMotion('threshold', { preset: 'slideIn', durationMs: 600, easing: 'ease-out' }),
   },
   // Brass-like triangle fanfares in C major, like reaching a summit.
-  sounds: makeSoundPack({ root: 523, wave: 'triangle', scale: 'major', gain: 0.11 }, {
+  ...themeSounds({ root: 523, wave: 'triangle', scale: 'major', gain: 0.11 }, {
     timeUp: [
       { freq: 523, at: 0, dur: 450, type: 'triangle', gain: 0.12 },
       { freq: 659, at: 380, dur: 600, type: 'triangle', gain: 0.1 },

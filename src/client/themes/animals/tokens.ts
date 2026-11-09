@@ -1,4 +1,5 @@
 /** Friendly animal mascots: soft leaf greens, berry plum accent, fox orange. Colour literals live only here. */
+import { FONT_PRESETS, SHADOW_PRESETS } from '../../../shared/themePackage/presets.ts';
 import { baseAvatar, baseIcons, baseShape, baseTypography, themeColors } from '../base.ts';
 import type { ThemeAvatar, ThemeIcons, ThemeShape, ThemeTypography } from '../types.ts';
 
@@ -31,7 +32,7 @@ export const colors = themeColors({
 
 export const typography: ThemeTypography = {
   ...baseTypography,
-  display: "'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', system-ui, sans-serif",
+  display: FONT_PRESETS.playful,
   weightHeading: 700,
   weightDisplay: 800,
   trackingDisplay: '0.015em',
@@ -41,8 +42,8 @@ export const shape: ThemeShape = {
   ...baseShape,
   radius: '1.35rem',
   radiusSm: '0.85rem',
-  shadow: '0 4px 16px var(--cc-shadow-color)',
-  shadowRaised: '0 14px 36px var(--cc-shadow-color)',
+  shadow: SHADOW_PRESETS.cushion,
+  shadowRaised: SHADOW_PRESETS.floating,
 };
 
 export const avatar: ThemeAvatar = { ...baseAvatar, saturation: 52, lightness: 37 };

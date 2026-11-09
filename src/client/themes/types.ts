@@ -9,128 +9,36 @@
 import type { ComponentType } from 'react';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import type { ThemeKey } from '../../shared/themes.ts';
+import type { Animation } from '../../shared/themePackage/motion.ts';
+import type { ThemePackageSounds } from '../../shared/themePackage/schema.ts';
+import { SOUND_EVENTS, type ColorToken, type IllustrationName, type MascotPose, type MotionName, type SoundEvent, type ThemeColors, type ThemeSoundPack } from '../../shared/themePackage/tokens.ts';
 
-/** Semantic colour tokens, emitted as `--cc-<name>`. Values are colour literals (hex). */
-export const COLOR_TOKENS = [
-  'bg',
-  'surface',
-  'surface-2',
-  'text',
-  'text-muted',
-  'border',
-  'border-strong',
-  'accent',
-  'accent-strong',
-  'accent-soft',
-  'accent-text',
-  'focus',
-  'success',
-  'success-soft',
-  'warning',
-  'warning-soft',
-  'danger',
-  'danger-strong',
-  'danger-soft',
-  'on-strong',
-  'overlay',
-  'shadow-color',
-  // "visible on the classroom display" banner (PIN-5)
-  'display-banner-bg',
-  'display-banner-text',
-  'display-banner-border',
-  // counter depth levels neutral → amber → deeper amber → red (CNT-6), always with numbers + words
-  'level-0',
-  'level-1',
-  'level-2',
-  'level-3',
-  'level-edge-0',
-  'level-edge-1',
-  'level-edge-2',
-  'level-edge-3',
-  // counter colour keys (CNT-12): teachers pick a name, never a raw colour
-  'counter-accent',
-  'counter-accent-edge',
-  'counter-teal',
-  'counter-teal-edge',
-  'counter-plum',
-  'counter-plum-edge',
-  'counter-rust',
-  'counter-rust-edge',
-  'counter-leaf',
-  'counter-leaf-edge',
-  'counter-berry',
-  'counter-berry-edge',
-  'segment-on',
-  'segment-off',
-  'avatar-text',
-  // icon accent (menu tiles, illustrations' line work)
-  'icon-accent',
-  // decorations, background pattern, mascot and illustrations (always subtle)
-  'deco-1',
-  'deco-2',
-  'deco-3',
-  'pattern',
-  'mascot-body',
-  'mascot-belly',
-  'mascot-accent',
-  'mascot-ink',
-  'mascot-cheek',
-  'art-sky',
-  'art-ground',
-  'art-light',
-  // avatars and badges (S13c, D-124): named colours, skin tones and hair colours only; never raw colours in specs
-  'avatar-red',
-  'avatar-orange',
-  'avatar-yellow',
-  'avatar-green',
-  'avatar-teal',
-  'avatar-blue',
-  'avatar-navy',
-  'avatar-purple',
-  'avatar-pink',
-  'avatar-brown',
-  'avatar-grey',
-  'avatar-mint',
-  'avatar-skin-1',
-  'avatar-skin-2',
-  'avatar-skin-3',
-  'avatar-skin-4',
-  'avatar-skin-5',
-  'avatar-skin-6',
-  'avatar-skin-7',
-  'avatar-skin-8',
-  'avatar-skin-9',
-  'avatar-skin-10',
-  'avatar-skin-11',
-  'avatar-skin-12',
-  'avatar-hair-black',
-  'avatar-hair-darkBrown',
-  'avatar-hair-brown',
-  'avatar-hair-auburn',
-  'avatar-hair-ginger',
-  'avatar-hair-blonde',
-  'avatar-hair-lightBlonde',
-  'avatar-hair-grey',
-  'avatar-hair-white',
-  'avatar-hair-blue',
-  'avatar-hair-pink',
-  'avatar-hair-purple',
-  'avatar-ink',
-  'avatar-outline',
-  'avatar-white',
-  'avatar-blush',
-  'badge-bronze',
-  'badge-silver',
-  'badge-gold',
-  'badge-plain',
-  'badge-ink',
-  'badge-shine',
-  // printed QR cards (S13b2, D-120): always pure black on white, the same in every theme
-  'print-ink',
-  'print-paper',
-] as const;
-export type ColorToken = (typeof COLOR_TOKENS)[number];
-export type ThemeColors = Record<ColorToken, string>;
+/*
+ * The theme vocabulary (colour tokens, poses, illustrations, motions, sound events and notes) lives in
+ * `src/shared/themePackage/tokens.ts` since S14g (D-158), so the theme package validator on the server
+ * uses the same lists. It is re-exported here for every existing import.
+ */
+export {
+  COLOR_TOKENS,
+  ILLUSTRATIONS,
+  MASCOT_POSES,
+  MOTIONS,
+  SOUND_EVENTS,
+  type ColorToken,
+  type IllustrationName,
+  type MascotPose,
+  type MotionName,
+  type SoundEvent,
+  type SoundSpec,
+  type ThemeColors,
+  type ThemeSoundPack,
+  type ToneNote,
+} from '../../shared/themePackage/tokens.ts';
+export type { Animation } from '../../shared/themePackage/motion.ts';
+
+/** @deprecated name kept for older call sites: a sound is named by its event. */
+export type SoundName = SoundEvent;
+export const SOUNDS = SOUND_EVENTS;
 
 export interface ThemeTypography {
   /** Font stack for body text (system fonts only: nothing is downloaded, CSP font-src 'self'). */
@@ -171,78 +79,11 @@ export interface ThemeIcons {
   linejoin: 'round' | 'miter' | 'bevel';
 }
 
-export const MASCOT_POSES = ['idle', 'cheer', 'thinking', 'celebrate', 'sleepy'] as const;
-export type MascotPose = (typeof MASCOT_POSES)[number];
-
-export const ILLUSTRATIONS = ['lockScreen', 'emptyState', 'threshold', 'startLesson', 'endLesson', 'celebration'] as const;
-export type IllustrationName = (typeof ILLUSTRATIONS)[number];
-
-export const MOTIONS = ['celebrate', 'threshold'] as const;
-export type MotionName = (typeof MOTIONS)[number];
-
-/** One CSS animation that plays exactly once (THM-5: no repeated flashing). */
-export interface Animation {
-  /** Keyframe body, e.g. `0% { transform: … } 100% { … }`. Emitted as `@keyframes cc-<theme>-<motion>[-reduced]`. */
-  keyframes: string;
-  durationMs: number;
-  easing: string;
-}
 export interface MotionSpec {
   full: Animation;
   /** Used under `prefers-reduced-motion`: opacity only, no movement. */
   reduced: Animation;
 }
-
-/**
- * The theme sound pack (S13b, D-110): one short synthesized cue per classroom event. Every theme
- * fills all of them (usually with `makeSoundPack`, src/client/themes/soundPack.ts); the SoundManager
- * plays them with the class volume, priorities and ducking. Callers name the event, never a sound.
- */
-export const SOUND_EVENTS = [
-  'tap',
-  'undo',
-  'stageChange',
-  'timeUp',
-  'thresholdReached',
-  'assistantCheck',
-  'groupShuffle',
-  'secretDrumroll',
-  'secretReveal',
-  'fanfare',
-  'clapping',
-  'fireworks',
-  'pointAwarded',
-  'softChime',
-  // S14a (D-145)
-  'lessonStart',
-  'lessonEnd',
-  'timerStart',
-  'groupMove',
-  'achievementGiven',
-  'soundTest',
-] as const;
-export type SoundEvent = (typeof SOUND_EVENTS)[number];
-/** @deprecated name kept for older call sites: a sound is named by its event. */
-export type SoundName = SoundEvent;
-export const SOUNDS = SOUND_EVENTS;
-
-/** A short synthesized note (WebAudio): no audio files are shipped. */
-export interface ToneNote {
-  /** Frequency in Hz (for 'noise': the centre of the band-pass filter). */
-  freq: number;
-  /** Optional glide: the frequency reached at the end of the note. */
-  to?: number;
-  /** Start offset in ms. */
-  at: number;
-  /** Length in ms. */
-  dur: number;
-  /** 'noise' is filtered white noise (claps, drum rolls, firework crackle). */
-  type: 'sine' | 'triangle' | 'square' | 'noise';
-  /** Peak gain 0..0.3 (gentle); scaled by the class volume. */
-  gain: number;
-}
-export type SoundSpec = readonly ToneNote[];
-export type ThemeSoundPack = Record<SoundEvent, SoundSpec>;
 
 /** Full-screen celebration (S13b): firework colours are theme colour tokens, never raw colours in components. */
 export interface ThemeCelebration {
@@ -253,7 +94,15 @@ export interface MascotProps {
   pose: MascotPose;
 }
 
+/** Names of an imported theme (S14g, D-158): its own text in both languages instead of i18n keys. */
+export interface ThemeLabels {
+  name: { en: string; tr: string };
+  description: { en: string; tr: string };
+  mascot: { en: string; tr: string };
+}
+
 export interface ThemeDefinition {
+  /** A built-in key (`THEME_KEYS`) or the slug of an imported theme package. */
   key: ThemeKey;
   /** `theme.<key>` */
   labelKey: MessageKey;
@@ -281,5 +130,12 @@ export interface ThemeDefinition {
   motion: Record<MotionName, MotionSpec>;
   /** The sound pack; null keeps the theme silent (the visual signal is always there). */
   sounds: ThemeSoundPack | null;
+  /** The `makeSoundPack` parameters the pack was made from (S14g: exported into theme packages). */
+  soundParams?: ThemePackageSounds | null;
   celebration: ThemeCelebration;
+  /**
+   * Set for an imported theme package (S14g): where it came from and its own names. Built-in themes
+   * leave it out. Components never branch on it (use `useThemeLabels`).
+   */
+  custom?: { base: ThemeKey; labels: ThemeLabels; status: 'draft' | 'enabled' | 'disabled' | 'preview' };
 }

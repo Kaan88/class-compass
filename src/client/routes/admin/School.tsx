@@ -30,7 +30,7 @@ import { DataTable } from '../../ui/Layout.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
 import { ClassLanguageSelect, StudentPageLanguageSelect, studentPageOverride } from '../../ui/ClassLanguageSelect.tsx';
 import type { ClassLanguage } from '../../../shared/classLanguage.ts';
-import { ThemePicker, ThemePreview, themeLabelKey } from '../../ui/ThemePreview.tsx';
+import { ThemeNameLabel, ThemePicker, ThemePreview } from '../../ui/ThemePreview.tsx';
 import { moduleLabelKey } from '../teacher/Classes.tsx';
 import { isSchoolModule } from '../../../shared/modules.ts';
 import { ADMIN } from './Admin.tsx';
@@ -657,7 +657,7 @@ export function ClassesPage() {
           { key: 'name', header: t('classes.name'), sortValue: (c) => c.name, render: (c) => <strong>{c.name}</strong> },
           { key: 'year', header: t('classes.year'), sortValue: (c) => yearName(c.schoolYearId), render: (c) => yearName(c.schoolYearId) },
           { key: 'students', header: t('classes.students'), sortValue: (c) => c.studentCount, render: (c) => c.studentCount },
-          { key: 'theme', header: t('classes.theme'), render: (c) => t(themeLabelKey(c.theme)) },
+          { key: 'theme', header: t('classes.theme'), render: (c) => <ThemeNameLabel theme={c.theme} /> },
           { key: 'tz', header: t('classes.timezone'), render: (c) => c.timezone ?? t('classes.schoolTimezone') },
           {
             key: 'state',

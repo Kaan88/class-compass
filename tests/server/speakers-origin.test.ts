@@ -185,6 +185,10 @@ describe('host routing while split (D-157)', () => {
     expect((await raw(env, 'GET', '/api/board', SPEAKERS_HOST)).statusCode).toBe(401);
     expect((await raw(env, 'GET', '/api/scorer/me', SPEAKERS_HOST)).statusCode).toBe(401);
     expect((await raw(env, 'POST', '/api/board/session', SPEAKERS_HOST, { origin: SPEAKERS, 'content-type': 'application/json' }, {})).statusCode).toBe(400);
+    // An imported theme the board or scorer app is drawn in (S14g, D-158): reached (unknown key → 404 from the API, JSON).
+    const theme = await raw(env, 'GET', '/api/themes/custom/ocean', SPEAKERS_HOST);
+    expect(theme.statusCode).toBe(404);
+    expect(theme.json().error.message).toBe('Theme not found');
     // The pages are reached (200 when the client is built, else the "not built" note), never the host's 404.
     for (const url of ['/p', '/p/app', '/p?x=1', '/board']) {
       const r = await raw(env, 'GET', url, SPEAKERS_HOST);
@@ -209,6 +213,8 @@ describe('host routing while split (D-157)', () => {
       '/api/auth/me',
       '/api/admin/speakers',
       '/api/student/page',
+      '/api/themes/available',
+      '/api/admin/themes',
       '/api/commands',
       '/api/scorer/../admin/speakers',
       '/api/scorer/%2e%2e/admin/speakers',
@@ -318,8 +324,8 @@ describe('host routing while split (D-157)', () => {
   });
 
   it('speakersHostAllows is an allow-list', () => {
-    for (const p of ['/p', '/p/app', '/p/icon-192.png', '/board', '/assets/index-abc.js', '/scorer-sw.js', '/healthz', '/api/scorer/me', '/api/board', '/api/board/events']) expect(speakersHostAllows(p), p).toBe(true);
-    for (const p of ['/', '/p/', '/assets/', '/boards', '/api/scorers', '/api/boardx', '/api/admin', '/p/%2e%2e/x', '/p/../x', '/p//x', '/p\\x', 'p']) expect(speakersHostAllows(p), p).toBe(false);
+    for (const p of ['/p', '/p/app', '/p/icon-192.png', '/board', '/assets/index-abc.js', '/scorer-sw.js', '/healthz', '/api/scorer/me', '/api/board', '/api/board/events', '/api/themes/custom/ocean']) expect(speakersHostAllows(p), p).toBe(true);
+    for (const p of ['/', '/p/', '/assets/', '/boards', '/api/scorers', '/api/boardx', '/api/admin', '/api/themes/custom/', '/api/themes/available', '/p/%2e%2e/x', '/p/../x', '/p//x', '/p\\x', 'p']) expect(speakersHostAllows(p), p).toBe(false);
   });
 });
 

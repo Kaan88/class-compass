@@ -32,6 +32,7 @@ const ModulesPage = lazyRouteComponent(school, 'ModulesPage');
 const AdminStudentsPage = lazyRouteComponent(() => import('./routes/admin/StudentsAdmin.tsx'), 'AdminStudentsPage');
 const SuperSpeakersPage = lazyRouteComponent(() => import('./routes/admin/SuperSpeakers.tsx'), 'SuperSpeakersPage');
 const AuditPage = lazyRouteComponent(() => import('./routes/admin/Audit.tsx'), 'AuditPage');
+const ThemesPage = lazyRouteComponent(() => import('./routes/admin/Themes.tsx'), 'ThemesPage');
 const MaintenancePage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'MaintenancePage');
 const AdminReportsPage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'AdminReportsPage');
 const CatalogPage = lazyRouteComponent(() => import('./dev/Catalog.tsx'), 'CatalogPage');
@@ -123,6 +124,7 @@ const adminModules = createRoute({ getParentRoute: () => adminRoute, path: 'modu
 const adminStudents = createRoute({ getParentRoute: () => adminRoute, path: 'students', component: AdminStudentsPage });
 const adminSpeakers = createRoute({ getParentRoute: () => adminRoute, path: 'super-speakers', component: SuperSpeakersPage });
 const adminAudit = createRoute({ getParentRoute: () => adminRoute, path: 'audit', component: AuditPage });
+const adminThemes = createRoute({ getParentRoute: () => adminRoute, path: 'themes', component: ThemesPage });
 const adminReports = createRoute({
   getParentRoute: () => adminRoute,
   path: 'reports',
@@ -160,7 +162,7 @@ const routeTree = rootRoute.addChildren([
   changePasswordRoute,
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),
-  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminSpeakers, adminMaintenance, adminAudit, adminProfile]),
+  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminReports, adminSpeakers, adminThemes, adminMaintenance, adminAudit, adminProfile]),
   helpRoute,
   catalogRoute,
 ]);

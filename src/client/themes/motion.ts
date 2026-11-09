@@ -1,8 +1,6 @@
 /**
  * Motion building blocks for themes (THM-5). Every animation plays once; the reduced-motion variant
- * only fades in (no movement, no flashing). Themes pick or write their own `full` keyframes.
+ * only fades in (no movement, no flashing). Since S14g (D-158) the keyframes are named presets in
+ * `src/shared/themePackage/motion.ts`, shared with imported theme packages.
  */
-import type { Animation } from './types.ts';
-
-/** The reduced-motion variant shared by all themes: a single short fade-in. */
-export const FADE_IN: Animation = { keyframes: '0% { opacity: 0; } 100% { opacity: 1; }', durationMs: 400, easing: 'ease-out' };
+export { FADE_IN, presetMotion } from '../../shared/themePackage/motion.ts';

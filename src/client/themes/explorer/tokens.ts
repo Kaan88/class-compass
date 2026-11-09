@@ -1,4 +1,5 @@
 /** Explorer / adventure: warm map paper, compass teal, rust trail markers. Colour literals live only here. */
+import { FONT_PRESETS, SHADOW_PRESETS } from '../../../shared/themePackage/presets.ts';
 import { baseAvatar, baseIcons, baseShape, baseTypography, themeColors } from '../base.ts';
 import type { ThemeAvatar, ThemeIcons, ThemeShape, ThemeTypography } from '../types.ts';
 
@@ -31,7 +32,7 @@ export const colors = themeColors({
 
 export const typography: ThemeTypography = {
   ...baseTypography,
-  display: "'Trebuchet MS', 'Segoe UI', system-ui, sans-serif",
+  display: FONT_PRESETS.friendly,
   weightHeading: 800,
   weightDisplay: 850,
   trackingDisplay: '0.01em',
@@ -42,7 +43,7 @@ export const shape: ThemeShape = {
   radius: '0.85rem',
   radiusSm: '0.5rem',
   // Paper cards: a crisp bottom edge plus a soft shadow.
-  shadow: '0 2px 0 var(--cc-shadow-color), 0 6px 14px var(--cc-shadow-color)',
+  shadow: SHADOW_PRESETS.paper,
 };
 
 export const avatar: ThemeAvatar = { ...baseAvatar, saturation: 50, lightness: 36 };

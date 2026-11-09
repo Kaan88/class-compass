@@ -9,7 +9,6 @@
  */
 import { sql } from 'drizzle-orm';
 import { integer, primaryKey, real, sqliteTable, text, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
-import { THEME_KEYS } from '../../shared/themes.ts';
 import { DEFAULT_SOUND_VOLUME, DEFAULT_WEATHER, TIME_UP_SOUNDS } from '../../shared/classDisplay.ts';
 import { FILE_KINDS } from '../../shared/contracts/files.ts';
 import { IMPORT_SOURCE_TYPES, type ImportFlag } from '../../shared/contracts/import.ts';
@@ -67,8 +66,12 @@ export const subjects = sqliteTable('subjects', {
   updatedAt: integer('updated_at').notNull(),
 });
 
-/** Theme keys come from the shared theme registry (D-070); stored as plain text, so adding a theme needs no migration. */
-export const CLASS_THEMES = THEME_KEYS;
+/**
+ * Theme keys (D-070, D-158): a built-in key or the slug of an imported theme package, stored as plain
+ * text, so adding a theme needs no migration. Writes go through `assertThemeUsable` (themes module);
+ * reads go through `effectiveTheme`, which falls back to the default theme for a package that is not
+ * enabled.
+ */
 
 export const classes = sqliteTable(
   'classes',
@@ -77,7 +80,7 @@ export const classes = sqliteTable(
     schoolYearId: text('school_year_id').notNull().references(() => schoolYears.id),
     name: text('name').notNull(), // e.g. '3-A'
     grade: integer('grade'),
-    theme: text('theme', { enum: CLASS_THEMES }).notNull().default('classroom'),
+    theme: text('theme').notNull().default('classroom'),
     /** Null = use the school timezone. */
     timezone: text('timezone'),
     soundsEnabled: integer('sounds_enabled', { mode: 'boolean' }).notNull().default(true),
@@ -1460,7 +1463,7 @@ export const superSpeakersSettings = sqliteTable('super_speakers_settings', {
   /** Board messages {en,tr} (S12 review); null or an empty text = the built-in translated message. */
   boardMessages: text('board_messages', { mode: 'json' }).$type<{ placeholder: LocalizedText; waiting: LocalizedText }>(),
   boardLanguage: text('board_language', { enum: ['en', 'tr'] }).notNull().default('en'),
-  theme: text('theme', { enum: CLASS_THEMES }).notNull().default('explorer'),
+  theme: text('theme').notNull().default('explorer'),
   boardSound: integer('board_sound', { mode: 'boolean' }).notNull().default(false),
   badgeSubjectId: text('badge_subject_id').references(() => subjects.id),
   updatedAt: integer('updated_at').notNull(),
@@ -1503,3 +1506,23 @@ export const userSettings = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.key] })],
 );
+
+// ---------------------------------------------------------------- theme packages (S14g, D-158)
+/**
+ * Imported theme packages. `packageJson` is the package exactly as validated (`shared/themePackage`),
+ * `reportJson` its validation report at import time (warnings only: a package with errors is never
+ * stored). `status`: a draft can be previewed but not chosen; enabled themes are offered next to the
+ * built-in ones; a disabled theme keeps its classes' choice but they show the default theme. Deleting
+ * removes the row and moves its classes and the Super Speakers board to the default (audited).
+ */
+export const customThemes = sqliteTable('custom_themes', {
+  key: text('key').primaryKey(),
+  packageJson: text('package_json', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+  reportJson: text('report_json', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+  status: text('status', { enum: ['draft', 'enabled', 'disabled'] }).notNull().default('draft'),
+  bytes: integer('bytes').notNull(),
+  createdBy: text('created_by').references(() => users.id),
+  updatedBy: text('updated_by').references(() => users.id),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});

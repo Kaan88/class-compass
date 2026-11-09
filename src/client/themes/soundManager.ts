@@ -22,6 +22,7 @@
  */
 import type { SoundEvent, SoundSpec } from './types.ts';
 import { soundLength } from './soundPack.ts';
+import { LOUDNESS, SOUND_LIMITS, volumeGain } from '../../shared/themePackage/limits.ts';
 
 export const SOUND_PRIORITY: Record<SoundEvent, number> = {
   tap: 1,
@@ -49,47 +50,13 @@ export const SOUND_PRIORITY: Record<SoundEvent, number> = {
 export const DUCK_LEVEL = 0.3;
 const TAP_MERGE_MS = 50;
 /** Loudest single note a pack may ask for (themes test and `schedule`). */
-export const NOTE_GAIN_CAP = 0.3;
+export const NOTE_GAIN_CAP = SOUND_LIMITS.noteGainCap;
 
-/**
- * The loudness chain (D-145). The compressor has a hard knee so its curve is exact; browsers add
- * their own makeup gain to a DynamicsCompressorNode (Web Audio spec: (1 / curve(0 dBFS))^0.6), which
- * `outputPeakDb` includes. Below the threshold the whole chain is about ×8.8 (+18.9 dB); a full-scale
- * input comes out near −1 dBFS, so nothing clips.
+/*
+ * The loudness chain (D-145) and its model (`outputPeakDb`) live in the shared theme limits since
+ * S14g (D-158), so the theme package validator checks a package's loudness with the same numbers.
  */
-export const LOUDNESS = {
-  thresholdDb: -24,
-  kneeDb: 0,
-  ratio: 6,
-  attack: 0.003,
-  release: 0.25,
-  makeup: 2.2,
-} as const;
-
-/** Class volume 0..100 → master gain. Squared, so the slider feels even to the ear (perceptual). */
-export function volumeGain(volume: number): number {
-  const v = Math.max(0, Math.min(100, volume)) / 100;
-  return v * v;
-}
-
-const toDb = (x: number) => 20 * Math.log10(Math.max(1e-9, x));
-
-/** Static compressor curve (hard knee) in dB. */
-export function compressorCurveDb(inputDb: number): number {
-  return inputDb <= LOUDNESS.thresholdDb ? inputDb : LOUDNESS.thresholdDb + (inputDb - LOUDNESS.thresholdDb) / LOUDNESS.ratio;
-}
-
-/** Makeup gain the browser applies inside the DynamicsCompressorNode (Web Audio spec). */
-export const compressorMakeupDb = () => -compressorCurveDb(0) * 0.6;
-
-/**
- * Peak level in dBFS at the speakers of a cue whose notes add up to `peak` (one note: its gain, capped
- * at NOTE_GAIN_CAP when played) at class volume `volume` (0..100), once the compressor has settled.
- */
-export function outputPeakDb(peak: number, volume: number): number {
-  const input = toDb(peak * volumeGain(volume));
-  return compressorCurveDb(input) + compressorMakeupDb() + toDb(LOUDNESS.makeup);
-}
+export { compressorCurveDb, compressorMakeupDb, LOUDNESS, outputPeakDb, volumeGain } from '../../shared/themePackage/limits.ts';
 
 export interface Voice {
   priority: number;
