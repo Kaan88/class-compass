@@ -178,6 +178,28 @@ export interface TeacherPage {
 }
 
 /** Per-class module settings shown under the module's switch on the class settings page. */
+/**
+ * S16c (D-165): a component mounted once with the lesson board of a class+subject. It must render
+ * nothing visible and send nothing about students. `layoutSource` says where the board's layout came
+ * from (null while it loads).
+ */
+export interface BoardWatcherProps {
+  context: ClassroomContext;
+  layoutSource: 'default' | 'class' | 'all' | null;
+}
+export interface BoardWatcher {
+  key: string;
+  Component: ComponentType<BoardWatcherProps>;
+}
+
+/** S16c (D-165): a tab on Admin → Maintenance, after the built-in ones. */
+export interface MaintenanceTab {
+  key: string;
+  order: number;
+  label: MessageKey;
+  Component: ComponentType;
+}
+
 export interface SettingsPanel {
   Component: ComponentType<{ contextId: string }>;
 }
@@ -195,6 +217,10 @@ export interface ClientModuleManifest {
   studentCardAddons?: readonly StudentCardAddon[];
   teacherPages?: readonly TeacherPage[];
   settingsPanel?: SettingsPanel;
+  /** S16c (D-165): invisible components mounted with the lesson board (they render nothing on it). */
+  boardWatchers?: readonly BoardWatcher[];
+  /** S16c (D-165): extra read-only tabs on Admin → Maintenance (admin access, behind the PIN gate). */
+  maintenanceTabs?: readonly MaintenanceTab[];
   invalidations?: readonly CommandInvalidation[];
 }
 

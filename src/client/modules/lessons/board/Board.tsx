@@ -16,7 +16,7 @@ import { useCallback, useMemo, type ReactNode, type Ref } from 'react';
 import { BOX_CATALOGUE, effectiveLayout, type BoxKey, type ClassroomLayout } from '../../../../shared/classroomLayout.ts';
 import type { LessonState } from '../../../../shared/contracts/lessons.ts';
 import { useI18n } from '../../../lib/i18n.tsx';
-import { availableBoxKeys, type ClassroomContext } from '../../registry.ts';
+import { allBoardWatchers, availableBoxKeys, type ClassroomContext } from '../../registry.ts';
 import { BoxContent } from './Box.tsx';
 import { LayoutEditor } from './LayoutEditor.tsx';
 import { useClassroomLayout, useLayoutEditing, useWideEnough } from './layoutClient.ts';
@@ -130,6 +130,19 @@ export function LessonBoard({ context, lesson, onEnd }: { context: ClassroomCont
   const stored = q.data?.layout ?? null;
   // `available` is a new Set on every render: the layout is recomputed only when its contents change.
   const layout = useMemo(() => effectiveLayout(stored, available), [stored, availableKey]);
-  if (editing === context.id && wide) return <LayoutEditor key={context.id} initial={layout} source={q.data?.source ?? 'default'} context={context} lesson={lesson} onEnd={onEnd} boardRef={boardRef} />;
-  return <BoardRows layout={layout} context={context} lesson={lesson} onEnd={onEnd} boardRef={boardRef} />;
+  // Invisible module watchers (S16c, D-165), keyed by class so they mount again for another class.
+  const watchers = allBoardWatchers().map(({ key, Component }) => <Component key={`${key}-${context.id}`} context={context} layoutSource={q.data?.source ?? null} />);
+  if (editing === context.id && wide)
+    return (
+      <>
+        {watchers}
+        <LayoutEditor key={context.id} initial={layout} source={q.data?.source ?? 'default'} context={context} lesson={lesson} onEnd={onEnd} boardRef={boardRef} />
+      </>
+    );
+  return (
+    <>
+      {watchers}
+      <BoardRows layout={layout} context={context} lesson={lesson} onEnd={onEnd} boardRef={boardRef} />
+    </>
+  );
 }

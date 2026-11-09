@@ -100,6 +100,8 @@ exports, erasure, backups, credentials, link tokens or files.
 | `teacherPages` | `{ key, path, labelKey, Icon, order, menu?, group?, setupTab?, module?, Component }`: the route `/teacher/<path>` inside the PIN gate plus, unless `menu: false`, a tile and nav link (a sub-page such as counter history sets `menu: false`). S14e3 (D-156): `group: 'today'` puts the tile on the teacher menu (daily work only); `group: 'setup'` with `setupTab: 'classes' \| 'lessons' \| 'progress'` puts it in the Class setup hub (both test-enforced for every menu page); `module` hides the tile while the module is off in all of the teacher's class+subjects, and the address then shows an empty state. `Component` gets `{ search }`, the URL's string search parameters. Link with `<Link to="/teacher/$page" params={{ page: 'x' }}>` (add `search={{ id }}` to preselect something). |
 | `settingsPanel` | `{ Component }`, shown under the module's switch on the class settings page. |
 | `invalidations` | Outbox command prefix to the query keys to refresh. |
+| `boardWatchers` | S16c (D-165): `{ key, Component }` mounted invisibly with the lesson board (`{ context, layoutSource }`); renders nothing and never sends student data. |
+| `maintenanceTabs` | S16c (D-165): `{ key, order, label, Component }`, a read-only tab on Admin → Maintenance after the built-in ones. |
 
 Ordering is deterministic: lists are sorted by `order`, then by `key`. Orders must be unique per list
 (test-enforced), so pick a free multiple of 10.

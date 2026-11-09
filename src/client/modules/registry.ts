@@ -6,7 +6,7 @@
 import { registerInvalidation } from '../lib/outbox-client.ts';
 import { CLIENT_MODULES } from './index.ts';
 import { availableBoxes, type BoxKey } from '../../shared/classroomLayout.ts';
-import type { ClassroomContext, ClientModuleManifest, DashboardSlot, EndStepUi, SetupTab, StartLessonContribution, StartStep, StudentCardAddon, TeacherPage } from './types.ts';
+import type { BoardWatcher, ClassroomContext, ClientModuleManifest, DashboardSlot, EndStepUi, SetupTab, StartLessonContribution, StartStep, MaintenanceTab, StudentCardAddon, TeacherPage } from './types.ts';
 import type { ContextModule } from '../../shared/modules.ts';
 
 export type { ClassroomContext, StudentCardExtras } from './types.ts';
@@ -22,6 +22,8 @@ const enabled = (ctx: ClassroomContext, m: ClientModuleManifest['policyKey']) =>
 export const allDashboardSlots = (): DashboardSlot[] => byOrder(all((m) => m.dashboardSlots));
 export const allStartSteps = (): StartStep[] => byOrder(all((m) => m.startSteps));
 export const allTeacherPages = (): TeacherPage[] => byOrder(all((m) => m.teacherPages));
+export const allBoardWatchers = (): BoardWatcher[] => all((m) => m.boardWatchers);
+export const allMaintenanceTabs = (): MaintenanceTab[] => byOrder(all((m) => m.maintenanceTabs));
 
 /** What the teacher menu needs to know about the teacher's class+subjects: which modules are on. */
 export type MenuContexts = ReadonlyArray<{ modules: Partial<Record<ContextModule, boolean>> }>;

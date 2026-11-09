@@ -18,6 +18,7 @@ import { avatarsClientManifest } from './avatars/manifest.tsx';
 import { textChecksClientManifest } from './textChecks/manifest.tsx';
 import { superSpeakersClientManifest } from './superSpeakers/manifest.tsx';
 import { notificationsClientManifest } from './notifications/manifest.tsx';
+import { displayInfoClientManifest } from './displayInfo/manifest.tsx';
 import type { ClientModuleManifest } from './types.ts';
 
 export const CLIENT_MODULES: readonly ClientModuleManifest[] = [
@@ -37,4 +38,5 @@ export const CLIENT_MODULES: readonly ClientModuleManifest[] = [
   textChecksClientManifest,
   superSpeakersClientManifest,
   notificationsClientManifest,
+  displayInfoClientManifest,
 ];

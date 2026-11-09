@@ -316,6 +316,14 @@ An AI agent connected over MCP makes theme packages as well as an agent in the g
 - [x] Tests: `tests/server/mcp-themes.test.ts`, privacy registry scan and conformance still green; docs (THEMING, ai-tools EN/TR, D-164)
 - [ ] Tried end to end from Claude Code and claude.ai against the test site (needs the Access bypass and a redeploy; owner)
 
+## S16c Classroom screen size for administrators (owner request 2026-11-09)
+The owner cannot see the real classroom display, so the board records its last screen for administrators; a removable core module `displayInfo`, decision D-165, no migration (per-account user setting `displayInfo.lastSeen`).
+- [x] Board sends window and screen size, pixel ratio, density, theme, layout source, browser family + major and OS family (parsed on the client, never the full user agent), touch, reduced motion and text scale once per mount and on a debounced resize at most once a minute (`classroom` access, works while locked, rate-limited 12/min, strict Zod bounds and allow-list patterns; not an outbox command)
+- [x] Last sample overwritten per account plus the last 5 distinct sizes; Admin → Maintenance → Classroom screens (read-only table, admin only, not an AI tool); in the full export as a `user_settings` row
+- [x] Generic client hooks `boardWatchers` and `maintenanceTabs`, so removal is deleting the module's folders and list lines (steps in the server manifest and D-165)
+- [x] Tests: `tests/server/displayInfo.test.ts` (locked classroom, admin-only read, bounds, ring of 5, rate limit), `tests/client/displayInfo.test.tsx` (once on mount, debounce, user agent parsing), `e2e/display-info.spec.ts` (1366×768 board seen by the admin, axe); admin guide EN/TR privacy note
+- [ ] Read on the real classroom display after deployment (owner)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site

@@ -44,6 +44,7 @@ import { textChecksManifest } from './textChecks/manifest.ts';
 
 import { superSpeakersManifest } from './superSpeakers/manifest.ts';
 import { themesManifest } from './themes/manifest.ts';
+import { displayInfoManifest } from './displayInfo/manifest.ts';
 
 export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   authManifest,
@@ -73,6 +74,7 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   themesManifest,
   notificationsManifest,
   mcpManifest,
+  displayInfoManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */

@@ -16,6 +16,7 @@ import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { useMe } from '../../lib/session.ts';
 import { useRun } from '../../lib/useRun.ts';
+import { allMaintenanceTabs } from '../../modules/registry.ts';
 import { linkFromSearch, linkSearch, ReportsPage } from '../../reports/ReportsPage.tsx';
 import { SectionView } from '../../reports/ReportView.tsx';
 import { Button, buttonClass } from '../../ui/Button.tsx';
@@ -508,6 +509,8 @@ export function MaintenancePage() {
           { id: 'backups', label: t('maint.backupsTab'), content: <MaintenancePanel /> },
           { id: 'exports', label: t('maint.exportsTab'), content: <ExportsPanel /> },
           { id: 'rollover', label: t('maint.rolloverTab'), content: <RolloverPanel /> },
+          // Read-only tabs from module manifests (S16c, D-165).
+          ...allMaintenanceTabs().map(({ key, label, Component }) => ({ id: key, label: t(label), content: <Component /> })),
         ]}
       />
     </main>

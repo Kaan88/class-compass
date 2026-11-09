@@ -13,6 +13,7 @@
  */
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import { DisplayInfoRecord, EMPTY_DISPLAY_INFO } from '../../shared/contracts/displayInfo.ts';
 import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings } from '../../shared/notifications.ts';
 import { DEFAULT_VIEW_REF, ViewRef } from '../../shared/reportViews.ts';
 import type { Db } from '../db/client.ts';
@@ -31,6 +32,8 @@ export const USER_SETTINGS = {
   'reports.defaultView.admin': setting(ViewRef, DEFAULT_VIEW_REF),
   /** S14e3 (D-155): which notification categories the teacher gets, and the daily email digest (off by default). */
   'notifications.settings': setting(NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS),
+  /** S16c (D-165): the last classroom screen seen by this account (removable module `displayInfo`; not a preference, account metadata only the admin sees). */
+  'displayInfo.lastSeen': setting(DisplayInfoRecord, EMPTY_DISPLAY_INFO),
 } as const;
 
 export type UserSettingKey = keyof typeof USER_SETTINGS;
