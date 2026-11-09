@@ -269,10 +269,12 @@ function BadgesTab({ contextId, defs }: { contextId: string; defs: A.Achievement
   );
 }
 
-function OverviewTab({ contextId, linkedStudent }: { contextId: string; linkedStudent?: string | undefined }) {
+function OverviewTab({ contextId, linkedStudent, onLinkedClosed }: { contextId: string; linkedStudent?: string | undefined; onLinkedClosed?: () => void }) {
   const { t } = useI18n();
   const q = useQuery({ queryKey: overviewKey(contextId), queryFn: () => call(A.achievementsOverview, { contextId }) });
   // A notification's Open names the student: their achievements open once the list has them (S14i).
+  // Closing the dialog uses the link up (the page forgets it), so a later remount of this tab
+  // (Badges and back, another class and back) does not open it again.
   const [student, setStudent] = useState<string | null>(linkedStudent ?? null);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const d = q.data;
@@ -300,7 +302,17 @@ function OverviewTab({ contextId, linkedStudent }: { contextId: string; linkedSt
           ))}
         </ul>
       </section>
-      {shown ? <StudentDialog contextId={contextId} studentId={shown} manual={manual} onClose={() => setStudent(null)} /> : null}
+      {shown ? (
+        <StudentDialog
+          contextId={contextId}
+          studentId={shown}
+          manual={manual}
+          onClose={() => {
+            setStudent(null);
+            onLinkedClosed?.();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -317,6 +329,8 @@ export function AchievementsPage({ search }: { search: TeacherPageSearch }) {
   const contexts = useQuery({ queryKey: CONTEXTS_KEY, queryFn: () => call(School.myContexts, {}) });
   const list = contexts.data?.contexts ?? [];
   const [picked, setPicked] = useState<string>(search.contextId ?? '');
+  // The student named by the link, until their dialog has been closed once.
+  const [linked, setLinked] = useState(search.studentId);
   const ctx = list.find((c) => c.id === picked) ?? list[0];
   return (
     <main className="cc-page cc-stack" data-testid="achievements-page">
@@ -329,7 +343,7 @@ export function AchievementsPage({ search }: { search: TeacherPageSearch }) {
             key={ctx.id}
             label={t('teacher.achievements')}
             items={[
-              { id: 'overview', label: t('achievements.tab.overview'), content: <OverviewTab contextId={ctx.id} linkedStudent={ctx.id === search.contextId ? search.studentId : undefined} /> },
+              { id: 'overview', label: t('achievements.tab.overview'), content: <OverviewTab contextId={ctx.id} linkedStudent={ctx.id === search.contextId ? linked : undefined} onLinkedClosed={() => setLinked(undefined)} /> },
               { id: 'badges', label: t('achievements.tab.badges'), content: <BadgesLoader contextId={ctx.id} /> },
             ]}
           />

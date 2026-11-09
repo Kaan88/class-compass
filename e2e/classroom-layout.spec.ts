@@ -9,6 +9,10 @@
  *    End lesson, Attendance, the timer's Start and the class counter fully in view at every listed
  *    display, 1280x720 included (D-139). This closes the S14a "known gap" (D-143). The same holds
  *    with Turkish as the class language (longer stage names and counter words, D-099).
+ * 2b. Short displays (S14i review) at 1280x720, 1366x768 and 1920x1080, English and Turkish: no name
+ *    is split inside a word at Compact, Normal or Large; when the student grid cuts a row, "N more
+ *    students below" is shown and scrolls to them; at 1280x720 the layout editor's handles and "Move to
+ *    lesson tools" buttons above the grid are not hidden under the lesson tools tray.
  * 3. Compact / Normal / Large on this device; the timer keypad; the assistant panel in the dock (hide
  *    and show for this lesson); the class language mode.
  * 4. Customise layout: PIN dialog, keyboard and mouse edits, "Put in dock" / "Show as a box", resize,
@@ -302,6 +306,106 @@ test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Nor
     await endActiveLessons(page);
     await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false });
     for (const m of original) await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/${m.module}`, { enabled: m.enabled, config: m.config });
+    await officeCtx.close();
+  }
+});
+
+/** Names on the cards whose words are split over two lines ("Şimşe / k"): each word must be one piece. */
+async function splitNames(page: Page) {
+  return page.locator('.cc-student-card__name-text').evaluateAll((els) =>
+    els.flatMap((el) => {
+      const node = el.firstChild;
+      if (!node || node.nodeType !== Node.TEXT_NODE) return [];
+      const text = node.textContent ?? '';
+      const out: string[] = [];
+      for (const m of text.matchAll(/\S+/gu)) {
+        const r = document.createRange();
+        r.setStart(node, m.index!);
+        r.setEnd(node, m.index! + m[0].length);
+        const tops = new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top)));
+        if (tops.size > 1) out.push(`${text}: ${m[0]}`);
+      }
+      return out;
+    }),
+  );
+}
+
+test('short displays (S14i review): names never split inside a word at any size, a cut student row shows how many are below, editor controls in view', async ({ page, browser }) => {
+  test.setTimeout(240_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  await endActiveLessons(page);
+  const ctx = await context3A(page);
+  const officeCtx = await browser.newContext();
+  const office = await officeCtx.newPage();
+  await login(office, 'english');
+  try {
+    await startLesson(page, ctx.id);
+    for (const lang of ['en', 'tr'] as const) {
+      expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
+      for (const vp of VIEWPORTS.filter((v) => ['1280x720', '1366x768', '1920x1080'].includes(v.name))) {
+        const { ctx: c, p } = await onDevice(browser, page, vp);
+        try {
+          await openClassroom(p);
+          await expect(p.locator('.cc-student-card')).toHaveCount(19);
+          for (const size of [/^(Compact|Küçük)$/u, /^(Large|Büyük)$/u, /^Normal$/u]) {
+            if (!(await p.getByTestId('density-control').isVisible())) await p.getByTestId('classroom-settings').click();
+            await p.getByTestId('density-control').getByRole('button', { name: size }).click();
+            await p.keyboard.press('Escape');
+            await p.waitForTimeout(300);
+            expect(await splitNames(p), `${vp.name} ${lang} ${size}`).toEqual([]);
+          }
+          // Normal: when a row is cut, the cue says how many children are below and scrolls to them.
+          const visible = await cardsOnScreen(p);
+          const more = p.getByTestId('students-more');
+          if (visible < 19) {
+            await expect(more, `${vp.name} ${lang}`).toBeVisible();
+            await expect(more).toContainText(String(19 - visible));
+            // One or two presses bring the last card fully into the box; then the cue goes away.
+            for (let i = 0; i < 3 && (await more.count()); i += 1) {
+              await more.click();
+              await p.waitForTimeout(500);
+            }
+            await expect(more).toHaveCount(0);
+            const lastShown = await p.evaluate(() => {
+              const box = document.querySelector('[data-box="core.students"] > .cc-lesson-box__body')!.getBoundingClientRect();
+              const cards = document.querySelectorAll('.cc-student-card');
+              return cards[cards.length - 1]!.getBoundingClientRect().bottom <= Math.min(box.bottom, window.innerHeight) + 1;
+            });
+            expect(lastShown, `${vp.name} ${lang}: the last card in view`).toBe(true);
+          } else await expect(more, `${vp.name} ${lang}`).toHaveCount(0);
+          // The layout editor: the handle and "Move to lesson tools" of every box above the student grid
+          // are in view and not under the lesson tools tray (a narrow box keeps its size for screen
+          // readers only). The student grid's own frame is reached by scrolling the rows at this height
+          // (a known gap, ROADMAP S14i).
+          if (vp.name === '1280x720') {
+            await p.getByTestId('classroom-settings').click();
+            await p.getByTestId('customise-layout').click();
+            const pin = p.getByTestId('pin-dialog').locator('input').first();
+            await pin.fill(PIN);
+            await pin.press('Enter');
+            await expect(p.getByTestId('layout-editor')).toBeVisible();
+            const hidden = await p.locator('[data-handle]:not([data-handle="core.students"]), [data-testid^="layout-to-dock-"]').evaluateAll((els) =>
+              els
+                .filter((e) => {
+                  const r = e.getBoundingClientRect();
+                  const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                  return r.bottom > window.innerHeight || r.right > window.innerWidth || !top || !(e === top || e.contains(top));
+                })
+                .map((e) => (e as HTMLElement).dataset.handle ?? (e as HTMLElement).dataset.testid),
+            );
+            expect(hidden, `${vp.name} ${lang}: editor controls out of view`).toEqual([]);
+            await p.getByTestId('layout-editor').getByRole('button', { name: /^(Cancel|Vazgeç|İptal)$/u }).click();
+            await expect(p.getByTestId('layout-editor')).toHaveCount(0);
+          }
+        } finally {
+          await c.close();
+        }
+      }
+    }
+  } finally {
+    await endActiveLessons(page);
+    await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false });
     await officeCtx.close();
   }
 });

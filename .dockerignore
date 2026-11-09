@@ -1,22 +1,28 @@
-# Keep the build context small and free of secrets and real data (D-018).
+# Keep the build context small and free of secrets and real data (D-018). Every output, secret and
+# data pattern of .gitignore has a rule here too (tests/scripts/docker.test.ts checks it). File
+# patterns start with **/ because in .dockerignore a bare `*.db` only matches at the context root.
 .git
 .github
 node_modules
 dist
+build
+.next
 coverage
 playwright-report
 test-results
 blob-report
-*.tsbuildinfo
+# Usability screenshot sets (npm run usability:screens): git-ignored output, often over a gigabyte.
+usability-shots
+**/*.tsbuildinfo
 # Secrets and local configuration
-.env
-.env.*
+**/.env
+**/.env.*
 !.env.example
-*.pem
-*.key
+**/*.pem
+**/*.key
 secrets/
-app.env
-tunnel.env
+**/app.env
+**/tunnel.env
 deploy/*.env
 # Real data: databases, uploads, backups, exports
 data/
@@ -24,15 +30,16 @@ data-*/
 uploads/
 storage/
 backups/
-*.db
-*.db-wal
-*.db-shm
-*.sqlite
-*.sqlite3
-*.tar
-*.zip
-*.dump
-*.bak
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/*.sqlite
+**/*.sqlite3
+**/*.tar
+**/*.zip
+**/*.dump
+**/*.sql.gz
+**/*.bak
 # Not needed in the image
 e2e/
 tests/
@@ -44,4 +51,6 @@ docs/*
 .claude/
 .vscode/
 .idea/
-*.log
+**/*.log
+**/.DS_Store
+**/Thumbs.db

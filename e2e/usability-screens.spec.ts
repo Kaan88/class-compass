@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { dictionaries, type Locale } from '../src/shared/i18n/index.ts';
 import { DEFAULT_THEME, THEME_KEYS } from '../src/shared/themes.ts';
 import { api, ensurePin, login, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
@@ -138,12 +138,23 @@ interface ShotSpec {
   theme?: string;
   /** Overlays that animate in (celebrations) are photographed while they play. */
   animations?: 'allow' | 'disabled';
+  /**
+   * A picture of this element alone. In headless Chromium the Customise layout PIN dialog was missing
+   * from page captures (Playwright's and a DevTools one) although it was open and on top: the DOM and
+   * `elementFromPoint` show it, the PIN e2e types into it, and a capture of the dialog itself shows it
+   * (S14i review). That state is photographed this way.
+   */
+  element?: Locator;
 }
 
 async function shot(page: Page, s: ShotSpec) {
   await settle(page);
   const theme = s.theme ?? ((await page.evaluate(() => document.documentElement.dataset.theme ?? '').catch(() => '')) || 'default');
   const file = `${[s.area, ...[s.page, s.state, s.dev.name, s.lang, theme].map(slug)].join('__')}.png`;
+  if (s.element) {
+    await s.element.screenshot({ path: path.join(OUT, file), animations: s.animations ?? 'disabled', caret: 'hide', timeout: 90_000 });
+    return;
+  }
   await page.screenshot({ path: path.join(OUT, file), fullPage: true, animations: s.animations ?? 'disabled', caret: 'hide', timeout: 90_000 });
 }
 
@@ -696,6 +707,26 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
       await d.keyboard.press('Escape');
     });
 
+    // S14a (D-145): the "Sound is off · Turn sound on" chip in the top bar. Headless Chromium lets
+    // audio play after the first tap, so the chip is brought up with this device's sounds switch off;
+    // its tap turns them back on.
+    await step(`classroom sound chip ${where}`, async () => {
+      await d.getByTestId('classroom-settings').click();
+      try {
+        const sw = d.getByRole('switch', { name: nm('Sounds on this device') });
+        // The switch's input is visually hidden (React Aria): a click event on it toggles it.
+        if (await sw.isChecked()) await sw.dispatchEvent('click');
+        await expect(sw).not.toBeChecked();
+      } finally {
+        await d.keyboard.press('Escape');
+      }
+      const chip = d.getByTestId('sound-chip');
+      await expect(chip).toBeVisible();
+      await S('top-bar', 'sound-chip');
+      await chip.click();
+      await expect(chip).toHaveCount(0);
+    });
+
     // S14e2 (D-154): a card's name opens the small positive card (never statistics).
     await step(`classroom student card ${where}`, async () => {
       await d.getByTestId('student-card-name').nth(2).click();
@@ -723,6 +754,19 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
           await expect(view).toBeHidden();
         });
       }
+      // Attendance is the dock's first item but draws its own button and dialog (no dock spec, D-148).
+      await step(`classroom dock view attendance ${where}`, async () => {
+        await dock.getByRole('button', { name: nm('Attendance') }).click();
+        const dialog = d.getByRole('dialog');
+        try {
+          await expect(dialog).toBeVisible();
+          await d.waitForTimeout(500);
+          await S('dock-view', 'attendance');
+        } finally {
+          await dialog.getByRole('button', { name: nm('Done') }).click();
+          await expect(dialog).toHaveCount(0);
+        }
+      });
     });
 
     // S14b (D-148): Customise layout asks for the PIN, then the editor; Cancel relocks.
@@ -737,7 +781,8 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
       await customise.click();
       const dialog = d.getByTestId('pin-dialog');
       await expect(dialog).toBeVisible();
-      await S('layout-editor', 'pin-dialog');
+      await expect(dialog.locator('input').first()).toBeVisible();
+      await shot(d, { area: 'classroom', page: 'layout-editor', state: 'pin-dialog', dev, lang, element: dialog });
       await dialog.locator('input').first().fill(PIN);
       await dialog.locator('input').first().press('Enter');
       const editor = d.getByTestId('layout-editor');
@@ -1422,6 +1467,145 @@ test('AI tools pages and the consent page', async ({ browser }) => {
     await setLocale(ap, 'en');
     // Switching AI tools off also ends every OAuth connection and waiting request (D-160).
     await api(ap, 'PUT', '/api/admin/ai-tools', { mcpEnabled: before.mcpEnabled, aiStudentDataAllowed: before.aiStudentDataAllowed });
+    await admin.context.close();
+  }
+});
+
+// ================================================================== 200 % text (S14i review)
+/**
+ * The S14 screens at the largest text size (Profile → Text size 200 %, `textScale: 200`) on a phone and
+ * a laptop, in English and Turkish: the teacher menu and Class setup hub, notifications (list and
+ * settings), Goals (with the starters library), reports with Customise open, the statistics drawer, the
+ * achievements dialog, Profile; Admin → Themes with an import preview and Admin → AI tools; the
+ * classroom's small positive card. Files end in `text-200`. The text size is put back in `finally`.
+ */
+test('S14 screens at 200 % text', async ({ browser }) => {
+  const teacher = await signIn(browser, 'english');
+  const admin = await signIn(browser, 'admin');
+  const tp = teacher.page;
+  const ap = admin.page;
+  await ensurePin(tp);
+  const scaleOf = async (p: Page) => (await api(p, 'GET', '/api/auth/me')).body.textScale as number;
+  const teacherScale = await scaleOf(tp);
+  const adminScale = await scaleOf(ap);
+  const RUNS: Array<[Device, Locale]> = [
+    [DEV.phone, 'en'],
+    [DEV.laptop, 'en'],
+    [DEV.laptop, 'tr'],
+    [DEV.phone, 'tr'],
+  ];
+  try {
+    for (const p of [tp, ap]) expect((await api(p, 'PATCH', '/api/auth/preferences', { textScale: 200 })).status).toBe(200);
+    for (const [dev, lang] of RUNS) {
+      await setLocale(tp, lang);
+      await setLocale(ap, lang);
+      const where = `${dev.name} ${lang}`;
+      const T = (pg: string, state: string) => ({ area: 'teacher' as const, page: pg, state: `${state}-text-200`, dev, lang });
+      const { context, page } = await newPage(browser, dev, lang, { storageState: await teacher.context.storageState() });
+      try {
+        await step(`text 200 teacher/menu ${where}`, async () => {
+          await page.goto('/teacher');
+          await expect(page.getByTestId('teacher-menu')).toBeVisible();
+          await shot(page, T('menu', 'default'));
+        });
+        for (const p of ['setup', 'notifications', 'goals', 'reports', 'students', 'achievements', 'profile']) {
+          await step(`text 200 teacher/${p} ${where}`, async () => {
+            await page.goto(`/teacher/${p}`);
+            await waitForHeading(page);
+            await page.waitForTimeout(500);
+            await chooseClass(page);
+            const n = await page.locator('main [role="tab"]').count();
+            if (n === 0) await shot(page, T(p, 'default'));
+            else
+              await eachTab(page, async (key) => {
+                await chooseClass(page);
+                await shot(page, T(p, `tab-${key}`));
+              });
+          });
+        }
+        await step(`text 200 teacher/reports customise ${where}`, async () => {
+          await page.goto('/teacher/reports');
+          await waitForHeading(page);
+          await chooseClass(page);
+          await page.getByRole('button', { name: nm('Customise') }).first().click();
+          await expect(page.getByTestId('report-view-tree')).toBeVisible();
+          await shot(page, T('reports', 'views-customise-open'));
+        });
+        await step(`text 200 teacher/students stats drawer ${where}`, async () => {
+          await page.goto('/teacher/students');
+          await waitForHeading(page);
+          await chooseClass(page);
+          await page.getByTestId('student-name').first().click();
+          const drawer = page.getByTestId('student-stats');
+          await expect(drawer.getByTestId('student-stats-report')).toBeVisible();
+          await page.waitForTimeout(800);
+          await shot(page, T('students', 'stats-drawer'));
+        });
+        await step(`text 200 teacher/achievements dialog ${where}`, async () => {
+          await page.goto('/teacher/achievements');
+          await waitForHeading(page);
+          await chooseClass(page);
+          await page.getByTestId('achievements-student-open').first().click();
+          await expect(page.getByTestId('achievements-student-dialog')).toBeVisible();
+          await page.waitForTimeout(600);
+          await shot(page, T('achievements', 'student-dialog'));
+        });
+      } finally {
+        await context.close();
+      }
+      const a = await newPage(browser, dev, lang, { storageState: await admin.context.storageState() });
+      try {
+        await step(`text 200 admin/themes ${where}`, async () => {
+          await a.page.goto('/admin/themes');
+          await waitForHeading(a.page);
+          await a.page.getByTestId('theme-file').setInputFiles({ name: 'ocean.theme.json', mimeType: 'application/json', buffer: Buffer.from(read('docs/examples/ocean.theme.json')) });
+          await a.page.getByRole('button', { name: nm('Check package') }).click();
+          await expect(a.page.getByTestId('theme-package-preview')).toBeVisible();
+          await a.page.waitForTimeout(600);
+          await shot(a.page, { area: 'admin', page: 'themes', state: 'import-preview-text-200', dev, lang });
+        });
+        await step(`text 200 admin/ai-tools ${where}`, async () => {
+          await a.page.goto('/admin/ai-tools');
+          await expect(a.page.getByTestId('admin-ai-tools')).toBeVisible();
+          await a.page.waitForTimeout(600);
+          await shot(a.page, { area: 'admin', page: 'ai-tools', state: 'default-text-200', dev, lang });
+        });
+      } finally {
+        await a.context.close();
+      }
+    }
+    // The classroom's small positive card (a display of its own: classroom mode locks only that session).
+    for (const lang of ['en', 'tr'] as const) {
+      await step(`text 200 classroom positive card ${lang}`, async () => {
+        await endActiveLessons(tp);
+        const ctx3A = await contextOf(tp, '3-A');
+        const r = await api(tp, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'lesson.start', contextId: ctx3A.id, payload: { contextId: ctx3A.id, othersPresent: true, attendance: [] } }] });
+        expect(r.body.results[0].ok).toBe(true);
+        await setLocale(tp, lang);
+        await setClassLanguage(tp, ctx3A.classId, lang === 'tr' ? { mainLanguage: 'tr', secondLanguageEnabled: true } : { mainLanguage: 'en', secondLanguageEnabled: false });
+        const { context, page } = await newPage(browser, DEV.laptop, lang);
+        try {
+          await login(page, 'english');
+          await openClass(page);
+          await expect(page.getByTestId('lesson-dashboard')).toBeVisible();
+          await page.waitForTimeout(800);
+          await shot(page, { area: 'classroom', page: 'dashboard', state: 'density-normal-text-200', dev: DEV.laptop, lang });
+          await page.getByTestId('student-card-name').nth(2).click();
+          await expect(page.getByTestId('classroom-student-card')).toBeVisible();
+          await page.waitForTimeout(600);
+          await shot(page, { area: 'classroom', page: 'student-card', state: 'positive-card-text-200', dev: DEV.laptop, lang });
+        } finally {
+          await context.close();
+        }
+      });
+    }
+  } finally {
+    await endActiveLessons(tp).catch(() => undefined);
+    const ctx3A = await contextOf(tp, '3-A').catch(() => null);
+    if (ctx3A) await setClassLanguage(tp, ctx3A.classId, { mainLanguage: 'en', secondLanguageEnabled: false }).catch(() => undefined);
+    await api(tp, 'PATCH', '/api/auth/preferences', { textScale: teacherScale, locale: 'en' });
+    await api(ap, 'PATCH', '/api/auth/preferences', { textScale: adminScale, locale: 'en' });
+    await teacher.context.close();
     await admin.context.close();
   }
 });

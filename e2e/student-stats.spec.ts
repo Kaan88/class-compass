@@ -163,10 +163,14 @@ test('a name on the classroom screen opens the positive-only card, apart from th
         document.documentElement.style.fontSize = scale;
         const range = document.createRange();
         range.selectNodeContents(btn);
-        const textRight = Math.max(...Array.from(range.getClientRects(), (r) => r.right));
+        const lines = Array.from(range.getClientRects());
+        const textRight = Math.max(...lines.map((r) => r.right));
         if (btn.scrollWidth > btn.clientWidth + 1) problems.push(`${scale}: name scrolls (${btn.scrollWidth} > ${btn.clientWidth})`);
         if (textRight > btn.getBoundingClientRect().right + 1) problems.push(`${scale}: text leaves the name button`);
-        if (add && textRight > add.getBoundingClientRect().left) problems.push(`${scale}: text runs under the + button`);
+        // Compact board cards put the + button on the line under the name (S14i review), so a line of
+        // text is a problem only where it really meets the button.
+        const a = add?.getBoundingClientRect();
+        if (a && lines.some((r) => r.right > a.left && r.left < a.right && r.bottom > a.top && r.top < a.bottom)) problems.push(`${scale}: text runs under the + button`);
       }
       shell.dataset.density = before.density ?? '';
       art.style.width = before.width;

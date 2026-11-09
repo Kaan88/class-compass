@@ -116,7 +116,7 @@ Under the top bar the lesson board is built from boxes, from top to bottom:
 
 1. **A wide row** with the **routine**, every stage visible, next to a big **timer**.
 2. **Today's focus** (the lesson topic, with **Change**) and the **counter bar**.
-3. **The student cards**, across the whole width. **Hide students** / **Show students** above them folds the cards away (for example while you show something on the board).
+3. **The student cards**, across the whole width. **Hide students** / **Show students** above them folds the cards away (for example while you show something on the board). On a smaller screen (a 1280×720 projector) not every card fits: the cards scroll inside their box, and a **… more students below** button at the bottom says how many are hidden and scrolls to them.
 4. **Lesson tools**: a row of big buttons at the bottom: **Attendance**, **Daily Assistant**, **Secret Students**, **Groups**, **Homework** and **Achievements**. A button opens its panel full screen; the board under it waits until you close the panel with **Close** (or the Escape key). Messages and **Undo** for what you do in a panel appear inside the panel. A small number on a button counts something for the class, for example the secret students chosen; it never shows anything private. **End lesson** always stays at the end of the row.
 
 A box whose module is switched off for this class is simply not there, and its neighbours take the space. Short messages (for example **Lesson started: 3-A · English**) appear for a moment at the bottom left. Messages with **Undo** stay a little longer.

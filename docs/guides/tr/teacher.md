@@ -116,7 +116,7 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
 
 1. **Geniş bir satır**: bütün aşamaları görünen **rutin** ve yanında büyük bir **zamanlayıcı**.
 2. **Bugünün odağı** (dersin konusu, **Değiştir** ile) ve **sınıf çubuğu** (sayaç).
-3. Bütün genişliği kaplayan **öğrenci kartları**. Üstlerindeki **Öğrencileri gizle** / **Öğrencileri göster** kartları katlar (örneğin tahtada bir şey gösterirken).
+3. Bütün genişliği kaplayan **öğrenci kartları**. Üstlerindeki **Öğrencileri gizle** / **Öğrencileri göster** kartları katlar (örneğin tahtada bir şey gösterirken). Daha küçük bir ekranda (1280×720 bir projeksiyon) kartların hepsi sığmaz: kartlar kendi kutularının içinde kayar, en alttaki **Aşağıda … öğrenci daha var** düğmesi kaç öğrencinin görünmediğini söyler ve onlara kaydırır.
 4. **Ders araçları**: altta büyük düğmelerden oluşan bir satır: **Yoklama**, **Günün Yardımcısı**, **Gizli Öğrenciler**, **Gruplar**, **Ödevler** ve **Başarılar**. Bir düğme kendi panelini tam ekran açar; siz paneli **Kapat** düğmesiyle (ya da Esc tuşuyla) kapatana kadar alttaki pano bekler. Bir panelde yaptığınız işlerin mesajları ve **Geri al** düğmesi panelin içinde görünür. Bir düğmenin üstündeki küçük sayı sınıfla ilgili bir şeyi sayar, örneğin seçilen gizli öğrencileri; özel hiçbir şey göstermez. **Dersi bitir** her zaman satırın sonunda kalır.
 
 Modülü bu sınıfta kapalı olan bir kutu hiç görünmez; boşalan yeri yanındaki kutular alır. Kısa mesajlar (örneğin **Ders başladı: 3-A · İngilizce**) sol altta kısa bir süre görünür. **Geri al** içeren mesajlar biraz daha uzun kalır.

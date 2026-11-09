@@ -47,6 +47,8 @@ function apply() {
   html.dataset.sounds = state.classSounds && state.deviceSounds ? 'on' : 'off';
   html.lang = state.locale;
   html.style.setProperty('--cc-text-scale', String(Math.min(200, Math.max(80, state.textScale)) / 100));
+  // For layout rules that only change at a large text size (the admin top bar on a phone, S14i).
+  html.dataset.text = state.textScale >= 150 ? 'large' : 'normal';
 }
 
 export function setDisplay(patch: Partial<DisplayState>) {

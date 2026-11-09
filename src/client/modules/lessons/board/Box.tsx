@@ -3,10 +3,11 @@
  * dashboard slot (`presentation="box"`). A box whose slot renders nothing is hidden by the stylesheet
  * (its row neighbours take the space), so a module with nothing to show never leaves an empty card.
  */
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { BoxKey, ClassroomLayout } from '../../../../shared/classroomLayout.ts';
 import type { LessonState } from '../../../../shared/contracts/lessons.ts';
 import type { MessageKey } from '../../../../shared/i18n/index.ts';
+import { motionAllowed, useDisplay } from '../../../lib/display.ts';
 import { useI18n } from '../../../lib/i18n.tsx';
 import { Button } from '../../../ui/Button.tsx';
 import { IconChevronDown, IconChevronUp } from '../../../ui/icons.tsx';
@@ -26,9 +27,43 @@ const readGridOpen = () => {
   }
 };
 
+/**
+ * How many student cards are not fully in view below the bottom of the box that scrolls the grid
+ * (S14i review): on a short display (1280×720) the grid scrolls inside its box and a cut row must not
+ * hide that more children are there. 0 when the box does not scroll (the page scrolls below 64rem).
+ */
+export function useCardsBelow(sectionRef: RefObject<HTMLElement | null>, deps: readonly unknown[]): number {
+  const [below, setBelow] = useState(0);
+  useEffect(() => {
+    const section = sectionRef.current;
+    const scroller = section?.parentElement;
+    if (!section || !scroller) return;
+    const measure = () => {
+      const scrolls = scroller.scrollHeight > scroller.clientHeight + 1 && /auto|scroll/u.test(getComputedStyle(scroller).overflowY);
+      if (!scrolls) return setBelow(0);
+      const bottom = scroller.getBoundingClientRect().bottom;
+      let n = 0;
+      for (const card of section.querySelectorAll('.cc-student-card')) if (card.getBoundingClientRect().bottom > bottom + 1) n += 1;
+      setBelow(n);
+    };
+    measure();
+    scroller.addEventListener('scroll', measure, { passive: true });
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    ro?.observe(scroller);
+    ro?.observe(section);
+    return () => {
+      scroller.removeEventListener('scroll', measure);
+      ro?.disconnect();
+    };
+  }, [sectionRef, ...deps]);
+  return below;
+}
+
 /** The student heading (count, show/hide, the modules' summaries) and the card grid (scrolls inside its box). */
 function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: LessonState }) {
   const { t } = useI18n();
+  const display = useDisplay();
+  const sectionRef = useRef<HTMLElement>(null);
   const roster = useLessonRoster(context.id, lesson.id);
   const [gridOpen, setGridOpen] = useState(readGridOpen);
   // The classroom card a tapped name opens (S14e2, D-154): positive things only, no full statistics.
@@ -37,6 +72,11 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
   const cardStudent = cardFor ? students.find((s) => s.id === cardFor) : undefined;
   const addons = useStudentCardAddons(context, lesson);
   const extrasFor = (id: string, name: string): StudentCardExtras => Object.assign({}, ...addons.map((a) => a.cardProps(id, name))) as StudentCardExtras;
+  const below = useCardsBelow(sectionRef, [gridOpen, students.length]);
+  const showMore = () => {
+    const scroller = sectionRef.current?.parentElement;
+    scroller?.scrollBy({ top: Math.max(80, scroller.clientHeight * 0.8), behavior: motionAllowed(display) ? 'smooth' : 'auto' });
+  };
   const toggleGrid = () => {
     const next = !gridOpen;
     setGridOpen(next);
@@ -47,7 +87,7 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
     }
   };
   return (
-    <section className="cc-students-box" aria-labelledby="cc-students-title">
+    <section ref={sectionRef} className="cc-students-box" aria-labelledby="cc-students-title">
       <div className="cc-row cc-students-box__head">
         <h2 id="cc-students-title" className="cc-h2">
           {t('lesson.students', { count: students.length })}
@@ -67,6 +107,12 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
             ))}
           </StudentGrid>
         </div>
+      ) : null}
+      {gridOpen && below > 0 ? (
+        <Button size="small" className="cc-students-box__more" onPress={showMore} aria-controls="cc-student-grid" data-testid="students-more">
+          <IconChevronDown />
+          {t('lesson.moreStudents', { count: below })}
+        </Button>
       ) : null}
       {cardStudent ? <StudentCardDialog contextId={context.id} student={cardStudent} onClose={() => setCardFor(null)} /> : null}
     </section>

@@ -47,10 +47,68 @@ describe('Dockerfile', () => {
 });
 
 describe('.dockerignore', () => {
-  it('keeps secrets and real data out of the build context', () => {
-    const ignore = read('.dockerignore').split(/\r?\n/u);
-    for (const p of ['.env', '.env.*', 'data/', 'uploads/', 'backups/', '*.db', '*.sqlite', 'node_modules', '.git', 'app.env', 'tunnel.env', 'deploy/*.env']) expect(ignore, p).toContain(p);
-    expect(ignore).toContain('!.env.example');
+  it('keeps secrets, real data and local output out of the build context, at any depth for file patterns', () => {
+    const outside = [
+      '.env',
+      '.env.local',
+      'deploy/.env',
+      'app.env',
+      'tunnel.env',
+      'deploy/app.env',
+      'deploy/prod.env',
+      'secrets/k',
+      'x.pem',
+      'deploy/certs/x.pem',
+      'x.key',
+      'data/app.db',
+      'data-test/app.db',
+      'data-e2e/app.db-wal',
+      'src/server/stray.db',
+      'stray.sqlite',
+      'uploads/x',
+      'storage/x',
+      'backups/x.tar',
+      'nested/backup.zip',
+      'dump/x.dump',
+      'x.sql.gz',
+      'x.bak',
+      'server.log',
+      'logs/server.log',
+      // Local output: the usability crawl (1 GB and more), test reports, builds, editors, worktrees.
+      'usability-shots/s14/a.png',
+      'usability-shots/after/b.png',
+      'test-results/x/trace.zip',
+      'playwright-report/index.html',
+      'blob-report/x',
+      'coverage/index.html',
+      'node_modules/x/index.js',
+      'dist/client/index.html',
+      'build/x',
+      'tsconfig.tsbuildinfo',
+      '.claude/worktrees/wf/x.ts',
+      '.git/HEAD',
+      '.DS_Store',
+      'src/.DS_Store',
+    ];
+    for (const p of outside) expect(inContext(p), `${p} stays out of the build context`).toBe(false);
+    expect(inContext('.env.example')).toBe(true);
+  });
+
+  it('every output, secret and data pattern of .gitignore is also left out of the build context', () => {
+    // Sample paths for each .gitignore pattern: `*` becomes a name, a folder pattern gets a file in it,
+    // and a pattern without a slash (which git applies at any depth) is also tried one folder down.
+    const patterns = read('.gitignore')
+      .split(/\r?\n/u)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#') && !l.startsWith('!'));
+    expect(patterns).toContain('usability-shots/');
+    for (const pattern of patterns) {
+      const dir = pattern.endsWith('/');
+      const base = pattern.replace(/\/$/u, '').replace(/\*/gu, 'sample');
+      const samples = [dir ? `${base}/file.txt` : base];
+      if (!base.includes('/') && !dir) samples.push(`src/${base}`);
+      for (const s of samples) expect(inContext(s), `${s} (from .gitignore ${pattern}) stays out of the build context`).toBe(false);
+    }
   });
 });
 

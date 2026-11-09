@@ -210,6 +210,11 @@ a {
     padding-inline: 0.5rem;
     white-space: nowrap;
   }
+  /* At 150–200 % text "Administration" no longer fits beside them and was drawn over them (S14i
+     review): then Help and Sign out move under the title. */
+  html[data-text='large'] .cc-topbar--compact {
+    flex-wrap: wrap;
+  }
   .cc-menu-grid--compact {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
     gap: 0.5rem;
@@ -255,6 +260,26 @@ a {
   height: 2rem;
   flex: none;
   color: var(--cc-accent);
+}
+/* A narrow menu at a large text size (a phone at 150–200 %, S14i review): beside the icon a tile had
+   room for a few letters per line ("Atten / dance", "Notifications" one letter a line next to the
+   count). The icon (and the bell's count) then sit above the label, which gets the tile's width.
+   `rem` here is the scaled root size, so this applies only when the text is large for the width. */
+.cc-menu-grid {
+  container-type: inline-size;
+}
+@container (max-width: 17rem) {
+  .cc-menu-tile {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.75rem 0.9rem;
+    font-size: 1rem;
+  }
+  .cc-menu-tile.cc-bell-tile .cc-bell__count {
+    margin-left: 0;
+  }
 }
 
 /* ------------------------------------------------------------------ buttons */
@@ -2012,6 +2037,19 @@ html:has(.cc-classroom) {
   margin: 0;
   font-size: 1.15rem;
 }
+/* When the grid scrolls inside its box and a row is cut (a short display, 1280×720), a cue at the
+   bottom says how many children are below and scrolls to them (S14i review, D-148). */
+.cc-students-box__more.cc-btn {
+  position: sticky;
+  bottom: 0.3rem;
+  z-index: 2;
+  align-self: center;
+  min-height: var(--cc-touch);
+  margin-top: -0.2rem;
+  border-width: var(--cc-border-width-strong);
+  border-color: var(--cc-accent-strong);
+  box-shadow: var(--cc-shadow-raised);
+}
 /* The dock: big buttons for the panels in the dock, a spacer, End lesson at the end. */
 .cc-dock {
   display: flex;
@@ -2258,6 +2296,14 @@ html:has(.cc-classroom) {
   --cc-card-min: 10rem;
   --cc-card-avatar: 2rem;
 }
+/* Compact cards are too narrow for a name beside both the avatar and the + button ("Şimşe / k" at
+   1280×720, S14i review): the name takes the whole first line next to the avatar, the + button sits
+   beside the count under it, so a name breaks only between words. */
+.cc-classroom[data-density='compact'] .cc-lesson-board .cc-student-card {
+  grid-template-areas:
+    'avatar name name'
+    'meta meta add';
+}
 .cc-classroom[data-density='large'] .cc-lesson-board {
   --cc-card-min: 15rem;
   --cc-card-avatar: 3rem;
@@ -2460,6 +2506,20 @@ html:has(.cc-classroom) {
   color: var(--cc-text);
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
+}
+/* In a narrow box (a 4/12 box below about 1700 px) the size is kept for screen readers only, so the
+   handle and "Move to lesson tools" stay on one line and are not cut off by the lesson tools tray on
+   a short display (S14i review, 1280×720). */
+@container (max-width: 34rem) {
+  .cc-layout-frame__size {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 .cc-layout-frame__wsplit,
 .cc-layout-rowsplit {
@@ -6012,6 +6072,14 @@ html[data-cursor='off'] * {
   .cc-page:where(:not(.cc-student)) .cc-btn {
     max-width: 100%;
     text-align: center;
+  }
+  /* At a large text size the side padding of a button shrinks, so its words keep their room
+     ("Customis / e", "Ope / n the classroom screen" at 200 %, S14i review). Unchanged at 100 %. */
+  .cc-page:where(:not(.cc-student)) .cc-btn {
+    padding-inline: min(1.1rem, calc(4.8vw / var(--cc-text-scale)));
+  }
+  .cc-page:where(:not(.cc-student)) .cc-btn--big {
+    padding-inline: min(1.75rem, calc(7.5vw / var(--cc-text-scale)));
   }
   .cc-page:where(:not(.cc-student)) .cc-att-chip {
     white-space: normal;

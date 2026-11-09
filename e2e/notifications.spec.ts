@@ -7,6 +7,9 @@
  * - The menu: Today tiles, one Class setup tile and its hub with tabs; a module switched off in every
  *   class of the teacher hides its tile, and its old address shows an empty state (which says so when
  *   the administrator turned the module off school-wide); axe.
+ * - Open preselects (S14i): the achievements dialog opens once for the linked student; avatars, student
+ *   links and the kind words check choose the class and mark the student's row (aria-current). The
+ *   blocked word and the notice switch are put back in `finally`.
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
@@ -156,5 +159,73 @@ test('teacher menu: Today tiles, one Class setup hub, and pages of modules that 
     }
   } finally {
     await adminCtx.close();
+  }
+});
+
+test('Open links preselect: the achievements dialog opens once, the class lists mark the student (S14i, D-155)', async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  const contexts = await contextsOf(page);
+  // A class+subject that is not the page's default choice, so the preselection is what picks it.
+  const target = contexts.filter((c) => c.classId !== contexts[0]!.classId).at(-1)!;
+  expect(target).toBeTruthy();
+  const roster = (await api(page, 'GET', `/api/classroom/contexts/${target.id}/roster`)).body.students as Array<{ id: string; fullName: string }>;
+  const student = roster[2]!;
+  const classSelect = page.getByRole('main').getByLabel('Class', { exact: true });
+
+  // Achievements: the student's dialog opens; once closed, it does not come back when the tab remounts.
+  await page.goto(`/teacher/achievements?contextId=${target.id}&studentId=${student.id}`);
+  const dialog = page.getByTestId('achievements-student-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: student.fullName })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(classSelect).toHaveValue(target.id);
+  await page.getByRole('tab', { name: 'All achievements' }).click();
+  await page.getByRole('tab', { name: 'Students and settings' }).click();
+  await expect(page.getByTestId('achievements-student-open').first()).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  await classSelect.selectOption(contexts[0]!.id);
+  await classSelect.selectOption(target.id);
+  await expect(page.getByTestId('achievements-student-open').first()).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+
+  // Avatars and student links: the class is chosen and the student's row is marked.
+  await page.goto(`/teacher/avatars?classId=${target.classId}&studentId=${student.id}`);
+  await expect(classSelect).toHaveValue(target.classId);
+  const avatarRow = page.getByTestId('avatars-page').locator('li[aria-current="true"]');
+  await expect(avatarRow).toHaveCount(1);
+  await expect(avatarRow).toContainText(student.fullName);
+  await page.goto(`/teacher/student-links?classId=${target.classId}&studentId=${student.id}`);
+  await expect(classSelect).toHaveValue(target.classId);
+  const linkRow = page.locator('[data-testid="link-row"][aria-current="true"]');
+  await expect(linkRow).toHaveCount(1);
+  await expect(linkRow).toContainText(student.fullName);
+
+  // Kind words check: the student tries a word the teacher blocked; with the notice on, their row is marked.
+  const words = (await api(page, 'GET', '/api/teacher/text-check-words')).body.block as string[];
+  const notice = `/api/teacher/contexts/${target.id}/blocked-text`;
+  const noticeWas = (await api(page, 'GET', notice)).body.enabled as boolean;
+  const phone = await browser.newContext({ locale: 'en-GB', timezoneId: 'Europe/Istanbul' });
+  try {
+    expect((await api(page, 'PUT', '/api/teacher/text-check-words', { block: [...words, 'zorblat'] })).status).toBe(200);
+    expect((await api(page, 'PUT', notice, { enabled: true })).status).toBe(200);
+    const sp = await phone.newPage();
+    await sp.goto(await studentLinkUrl(page, target.classId, student.id));
+    await expect(sp.getByTestId('student-page')).toBeVisible();
+    const pageData = (await api(sp, 'GET', '/api/student/page')).body;
+    const goals = pageData.subjects.find((s: any) => s.name.en === target.subjectName.en).sections.find((x: any) => x.key === 'goals').data;
+    const r = await api(sp, 'POST', '/api/student/goals', { subjectId: target.subjectId, categoryId: goals.categories[0].id, text: 'I will zorblat every single day.' });
+    expect(r.body.error.details.reason).toBe('TEXT_BLOCKED_WORD');
+    await page.goto(`/teacher/text-checks?contextId=${target.id}&studentId=${student.id}`);
+    await expect(classSelect).toHaveValue(target.id);
+    const marked = page.getByTestId('text-checks-page').locator('li[aria-current="true"]');
+    await expect(marked).toHaveCount(1);
+    await expect(marked).toContainText(student.fullName);
+  } finally {
+    await phone.close();
+    await api(page, 'PUT', '/api/teacher/text-check-words', { block: words });
+    await api(page, 'PUT', notice, { enabled: noticeWas });
   }
 });
