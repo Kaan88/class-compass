@@ -216,7 +216,7 @@ export function allowedOrigins(deps: AppDeps, originClass: OriginClass): string[
 }
 
 function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext, opts: AccessOptions = {}): void {
-  if (access === 'public') return;
+  if (access === 'public' || access === 'oauth') return;
   if (access === 'student') {
     if (!ctx.student) throw new AppError('UNAUTHENTICATED', 'Student link session required');
     return;
@@ -259,9 +259,10 @@ function enforceAccess(deps: AppDeps, access: Access, ctx: RequestContext, opts:
 }
 
 /**
- * `/mcp` (S14h1, D-160): a browser page on another site must not reach a local or tunnelled server
- * through the user's browser (DNS rebinding), so an Origin header, when present, must be the main
- * origin. Clients that are not browsers send none. No CSRF header: the bearer token is not ambient.
+ * `/mcp` (S14h1, D-160) and the OAuth POST endpoints (S14h2): a browser page on another site must not
+ * reach a local or tunnelled server through the user's browser (DNS rebinding), so an Origin header,
+ * when present, must be the main origin. Clients that are not browsers send none. No CSRF header: the
+ * bearer token is not ambient.
  */
 function enforceMcpOrigin(deps: AppDeps, req: FastifyRequest) {
   const origin = req.headers.origin;
@@ -310,6 +311,13 @@ export function contextFor(deps: AppDeps, req: FastifyRequest, access: Access, o
   }
   // A bearer token never works on the app's own endpoints, whatever cookies come with it.
   if (req.headers.authorization !== undefined && bearerOf(req) !== null) throw new AppError('UNAUTHENTICATED', 'Bearer tokens are accepted only by the AI tools endpoint', { reason: 'BEARER_NOT_ALLOWED' });
+  if (access === 'oauth') {
+    // OAuth protocol endpoints (S14h2, D-160): no cookie is read and nothing is ambient (public clients
+    // prove themselves with PKCE, codes and refresh tokens), so no CSRF header. A browser page on another
+    // site still may not post here: an Origin header on a POST must be the main origin.
+    if (MUTATING.has(req.method)) enforceMcpOrigin(deps, req);
+    return { ...deps, ip: clientIp(deps, req), session: null, user: null, student: null, scorer: null, display: null, actor: { type: 'system', id: null } };
+  }
   enforceCsrf(deps, req, opts.originClass ?? 'main');
   // Student endpoints see ONLY the student session (studentId comes from it, STU-4/5); every other
   // endpoint sees only the teacher/admin session, so a browser holding both never mixes them.

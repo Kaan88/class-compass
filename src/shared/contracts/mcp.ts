@@ -30,6 +30,38 @@ export const AiToken = z.object({
 });
 export type AiToken = z.infer<typeof AiToken>;
 
+/** An OAuth connection (S14h2, D-160): what one account allowed one app on the consent page. */
+export const AI_CONNECTION_STATUSES = ['active', 'expired', 'revoked'] as const;
+export const AiConnection = z.object({
+  id: z.string(),
+  clientName: z.string(),
+  redirectHost: z.string(),
+  scopes: z.array(McpScopeSchema),
+  privacy: AiPrivacyMode,
+  status: z.enum(AI_CONNECTION_STATUSES),
+  createdAt: z.number(),
+  expiresAt: z.number(),
+  lastUsedAt: z.number().nullable(),
+  revokedAt: z.number().nullable(),
+});
+export type AiConnection = z.infer<typeof AiConnection>;
+export const AdminAiConnection = AiConnection.extend({ userId: z.string(), userName: z.string(), userRole: z.enum(['admin', 'teacher']) });
+export type AdminAiConnection = z.infer<typeof AdminAiConnection>;
+
+export const OAuthClientView = z.object({
+  id: z.string(),
+  kind: z.enum(['dcr', 'cimd']),
+  name: z.string(),
+  /** For a metadata document its address, for a registration our id. */
+  clientId: z.string(),
+  redirectHosts: z.array(z.string()),
+  status: z.enum(['active', 'expired', 'revoked']),
+  createdAt: z.number(),
+  lastUsedAt: z.number().nullable(),
+  activeConnections: z.number().int(),
+});
+export type OAuthClientView = z.infer<typeof OAuthClientView>;
+
 export const AiToolsAccount = z.object({
   /** The administrator switched AI tools on. */
   enabled: z.boolean(),
@@ -42,7 +74,10 @@ export const AiToolsAccount = z.object({
   scopes: z.array(McpScopeSchema),
   /** The address to give an AI client (`<PUBLIC_ORIGIN>/mcp`). */
   url: z.string(),
+  /** Personal tokens (OAuth access tokens are not listed: their connection is). */
   tokens: z.array(AiToken),
+  /** Apps connected through the consent page (S14h2). */
+  connections: z.array(AiConnection),
 });
 export type AiToolsAccount = z.infer<typeof AiToolsAccount>;
 
@@ -80,6 +115,10 @@ export const AiToolsAdmin = z.object({
   settings: AiToolsSettings,
   url: z.string(),
   tokens: z.array(AdminAiToken),
+  /** OAuth (S14h2): every connection, the registered apps and the redirect host allow-list. */
+  connections: z.array(AdminAiConnection),
+  clients: z.array(OAuthClientView),
+  redirectHosts: z.array(z.string()),
   /** Calls in the last 7 days (counts only; arguments are never logged). */
   calls: z.object({ total: z.number().int(), errors: z.number().int(), denied: z.number().int() }),
 });

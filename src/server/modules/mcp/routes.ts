@@ -1,9 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import * as C from '../../../shared/contracts/mcp.ts';
+import * as O from '../../../shared/contracts/oauth.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route, setMcpResolver } from '../../lib/http.ts';
 import { accountView, adminRevoke, adminView, createToken, resolveBearer, revokeOwn, setSettings } from './tokens.ts';
 import { registerMcpTransport } from './transport.ts';
+import { adminDisconnect, adminRevokeClient, decide, disconnectOwn, requestView, setRedirectHosts } from './oauth/consent.ts';
+import { registerOAuthProtocol } from './oauth/protocol.ts';
 
 export function registerMcpRoutes(app: FastifyInstance, deps: AppDeps) {
   setMcpResolver(resolveBearer);
@@ -17,4 +20,14 @@ export function registerMcpRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.setAiToolsSettings, (ctx, input) => setSettings(ctx, input));
   route(app, deps, C.adminRevokeAiToken, (ctx, input) => adminRevoke(ctx, input.tokenId));
   registerMcpTransport(app, deps);
+
+  // OAuth for AI apps (S14h2): the consent page (`account`: PIN-gated, password again for Allow) and connections.
+  route(app, deps, O.getOAuthRequest, (ctx, input, http) => requestView(ctx, input.requestId, http.req));
+  route(app, deps, O.decideOAuthRequest, (ctx, input, http) => decide(ctx, input, http.req), { rateLimit: { max: 100, timeWindow: '15 minutes' } });
+  route(app, deps, O.revokeAiConnection, (ctx, input) => disconnectOwn(ctx, input.connectionId));
+  route(app, deps, O.adminRevokeAiConnection, (ctx, input) => adminDisconnect(ctx, input.connectionId));
+  route(app, deps, O.adminRevokeOAuthClient, (ctx, input) => adminRevokeClient(ctx, input.clientRowId));
+  route(app, deps, O.setOAuthRedirectHosts, (ctx, input) => setRedirectHosts(ctx, input));
+  // The protocol endpoints (`oauth` access class): discovery, registration, authorize, token, revoke.
+  registerOAuthProtocol(app, deps);
 }

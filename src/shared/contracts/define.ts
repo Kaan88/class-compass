@@ -16,10 +16,16 @@ import { pii, type McpScope } from '../mcp.ts';
  * - display:   read-only Super Speakers board session from a display link (S12, D-128): the board only.
  * - mcp:       the AI tools endpoint `/mcp` (S14h1, D-160): a bearer token only, never a cookie; bearer
  *              tokens are refused on every other access class.
+ * - oauth:     the OAuth 2.1 protocol endpoints for AI apps (S14h2, D-160): discovery documents,
+ *              client registration, authorize, token, revoke. Called by the AI provider's servers, by
+ *              native apps and by the browser on its way to the consent page, so no cookie is read and
+ *              no CSRF header is needed (nothing ambient: public clients prove themselves with PKCE and
+ *              their codes or refresh tokens); a bearer token is refused; they answer only while the
+ *              school's AI tools switch is on. The consent itself is an `account` endpoint.
  */
-export type Access = 'public' | 'classroom' | 'teacher' | 'admin' | 'student' | 'user' | 'account' | 'scorer' | 'display' | 'mcp';
+export type Access = 'public' | 'classroom' | 'teacher' | 'admin' | 'student' | 'user' | 'account' | 'scorer' | 'display' | 'mcp' | 'oauth';
 /** Every access class (the permission matrix iterates these). */
-export const ACCESS_CLASSES = ['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display', 'mcp'] as const satisfies readonly Access[];
+export const ACCESS_CLASSES = ['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display', 'mcp', 'oauth'] as const satisfies readonly Access[];
 
 /**
  * An endpoint offered to AI tools as a generated MCP tool (S14h1, D-160). Only `classroom`, `teacher`

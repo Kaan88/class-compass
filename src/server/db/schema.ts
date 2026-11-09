@@ -41,6 +41,11 @@ export const schoolSettings = sqliteTable('school_settings', {
   mcpEnabled: integer('mcp_enabled', { mode: 'boolean' }).notNull().default(false),
   aiStudentDataAllowed: integer('ai_student_data_allowed', { mode: 'boolean' }).notNull().default(false),
   mcpTokenMaxDays: integer('mcp_token_max_days').notNull().default(90),
+  /**
+   * OAuth for AI apps (S14h2, D-160): the hosts an https redirect address (and a Client ID Metadata
+   * Document) may use; loopback addresses are always allowed. Edited on Admin → AI tools (audited).
+   */
+  oauthRedirectHostsJson: text('oauth_redirect_hosts_json', { mode: 'json' }).$type<string[]>().notNull().default(sql`'["claude.ai"]'`),
   updatedAt: integer('updated_at').notNull(),
 });
 
@@ -1718,4 +1723,132 @@ export const mcpCalls = sqliteTable(
     bytes: integer('bytes').notNull(),
   },
   (t) => [index('mcp_calls_at_idx').on(t.at), index('mcp_calls_token_idx').on(t.tokenId, t.at)],
+);
+
+// ---------------------------------------------------------------- OAuth 2.1 for AI apps (S14h2, D-160)
+/**
+ * Apps that may ask a teacher or administrator for access (claude.ai, Claude Desktop, Claude Code):
+ * `kind` 'dcr' = registered through Dynamic Client Registration (`clientId` is our random id), 'cimd' =
+ * a Client ID Metadata Document (`clientId` is its https address on an allowed host, read again after
+ * an hour). Public clients only (no secret). `name` is the app's own, untrusted display text. A
+ * registration nobody used for 30 days expires (and is pruned when it never got a connection);
+ * administrators can revoke one, which also ends its connections.
+ */
+export const oauthClients = sqliteTable(
+  'oauth_clients',
+  {
+    id: text('id').primaryKey(),
+    clientId: text('client_id').notNull(),
+    kind: text('kind', { enum: ['dcr', 'cimd'] }).notNull(),
+    name: text('name').notNull(),
+    redirectUrisJson: text('redirect_uris_json', { mode: 'json' }).$type<string[]>().notNull(),
+    createdAt: integer('created_at').notNull(),
+    lastUsedAt: integer('last_used_at'),
+    metadataFetchedAt: integer('metadata_fetched_at'),
+    revokedAt: integer('revoked_at'),
+    revokedBy: text('revoked_by'),
+  },
+  (t) => [uniqueIndex('oauth_clients_client_id_uq').on(t.clientId)],
+);
+
+/**
+ * An authorization request waiting for the consent page (`id` is a random handle in the consent
+ * address). Bound to the browser that opened `/oauth/authorize` (`browserHash`, an HMAC of a cookie
+ * nonce) and, from the first view, to the signed-in account. Single use; 15 minutes.
+ */
+export const oauthRequests = sqliteTable(
+  'oauth_requests',
+  {
+    id: text('id').primaryKey(),
+    clientRowId: text('client_row_id')
+      .notNull()
+      .references(() => oauthClients.id),
+    redirectUri: text('redirect_uri').notNull(),
+    state: text('state'),
+    codeChallenge: text('code_challenge').notNull(),
+    resource: text('resource').notNull(),
+    scopesRequestedJson: text('scopes_requested_json', { mode: 'json' }).$type<string[]>().notNull(),
+    browserHash: text('browser_hash').notNull(),
+    userId: text('user_id').references(() => users.id),
+    status: text('status', { enum: ['pending', 'approved', 'denied', 'expired'] }).notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    decidedAt: integer('decided_at'),
+  },
+  (t) => [index('oauth_requests_user_idx').on(t.userId), index('oauth_requests_created_idx').on(t.createdAt)],
+);
+
+/**
+ * A connection (grant): what one account allowed one app, captured at consent (scopes, privacy mode,
+ * the consent's expiry within the administrator's cap). Its id is the token family of every access
+ * token issued under it (`mcp_tokens.family_id`, so pseudonyms stay stable across refreshes).
+ * `clientName` and `redirectHost` are snapshots for the lists.
+ */
+export const oauthGrants = sqliteTable(
+  'oauth_grants',
+  {
+    id: text('id').primaryKey(),
+    clientRowId: text('client_row_id')
+      .notNull()
+      .references(() => oauthClients.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    clientName: text('client_name').notNull(),
+    redirectHost: text('redirect_host').notNull(),
+    scopesJson: text('scopes_json', { mode: 'json' }).$type<string[]>().notNull(),
+    privacyMode: text('privacy_mode', { enum: ['pseudonymous', 'named'] }).notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    lastRefreshAt: integer('last_refresh_at'),
+    revokedAt: integer('revoked_at'),
+    /** Who ended it: the owner, an administrator, or null for the system (reuse detected, account locked out, switch off). */
+    revokedBy: text('revoked_by'),
+    revokeReason: text('revoke_reason'),
+  },
+  (t) => [index('oauth_grants_user_idx').on(t.userId), index('oauth_grants_client_idx').on(t.clientRowId)],
+);
+
+/** Authorization codes: only the HMAC is stored; single use, 60 seconds, bound to client, account, redirect address and PKCE challenge. */
+export const oauthCodes = sqliteTable(
+  'oauth_codes',
+  {
+    id: text('id').primaryKey(),
+    codeHash: text('code_hash').notNull(),
+    grantId: text('grant_id')
+      .notNull()
+      .references(() => oauthGrants.id),
+    clientRowId: text('client_row_id')
+      .notNull()
+      .references(() => oauthClients.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    redirectUri: text('redirect_uri').notNull(),
+    codeChallenge: text('code_challenge').notNull(),
+    resource: text('resource').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    usedAt: integer('used_at'),
+  },
+  (t) => [uniqueIndex('oauth_codes_hash_uq').on(t.codeHash), index('oauth_codes_grant_idx').on(t.grantId)],
+);
+
+/**
+ * Refresh tokens (`ccmcpr_…`, only the HMAC stored). Each use rotates it (`rotatedAt` set, a new row
+ * issued); presenting a rotated one again revokes the whole connection. They live as long as the
+ * connection.
+ */
+export const oauthRefreshTokens = sqliteTable(
+  'oauth_refresh_tokens',
+  {
+    id: text('id').primaryKey(),
+    grantId: text('grant_id')
+      .notNull()
+      .references(() => oauthGrants.id),
+    tokenHash: text('token_hash').notNull(),
+    createdAt: integer('created_at').notNull(),
+    rotatedAt: integer('rotated_at'),
+  },
+  (t) => [uniqueIndex('oauth_refresh_hash_uq').on(t.tokenHash), index('oauth_refresh_grant_idx').on(t.grantId)],
 );

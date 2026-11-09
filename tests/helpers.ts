@@ -39,7 +39,7 @@ export class FakeMailer implements Mailer {
 
 export async function makeEnv(
   overrides: Partial<Config> = {},
-  extra: { mailer?: Mailer | null; logStream?: { write: (line: string) => void }; weatherFetch?: WeatherFetch } = {},
+  extra: { mailer?: Mailer | null; logStream?: { write: (line: string) => void }; weatherFetch?: WeatherFetch; clientMetadataFetch?: (url: string) => Promise<unknown> } = {},
 ): Promise<TestEnv> {
   const config = loadConfig(
     { NODE_ENV: 'test', SECRET_PEPPER: 'test-pepper-0123456789abcdef', PUBLIC_ORIGIN: TEST_ORIGIN, DATA_DIR: './data-test' },
@@ -49,7 +49,9 @@ export async function makeEnv(
   runMigrations(db);
   const clock = new Clock();
   // No test ever reaches the internet: without a fake, the weather source is unreachable.
-  const deps: AppDeps = { db, config, now: clock.now, mailer: extra.mailer ?? null, weatherFetch: extra.weatherFetch ?? (() => Promise.reject(new Error('offline in tests'))) };
+  const deps: AppDeps = { db, config, now: clock.now, mailer: extra.mailer ?? null, weatherFetch: extra.weatherFetch ?? (() => Promise.reject(new Error('offline in tests'))),
+    clientMetadataFetch: extra.clientMetadataFetch ?? (() => Promise.reject(new Error('offline in tests'))),
+  };
   const app = await buildApp(deps, extra.logStream ? { logStream: extra.logStream } : {});
   await app.ready();
   return { app, db, clock, config, deps };
@@ -70,7 +72,8 @@ export class Client {
   }
 
   async req(method: string, url: string, body?: unknown, extraHeaders: Record<string, string> = {}) {
-    const headers: Record<string, string> = { origin: TEST_ORIGIN, 'x-cc-csrf': '1', ...extraHeaders };
+    // Same-origin like a browser on the app's own page (TEST_ORIGIN unless the test set PUBLIC_ORIGIN).
+    const headers: Record<string, string> = { origin: this.env.config.origins.main, 'x-cc-csrf': '1', ...extraHeaders };
     if (this.cookies.size) headers.cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
     const res = await this.env.app.inject({ method: method as 'GET', url, headers, ...(body !== undefined ? { payload: body as object } : {}) });
     for (const c of res.cookies as Array<{ name: string; value: string; maxAge?: number }>) {

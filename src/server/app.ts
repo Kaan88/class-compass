@@ -40,6 +40,11 @@ const REDACT = [
   '*.pin',
   '*.token',
   '*.code',
+  // OAuth for AI apps (S14h2, D-160): never log a token, code, verifier or secret.
+  '*.access_token',
+  '*.refresh_token',
+  '*.code_verifier',
+  '*.client_secret',
 ];
 
 /**

@@ -18,7 +18,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { mcpDelete, mcpPost } from '../../../shared/contracts/mcp.ts';
-import { MCP_PATH, MCP_RESULT_MAX_BYTES } from '../../../shared/mcp.ts';
+import { MCP_PATH, MCP_RESULT_MAX_BYTES, OAUTH_WELL_KNOWN } from '../../../shared/mcp.ts';
 import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
@@ -73,10 +73,17 @@ const isId = (v: unknown): v is Id => typeof v === 'string' || (typeof v === 'nu
 const ok = (id: Id, result: unknown): RpcResponse => ({ jsonrpc: '2.0', id, result });
 const fail = (id: Id | null, e: RpcError): RpcResponse => ({ jsonrpc: '2.0', id, error: e });
 
-/** The AppError of a refused request as an HTTP answer in JSON-RPC form (401s name the auth scheme). */
-function httpError(reply: FastifyReply, err: AppError) {
+/** The Protected Resource Metadata address (RFC 9728) that 401 and 403 answers point to (S14h2). */
+export const resourceMetadataUrl = (deps: Pick<AppDeps, 'config'>) => `${deps.config.origins.main}${OAUTH_WELL_KNOWN.resourceMcp}`;
+
+/**
+ * The AppError of a refused request as an HTTP answer in JSON-RPC form. 401s name the auth scheme and
+ * the resource metadata (RFC 9728 §5.1, so OAuth clients find the authorization server), with
+ * `error="invalid_token"` for a token that is unknown, expired or revoked (RFC 6750 §3.1).
+ */
+function httpError(reply: FastifyReply, err: AppError, deps: Pick<AppDeps, 'config'>) {
   const reason = (err.details as { reason?: string } | undefined)?.reason;
-  if (err.status === 401) reply.header('WWW-Authenticate', `Bearer realm="class-compass"${reason === 'TOKEN_MISSING' ? '' : ', error="invalid_token"'}`);
+  if (err.status === 401) reply.header('WWW-Authenticate', `Bearer realm="class-compass", resource_metadata="${resourceMetadataUrl(deps)}"${reason === 'TOKEN_MISSING' ? '' : ', error="invalid_token"'}`);
   return reply.status(err.status).send(fail(null, { code: RPC.SERVER, message: err.message, data: { code: err.code, ...(reason ? { reason } : {}) } }));
 }
 
@@ -124,7 +131,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
       return contextFor(deps, req, 'mcp');
     } catch (err) {
       if (err instanceof AppError) {
-        httpError(reply, err);
+        httpError(reply, err, deps);
         return null;
       }
       throw err;
@@ -136,7 +143,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
    * in JSON-RPC form too: a body that is not JSON is a Parse error (-32700).
    */
   const rpcErrorHandler = (err: Error & { statusCode?: number; code?: string }, req: FastifyRequest, reply: FastifyReply) => {
-    if (err instanceof AppError) return httpError(reply, err);
+    if (err instanceof AppError) return httpError(reply, err, deps);
     const status = err.statusCode && err.statusCode >= 400 && err.statusCode < 500 ? err.statusCode : 500;
     if (status === 500) {
       req.log.error({ err }, 'mcp request failed');
@@ -218,6 +225,23 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
     if (typeof pv === 'string' && pv !== session.version) return reply.status(400).send(fail(null, { code: RPC.INVALID_REQUEST, message: `Unsupported MCP-Protocol-Version ${pv}; this session uses ${session.version}` }));
     if (batch && session.version !== BATCH_VERSION) return reply.status(400).send(fail(null, { code: RPC.INVALID_REQUEST, message: `Batches are not part of protocol ${session.version}` }));
     if (messages.length > BATCH_MAX) return reply.status(400).send(fail(null, { code: RPC.INVALID_REQUEST, message: `A batch can hold at most ${BATCH_MAX} messages` }));
+
+    // An OAuth connection without a tool's scope (S14h2): 403 with a step-up challenge (MCP authorization,
+    // RFC 6750 §3.1) naming the scopes it holds plus the missing one, so the app can ask the person again.
+    // Personal tokens cannot step up and keep the tool error result.
+    if (principal.kind === 'oauth' && !batch) {
+      const m = messages[0] as Record<string, unknown>;
+      const params = isRecord(m.params) ? m.params : {};
+      const tool = m.method === 'tools/call' ? toolList().find((t) => t.name === params.name) : undefined;
+      if (tool?.scope && toolAccess(tool, user.role, principal.scopes) === 'SCOPE_NOT_GRANTED') {
+        const scopes = [...new Set([...principal.scopes, tool.scope])].join(' ');
+        log.record(now, { tokenId: principal.tokenId, userId: user.id, method: `tools/call:${tool.name}`, status: 'denied', errorCode: 'SCOPE_NOT_GRANTED', durationMs: 0, bytes: 0 });
+        return reply
+          .status(403)
+          .header('WWW-Authenticate', `Bearer error="insufficient_scope", scope="${scopes}", resource_metadata="${resourceMetadataUrl(deps)}", error_description="This connection does not have the ${tool.scope} scope"`)
+          .send(fail(isId(m.id) ? m.id : null, { code: RPC.SERVER, message: `This connection does not have the ${tool.scope} scope`, data: { code: 'FORBIDDEN', reason: 'SCOPE_NOT_GRANTED', scope: tool.scope } }));
+      }
+    }
 
     const tenv: ToolEnv = { app, ctx };
     const responses: RpcResponse[] = [];

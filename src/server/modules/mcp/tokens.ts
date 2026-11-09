@@ -9,8 +9,10 @@
  * account (active, no temporary password). Role and scope are checked per tool, then the endpoint's
  * own ownership checks run.
  *
- * Designed for S14h2's OAuth: `kind` 'oauth' rows resolve the same way, `familyId` groups a refresh
- * chain (pseudonyms are per family) and `clientId` names the OAuth client.
+ * OAuth (S14h2): `kind` 'oauth' rows are the hour-long access tokens of a connection (`oauth/`); they
+ * resolve the same way, `familyId` is the connection (pseudonyms are per family), `clientId` the
+ * client's row, and they work only while the connection lives. Lists here show personal tokens only;
+ * connections are listed by `oauth/store.ts`.
  */
 import { and, desc, eq, gt, gte, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -18,13 +20,14 @@ import type * as C from '../../../shared/contracts/mcp.ts';
 import { AI_STUDENT_DATA_CONFIRM } from '../../../shared/contracts/mcp.ts';
 import { MCP_PATH, MCP_TOKEN_DEFAULT_DAYS, MCP_TOKEN_MAX_DAYS, MCP_TOKEN_PREFIX, MCP_TOKENS_PER_USER, scopesForRole, type McpScope } from '../../../shared/mcp.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { mcpCalls, mcpTokens, schoolSettings, users } from '../../db/schema.ts';
+import { mcpCalls, mcpTokens, oauthGrants, schoolSettings, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type AppDeps, type McpPrincipal, type RequestContext, type UserRow } from '../../lib/context.ts';
 import { newId, randomToken, tokenHash } from '../../lib/crypto.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { assertReauth } from '../auth/service.ts';
 import { getSchoolSettings } from '../school/policy.ts';
+import { accountConnections, adminConnections, clampGrants, clientViews, grantLive, redirectHosts, revokeAllOAuth } from './oauth/store.ts';
 
 type TokenRow = typeof mcpTokens.$inferSelect;
 type In<E extends { input: z.ZodType }> = z.infer<E['input']>;
@@ -68,7 +71,7 @@ export function accountView(ctx: RequestContext): z.infer<typeof C.AiToolsAccoun
   const rows = ctx.db
     .select()
     .from(mcpTokens)
-    .where(and(eq(mcpTokens.userId, user.id), gt(mcpTokens.expiresAt, now - 90 * DAY)))
+    .where(and(eq(mcpTokens.userId, user.id), eq(mcpTokens.kind, 'pat'), gt(mcpTokens.expiresAt, now - 90 * DAY)))
     .orderBy(desc(mcpTokens.createdAt))
     .all();
   return {
@@ -79,6 +82,7 @@ export function accountView(ctx: RequestContext): z.infer<typeof C.AiToolsAccoun
     scopes: scopesForRole(user.role),
     url: mcpUrl(ctx),
     tokens: rows.map((r) => dto(r, now, s.mcpTokenMaxDays)),
+    connections: accountConnections(ctx.db, user.id, now, s.mcpTokenMaxDays),
   };
 }
 
@@ -96,7 +100,7 @@ export async function createToken(ctx: RequestContext, input: In<typeof C.create
   const now = ctx.now();
   const secret = `${MCP_TOKEN_PREFIX}${randomToken(32)}`;
   return tx(ctx.db, () => {
-    const live = ctx.db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(and(eq(mcpTokens.userId, user.id), isNull(mcpTokens.revokedAt), gt(mcpTokens.expiresAt, now), gt(mcpTokens.createdAt, now - s.mcpTokenMaxDays * DAY))).get()?.n ?? 0;
+    const live = ctx.db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(and(eq(mcpTokens.userId, user.id), eq(mcpTokens.kind, 'pat'), isNull(mcpTokens.revokedAt), gt(mcpTokens.expiresAt, now), gt(mcpTokens.createdAt, now - s.mcpTokenMaxDays * DAY))).get()?.n ?? 0;
     if (live >= MCP_TOKENS_PER_USER) throw conflict('Too many tokens', { reason: 'TOO_MANY_TOKENS', max: MCP_TOKENS_PER_USER });
     const id = newId();
     const row: TokenRow = {
@@ -154,7 +158,7 @@ export function adminView(ctx: RequestContext): z.infer<typeof C.AiToolsAdmin> {
     .select({ t: mcpTokens, userName: users.displayName, userRole: users.role })
     .from(mcpTokens)
     .innerJoin(users, eq(users.id, mcpTokens.userId))
-    .where(gt(mcpTokens.expiresAt, now - 90 * DAY))
+    .where(and(eq(mcpTokens.kind, 'pat'), gt(mcpTokens.expiresAt, now - 90 * DAY)))
     .orderBy(desc(mcpTokens.createdAt))
     .all();
   const since = now - 7 * DAY;
@@ -170,6 +174,9 @@ export function adminView(ctx: RequestContext): z.infer<typeof C.AiToolsAdmin> {
     url: mcpUrl(ctx),
     tokens: rows.map((r) => ({ ...dto(r.t, now, cap), userId: r.t.userId, userName: r.userName, userRole: r.userRole })),
     calls: { total: counts.reduce((a, c) => a + c.n, 0), errors: n('error'), denied: n('denied') + n('rate_limited') },
+    connections: adminConnections(ctx.db, now, cap),
+    clients: clientViews(ctx.db, now),
+    redirectHosts: redirectHosts(ctx.db),
   };
 }
 
@@ -195,7 +202,11 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setAiToolsSe
       shortened = ctx.db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(over).get()?.n ?? 0;
       if (shortened) ctx.db.update(mcpTokens).set({ expiresAt: sql`${mcpTokens.createdAt} + ${capMs}` }).where(over).run();
     }
-    audit(ctx.db, ctx.actor, { action: 'school.ai_tools', entity: 'school_settings', entityId: '1', before, after: shortened ? { ...patch, tokensShortened: shortened } : patch }, now);
+    if (patch.mcpTokenMaxDays !== undefined && patch.mcpTokenMaxDays < before.mcpTokenMaxDays) shortened += clampGrants(ctx.db, patch.mcpTokenMaxDays, now);
+    // Switching AI tools off ends every OAuth connection, code and waiting request (S14h2); personal tokens only stop answering.
+    const connectionsEnded = patch.mcpEnabled === false && before.mcpEnabled ? revokeAllOAuth(ctx.db, now) : 0;
+    const after = { ...patch, ...(shortened ? { tokensShortened: shortened } : {}), ...(connectionsEnded ? { connectionsEnded } : {}) };
+    audit(ctx.db, ctx.actor, { action: 'school.ai_tools', entity: 'school_settings', entityId: '1', before, after }, now);
   });
   return aiSettings(ctx.db);
 }
@@ -221,6 +232,11 @@ export function resolveBearer(deps: AppDeps, raw: string | null): { user: UserRo
   const user = deps.db.select().from(users).where(eq(users.id, row.userId)).get();
   if (!user || user.disabledAt !== null) throw refuse('FORBIDDEN', 'ACCOUNT_INACTIVE', 'The account is not active');
   if (user.mustChangePassword) throw refuse('FORBIDDEN', 'MUST_CHANGE_PASSWORD', 'The account must change its password first');
+  if (row.kind === 'oauth') {
+    // An OAuth access token works only while its connection lives (S14h2): ending the connection, the consent's expiry or a lower cap stops it.
+    const grant = deps.db.select().from(oauthGrants).where(eq(oauthGrants.id, row.familyId)).get();
+    if (!grant || !grantLive(grant, now, s.mcpTokenMaxDays)) throw refuse('UNAUTHENTICATED', 'TOKEN_REVOKED', 'This connection has ended');
+  }
   if (row.lastUsedAt === null || now - row.lastUsedAt > TOUCH_MS) deps.db.update(mcpTokens).set({ lastUsedAt: now }).where(eq(mcpTokens.id, row.id)).run();
   return {
     user,

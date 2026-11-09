@@ -75,6 +75,12 @@ export interface AppDeps {
   mailer?: Mailer | null;
   /** Classroom weather fetcher (S13b); tests inject a fake, production uses HTTPS to Open-Meteo. */
   weatherFetch?: WeatherFetch;
+  /**
+   * OAuth Client ID Metadata Documents (S14h2, D-160): reads one document (https, an allowed host, no
+   * redirects, size and time caps, public addresses only) and returns its parsed JSON. Tests inject a
+   * fake; production uses `fetchClientMetadata` in `modules/mcp/oauth/cimd.ts`.
+   */
+  clientMetadataFetch?: (url: string) => Promise<unknown>;
 }
 
 export interface RequestContext extends AppDeps {

@@ -1,20 +1,22 @@
 /**
  * MCP conformance (S14h1, D-160): the official SDK client (`@modelcontextprotocol/sdk`, a pinned
  * devDependency used only here) talks to a real listening server over Streamable HTTP with a personal
- * token: initialize and version negotiation, ping, tools, resources, prompts, session end. OAuth
- * comes with S14h2. Fictional data only.
+ * token: initialize and version negotiation, ping, tools, resources, prompts, session end; and the
+ * SDK client's own OAuth flow (S14h2) below. Fictional data only.
  */
 import fs from 'node:fs';
-import type { AddressInfo } from 'node:net';
+import net, { type AddressInfo } from 'node:net';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { UnauthorizedError, type OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { LATEST_PROTOCOL_VERSION as SDK_LATEST, SUPPORTED_PROTOCOL_VERSIONS as SDK_SUPPORTED } from '@modelcontextprotocol/sdk/types.js';
 import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from '../../src/server/modules/mcp/transport.ts';
-import { makeEnv, type TestEnv } from '../helpers.ts';
-import { makeToken, setAi } from '../mcp-helpers.ts';
-import { buildSchool, type School } from '../school-fixture.ts';
+import { makeEnv, type Client, type TestEnv } from '../helpers.ts';
+import { makeToken, PASSWORD, setAi } from '../mcp-helpers.ts';
+import { buildSchool, ok, type School } from '../school-fixture.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 let env: TestEnv;
@@ -97,5 +99,147 @@ describe('SDK client against /mcp (D-160)', () => {
     const t = await makeToken(s.teacherA, { scopes: ['classes:read'], name: 'Revoked' });
     await s.teacherA.post(`/api/account/ai-tools/tokens/${t.id}/revoke`);
     await expect(connect(t.secret)).rejects.toThrow();
+  });
+});
+
+/**
+ * OAuth (S14h2, D-160): the SDK client's own OAuth flow end to end against a real listening server whose
+ * PUBLIC_ORIGIN is its listening address: 401 → protected resource metadata → authorization server
+ * metadata → dynamic client registration → authorize with PKCE S256 and the resource → a programmatic
+ * consent by a signed-in teacher (the provider follows the authorize redirect with that teacher's
+ * browser) → code exchange → tools over the access token → refresh rotation when the access token
+ * expires. Then the same with a Client ID Metadata Document when the provider offers one.
+ */
+describe('SDK client OAuth flow (S14h2, D-160)', () => {
+  let oenv: TestEnv;
+  let os: School;
+  let origin: string;
+  const docs: string[] = [];
+  beforeAll(async () => {
+    const probe = net.createServer();
+    await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
+    const port = (probe.address() as AddressInfo).port;
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+    origin = `http://127.0.0.1:${port}`;
+    oenv = await makeEnv(
+      { PUBLIC_ORIGIN: origin },
+      {
+        clientMetadataFetch: async (url) => {
+          docs.push(url);
+          return { client_id: url, client_name: 'SDK conformance (CIMD)', redirect_uris: ['http://127.0.0.1/callback'], token_endpoint_auth_method: 'none' };
+        },
+      },
+    );
+    os = await buildSchool(oenv);
+    await setAi(os.admin, { mcpEnabled: true });
+    await oenv.app.listen({ port, host: '127.0.0.1' });
+  });
+  afterAll(async () => {
+    await setAi(os.admin, { mcpEnabled: false });
+    await oenv.app.close();
+  });
+
+  /** An in-test OAuthClientProvider: memory storage; "the browser" is a signed-in teacher who allows. */
+  class TestProvider implements OAuthClientProvider {
+    info: OAuthClientInformationMixed | undefined;
+    saved: OAuthTokens | undefined;
+    verifier = '';
+    code: string | null = null;
+    consentedScopes: string[] = [];
+    clientMetadataUrl: string | undefined;
+    private browser: Client;
+    constructor(browser: Client, cimd?: string) {
+      this.browser = browser;
+      this.clientMetadataUrl = cimd;
+    }
+    get redirectUrl() {
+      return 'http://127.0.0.1:47999/callback';
+    }
+    get clientMetadata(): OAuthClientMetadata {
+      return { client_name: 'SDK conformance', redirect_uris: [this.redirectUrl], grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'none' };
+    }
+    state() {
+      return 'conformance-state';
+    }
+    clientInformation() {
+      return this.info;
+    }
+    saveClientInformation(i: OAuthClientInformationMixed) {
+      this.info = i;
+    }
+    tokens() {
+      return this.saved;
+    }
+    saveTokens(t: OAuthTokens) {
+      this.saved = t;
+    }
+    saveCodeVerifier(v: string) {
+      this.verifier = v;
+    }
+    codeVerifier() {
+      return this.verifier;
+    }
+    async redirectToAuthorization(url: URL) {
+      expect(url.origin).toBe(origin);
+      expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+      expect(url.searchParams.get('resource')).toBe(`${origin}/mcp`);
+      const r = await this.browser.req('GET', `${url.pathname}${url.search}`);
+      expect(r.status).toBe(303);
+      const requestId = new URL(String(r.headers.location), origin).searchParams.get('request')!;
+      const view = await ok(this.browser.get(`/api/account/oauth/requests/${requestId}`));
+      // The teacher narrows the request to two read scopes.
+      this.consentedScopes = view.offered.filter((x: string) => x === 'classes:read' || x === 'reports:read');
+      const d = await ok(this.browser.post(`/api/account/oauth/requests/${requestId}`, { allow: true, currentPassword: PASSWORD, scopes: this.consentedScopes }));
+      const back = new URL(d.redirectTo);
+      expect(back.searchParams.get('state')).toBe('conformance-state');
+      this.code = back.searchParams.get('code');
+    }
+  }
+
+  const connectWith = async (provider: TestProvider) => {
+    const first = new StreamableHTTPClientTransport(new URL(`${origin}/mcp`), { authProvider: provider });
+    const c1 = new McpClient({ name: 'class-compass-oauth', version: '1.0.0' });
+    await expect(c1.connect(first)).rejects.toThrow(UnauthorizedError);
+    expect(provider.code).toBeTruthy();
+    await first.finishAuth(provider.code!);
+    const transport = new StreamableHTTPClientTransport(new URL(`${origin}/mcp`), { authProvider: provider });
+    const client = new McpClient({ name: 'class-compass-oauth', version: '1.0.0' });
+    await client.connect(transport);
+    return { client, transport };
+  };
+
+  it('registers, authorizes with PKCE through the consent page, exchanges the code and calls tools', async () => {
+    const provider = new TestProvider(os.teacherA);
+    const { client } = await connectWith(provider);
+    expect(provider.info?.client_id).toMatch(/^ccc_/u);
+    expect(provider.consentedScopes).toEqual(['classes:read', 'reports:read']);
+    expect(provider.saved?.refresh_token).toMatch(/^ccmcpr_/u);
+    const classes = await client.callTool({ name: 'list_my_classes', arguments: {} });
+    expect(classes.isError).toBe(false);
+    expect(JSON.parse((classes.content as Array<{ text: string }>)[0]!.text).contexts[0].className).toBe('3-A');
+    // Only the consented scopes' tools are listed.
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name)).not.toContain('create_goal_preset');
+    await client.close();
+
+    // An hour later the access token has expired: the SDK refreshes (rotation) and reconnects.
+    const before = provider.saved!.refresh_token;
+    oenv.clock.advance(61 * 60_000);
+    const again = new StreamableHTTPClientTransport(new URL(`${origin}/mcp`), { authProvider: provider });
+    const c2 = new McpClient({ name: 'class-compass-oauth', version: '1.0.0' });
+    await c2.connect(again);
+    expect(provider.saved!.refresh_token).not.toBe(before);
+    expect((await c2.callTool({ name: 'list_my_classes', arguments: {} })).isError).toBe(false);
+    await c2.close();
+  });
+
+  it('uses a Client ID Metadata Document when the provider offers one (on an allowed host)', async () => {
+    const url = 'https://claude.ai/oauth/sdk-conformance-client';
+    const provider = new TestProvider(os.teacherA, url);
+    const { client } = await connectWith(provider);
+    expect(provider.info?.client_id).toBe(url);
+    expect(docs).toContain(url);
+    expect((await client.callTool({ name: 'list_my_classes', arguments: {} })).isError).toBe(false);
+    await client.close();
   });
 });

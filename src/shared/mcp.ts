@@ -96,6 +96,48 @@ export const NEVER_LEAVES: readonly PiiKind[] = ['note', 'level', 'file', 'secre
 /** The metadata object for `.meta()`: `z.string().meta(pii('studentName'))`. */
 export const pii = (kind: PiiKind) => ({ cc: { pii: kind } });
 
+/**
+ * OAuth 2.1 for AI apps (S14h2, D-160): claude.ai, Claude Desktop and Claude Code connect without a
+ * pasted token. The paths of the authorization server (on the main origin, which is also the issuer)
+ * and of the discovery documents (RFC 9728, RFC 8414).
+ */
+export const OAUTH_PATHS = {
+  register: '/oauth/register',
+  authorize: '/oauth/authorize',
+  token: '/oauth/token',
+  revoke: '/oauth/revoke',
+  /** The consent page of the app (SPA route). */
+  consent: '/oauth/consent',
+} as const;
+export const OAUTH_WELL_KNOWN = {
+  resource: '/.well-known/oauth-protected-resource',
+  /** RFC 9728 §3.1: the path of the resource (`/mcp`) appended; clients try this one first. */
+  resourceMcp: `/.well-known/oauth-protected-resource${MCP_PATH}`,
+  server: '/.well-known/oauth-authorization-server',
+} as const;
+/** Access tokens last an hour; codes a minute; an authorization request waits 15 minutes for the consent page. */
+export const OAUTH_ACCESS_TOKEN_SECONDS = 3600;
+export const OAUTH_CODE_SECONDS = 60;
+export const OAUTH_REQUEST_MINUTES = 15;
+/** A registration nobody used for this long expires. */
+export const OAUTH_CLIENT_UNUSED_DAYS = 30;
+/** Refresh tokens: `ccmcpr_` + 256 random bits (never accepted on `/mcp`). */
+export const OAUTH_REFRESH_PREFIX = 'ccmcpr_';
+/**
+ * Hosts an https redirect address may use by default: claude.ai, the callback host Anthropic documents
+ * for claude.ai, Claude Desktop, mobile and Cowork (`https://claude.ai/api/mcp/auth_callback`) and the
+ * host of Claude Code's Client ID Metadata Document (verified 2026-11-09). Loopback addresses
+ * (Claude Code, MCP Inspector) are always allowed on any port.
+ */
+export const DEFAULT_OAUTH_REDIRECT_HOSTS: readonly string[] = ['claude.ai'];
+export const OAUTH_REDIRECT_HOSTS_MAX = 20;
+/** Live connections (grants) per account. */
+export const OAUTH_CONNECTIONS_PER_USER = 20;
+/** The `offline_access` scope some clients add to ask for a refresh token: accepted and ignored (refresh tokens are always issued). */
+export const OAUTH_IGNORED_SCOPES: readonly string[] = ['offline_access'];
+/** A host name an administrator may allow (lower case, at least one dot, no wildcard, port or path). */
+export const OAUTH_HOST_PATTERN = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/u;
+
 /** Calls per minute per token (each call costs at least 1; heavy tools cost more). */
 export const MCP_RATE_PER_MINUTE = 120;
 /** Largest tool result (serialised); longer results are cut with a note. */

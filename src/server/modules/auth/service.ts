@@ -3,6 +3,7 @@ import type { Me } from '../../../shared/contracts/auth.ts';
 import { foldForSearch } from '../../../shared/text/turkish.ts';
 import type { Db } from '../../db/client.ts';
 import { authAttempts, mcpTokens, oneTimeTokens, sessions, users } from '../../db/schema.ts';
+import { revokeOAuthForUser } from '../mcp/oauth/store.ts';
 import { tx } from '../../db/client.ts';
 import { translate } from '../../../shared/i18n/index.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
@@ -157,10 +158,12 @@ export function revokeAllUserSessions(db: Db, userId: string, now: number, excep
 export function revokeAllUserMcpTokens(db: Db, actor: Actor, userId: string, now: number, reason: 'deactivated' | 'password_reset' | 'password_change' | 'method_change') {
   const live = and(eq(mcpTokens.userId, userId), isNull(mcpTokens.revokedAt), gt(mcpTokens.expiresAt, now));
   const n = db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(live).get()?.n ?? 0;
-  if (!n) return 0;
-  db.update(mcpTokens).set({ revokedAt: now, revokedBy: null }).where(live).run();
-  audit(db, actor, { action: 'mcp_token.revoke_all', entity: 'user', entityId: userId, after: { count: n, reason } }, now);
-  return n;
+  if (n) db.update(mcpTokens).set({ revokedAt: now, revokedBy: null }).where(live).run();
+  // OAuth (S14h2): the account's connections, their refresh tokens and codes, and requests waiting on a consent page end too.
+  const connections = revokeOAuthForUser(db, userId, now, reason);
+  if (!n && !connections) return 0;
+  audit(db, actor, { action: 'mcp_token.revoke_all', entity: 'user', entityId: userId, after: { count: n, connections, reason } }, now);
+  return n + connections;
 }
 
 /**

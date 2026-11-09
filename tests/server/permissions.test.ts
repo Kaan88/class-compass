@@ -8,6 +8,9 @@
  *   access class; signed-in staff → 401 on the scorer and board endpoints (other cookies)
  * - AI tools (S14h1, D-160): `/mcp` answers 403 while the school switch is off, then 401 without a
  *   bearer token; cookies of every kind never work there, and a bearer token never works anywhere else
+ * - OAuth protocol endpoints (S14h2, D-160, access class `oauth`): nothing while the switch is off (404, the
+ *   authorize step our own error page); with it on they answer without any session and ignore cookies;
+ *   the consent endpoints are `account` endpoints and so in the 401 and 423 rows above
  * Access is checked before input validation, so dummy ids and empty bodies are enough.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -50,14 +53,14 @@ async function expectAll(c: Client, filter: (e: Endpoint) => boolean, status: nu
 describe('permission matrix over all endpoints', () => {
   it('registers a meaningful set of endpoints, each with an access class', () => {
     expect(endpoints.length).toBeGreaterThan(50);
-    for (const e of endpoints) expect(['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display', 'mcp']).toContain(e.access);
-    expect([...ACCESS_CLASSES].sort()).toEqual(['account', 'admin', 'classroom', 'display', 'mcp', 'public', 'scorer', 'student', 'teacher', 'user']);
+    for (const e of endpoints) expect(['public', 'classroom', 'teacher', 'admin', 'student', 'user', 'account', 'scorer', 'display', 'mcp', 'oauth']).toContain(e.access);
+    expect([...ACCESS_CLASSES].sort()).toEqual(['account', 'admin', 'classroom', 'display', 'mcp', 'oauth', 'public', 'scorer', 'student', 'teacher', 'user']);
     // Every access class is in use, so each is covered by the matrix below.
     for (const a of ACCESS_CLASSES) expect(endpoints.some((e) => e.access === a), a).toBe(true);
   });
 
   it('answers 401 to unauthenticated callers on every non-public endpoint', async () => {
-    await expectAll(new Client(env), (e) => e.access !== 'public' && e.access !== 'mcp', 401);
+    await expectAll(new Client(env), (e) => e.access !== 'public' && e.access !== 'mcp' && e.access !== 'oauth', 401);
   });
 
   it('answers 403 to teachers on every admin endpoint (ACC-1)', async () => {
@@ -85,8 +88,8 @@ describe('permission matrix over all endpoints', () => {
     expect((await scorer.get('/api/scorer/me')).status).toBe(200);
     expect((await board.get('/api/board')).status).toBe(200);
     // …and nowhere else (the session ending endpoint is left out so the matrix keeps its session).
-    await expectAll(scorer, (e) => e.access !== 'public' && e.access !== 'scorer' && e.access !== 'mcp', 401);
-    await expectAll(board, (e) => e.access !== 'public' && e.access !== 'display' && e.access !== 'mcp', 401);
+    await expectAll(scorer, (e) => e.access !== 'public' && e.access !== 'scorer' && e.access !== 'mcp' && e.access !== 'oauth', 401);
+    await expectAll(board, (e) => e.access !== 'public' && e.access !== 'display' && e.access !== 'mcp' && e.access !== 'oauth', 401);
     // Staff sessions do not carry the scorer or board cookie.
     const t = new Client(env);
     await t.login('ayse.teacher');
@@ -129,6 +132,48 @@ describe('permission matrix over all endpoints', () => {
       // …while the same token works on /mcp.
       const init = await env.app.inject({ method: 'POST', url: '/mcp', headers: { ...bearer, 'content-type': 'application/json' }, payload: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'matrix', version: '1' } } }) });
       expect(init.statusCode).toBe(200);
+    } finally {
+      expect((await a.put('/api/admin/ai-tools', { mcpEnabled: false })).status).toBe(200);
+    }
+  });
+
+  it('OAuth protocol endpoints: nothing while the switch is off, no session needed while it is on, cookies ignored (S14h2, D-160)', async () => {
+    const a = new Client(env);
+    await a.login('root.admin');
+    const isOAuth = (e: Endpoint) => e.access === 'oauth';
+    const targets = endpoints.filter(isOAuth);
+    expect(targets.map((e) => `${e.method} ${e.path}`).sort()).toEqual([
+      'GET /.well-known/oauth-authorization-server',
+      'GET /.well-known/oauth-protected-resource',
+      'GET /.well-known/oauth-protected-resource/mcp',
+      'GET /oauth/authorize',
+      'POST /oauth/register',
+      'POST /oauth/revoke',
+      'POST /oauth/token',
+    ]);
+    const expectOff = async (c: Client) => {
+      const wrong: string[] = [];
+      for (const e of targets) {
+        const r = await hit(c, e);
+        const ok = e.path === '/oauth/authorize' ? r.status === 303 && r.headers.location === '/oauth/consent?error=MCP_DISABLED' : r.status === 404;
+        if (!ok) wrong.push(`${e.method} ${e.path} → ${r.status}`);
+      }
+      expect(wrong).toEqual([]);
+    };
+    await expectOff(new Client(env));
+    await expectOff(a);
+    expect((await a.put('/api/admin/ai-tools', { mcpEnabled: true })).status).toBe(200);
+    try {
+      // Anonymous callers and signed-in browsers get the same answers: discovery 200, the rest refuse the empty request.
+      for (const c of [new Client(env), a]) {
+        const wrong: string[] = [];
+        for (const e of targets) {
+          const r = await hit(c, e);
+          const want = e.method === 'GET' ? (e.path === '/oauth/authorize' ? 303 : 200) : 400;
+          if (r.status !== want) wrong.push(`${e.method} ${e.path} → ${r.status}`);
+        }
+        expect(wrong).toEqual([]);
+      }
     } finally {
       expect((await a.put('/api/admin/ai-tools', { mcpEnabled: false })).status).toBe(200);
     }
