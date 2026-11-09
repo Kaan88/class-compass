@@ -311,7 +311,10 @@ export const GroupingCommands = {
   'grouping.restore': z.object({ contextId: Id, lessonId: Id, groupingId: Id }),
   /** S13a: move one present student to another group of the lesson's groups (tap or drag); S14c: `toGroupId` `UNPLACED` takes them out of every group. */
   'grouping.move': z.object({ contextId: Id, lessonId: Id, studentId: Id, toGroupId: z.string().min(1).max(64) }),
-  /** S13a: save the lesson's groups into the option (absent students keep their saved group). */
+  /**
+   * S13a: save the lesson's groups into the option (absent students keep their saved group). S14c:
+   * a student taken out with `UNPLACED` is saved in no group; a late arrival not placed yet keeps theirs.
+   */
   'grouping.saveToOption': z.object({ contextId: Id, lessonId: Id }),
 } as const;
 export type GroupingCommandType = keyof typeof GroupingCommands;

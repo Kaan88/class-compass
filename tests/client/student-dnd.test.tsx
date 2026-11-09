@@ -101,6 +101,22 @@ describe('StudentDnd tap path (S14c, D-150, UX-8)', () => {
     expect(moves).toEqual([['s3', 'g1']]);
   });
 
+  it('after a keyboard "Move here" the focus is on the moved name in its new list, not lost to the page (a11y)', async () => {
+    const moves: Array<[string, string]> = [];
+    render(<Harness moves={moves} />);
+    const r = row(NAMES.s3!);
+    act(() => r.focus());
+    fireEvent.keyDown(r, { key: 'Enter' });
+    fireEvent.keyUp(r, { key: 'Enter' });
+    const button = list('g1').getByRole('button', { name: 'Move here: Group 1' });
+    act(() => button.focus());
+    fireEvent.keyDown(button, { key: 'Enter' });
+    fireEvent.keyUp(button, { key: 'Enter' });
+    expect(moves).toEqual([['s3', 'g1']]);
+    await waitFor(() => expect(document.activeElement).toBe(list('g1').getByRole('row', { name: NAMES.s3 })));
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   it('rows carry the test id and student id the e2e specs use', () => {
     render(<Harness moves={[]} />);
     const rows = screen.getAllByTestId('member');
@@ -150,10 +166,12 @@ describe('StudentDnd keyboard drag and drop (S14c, D-150)', () => {
 describe('StudentDnd language (S14c, D-099)', () => {
   it.each([
     ['en', `Drag ${NAMES.s1}`, 'Move here: Group 2'],
-    ['tr', `${NAMES.s1}’i sürükle`, 'Buraya taşı: Group 2'],
-  ] as const)('speaks %s: the react-aria drag handle and our own labels', (locale, handle, moveHere) => {
+    // Our own label: react-aria's Turkish one is "<name>’i sürükle", wrong for "Kaya" (Kaya’yı) and "Öztürk" (Öztürk’ü).
+    ['tr', `${NAMES.s1} adlı öğrenciyi sürükle`, 'Buraya taşı: Group 2'],
+  ] as const)('speaks %s: the drag handle and the "Move here" labels', (locale, handle, moveHere) => {
     render(<Harness locale={locale} moves={[]} />);
     expect(screen.getByRole('button', { name: handle })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /’i sürükle$/ })).toBeNull();
     fireEvent.click(row(NAMES.s1!));
     expect(screen.getByRole('button', { name: moveHere })).toBeTruthy();
   });

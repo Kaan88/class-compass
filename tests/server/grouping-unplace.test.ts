@@ -1,7 +1,8 @@
 /**
  * S14c (D-150): drag and drop on the classroom group screen moves a student into "Not in a group"
- * with the `grouping.move` target `UNPLACED` (GRP-5, UX-8, UX-11). Save to option saves what the
- * screen shows. Test clock: Monday 2026-11-09, Europe/Istanbul. Fictional names only.
+ * with the `grouping.move` target `UNPLACED` (GRP-5, UX-8, UX-11). Save to option leaves out whom the
+ * teacher took out; late arrivals not placed keep their saved group. Test clock: Monday 2026-11-09,
+ * Europe/Istanbul. Fictional names only.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { UNPLACED } from '../../src/shared/contracts/grouping.ts';
@@ -91,7 +92,7 @@ describe('grouping.move to UNPLACED (S14c, D-150)', () => {
     expect((await cmd(s.teacherA, 'grouping.move', { contextId: ctx(), lessonId, studentId: kids[2]!.id, toGroupId: UNPLACED })).error?.reason).toBe('GROUPS_NOT_SHOWN');
   });
 
-  it('save to option saves what the screen shows: an unplaced student is in no group, an absent one keeps theirs (GRP-5)', async () => {
+  it('save to option: a student taken out with UNPLACED is in no group, an absent one keeps theirs (GRP-5)', async () => {
     const { lessonId, lions } = await lessonWithLions();
     const absent = lions.groups[1].memberIds[0] as string;
     await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: absent, status: 'absent' });
@@ -106,6 +107,49 @@ describe('grouping.move to UNPLACED (S14c, D-150)', () => {
     // Next time the option is used, the unplaced student joins the smallest group again (GRP-5 fit).
     expect((await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: lions.id })).ok).toBe(true);
     expect((await lessonState(s.teacherA, ctx())).grouping.notPlaced).toEqual([]);
+  });
+
+  it('save to option keeps the saved group and role of a late arrival the teacher has not placed (GRP-5, D-098)', async () => {
+    const { lessonId, lions } = await lessonWithLions();
+    const g = lions.groups[0];
+    const late = g.memberIds[0] as string;
+    // A role in the option for the student who will arrive late.
+    const withRole = await ok(
+      s.teacherA.put(`/api/teacher/grouping/templates/${lions.id}`, {
+        expectedVersion: lions.version,
+        groups: lions.groups.map((x: any) => ({ id: x.id, name: x.name, icon: x.icon, memberIds: x.memberIds, roles: x.id === g.id ? [{ studentId: late, label: { en: 'Leader' } }] : [] })),
+      }),
+    );
+    // Away when the option is used, marked late afterwards: listed under "Not in a group".
+    await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: late, status: 'absent' });
+    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: withRole.id })).ok).toBe(true);
+    await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: late, status: 'late' });
+    const st = (await lessonState(s.teacherA, ctx())).grouping;
+    expect(ids(st.notPlaced)).toEqual([late]);
+    // The teacher moves someone else and saves: the late arrival's saved place and role survive.
+    const other = st.groups[1].members[0].id as string;
+    expect((await cmd(s.teacherA, 'grouping.move', { contextId: ctx(), lessonId, studentId: other, toGroupId: st.groups[2].id })).ok).toBe(true);
+    expect((await cmd(s.teacherA, 'grouping.saveToOption', { contextId: ctx(), lessonId })).ok).toBe(true);
+    const t2 = (await ok(s.teacherA.get(`/api/teacher/contexts/${ctx()}/grouping`))).templates.find((t: any) => t.id === lions.id);
+    const savedG = t2.groups.find((x: any) => x.id === g.id);
+    expect(savedG.memberIds).toContain(late);
+    expect(savedG.roles).toEqual([{ studentId: late, label: { en: 'Leader' } }]);
+    expect(t2.groups.flatMap((x: any) => x.memberIds).sort()).toEqual(kids.map((k) => k.id).sort());
+  });
+
+  it('a late arrival placed by hand and then taken out is saved in no group (GRP-5)', async () => {
+    const { lessonId, lions } = await lessonWithLions();
+    const late = lions.groups[0].memberIds[0] as string;
+    await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: late, status: 'absent' });
+    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: lions.id })).ok).toBe(true);
+    await cmd(s.teacherA, 'attendance.setDaily', { contextId: ctx(), lessonId, studentId: late, status: 'late' });
+    const st = (await lessonState(s.teacherA, ctx())).grouping;
+    expect((await cmd(s.teacherA, 'grouping.move', { contextId: ctx(), lessonId, studentId: late, toGroupId: st.groups[1].id })).ok).toBe(true);
+    expect((await cmd(s.teacherA, 'grouping.move', { contextId: ctx(), lessonId, studentId: late, toGroupId: UNPLACED })).ok).toBe(true);
+    expect(ids((await lessonState(s.teacherA, ctx())).grouping.notPlaced)).toEqual([late]);
+    expect((await cmd(s.teacherA, 'grouping.saveToOption', { contextId: ctx(), lessonId })).ok).toBe(true);
+    const t2 = (await ok(s.teacherA.get(`/api/teacher/contexts/${ctx()}/grouping`))).templates.find((t: any) => t.id === lions.id);
+    expect(t2.groups.flatMap((x: any) => x.memberIds)).not.toContain(late);
   });
 
   it('the payload refuses an empty or over-long target (contract)', async () => {

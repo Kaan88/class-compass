@@ -2156,6 +2156,7 @@ export const en = {
   'grouping.memberCount_one': '{count} student',
   'grouping.memberCount_other': '{count} students',
   'grouping.unplacedEmpty': 'Drop a name here to take it out of the groups.',
+  'studentDnd.dragName': 'Drag {name}',
   'studentDnd.dropHere': 'Drop here',
   'studentDnd.empty': 'No one here yet.',
   'studentDnd.moveHere': 'Move here: {list}',

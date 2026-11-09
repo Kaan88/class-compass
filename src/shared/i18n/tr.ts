@@ -2154,6 +2154,7 @@ export const tr = {
   'grouping.memberCount_one': '{count} öğrenci',
   'grouping.memberCount_other': '{count} öğrenci',
   'grouping.unplacedEmpty': 'Bir öğrenciyi gruplardan çıkarmak için adını buraya bırakın.',
+  'studentDnd.dragName': '{name} adlı öğrenciyi sürükle',
   'studentDnd.dropHere': 'Buraya bırakın',
   'studentDnd.empty': 'Burada henüz kimse yok.',
   'studentDnd.moveHere': 'Buraya taşı: {list}',

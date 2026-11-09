@@ -523,7 +523,9 @@ export function restoreGrouping(ctx: RequestContext, p: z.infer<(typeof C.Groupi
  * group; or drag). Only students of the class who are here now; a student in no group yet (a late
  * arrival) is placed. Applies to this lesson at once; 'grouping.saveToOption' keeps it for later.
  * S14c (D-150): the target `UNPLACED` takes the student out of every group ("Not in a group"); their
- * role in the old group goes with them, like any move.
+ * role in the old group goes with them, like any move. A late arrival taken out this way (placed by
+ * hand first) also leaves `excludedAbsentIds`, so 'grouping.saveToOption' knows the teacher took them
+ * out and does not keep their saved group.
  */
 export function moveInGrouping(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.move']>, meta: CommandMeta) {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
@@ -542,7 +544,8 @@ export function moveInGrouping(ctx: RequestContext, p: z.infer<(typeof C.Groupin
     roles: into(g) ? g.roles : g.roles.filter((r) => r.studentId !== p.studentId),
   }));
   const unsatisfied = evaluateRules(next.map((g) => g.memberIds), domainRules(ruleRows(ctx.db, context.id)), { byHand: true }) as UnsatisfiedJson[];
-  ctx.db.update(lessonGroupings).set({ effectiveGroupsJson: next, unsatisfiedJson: unsatisfied }).where(eq(lessonGroupings.id, live.id)).run();
+  const excludedAbsentIds = unplace ? live.excludedAbsentIds.filter((x) => x !== p.studentId) : live.excludedAbsentIds;
+  ctx.db.update(lessonGroupings).set({ effectiveGroupsJson: next, unsatisfiedJson: unsatisfied, excludedAbsentIds }).where(eq(lessonGroupings.id, live.id)).run();
   updateLesson(ctx, lesson, {});
   audit(ctx.db, ctx.actor, { action: 'grouping.move', entity: 'lesson', entityId: lesson.id, opId: meta.opId, after: { groupingId: live.id, studentId: p.studentId, from, to: p.toGroupId } }, ctx.now());
   return { moved: true, from };
@@ -552,8 +555,10 @@ export function moveInGrouping(ctx: RequestContext, p: z.infer<(typeof C.Groupin
  * 'grouping.saveToOption' (S13a): the lesson's groups become the option's saved groups. Students away
  * in this lesson keep the group they had in the option; groups made only for the lesson are added.
  * Bumps the option's version (audited); the option keeps its type, so Shuffle still works.
- * S14c (D-150): what the screen shows is saved, so a student here now who is under "Not in a group"
- * (taken out with `UNPLACED`, or a late arrival not placed yet) is saved in no group.
+ * S14c (D-150): a student the teacher took out with `UNPLACED` (here now, under "Not in a group") is
+ * saved in no group. Everyone else outside the lesson's groups keeps their saved group and role:
+ * students away now, and late arrivals (away when the groups were made, `excludedAbsentIds`) whom the
+ * teacher has not placed or taken out since.
  */
 export function saveGroupingToOption(ctx: RequestContext, p: z.infer<(typeof C.GroupingCommands)['grouping.saveToOption']>, meta: CommandMeta) {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
@@ -564,9 +569,10 @@ export function saveGroupingToOption(ctx: RequestContext, p: z.infer<(typeof C.G
   if (!tpl || tpl.archivedAt !== null) throw new AppError('NOT_FOUND', 'Arrangement not found', { reason: 'ARRANGEMENT_NOT_FOUND' });
   const inLesson = new Set(live.effectiveGroupsJson.flatMap((g) => g.memberIds));
   const here = new Set(presentStudents(ctx.db, lesson).map((st) => st.id));
+  const leftOut = new Set(live.excludedAbsentIds);
   const saved: GroupJson[] = tpl.groupsJson.map((g) => {
     const lessonGroup = live.effectiveGroupsJson.find((x) => x.id === g.id);
-    const keep = g.memberIds.filter((x) => !inLesson.has(x) && !here.has(x));
+    const keep = g.memberIds.filter((x) => !inLesson.has(x) && (!here.has(x) || leftOut.has(x)));
     const members = [...(lessonGroup?.memberIds ?? []), ...keep];
     const set = new Set(members);
     return { ...g, memberIds: members, roles: [...(lessonGroup?.roles ?? []), ...g.roles.filter((r) => keep.includes(r.studentId))].filter((r) => set.has(r.studentId)) };

@@ -5,7 +5,8 @@
  *   "Drop here" line where it will land;
  * - tap a name (it is picked: filled and outlined), then "Move here" on the list it should go to;
  *   Enter on a name picks it from the keyboard;
- * - keyboard and screen readers: every name has a drag handle (react-aria names it "Drag <name>");
+ * - keyboard and screen readers: every name has a drag handle ("Drag <name>", our own label: react-aria's
+ *   Turkish one adds a fixed "’i" suffix that is wrong for most names);
  *   Tab to a list, arrows to a name, Right arrow to its handle, Enter starts a drag, Tab goes from
  *   list to list, Enter drops and Escape cancels.
  * Picking is the row's action, not react-aria selection: react-aria selects whatever a drop inserts
@@ -18,7 +19,7 @@
  * what a move does (an outbox command in the classroom, a draft change in the editor). A drop
  * inside the list a name came from does nothing (lists are not ordered).
  */
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
 import { DropIndicator, GridList, GridListItem, I18nProvider as AriaI18nProvider, isTextDropItem, useDragAndDrop, type DropItem } from 'react-aria-components';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
@@ -78,6 +79,22 @@ async function droppedIds(items: readonly DropItem[]): Promise<string[]> {
   return out.filter(Boolean);
 }
 
+/**
+ * After "Move here" the pressed button is gone (nothing is picked any more), so focus would fall to the
+ * page. Keep the keyboard user's place: focus the moved name once it shows in this list, or the list
+ * itself when it does not show (the move was refused).
+ */
+function focusMoved(box: RefObject<HTMLDivElement | null>, studentId: string, frames: { current: number }, tries = 10) {
+  frames.current = requestAnimationFrame(() => {
+    const el = box.current;
+    if (!el) return;
+    const row = [...el.querySelectorAll<HTMLElement>('[role="row"]')].find((r) => r.dataset.studentId === studentId);
+    if (row) row.focus();
+    else if (tries > 0) focusMoved(box, studentId, frames, tries - 1);
+    else el.querySelector<HTMLElement>('[role="grid"]')?.focus();
+  });
+}
+
 /** One list of students: a drop target, a drag source, tap-to-pick and its own "Move here" button. */
 export function StudentDropList<S extends DndStudent>({ id, name, label, students, renderStudent, emptyText, className = '', itemTestId, testId }: StudentDropListProps<S>) {
   const { t } = useI18n();
@@ -85,6 +102,13 @@ export function StudentDropList<S extends DndStudent>({ id, name, label, student
   if (!ctx) throw new Error('StudentDropList must be inside StudentDnd');
   const { picked, onPick, onMove } = ctx;
   const here = new Set(students.map((s) => s.id));
+  const box = useRef<HTMLDivElement>(null);
+  const frame = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  const moveHere = (studentId: string) => {
+    onMove(studentId, id);
+    focusMoved(box, studentId, frame);
+  };
   const dropped = async (items: readonly DropItem[]) => {
     for (const sid of await droppedIds(items)) onMove(sid, id);
   };
@@ -103,7 +127,7 @@ export function StudentDropList<S extends DndStudent>({ id, name, label, student
     ),
   });
   return (
-    <div className={`cc-dnd ${className}`.trim()} data-testid={testId}>
+    <div ref={box} className={`cc-dnd ${className}`.trim()} data-testid={testId}>
       <GridList
         aria-label={label ?? name}
         className="cc-dnd__list"
@@ -118,8 +142,8 @@ export function StudentDropList<S extends DndStudent>({ id, name, label, student
       >
         {(s) => (
           <GridListItem id={s.id} textValue={s.name} className="cc-dnd__item" data-testid={itemTestId} data-student-id={s.id} data-picked={picked === s.id || undefined}>
-            {/* The keyboard and screen-reader drag start (react-aria gives it its label and press). */}
-            <Button slot="drag" variant="ghost" size="small" className="cc-dnd__grip">
+            {/* The keyboard and screen-reader drag start (react-aria gives it its press; the label is ours). */}
+            <Button slot="drag" variant="ghost" size="small" className="cc-dnd__grip" aria-label={t('studentDnd.dragName', { name: s.name })}>
               <IconMove />
             </Button>
             {renderStudent(s)}
@@ -127,7 +151,7 @@ export function StudentDropList<S extends DndStudent>({ id, name, label, student
         )}
       </GridList>
       {picked && !here.has(picked) ? (
-        <Button size="small" variant="primary" className="cc-dnd__here" onPress={() => onMove(picked, id)}>
+        <Button size="small" variant="primary" className="cc-dnd__here" onPress={() => moveHere(picked)}>
           {t('studentDnd.moveHere', { list: name })}
         </Button>
       ) : null}
