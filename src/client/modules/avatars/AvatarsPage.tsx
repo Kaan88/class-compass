@@ -18,6 +18,7 @@ import { ConfirmDestructive } from '../../ui/Dialog.tsx';
 import { EmptyState } from '../../ui/Feedback.tsx';
 import { Select, Toggle } from '../../ui/Fields.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 
 const settingsKey = (classId: string) => [SENSITIVE, 'teacher', 'avatars', classId] as const;
 
@@ -50,7 +51,7 @@ function ClassAvatars({ classId }: { classId: string }) {
           {(roster.data?.students ?? []).map((st) => (
             <li key={st.id} className="cc-row">
               <Avatar name={st.fullName} id={st.id} hue={st.avatarHue} initials={st.initials} size="sm" />
-              <span>{st.fullName}</span>
+              <StudentName id={st.id} name={st.fullName} classId={classId} />
               <Button size="small" className="cc-push-right" onPress={() => setResetting({ id: st.id, name: st.fullName })} data-testid="avatar-reset">
                 {t('avatar.reset')}
               </Button>

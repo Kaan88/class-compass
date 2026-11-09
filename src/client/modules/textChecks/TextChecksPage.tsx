@@ -14,6 +14,7 @@ import { SENSITIVE } from '../../lib/queryClient.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Select, Toggle } from '../../ui/Fields.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 
 const WORDS_KEY = [SENSITIVE, 'teacher', 'textWords'] as const;
 const noticeKey = (contextId: string) => [SENSITIVE, 'teacher', 'blockedText', contextId] as const;
@@ -63,7 +64,11 @@ function Notice({ contextId }: { contextId: string }) {
         q.data.students.length ? (
           <ul className="cc-stack">
             {q.data.students.map((s) => (
-              <li key={s.id}>{t('textCheck.noticeRow', { name: s.fullName, count: s.count, date: s.lastDate })}</li>
+              <li key={s.id} className="cc-row">
+                {/* The name opens the student's statistics (S14e2). */}
+                <StudentName id={s.id} name={s.fullName} contextId={contextId} />
+                <span>{t('textCheck.noticeCount', { count: s.count, date: s.lastDate })}</span>
+              </li>
             ))}
           </ul>
         ) : (

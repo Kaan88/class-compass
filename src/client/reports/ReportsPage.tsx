@@ -10,6 +10,9 @@
  * fold (`<details>`, remembered on this device) and Print opens them all. Everything the page shows is
  * a deep link: `contextId`, `studentId`, `view`, `period`, `from`, `to` (`from` alone is the day of a
  * day/week/month/term period, `from` + `to` a custom period).
+ *
+ * S14e2 (D-154): in the teacher area a student's name in a table opens their statistics drawer; its
+ * "Open full report" comes back here through the deep link with the built-in `studentOverview` view.
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -39,7 +42,7 @@ import { DialogActions, Modal } from '../ui/Dialog.tsx';
 import { Alert, EmptyState } from '../ui/Feedback.tsx';
 import { Select, TextField } from '../ui/Fields.tsx';
 import { IconPrint, IconSettings, IconStar, IconTrash } from '../ui/icons.tsx';
-import { SectionView, useLabel } from './ReportView.tsx';
+import { ReportContextId, SectionView, useLabel } from './ReportView.tsx';
 
 /** Native date input (calendar picker on touch devices) with the usual field chrome. */
 function DateInput({ label, value, onChange, hint }: { label: string; value: string; onChange: (v: string) => void; hint?: string }) {
@@ -477,9 +480,12 @@ export function ReportsPage({ viewer, link: linkProp, onLinkChange }: { viewer: 
             <p className="cc-muted">{t('report.ui.rpt5')}</p>
           </header>
           {spec && !shown.length ? <EmptyState title={t('reportViews.emptyView')} mascot={false} /> : null}
-          {shown.map((s) => (
-            <SectionView key={s.key} section={s} csvHref={csvHref(s.key)} open={printing || !folded.has(s.key)} onToggle={(open) => setFold(s.key, open)} />
-          ))}
+          {/* A student's name in the tables opens their statistics in this class+subject (teacher area, S14e2). */}
+          <ReportContextId.Provider value={contextId}>
+            {shown.map((s) => (
+              <SectionView key={s.key} section={s} csvHref={csvHref(s.key)} open={printing || !folded.has(s.key)} onToggle={(open) => setFold(s.key, open)} />
+            ))}
+          </ReportContextId.Provider>
           {viewer === 'teacher' && studentId && timeline.data ? (
             <section className="cc-card cc-stack" aria-labelledby="sec-timeline">
               <h3 className="cc-h2" id="sec-timeline">

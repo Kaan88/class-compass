@@ -19,6 +19,7 @@ import { SignInMethodSection } from '../SignIn.tsx';
 import { TimeUpClipSection } from './ClassDisplay.tsx';
 import * as School from '../../../shared/contracts/school.ts';
 import { SensitiveGate } from '../Lock.tsx';
+import { StudentStatsProvider } from '../../ui/StudentName.tsx';
 
 export function TeacherLayout() {
   const { t } = useI18n();
@@ -37,10 +38,11 @@ export function TeacherLayout() {
           />
         </main>
       ) : (
-        <>
+        // Every student name below opens the statistics drawer, behind the PIN gate (S14e2, D-154).
+        <StudentStatsProvider>
           <TeacherNav />
           <Outlet />
-        </>
+        </StudentStatsProvider>
       )}
     </SensitiveGate>
   );

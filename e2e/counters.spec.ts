@@ -95,7 +95,7 @@ test('tap + on students, bar and weekly counts, undo, double tap guard, offline 
     // Double tap within 700 ms: one count and a calm message (CNT-5).
     const card0 = page.getByRole('article', { name: names[0]! });
     await page.waitForTimeout(800);
-    await card0.getByRole('button').dblclick();
+    await card0.getByRole('button', { name: /^Add one / }).dblclick();
     await expect(card0.getByText('Already counted – tap again to add another')).toBeVisible();
     await expect(weeklyCount(names[0]!)(weekly[0]! + 2)).toBeVisible();
     await expect.poll(async () => (await counter()).lessonTotal, { timeout: 15_000 }).toBe(3);

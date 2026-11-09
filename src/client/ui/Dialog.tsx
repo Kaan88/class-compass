@@ -26,8 +26,11 @@ export function Modal({
   children: ReactNode;
   dismissable?: boolean;
   role?: 'dialog' | 'alertdialog';
-  /** 'wide' for grids (homework checking), 'full' for full-screen classroom screens (groups, S13a). */
-  size?: 'normal' | 'wide' | 'full';
+  /**
+   * 'wide' for grids (homework checking), 'full' for full-screen classroom screens (groups, S13a),
+   * 'drawer' for a full-height panel at the end side of the screen (student statistics, S14e2).
+   */
+  size?: 'normal' | 'wide' | 'full' | 'drawer';
   testId?: string;
   /** A Close button next to the title, for long dialogs whose own buttons are at the end (D-139). */
   closeButton?: boolean;

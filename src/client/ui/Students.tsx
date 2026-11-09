@@ -4,6 +4,7 @@
  * density kicks in automatically for larger classes (34+).
  */
 import { useState, type CSSProperties } from 'react';
+import { Button as RACButton } from 'react-aria-components';
 import { isAway, type EffectiveAttendance } from '../../domain/attendance.ts';
 import { generatedAvatar, type AvatarSpecValue } from '../../shared/avatars.ts';
 import { AvatarArt } from '../avatars/AvatarArt.tsx';
@@ -114,6 +115,7 @@ export function StudentCard({
   periodLabel,
   addLabel,
   notice,
+  onOpen,
 }: {
   student: StudentCardData;
   /** Counter values (S6). Omitted = no counter shown (never a fake zero). */
@@ -132,13 +134,24 @@ export function StudentCard({
   attendance?: EffectiveAttendance;
   onAdd?: () => void;
   disabled?: boolean;
+  /**
+   * S14e2 (D-154): the name becomes a button that opens the classroom student card (positive things
+   * only). It has its own grid area, apart from the + button, so the two never overlap.
+   */
+  onOpen?: () => void;
 }) {
   const { t } = useI18n();
   const away = absent || (attendance !== undefined && isAway(attendance));
   return (
     <article className="cc-student-card" data-absent={away ? '' : undefined} aria-label={student.fullName}>
       <Avatar name={student.fullName} id={student.id} hue={student.avatarHue} initials={student.initials} photoUrl={student.photoUrl} photoAllowed={Boolean(student.photoUrl)} />
-      <div className="cc-student-card__name">{student.fullName}</div>
+      {onOpen ? (
+        <RACButton className="cc-student-card__name cc-student-card__name-btn" aria-haspopup="dialog" onPress={onOpen} data-testid="student-card-name">
+          {student.fullName}
+        </RACButton>
+      ) : (
+        <div className="cc-student-card__name">{student.fullName}</div>
+      )}
       <div className="cc-student-card__meta">
         {attendance !== undefined && attendance !== 'present' && attendance !== 'not_recorded' ? (
           <AttendanceChip status={attendance} />

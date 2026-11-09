@@ -25,6 +25,7 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconCheck, IconNext, IconPlus, IconPrev, IconUndo, IconX } from '../../ui/icons.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
@@ -220,7 +221,7 @@ function OutstandingTab({ contextId }: { contextId: string }) {
             {i.students.map((s) => (
               <li key={s.student.id} className="cc-row">
                 <Avatar name={s.student.fullName} id={s.student.id} hue={s.student.avatarHue} initials={s.student.initials} size="sm" />
-                <span>{s.student.fullName}</span>
+                <StudentName id={s.student.id} name={s.student.fullName} contextId={contextId} />
                 <span className="cc-chip">{statusLabel(i.statuses, s.status, locale)}</span>
               </li>
             ))}

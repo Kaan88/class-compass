@@ -4,22 +4,32 @@
  * and a printable A4 layout. RPT-5: "not recorded", "absent" and "not in the class" are words with
  * their own look, never 0; counts show what they are out of.
  */
-import { useEffect, useId, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState } from 'react';
 import type { ReportCell, ReportChart, ReportLabel, ReportSection, ReportTable } from '../../shared/contracts/reports.ts';
 import { chartValue, reportCellText, reportLabelText } from '../../shared/reportText.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { ellipsis, labelLayout, rowLabels } from './chartLabels.ts';
 import { formatDay } from '../../shared/i18n/index.ts';
+import { StudentName } from '../ui/StudentName.tsx';
 
 export function useLabel() {
   const { locale } = useI18n();
   return (l: ReportLabel) => reportLabelText(l, locale);
 }
 
-/** One cell (RPT-5): a count with its denominator, or a word for not recorded / absent / not applicable. */
+/** The class+subject of the report on screen: a student's name in it opens their statistics there (S14e2). */
+export const ReportContextId = createContext<string | undefined>(undefined);
+
+/**
+ * One cell (RPT-5): a count with its denominator, or a word for not recorded / absent / not applicable.
+ * A student cell is the student's name, which opens their statistics in the teacher area (S14e2, D-154).
+ */
 export function CellView({ cell }: { cell: ReportCell }) {
   const { locale } = useI18n();
+  const contextId = useContext(ReportContextId);
   switch (cell.t) {
+    case 'student':
+      return <StudentName id={cell.id} name={cell.name} contextId={contextId} />;
     case 'n':
       return (
         <span className="cc-metric" data-state="value">
@@ -236,7 +246,8 @@ function ColumnLabel({ l }: { l: ReportLabel }) {
   return <>{label(l)}</>;
 }
 
-export function TableView({ table, csvHref }: { table: ReportTable; csvHref?: string | undefined }) {
+/** `compact` (the student statistics drawer, S14e2): no chart and no CSV link, only the table. */
+export function TableView({ table, csvHref, compact = false }: { table: ReportTable; csvHref?: string | undefined; compact?: boolean }) {
   const label = useLabel();
   const { t } = useI18n();
   return (
@@ -253,8 +264,9 @@ export function TableView({ table, csvHref }: { table: ReportTable; csvHref?: st
         ) : null}
       </div>
       {table.note ? <p className="cc-muted">{label(table.note)}</p> : null}
-      {table.chart ? <ChartView table={table} chart={table.chart} /> : null}
-      <div className="cc-table-wrap">
+      {table.chart && !compact ? <ChartView table={table} chart={table.chart} /> : null}
+      {/* In the narrow drawer a table may scroll sideways: the keyboard can reach and scroll it (S14e2). */}
+      <div className="cc-table-wrap" {...(compact ? { tabIndex: 0, role: 'region', 'aria-label': label(table.title) } : {})}>
         <table className="cc-table">
           <caption className="cc-visually-hidden">{label(table.title)}</caption>
           <thead>
@@ -306,31 +318,36 @@ export function SectionView({
   csvHref,
   open,
   onToggle,
+  compact = false,
 }: {
   section: ReportSection;
   csvHref?: ((table: string) => string) | undefined;
   open?: boolean;
   onToggle?: ((open: boolean) => void) | undefined;
+  /** The student statistics drawer (S14e2): tables without charts or CSV links. */
+  compact?: boolean;
 }) {
   const label = useLabel();
-  const body = <SectionBody section={section} csvHref={csvHref} />;
+  // Unique per instance: the statistics drawer can show a section above the reports page (S14e2).
+  const headingId = `sec-${section.key}-${useId().replace(/:/gu, '')}`;
+  const body = <SectionBody section={section} csvHref={compact ? undefined : csvHref} compact={compact} />;
   if (onToggle) {
     return (
       <details className="cc-card cc-report-section cc-report-fold cc-disclosure" open={open} onToggle={(e) => onToggle(e.currentTarget.open)} data-section={section.key}>
         <summary>
-          <h3 className="cc-h2" id={`sec-${section.key}`}>
+          <h3 className="cc-h2" id={headingId}>
             {label(section.title)}
           </h3>
         </summary>
-        <section className="cc-stack" aria-labelledby={`sec-${section.key}`}>
+        <section className="cc-stack" aria-labelledby={headingId}>
           {body}
         </section>
       </details>
     );
   }
   return (
-    <section className="cc-card cc-stack cc-report-section" aria-labelledby={`sec-${section.key}`}>
-      <h3 className="cc-h2" id={`sec-${section.key}`}>
+    <section className={`cc-card cc-stack cc-report-section${compact ? ' cc-report-section--compact' : ''}`} aria-labelledby={headingId}>
+      <h3 className="cc-h2" id={headingId}>
         {label(section.title)}
       </h3>
       {body}
@@ -338,7 +355,7 @@ export function SectionView({
   );
 }
 
-function SectionBody({ section, csvHref }: { section: ReportSection; csvHref?: ((table: string) => string) | undefined }) {
+function SectionBody({ section, csvHref, compact }: { section: ReportSection; csvHref?: ((table: string) => string) | undefined; compact: boolean }) {
   const label = useLabel();
   return (
     <>
@@ -356,7 +373,7 @@ function SectionBody({ section, csvHref }: { section: ReportSection; csvHref?: (
         </dl>
       ) : null}
       {section.tables.map((tb) => (
-        <TableView key={tb.key} table={tb} csvHref={csvHref?.(tb.key)} />
+        <TableView key={tb.key} table={tb} csvHref={csvHref?.(tb.key)} compact={compact} />
       ))}
       {section.notes.length ? (
         <ul className="cc-report-notes">

@@ -23,6 +23,7 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { StudentStatsButton } from '../../ui/StudentName.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
@@ -289,6 +290,8 @@ function OverviewTab({ contextId }: { contextId: string }) {
               <Button variant="ghost" onPress={() => setStudent(s.id)} data-testid="achievements-student-open">
                 {s.fullName}
               </Button>
+              {/* The name opens the student's achievements; statistics have their own button (S14e2). */}
+              <StudentStatsButton id={s.id} name={s.fullName} contextId={contextId} />
               <span className="cc-muted cc-push-right">{t('achievements.studentCounts', { manual: s.manual, auto: s.auto })}</span>
             </li>
           ))}

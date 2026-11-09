@@ -22,6 +22,7 @@ import { EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { AttendanceChip, Avatar, MetricCell } from '../../ui/Students.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 import { IconNote } from '../../ui/icons.tsx';
 
 const key = (...rest: unknown[]) => [SENSITIVE, 'teacher', 'attendance', ...rest];
@@ -128,7 +129,7 @@ export function AttendancePage() {
               render: (s) => (
                 <span className="cc-row">
                   <Avatar name={s.fullName} id={s.studentId} hue={s.avatarHue} initials={s.initials} size="sm" />
-                  {s.fullName}
+                  <StudentName id={s.studentId} name={s.fullName} classId={cid} />
                 </span>
               ),
             },

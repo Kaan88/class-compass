@@ -176,7 +176,8 @@ function Everything() {
           <Avatar name="Ada Yıldız" id="x" size="lg" />
         </div>
         <StudentGrid count={4} label={t('catalog.students')}>
-          <StudentCard student={sample[0]!} weeklyCount={0} level={0} onAdd={() => undefined} />
+          {/* S14e2: on the classroom board the name is a button that opens the positive-only card. */}
+          <StudentCard student={sample[0]!} weeklyCount={0} level={0} onAdd={() => undefined} onOpen={() => undefined} />
           <StudentCard student={sample[1]!} weeklyCount={3} level={1} onAdd={() => undefined} />
           <StudentCard student={sample[2]!} weeklyCount={4} level={2} onAdd={() => undefined} />
           <StudentCard student={sample[4] ?? sample[2]!} weeklyCount={7} level={3} onAdd={() => undefined} />

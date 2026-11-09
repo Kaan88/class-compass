@@ -15,6 +15,7 @@ import { slotForBox, useStudentCardAddons, type ClassroomContext, type StudentCa
 import { LessonTimer } from '../LessonTimer.tsx';
 import { useLessonRoster } from '../lessonClient.ts';
 import { Dock } from './Dock.tsx';
+import { StudentCardDialog } from './StudentCardDialog.tsx';
 
 const GRID_KEY = 'cc.studentGridOpen';
 const readGridOpen = () => {
@@ -30,7 +31,10 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
   const { t } = useI18n();
   const roster = useLessonRoster(context.id, lesson.id);
   const [gridOpen, setGridOpen] = useState(readGridOpen);
+  // The classroom card a tapped name opens (S14e2, D-154): positive things only, no full statistics.
+  const [cardFor, setCardFor] = useState<string | null>(null);
   const students = roster.data?.students ?? [];
+  const cardStudent = cardFor ? students.find((s) => s.id === cardFor) : undefined;
   const addons = useStudentCardAddons(context, lesson);
   const extrasFor = (id: string, name: string): StudentCardExtras => Object.assign({}, ...addons.map((a) => a.cardProps(id, name))) as StudentCardExtras;
   const toggleGrid = () => {
@@ -59,11 +63,12 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
         <div id="cc-student-grid" className="cc-students-box__grid">
           <StudentGrid count={students.length} label={t('lesson.studentCards')}>
             {students.map((s) => (
-              <StudentCard key={s.id} student={s} {...extrasFor(s.id, s.fullName)} />
+              <StudentCard key={s.id} student={s} {...extrasFor(s.id, s.fullName)} onOpen={() => setCardFor(s.id)} />
             ))}
           </StudentGrid>
         </div>
       ) : null}
+      {cardStudent ? <StudentCardDialog contextId={context.id} student={cardStudent} onClose={() => setCardFor(null)} /> : null}
     </section>
   );
 }

@@ -33,6 +33,7 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextArea, TextField } from '../../ui/Fields.tsx';
 import { IconAlert, IconCopy, IconPrint, IconX } from '../../ui/icons.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'links'] as const;
@@ -269,7 +270,7 @@ function ClassLinks({ classId }: { classId: string }) {
           <li key={s.id} className="cc-card cc-stack" data-testid="link-row">
             <div className="cc-row">
               <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
-              <strong>{s.fullName}</strong>
+              <StudentName id={s.id} name={s.fullName} classId={classId} />
               <LinkStatusLine s={s} />
               <span className="cc-push-right cc-row">
                 {s.link?.url ? (

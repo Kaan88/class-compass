@@ -17,6 +17,7 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 import { ClassDisplaySection } from './ClassDisplay.tsx';
 import { settingsPanelFor } from '../../modules/registry.ts';
 import { ClassLanguageSelect, StudentPageLanguageSelect, studentPageOverride } from '../../ui/ClassLanguageSelect.tsx';
@@ -149,7 +150,7 @@ export function TeacherStudentsPage() {
               render: (s) => (
                 <span className="cc-row">
                   <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} photoUrl={s.photoUrl} photoAllowed={photosOn && Boolean(s.photoUrl)} size="sm" />
-                  {s.fullName}
+                  <StudentName id={s.id} name={s.fullName} classId={cid} />
                 </span>
               ),
             },

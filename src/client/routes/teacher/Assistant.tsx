@@ -27,6 +27,7 @@ import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconCalendar, IconNext, IconPlus, IconPrev, IconSwap, IconSync, IconX } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
@@ -39,13 +40,13 @@ const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] as const;
 type Student = { id: string; fullName: string; initials: string; avatarHue: number } | null;
 const statusKey = (s: string) => `assistant.status.${s}` as MessageKey;
 
-function Who({ s }: { s: Student }) {
+function Who({ s, contextId }: { s: Student; contextId: string }) {
   const { t } = useI18n();
   if (!s) return <span className="cc-muted">{t('assistant.notPlanned')}</span>;
   return (
     <span className="cc-row" style={{ gap: '0.5rem' }}>
       <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
-      {s.fullName}
+      <StudentName id={s.id} name={s.fullName} contextId={contextId} />
     </span>
   );
 }
@@ -125,8 +126,8 @@ function WeekTab({ contextId }: { contextId: string }) {
           emptyText={t('assistant.noDays')}
           columns={[
             { key: 'day', header: t('assistant.col.day'), render: (d) => <span>{dayLabel(d.date, locale)}{d.today ? ` · ${t('assistant.today')}` : ''}</span> },
-            { key: 'who', header: t('assistant.col.assistant'), render: (d) => <Who s={d.assistant} /> },
-            { key: 'planned', header: t('assistant.col.planned'), render: (d) => (d.actual ? <Who s={d.planned} /> : <span className="cc-muted">{t('assistant.asPlanned')}</span>) },
+            { key: 'who', header: t('assistant.col.assistant'), render: (d) => <Who contextId={contextId} s={d.assistant} /> },
+            { key: 'planned', header: t('assistant.col.planned'), render: (d) => (d.actual ? <Who contextId={contextId} s={d.planned} /> : <span className="cc-muted">{t('assistant.asPlanned')}</span>) },
             { key: 'status', header: t('assistant.col.status'), render: (d) => (d.status ? <span>{t(statusKey(d.status))}{d.reason ? ` – ${reasonText(t, d.reason)}` : ''}</span> : '') },
           ]}
         />
@@ -279,7 +280,7 @@ function HistoryTab({ contextId }: { contextId: string }) {
         rowKey={(r) => r.student.id}
         emptyText={t('assistant.historyEmpty')}
         columns={[
-          { key: 'name', header: t('common.name'), render: (r) => <Who s={r.student} />, sortValue: (r) => r.student.fullName },
+          { key: 'name', header: t('common.name'), render: (r) => <Who contextId={contextId} s={r.student} />, sortValue: (r) => r.student.fullName },
           { key: 'turns', header: t('assistant.col.turns'), render: (r) => r.turns, sortValue: (r) => r.turns },
           { key: 'missed', header: t('assistant.col.missed'), render: (r) => r.missed, sortValue: (r) => r.missed },
           { key: 'last', header: t('assistant.col.last'), render: (r) => d(r.lastDate), sortValue: (r) => r.lastDate ?? '' },
@@ -293,8 +294,8 @@ function HistoryTab({ contextId }: { contextId: string }) {
         emptyText={t('assistant.historyEmpty')}
         columns={[
           { key: 'day', header: t('assistant.col.day'), render: (r) => dayLabel(r.date, locale) },
-          { key: 'planned', header: t('assistant.col.planned'), render: (r) => <Who s={r.planned} /> },
-          { key: 'actual', header: t('assistant.col.actual'), render: (r) => (r.actual ? <Who s={r.actual} /> : <span className="cc-muted">{t('assistant.asPlanned')}</span>) },
+          { key: 'planned', header: t('assistant.col.planned'), render: (r) => <Who contextId={contextId} s={r.planned} /> },
+          { key: 'actual', header: t('assistant.col.actual'), render: (r) => (r.actual ? <Who contextId={contextId} s={r.actual} /> : <span className="cc-muted">{t('assistant.asPlanned')}</span>) },
           { key: 'status', header: t('assistant.col.status'), render: (r) => `${t(statusKey(r.status))}${r.reason ? ` – ${reasonText(t, r.reason)}` : ''}${r.absent.length ? ` (${t('assistant.absentNames', { names: r.absent.map((a) => a.fullName).join(', ') })})` : ''}` },
           { key: 'thanked', header: t('assistant.col.thanked'), render: (r) => (r.thanked ? t('common.yes') : t('common.no')) },
           { key: 'duties', header: t('assistant.col.duties'), render: (r) => (r.duties.length ? r.duties.map((x) => pickText(x.label, locale)).join(', ') : '–') },

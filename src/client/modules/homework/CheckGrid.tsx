@@ -22,6 +22,7 @@ import { Button } from '../../ui/Button.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
 import { IconCheck, IconNote } from '../../ui/icons.tsx';
 import { AttendanceChip, Avatar } from '../../ui/Students.tsx';
+import { StudentStatsButton } from '../../ui/StudentName.tsx';
 
 type AnyCheck = HomeworkCheck | ClassroomHomeworkCheck;
 type Row = AnyCheck['rows'][number] & { note?: string | null };
@@ -168,6 +169,8 @@ export function CheckGrid({ check, actions, onCheck, withNotes, scope }: { check
                 <Avatar name={r.student.fullName} id={r.student.id} hue={r.student.avatarHue} initials={r.student.initials} size="sm" />
                 <strong>{r.student.fullName}</strong>
               </label>
+              {/* The name selects the row; statistics have their own button (teacher area only, S14e2). */}
+              <StudentStatsButton id={r.student.id} name={r.student.fullName} contextId={check.assignment.contextId} />
               {/* Only when attendance was taken, and named, so "Not recorded" is never read as "not handed in". */}
               {r.attendance && r.attendance !== 'not_recorded' ? <AttendanceChip status={r.attendance} prefix={t('homework.attendanceChipPrefix')} /> : null}
               {!r.enrolled ? <span className="cc-chip">{t('homework.leftClass')}</span> : null}

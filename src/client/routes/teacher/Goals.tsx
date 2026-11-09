@@ -31,6 +31,7 @@ import { Select, TextArea, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconBack, IconLock, IconPlus, IconTrash, IconUndo } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { StudentStatsButton } from '../../ui/StudentName.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
@@ -226,6 +227,7 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
         </Button>
         <Avatar name={d.student.fullName} id={d.student.id} hue={d.student.avatarHue} initials={d.student.initials} />
         <h2 className="cc-h2">{d.student.fullName}</h2>
+        <StudentStatsButton id={d.student.id} name={d.student.fullName} contextId={contextId} />
       </div>
       <NewGoalForm contextId={contextId} studentId={studentId} library={d.library} />
       <section className="cc-stack" aria-labelledby="goals-list">
@@ -335,10 +337,14 @@ function Overview({ contextId, onOpen }: { contextId: string; onOpen: (studentId
           key: 'name',
           header: t('goals.col.student'),
           render: (r) => (
-            <Button variant="ghost" onPress={() => onOpen(r.id)}>
-              <Avatar name={r.fullName} id={r.id} hue={r.avatarHue} initials={r.initials} size="sm" />
-              {r.fullName}
-            </Button>
+            <span className="cc-row">
+              <Button variant="ghost" onPress={() => onOpen(r.id)}>
+                <Avatar name={r.fullName} id={r.id} hue={r.avatarHue} initials={r.initials} size="sm" />
+                {r.fullName}
+              </Button>
+              {/* The name opens the student's goals; statistics have their own button (S14e2). */}
+              <StudentStatsButton id={r.id} name={r.fullName} contextId={contextId} />
+            </span>
           ),
         },
         { key: 'active', header: t('goals.col.active'), render: (r) => String(r.activeGoals) },

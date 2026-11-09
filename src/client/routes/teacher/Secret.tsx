@@ -19,16 +19,17 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField } from '../../ui/Fields.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'secret'] as const;
 
 type Who = { id: string; fullName: string; initials: string; avatarHue: number };
-function Name({ s }: { s: Who }) {
+function Name({ s, contextId }: { s: Who; contextId: string }) {
   return (
     <span className="cc-row" style={{ gap: '0.5rem' }}>
       <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
-      {s.fullName}
+      <StudentName id={s.id} name={s.fullName} contextId={contextId} />
     </span>
   );
 }
@@ -85,7 +86,7 @@ function History({ contextId }: { contextId: string }) {
         rowKey={(r) => r.student.id}
         emptyText={t('secret.historyEmpty')}
         columns={[
-          { key: 'name', header: t('common.name'), render: (r) => <Name s={r.student} />, sortValue: (r) => r.student.fullName },
+          { key: 'name', header: t('common.name'), render: (r) => <Name contextId={contextId} s={r.student} />, sortValue: (r) => r.student.fullName },
           { key: 'revealed', header: t('secret.col.revealed'), render: (r) => r.revealed, sortValue: (r) => r.revealed },
           { key: 'met', header: t('secret.outcome.goal_met'), render: (r) => r.goalMet, sortValue: (r) => r.goalMet },
           { key: 'practising', header: t('secret.outcome.still_practising'), render: (r) => r.stillPractising, sortValue: (r) => r.stillPractising },
@@ -104,7 +105,7 @@ function History({ contextId }: { contextId: string }) {
               <ul className="cc-stack">
                 {r.selections.map((s) => (
                   <li key={s.selectionId} className="cc-row">
-                    <Name s={s.student} />
+                    <Name contextId={contextId} s={s.student} />
                     <span>{outcomeText(t, s.outcome)}</span>
                     {s.note ? <span className="cc-muted">{s.note}</span> : null}
                   </li>

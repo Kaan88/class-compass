@@ -25,6 +25,7 @@ import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconCalendar, IconPlus, IconX } from '../../ui/icons.tsx';
 import { Avatar, CounterBar, MetricCell } from '../../ui/Students.tsx';
+import { StudentName } from '../../ui/StudentName.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const countersKey = (contextId: string) => [SENSITIVE, 'teacher', 'counters', contextId] as const;
@@ -435,7 +436,7 @@ export function CounterHistoryPage({ initialCounterId }: { initialCounterId?: st
                   <th scope="row" className="cc-history__name">
                     <span className="cc-row" style={{ gap: '0.5rem', flexWrap: 'nowrap' }}>
                       <Avatar name={s.fullName} id={s.id} hue={s.avatarHue} initials={s.initials} size="sm" />
-                      {s.fullName}
+                      <StudentName id={s.id} name={s.fullName} contextId={contextId} />
                     </span>
                   </th>
                   {h.weeks.map((w) => (
