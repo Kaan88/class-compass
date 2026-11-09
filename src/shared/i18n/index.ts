@@ -1,6 +1,7 @@
 import { en, type MessageKey } from './en.ts';
 import { tr } from './tr.ts';
 import type { LocalizedTextValue as LocalizedText } from '../contracts/define.ts';
+import { dateTimeFormat } from '../intl.ts';
 
 export type Locale = 'en' | 'tr';
 export const dictionaries = { en, tr } as const;
@@ -29,7 +30,7 @@ export function pickText(t: LocalizedText | null | undefined, locale: Locale): s
 
 /** Locale-aware date formatting in a given IANA timezone (DSH-2). */
 export function formatDate(ms: number, locale: Locale, timeZone: string, opts: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { timeZone, ...opts }).format(ms);
+  return dateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { timeZone, ...opts }).format(ms);
 }
 
 /**
@@ -40,7 +41,7 @@ export function formatDate(ms: number, locale: Locale, timeZone: string, opts: I
 export function formatWeekRange(start: string, end: string, locale: Locale, opts: { year?: boolean } = {}): string {
   const at = (d: string) => Date.parse(`${d}T12:00:00Z`);
   const tag = locale === 'tr' ? 'tr-TR' : 'en-GB';
-  const part = (d: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...o }).format(at(d));
+  const part = (d: string, o: Intl.DateTimeFormatOptions) => dateTimeFormat(tag, { timeZone: 'UTC', ...o }).format(at(d));
   const day = (d: string) => `${part(d, { weekday: 'short' })} ${part(d, { day: 'numeric', month: 'short' })}`;
   return `${day(start)} – ${day(end)}${opts.year ? ` ${part(end, { year: 'numeric' })}` : ''}`;
 }
@@ -49,5 +50,5 @@ export function formatWeekRange(start: string, end: string, locale: Locale, opts
 export function formatDay(iso: string, locale: Locale, opts: { year?: boolean } = {}): string {
   const at = Date.parse(`${iso}T12:00:00Z`);
   if (Number.isNaN(at)) return iso;
-  return new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', ...(opts.year === false ? {} : { year: 'numeric' }) }).format(at);
+  return dateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', ...(opts.year === false ? {} : { year: 'numeric' }) }).format(at);
 }

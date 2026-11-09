@@ -13,6 +13,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { localDate } from '../../../domain/dates.ts';
 import type * as C from '../../../shared/contracts/textChecks.ts';
+import { compareTr } from '../../../shared/intl.ts';
 import { checkStudentText, findRiskyWord, type TextKind, type TextLimits, type WordLists } from '../../../shared/text/textQuality.ts';
 import { starterKindsOf } from '../../../shared/text/starters.ts';
 import { tx, type Db } from '../../db/client.ts';
@@ -44,7 +45,7 @@ function wordsOf(db: Db, scope: 'school' | 'teacher', ownerIds: readonly string[
     .where(and(eq(textCheckWords.scope, scope), inArray(textCheckWords.ownerId, [...ownerIds]), eq(textCheckWords.list, list)))
     .all()
     .map((r) => r.word)
-    .sort((a, b) => a.localeCompare(b, 'tr'));
+    .sort(compareTr);
 }
 
 /** The lists that apply to a student's text in a subject taught by these teachers. */

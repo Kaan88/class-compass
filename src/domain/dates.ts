@@ -3,11 +3,15 @@
  * timezone (DSH-2, D-003). Never hard-code dates; always derive them from an injected clock.
  */
 export { isIsoDate, isValidTimeZone } from '../shared/dates.ts';
+import { dateTimeFormat } from '../shared/intl.ts';
+
+const LOCAL_DATE_OPTIONS = { year: 'numeric', month: '2-digit', day: '2-digit' } as const;
 
 /** Local calendar date of instant `ms` in timezone `tz`. */
 export function localDate(ms: number, tz: string): string {
-  // en-CA formats as YYYY-MM-DD.
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
+  // en-CA formats as YYYY-MM-DD. One cached formatter per timezone (S15a, D-162): building one per
+  // call made whole-year reports slow and left hundreds of MB of ICU memory behind.
+  return dateTimeFormat('en-CA', { timeZone: tz, ...LOCAL_DATE_OPTIONS }).format(ms);
 }
 
 export interface SchoolYearSpan {

@@ -22,9 +22,32 @@ import { outcomesOf } from './library.ts';
 const CONFIDENCE = [1, 2, 3, 4, 5] as const;
 const GOAL_STATES = ['active', 'achieved', 'archived'] as const;
 
+function pushTo<K, V>(m: Map<K, V[]>, k: K, v: V): void {
+  const xs = m.get(k);
+  if (xs) xs.push(v);
+  else m.set(k, [v]);
+}
+
+/** Rows by key, each group in the rows' order (rows whose key is undefined are left out). */
+function groupBy<T>(xs: readonly T[], keyOf: (x: T) => string | undefined): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const x of xs) {
+    const k = keyOf(x);
+    if (k !== undefined) pushTo(m, k, x);
+  }
+  return m;
+}
+
 function load(ctx: RequestContext, scope: ReportScope) {
   const ids = scopeIds(scope);
-  const day = (ms: number) => localDate(ms, scope.timezone);
+  // Each instant's local day is computed once per report (S15a, D-162): sections filter the same rows
+  // by period, student and week many times.
+  const days = new Map<number, string>();
+  const day = (ms: number) => {
+    let d = days.get(ms);
+    if (d === undefined) days.set(ms, (d = localDate(ms, scope.timezone)));
+    return d;
+  };
   const all = ids.length ? ctx.db.select().from(goals).where(and(inArray(goals.studentId, ids), eq(goals.subjectId, scope.context.subjectId), isNull(goals.deletedAt))).all() : [];
   const gs = all.filter((g) => day(g.createdAt) <= scope.to);
   const gIds = gs.map((g) => g.id);
@@ -78,6 +101,21 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
   const inPeriod = (ms: number) => day(ms) >= scope.from && day(ms) <= scope.to;
   const teacherLatest = [...lastTeacher.values()];
   const selfLatest = [...lastSelf.values()];
+  // Rows grouped once by student and by week instead of filtering every row per student and per week
+  // (S15a, D-162); the groups keep the rows' order, so every count is the same as before.
+  const goalsOf = groupBy(gs, (g) => g.studentId);
+  const entriesInPeriodOf = groupBy(entriesInPeriod, (e) => owner.get(e.goalId));
+  const selfInPeriodOf = groupBy(
+    self.filter((e) => inPeriod(e.createdAt)),
+    (e) => owner.get(e.goalId),
+  );
+  const evidenceOf = new Map<string, number>();
+  for (const e of ev) evidenceOf.set(e.studentId, (evidenceOf.get(e.studentId) ?? 0) + 1);
+  // A day may fall in more than one listed week only if the weeks overlapped; count it in each, as before.
+  const weeksOfDay = new Map<string, string[]>();
+  for (const w of weeks) for (let i = 0; i < 7; i++) pushTo(weeksOfDay, addDays(w, i), w);
+  const selfInWeek = new Map<string, typeof selfInPeriod>();
+  for (const e of selfInPeriod) for (const w of weeksOfDay.get(day(e.createdAt)) ?? []) pushTo(selfInWeek, w, e);
   return {
     key: 'goals',
     title: key('report.section.goals'),
@@ -135,7 +173,7 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
           col('selfInPeriod', key('report.goals.selfInPeriod'), true),
         ],
         rows: scope.students.map((s) => {
-          const mine = gs.filter((g) => g.studentId === s.id);
+          const mine = goalsOf.get(s.id) ?? [];
           if (!mine.length) return { key: s.id, cells: [student(s), n(0), NA, NA, NA, NA] };
           const ids = new Set(mine.map((g) => g.id));
           return {
@@ -146,7 +184,7 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
               n(mine.filter((g) => g.status === 'achieved').length, mine.length),
               n([...lastTeacher.keys()].filter((id) => ids.has(id)).length, mine.length),
               n([...lastSelf.keys()].filter((id) => ids.has(id)).length, mine.length),
-              n(self.filter((e) => ids.has(e.goalId) && inPeriod(e.createdAt)).length),
+              n((selfInPeriodOf.get(s.id) ?? []).length),
             ],
           };
         }),
@@ -161,11 +199,11 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
           col('evidence', key('report.goals.evidence'), true),
         ],
         rows: scope.students.map((s) => {
-          const hasGoals = gs.some((g) => g.studentId === s.id);
-          const mine = entriesInPeriod.filter((e) => owner.get(e.goalId) === s.id);
+          const hasGoals = goalsOf.has(s.id);
+          const mine = entriesInPeriodOf.get(s.id) ?? [];
           return {
             key: s.id,
-            cells: [student(s), ...GOAL_ENTRY_KINDS.map((k) => (hasGoals ? n(mine.filter((e) => e.kind === k).length) : NR)), n(ev.filter((e) => e.studentId === s.id).length)],
+            cells: [student(s), ...GOAL_ENTRY_KINDS.map((k) => (hasGoals ? n(mine.filter((e) => e.kind === k).length) : NR)), n(evidenceOf.get(s.id) ?? 0)],
           };
         }),
       }),
@@ -180,7 +218,7 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
         ],
         rows: weeks.map((w) => {
           const we = addDays(w, 6);
-          const inWeek = selfInPeriod.filter((e) => day(e.createdAt) >= w && day(e.createdAt) <= we);
+          const inWeek = selfInWeek.get(w) ?? [];
           // A week without any self-assessment has no distribution: "not recorded", never 0 of 0.
           return { key: w, cells: [range(w, we), n(inWeek.length), ...CONFIDENCE.map((c) => (inWeek.length ? n(inWeek.filter((e) => e.confidence === c).length, inWeek.length) : NR))] };
         }),

@@ -7,6 +7,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { ACHIEVEMENT_CATEGORIES } from '../../../shared/achievements.ts';
 import type { MessageKey } from '../../../shared/i18n/index.ts';
+import { compareTr } from '../../../shared/intl.ts';
 import { localDate } from '../../../domain/dates.ts';
 import type { ReportSectionData, TimelineEvent } from '../../../shared/contracts/reports.ts';
 import { achievementDefinitions, studentAchievements, users } from '../../db/schema.ts';
@@ -48,7 +49,7 @@ function byTeacher(ctx: RequestContext, all: readonly AwardIn[]) {
   const names = new Map((ids.length ? ctx.db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, ids)).all() : []).map((u) => [u.id, u.name]));
   return ids
     .map((id) => ({ id, name: names.get(id) ?? '' }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+    .sort((a, b) => compareTr(a.name, b.name))
     .map(({ id, name }) => {
       const mine = manual.filter((a) => a.awardedBy === id);
       const live = mine.filter((a) => a.revokedAt === null).length;

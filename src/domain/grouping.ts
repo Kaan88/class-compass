@@ -20,6 +20,7 @@
  *   Whatever cannot be met is reported with a reason (GRP-8); nothing is dropped silently.
  * - Ties are broken with `seededRank(seed, id)`, so the same seed always gives the same groups.
  */
+import { collator } from '../shared/intl.ts';
 import { foldForSearch } from '../shared/text/turkish.ts';
 import { seededRank } from './rotation.ts';
 
@@ -120,7 +121,7 @@ export const levelWordStep = (label: string): number | null => WORD_STEP.get(fol
  * the order used is never a surprise.
  */
 export function orderedLevels(labels: Iterable<string | null | undefined>): string[] {
-  const collator = new Intl.Collator('tr', { numeric: true, sensitivity: 'base' });
+  const levelCollator = collator('tr', { numeric: true, sensitivity: 'base' });
   const distinct = [...new Set([...labels].filter((l): l is string => Boolean(l?.trim())).map((l) => l.trim()))];
   return distinct.sort((a, b) => {
     const sa = levelWordStep(a);
@@ -128,7 +129,7 @@ export function orderedLevels(labels: Iterable<string | null | undefined>): stri
     if (sa !== null && sb !== null && sa !== sb) return sa - sb;
     if (sa !== null && sb === null) return -1;
     if (sa === null && sb !== null) return 1;
-    return collator.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0);
+    return levelCollator.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0);
   });
 }
 
