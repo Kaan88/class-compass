@@ -27,7 +27,8 @@
     "usability:screens": "playwright test -c playwright.usability.config.ts",
     "check": "node --run typecheck && node --run lint && node --run test",
     "new:module": "node scripts/new-module.ts",
-    "new:theme": "node scripts/new-theme.ts"
+    "new:theme": "node scripts/new-theme.ts",
+    "docs:theming": "node scripts/theme-docs.ts"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",

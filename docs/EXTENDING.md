@@ -9,7 +9,7 @@ Both registries are **one list per side** and are test-enforced, so a forgotten 
 | | Shared key list | Server | Client |
 |---|---|---|---|
 | Module | `src/shared/modules.ts` (`CONTEXT_MODULE_CATALOG`) | `src/server/modules/<m>/manifest.ts`, listed in `src/server/modules/index.ts` | `src/client/modules/<m>/manifest.tsx`, listed in `src/client/modules/index.ts` |
-| Theme | `src/shared/themes.ts` (`THEME_KEYS`) | `classes.theme` validates against the key list | `src/client/themes/<t>/`, listed in `src/client/themes/registry.ts` |
+| Theme | `src/shared/themes.ts` (`THEME_KEYS`, built-in) | `classes.theme`: a built-in key or an enabled theme package (`assertThemeUsable`, D-158) | `src/client/themes/<t>/`, listed in `src/client/themes/registry.ts` |
 
 ## Add a module
 
@@ -163,8 +163,14 @@ export const pointsGenerator: HistoryGenerator = {
 ## Add a theme
 
 > **Agents: read [THEMING.md](THEMING.md) first.** It explains the sound packs, the SoundManager,
-> celebrations and the time's-up announcement (S13b, D-110), with recipes for a new theme, a new
-> sound event and a new celebration trigger.
+> celebrations and the time's-up announcement (S13b, D-110), theme packages (S14g, D-158), palette
+> design, every colour token and every limit, with recipes for a new theme, a theme package, a new
+> sound event, a new token and a new celebration trigger.
+
+**A theme without code (S14g, D-158).** Most new looks do not need a built-in theme: an
+administrator imports a **theme package** (JSON) on Admin → Themes. Start from Export of the closest
+theme and follow THEMING.md → "Theme packages". Make a built-in theme only when it needs art or
+motions the package format cannot express.
 
 A theme is a folder `src/client/themes/<key>/` that fills **every** slot of `ThemeDefinition`
 (`src/client/themes/types.ts`). Start with the scaffold, which copies the default theme with renamed
@@ -197,11 +203,25 @@ registry line, the names in en and tr (Turkish marked TODO) and `tests/client/th
 All art is coloured with `tok('name')` (that is, `var(--cc-name)`), never literals. Shared building
 blocks (`Face`, `Arms`, `Scene`, `Sparkles`, `Confetti`, …) are in `src/client/themes/art.tsx`.
 
+### Theme hooks (S14g, D-158)
+
+| Hook | Where | Use |
+|---|---|---|
+| `validateThemePackage(textOrValue)` | `src/shared/themePackage/validate.ts` | The one check of a package (server, admin page, MCP, tests). |
+| `assertThemeUsable(db, key)` / `effectiveTheme(db, key)` | `src/server/modules/themes/service.ts` | Before writing a theme key / when sending one to a screen. |
+| `themeOf(key)`, `pickerThemes()` | `src/client/themes/registry.ts` | Resolve a key (falls back to the default); list choosable themes. |
+| `registerThemePackage(pkg, status, key?)`, `loadThemePackage(key)`, `useAvailableThemes()` | `src/client/themes/custom.tsx` | Make a package a live theme or a preview; load the one the display needs; load the enabled ones for pickers. |
+| `useThemeLabels(def)`, `useThemeName(key)` | `src/client/themes/index.tsx` | A theme's names (imported themes carry their own). |
+| `<SvgTree nodes>` | `src/client/themes/SvgTree.tsx` | Draw sanitised package art. |
+| `themeSounds(params, overrides)` | `src/client/themes/soundPack.ts` | A built-in theme's sounds plus the parameters exported into packages. |
+| `presetMotion`, `FONT_PRESETS`, `SHADOW_PRESETS` | `src/shared/themePackage/motion.ts`, `presets.ts` | Motions, fonts and shadows by name (built-in themes use them too). |
+| `npm run docs:theming` | `scripts/theme-docs.ts` | Regenerate the token table, the limits and the package schema in the docs. |
+
 ### What the registry gives you
 
 - **CSS.** `installThemeStyles()` writes one complete token block per theme (`[data-theme='<key>']`, the default theme also on `:root`) plus its keyframes, so nested previews work.
 - **React.** `ThemeProvider` (previews and catalogue), `useTheme()`, `<Mascot pose motion>`, `<ThemeIllustration name motion>`, `<ThemeDecoration>`, `<ThemeBackdrop>`, `useThemeMotion()` and `useThemeSound()`. Components use these and never branch on a theme key (theme lint).
-- **Everywhere that lists themes iterates `THEME_LIST`.** That covers the admin class editor, the teacher preview, `/dev/catalog`, the e2e axe loop with per-theme screenshots, and the contrast and slot tests.
+- **Everywhere that lists built-in themes iterates `THEME_LIST`** (`/dev/catalog`, the e2e axe loop with per-theme screenshots, the contrast and slot tests); the pickers (admin class editor, Class settings, Super Speakers) use `pickerThemes()`, which adds the enabled packages.
 
 ### THM-3: same controls, same meanings
 
@@ -217,6 +237,7 @@ labels, the same counter levels (number + pattern + word) and the same flows.
 - [ ] Look at `/dev/catalog` (all poses and illustrations; the animation switch replays motions; sound buttons) in both languages and at 200 % text.
 - [ ] `npm run test:e2e -- catalog` (axe on every theme, plus screenshots attached to the report).
 - [ ] Translate the `TODO(tr)` lines. Record the theme in ROADMAP and DECISIONS.
+- [ ] `npm run docs:theming` (the token table shows every built-in theme's values; drift-tested).
 
 ## Add a language (notes)
 

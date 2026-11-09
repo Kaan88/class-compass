@@ -240,9 +240,11 @@ Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, m
 - [ ] S14d Student page: home tiles and short steps, screens in the query string, simpler words (D-151)
   - [ ] Tried on a low-end Android phone and an iPhone (tiles, steps, back button, reload, camera and voice)
 - [ ] S14d Sentence starters: built-in EN/TR, teacher and admin lists, `STARTER_UNFINISHED` text check (D-152)
-- [ ] S14g Theme packages: shared validators, safe SVG tree, admin Themes page with import, preview, export, enable (D-158)
+- [x] S14g Theme packages: shared validators, safe SVG tree, admin Themes page with import, preview, export, enable (D-158)
+  - Open theme keys checked by `assertThemeUsable` (classes, class display, Super Speakers board), reads fall back to the default theme, delete moves classes and the board to the default; worked example `docs/examples/ocean.theme.json`; tests: sanitiser fuzz and injection list, validators, CSS injection, server lifecycle and permissions, `e2e/theme-packages.spec.ts` (bad contrast → fix → enable → class uses it → axe → delete falls back)
   - [ ] The worked example theme imported and previewed on the classroom display
-- [ ] S14g AI guidelines: `AGENTS.md`, `CLAUDE.md`, generated token table and the full theming guide (D-159)
+- [x] S14g AI guidelines: `AGENTS.md`, `CLAUDE.md`, generated token table and the full theming guide (D-159)
+  - The MCP theme tools are documented as coming with S14h (they do not exist yet)
 - [ ] S14c Groups drag-and-drop in the teacher editor and the classroom group screen, with tap and keyboard fallbacks (D-150)
   - [ ] Mouse, touch panel, iPad and Android drag, keyboard, VoiceOver
 - [ ] S14e2 Student name → stats: drawer in the teacher area; positive-only card on the classroom screen with no full-stats link (D-154)
