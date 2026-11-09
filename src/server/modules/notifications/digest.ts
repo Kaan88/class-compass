@@ -1,0 +1,144 @@
+/**
+ * The notifications tick (S14e3, D-155), run every 5 minutes from main.ts (and directly by tests):
+ *
+ * 1. Purge: notifications and digest records older than NOTIFICATION_RETENTION_DAYS (90) are deleted.
+ * 2. Daily email digest, off by default: once a day per teacher (an active teacher account with an
+ *    email address and the digest switched on), after the teacher's chosen hour in the school
+ *    timezone, a plain-text email in the teacher's language with COUNTS ONLY: how many unread
+ *    notifications of each kind arrived since the last digest (at most a week back; the last 24 hours
+ *    for the first one), after the same access check as the page. Student names (with a count each) only when the
+ *    teacher opted in; never student text, never class lists. Nothing new = no email (`empty`).
+ *
+ * A digest row (teacher, local day) is inserted BEFORE the mail goes out, so two ticks never send
+ * twice; a failed send is recorded as `failed` and not retried that day (no SMTP hammering).
+ */
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
+import { localDate } from '../../../domain/dates.ts';
+import { categoryOn, NOTIFICATION_CATEGORIES, type NotificationCategory } from '../../../shared/notifications.ts';
+import { translate, type Locale } from '../../../shared/i18n/index.ts';
+import { sortByName } from '../../../shared/text/turkish.ts';
+import { notificationDigests, notifications, users } from '../../db/schema.ts';
+import type { AppDeps } from '../../lib/context.ts';
+import { getUserSetting } from '../../lib/userSettings.ts';
+import { getSchoolSettings } from '../school/policy.ts';
+import { visibleRows } from './service.ts';
+
+export const TICK_MS = 5 * 60_000;
+const DAY_MS = 24 * 3600_000;
+
+/** The hour of `ms` in timezone `tz` (0–23). */
+export function localHour(ms: number, tz: string): number {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(ms));
+  return Number.isFinite(h) ? h % 24 : 0;
+}
+
+/** Deletes notifications and digest records older than the retention period. */
+export function purgeNotifications(deps: Pick<AppDeps, 'db' | 'now' | 'config'>): number {
+  const cutoff = deps.now() - deps.config.NOTIFICATION_RETENTION_DAYS * DAY_MS;
+  const n = deps.db.delete(notifications).where(lt(notifications.createdAt, cutoff)).run().changes;
+  deps.db.delete(notificationDigests).where(lt(notificationDigests.sentAt, cutoff)).run();
+  return n;
+}
+
+export interface DigestContent {
+  total: number;
+  byCategory: Partial<Record<NotificationCategory, number>>;
+  byStudent: Array<{ fullName: string; count: number }>;
+}
+
+/** What a teacher's digest would say now (unread rows they may see, updated after `since`, of the kinds `keep` accepts). */
+export function digestContent(deps: Pick<AppDeps, 'db' | 'now'>, userId: string, since: number, keep: (c: NotificationCategory) => boolean = () => true): DigestContent {
+  const rows = deps.db
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.userId, userId), isNull(notifications.readAt), gt(notifications.updatedAt, since)))
+    .all();
+  const byCategory: Partial<Record<NotificationCategory, number>> = {};
+  const students = new Map<string, { fullName: string; count: number }>();
+  let total = 0;
+  for (const { row, fullName } of visibleRows(deps, userId, rows)) {
+    if (!keep(row.category)) continue;
+    byCategory[row.category] = (byCategory[row.category] ?? 0) + row.count;
+    const s = students.get(row.studentId) ?? { fullName, count: 0 };
+    s.count += row.count;
+    students.set(row.studentId, s);
+    total += row.count;
+  }
+  return { total, byCategory, byStudent: sortByName([...students.values()], (s) => s.fullName) };
+}
+
+/** The plain-text email (counts only; names only when `includeNames`). */
+export function digestMail(locale: Locale, name: string, content: DigestContent, includeNames: boolean, link: string) {
+  const T = (key: string, vars: Record<string, string | number> = {}) => translate(locale, key, vars);
+  const lines = NOTIFICATION_CATEGORIES.filter((c) => content.byCategory[c]).map((c) => `- ${T(`notifications.category.${c}`)}: ${content.byCategory[c]}`);
+  const students = includeNames ? `${T('notifications.digest.byStudent')}\n${content.byStudent.map((s) => `- ${s.fullName}: ${s.count}`).join('\n')}\n\n` : '';
+  return {
+    subject: T('notifications.digest.subject', { count: content.total }),
+    text: T('notifications.digest.body', { name, lines: lines.join('\n'), students, link }),
+  };
+}
+
+/** One tick: purge, then the digests that are due. Resolves when every due mail was tried. */
+export async function runNotificationTick(deps: AppDeps): Promise<{ purged: number; sent: number; empty: number; failed: number }> {
+  const purged = purgeNotifications(deps);
+  const result = { purged, sent: 0, empty: 0, failed: 0 };
+  const mailer = deps.mailer;
+  if (!mailer) return result;
+  const now = deps.now();
+  const tz = getSchoolSettings(deps.db).timezone;
+  const today = localDate(now, tz);
+  const hour = localHour(now, tz);
+  const teachers = deps.db
+    .select()
+    .from(users)
+    .where(and(eq(users.role, 'teacher'), isNull(users.disabledAt), isNotNull(users.email)))
+    .all();
+  for (const u of teachers) {
+    if (!u.email) continue;
+    const settings = getUserSetting(deps.db, u.id, 'notifications.settings');
+    if (!settings.digest.enabled || hour < settings.digest.hour) continue;
+    if (deps.db.select().from(notificationDigests).where(and(eq(notificationDigests.userId, u.id), eq(notificationDigests.localDate, today))).get()) continue;
+    // Since the last digest that went out or found nothing (a failed one is mailed again next time),
+    // at most a week back; the last 24 hours for the first one.
+    const last = deps.db
+      .select()
+      .from(notificationDigests)
+      .where(and(eq(notificationDigests.userId, u.id), inArray(notificationDigests.status, ['sent', 'empty'])))
+      .orderBy(desc(notificationDigests.sentAt))
+      .limit(1)
+      .get();
+    const since = last ? Math.max(last.sentAt, now - 7 * DAY_MS) : now - DAY_MS;
+    // Claim the day first: a second tick (or process) finds the row and sends nothing.
+    const claimed = deps.db
+      .insert(notificationDigests)
+      .values({ userId: u.id, localDate: today, sentAt: now, status: 'sending', itemsJson: {} })
+      .onConflictDoNothing()
+      .run().changes;
+    if (!claimed) continue;
+    // Only the kinds the teacher still gets (a kind switched off since is not mailed).
+    const content = digestContent(deps, u.id, since, (c) => categoryOn(settings, c));
+    const counts = { ...content.byCategory } as Record<string, number>;
+    const setStatus = (status: 'sent' | 'failed' | 'empty') =>
+      deps.db
+        .update(notificationDigests)
+        .set({ status, itemsJson: counts })
+        .where(and(eq(notificationDigests.userId, u.id), eq(notificationDigests.localDate, today)))
+        .run();
+    if (!content.total) {
+      setStatus('empty');
+      result.empty += 1;
+      continue;
+    }
+    const mail = digestMail(u.locale, u.displayName, content, settings.digest.includeNames, `${deps.config.origins.main}/teacher/notifications`);
+    try {
+      await mailer.send({ to: u.email, subject: mail.subject, text: mail.text });
+      setStatus('sent');
+      result.sent += 1;
+    } catch {
+      // The address and the error stay out of the logs and the database (they may name a person).
+      setStatus('failed');
+      result.failed += 1;
+    }
+  }
+  return result;
+}

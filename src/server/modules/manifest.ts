@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import type { PolicyKey } from '../../shared/modules.ts';
 import type { ActivityListener } from '../lib/activity.ts';
 import type { AnyCommandDef } from '../lib/commands.ts';
+import type { NotificationSink } from '../lib/notify.ts';
 import type { AppDeps, RequestContext } from '../lib/context.ts';
 import type { AttendanceListener } from './attendance/service.ts';
 import type { EndLessonStep } from './lessons/endSteps.ts';
@@ -179,6 +180,11 @@ export interface ServerModuleManifest {
   studentPage?: readonly StudentPageContribution[];
   /** S14e2 classroom student card items (served by the students module, `classroom` access, D-154). */
   classroomCard?: readonly ClassroomCardContribution[];
+  /**
+   * S14e3 (D-155): receives every `notify()` event (lib/notify.ts) inside the writing transaction.
+   * Only the notifications module declares one; emitting modules call `notify`, never a sink.
+   */
+  notificationSink?: NotificationSink;
   /** Default config + Zod schema for `context_modules.configJson` of `policyKey`. */
   config?: ModuleConfigSpec;
 }

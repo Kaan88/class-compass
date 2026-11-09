@@ -13,6 +13,7 @@ import { DEFAULT_SOUND_VOLUME, DEFAULT_WEATHER, TIME_UP_SOUNDS } from '../../sha
 import { FILE_KINDS } from '../../shared/contracts/files.ts';
 import { IMPORT_SOURCE_TYPES, type ImportFlag } from '../../shared/contracts/import.ts';
 import { STARTER_KINDS } from '../../shared/text/starters.ts';
+import { NOTIFICATION_CATEGORIES, NOTIFICATION_ENTITIES } from '../../shared/notifications.ts';
 
 export type LocalizedText = { en?: string; tr?: string };
 
@@ -1571,4 +1572,63 @@ export const classroomLayouts = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.scope] })],
+);
+
+// ---------------------------------------------------------------- teacher notifications (S14e3, D-155)
+/**
+ * What students did that a teacher may want to see (the bell, `/teacher/notifications`). One row per
+ * recipient teacher, with ids only: the text shown is read at display time after the access check, so
+ * hidden or deleted items and students the teacher no longer teaches never show. `subjectId` null =
+ * about the student as a whole (avatar, link). `contextId` is the recipient's own class+subject for
+ * the student (deep links). The daily aggregate categories (`AGGREGATE_CATEGORIES`: blocked text,
+ * Super Speakers points) keep one row per teacher, student, category and local day with a `count`
+ * (unique partial index); other categories bump the count of an unread row about the same record.
+ * Purged after NOTIFICATION_RETENTION_DAYS (90) by the notifications tick; erased with the student
+ * (`student_id`); in the full export, not in the per-student export (teacher-side data, like notes).
+ */
+export const notifications = sqliteTable(
+  'notifications',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id),
+    studentId: text('student_id').notNull().references(() => students.id),
+    subjectId: text('subject_id').references(() => subjects.id),
+    contextId: text('context_id').references(() => teachingContexts.id),
+    category: text('category', { enum: NOTIFICATION_CATEGORIES }).notNull(),
+    entity: text('entity', { enum: NOTIFICATION_ENTITIES }).notNull(),
+    entityId: text('entity_id'),
+    count: integer('count').notNull().default(1),
+    /** The day it happened (school timezone), for the daily aggregates and the digest. */
+    localDate: text('local_date').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    readAt: integer('read_at'),
+  },
+  (t) => [
+    index('notifications_user_idx').on(t.userId, t.updatedAt),
+    index('notifications_entity_idx').on(t.userId, t.category, t.entityId),
+    index('notifications_student_idx').on(t.studentId),
+    index('notifications_created_idx').on(t.createdAt),
+    uniqueIndex('notifications_daily_uq')
+      .on(t.userId, t.studentId, t.category, t.localDate)
+      .where(sql`category in ('textBlocked', 'speakersPoints')`),
+  ],
+);
+
+/**
+ * The daily email digest (S14e3, D-155): one row per teacher and local day once the day's digest was
+ * decided, so a teacher gets at most one email a day. `itemsJson` holds counts per category only
+ * (never names or student text). `status`: `sending` while the mail is out, then `sent`, `failed`
+ * (not retried that day) or `empty` (nothing new, no email).
+ */
+export const notificationDigests = sqliteTable(
+  'notification_digests',
+  {
+    userId: text('user_id').notNull().references(() => users.id),
+    localDate: text('local_date').notNull(),
+    sentAt: integer('sent_at').notNull(),
+    status: text('status', { enum: ['sending', 'sent', 'failed', 'empty'] }).notNull(),
+    itemsJson: text('items_json', { mode: 'json' }).$type<Record<string, number>>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
 );

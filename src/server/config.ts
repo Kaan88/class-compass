@@ -70,6 +70,8 @@ const EnvSchema = z.object({
    * heartbeat also re-checks the board link and the week (rollover).
    */
   SPEAKERS_HEARTBEAT_MS: z.coerce.number().int().min(500).max(90_000).default(25_000),
+  /** Teacher notifications (S14e3, D-155): rows and digest records older than this many days are deleted. */
+  NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().min(7).max(3650).default(90),
   /**
    * Test-only clock offset file (S12 e2e): when set and NODE_ENV=test, the server's clock is
    * `Date.now()` plus the number of milliseconds in this file (so a test can move to next week).

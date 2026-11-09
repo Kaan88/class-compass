@@ -23,6 +23,7 @@ import { initials, lowerTr, normaliseName } from '../../../shared/text/turkish.t
 import { tx, type Db } from '../../db/client.ts';
 import { authAttempts, classes, sessions, studentLinks, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
+import { notify } from '../../lib/notify.ts';
 import type { Actor, AppDeps, RequestContext, SessionRow, StudentPrincipal } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { newId, openSecret, randomToken, sealSecret, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
@@ -100,6 +101,8 @@ export function exchangeToken(deps: AppDeps, ip: string, token: string): { token
     const { token: sessionToken } = createSession(deps, { kind: 'student', studentLinkId: link.id }, now, STUDENT_SESSION_ABSOLUTE_MS);
     deps.db.update(studentLinks).set({ lastUsedAt: now }).where(eq(studentLinks.id, link.id)).run();
     audit(deps.db, { type: 'student', id: link.studentId }, { action: 'student_link.open', entity: 'student_link', entityId: link.id, after: { generation: link.generation } }, now);
+    // Every exchange is a new device (a device with a session cookie never exchanges again).
+    notify(deps, { category: 'linkNewDevice', studentId: link.studentId, subjectId: null, entity: 'student_link', entityId: link.id });
     return { token: sessionToken };
   });
 }

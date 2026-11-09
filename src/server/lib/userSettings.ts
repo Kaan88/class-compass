@@ -13,6 +13,7 @@
  */
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings } from '../../shared/notifications.ts';
 import { DEFAULT_VIEW_REF, ViewRef } from '../../shared/reportViews.ts';
 import type { Db } from '../db/client.ts';
 import { userSettings } from '../db/schema.ts';
@@ -28,6 +29,8 @@ export const USER_SETTINGS = {
   'reports.defaultView.teacher': setting(ViewRef, DEFAULT_VIEW_REF),
   /** The same for the admin area's "By class and subject" reports. */
   'reports.defaultView.admin': setting(ViewRef, DEFAULT_VIEW_REF),
+  /** S14e3 (D-155): which notification categories the teacher gets, and the daily email digest (off by default). */
+  'notifications.settings': setting(NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS),
 } as const;
 
 export type UserSettingKey = keyof typeof USER_SETTINGS;

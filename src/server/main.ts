@@ -4,6 +4,7 @@ import { loadConfig, testClockFile } from './config.ts';
 import { openDatabase } from './db/client.ts';
 import { mailerFor } from './lib/mailer.ts';
 import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
+import { runNotificationTick, TICK_MS as NOTIFICATION_TICK_MS } from './modules/notifications/digest.ts';
 import { migrateWithSnapshot, writeServerLock } from './ops/backup.ts';
 
 const config = loadConfig();
@@ -40,9 +41,23 @@ const sweepExports = () => void cleanupExpiredExports(config, Date.now()).catch(
 sweepExports();
 const exportSweep = setInterval(sweepExports, 5 * 60_000);
 exportSweep.unref();
+// Teacher notifications (S14e3, D-155): the optional daily digest and the 90-day purge, every 5 minutes.
+let notificationTickRunning = false;
+const notificationTick = () => {
+  if (notificationTickRunning) return;
+  notificationTickRunning = true;
+  runNotificationTick({ db, config, now, mailer })
+    .catch((err: unknown) => app.log.warn({ err }, 'notification tick failed'))
+    .finally(() => {
+      notificationTickRunning = false;
+    });
+};
+const notificationTimer = setInterval(notificationTick, NOTIFICATION_TICK_MS);
+notificationTimer.unref();
 
 const shutdown = async () => {
   clearInterval(exportSweep);
+  clearInterval(notificationTimer);
   await app.close();
   db.$client.close();
   releaseLock();

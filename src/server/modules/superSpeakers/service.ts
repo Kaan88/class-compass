@@ -28,6 +28,7 @@ import { authAttempts, classes, displayLinks, enrolments, pointEvents, schoolYea
 import { assertThemeUsable, effectiveTheme, isThemeUsable, themeRevision } from '../themes/service.ts';
 import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
+import { notify } from '../../lib/notify.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
 import { requireScorer, requireUser, type AppDeps, type DisplayPrincipal, type RequestContext, type ScorerPrincipal, type SessionRow } from '../../lib/context.ts';
 import { newId, openSecret, randomToken, sealSecret, sha256, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
@@ -456,6 +457,8 @@ export function awardPoint(ctx: RequestContext, p: z.infer<(typeof C.SpeakerComm
   // S13c achievements (D-132): the badge subject's class+subjects re-evaluate the student's badges.
   const subject = badgeSubject(ctx.db);
   if (subject) emitStudentActivity(ctx, { source: 'speakers', studentIds: [row.studentId], subjectId: subject.id });
+  // Teacher notification (S14e3, D-155): a daily count per student, in the badge subject (else every subject).
+  notify(ctx, { category: 'speakersPoints', studentId: row.studentId, subjectId: subject?.id ?? null, entity: 'point_event', entityId: null, actorUserId: row.userId });
   notifyBoardChange();
   return { eventId: row.id, studentId: row.studentId, undoUntil: at + s.undoWindowMinutes * 60_000 };
 }

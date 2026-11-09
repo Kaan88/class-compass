@@ -24,7 +24,7 @@ import { allReportContributions, reportContributions } from '../index.ts';
 import { key } from './cells.ts';
 import { reportableContext, type Viewer } from './scope.ts';
 
-const defaultKey = (viewer: Viewer): UserSettingKey => (viewer === 'admin' ? 'reports.defaultView.admin' : 'reports.defaultView.teacher');
+const defaultKey = (viewer: Viewer): Extract<UserSettingKey, `reports.defaultView.${string}`> => (viewer === 'admin' ? 'reports.defaultView.admin' : 'reports.defaultView.teacher');
 
 export function reportCatalog(ctx: RequestContext, viewer: Viewer, contextId?: string): ReportCatalog {
   const list = contextId ? reportContributions(ctx.db, reportableContext(ctx, contextId, viewer).id) : allReportContributions();

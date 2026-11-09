@@ -15,6 +15,8 @@
  * (SEC-3: hidden from everyone, administrators included). Private teacher notes (GOL-6, D-086) are in
  * the FULL export since S13b2 (owner decision, D-114: one CSV for the notes table with author,
  * student and subject names), and stay out of the per-student export, whose manifest gives their count.
+ * Teachers' notifications about a student (S14e3, D-155) are in the full export and, like the notes,
+ * not in the per-student export (`STUDENT_EXPORT_EXCLUDED`).
  * Student link tokens are never exported: `token_cipher` is blanked like the hashes.
  * Prepared files are removed after one download, when they expire (start-up + a timer in main.ts,
  * and before each new export), and only the administrator who prepared one can download it. CSV cells are formula-escaped and UTF-8 with BOM like report CSVs (RPT-4).
@@ -46,6 +48,11 @@ export const EXPORT_TTL_MS = 60 * 60_000;
 export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'command_log', 'scorer_pairings', '__drizzle_migrations'] as const;
 /** Columns blanked in every export (sign-in secrets: password/PIN/token/request/code hashes, encrypted tokens). */
 export const SECRET_COLUMN = /(^|_)(password|pin|token|request|code)_hash$|^token_cipher$/u;
+/**
+ * Teacher-side tables left out of the per-student export like the private notes (S14e3, D-155): a
+ * teacher's notifications about the student hold ids only and are in the full export.
+ */
+export const STUDENT_EXPORT_EXCLUDED = ['notifications'] as const;
 const STUDENT_COLUMNS = new Set(['student_id', 'owner_student_id', 'student_a', 'student_b', 'planned_student_id', 'actual_student_id', 'matched_student_id', 'created_student_id']);
 
 /** Where prepared exports wait for their download. */
@@ -302,7 +309,7 @@ function jsonAwareRows(db: Db, table: string, sid: string): Row[] | null {
 export async function studentExport(ctx: RequestContext, studentId: string): Promise<ExportReady> {
   const st = ctx.db.select().from(students).where(eq(students.id, studentId)).get();
   if (!st) throw notFound('Student');
-  const ready = await prepare(ctx, `student-export-${studentId.slice(0, 8)}-${stamp(ctx.now())}.zip`, ['private teacher notes (count only, D-114)'], async (b) => {
+  const ready = await prepare(ctx, `student-export-${studentId.slice(0, 8)}-${stamp(ctx.now())}.zip`, ['private teacher notes (count only, D-114)', ...STUDENT_EXPORT_EXCLUDED.map((t) => `${t} (teacher-side, D-155)`)], async (b) => {
     let hiddenSelections = 0;
     const goalIds: string[] = [];
     // Files about the student: their own uploads, the files on their evidence (also ones a teacher
@@ -312,6 +319,7 @@ export async function studentExport(ctx: RequestContext, studentId: string): Pro
     ];
     let fileRows: Row[] = [];
     for (const t of tableNames(ctx.db)) {
+      if ((STUDENT_EXPORT_EXCLUDED as readonly string[]).includes(t)) continue;
       const columns = columnsOf(ctx.db, t);
       let rows: Row[] = [];
       const special = jsonAwareRows(ctx.db, t, studentId);

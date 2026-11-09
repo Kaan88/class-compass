@@ -16,6 +16,8 @@ import type { Evidence, Goal, StudentGoalsSection } from '../../../shared/contra
 import { tx } from '../../db/client.ts';
 import { evidence, files, goalEntries, goals } from '../../db/schema.ts';
 import { emitStudentActivity } from '../../lib/activity.ts';
+import { notify } from '../../lib/notify.ts';
+import type { NotificationCategory } from '../../../shared/notifications.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireStudent, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
@@ -100,6 +102,15 @@ const checkChoices = (ctx: RequestContext, target: ReturnType<typeof textTarget>
 };
 const ENTRY_TEXT_KIND = { reflection: 'reflection', note: 'note', progress: 'note', self_assessment: 'selfAssessment' } as const;
 const activity = (ctx: RequestContext, studentId: string, subjectId: string) => emitStudentActivity(ctx, { source: 'goals', studentIds: [studentId], subjectId });
+/** Teacher notifications (S14e3, D-155): ids only, inside the write's transaction. */
+const ENTRY_NOTIFY = { reflection: 'reflection', note: 'note', self_assessment: 'selfAssessment' } as const satisfies Record<string, NotificationCategory>;
+function evidenceCategory(ctx: RequestContext, kind: EvidenceRow['kind'], fileId: string | null): NotificationCategory {
+  if (kind === 'text') return 'evidenceText';
+  if (kind === 'link') return 'evidenceLink';
+  if (kind === 'audio') return 'evidenceVoice';
+  const f = fileId ? ctx.db.select({ kind: files.kind }).from(files).where(eq(files.id, fileId)).get() : undefined;
+  return f?.kind === 'image' ? 'evidencePicture' : 'evidenceDocument';
+}
 
 // ---------------------------------------------------------------- goals
 export function createGoal(ctx: RequestContext, input: In<typeof C.studentCreateGoal>): Goal {
@@ -143,6 +154,7 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.studentCreate
     ctx.db.insert(goals).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'goal.create', entity: 'goal', entityId: row.id, after: { subjectId: row.subjectId, categoryId: row.categoryId, presetId: row.presetId } }, now);
     activity(ctx, studentId, row.subjectId);
+    notify(ctx, { category: 'goalCreated', studentId, subjectId: row.subjectId, entity: 'goal', entityId: row.id });
     return goalDto(ctx.db, row, { forStudent: true });
   }));
 }
@@ -168,6 +180,8 @@ export function updateGoal(ctx: RequestContext, input: In<typeof C.studentUpdate
     ctx.db.update(goals).set(patch).where(eq(goals.id, goal.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal.update', entity: 'goal', entityId: goal.id, before: { status: goal.status }, after: { status: patch.status, textChanged: input.text !== undefined } }, ctx.now());
     activity(ctx, goal.studentId, goal.subjectId);
+    const achieved = patch.status === 'achieved' && goal.status !== 'achieved';
+    notify(ctx, { category: achieved ? 'goalAchieved' : 'goalEdited', studentId: goal.studentId, subjectId: goal.subjectId, entity: 'goal', entityId: goal.id });
     return reload(ctx, goal.id);
   }));
 }
@@ -196,6 +210,7 @@ export function addEntry(ctx: RequestContext, input: In<typeof C.studentAddEntry
     ctx.db.update(goals).set({ updatedAt: now }).where(eq(goals.id, goal.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal_entry.create', entity: 'goal_entry', entityId: id, after: { goalId: goal.id, kind: input.kind, confidence: input.confidence ?? null } }, now);
     activity(ctx, goal.studentId, goal.subjectId);
+    notify(ctx, { category: ENTRY_NOTIFY[input.kind], studentId: goal.studentId, subjectId: goal.subjectId, entity: 'goal_entry', entityId: id });
     return reload(ctx, goal.id);
   }));
 }
@@ -225,6 +240,7 @@ export function updateEntry(ctx: RequestContext, input: In<typeof C.studentUpdat
     ctx.db.update(goalEntries).set(patch).where(eq(goalEntries.id, entry.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal_entry.update', entity: 'goal_entry', entityId: entry.id, after: { confidence: input.confidence } }, ctx.now());
     activity(ctx, goal.studentId, goal.subjectId);
+    if (entry.kind !== 'progress') notify(ctx, { category: ENTRY_NOTIFY[entry.kind], studentId: goal.studentId, subjectId: goal.subjectId, entity: 'goal_entry', entityId: entry.id });
     return reload(ctx, goal.id);
   }));
 }
@@ -274,6 +290,7 @@ export function addEvidence(ctx: RequestContext, input: In<typeof C.studentAddEv
     ctx.db.insert(evidence).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'evidence.create', entity: 'evidence', entityId: row.id, after: { subjectId: row.subjectId, goalId: row.goalId, kind: row.kind, fileId } }, now);
     activity(ctx, studentId, row.subjectId);
+    notify(ctx, { category: evidenceCategory(ctx, row.kind, fileId), studentId, subjectId: row.subjectId, entity: 'evidence', entityId: row.id });
     return evidenceDtos(ctx.db, [row])[0]!;
   }));
 }
@@ -306,6 +323,7 @@ export function updateEvidence(ctx: RequestContext, input: In<typeof C.studentUp
     }
     ctx.db.update(evidence).set(patch).where(eq(evidence.id, e.id)).run();
     audit(ctx.db, ctx.actor, { action: 'evidence.update', entity: 'evidence', entityId: e.id, after: { goalId: patch.goalId } }, ctx.now());
+    notify(ctx, { category: evidenceCategory(ctx, e.kind, e.fileId), studentId: e.studentId, subjectId: e.subjectId, entity: 'evidence', entityId: e.id });
     return evidenceDtos(ctx.db, [ctx.db.select().from(evidence).where(eq(evidence.id, e.id)).get()!])[0]!;
   }));
 }

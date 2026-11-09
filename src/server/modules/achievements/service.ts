@@ -24,6 +24,7 @@ import { tx, type Db } from '../../db/client.ts';
 import { achievementDefinitions, defaultItemArchives, lessons, studentAchievements, students, users } from '../../db/schema.ts';
 import type { StudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
+import { notify } from '../../lib/notify.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
 import { requireStudent, requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
@@ -118,6 +119,15 @@ function insertAward(ctx: RequestContext, d: DefRow, studentId: string, contextI
   return row;
 }
 
+/**
+ * Teacher notification for an award (S14e3, D-155): never for a quiet backfill (the past, item 3) and
+ * never to the teacher who gave it (`by`); the other current teachers of the subject get it.
+ */
+function notifyAward(ctx: RequestContext, context: ContextRow, row: AwardRow) {
+  if (row.quiet || row.source === 'backfill') return;
+  notify(ctx, { category: 'achievementEarned', studentId: row.studentId, subjectId: context.subjectId, contextId: context.id, entity: 'student_achievement', entityId: row.id, actorUserId: row.awardedBy });
+}
+
 const liveAwardsOf = (db: Db, studentIds: readonly string[], contextId: string) =>
   studentIds.length ? db.select().from(studentAchievements).where(and(inArray(studentAchievements.studentId, [...studentIds]), eq(studentAchievements.contextId, contextId), isNull(studentAchievements.revokedAt))).all() : [];
 
@@ -139,7 +149,9 @@ export function evaluate(ctx: RequestContext, context: ContextRow, studentIds: r
     const f = facts.get(sid)!;
     for (const d of defs) {
       if (held.has(`${sid}:${d.id}`) || !ruleReached(ruleOf(d)!, f, since)) continue;
-      out.push(insertAward(ctx, d, sid, context.id, { source: opts.source ?? 'auto', by: null, ref: opts.ref ?? null, quiet: opts.quiet ?? false }));
+      const row = insertAward(ctx, d, sid, context.id, { source: opts.source ?? 'auto', by: null, ref: opts.ref ?? null, quiet: opts.quiet ?? false });
+      notifyAward(ctx, context, row);
+      out.push(row);
       held.add(`${sid}:${d.id}`);
     }
   }
@@ -344,6 +356,7 @@ function giveManual(ctx: RequestContext, context: ContextRow, achievementId: str
   const held = new Set(liveAwardsOf(ctx.db, unique, context.id).filter((a) => a.achievementId === d.id).map((a) => a.studentId));
   const uid = requireUser(ctx).id;
   const rows = unique.filter((s) => !held.has(s)).map((s) => insertAward(ctx, d, s, context.id, { source: 'manual', by: uid, lessonId: ref.lessonId ?? null, ref: ref.opId ?? null }));
+  for (const r of rows) notifyAward(ctx, context, r);
   if (rows.length)
     audit(ctx.db, ctx.actor, { action: 'achievement.award', entity: 'achievement_definition', entityId: d.id, opId: ref.opId, after: { contextId: context.id, lessonId: ref.lessonId ?? null, studentIds: rows.map((r) => r.studentId), awardIds: rows.map((r) => r.id) } }, ctx.now());
   return { rows, already: unique.length - rows.length };

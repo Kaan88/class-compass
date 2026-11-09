@@ -18,6 +18,7 @@ import { starterKindsOf } from '../../../shared/text/starters.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { classes, enrolments, evidence, goalEntries, goals, schoolSettings, students, teachingContexts, textCheckAttempts, textCheckWords } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
+import { notify } from '../../lib/notify.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
@@ -119,6 +120,8 @@ export function recordBlockedAttempts<T>(ctx: RequestContext, fn: () => T): T {
         .values({ studentId: attempt.studentId, subjectId: attempt.subjectId, localDate: date, count: 1, updatedAt: ctx.now() })
         .onConflictDoUpdate({ target: [textCheckAttempts.studentId, textCheckAttempts.subjectId, textCheckAttempts.localDate], set: { count: sql`${textCheckAttempts.count} + 1`, updatedAt: ctx.now() } })
         .run();
+      // Teacher notification (S14e3, D-155): a daily count only, never the text.
+      notify(ctx, { category: 'textBlocked', studentId: attempt.studentId, subjectId: attempt.subjectId, entity: 'text_check', entityId: null });
     }
     throw e;
   }

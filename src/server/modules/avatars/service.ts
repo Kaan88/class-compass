@@ -13,6 +13,7 @@ import type { StudentAvatarInfo } from '../../../shared/contracts/avatars.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { achievementDefinitions, classes, studentAchievements, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
+import { notify } from '../../lib/notify.ts';
 import { requireStudent, requireUser, type RequestContext } from '../../lib/context.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { studentScope } from '../links/scope.ts';
@@ -57,6 +58,7 @@ export function setOwnAvatar(ctx: RequestContext, input: In<typeof C.studentSetA
     const now = ctx.now();
     ctx.db.update(students).set({ avatarJson: input.spec as unknown as Record<string, unknown>, avatarUpdatedAt: now }).where(eq(students.id, studentId)).run();
     audit(ctx.db, ctx.actor, { action: 'avatar.set', entity: 'student', entityId: studentId, after: { type: input.spec.type } }, now);
+    notify(ctx, { category: 'avatarChanged', studentId, subjectId: null, entity: 'student', entityId: studentId });
     const student = ctx.db.select().from(students).where(eq(students.id, studentId)).get()!;
     return studentAvatarInfo(ctx.db, student, scope.classes);
   });

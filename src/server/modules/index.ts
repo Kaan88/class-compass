@@ -5,6 +5,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { registerActivityListener } from '../lib/activity.ts';
+import { registerNotificationSink } from '../lib/notify.ts';
 import { defineCommand } from '../lib/commands.ts';
 import type { AppDeps } from '../lib/context.ts';
 import type { Db } from '../db/client.ts';
@@ -28,6 +29,7 @@ import { linksManifest } from './links/manifest.ts';
 import { registerLessonCloseHook, registerLessonStateContributor } from './lessons/service.ts';
 import type { ClassroomCardContribution, ReportContribution, ServerModuleManifest, StudentPageContribution, TimelineContribution } from './manifest.ts';
 import { maintenanceManifest } from './maintenance/manifest.ts';
+import { notificationsManifest } from './notifications/manifest.ts';
 import { reportsManifest } from './reports/manifest.ts';
 import { routinesManifest } from './routines/manifest.ts';
 import { schoolManifest } from './school/manifest.ts';
@@ -68,6 +70,7 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   textChecksManifest,
   superSpeakersManifest,
   themesManifest,
+  notificationsManifest,
 ];
 
 /** A contribution as registered: stamped with the policy key of the manifest that declared it. */
@@ -123,6 +126,7 @@ export function installModules(): void {
     for (const h of m.lessonCloseHooks ?? []) registerLessonCloseHook(h);
     for (const l of m.attendanceListeners ?? []) registerAttendanceListener(l);
     for (const l of m.activityListeners ?? []) registerActivityListener(l);
+    if (m.notificationSink) registerNotificationSink(m.notificationSink);
     if (m.config) {
       if (!m.policyKey) throw new Error(`Module ${m.key} has a config but no policy key`);
       // School-wide modules (D-127) keep their settings in their own tables, not per class+subject.
