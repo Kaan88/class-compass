@@ -297,13 +297,51 @@ export function TableView({ table, csvHref }: { table: ReportTable; csvHref?: st
   );
 }
 
-export function SectionView({ section, csvHref }: { section: ReportSection; csvHref?: ((table: string) => string) | undefined }) {
+/**
+ * One report section. With `onToggle` (S14e1, D-153) it is a `<details>` the teacher can fold: the
+ * title stays visible as the summary and the page remembers what is folded; printing opens it.
+ */
+export function SectionView({
+  section,
+  csvHref,
+  open,
+  onToggle,
+}: {
+  section: ReportSection;
+  csvHref?: ((table: string) => string) | undefined;
+  open?: boolean;
+  onToggle?: ((open: boolean) => void) | undefined;
+}) {
   const label = useLabel();
+  const body = <SectionBody section={section} csvHref={csvHref} />;
+  if (onToggle) {
+    return (
+      <details className="cc-card cc-report-section cc-report-fold cc-disclosure" open={open} onToggle={(e) => onToggle(e.currentTarget.open)} data-section={section.key}>
+        <summary>
+          <h3 className="cc-h2" id={`sec-${section.key}`}>
+            {label(section.title)}
+          </h3>
+        </summary>
+        <section className="cc-stack" aria-labelledby={`sec-${section.key}`}>
+          {body}
+        </section>
+      </details>
+    );
+  }
   return (
     <section className="cc-card cc-stack cc-report-section" aria-labelledby={`sec-${section.key}`}>
       <h3 className="cc-h2" id={`sec-${section.key}`}>
         {label(section.title)}
       </h3>
+      {body}
+    </section>
+  );
+}
+
+function SectionBody({ section, csvHref }: { section: ReportSection; csvHref?: ((table: string) => string) | undefined }) {
+  const label = useLabel();
+  return (
+    <>
       {section.intro ? <p className="cc-muted">{label(section.intro)}</p> : null}
       {section.metrics.length ? (
         <dl className="cc-report-metrics">
@@ -327,6 +365,6 @@ export function SectionView({ section, csvHref }: { section: ReportSection; csvH
           ))}
         </ul>
       ) : null}
-    </section>
+    </>
   );
 }

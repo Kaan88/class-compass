@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import * as M from '../../../shared/contracts/maintenance.ts';
 import * as R from '../../../shared/contracts/reports.ts';
 import * as School from '../../../shared/contracts/school.ts';
@@ -16,7 +16,7 @@ import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { useMe } from '../../lib/session.ts';
 import { useRun } from '../../lib/useRun.ts';
-import { ReportsPage } from '../../reports/ReportsPage.tsx';
+import { linkFromSearch, linkSearch, ReportsPage } from '../../reports/ReportsPage.tsx';
 import { SectionView } from '../../reports/ReportView.tsx';
 import { Button, buttonClass } from '../../ui/Button.tsx';
 import { ConfirmDestructive, DialogActions, Modal } from '../../ui/Dialog.tsx';
@@ -466,9 +466,18 @@ function UsagePanel() {
   );
 }
 
+/**
+ * Admin reports: school-wide usage, and "By class and subject" with the same report views and deep
+ * link as the teacher page (S14e1, D-153): `?tab=contexts&contextId=…&view=…&period=…`.
+ */
 export function AdminReportsPage() {
   const { t } = useI18n();
-  const [tab, setTab] = useState('usage');
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as Record<string, unknown>;
+  const link = linkFromSearch(search);
+  const tab = search.tab === 'contexts' || (search.tab !== 'usage' && Object.keys(link).length) ? 'contexts' : 'usage';
+  const go = (next: Record<string, string>) => void navigate({ to: '/admin/reports', search: next, replace: true });
+  const setTab = (id: string) => go(id === 'contexts' ? { tab: id, ...linkSearch(link) } : { tab: id });
   return (
     <main className="cc-page cc-stack">
       <h1 className="cc-h1">{t('admin.reports')}</h1>
@@ -478,7 +487,7 @@ export function AdminReportsPage() {
         onSelectionChange={setTab}
         items={[
           { id: 'usage', label: t('report.ui.usage'), content: <UsagePanel /> },
-          { id: 'contexts', label: t('report.ui.byContext'), content: <ReportsPage viewer="admin" /> },
+          { id: 'contexts', label: t('report.ui.byContext'), content: <ReportsPage viewer="admin" link={link} onLinkChange={(l) => go({ tab: 'contexts', ...linkSearch(l) })} /> },
         ]}
       />
     </main>

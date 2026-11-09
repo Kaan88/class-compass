@@ -227,7 +227,7 @@ Brief: `docs/design/2026-11-09-feedback-round-2.md`. Decisions D-143 to D-161, m
   - [ ] Sare and a few children name each redrawn species
 - [x] S14f Super Speakers on its own origin: optional `SPEAKERS_ORIGIN`, CSRF by endpoint, host routing with 308s, links and QR codes, service-worker kill switch, OPERATIONS for a second hostname (D-157). No deployment
   - [ ] Second hostname set up (tunnel, Cloudflare settings, Access Bypass) and checked with a TV and a phone: only when the owner creates a hostname (OPERATIONS → "Super Speakers on its own hostname")
-- [ ] S14e1 Report views: section catalogue, saved views with a default star, built-in views, Customise tree, collapsible sections, deep links (D-153)
+- [x] S14e1 Report views: section catalogue, saved views with a default star, built-in views, Customise tree, collapsible sections, deep links (D-153)
 - [ ] S14b Classroom board: wide routine + timer row, counter bar, full-width student grid, bottom dock with full-screen panel views; every routine stage visible (D-148)
   - [ ] Customise layout (PIN-gated drag and resize on a 12×12 grid, keyboard and pointer, this class or all classes, relock on save)
   - [ ] Checked on Sare's MacBook, a 1280×720 projector and a touch panel

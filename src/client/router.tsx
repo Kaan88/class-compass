@@ -123,7 +123,13 @@ const adminModules = createRoute({ getParentRoute: () => adminRoute, path: 'modu
 const adminStudents = createRoute({ getParentRoute: () => adminRoute, path: 'students', component: AdminStudentsPage });
 const adminSpeakers = createRoute({ getParentRoute: () => adminRoute, path: 'super-speakers', component: SuperSpeakersPage });
 const adminAudit = createRoute({ getParentRoute: () => adminRoute, path: 'audit', component: AuditPage });
-const adminReports = createRoute({ getParentRoute: () => adminRoute, path: 'reports', component: AdminReportsPage });
+const adminReports = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'reports',
+  // The tab and the report's deep link (S14e1, D-153): string parameters only.
+  validateSearch: (s: Record<string, unknown>): Readonly<Record<string, string>> => Object.fromEntries(Object.entries(s).filter((e): e is [string, string] => typeof e[1] === 'string')),
+  component: AdminReportsPage,
+});
 const adminMaintenance = createRoute({ getParentRoute: () => adminRoute, path: 'maintenance', component: MaintenancePage });
 const adminProfile = createRoute({ getParentRoute: () => adminRoute, path: 'profile', component: ProfilePage });
 
