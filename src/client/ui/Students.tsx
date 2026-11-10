@@ -12,6 +12,7 @@ import { useAvatarEntry } from '../avatars/context.ts';
 import { avatarHue, initials as initialsOf } from '../../shared/text/turkish.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
+import { FrameOverlay } from './Frame.tsx';
 import { IconAlert, IconCheck, IconClock, IconDot, IconMinus, IconNote, IconPlus, IconUp, IconUserOff } from './icons.tsx';
 
 export function Avatar({
@@ -144,6 +145,8 @@ export function StudentCard({
   const away = absent || (attendance !== undefined && isAway(attendance));
   return (
     <article className="cc-student-card" data-absent={away ? '' : undefined} aria-label={student.fullName}>
+      {/* Theme frame (S17a, D-166): the edge only, decorative and outside the card's content. */}
+      <FrameOverlay surface="studentCards" />
       <Avatar name={student.fullName} id={student.id} hue={student.avatarHue} initials={student.initials} photoUrl={student.photoUrl} photoAllowed={Boolean(student.photoUrl)} />
       {onOpen ? (
         <RACButton className="cc-student-card__name cc-student-card__name-btn" aria-haspopup="dialog" onPress={onOpen} data-testid="student-card-name">

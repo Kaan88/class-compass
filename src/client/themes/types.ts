@@ -9,6 +9,7 @@
 import type { ComponentType } from 'react';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import type { ThemeKey } from '../../shared/themes.ts';
+import type { AmbientSpec, ResolvedFrame, SceneAnchor, SceneFit, SceneSmallScreens, ThemeSetsSpec } from '../../shared/themePackage/engine.ts';
 import type { Animation } from '../../shared/themePackage/motion.ts';
 import type { ThemePackageSounds } from '../../shared/themePackage/schema.ts';
 import { SOUND_EVENTS, type ColorToken, type IllustrationName, type MascotPose, type MotionName, type SoundEvent, type ThemeColors, type ThemeSoundPack } from '../../shared/themePackage/tokens.ts';
@@ -101,6 +102,23 @@ export interface ThemeLabels {
   mascot: { en: string; tr: string };
 }
 
+/** One layer of a theme scene (S17a): art in its own coordinate box, placed by fit and anchor. */
+export interface ThemeSceneLayer {
+  /** SVG content (no <svg> wrapper) in the `viewBox`, coloured only with var(--cc-*) tokens. */
+  Art: ComponentType;
+  viewBox: string;
+  fit: SceneFit;
+  anchor: SceneAnchor;
+  maxHeightVh?: number;
+}
+
+export interface ThemeScene {
+  /** Back to front. */
+  layers: readonly ThemeSceneLayer[];
+  opacity: number;
+  smallScreens: SceneSmallScreens;
+}
+
 export interface ThemeDefinition {
   /** A built-in key (`THEME_KEYS`) or the slug of an imported theme package. */
   key: ThemeKey;
@@ -133,6 +151,16 @@ export interface ThemeDefinition {
   /** The `makeSoundPack` parameters the pack was made from (S14g: exported into theme packages). */
   soundParams?: ThemePackageSounds | null;
   celebration: ThemeCelebration;
+  /**
+   * S17a (D-166), all optional: a viewport-scale scene behind the app, app-drawn frames around cards,
+   * a silent ambient animation and the built-in sets the theme picks. Rendered by `ThemeScene`,
+   * `ThemeAmbient` (`themes/Scene.tsx`, `themes/Ambient.tsx`) and `FrameOverlay` (`ui/Frame.tsx`);
+   * components never read them to branch on a theme.
+   */
+  scene?: ThemeScene;
+  frame?: ResolvedFrame;
+  ambient?: AmbientSpec;
+  sets?: ThemeSetsSpec;
   /**
    * Set for an imported theme package (S14g): where it came from and its own names. Built-in themes
    * leave it out. Components never branch on it (use `useThemeLabels`).

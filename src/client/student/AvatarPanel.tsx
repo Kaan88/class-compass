@@ -7,7 +7,7 @@
  * Built from native selects and buttons: small, fast on a cheap phone and accessible (axe-checked at
  * 375×812). The ready-made list is drawn in pages of 24.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AVATAR_COLOURS,
@@ -38,17 +38,20 @@ import { reasonOf } from '../lib/errors.ts';
 import { showToast } from '../lib/toast.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from '../ui/Button.tsx';
+import { orderByFamilies, orderFamilies } from '../../shared/themePackage/engine.ts';
+import { useTheme } from '../themes/index.tsx';
 import { STUDENT_PAGE_KEY } from './keys.ts';
 
 type Part = { key: string; options: readonly string[]; names: (o: string) => string };
 const PAGE = 24;
 
-function partsOf(spec: AvatarSpecValue, locale: 'en' | 'tr'): Part[] {
+function partsOf(spec: AvatarSpecValue, locale: 'en' | 'tr', families: readonly string[] = CREATURE_FAMILY_KEYS): Part[] {
   const opt = (part: string) => (o: string) => OPTION_NAMES[`${part}.${o}`]?.[locale] ?? o;
   const colour = (o: string) => COLOUR_NAMES[o as keyof typeof COLOUR_NAMES]?.[locale] ?? o;
   if (spec.type === 'creature') {
     return [
-      { key: 'family', options: CREATURE_FAMILY_KEYS, names: opt('family') },
+      // The theme's families first (S17a, D-166: `sets.avatarFamiliesFirst`); every family stays.
+      { key: 'family', options: families, names: opt('family') },
       { key: 'species', options: CREATURE_FAMILIES[spec.family], names: opt('species') },
       { key: 'color', options: AVATAR_COLOURS, names: colour },
       { key: 'eyes', options: CREATURE_PARTS.eyes, names: opt('eyes') },
@@ -105,6 +108,11 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
   const [draft, setDraft] = useState<AvatarSpecValue>(info.spec ?? info.generated);
   const [history, setHistory] = useState<AvatarSpecValue[]>([]);
   const [shown, setShown] = useState(PAGE);
+  // Theme sets (S17a, D-166): only the order changes; nothing is hidden and saved avatars never change.
+  const first = useTheme().sets?.avatarFamiliesFirst;
+  const firstKey = first?.join(',') ?? '';
+  const families = useMemo(() => orderFamilies(CREATURE_FAMILY_KEYS, first), [firstKey]);
+  const readyMade = useMemo(() => orderByFamilies(READY_MADE, first), [firstKey]);
   const earned = new Set(info.earned);
   const change = (next: AvatarSpecValue) => {
     setHistory((h) => [...h.slice(-19), draft]);
@@ -169,7 +177,7 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
           {tab === 'ready' ? (
             <>
               <ul className="cc-avatar-grid" aria-label={t('avatar.readyMade')}>
-                {READY_MADE.slice(0, shown).map((spec, i) => {
+                {readyMade.slice(0, shown).map((spec, i) => {
                   const label = describeAvatar(spec, locale);
                   return (
                     <li key={i}>
@@ -180,8 +188,8 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
                   );
                 })}
               </ul>
-              {shown < READY_MADE.length ? (
-                <Button onPress={() => setShown((n) => n + PAGE)}>{t('avatar.showMore', { count: READY_MADE.length - shown })}</Button>
+              {shown < readyMade.length ? (
+                <Button onPress={() => setShown((n) => n + PAGE)}>{t('avatar.showMore', { count: readyMade.length - shown })}</Button>
               ) : null}
             </>
           ) : (
@@ -194,7 +202,7 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
                   {t('avatar.creature')}
                 </Button>
               </div>
-              {partsOf(draft, locale).map((p) => {
+              {partsOf(draft, locale, families).map((p) => {
                 const id = `avatar-part-${p.key}`;
                 const value = (draft as unknown as Record<string, string>)[p.key] ?? '';
                 return (

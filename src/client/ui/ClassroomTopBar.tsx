@@ -29,6 +29,7 @@ import { topBarSlots, type TopBarSlotKey } from '../modules/classroomHooks.ts';
 import type { ClassroomContext } from '../modules/types.ts';
 import { playEvent, SELF_UNLOCK_ATTR, sounds, useSoundStatus, type SoundSnapshot, type SoundStatus } from '../themes/index.tsx';
 import { Button } from './Button.tsx';
+import { FrameOverlay } from './Frame.tsx';
 import { lockNow } from '../lib/session.ts';
 import { isWideEnough, setLayoutEditing, useWideEnough } from '../modules/lessons/board/layoutClient.ts';
 import { IconCopy, IconLayout, IconSettings, IconSound, IconSoundOff } from './icons.tsx';
@@ -196,6 +197,8 @@ export function ClassroomTopBar({
   };
   return (
     <header className="cc-topbar cc-classroom-bar" aria-label={t('classroom.activeClass')}>
+      {/* Theme frame (S17a, D-166): decorative, outside the bar's content. */}
+      <FrameOverlay surface="topBar" />
       <div className="cc-classroom-bar__class">
         {context ? (
           <>

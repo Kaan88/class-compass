@@ -3,7 +3,7 @@
  * board. All shapes use semantic tokens only.
  */
 import type { ComponentType } from 'react';
-import { Arms, Confetti, Face, Moon, Place, PoseExtras, Scene, Sparkles, Stars, Sun, tok } from '../art.tsx';
+import { Arms, Confetti, Face, mascotSlot, Moon, Place, PoseExtras, Scene, Sparkles, Stars, Sun, tok } from '../art.tsx';
 import type { IllustrationName, MascotProps } from '../types.ts';
 
 export function ClassroomMascot({ pose }: MascotProps) {
@@ -26,7 +26,8 @@ export function ClassroomMascot({ pose }: MascotProps) {
   );
 }
 
-const Mascot = ClassroomMascot;
+// The active theme's mascot in the illustrations (S17a, D-166); this theme's own where none is provided.
+const Mascot = mascotSlot(ClassroomMascot);
 
 /** Corner decoration: simple bright shapes. */
 export function ClassroomDecoration() {

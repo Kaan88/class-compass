@@ -12,7 +12,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import * as Th from '../../../shared/contracts/themes.ts';
 import type { MessageKey } from '../../../shared/i18n/index.ts';
-import { translate } from '../../../shared/i18n/index.ts';
+import { pickText, translate } from '../../../shared/i18n/index.ts';
+import { OPTION_NAMES } from '../../../shared/avatars.ts';
 import { DEFAULT_THEME } from '../../../shared/themes.ts';
 import { AA, CONTRAST_PAIRS, pairContrast } from '../../../shared/themePackage/contrast.ts';
 import { PACKAGE_LIMITS } from '../../../shared/themePackage/limits.ts';
@@ -23,7 +24,10 @@ import { showToast } from '../../lib/toast.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { CelebrationPreview } from '../../themes/Celebration.tsx';
 import { AVAILABLE_THEMES_KEY, packageFromDefinition, previewKey, registerThemePackage } from '../../themes/custom.tsx';
-import { playThemeSound, THEME_LIST, ThemeProvider, themeOf, useThemeLabels } from '../../themes/index.tsx';
+import { motionMode, playThemeSound, THEME_LIST, ThemeProvider, themeOf, useTheme, useThemeLabels } from '../../themes/index.tsx';
+import { ThemeAmbient, type AmbientMode } from '../../themes/Ambient.tsx';
+import { ThemeScene } from '../../themes/Scene.tsx';
+import { FrameOverlay } from '../../ui/Frame.tsx';
 import { customThemesVersion, getCustomTheme, removeCustomTheme, subscribeCustomThemes } from '../../themes/registry.ts';
 import { ILLUSTRATIONS, MASCOT_POSES, SOUND_EVENTS, type ThemeDefinition } from '../../themes/types.ts';
 import { Button } from '../../ui/Button.tsx';
@@ -102,6 +106,9 @@ function IssueText({ issue }: { issue: Issue }) {
     case 'ART_FROM_BASE':
       text = t('themes.issue.ART_FROM_BASE', { items: str('items'), base: str('base') });
       break;
+    case 'MASCOT_FROM_UNUSED':
+      text = t('themes.issue.MASCOT_FROM_UNUSED', { theme: str('theme') });
+      break;
     default:
       text = t(`themes.issue.${issue.code}` as MessageKey);
   }
@@ -151,17 +158,30 @@ function ReportView({ report }: { report: Report }) {
   );
 }
 
-/** The classroom board in miniature: banner, class bar, four student cards, buttons. */
-function ClassroomSample() {
+/**
+ * The classroom board in miniature: the theme's scene, tile pattern and ambient animation behind a
+ * framed box with the class bar, four framed student cards and buttons (S17a, D-166). `motion` is the
+ * preview's own Motion on/off: the class switch and reduced motion still apply in the classroom.
+ */
+function ClassroomSample({ motion }: { motion: AmbientMode }) {
   const { t } = useI18n();
+  const def = useTheme();
   return (
-    <div className="cc-theme-sample cc-stack" data-testid="theme-sample-classroom">
+    <div className="cc-theme-sample cc-stack" data-testid="theme-sample-classroom" data-scene={def.scene ? '' : undefined}>
+      <ThemeScene contained />
       <ThemeBackdrop />
-      <div className="cc-row">
+      <ThemeAmbient contained motion={motion} />
+      <div className="cc-row cc-theme-sample__scrim">
         <Mascot size={56} pose="idle" />
         <strong className="cc-theme-sample__title">{t('themes.preview.className')}</strong>
       </div>
-      <CounterBar value={4} max={10} label={t('catalog.sampleCounter')} />
+      <div className="cc-lesson-box cc-theme-sample__box" data-box="routine">
+        <FrameOverlay surface="boardBoxes" boxKey="routine" />
+        <div className="cc-card cc-stack cc-theme-sample__card">
+          <strong>{t('themes.preview.sampleRoutine')}</strong>
+          <CounterBar value={4} max={10} label={t('catalog.sampleCounter')} />
+        </div>
+      </div>
       <StudentGrid count={SAMPLE.length} label={t('themes.preview.classroom')}>
         {SAMPLE.map((s) => (
           <StudentCard key={s.id} student={s} weeklyCount={s.weeklyCount} level={levelOf(s.weeklyCount)} onAdd={() => undefined} />
@@ -264,6 +284,96 @@ function ContrastTable({ def }: { def: ThemeDefinition }) {
   );
 }
 
+/** One block of the engine summary: a heading and a list of terms (S17a). */
+function Facts({ id, title, rows }: { id: string; title: string; rows: Array<[string, ReactNode]> }) {
+  return (
+    <section className="cc-card cc-stack cc-theme-engine__block" aria-labelledby={`theme-engine-${id}`} data-testid={`theme-engine-${id}`}>
+      <h5 className="cc-h3" id={`theme-engine-${id}`}>
+        {title}
+      </h5>
+      <dl className="cc-theme-engine__facts">
+        {rows.map(([term, value]) => (
+          <div key={term} className="cc-theme-engine__fact">
+            <dt className="cc-muted">{term}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/** What the theme asks of the engine: scene, frames, ambient, sets (mockup AdminPreview.dc.html). */
+function EngineBlocks({ def, mascot }: { def: ThemeDefinition; mascot: string }) {
+  const { t, locale } = useI18n();
+  const none = t('themes.engine.none');
+  const scene = def.scene;
+  const frame = def.frame;
+  const ambient = def.ambient && def.ambient.preset !== 'none' ? def.ambient : null;
+  const sets = def.sets;
+  const list = (items: string[]) => (items.length ? items.join(', ') : none);
+  return (
+    <div className="cc-theme-engine">
+      <Facts
+        id="scene"
+        title={t('themes.engine.scene')}
+        rows={
+          scene
+            ? [
+                [
+                  t('themes.engine.scene.layers'),
+                  <ol key="l" className="cc-theme-engine__layers">
+                    {scene.layers.map((l, i) => (
+                      <li key={i}>{t('themes.engine.scene.layer', { n: i + 1, fit: t(`themes.engine.fit.${l.fit}`), anchor: t(`themes.engine.anchor.${l.anchor}`) })}</li>
+                    ))}
+                  </ol>,
+                ],
+                [t('themes.engine.scene.opacity'), String(scene.opacity)],
+                [t('themes.engine.scene.smallScreens'), t(`themes.engine.small.${scene.smallScreens}`)],
+              ]
+            : [[t('themes.engine.scene.layers'), none]]
+        }
+      />
+      <Facts
+        id="frame"
+        title={t('themes.engine.frame')}
+        rows={
+          frame
+            ? [
+                [t('themes.engine.frame.edge'), t(`themes.engine.edge.${frame.edge}`)],
+                [t('themes.engine.frame.trim'), frame.trim === 'none' ? none : `${t(`themes.engine.trim.${frame.trim}`)} (${list(frame.trimOn.map((b) => t(`themes.engine.box.${b}`)))})`],
+                [t('themes.engine.frame.corners'), t(`themes.engine.corners.${frame.corners}`)],
+                [t('themes.engine.frame.apply'), list(frame.apply.map((s) => t(`themes.engine.surface.${s}`)))],
+              ]
+            : [[t('themes.engine.frame.edge'), none]]
+        }
+      />
+      <Facts
+        id="ambient"
+        title={t('themes.engine.ambient')}
+        rows={
+          ambient
+            ? [
+                [t('themes.engine.ambient.preset'), t(`themes.engine.ambientPreset.${ambient.preset}`)],
+                [t('themes.engine.ambient.details'), t('themes.engine.ambient.value', { count: ambient.density, speed: t(`themes.engine.speed.${ambient.speed}`), size: t(`themes.engine.size.${ambient.size}`) })],
+                [t('themes.engine.ambient.still'), t('themes.engine.ambient.stillValue')],
+              ]
+            : [[t('themes.engine.ambient.preset'), none]]
+        }
+      />
+      <Facts
+        id="sets"
+        title={t('themes.engine.sets')}
+        rows={[
+          [t('themes.engine.sets.achievementFrame'), t(`themes.engine.achievementFrame.${sets?.achievementFrame ?? 'classic'}`)],
+          [t('themes.engine.sets.families'), list((sets?.avatarFamiliesFirst ?? []).map((f) => pickText(OPTION_NAMES[`family.${f}`] ?? { en: f, tr: f }, locale)))],
+          [t('themes.engine.sets.mascot'), t('themes.engine.sets.mascotValue', { mascot })],
+        ]}
+      />
+    </div>
+  );
+}
+
 /** Every preview of one theme: classroom, student home, board, mascot and art, celebration, sounds, contrast. */
 export function ThemePackagePreview({ themeKey, onClose }: { themeKey: string; onClose?: () => void }) {
   const { t } = useI18n();
@@ -271,6 +381,8 @@ export function ThemePackagePreview({ themeKey, onClose }: { themeKey: string; o
   const def = themeOf(themeKey);
   const labels = useThemeLabels(def);
   const [celebrate, setCelebrate] = useState(0);
+  // The preview's own Motion on/off (S17a): starts like this device (off with reduced motion).
+  const [motion, setMotion] = useState<AmbientMode>(() => (motionMode(getDisplay()) === 'full' ? 'full' : 'still'));
   const section = (id: string, title: string, children: ReactNode) => (
     <section className="cc-stack" aria-labelledby={`theme-preview-${id}`}>
       <h4 className="cc-h3" id={`theme-preview-${id}`}>
@@ -288,10 +400,21 @@ export function ThemePackagePreview({ themeKey, onClose }: { themeKey: string; o
         {onClose ? <Button onPress={onClose}>{t('themes.preview.close')}</Button> : null}
       </div>
       <p className="cc-muted">{labels.description}</p>
+      <div className="cc-row cc-theme-motion" role="group" aria-label={t('themes.preview.motion')} data-testid="theme-preview-motion">
+        <Button variant={motion === 'full' ? 'primary' : 'secondary'} aria-pressed={motion === 'full'} onPress={() => setMotion('full')}>
+          {t('themes.preview.motionOn')}
+        </Button>
+        <Button variant={motion === 'still' ? 'primary' : 'secondary'} aria-pressed={motion === 'still'} onPress={() => setMotion('still')}>
+          {t('themes.preview.motionOff')}
+        </Button>
+      </div>
+      <p className="cc-muted" aria-live="polite">
+        {t(motion === 'full' ? 'themes.preview.motionNoteOn' : 'themes.preview.motionNoteOff')}
+      </p>
       <ThemeProvider theme={def.key} className="cc-theme-preview-area cc-stack" testId={`theme-preview-area-${def.key}`}>
         <ThemeDecoration size={140} />
         <div className="cc-theme-preview-grid">
-          {section('class-board', t('themes.preview.classroom'), <ClassroomSample />)}
+          {section('class-board', t('themes.preview.classroom'), <ClassroomSample motion={motion} />)}
           {section('student', t('themes.preview.student'), <StudentSample />)}
           {section('board', t('themes.preview.board'), <BoardSample />)}
           {section('celebration', t('themes.preview.celebration'), (
@@ -304,6 +427,7 @@ export function ThemePackagePreview({ themeKey, onClose }: { themeKey: string; o
             </>
           ))}
         </div>
+        {section('engine', t('themes.engine.heading'), <EngineBlocks def={def} mascot={labels.mascot} />)}
         {section('mascot', t('themes.preview.mascot', { mascot: labels.mascot }), (
           <div className="cc-row">
             {MASCOT_POSES.map((pose) => (

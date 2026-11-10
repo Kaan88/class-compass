@@ -6,6 +6,7 @@ import { errorText } from '../lib/errors.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from './Button.tsx';
 import { TextField } from './Fields.tsx';
+import { FrameOverlay } from './Frame.tsx';
 import { IconAlert, IconCheck, IconCopy, IconX } from './icons.tsx';
 
 /** Accessible modal dialog (focus trap; Escape / outside press close unless `dismissable` is false). */
@@ -44,6 +45,8 @@ export function Modal({
   return (
     <ModalOverlay isOpen={isOpen} onOpenChange={onOpenChange} isDismissable={dismissable} isKeyboardDismissDisabled={!dismissable} className={`cc-modal-overlay cc-modal-overlay--${size}`}>
       <RACModal className={`cc-modal cc-modal--${size}`} data-testid={testId}>
+        {/* Theme frame (S17a, D-166), drawn inside the dialog's top edge; not on full-screen views. */}
+        {size === 'normal' || size === 'wide' ? <FrameOverlay surface="dialogs" /> : null}
         <Dialog className="cc-dialog" role={role}>
           {closeButton ? (
             <div className="cc-dialog__head">

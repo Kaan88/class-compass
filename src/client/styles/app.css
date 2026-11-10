@@ -1394,11 +1394,12 @@ html:has(.cc-lesson-board) .cc-toaster {
 .cc-menu-tile .cc-icon {
   color: var(--cc-icon-accent);
 }
-/* Faint repeating pattern of the theme, behind every page (never over text). */
+/* Faint repeating pattern of the theme, behind every page (never over text). Above the theme scene
+   and below the ambient layer (S17a). */
 .cc-backdrop {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   width: 100%;
   height: 100%;
   pointer-events: none;
@@ -1406,6 +1407,288 @@ html:has(.cc-lesson-board) .cc-toaster {
 }
 .cc-catalog-panel > .cc-backdrop {
   position: absolute;
+}
+
+/* ------------------------------------------------------------------ S17a: theme scene, ambient, frames (D-166) */
+/* Back to front: scene (-3), tile pattern (-2), ambient (-1), then the page. All decorative. */
+.cc-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cc-scene--contained,
+.cc-ambient--contained {
+  position: absolute;
+}
+.cc-scene__layer {
+  position: absolute;
+  display: block;
+  max-width: none;
+}
+.cc-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transition: opacity 400ms ease-out;
+}
+/* The ambient layer is not part of the celebration; it steps back while one is on screen. */
+body:has(.cc-celebration) .cc-ambient {
+  opacity: 0.3;
+}
+/* Text never sits on the scene: headings and lines on the page get a scrim panel (contrast-checked:
+   text on scene-scrim ≥ 7:1), boxes keep their surfaces, the dock row lets the scene show beside it. */
+html[data-scene] .cc-page > :is(h1, h2, h3, p, .cc-h1, .cc-h2, .cc-h3),
+.cc-theme-sample[data-scene] .cc-theme-sample__scrim {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.1rem 0.6rem;
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-scene-scrim);
+}
+html[data-scene] .cc-lesson-row[data-dock-row] {
+  background: transparent;
+}
+/* The quiet "Choose a topic" action is not a card: no frame around it, a scrim under it on a scene. */
+.cc-lesson-box:has(> .cc-lesson-box__body > .cc-focus-empty) > .cc-frame {
+  display: none;
+}
+html[data-scene] .cc-focus-empty > .cc-btn {
+  background: var(--cc-scene-scrim);
+}
+/* The student grid gets a card of its own; the padding is taken from outside the box (negative
+   margin, outline as the border), so the cards keep exactly their width and every tap target its size. */
+html[data-scene] .cc-lesson-box[data-box='core.students'] > .cc-lesson-box__body,
+.cc-lesson-box[data-box='core.students']:has(> .cc-frame) > .cc-lesson-box__body {
+  margin-inline: -0.6rem;
+  padding: 0 0.6rem 0.5rem;
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface);
+  box-shadow:
+    0 0 0 var(--cc-border-width) var(--cc-border),
+    var(--cc-shadow);
+}
+html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head,
+.cc-lesson-box[data-box='core.students']:has(> .cc-frame) .cc-students-box__head {
+  padding-top: 0.45rem;
+  background: var(--cc-surface);
+}
+
+/* Frames: overlays placed around a card (FrameOverlay). Over the card they fade away while keyboard
+   focus is inside it, so a focus ring is never covered; rings and glows are drawn behind it. */
+.cc-frame {
+  --cc-frame-c0: var(--cc-accent);
+  --cc-frame-c1: var(--cc-surface);
+  position: absolute;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+.cc-frame--over {
+  z-index: 1;
+  transition: opacity 120ms ease-out;
+}
+.cc-frame--under {
+  z-index: -1;
+}
+.cc-frame[data-flip='y'] {
+  transform: scaleY(-1);
+}
+.cc-frame[data-flip='x'] {
+  transform: scaleX(-1);
+}
+.cc-lesson-box:has(> .cc-frame) {
+  isolation: isolate;
+}
+.cc-student-card:has(> .cc-frame),
+.cc-classroom-bar:has(> .cc-frame),
+.cc-modal:has(> .cc-frame) {
+  position: relative;
+  isolation: isolate;
+}
+:is(.cc-lesson-box, .cc-student-card, .cc-classroom-bar, .cc-modal):has(:focus-visible) > .cc-frame--over {
+  opacity: 0;
+}
+/* Room for the overlays: the board's rows and the student grid scroll, so they would clip them. */
+.cc-lesson-board__rows:has(> .cc-lesson-row > .cc-lesson-box > .cc-frame) {
+  margin-inline: -0.9rem;
+  padding: 0.85rem 0.9rem 0;
+  gap: 0.9rem;
+}
+.cc-student-grid:has(> .cc-student-card > .cc-frame) {
+  padding-top: 0.55rem;
+  row-gap: 0.9rem;
+}
+/* Edges (silhouettes). */
+.cc-frame__edge--drift {
+  left: -8px;
+  top: -14px;
+  width: calc(100% + 16px);
+  height: 22px;
+}
+.cc-frame__drip {
+  left: -6px;
+  top: 6px;
+  width: 10px;
+  height: 30px;
+}
+.cc-frame__edge--scallop,
+.cc-frame__edge--torn {
+  left: 14px;
+  width: calc(100% - 28px);
+  height: 12px;
+}
+.cc-frame__edge--scallop.cc-frame__edge--top {
+  top: -9px;
+}
+.cc-frame__edge--scallop.cc-frame__edge--bottom {
+  bottom: -9px;
+}
+.cc-frame__edge--torn.cc-frame__edge--top {
+  top: -8px;
+}
+.cc-frame__edge--torn.cc-frame__edge--bottom {
+  bottom: -8px;
+}
+.cc-student-card > .cc-frame__edge--drift {
+  left: -3px;
+  top: -8px;
+  width: calc(100% + 6px);
+  height: 13px;
+}
+.cc-student-card > :is(.cc-frame__edge--scallop, .cc-frame__edge--torn) {
+  left: 10px;
+  top: -6px;
+  width: calc(100% - 20px);
+  height: 9px;
+}
+/* The top bar spans the page from its top: its edge hangs from the bottom border. */
+.cc-classroom-bar > .cc-frame__edge--drift {
+  top: auto;
+  bottom: -12px;
+  left: 0;
+  width: 100%;
+  height: 16px;
+}
+/* Dialogs scroll: their edge and corners are drawn just inside the top. */
+.cc-modal > .cc-frame__edge--top {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 16px;
+}
+.cc-modal > .cc-frame__edge--bottom {
+  display: none;
+}
+/* Trims (only on the board boxes the theme lists). */
+.cc-frame__ring {
+  inset: -6px;
+  border-radius: calc(var(--cc-radius) + 6px);
+}
+.cc-frame__ring--candy {
+  background: repeating-linear-gradient(135deg, var(--cc-frame-c0) 0 11px, var(--cc-frame-c1) 11px 22px);
+}
+.cc-frame__ring--frost {
+  inset: -4px;
+  border-radius: calc(var(--cc-radius) + 4px);
+  background: var(--cc-frame-c0);
+  box-shadow: 0 0 12px 4px var(--cc-frame-c1);
+}
+.cc-frame__stitch {
+  inset: 5px;
+  border: 2.5px dashed var(--cc-frame-c0);
+  border-radius: max(0px, calc(var(--cc-radius) - 5px));
+}
+.cc-frame__swag {
+  left: -6px;
+  top: -18px;
+  width: calc(100% + 12px);
+  height: 28px;
+}
+.cc-frame__swag--lights {
+  left: 0;
+  top: -12px;
+  width: 100%;
+  height: 22px;
+}
+.cc-frame__pencil {
+  left: 18px;
+  top: -12px;
+  width: calc(100% - 36px);
+  height: 18px;
+}
+/* Corners. */
+.cc-frame__corner {
+  width: 34px;
+  height: 34px;
+}
+.cc-frame__corner--wide {
+  width: 46px;
+  height: 38px;
+}
+.cc-frame__corner--top-left {
+  left: -10px;
+  top: -12px;
+}
+.cc-frame__corner--top-right {
+  right: -10px;
+  top: -12px;
+}
+.cc-frame__corner--bottom-left {
+  left: -6px;
+  bottom: -6px;
+}
+.cc-frame__corner--bottom-right {
+  right: -6px;
+  bottom: -6px;
+}
+:is(.cc-classroom-bar, .cc-modal) > :is(.cc-frame__corner--top-left, .cc-frame__corner--top-right) {
+  top: 2px;
+}
+:is(.cc-classroom-bar, .cc-modal) > .cc-frame__corner--top-left {
+  left: 2px;
+}
+:is(.cc-classroom-bar, .cc-modal) > .cc-frame__corner--top-right {
+  right: 2px;
+}
+/* Compact density and phones: the edge only (trims and corners are detail). */
+.cc-classroom[data-density='compact'] .cc-frame--detail {
+  display: none;
+}
+@media (max-width: 40rem) {
+  .cc-frame--detail {
+    display: none;
+  }
+}
+/* Ordinary cards on other pages: the edge only, drawn here from <html data-frame-cards>. */
+html[data-frame-cards] .cc-card:not(.cc-lesson-box .cc-card) {
+  position: relative;
+}
+html[data-frame-cards] .cc-card:not(.cc-lesson-box .cc-card)::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: -8px;
+  height: 10px;
+  pointer-events: none;
+}
+html[data-frame-cards='snowDrift'] .cc-card:not(.cc-lesson-box .cc-card)::before {
+  background: radial-gradient(circle at 50% 100%, var(--cc-frame-edge, var(--cc-surface)) 7px, transparent 7.5px) 0 0 / 18px 10px repeat-x;
+}
+html[data-frame-cards='scallop'] .cc-card:not(.cc-lesson-box .cc-card)::before {
+  background: radial-gradient(circle at 50% 100%, var(--cc-frame-edge, var(--cc-surface)) 7px, var(--cc-border) 7.5px 9px, transparent 9.5px) 0 0 / 20px 10px repeat-x;
+}
+html[data-frame-cards='torn'] .cc-card:not(.cc-lesson-box .cc-card)::before {
+  top: -6px;
+  height: 7px;
+  background:
+    linear-gradient(135deg, transparent 50%, var(--cc-frame-edge, var(--cc-surface)) 50%) 0 0 / 10px 7px repeat-x,
+    linear-gradient(225deg, transparent 50%, var(--cc-frame-edge, var(--cc-surface)) 50%) 0 0 / 10px 7px repeat-x;
 }
 .cc-flow-head {
   display: flex;
@@ -1555,7 +1838,43 @@ html:has(.cc-lesson-board) .cc-toaster {
 /* The theme's background pattern stays inside its sample instead of covering the page. */
 .cc-theme-sample .cc-backdrop {
   position: absolute;
-  z-index: -1;
+  z-index: -2;
+}
+/* S17a (D-166): the framed sample box and the engine blocks of the package preview. */
+.cc-theme-sample__box.cc-lesson-box {
+  flex: none;
+  margin: 0.6rem 0.4rem 0;
+}
+.cc-theme-sample__card.cc-card {
+  padding: 0.75rem;
+}
+.cc-theme-engine {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+.cc-theme-engine__block.cc-card {
+  padding: 0.85rem 1rem;
+  min-width: 0;
+}
+.cc-theme-engine__facts {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+}
+.cc-theme-engine__fact {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+  gap: 0.6rem;
+}
+.cc-theme-engine__fact dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-theme-engine__layers {
+  margin: 0;
+  padding-left: 1.2rem;
 }
 .cc-theme-sample__title {
   font-family: var(--cc-font-display);

@@ -4,10 +4,28 @@
  * Nothing here is interactive or carries meaning on its own: all art is decorative (aria-hidden by
  * its wrapper) and never contains text.
  */
-import type { ReactNode } from 'react';
-import type { ColorToken, MascotPose } from './types.ts';
+import { createContext, useContext, type ComponentType, type ReactNode } from 'react';
+import type { ColorToken, MascotPose, MascotProps } from './types.ts';
 
 export const tok = (t: ColorToken) => `var(--cc-${t})`;
+
+/**
+ * One mascot everywhere (S17a, D-166): the mascot of the theme that is drawing an illustration.
+ * `ThemeIllustration` provides the active theme's mascot, so an imported package that keeps a built-in
+ * theme's illustrations shows its own mascot in them instead of the built-in one.
+ */
+export const MascotContext = createContext<ComponentType<MascotProps> | null>(null);
+
+/**
+ * The mascot a built-in illustration draws: the one from `MascotContext`, else `fallback` (the theme's
+ * own mascot, e.g. in the catalogue where nothing provides one).
+ */
+export function mascotSlot(fallback: ComponentType<MascotProps>): ComponentType<MascotProps> {
+  return function ThemeMascotSlot({ pose }: MascotProps) {
+    const Active = useContext(MascotContext) ?? fallback;
+    return <Active pose={pose} />;
+  };
+}
 
 type Pt = readonly [number, number];
 

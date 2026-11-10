@@ -6,6 +6,8 @@
  */
 import type { ReactNode } from 'react';
 import type { AchievementTier, BadgeIcon } from '../../shared/achievements.ts';
+import type { AchievementFrame } from '../../shared/themePackage/engine.ts';
+import { useTheme } from '../themes/index.tsx';
 
 /** Every key of BADGE_ICONS has a glyph (type-checked by the Record). */
 export const GLYPHS: Record<BadgeIcon, string> = {
@@ -128,12 +130,59 @@ function rosette(): string {
 
 const FILL: Record<AchievementTier, string> = { bronze: 'badge-bronze', silver: 'badge-silver', gold: 'badge-gold', none: 'badge-plain' };
 
+/**
+ * The theme's achievement frame (S17a, D-166; `sets.achievementFrame`): an ornament drawn AROUND the
+ * tier shape, in the tier's own colour token, so the tier keeps its shape, colour and word. `classic`
+ * (and no theme choice) draws nothing extra.
+ */
+function ornament(frame: AchievementFrame, fill: string): ReactNode {
+  const ink = 'var(--cc-badge-ink)';
+  switch (frame) {
+    case 'ornament':
+      // A bauble: a cap and a loop above the badge.
+      return (
+        <g stroke={ink} strokeWidth="1.5" strokeLinejoin="round">
+          <circle cx="24" cy="-5.5" r="2.6" fill="none" />
+          <rect x="19" y="-3.5" width="10" height="6" rx="1.5" fill="var(--cc-badge-silver)" />
+        </g>
+      );
+    case 'snowflake': {
+      // Six ice points between the tier shape and the edge.
+      const arms = [0, 60, 120, 180, 240, 300].map((a) => <path key={a} d="M24 -6 L28 3 L24 6 L20 3Z" transform={`rotate(${a} 24 24)`} />);
+      return (
+        <g fill={fill} stroke={ink} strokeWidth="1.3" strokeLinejoin="round">
+          {arms}
+        </g>
+      );
+    }
+    case 'star':
+      return <path d="M24 -7 l8.6 17.3 19 2.4 -14 13 3.6 18.9 -17.2 -9.4 -17.2 9.4 3.6 -18.9 -14 -13 19 -2.4z" fill={fill} stroke={ink} strokeWidth="1.5" strokeLinejoin="round" />;
+    case 'shield':
+      return <path d="M24 -6 L50 2 V24 C50 41 38 52 24 56 C10 52 -2 41 -2 24 V2Z" fill={fill} stroke={ink} strokeWidth="1.5" strokeLinejoin="round" />;
+    default:
+      return null;
+  }
+}
+
 /** A badge: tier frame (shape) + glyph. Decorative; the badge name and tier label are written beside it. */
 export function BadgeArt({ icon, tier, size = 48, locked = false }: { icon: BadgeIcon | string; tier: AchievementTier; size?: number | string; locked?: boolean }) {
   const d = GLYPHS[icon as BadgeIcon] ?? GLYPHS.star;
+  const frame = useTheme().sets?.achievementFrame ?? 'classic';
+  const fill = `var(--cc-${FILL[tier]})`;
+  const extra = ornament(frame, fill);
   return (
-    <svg viewBox="0 0 48 48" width={size} height={size} className={`cc-badge-art${locked ? ' cc-badge-art--locked' : ''}`} aria-hidden="true" focusable="false" data-tier={tier}>
-      <g fill={`var(--cc-${FILL[tier]})`} stroke="var(--cc-badge-ink)" strokeWidth="1.5">
+    <svg
+      viewBox={extra ? '-9 -9 66 66' : '0 0 48 48'}
+      width={size}
+      height={size}
+      className={`cc-badge-art${locked ? ' cc-badge-art--locked' : ''}`}
+      aria-hidden="true"
+      focusable="false"
+      data-tier={tier}
+      data-frame={frame}
+    >
+      {extra}
+      <g fill={fill} stroke="var(--cc-badge-ink)" strokeWidth="1.5">
         {FRAME[tier]}
       </g>
       <g transform="translate(12 12)" fill="none" stroke="var(--cc-badge-ink)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

@@ -23,7 +23,8 @@ import { FONT_PRESETS, presetName, SHADOW_PRESETS, type FontPreset, type ShadowP
 import { StoredThemePackage, THEME_PACKAGE_FORMAT, THEME_PACKAGE_VERSION, type ThemePackage, type ThemePackageSounds } from '../../shared/themePackage/schema.ts';
 import { makeSoundPack } from '../../shared/themePackage/sound.ts';
 import { PACKAGE_COLOR_TOKENS, type ThemeColors } from '../../shared/themePackage/tokens.ts';
-import { FIXED_COLORS, packageArt } from '../../shared/themePackage/validate.ts';
+import { derivedColors, FIXED_COLORS, packageArt } from '../../shared/themePackage/validate.ts';
+import { resolveFrame } from '../../shared/themePackage/engine.ts';
 import { call, callConditional } from '../lib/api.ts';
 import { getCustomTheme, setCustomTheme, THEMES } from './registry.ts';
 import { SvgTree } from './SvgTree.tsx';
@@ -47,10 +48,24 @@ export function definitionFromPackage(raw: unknown, status: CustomStatus, key?: 
   if (!SAFE_KEY.test(themeKey) || isThemeKey(themeKey)) return null;
   const base = THEMES[pkg.base];
   const own = Object.fromEntries(PACKAGE_COLOR_TOKENS.flatMap((t) => (pkg.colors[t] ? [[t, pkg.colors[t]]] : [])));
-  const colors = { ...base.colors, ...own, ...FIXED_COLORS } as ThemeColors;
+  // Optional tokens the package left out follow its own colours (S17a: scene-scrim = its surface).
+  const colors = { ...base.colors, ...derivedColors(pkg.colors), ...own, ...FIXED_COLORS } as ThemeColors;
   const art = packageArt(pkg);
   const mascot = art.mascot;
-  const Mascot = mascot ? ({ pose }: MascotProps) => <SvgTree nodes={mascot[pose]} /> : base.Mascot;
+  // Without mascot art: the mascot of `sets.mascotFrom`, else the base theme's (S17a).
+  const Mascot = mascot ? ({ pose }: MascotProps) => <SvgTree nodes={mascot[pose]} /> : THEMES[pkg.sets?.mascotFrom ?? pkg.base].Mascot;
+  const sceneTrees = art.scene;
+  const scene: ThemeDefinition['scene'] =
+    pkg.scene && sceneTrees
+      ? {
+          opacity: pkg.scene.opacity,
+          smallScreens: pkg.scene.smallScreens,
+          layers: pkg.scene.layers.map((l, i) => {
+            const nodes = sceneTrees[i]!;
+            return { Art: () => <SvgTree nodes={nodes} />, viewBox: l.viewBox, fit: l.fit, anchor: l.anchor, ...(l.maxHeightVh === undefined ? {} : { maxHeightVh: l.maxHeightVh }) };
+          }),
+        }
+      : undefined;
   const illustrations = Object.fromEntries(
     ILLUSTRATIONS.map((name) => {
       const nodes = art.illustrations[name];
@@ -99,6 +114,10 @@ export function definitionFromPackage(raw: unknown, status: CustomStatus, key?: 
     sounds: sounds === null ? null : makeSoundPack(sounds, sounds.overrides ?? {}),
     soundParams: sounds,
     celebration: { colors: [...pkg.celebration.colors] },
+    ...(scene ? { scene } : {}),
+    ...(pkg.frame ? { frame: resolveFrame(pkg.frame) } : {}),
+    ...(pkg.ambient ? { ambient: { ...pkg.ambient } } : {}),
+    ...(pkg.sets ? { sets: { achievementFrame: pkg.sets.achievementFrame, avatarFamiliesFirst: [...pkg.sets.avatarFamiliesFirst], ...(pkg.sets.mascotFrom ? { mascotFrom: pkg.sets.mascotFrom } : {}) } } : {}),
     custom: { base: pkg.base, status, labels: { name: pkg.name, description: pkg.description, mascot: pkg.mascotName } },
   };
 }
@@ -227,5 +246,23 @@ export function packageFromDefinition(def: ThemeDefinition, opts: { key: string;
     motion: { celebrate: motion('celebrate'), threshold: motion('threshold') },
     sounds: def.sounds === null ? null : ((def.soundParams ?? null) as ThemePackageSounds | null),
     celebration: { colors: [...def.celebration.colors] },
+    // S17a (D-166): frames, ambient and sets are data and are exported; a built-in scene is drawn by
+    // code (like the rest of its art) and stays with the theme.
+    ...(def.frame
+      ? {
+          frame: {
+            edge: def.frame.edge,
+            trim: def.frame.trim,
+            corners: def.frame.corners,
+            apply: [...def.frame.apply],
+            trimOn: [...def.frame.trimOn],
+            snowColor: def.frame.snowColor,
+            trimColors: [...def.frame.trimColors],
+            cornerColors: [...def.frame.cornerColors],
+          },
+        }
+      : {}),
+    ...(def.ambient ? { ambient: { ...def.ambient } } : {}),
+    ...(def.sets ? { sets: { achievementFrame: def.sets.achievementFrame, avatarFamiliesFirst: [...def.sets.avatarFamiliesFirst], ...(def.sets.mascotFrom ? { mascotFrom: def.sets.mascotFrom } : {}) } } : {}),
   };
 }

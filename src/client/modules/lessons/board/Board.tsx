@@ -16,6 +16,7 @@ import { useCallback, useMemo, type ReactNode, type Ref } from 'react';
 import { BOX_CATALOGUE, effectiveLayout, type BoxKey, type ClassroomLayout } from '../../../../shared/classroomLayout.ts';
 import type { LessonState } from '../../../../shared/contracts/lessons.ts';
 import { useI18n } from '../../../lib/i18n.tsx';
+import { FrameOverlay } from '../../../ui/Frame.tsx';
 import { allBoardWatchers, availableBoxKeys, type ClassroomContext } from '../../registry.ts';
 import { BoxContent } from './Box.tsx';
 import { LayoutEditor } from './LayoutEditor.tsx';
@@ -107,6 +108,8 @@ export function BoardRows({
                   <div className="cc-lesson-box__body" inert={editing ? true : undefined}>
                     {dockRow && editing ? null : <BoxContent boxKey={b.key} layout={layout} context={context} lesson={lesson} onEnd={onEnd} />}
                   </div>
+                  {/* Theme frame (S17a, D-166): decorative overlays outside the content; none while editing. */}
+                  {editing ? null : <FrameOverlay surface={dockRow ? 'dock' : 'boardBoxes'} boxKey={b.key} />}
                   {dockRow && editing ? editing.dock : null}
                   {editing && !dockRow ? editing.frame(b.key, ri, bi) : null}
                 </div>

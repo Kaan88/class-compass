@@ -31,6 +31,12 @@ import { READY_MADE } from '../../shared/avatars.ts';
 import { BadgeArt } from '../achievements/icons.tsx';
 import { AvatarArt } from '../avatars/AvatarArt.tsx';
 import { levelFor, sampleStudents } from './fixtures.ts';
+import { DEFAULT_THEME } from '../../shared/themes.ts';
+import { FRAME_CORNERS, FRAME_EDGES, FRAME_SURFACES, FRAME_TRIMS, type FrameCorners, type FrameEdge, type FrameTrim } from '../../shared/themePackage/engine.ts';
+import { packageFromDefinition, previewKey, registerThemePackage } from '../themes/custom.tsx';
+import { removeCustomTheme, THEMES } from '../themes/registry.ts';
+import { ThemeProvider } from '../themes/index.tsx';
+import { FrameOverlay } from '../ui/Frame.tsx';
 
 const SUBJECT = { en: 'English', tr: 'İngilizce' };
 const SWITCH = [
@@ -289,7 +295,56 @@ export function CatalogPage() {
           ))}
         </StudentGrid>
       </div>
+      <FramesDemo />
     </main>
+  );
+}
+
+const FRAMES_KEY = previewKey('catalog-frames');
+
+/**
+ * Theme frames (S17a, D-166): every edge, trim and corner preset on a board box and student cards, on
+ * a preview copy of the default theme (built-in themes have no frame yet). Fictional data only.
+ */
+function FramesDemo() {
+  const { t } = useI18n();
+  const [edge, setEdge] = useState<FrameEdge>('snowDrift');
+  const [trim, setTrim] = useState<FrameTrim>('candyStripe');
+  const [corners, setCorners] = useState<FrameCorners>('frost');
+  const def = useTheme(FRAMES_KEY);
+  useEffect(() => {
+    const base = packageFromDefinition(THEMES[DEFAULT_THEME], { key: 'catalog-frames', copyOf: (_l, name) => name });
+    registerThemePackage({ ...base, frame: { edge, trim, corners, apply: [...FRAME_SURFACES] } }, 'preview', FRAMES_KEY);
+  }, [edge, trim, corners]);
+  useEffect(() => () => removeCustomTheme(FRAMES_KEY), []);
+  const sample = sampleStudents(3);
+  return (
+    <section className="cc-stack" aria-labelledby="cc-catalog-frames">
+      <h2 className="cc-h2" id="cc-catalog-frames">
+        {t('catalog.frames')}
+      </h2>
+      <div className="cc-row">
+        <Select label={t('themes.engine.frame.edge')} value={edge} onChange={(v) => setEdge(v as FrameEdge)} items={FRAME_EDGES.map((e) => ({ id: e, label: t(`themes.engine.edge.${e}`) }))} />
+        <Select label={t('themes.engine.frame.trim')} value={trim} onChange={(v) => setTrim(v as FrameTrim)} items={FRAME_TRIMS.map((e) => ({ id: e, label: t(`themes.engine.trim.${e}`) }))} />
+        <Select label={t('themes.engine.frame.corners')} value={corners} onChange={(v) => setCorners(v as FrameCorners)} items={FRAME_CORNERS.map((e) => ({ id: e, label: t(`themes.engine.corners.${e}`) }))} />
+      </div>
+      {def.key === FRAMES_KEY ? (
+        <ThemeProvider theme={FRAMES_KEY} className="cc-catalog-panel cc-stack" testId="catalog-frames">
+          <div className="cc-lesson-box cc-theme-sample__box" data-box="routine">
+            <FrameOverlay surface="boardBoxes" boxKey="routine" />
+            <div className="cc-card cc-stack cc-theme-sample__card">
+              <strong>{t('themes.preview.sampleRoutine')}</strong>
+              <CounterBar value={3} max={10} label={t('catalog.sampleCounter')} />
+            </div>
+          </div>
+          <StudentGrid count={sample.length} label={t('catalog.frames')}>
+            {sample.map((s) => (
+              <StudentCard key={s.id} student={s} weeklyCount={s.weeklyCount} level={levelFor(s.weeklyCount)} onAdd={() => undefined} />
+            ))}
+          </StudentGrid>
+        </ThemeProvider>
+      ) : null}
+    </section>
   );
 }
 

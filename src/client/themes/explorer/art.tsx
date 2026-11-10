@@ -3,7 +3,7 @@
  * All shapes use semantic tokens only.
  */
 import type { ComponentType } from 'react';
-import { Arms, Confetti, Face, Moon, Place, PoseExtras, Scene, Sparkles, Stars, Sun, tok } from '../art.tsx';
+import { Arms, Confetti, Face, mascotSlot, Moon, Place, PoseExtras, Scene, Sparkles, Stars, Sun, tok } from '../art.tsx';
 import type { IllustrationName, MascotProps } from '../types.ts';
 
 export function ExplorerMascot({ pose }: MascotProps) {
@@ -31,7 +31,8 @@ export function ExplorerMascot({ pose }: MascotProps) {
   );
 }
 
-const Mascot = ExplorerMascot;
+// The active theme's mascot in the illustrations (S17a, D-166); Compy where none is provided.
+const Mascot = mascotSlot(ExplorerMascot);
 
 /** Corner decoration: compass rose and a dotted trail. */
 export function ExplorerDecoration() {

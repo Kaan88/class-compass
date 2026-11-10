@@ -12,6 +12,9 @@ import { EmptyState, Toaster } from '../ui/Feedback.tsx';
 import { ManualCopyDialog } from '../ui/Dialog.tsx';
 import { ThemeBackdrop } from '../ui/Mascot.tsx';
 import { CelebrationLayer } from '../themes/Celebration.tsx';
+import { ThemeAmbient } from '../themes/Ambient.tsx';
+import { ThemeScene } from '../themes/Scene.tsx';
+import { FrameDocumentFlags } from '../ui/Frame.tsx';
 import { AvatarDirectoryProvider } from '../avatars/AvatarDirectory.tsx';
 
 /**
@@ -31,7 +34,11 @@ export function RootLayout() {
   }, [locale, textScale]);
   return (
     <I18nProvider locale={locale}>
+      {/* Theme layers, back to front (S17a, D-166): scene, tile pattern, ambient; then the page. */}
+      <ThemeScene documentFlag />
       <ThemeBackdrop />
+      <ThemeAmbient />
+      <FrameDocumentFlags />
       <AvatarDirectoryProvider enabled={me?.role === 'teacher'}>
         <Outlet />
       </AvatarDirectoryProvider>

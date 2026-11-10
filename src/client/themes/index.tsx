@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useSyncExternalStore, type CSSPro
 import type { ThemeKey } from '../../shared/themes.ts';
 import { getDisplay, motionAllowed, soundsAllowed, useDisplay, type DisplayState } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
+import { MascotContext } from './art.tsx';
 import { animationName } from './css.ts';
 import { customThemesVersion, subscribeCustomThemes, themeOf } from './registry.ts';
 import { SOUND_PRIORITY, soundStatus, sounds, type SoundSnapshot, type SoundStatus } from './soundManager.ts';
@@ -165,7 +166,10 @@ export function ThemeIllustration({ name, theme, width = 200, motion }: { name: 
       aria-hidden="true"
       focusable="false"
     >
-      <Art />
+      {/* One mascot everywhere (S17a, D-166): built-in illustrations draw this theme's mascot. */}
+      <MascotContext.Provider value={def.Mascot}>
+        <Art />
+      </MascotContext.Provider>
     </svg>
   );
 }
