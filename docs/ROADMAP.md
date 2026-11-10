@@ -327,6 +327,29 @@ The owner cannot see the real classroom display, so the board records its last s
   - **Earlier the same morning:** Sare's MacBook, 1440×900 CSS px at pixel ratio 2, window 1440×825 and 1440×787.
   - **To act on:** design and test the board for 1536×703 (not only 1920×1080 and 1366×768); the S17 theme engine adds this size to its e2e set. Full screen (F11) on the classroom PC would give the board 161 px more height.
 
+## S17a Theme engine: scenes, frames, ambient, sets (owner request 2026-11-09, mockups approved 2026-11-11)
+Brief: `docs/design/2026-11-11-theme-engine.md`; decision D-166; no migration.
+- [ ] Package fields `scene`, `frame`, `ambient`, `sets` (optional, format version 1), limits, validator, sanitiser limits for scenes, generated schema and THEMING tables
+- [ ] Board renders scene, frames (boxes, student cards, top bar) and ambient; still frame with motion off; text only on surfaces, `scene-scrim` token
+- [ ] One mascot everywhere (mascot context); achievement frames; avatar families first in the picker
+- [ ] Admin → Themes preview with Motion on/off and the new blocks; MCP theme tools cover the new fields
+- [ ] Snow Day example package (`docs/examples/peppermint-snow-day.theme.json`), validated; THEMING section and guide note
+- [ ] Tests at the real display sizes (1536×703 and 1536×864 at scale 1.25, 1920×1080), axe, focus, tap targets, ambient performance
+- [ ] Seen on the real classroom display (owner)
+
+## S18 Full screen during lessons (owner 2026-11-11)
+Brief: `docs/design/2026-11-11-theme-engine.md` → S18; decision D-167; no migration.
+- [ ] Start lesson enters full screen, End lesson leaves it; Full screen / Leave full screen button on the board while a lesson runs; nothing where unsupported
+- [ ] Teacher setting "Full screen during lessons" (on by default); `displayInfo` records `fullscreen`
+- [ ] Tests (stubbed Fullscreen API), guides EN/TR
+- [ ] Tried on the classroom PC (owner)
+
+## S17b Built-in themes remade, sound styles (owner 2026-11-11)
+Brief: `docs/design/2026-11-11-theme-engine.md` → S17b; decision D-168; after S17a.
+- [ ] Explorer, Animals and Classroom remade with scenes, frames, ambient and sets per the mockups; screenshots before/after
+- [ ] `sounds.style` (tones, bells, marimba, chimes, musicBox) in packages, the validator, docs and the MCP tools; built-ins and Snow Day choose a style
+- [ ] Heard on the classroom speakers (owner)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site

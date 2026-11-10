@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Classroom board at the real display size</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&amp;family=Nunito:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1536px; height: {{h}}px; position: relative; overflow: hidden; font-family: Nunito, system-ui, sans-serif; color: {{t.text}}; background: {{t.bg}}">
+
+<!-- SCENES (viewBox 1920×1080, cover, anchored bottom) -->
+<svg aria-hidden="true" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMax slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<sc-if value="{{is.snow}}" hint-placeholder-val="{{ true }}">
+<rect width="1920" height="1080" fill="#cfe6fa"></rect>
+<path d="M0 700 C220 620 420 660 600 640 C820 610 980 680 1180 650 C1380 620 1560 600 1920 670 V1080 H0Z" fill="#e3effa"></path>
+<g fill="#a9c9e2"><path d="M140 690 l22 -60 l22 60z"></path><path d="M1240 664 l20 -56 l20 56z"></path><path d="M1700 650 l24 -66 l24 66z"></path><path d="M760 650 l18 -50 l18 50z"></path></g>
+<path d="M0 820 C260 760 520 800 760 780 C1000 760 1180 820 1440 790 C1640 770 1800 760 1920 790 V1080 H0Z" fill="#ffffff"></path>
+<path d="M60 900 l50 -150 l50 150z" fill="#148362"></path><path d="M88 800 l22 -50 l22 50 q-22 -12 -44 0z" fill="#ffffff"></path>
+<path d="M1760 880 l56 -170 l56 170z" fill="#148362"></path><path d="M1784 780 l32 -70 l32 70 q-32 -14 -64 0z" fill="#ffffff"></path>
+<path d="M1640 900 l40 -120 l40 120z" fill="#148362"></path><path d="M1660 830 l20 -50 l20 50 q-20 -10 -40 0z" fill="#ffffff"></path>
+<rect x="190" y="860" width="170" height="120" rx="6" fill="#fffcf7"></rect><path d="M172 870 L275 790 L378 870 Z" fill="#a51e48"></path><path d="M200 852 L275 794 L350 852 C330 846 316 856 296 848 C276 858 258 846 238 854 C222 846 212 856 200 852Z" fill="#ffffff"></path><rect x="212" y="892" width="40" height="36" rx="4" fill="#ffcb48"></rect><rect x="298" y="892" width="40" height="36" rx="4" fill="#ffcb48"></rect><rect x="262" y="926" width="28" height="54" rx="12" fill="#148362"></rect>
+<rect x="1500" y="870" width="150" height="110" rx="6" fill="#fffcf7"></rect><path d="M1484 878 L1575 806 L1666 878 Z" fill="#148362"></path><path d="M1494 868 L1575 810 L1656 868 C1636 860 1620 870 1602 862 C1584 872 1566 860 1548 868 C1530 860 1512 870 1494 868Z" fill="#ffffff"></path><rect x="1520" y="900" width="36" height="34" rx="4" fill="#ffcb48"></rect><rect x="1594" y="900" width="36" height="34" rx="4" fill="#ffcb48"></rect>
+<path d="M110 760 C300 860 420 830 506 806" fill="none" stroke="#45574a" stroke-width="2"></path><circle cx="150" cy="784" r="8" fill="#ffcb48"></circle><circle cx="200" cy="808" r="8" fill="#e22a60"></circle><circle cx="252" cy="824" r="8" fill="#7950cf"></circle><circle cx="306" cy="830" r="8" fill="#ffcb48"></circle><circle cx="360" cy="828" r="8" fill="#e22a60"></circle><circle cx="414" cy="820" r="8" fill="#7950cf"></circle>
+<path d="M0 1000 C300 960 600 1010 960 990 C1300 970 1600 1010 1920 980 V1080 H0Z" fill="#ffffff"></path>
+</sc-if>
+
+<sc-if value="{{is.explorer}}" hint-placeholder-val="{{ false }}">
+<rect width="1920" height="1080" fill="#e3efe9"></rect>
+<g fill="none" stroke="#cdbf9f" stroke-width="3" opacity="0.8"><circle cx="1660" cy="250" r="120"></circle><circle cx="1660" cy="250" r="86"></circle><path d="M1660 110 V390 M1520 250 H1800"></path></g>
+<path d="M1660 150 L1680 230 L1760 250 L1680 270 L1660 350 L1640 270 L1560 250 L1640 230Z" fill="#cdbf9f" opacity="0.8"></path>
+<path d="M0 720 L180 600 L300 680 L460 560 L640 700 L820 610 L1000 700 L1200 580 L1380 690 L1560 600 L1760 690 L1920 640 V1080 H0Z" fill="#d8ccb0"></path>
+<path d="M440 580 L460 560 L482 584 L470 578 L458 590Z M1180 600 L1200 580 L1222 604 L1208 598 L1196 610Z" fill="#fffaf0"></path>
+<path d="M0 800 C260 740 520 790 780 770 C1040 750 1240 810 1500 780 C1680 760 1820 760 1920 780 V1080 H0Z" fill="#e6d6b0"></path>
+<path d="M0 900 C300 860 640 900 960 880 C1280 860 1600 900 1920 870 V1080 H0Z" fill="#d9c69a"></path>
+<path d="M120 1000 C340 930 520 990 760 920 C980 860 1180 940 1400 880 C1580 830 1720 860 1860 800" fill="none" stroke="#c8642c" stroke-width="6" stroke-dasharray="4 18" stroke-linecap="round"></path>
+<path d="M1846 800 l14 -64 M1860 736 l40 12 l-38 14" fill="#c8642c" stroke="#4f4a3d" stroke-width="4" stroke-linejoin="round"></path>
+<g fill="#1f6f5c"><circle cx="90" cy="830" r="46"></circle><circle cx="150" cy="850" r="36"></circle><circle cx="1690" cy="830" r="42"></circle><circle cx="1750" cy="850" r="32"></circle><circle cx="620" cy="830" r="30"></circle></g>
+<g fill="#4f4a3d"><rect x="84" y="866" width="12" height="40"></rect><rect x="1684" y="864" width="12" height="40"></rect></g>
+<path d="M300 930 L360 840 L420 930Z" fill="#c8642c"></path><path d="M360 840 L372 930 H348Z" fill="#8f4219"></path>
+<path d="M1300 900 L1350 830 L1400 900Z" fill="#1f6f5c"></path><path d="M1350 830 L1360 900 H1340Z" fill="#17574a"></path>
+<path d="M0 1010 C320 980 640 1020 960 1000 C1300 980 1600 1020 1920 990 V1080 H0Z" fill="#cdbf9f"></path>
+</sc-if>
+
+<sc-if value="{{is.animals}}" hint-placeholder-val="{{ false }}">
+<rect width="1920" height="1080" fill="#e6f2fb"></rect>
+<circle cx="1640" cy="230" r="90" fill="#fff4d6"></circle><circle cx="1640" cy="230" r="130" fill="#fff4d6" opacity="0.5"></circle>
+<g fill="#ffffff" opacity="0.9"><ellipse cx="320" cy="220" rx="90" ry="34"></ellipse><ellipse cx="380" cy="200" rx="60" ry="34"></ellipse><ellipse cx="1100" cy="160" rx="80" ry="28"></ellipse></g>
+<path d="M0 740 C240 660 480 700 720 680 C980 660 1200 720 1440 690 C1660 660 1800 670 1920 690 V1080 H0Z" fill="#cfe6c4"></path>
+<g fill="#7fb36a"><circle cx="220" cy="660" r="60"></circle><circle cx="300" cy="690" r="44"></circle><circle cx="1500" cy="650" r="66"></circle><circle cx="1590" cy="680" r="48"></circle><circle cx="860" cy="670" r="40"></circle></g>
+<path d="M0 840 C300 790 620 830 940 815 C1260 800 1560 840 1920 810 V1080 H0Z" fill="#a9d08f"></path>
+<g fill="#5f9b45"><circle cx="80" cy="800" r="70"></circle><circle cx="170" cy="830" r="54"></circle><circle cx="1800" cy="790" r="74"></circle><circle cx="1700" cy="830" r="50"></circle></g>
+<g fill="#6b4428"><rect x="72" y="850" width="16" height="70"></rect><rect x="1792" y="846" width="16" height="70"></rect></g>
+<g fill="#ef8a3c"><circle cx="420" cy="900" r="8"></circle><circle cx="560" cy="930" r="8"></circle><circle cx="1240" cy="920" r="8"></circle><circle cx="1400" cy="900" r="8"></circle></g>
+<g fill="#7a35a6"><circle cx="480" cy="940" r="7"></circle><circle cx="1320" cy="940" r="7"></circle><circle cx="700" cy="910" r="7"></circle></g>
+<g fill="#ffffff"><circle cx="1000" cy="930" r="7"></circle><circle cx="1100" cy="905" r="7"></circle></g>
+<path d="M880 960 a70 50 0 0 1 140 0Z" fill="#6b4428"></path><path d="M906 960 a44 32 0 0 1 88 0Z" fill="#3e2a1f"></path>
+<path d="M0 1000 C320 970 640 1010 960 990 C1300 970 1600 1010 1920 980 V1080 H0Z" fill="#8fbf74"></path>
+</sc-if>
+
+<sc-if value="{{is.classroom}}" hint-placeholder-val="{{ false }}">
+<rect width="1920" height="1080" fill="#f7f8fc"></rect>
+<path d="M0 120 Q160 170 320 120 Q480 170 640 120 Q800 170 960 120 Q1120 170 1280 120 Q1440 170 1600 120 Q1760 170 1920 120" fill="none" stroke="#8b6fd6" stroke-width="3"></path>
+<g><path d="M60 136 l40 0 l-20 44z" fill="#ffd166"></path><path d="M220 160 l40 0 l-20 44z" fill="#8fc3ef"></path><path d="M380 136 l40 0 l-20 44z" fill="#8b6fd6"></path><path d="M1500 136 l40 0 l-20 44z" fill="#ffd166"></path><path d="M1660 160 l40 0 l-20 44z" fill="#8fc3ef"></path><path d="M1820 136 l40 0 l-20 44z" fill="#8b6fd6"></path></g>
+<g><rect x="70" y="300" width="300" height="360" rx="14" fill="#dcecfb" stroke="#8fc3ef" stroke-width="14"></rect><path d="M220 300 V660 M70 480 H370" stroke="#8fc3ef" stroke-width="10"></path><circle cx="300" cy="380" r="34" fill="#fff7d6"></circle></g>
+<g><rect x="1550" y="300" width="300" height="360" rx="14" fill="#dcecfb" stroke="#8fc3ef" stroke-width="14"></rect><path d="M1700 300 V660 M1550 480 H1850" stroke="#8fc3ef" stroke-width="10"></path><ellipse cx="1640" cy="560" rx="54" ry="20" fill="#ffffff"></ellipse></g>
+<rect x="0" y="880" width="1920" height="200" fill="#e8e2f8"></rect>
+<rect x="40" y="740" width="420" height="160" rx="10" fill="#c9d0e6"></rect>
+<g><rect x="60" y="760" width="26" height="120" fill="#8b6fd6"></rect><rect x="90" y="770" width="22" height="110" fill="#ffd166"></rect><rect x="116" y="756" width="30" height="124" fill="#2f5bd3"></rect><rect x="150" y="776" width="22" height="104" fill="#8fc3ef"></rect><rect x="176" y="764" width="28" height="116" fill="#e46aa6"></rect><path d="M212 880 L236 770 L258 774 L236 880Z" fill="#ffd166"></path></g>
+<g><path d="M330 900 h80 l-10 -60 h-60z" fill="#e8833a"></path><path d="M370 840 C340 800 330 770 350 740 M370 840 C390 790 410 780 420 750 M370 840 C368 800 372 770 370 730" stroke="#4caf6a" stroke-width="10" fill="none" stroke-linecap="round"></path></g>
+<rect x="1460" y="740" width="420" height="160" rx="10" fill="#c9d0e6"></rect>
+<g><rect x="1480" y="760" width="26" height="120" fill="#2f5bd3"></rect><rect x="1510" y="772" width="24" height="108" fill="#ffd166"></rect><rect x="1538" y="758" width="30" height="122" fill="#8b6fd6"></rect><rect x="1572" y="768" width="22" height="112" fill="#4caf6a"></rect></g>
+<path d="M1760 720 l14 30 32 3 -24 21 7 32 -29 -16 -29 16 7 -32 -24 -21 32 -3z" fill="#ffd166" stroke="#b9892a" stroke-width="3" stroke-linejoin="round"></path>
+</sc-if>
+</svg>
+
+<!-- AMBIENT, drawn still in this set (motion is shown on the 1920 board) -->
+<div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none">
+<sc-for list="{{particles}}" as="p" hint-placeholder-count="30"><div style="{{p.style}}"></div></sc-for>
+</div>
+
+<div style="position: absolute; inset: 0; box-sizing: border-box; padding: 12px 20px 14px; display: flex; flex-direction: column; gap: 16px">
+
+<header style="height: 56px; flex: none; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 18px; position: relative; {{B.outer}}">
+<sc-if value="{{is.snow}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" viewBox="0 0 100 100" style="width: 42px; height: 42px"><path d="M33 36Q24 28 17 15 M25 26L25 12 M67 36Q76 28 83 15 M75 26L75 12" fill="none" stroke="#14182b" stroke-width="4" stroke-linecap="round"></path><path d="M32 48Q12 50 12 34Q24 31 35 41Z M68 48Q88 50 88 34Q76 31 65 41Z" fill="#bf754e"></path><ellipse cx="50" cy="55" rx="24" ry="25" fill="#bf754e"></ellipse><ellipse cx="50" cy="65" rx="15" ry="11" fill="#fff1d9"></ellipse><circle cx="39" cy="52" r="3" fill="#14182b"></circle><circle cx="61" cy="52" r="3" fill="#14182b"></circle><ellipse cx="50" cy="60" rx="5" ry="3.5" fill="#e22a60"></ellipse></svg></sc-if>
+<sc-if value="{{is.explorer}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" viewBox="0 0 100 100" style="width: 42px; height: 42px"><circle cx="50" cy="54" r="36" fill="#1f6f5c"></circle><circle cx="50" cy="54" r="26" fill="#fffaf0"></circle><path d="M50 30 L56 54 L50 78 L44 54Z" fill="#c8642c"></path><circle cx="40" cy="48" r="3.5" fill="#2b2618"></circle><circle cx="60" cy="48" r="3.5" fill="#2b2618"></circle><path d="M26 22 Q50 4 74 22 L70 28 H30Z" fill="#c8642c"></path></svg></sc-if>
+<sc-if value="{{is.animals}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" viewBox="0 0 100 100" style="width: 42px; height: 42px"><path d="M20 40 L24 8 L46 30Z M80 40 L76 8 L54 30Z" fill="#ef8a3c"></path><ellipse cx="50" cy="56" rx="32" ry="28" fill="#ef8a3c"></ellipse><path d="M30 64 Q50 92 70 64 Q50 70 30 64Z" fill="#ffe6d1"></path><circle cx="38" cy="52" r="3.5" fill="#1f2a1c"></circle><circle cx="62" cy="52" r="3.5" fill="#1f2a1c"></circle><ellipse cx="50" cy="66" rx="5" ry="3.5" fill="#1f2a1c"></ellipse></svg></sc-if>
+<sc-if value="{{is.classroom}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" viewBox="0 0 100 100" style="width: 42px; height: 42px"><path d="M50 4 l13 28 31 3 -23 21 7 31 -28 -16 -28 16 7 -31 -23 -21 31 -3z" fill="#8b6fd6" stroke="#5a44a8" stroke-width="3" stroke-linejoin="round"></path><circle cx="41" cy="48" r="3.5" fill="#ffffff"></circle><circle cx="59" cy="48" r="3.5" fill="#ffffff"></circle><path d="M42 58 Q50 65 58 58" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"></path></svg></sc-if>
+<span style="font-family: Fredoka, Nunito, sans-serif; font-weight: 700; font-size: 23px">Class 3B</span>
+<span style="font-size: 15px; color: {{t.muted}}; font-weight: 600">Thu 12 Nov</span>
+<div style="flex: 1"></div>
+<span style="font-size: 16px; font-weight: 800; background: {{t.soft2}}; border-radius: 12px; padding: 6px 14px">Reading · 09:40 – 10:20</span>
+<span style="font-family: Fredoka, Nunito, sans-serif; font-size: 24px; font-weight: 600">09:52</span>
+<sc-if value="{{full}}" hint-placeholder-val="{{ false }}">
+<button aria-label="Leave full screen" title="Leave full screen" style="width: 44px; height: 44px; border-radius: 12px; border: 2px solid {{t.border}}; background: {{t.surface}}; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 22px; height: 22px" fill="none" stroke="{{t.text}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6"></path></svg></button>
+</sc-if>
+<sc-if value="{{windowed}}" hint-placeholder-val="{{ true }}">
+<button style="height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid {{t.border}}; background: {{t.surface}}; color: {{t.text}}; font: inherit; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 20px; height: 20px" fill="none" stroke="{{t.text}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"></path></svg>Full screen</button>
+</sc-if>
+<svg aria-hidden="true" viewBox="0 0 40 40" style="{{K.style}}"><path d="{{K.d}}" fill="{{K.fill}}" stroke="{{K.stroke}}" stroke-width="2" stroke-linejoin="round"></path><path d="{{K.d2}}" fill="none" stroke="{{K.stroke2}}" stroke-width="3" stroke-linecap="round"></path></svg>
+</header>
+
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr) 330px; gap: 20px">
+
+<div style="display: flex; flex-direction: column; gap: 18px; min-height: 0">
+<section aria-label="Today" style="flex: 1.2; min-height: 0; position: relative; display: flex; flex-direction: column; box-sizing: border-box; {{A.outer}}">
+<div style="flex: 1; min-height: 0; box-sizing: border-box; padding: 24px 18px 12px; display: flex; flex-direction: column; gap: 7px; font-size: 16px; {{A.inner}}">
+<h2 style="margin: 0 0 2px; font-family: Fredoka, Nunito, sans-serif; font-size: 21px">Today</h2>
+<div style="display: flex; gap: 10px; color: {{t.muted}}"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 20px; height: 20px" fill="none" stroke="{{t.success}}" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5 9-10"></path></svg>Morning circle<span style="margin-left: auto; font-size: 13px">Done</span></div>
+<div style="display: flex; gap: 10px; font-weight: 800; background: {{t.accentSoft}}; border: 2px solid {{t.accent}}; border-radius: 10px; padding: 5px 8px; margin: 0 -8px"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 20px; height: 20px" fill="{{t.accent}}"><path d="M7 5l12 7-12 7z"></path></svg>Reading<span style="margin-left: auto; font-size: 13px; color: {{t.accentStrong}}">Now</span></div>
+<div style="display: flex; gap: 10px"><span style="width: 20px; height: 20px; box-sizing: border-box; border: 3px solid {{t.border}}; border-radius: 50%"></span>Maths<span style="margin-left: auto; font-size: 13px; color: {{t.muted}}">10:30</span></div>
+<div style="display: flex; gap: 10px"><span style="width: 20px; height: 20px; box-sizing: border-box; border: 3px solid {{t.border}}; border-radius: 50%"></span>Break<span style="margin-left: auto; font-size: 13px; color: {{t.muted}}">11:10</span></div>
+<div style="display: flex; gap: 10px"><span style="width: 20px; height: 20px; box-sizing: border-box; border: 3px solid {{t.border}}; border-radius: 50%"></span>Art<span style="margin-left: auto; font-size: 13px; color: {{t.muted}}">11:30</span></div>
+</div>
+<svg aria-hidden="true" viewBox="{{A.top.vb}}" preserveAspectRatio="none" style="{{A.top.style}}"><path d="{{A.top.d}}" fill="{{A.top.fill}}"></path><path d="{{A.top.d2}}" fill="none" stroke="{{A.top.stroke}}" stroke-width="{{A.top.sw}}" stroke-linecap="round" stroke-linejoin="round"></path><path d="{{A.top.d3}}" fill="{{A.top.fill3}}"></path></svg>
+<svg aria-hidden="true" viewBox="0 0 40 40" style="{{K.style}}"><path d="{{K.d}}" fill="{{K.fill}}" stroke="{{K.stroke}}" stroke-width="2" stroke-linejoin="round"></path><path d="{{K.d2}}" fill="none" stroke="{{K.stroke2}}" stroke-width="3" stroke-linecap="round"></path></svg>
+</section>
+
+<section aria-label="Timer" style="flex: 0.8; min-height: 0; position: relative; display: flex; flex-direction: column; box-sizing: border-box; {{A.outer}}">
+<div style="flex: 1; min-height: 0; box-sizing: border-box; padding: 22px 16px 10px; display: flex; align-items: center; gap: 14px; {{A.inner}}">
+<svg aria-hidden="true" viewBox="0 0 120 120" style="width: 96px; height: 96px; flex: none"><circle cx="60" cy="60" r="50" fill="none" stroke="{{t.soft2}}" stroke-width="14"></circle><circle cx="60" cy="60" r="50" fill="none" stroke="{{t.success}}" stroke-width="14" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="100" transform="rotate(-90 60 60)"></circle></svg>
+<div style="display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 700; color: {{t.muted}}">Quiet reading</span><span style="font-family: Fredoka, Nunito, sans-serif; font-size: 46px; font-weight: 600; line-height: 1">12:40</span></div>
+</div>
+<svg aria-hidden="true" viewBox="{{A.top.vb}}" preserveAspectRatio="none" style="{{A.top.style}}"><path d="{{A.top.d}}" fill="{{A.top.fill}}"></path><path d="{{A.top.d2}}" fill="none" stroke="{{A.top.stroke}}" stroke-width="{{A.top.sw}}" stroke-linecap="round" stroke-linejoin="round"></path><path d="{{A.top.d3}}" fill="{{A.top.fill3}}"></path></svg>
+</section>
+</div>
+
+<section aria-label="Students" style="position: relative; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 26px 18px 16px; {{B.outer}}">
+<div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px"><h2 style="margin: 0; font-family: Fredoka, Nunito, sans-serif; font-size: 21px">Students</h2><span style="font-size: 14px; color: {{t.muted}}; font-weight: 600">24 here</span></div>
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 14px 10px">
+<sc-for list="{{students}}" as="s" hint-placeholder-count="24">
+<button style="position: relative; box-sizing: border-box; padding: 8px 2px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; color: {{t.text}}; {{C.card}} {{s.ring}}">
+<svg aria-hidden="true" viewBox="{{C.top.vb}}" preserveAspectRatio="none" style="{{C.top.style}}"><path d="{{C.top.d}}" fill="{{C.top.fill}}"></path><path d="{{C.top.d2}}" fill="none" stroke="{{C.top.stroke}}" stroke-width="{{C.top.sw}}"></path></svg>
+<svg aria-hidden="true" viewBox="0 0 64 64" style="width: {{av}}px; height: {{av}}px"><path d="{{s.ears}}" fill="{{s.color}}"></path><circle cx="32" cy="36" r="22" fill="{{s.color}}"></circle><circle cx="24" cy="34" r="3" fill="#1d2033"></circle><circle cx="40" cy="34" r="3" fill="#1d2033"></circle><path d="M26 43 Q32 48 38 43" fill="none" stroke="#1d2033" stroke-width="2.4" stroke-linecap="round"></path></svg>
+<span style="font-size: 16px; font-weight: 800">{{s.name}}</span>
+</button>
+</sc-for>
+</div>
+<svg aria-hidden="true" viewBox="{{B.top.vb}}" preserveAspectRatio="none" style="{{B.top.style}}"><path d="{{B.top.d}}" fill="{{B.top.fill}}"></path><path d="{{B.top.d2}}" fill="none" stroke="{{B.top.stroke}}" stroke-width="{{B.top.sw}}" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</section>
+
+<div style="display: flex; flex-direction: column; gap: 18px; min-height: 0">
+<section aria-label="Class jobs" style="flex: 1; min-height: 0; position: relative; box-sizing: border-box; padding: 26px 18px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; {{B.outer}}">
+<h2 style="margin: 0 0 2px; font-family: Fredoka, Nunito, sans-serif; font-size: 21px">Class jobs</h2>
+<div style="display: flex; justify-content: space-between; border-bottom: 2px dashed {{t.border}}; padding-bottom: 6px"><span style="color: {{t.muted}}">Line leader</span><strong>Ela</strong></div>
+<div style="display: flex; justify-content: space-between; border-bottom: 2px dashed {{t.border}}; padding-bottom: 6px"><span style="color: {{t.muted}}">Plant helper</span><strong>Mert</strong></div>
+<div style="display: flex; justify-content: space-between; border-bottom: 2px dashed {{t.border}}; padding-bottom: 6px"><span style="color: {{t.muted}}">Board monitor</span><strong>Nil</strong></div>
+<div style="display: flex; justify-content: space-between"><span style="color: {{t.muted}}">Door holder</span><strong>Hugo</strong></div>
+<svg aria-hidden="true" viewBox="{{B.top.vb}}" preserveAspectRatio="none" style="{{B.top.style}}"><path d="{{B.top.d}}" fill="{{B.top.fill}}"></path><path d="{{B.top.d2}}" fill="none" stroke="{{B.top.stroke}}" stroke-width="{{B.top.sw}}" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</section>
+<section aria-label="Class goal" style="flex: 0.8; min-height: 0; position: relative; box-sizing: border-box; padding: 26px 18px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; {{B.outer}}">
+<h2 style="margin: 0; font-family: Fredoka, Nunito, sans-serif; font-size: 21px">Class goal</h2>
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="font-family: Fredoka, Nunito, sans-serif; font-size: 38px; font-weight: 600; line-height: 1">34</span><span style="color: {{t.muted}}">of 50 {{goalUnit}}</span></div>
+<div style="height: 14px; border-radius: 7px; background: {{t.soft2}}; border: 2px solid {{t.border}}; overflow: hidden"><div style="width: 68%; height: 100%; background: {{t.success}}"></div></div>
+<svg aria-hidden="true" viewBox="{{B.top.vb}}" preserveAspectRatio="none" style="{{B.top.style}}"><path d="{{B.top.d}}" fill="{{B.top.fill}}"></path><path d="{{B.top.d2}}" fill="none" stroke="{{B.top.stroke}}" stroke-width="{{B.top.sw}}" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</section>
+</div>
+</div>
+
+<nav aria-label="Classroom tools" style="flex: none; align-self: center; height: 68px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 14px; position: relative; {{B.outer}}">
+<button style="height: 50px; padding: 0 18px; border-radius: 12px; border: none; background: {{t.accent}}; color: #ffffff; font: inherit; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 20px; height: 20px" fill="#ffffff"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>End lesson</button>
+<button style="height: 50px; padding: 0 16px; border-radius: 12px; border: 2px solid {{t.border}}; background: {{t.surface}}; color: {{t.text}}; font: inherit; font-size: 16px; font-weight: 700">Pick a student</button>
+<button style="height: 50px; padding: 0 16px; border-radius: 12px; border: 2px solid {{t.border}}; background: {{t.surface}}; color: {{t.text}}; font: inherit; font-size: 16px; font-weight: 700">Timer</button>
+<button style="height: 50px; padding: 0 16px; border-radius: 12px; border: 2px solid {{t.border}}; background: {{t.surface}}; color: {{t.text}}; font: inherit; font-size: 16px; font-weight: 700">Groups</button>
+<button style="height: 50px; padding: 0 16px; border-radius: 12px; border: 2px solid {{t.border}}; background: {{t.surface}}; color: {{t.text}}; font: inherit; font-size: 16px; font-weight: 700">Celebrate</button>
+</nav>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["snow","explorer","animals","classroom"],"default":"snow"},"full":{"editor":"boolean","default":false},"focused":{"editor":"int","default":3,"min":0,"max":23},"$preview":{"width":1536,"height":703}}'>
+class Component extends DCLogic {
+renderVals() {
+const key = this.props.theme ?? 'snow';
+const full = this.props.full ?? false;
+const focused = this.props.focused ?? 3;
+const T = {
+snow: { bg: '#cce8f9', surface: '#fffcf7', text: '#14182b', muted: '#45574a', border: '#98b5ce', accent: '#a51e48', accentSoft: '#ffe5ee', accentStrong: '#801237', focus: '#b0470c', soft2: '#e1f5eb', success: '#17733f', shadow: 'rgba(41,77,119,.27)', r: 26, rs: 14 },
+explorer: { bg: '#f4efe3', surface: '#fffaf0', text: '#2b2618', muted: '#4f4a3d', border: '#cdbf9f', accent: '#1f6f5c', accentSoft: '#d7ece5', accentStrong: '#17574a', focus: '#a8480f', soft2: '#efe4cc', success: '#1f6f5c', shadow: 'rgba(79,74,61,.2)', r: 12, rs: 8 },
+animals: { bg: '#f2f7ef', surface: '#ffffff', text: '#1f2a1c', muted: '#45574a', border: '#c4d8b8', accent: '#7a35a6', accentSoft: '#efe2f7', accentStrong: '#5e2585', focus: '#b0470c', soft2: '#e3f0dc', success: '#3f7a2c', shadow: 'rgba(63,90,50,.18)', r: 22, rs: 14 },
+classroom: { bg: '#f7f8fc', surface: '#ffffff', text: '#1d2033', muted: '#4a5068', border: '#c9d0e6', accent: '#2f5bd3', accentSoft: '#e3eafb', accentStrong: '#2348a8', focus: '#b25e00', soft2: '#eef1fb', success: '#2f7a4a', shadow: 'rgba(47,91,211,.14)', r: 16, rs: 10 }
+};
+const t = T[key];
+// shared paths
+const DRIFT = 'M0 42 V24 C10 22 14 12 30 13 C44 4 62 8 72 14 C86 6 104 4 116 13 C132 5 150 7 160 15 C176 6 194 6 206 14 C220 5 240 6 250 14 C266 4 286 7 296 15 C310 6 330 6 342 13 C356 5 378 8 388 15 C396 16 400 20 400 26 V42 C392 38 386 44 378 40 C360 44 350 38 330 41 C300 36 280 44 250 40 C220 44 200 37 170 41 C140 44 120 38 90 41 C60 44 40 38 20 41 C10 44 4 40 0 42Z';
+const DRIFT_SM = 'M0 30 V18 C8 14 14 8 26 10 C38 3 52 6 60 11 C72 4 88 4 96 11 C108 4 124 5 132 11 C142 8 150 12 150 18 V30 C140 26 132 30 120 27 C100 30 90 25 70 28 C50 30 36 25 20 28 C10 30 4 27 0 30Z';
+let tornLine = 'M0 8'; for (let x = 12, i = 0; x <= 400; x += 14, i++) tornLine += ' L' + x + ' ' + [4, 9, 3, 8, 2, 7][i % 6];
+const tornFill = tornLine + ' L400 20 L0 20Z';
+let scal = 'M0 16'; for (let i = 0; i < 10; i++) scal += ' a10 10 0 0 1 20 0';
+let leaves = ''; let flowers = '';
+for (let i = 0; i < 9; i++) { const x = 20 + i * 45; const y = 10 + Math.round(12 * Math.sin((x / 400) * Math.PI * 2 - 1.2) + 10); leaves += ' M' + x + ' ' + y + ' q9 -12 18 -2 q-9 10 -18 2z'; if (i % 2 === 0) flowers += ' M' + (x + 22) + ' ' + (y + 4) + ' a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0'; }
+const pos = (l, tp, w, h) => 'position: absolute; pointer-events: none; left: ' + l + '; top: ' + tp + '; width: ' + w + '; height: ' + h;
+const none = { vb: '0 0 10 10', style: 'display: none', d: '', fill: 'none', d2: '', stroke: 'none', sw: 0, d3: '', fill3: 'none' };
+const plainOuter = 'border-radius: ' + t.r + 'px; background: ' + t.surface + '; border: 2px solid ' + t.border + '; box-shadow: 0 6px 18px ' + t.shadow;
+const F = {
+snow: {
+A: { outer: 'border-radius: ' + t.r + 'px; padding: 8px; background: repeating-linear-gradient(135deg, #a51e48 0 12px, #fffcf7 12px 24px); box-shadow: 0 6px 18px ' + t.shadow, inner: 'background: #fffcf7; border-radius: ' + (t.r - 7) + 'px',
+top: { vb: '0 0 400 46', style: pos('-8px', '-18px', 'calc(100% + 16px)', '38px'), d: DRIFT, fill: '#ffffff', d2: DRIFT, stroke: '#cfe2f1', sw: 1.5, d3: '', fill3: 'none' } },
+B: { outer: plainOuter, top: { vb: '0 0 400 46', style: pos('-8px', '-18px', 'calc(100% + 16px)', '38px'), d: DRIFT, fill: '#ffffff', d2: DRIFT, stroke: '#cfe2f1', sw: 1.5 } },
+C: { card: 'background: #fffcf7; border: 2px solid #98b5ce; border-radius: 14px;', top: { vb: '0 0 150 30', style: pos('-3px', '-9px', 'calc(100% + 6px)', '18px'), d: DRIFT_SM, fill: '#ffffff', d2: DRIFT_SM, stroke: '#cfe2f1', sw: 1.2 } },
+K: { style: pos('-6px', 'calc(100% - 34px)', '40px', '40px'), d: '', fill: 'none', stroke: 'none', d2: 'M4 36 L20 20 M4 36 L30 34 M4 36 L6 10 M12 28 l-4 -6 M12 28 l6 2 M20 34 l-2 -6', stroke2: '#ffffff' }
+},
+explorer: {
+A: { outer: plainOuter + ', 0 3px 0 ' + t.border + '; padding: 0', inner: 'margin: 7px; border: 3px dashed #c8642c; border-radius: 8px; background: #fffaf0',
+top: { vb: '0 0 400 20', style: pos('14px', '-8px', 'calc(100% - 28px)', '14px'), d: tornFill, fill: '#fffaf0', d2: tornLine, stroke: '#cdbf9f', sw: 2, d3: '', fill3: 'none' } },
+B: { outer: plainOuter + ', 0 3px 0 ' + t.border, top: { vb: '0 0 400 20', style: pos('14px', '-8px', 'calc(100% - 28px)', '14px'), d: tornFill, fill: '#fffaf0', d2: tornLine, stroke: '#cdbf9f', sw: 2 } },
+C: { card: 'background: #fffaf0; border: 2px solid #cdbf9f; border-radius: 8px; box-shadow: 0 2px 0 #cdbf9f;', top: { vb: '0 0 400 20', style: pos('8px', '-5px', 'calc(100% - 16px)', '9px'), d: tornFill, fill: '#fffaf0', d2: tornLine, stroke: '#cdbf9f', sw: 2 } },
+K: { style: pos('calc(100% - 30px)', '-12px', '40px', '40px'), d: 'M20 2 L24 16 L38 20 L24 24 L20 38 L16 24 L2 20 L16 16Z', fill: '#c8642c', stroke: '#4f4a3d', d2: '', stroke2: 'none' }
+},
+animals: {
+A: { outer: plainOuter + '; padding: 0', inner: 'border-radius: ' + (t.r - 2) + 'px; background: #ffffff',
+top: { vb: '0 0 400 46', style: pos('-6px', '-16px', 'calc(100% + 12px)', '36px'), d: leaves, fill: '#5f9b45', d2: 'M0 14 C100 40 200 0 300 30 C340 40 380 20 400 14', stroke: '#3f7a2c', sw: 3, d3: flowers, fill3: '#ef8a3c' } },
+B: { outer: plainOuter, top: none },
+C: { card: 'background: #ffffff; border: 2px solid #c4d8b8; border-radius: 16px;', top: none },
+K: { style: pos('-12px', '-14px', '40px', '40px'), d: 'M4 30 C4 12 16 4 34 4 C34 22 22 30 4 30Z', fill: '#5f9b45', stroke: '#3f7a2c', d2: 'M7 27 L28 8', stroke2: '#3f7a2c' }
+},
+classroom: {
+A: { outer: plainOuter + '; padding: 0', inner: 'border-radius: ' + (t.r - 2) + 'px; background: #ffffff',
+top: { vb: '0 0 400 30', style: pos('18px', '-14px', 'calc(100% - 36px)', '26px'), d: 'M20 6 H360 L398 15 L360 24 H20Z', fill: '#ffd166', d2: 'M20 6 H360 L398 15 L360 24 H20Z M360 6 V24 M20 15 H360 M386 12 L398 15 L386 18', stroke: '#8a6a1f', sw: 2, d3: 'M2 6 H20 V24 H2Z', fill3: '#f19bb5' } },
+B: { outer: plainOuter, top: { vb: '0 0 200 16', style: pos('18px', '-9px', 'calc(100% - 36px)', '15px'), d: scal, fill: '#ffffff', d2: scal, stroke: '#c9d0e6', sw: 2 } },
+C: { card: 'background: #ffffff; border: 2px solid #c9d0e6; border-radius: 12px;', top: { vb: '0 0 200 16', style: pos('10px', '-6px', 'calc(100% - 20px)', '10px'), d: scal, fill: '#ffffff', d2: scal, stroke: '#c9d0e6', sw: 2 } },
+K: { style: pos('calc(100% - 28px)', '-14px', '40px', '40px'), d: 'M20 2 l5 12 13 1 -10 8 3 13 -11 -7 -11 7 3 -13 -10 -8 13 -1z', fill: '#ffd166', stroke: '#8a6a1f', d2: '', stroke2: 'none' }
+}
+}[key];
+const A = Object.assign({}, F.A, { top: Object.assign({}, none, F.A.top) });
+const B = Object.assign({}, F.B, { top: Object.assign({}, none, F.B.top) });
+const C = Object.assign({}, F.C, { top: Object.assign({}, none, F.C.top) });
+const particles = [];
+const H = full ? 864 : 703;
+if (key === 'snow') for (let i = 0; i < 46; i++) { const s = [3, 5, 7, 4, 9][i % 5]; particles.push({ style: 'position: absolute; left: ' + ((i * 131) % 1536) + 'px; top: ' + ((i * 173) % H) + 'px; width: ' + s + 'px; height: ' + s + 'px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 2px rgba(41,77,119,.35)' }); }
+if (key === 'animals') for (let i = 0; i < 16; i++) { const c = ['#5f9b45', '#ef8a3c', '#c8642c', '#7fb36a'][i % 4]; particles.push({ style: 'position: absolute; left: ' + ((i * 197) % 1536) + 'px; top: ' + ((i * 151) % H) + 'px; width: 16px; height: 10px; border-radius: 0 80% 0 80%; background: ' + c + '; transform: rotate(' + ((i * 47) % 360) + 'deg); opacity: .85' }); }
+const names = ['Ada','Bora','Cem','Defne','Ela','Ferhat','Gizem','Hugo','Ines','Jale','Kerem','Lina','Mert','Nil','Oscar','Pelin','Rüya','Sami','Tara','Umut','Vera','Yusuf','Zeynep','Aras'];
+const colors = ['#d9483b','#3b7dd8','#4caf6a','#8a5cc2','#e8833a','#2a9d8f','#e46aa6','#2c3e7a','#8d5b3e','#f2c94c','#8fd6c0','#8a93a6'];
+const ears = ['M14 22 L18 4 L28 16 Z M50 22 L46 4 L36 16 Z','M12 20 a8 8 0 1 1 12 -6 Z M52 20 a8 8 0 1 0 -12 -6 Z','M20 18 C16 2 22 -2 26 16 Z M44 18 C48 2 42 -2 38 16 Z'];
+const students = names.map((name, i) => ({ name, color: colors[i % colors.length], ears: ears[i % 3], ring: i === focused ? 'outline: 4px solid ' + t.focus + '; outline-offset: 3px; z-index: 2;' : '' }));
+return {
+t, A, B, C, K: F.K, particles, students, full, windowed: !full, h: H, av: full ? 58 : 46,
+goalUnit: { snow: 'snowflakes', explorer: 'map pins', animals: 'acorns', classroom: 'stars' }[key],
+is: { snow: key === 'snow', explorer: key === 'explorer', animals: key === 'animals', classroom: key === 'classroom' }
+};
+}
+}
+</script>
+</body>
+</html>

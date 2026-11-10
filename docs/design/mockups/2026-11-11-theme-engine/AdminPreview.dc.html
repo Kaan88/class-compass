@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, Themes preview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&amp;family=Nunito:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f4f6f9}
+a{color:#2457a6}a:hover{color:#163d7a}
+button:focus-visible,a:focus-visible{outline:3px solid #b0470c;outline-offset:2px}
+.pf{position:absolute;top:-10px;border-radius:50%;background:#ffffff;box-shadow:0 0 2px rgba(41,77,119,.4);animation:pfall 7s linear infinite}
+.pf.still{animation:none}
+@keyframes pfall{0%{transform:translate(0,0)}100%{transform:translate(8px,360px)}}
+@media (prefers-reduced-motion: reduce){.pf{animation:none}}
+</style>
+</helmet>
+<div style="min-height: 1040px; box-sizing: border-box; background: #f4f6f9; font-family: Nunito, system-ui, sans-serif; color: #1d2033; display: flex; flex-wrap: wrap; align-items: flex-start">
+
+<nav aria-label="Admin" style="flex: 1 1 220px; max-width: 260px; box-sizing: border-box; padding: 28px 18px; display: flex; flex-direction: column; gap: 4px">
+<strong style="font-size: 18px; padding: 0 12px 14px">Administration</strong>
+<a href="#" style="padding: 10px 12px; border-radius: 10px; text-decoration: none; color: #1d2033">School</a>
+<a href="#" style="padding: 10px 12px; border-radius: 10px; text-decoration: none; color: #1d2033">People</a>
+<a href="#" style="padding: 10px 12px; border-radius: 10px; text-decoration: none; color: #1d2033">Import</a>
+<a href="#" style="padding: 10px 12px; border-radius: 10px; text-decoration: none; color: #1d2033">Modules</a>
+<a href="#" aria-current="page" style="padding: 10px 12px; border-radius: 10px; text-decoration: none; color: #1d2033; background: #e3ebf7; font-weight: 800">Themes</a>
+<a href="#" style="padding: 10px 12px; border-radius: 10px; text-decoration: none; color: #1d2033">AI tools</a>
+<a href="#" style="padding: 10px 12px; border-radius: 10px; text-decoration: none; color: #1d2033">Maintenance</a>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 28px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1180px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<h1 style="margin: 0; font-size: 30px; font-weight: 800">Peppermint Parade: Snow Day</h1>
+<span style="font-size: 14px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #fff1d1; color: #6e3f00; border: 1px solid #8a5100">Imported · not enabled</span>
+<div style="flex: 1"></div>
+<button style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #9aa6b8; background: #ffffff; font: inherit; font-weight: 700; color: #1d2033">Export package</button>
+<button style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #b3261e; background: #ffffff; font: inherit; font-weight: 700; color: #b3261e">Delete</button>
+<button style="min-height: 44px; padding: 0 18px; border-radius: 10px; border: none; background: #2457a6; font: inherit; font-weight: 800; color: #ffffff">Enable for classes…</button>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<!-- PREVIEW -->
+<section aria-label="Preview" style="flex: 1 1 520px; min-width: 0; background: #ffffff; border: 1px solid #d5dbe5; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+<h2 style="margin: 0; font-size: 20px">Classroom preview</h2>
+<div style="flex: 1"></div>
+<div role="group" aria-label="Motion" style="display: flex; border: 1px solid #9aa6b8; border-radius: 10px; overflow: hidden">
+<button aria-pressed="{{motionOn}}" onClick="{{setOn}}" style="min-height: 44px; padding: 0 16px; border: none; font: inherit; font-weight: 700; {{onStyle}}">Motion on</button>
+<button aria-pressed="{{motionOff}}" onClick="{{setOff}}" style="min-height: 44px; padding: 0 16px; border: none; border-left: 1px solid #9aa6b8; font: inherit; font-weight: 700; {{offStyle}}">Motion off</button>
+</div>
+</div>
+
+<div style="position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #cce8f9; font-family: Nunito, system-ui, sans-serif; color: #14182b">
+<svg aria-hidden="true" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMax slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<rect width="1920" height="1080" fill="#cfe6fa"></rect>
+<path d="M0 700 C220 620 420 660 600 640 C820 610 980 680 1180 650 C1380 620 1560 600 1920 670 V1080 H0Z" fill="#e3effa"></path>
+<path d="M0 820 C260 760 520 800 760 780 C1000 760 1180 820 1440 790 C1640 770 1800 760 1920 790 V1080 H0Z" fill="#ffffff"></path>
+<path d="M60 900 l50 -150 l50 150z" fill="#148362"></path><path d="M1760 880 l56 -170 l56 170z" fill="#148362"></path><path d="M1784 780 l32 -70 l32 70 q-32 -14 -64 0z" fill="#ffffff"></path>
+<rect x="190" y="860" width="170" height="120" rx="6" fill="#fffcf7"></rect><path d="M172 870 L275 790 L378 870 Z" fill="#a51e48"></path><path d="M200 852 L275 794 L350 852 C330 846 316 856 296 848 C276 858 258 846 238 854 C222 846 212 856 200 852Z" fill="#ffffff"></path><rect x="212" y="892" width="40" height="36" rx="4" fill="#ffcb48"></rect><rect x="298" y="892" width="40" height="36" rx="4" fill="#ffcb48"></rect>
+<rect x="1500" y="870" width="150" height="110" rx="6" fill="#fffcf7"></rect><path d="M1484 878 L1575 806 L1666 878 Z" fill="#148362"></path><rect x="1520" y="900" width="36" height="34" rx="4" fill="#ffcb48"></rect>
+</svg>
+<div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none">
+<sc-for list="{{flakes}}" as="f" hint-placeholder-count="24"><div class="pf {{f.cls}}" style="left: {{f.x}}%; top: {{f.y}}%; width: {{f.s}}px; height: {{f.s}}px; animation-delay: {{f.delay}}s"></div></sc-for>
+</div>
+<div style="position: absolute; left: 3%; top: 6%; width: 28%; height: 52%; box-sizing: border-box; border-radius: 16px; padding: 5px; background: repeating-linear-gradient(135deg, #a51e48 0 8px, #fffcf7 8px 16px)"><div style="height: 100%; box-sizing: border-box; background: #fffcf7; border-radius: 12px; padding: 16px 10px 8px; font-size: 13px"><strong style="font-family: Fredoka, Nunito, sans-serif; font-size: 15px">Today</strong><div style="margin-top: 6px; font-weight: 800; background: #ffe5ee; border: 2px solid #a51e48; border-radius: 8px; padding: 3px 6px">Reading · Now</div><div style="margin-top: 5px">Maths</div><div style="margin-top: 5px">Snow play break</div></div>
+<svg aria-hidden="true" viewBox="0 0 400 46" preserveAspectRatio="none" style="position: absolute; left: -4px; top: -10px; width: calc(100% + 8px); height: 22px"><path d="M0 42 V24 C10 22 14 12 30 13 C44 4 62 8 72 14 C86 6 104 4 116 13 C132 5 150 7 160 15 C176 6 194 6 206 14 C220 5 240 6 250 14 C266 4 286 7 296 15 C310 6 330 6 342 13 C356 5 378 8 388 15 C396 16 400 20 400 26 V42 C392 38 386 44 378 40 C360 44 350 38 330 41 C300 36 280 44 250 40 C220 44 200 37 170 41 C140 44 120 38 90 41 C60 44 40 38 20 41 C10 44 4 40 0 42Z" fill="#ffffff" stroke="#cfe2f1" stroke-width="1.5"></path></svg>
+</div>
+<div style="position: absolute; left: 34%; top: 6%; width: 63%; height: 70%; box-sizing: border-box; background: #fffcf7; border: 2px solid #98b5ce; border-radius: 16px; padding: 16px 10px 8px">
+<strong style="font-family: Fredoka, Nunito, sans-serif; font-size: 15px">Students</strong>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 8px; margin-top: 10px">
+<sc-for list="{{students}}" as="s" hint-placeholder-count="8">
+<div style="position: relative; height: 54px; box-sizing: border-box; border: 2px solid #98b5ce; border-radius: 10px; background: #fffcf7; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 3px; font-size: 12px; font-weight: 800">
+<svg aria-hidden="true" viewBox="0 0 150 30" preserveAspectRatio="none" style="position: absolute; left: -3px; top: -7px; width: calc(100% + 6px); height: 12px"><path d="M0 30 V18 C8 14 14 8 26 10 C38 3 52 6 60 11 C72 4 88 4 96 11 C108 4 124 5 132 11 C142 8 150 12 150 18 V30 C140 26 132 30 120 27 C100 30 90 25 70 28 C50 30 36 25 20 28 C10 30 4 27 0 30Z" fill="#ffffff" stroke="#cfe2f1" stroke-width="1.2"></path></svg>
+<span style="width: 24px; height: 24px; border-radius: 50%; background: {{s.color}}"></span>{{s.name}}</div>
+</sc-for>
+</div>
+<svg aria-hidden="true" viewBox="0 0 400 46" preserveAspectRatio="none" style="position: absolute; left: -5px; top: -11px; width: calc(100% + 10px); height: 24px"><path d="M0 42 V24 C10 22 14 12 30 13 C44 4 62 8 72 14 C86 6 104 4 116 13 C132 5 150 7 160 15 C176 6 194 6 206 14 C220 5 240 6 250 14 C266 4 286 7 296 15 C310 6 330 6 342 13 C356 5 378 8 388 15 C396 16 400 20 400 26 V42 C392 38 386 44 378 40 C360 44 350 38 330 41 C300 36 280 44 250 40 C220 44 200 37 170 41 C140 44 120 38 90 41 C60 44 40 38 20 41 C10 44 4 40 0 42Z" fill="#ffffff" stroke="#cfe2f1" stroke-width="1"></path></svg>
+</div>
+<div style="position: absolute; left: 30%; bottom: 5%; width: 40%; height: 12%; box-sizing: border-box; background: #fffcf7; border: 2px solid #98b5ce; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; font-weight: 800"><span style="background: #a51e48; color: #ffffff; padding: 4px 8px; border-radius: 8px">Next lesson</span><span style="border: 1px solid #98b5ce; padding: 3px 7px; border-radius: 8px">Pick</span><span style="border: 1px solid #98b5ce; padding: 3px 7px; border-radius: 8px">Timer</span></div>
+</div>
+<p style="margin: 0; font-size: 14px; color: #4a5568">{{previewNote}}</p>
+
+<h3 style="margin: 6px 0 0; font-size: 17px">Checks</h3>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 15px">
+<li style="display: flex; gap: 8px"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 20px; height: 20px; flex: none" fill="none" stroke="#17733f" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5 9-10"></path></svg>Text and surfaces: all pairs ≥ 4.5:1 (lowest: muted on surface-2, 6.1:1)</li>
+<li style="display: flex; gap: 8px"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 20px; height: 20px; flex: none" fill="none" stroke="#17733f" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5 9-10"></path></svg>Focus ring on surface and on snow: ≥ 3:1</li>
+<li style="display: flex; gap: 8px"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 20px; height: 20px; flex: none" fill="none" stroke="#17733f" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5 9-10"></path></svg>Scene: 3 layers, 41 KB, 1,120 shapes (limit 60 KB, 1,500 per layer)</li>
+<li style="display: flex; gap: 8px"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 20px; height: 20px; flex: none" fill="none" stroke="#8a5100" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"></path><circle cx="12" cy="12" r="10"></circle></svg>Note: the scene-scrim token is unset; headings on the page background get the default scrim.</li>
+</ul>
+</section>
+
+<!-- SETTINGS BLOCKS -->
+<div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<section aria-label="Scene" style="background: #ffffff; border: 1px solid #d5dbe5; border-radius: 16px; padding: 16px 18px">
+<h2 style="margin: 0 0 10px; font-size: 18px">Scene</h2>
+<dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px">
+<dt style="color: #4a5568">Layers</dt><dd style="margin: 0">Far hills · Fir trees · Village</dd>
+<dt style="color: #4a5568">Fit, anchor</dt><dd style="margin: 0">Cover, bottom</dd>
+<dt style="color: #4a5568">Opacity</dt><dd style="margin: 0">1</dd>
+<dt style="color: #4a5568">Small screens</dt><dd style="margin: 0">Village strip at the bottom</dd>
+</dl>
+</section>
+<section aria-label="Frames" style="background: #ffffff; border: 1px solid #d5dbe5; border-radius: 16px; padding: 16px 18px">
+<h2 style="margin: 0 0 10px; font-size: 18px">Frames</h2>
+<dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px">
+<dt style="color: #4a5568">Edge</dt><dd style="margin: 0">Snow drift</dd>
+<dt style="color: #4a5568">Trim</dt><dd style="margin: 0">Candy stripe (Today, Timer)</dd>
+<dt style="color: #4a5568">Corners</dt><dd style="margin: 0">Frost</dd>
+<dt style="color: #4a5568">Applies to</dt><dd style="margin: 0; display: flex; flex-wrap: wrap; gap: 6px"><span style="padding: 2px 8px; border-radius: 999px; background: #e3ebf7; font-size: 13px">Board boxes</span><span style="padding: 2px 8px; border-radius: 999px; background: #e3ebf7; font-size: 13px">Student cards</span><span style="padding: 2px 8px; border-radius: 999px; background: #e3ebf7; font-size: 13px">Top bar</span></dd>
+</dl>
+</section>
+<section aria-label="Ambient" style="background: #ffffff; border: 1px solid #d5dbe5; border-radius: 16px; padding: 16px 18px">
+<h2 style="margin: 0 0 10px; font-size: 18px">Ambient</h2>
+<dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px">
+<dt style="color: #4a5568">Preset</dt><dd style="margin: 0">Snowfall</dd>
+<dt style="color: #4a5568">Density, speed</dt><dd style="margin: 0">60 flakes, slow, mixed sizes</dd>
+<dt style="color: #4a5568">When motion is off</dt><dd style="margin: 0">One still frame of snow</dd>
+</dl>
+</section>
+<section aria-label="Sets" style="background: #ffffff; border: 1px solid #d5dbe5; border-radius: 16px; padding: 16px 18px">
+<h2 style="margin: 0 0 10px; font-size: 18px">Sets</h2>
+<dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px">
+<dt style="color: #4a5568">Achievement frame</dt><dd style="margin: 0">Snowflake</dd>
+<dt style="color: #4a5568">Avatars first</dt><dd style="margin: 0">Animals, Mythical</dd>
+<dt style="color: #4a5568">Mascot</dt><dd style="margin: 0">Jingle the Reindeer (from the package), used in every picture</dd>
+</dl>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = { motion: true }; }
+renderVals() {
+const on = this.state.motion;
+const sel = 'background: #2457a6; color: #ffffff';
+const unsel = 'background: #ffffff; color: #1d2033';
+const flakes = [];
+for (let i = 0; i < 30; i++) flakes.push({ x: (i * 37) % 100, y: on ? -3 : (i * 53) % 95, s: [3, 4, 6, 5][i % 4], delay: -((i * 0.83) % 7).toFixed(2), cls: on ? '' : 'still' });
+const names = ['Ada','Bora','Cem','Defne','Ela','Ferhat','Gizem','Hugo'];
+const colors = ['#d9483b','#3b7dd8','#4caf6a','#8a5cc2','#e8833a','#2a9d8f','#e46aa6','#2c3e7a'];
+return {
+flakes, students: names.map((name, i) => ({ name, color: colors[i] })),
+motionOn: on ? 'true' : 'false', motionOff: on ? 'false' : 'true',
+onStyle: on ? sel : unsel, offStyle: on ? unsel : sel,
+setOn: () => this.setState({ motion: true }), setOff: () => this.setState({ motion: false }),
+previewNote: on ? 'Motion on: snow falls slowly behind the boxes. It stops by itself when the class animation switch is off or the device asks for reduced motion.' : 'Motion off: the same snow, standing still. Nothing moves.'
+};
+}
+}
+</script>
+</body>
+</html>

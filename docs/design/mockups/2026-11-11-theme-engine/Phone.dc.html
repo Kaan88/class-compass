@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone, Snow Day</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&amp;family=Nunito:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#a51e48}a:hover{color:#801237}
+.cc-btn:focus-visible{outline:3px solid #b0470c;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: Nunito, system-ui, sans-serif; color: #14182b; background: #cce8f9">
+
+<!-- SCENE, smallScreens: bottomStrip — only the village layer, 120 px high, anchored bottom -->
+<svg aria-hidden="true" viewBox="0 0 390 130" preserveAspectRatio="xMidYMax slice" style="position: absolute; left: 0; bottom: 0; width: 390px; height: 130px">
+<path d="M0 40 C80 24 160 36 230 30 C300 24 350 30 390 34 V130 H0Z" fill="#e3effa"></path>
+<path d="M0 70 C90 56 180 66 260 60 C320 56 360 62 390 64 V130 H0Z" fill="#ffffff"></path>
+<path d="M14 92 l18 -54 l18 54z" fill="#148362"></path><path d="M24 58 l8 -20 l8 20 q-8 -5 -16 0z" fill="#ffffff"></path>
+<rect x="66" y="74" width="74" height="50" rx="4" fill="#fffcf7"></rect><path d="M58 78 L103 42 L148 78 Z" fill="#a51e48"></path><path d="M70 72 L103 46 L136 72 C126 68 118 74 108 70 C98 76 90 68 80 73Z" fill="#ffffff"></path><rect x="76" y="88" width="18" height="16" rx="3" fill="#ffcb48"></rect><rect x="112" y="88" width="18" height="16" rx="3" fill="#ffcb48"></rect>
+<rect x="250" y="80" width="64" height="44" rx="4" fill="#fffcf7"></rect><path d="M242 84 L282 52 L322 84 Z" fill="#175891"></path><path d="M252 78 L282 56 L312 78 C302 74 294 79 286 75 C276 80 266 74 252 78Z" fill="#ffffff"></path><rect x="262" y="92" width="16" height="14" rx="3" fill="#ffcb48"></rect><rect x="288" y="92" width="16" height="14" rx="3" fill="#ffcb48"></rect>
+<path d="M340 96 l22 -66 l22 66z" fill="#148362"></path><path d="M352 52 l10 -22 l10 22 q-10 -5 -20 0z" fill="#ffffff"></path>
+<path d="M32 50 C90 80 180 70 250 64 C300 60 330 50 362 40" fill="none" stroke="#45574a" stroke-width="1.5"></path>
+<circle cx="60" cy="62" r="4" fill="#ffcb48"></circle><circle cx="160" cy="70" r="4" fill="#e22a60"></circle><circle cx="210" cy="67" r="4" fill="#7950cf"></circle><circle cx="300" cy="58" r="4" fill="#ffcb48"></circle><circle cx="340" cy="46" r="4" fill="#e22a60"></circle>
+<path d="M0 116 C120 106 250 120 390 110 V130 H0Z" fill="#ffffff"></path>
+</svg>
+
+<!-- static flakes (fewer on phones) -->
+<div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none">
+<sc-for list="{{flakes}}" as="f" hint-placeholder-count="14"><div style="position: absolute; left: {{f.x}}px; top: {{f.y}}px; width: {{f.s}}px; height: {{f.s}}px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 2px rgba(41,77,119,.35)"></div></sc-for>
+</div>
+
+<header style="position: absolute; left: 12px; top: 12px; width: 366px; height: 60px; box-sizing: border-box; background: #fffcf7; border: 2px solid #98b5ce; border-radius: 20px; display: flex; align-items: center; gap: 10px; padding: 0 14px">
+<svg aria-hidden="true" viewBox="0 0 100 100" style="width: 38px; height: 38px"><path d="M33 36Q24 28 17 15 M67 36Q76 28 83 15" fill="none" stroke="#14182b" stroke-width="5" stroke-linecap="round"></path><ellipse cx="50" cy="55" rx="26" ry="27" fill="#bf754e"></ellipse><ellipse cx="50" cy="66" rx="16" ry="12" fill="#fff1d9"></ellipse><circle cx="39" cy="52" r="3.5" fill="#14182b"></circle><circle cx="61" cy="52" r="3.5" fill="#14182b"></circle><ellipse cx="50" cy="61" rx="6" ry="4" fill="#e22a60"></ellipse></svg>
+<span style="font-family: Fredoka, Nunito, sans-serif; font-weight: 700; font-size: 21px">Class 3B</span>
+<span style="margin-left: auto; font-size: 15px; font-weight: 700; color: #45574a">09:52</span>
+</header>
+
+<!-- simple frame: snow cap only, no trim -->
+<section aria-label="Now" style="position: absolute; left: 12px; top: 92px; width: 366px; box-sizing: border-box; background: #fffcf7; border: 2px solid #98b5ce; border-radius: 20px; padding: 20px 16px 14px">
+<svg aria-hidden="true" viewBox="0 0 150 30" preserveAspectRatio="none" style="position: absolute; left: -4px; top: -11px; width: 374px; height: 20px"><path d="M0 30 V18 C8 14 14 8 26 10 C38 3 52 6 60 11 C72 4 88 4 96 11 C108 4 124 5 132 11 C142 8 150 12 150 18 V30 C140 26 132 30 120 27 C100 30 90 25 70 28 C50 30 36 25 20 28 C10 30 4 27 0 30Z" fill="#ffffff" stroke="#cfe2f1" stroke-width="0.8"></path></svg>
+<div style="display: flex; align-items: center; gap: 10px"><svg aria-hidden="true" viewBox="0 0 24 24" style="width: 22px; height: 22px" fill="#a51e48"><path d="M7 5l12 7-12 7z"></path></svg><strong style="font-size: 19px">Reading</strong><span style="color: #45574a; font-size: 15px">until 10:20</span><span style="margin-left: auto; font-family: Fredoka, Nunito, sans-serif; font-size: 26px; font-weight: 600">12:40</span></div>
+</section>
+
+<section aria-label="Students" style="position: absolute; left: 12px; top: 180px; width: 366px; height: 470px; box-sizing: border-box; background: #fffcf7; border: 2px solid #98b5ce; border-radius: 20px; padding: 20px 12px 12px">
+<svg aria-hidden="true" viewBox="0 0 150 30" preserveAspectRatio="none" style="position: absolute; left: -4px; top: -11px; width: 374px; height: 20px"><path d="M0 30 V18 C8 14 14 8 26 10 C38 3 52 6 60 11 C72 4 88 4 96 11 C108 4 124 5 132 11 C142 8 150 12 150 18 V30 C140 26 132 30 120 27 C100 30 90 25 70 28 C50 30 36 25 20 28 C10 30 4 27 0 30Z" fill="#ffffff" stroke="#cfe2f1" stroke-width="0.8"></path></svg>
+<div style="display: flex; align-items: baseline; gap: 8px; margin: 0 4px 12px"><h2 style="margin: 0; font-family: Fredoka, Nunito, sans-serif; font-size: 20px">Students</h2><span style="font-size: 14px; color: #45574a">24 here</span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{students}}" as="s" hint-placeholder-count="12">
+<button class="cc-btn" style="height: 88px; box-sizing: border-box; background: #fffcf7; border: 2px solid #98b5ce; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; color: #14182b">
+<svg aria-hidden="true" viewBox="0 0 64 64" style="width: 42px; height: 42px"><path d="{{s.ears}}" fill="{{s.color}}"></path><circle cx="32" cy="36" r="22" fill="{{s.color}}"></circle><circle cx="24" cy="34" r="3" fill="#1d2033"></circle><circle cx="40" cy="34" r="3" fill="#1d2033"></circle><path d="M26 43 Q32 48 38 43" fill="none" stroke="#1d2033" stroke-width="2.4" stroke-linecap="round"></path></svg>
+<span style="font-size: 15px; font-weight: 800">{{s.name}}</span>
+</button>
+</sc-for>
+</div>
+</section>
+
+<nav aria-label="Classroom tools" style="position: absolute; left: 12px; top: 666px; width: 366px; height: 60px; box-sizing: border-box; background: #fffcf7; border: 2px solid #98b5ce; border-radius: 20px; display: flex; align-items: center; justify-content: space-around; padding: 0 6px">
+<button class="cc-btn" style="height: 46px; padding: 0 14px; border-radius: 12px; border: none; background: #a51e48; color: #ffffff; font: inherit; font-size: 15px; font-weight: 800">Next</button>
+<button class="cc-btn" style="height: 46px; padding: 0 10px; border-radius: 12px; border: 2px solid #98b5ce; background: #fffcf7; color: #14182b; font: inherit; font-size: 15px; font-weight: 700">Pick</button>
+<button class="cc-btn" style="height: 46px; padding: 0 10px; border-radius: 12px; border: 2px solid #98b5ce; background: #fffcf7; color: #14182b; font: inherit; font-size: 15px; font-weight: 700">Timer</button>
+<button class="cc-btn" style="height: 46px; padding: 0 10px; border-radius: 12px; border: 2px solid #98b5ce; background: #fffcf7; color: #14182b; font: inherit; font-size: 15px; font-weight: 700">Groups</button>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const flakes = [];
+for (let i = 0; i < 18; i++) flakes.push({ x: (i * 67) % 390, y: (i * 149) % 820, s: [3, 5, 4, 7][i % 4] });
+const names = ['Ada','Bora','Cem','Defne','Ela','Ferhat','Gizem','Hugo','Ines','Jale','Kerem','Lina','Mert','Nil','Oscar'];
+const colors = ['#d9483b','#3b7dd8','#4caf6a','#8a5cc2','#e8833a','#2a9d8f','#e46aa6','#2c3e7a','#8d5b3e','#f2c94c'];
+const ears = ['M14 22 L18 4 L28 16 Z M50 22 L46 4 L36 16 Z','M12 20 a8 8 0 1 1 12 -6 Z M52 20 a8 8 0 1 0 -12 -6 Z','M20 18 C16 2 22 -2 26 16 Z M44 18 C48 2 42 -2 38 16 Z'];
+return { flakes, students: names.map((name, i) => ({ name, color: colors[i % colors.length], ears: ears[i % 3] })) };
+}
+}
+</script>
+</body>
+</html>
