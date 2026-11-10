@@ -329,13 +329,14 @@ The owner cannot see the real classroom display, so the board records its last s
 
 ## S17a Theme engine: scenes, frames, ambient, sets (owner request 2026-11-09, mockups approved 2026-11-11)
 Brief: `docs/design/2026-11-11-theme-engine.md`; decision D-166; no migration.
-- [ ] Package fields `scene`, `frame`, `ambient`, `sets` (optional, format version 1), limits, validator, sanitiser limits for scenes, generated schema and THEMING tables
-- [ ] Board renders scene, frames (boxes, student cards, top bar) and ambient; still frame with motion off; text only on surfaces, `scene-scrim` token
-- [ ] One mascot everywhere (mascot context); achievement frames; avatar families first in the picker
-- [ ] Admin → Themes preview with Motion on/off and the new blocks; MCP theme tools cover the new fields
-- [ ] Snow Day example package (`docs/examples/peppermint-snow-day.theme.json`), validated; THEMING section and guide note
-- [ ] Tests at the real display sizes (1536×703 and 1536×864 at scale 1.25, 1920×1080), axe, focus, tap targets, ambient performance
+- [x] Package fields `scene`, `frame`, `ambient`, `sets` (optional, format version 1), limits, validator, sanitiser limits for scenes, generated schema and THEMING tables
+- [x] Board renders scene, frames (boxes, student cards, top bar) and ambient; still frame with motion off; text only on surfaces, `scene-scrim` token
+- [x] One mascot everywhere (mascot context); achievement frames; avatar families first in the picker
+- [x] Admin → Themes preview with Motion on/off and the new blocks; MCP theme tools cover the new fields
+- [x] Snow Day example package (`docs/examples/peppermint-snow-day.theme.json`), validated; THEMING section and guide note
+- [x] Tests at the real display sizes (1536×703 and 1536×864 at scale 1.25, 1920×1080), axe, focus, tap targets, ambient performance
 - [ ] Seen on the real classroom display (owner)
+- [ ] Found by S17a's axe run of the whole lesson board, not caused by themes: the routine's stage chips are named "Go to stage N: …" while they show "N … Now" (axe `label-content-name-mismatch`); the routines module should name them by their visible text (the e2e check lists it as known)
 
 ## S18 Full screen during lessons (owner 2026-11-11)
 Brief: `docs/design/2026-11-11-theme-engine.md` → S18; decision D-167; no migration.

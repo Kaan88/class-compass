@@ -229,6 +229,7 @@ registry line, the names in en and tr (Turkish marked TODO) and `tests/client/th
 | `index.ts` | `motion` | `celebrate` and `threshold`. Each has `full` and `reduced` variants, plays once and lasts 150–1500 ms. `reduced` is opacity only (`FADE_IN`). No flashing: opacity changes direction at most once. |
 | `index.ts` | `sounds` | A sound pack with one cue per classroom event (`SOUND_EVENTS`), usually `makeSoundPack({ root, wave, scale, gain, tempo }, overrides)`; `null` means silent. Synthesized only, gain ≤ 0.3, short cues ≤ 1.2 s, celebration cues ≤ 2.5 s (THEMING.md). |
 | `index.ts` | `celebration` | `colors`: 2+ colour tokens for the celebration fireworks. |
+| `index.ts` (optional, S17a) | `scene`, `frame`, `ambient`, `sets` | The theme engine (THEMING.md → "Scenes, frames, ambient and sets"): scene layers as React SVG components with `viewBox`, `fit`, `anchor`; a frame from presets (`resolveFrame`); an ambient preset; sets. |
 
 All art is coloured with `tok('name')` (that is, `var(--cc-name)`), never literals. Shared building
 blocks (`Face`, `Arms`, `Scene`, `Sparkles`, `Confetti`, …) are in `src/client/themes/art.tsx`.
@@ -244,6 +245,9 @@ blocks (`Face`, `Arms`, `Scene`, `Sparkles`, `Confetti`, …) are in `src/client
 | `<ThemePicker value switchedOff>`, `<ThemeNameLabel theme switchedOff>` | `src/client/ui/ThemePreview.tsx` | Choose a theme; `switchedOff` when the stored choice is an imported theme that is not enabled now. |
 | `useThemeLabels(def)`, `useThemeName(key)` | `src/client/themes/index.tsx` | A theme's names (imported themes carry their own). |
 | `<SvgTree nodes>` | `src/client/themes/SvgTree.tsx` | Draw sanitised package art. |
+| `<ThemeScene contained?>`, `<ThemeAmbient contained? motion?>` | `src/client/themes/Scene.tsx`, `Ambient.tsx` | S17a (D-166): the theme's scene and ambient animation (root layout; previews pass `contained`). |
+| `<FrameOverlay surface boxKey?>` | `src/client/ui/Frame.tsx` | S17a: the theme's frame around a card (decorative overlays; nothing when the theme has no frame there). |
+| `mascotSlot(OwnMascot)`, `MascotContext` | `src/client/themes/art.tsx` | S17a: built-in illustrations draw the active theme's mascot. |
 | `themeSounds(params, overrides)` | `src/client/themes/soundPack.ts` | A built-in theme's sounds plus the parameters exported into packages. |
 | `presetMotion`, `FONT_PRESETS`, `SHADOW_PRESETS` | `src/shared/themePackage/motion.ts`, `presets.ts` | Motions, fonts and shadows by name (built-in themes use them too). |
 | `npm run docs:theming` | `scripts/theme-docs.ts` | Regenerate the token table, the limits and the package schema in the docs. |

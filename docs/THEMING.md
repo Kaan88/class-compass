@@ -96,6 +96,10 @@ numbers; loosening one is a decision in DECISIONS.md):
 | Shape | radius 0–2 rem (small 0–1.5 rem); borders 1–4 px (strong 1–6 px); shadow presets only |
 | Icons and avatars | icon stroke 1.5–3; avatar saturation 0–100 %, lightness 10–90 % |
 | Celebration colours | 2–8 colour tokens |
+| Scene (S17a) | 1–3 layers; each ≤ 1500 elements, ≤ 60 KB, groups nested ≤ 12 deep; opacity 0.3–1; maxHeightVh 20–100 |
+| Frames (S17a) | presets only; trimColors 2–3 colour tokens, cornerColors 1–3 |
+| Ambient (S17a) | density 10–150 particles on 1920×1080 (fewer on smaller screens); ≤ 30 frames a second; one still frame without full motion |
+| Sets (S17a) | avatarFamiliesFirst 0–4 families |
 
 <!-- END GENERATED limits -->
 
@@ -104,7 +108,7 @@ numbers; loosening one is a decision in DECISIONS.md):
 - **Add a badge icon:** add the key to `BADGE_ICONS` (`src/shared/achievements.ts`) and its 24×24 single-path glyph to `GLYPHS` (`src/client/achievements/icons.tsx`); the Record type and `tests/client/avatars-badges.test.tsx` make sure every key has a distinct glyph. Draw it yourself in the same line style (round caps, 1.8 stroke); never copy an icon set.
 - **Add an avatar part:** add the option to `PERSON_PARTS` / `CREATURE_PARTS` (and `OPTION_NAMES` in EN and TR for the accessible name) in `src/shared/avatars.ts`, then draw it in `AvatarArt.tsx` with `var(--cc-avatar-*)` colours only, no ids, filters or `<image>`. The server validates specs against the same catalogue, so an unknown value is refused until it is added there. An option can unlock with a default badge through `AVATAR_UNLOCKS`.
 - **Creature faces (S14a, D-146):** `SPECIES_FACE` in `AvatarArt.tsx` says where each species' eyes go (centre, height, spacing, size), which mouth it has (`person`, `beak`, `snout`, `muzzle`, `jaw`) and where a hat sits; the unicorn's horn is drawn over the hat. A new species gets an entry there (a species without one gets the front-facing default) and a body in `CreatureBody` that is more than one plain ellipse (test-enforced: every species has its own outline). Darker parts of a creature use `Shade` (the body colour under a thin ink layer), so they follow the chosen colour.
-- Theme-specific icon variants, frames or extra avatar families are not supported yet (ROADMAP S13c); a theme changes badges and avatars through the tokens above.
+- Theme-specific glyph variants and extra avatar families or parts are still not supported (ROADMAP S13c); since S17a a theme can draw a frame around the achievement art (`sets.achievementFrame`) and put avatar families first (`sets.avatarFamiliesFirst`), see [Scenes, frames, ambient and sets](#scenes-frames-ambient-and-sets-s17a-d-166). Otherwise a theme changes badges and avatars through the tokens above.
 
 ## Palette design and contrast
 
@@ -133,7 +137,7 @@ Design the palette in this order; the validator and `tests/client/themes.test.ts
 
 <!-- BEGIN GENERATED tokens (npm run docs:theming; do not edit by hand) -->
 
-109 colour tokens, emitted as `--cc-<token>`. Contrast rules use WCAG ratios (`fg on bg ≥ min`). Values are those of the built-in themes.
+110 colour tokens, emitted as `--cc-<token>`. Contrast rules use WCAG ratios (`fg on bg ≥ min`). Values are those of the built-in themes.
 
 #### Page, cards and text
 
@@ -142,12 +146,13 @@ Design the palette in this order; the validator and `tests/client/themes.test.ts
 | `bg` | Page background. Classroom text on it needs 7:1 (AAA). | under text ≥ 7; under text-muted ≥ 4.5; under accent-strong ≥ 4.5; under focus ≥ 3 | `#f4efe3` | `#f2f7ef` | `#f7f8fc` |
 | `surface` | Cards, dialogs and inputs. Classroom text on it needs 7:1 (AAA). | under text ≥ 7; under text-muted ≥ 4.5; under accent-strong ≥ 4.5; under success ≥ 4.5; under warning ≥ 4.5; under danger ≥ 4.5; under border-strong ≥ 3; under focus ≥ 3; under icon-accent ≥ 3; under segment-on ≥ 3; under counter-teal ≥ 3; under counter-plum ≥ 3; under counter-rust ≥ 3; under counter-leaf ≥ 3; under counter-berry ≥ 3 | `#fffaf0` | `#ffffff` | `#ffffff` |
 | `surface-2` | Secondary surfaces: table stripes, panels inside cards, the empty counter segment. | under text ≥ 4.5; under text-muted ≥ 4.5 | `#efe4cc` | `#e3f0dc` | `#eef1f8` |
-| `text` | Body and classroom text. | on bg ≥ 7; on surface ≥ 7; on surface-2 ≥ 4.5; on accent-soft ≥ 4.5; on level-0 ≥ 4.5; on level-1 ≥ 4.5; on level-2 ≥ 4.5; on level-3 ≥ 4.5 | `#14182b` | `#14182b` | `#14182b` |
+| `text` | Body and classroom text. | on bg ≥ 7; on surface ≥ 7; on scene-scrim ≥ 7; on surface-2 ≥ 4.5; on accent-soft ≥ 4.5; on level-0 ≥ 4.5; on level-1 ≥ 4.5; on level-2 ≥ 4.5; on level-3 ≥ 4.5 | `#14182b` | `#14182b` | `#14182b` |
 | `text-muted` | Hints and secondary text (4.5:1 on bg, surface and surface-2). | on bg ≥ 4.5; on surface ≥ 4.5; on surface-2 ≥ 4.5 | `#4f4a3d` | `#45574a` | `#4a5170` |
 | `border` | Quiet dividers and card outlines (decorative, no contrast rule). | – | `#cdbf9f` | `#c4d8b8` | `#c9cfe0` |
 | `border-strong` | Borders of inputs and controls (3:1 on surface). | on surface ≥ 3 | `#5b5140` | `#47604a` | `#4a5170` |
 | `overlay` | Dim layer behind dialogs (usually translucent, #rrggbbaa). | – | `#14182b8c` | `#14182b8c` | `#14182b8c` |
 | `shadow-color` | Colour of card and dialog shadows (usually translucent). | – | `#14182b1f` | `#14182b1f` | `#14182b1f` |
+| `scene-scrim` | Panel behind headings and text that sit on a theme scene (S17a). Classroom text on it needs 7:1 (AAA). Optional in packages: then the package surface. | under text ≥ 7 | `#fffaf0` | `#ffffff` | `#ffffff` |
 
 #### Accent, focus and status
 
@@ -326,6 +331,7 @@ preview, the MCP tools of S14h and the tests use it).
 | `sounds` | `null` (silent) or `{ root, wave, scale, gain, tempo, overrides? }` (`overrides`: hand-made cues per event, as `ToneNote` lists) |
 | `celebration.colors` | Colour tokens of the fireworks |
 | `art` (optional) | `mascot` (all five poses), `illustrations` (any of the six), `decoration`, `pattern`, `patternSize` |
+| `scene`, `frame`, `ambient`, `sets` (optional, S17a) | The theme engine: art behind the app, app-drawn frames, a silent background animation, built-in sets. See [Scenes, frames, ambient and sets](#scenes-frames-ambient-and-sets-s17a-d-166) |
 
 ### SVG allow-list
 
@@ -379,6 +385,13 @@ definitions by `npm run docs:theme-examples`, and `tests/docs/theme-examples.tes
 built-in theme changes and the files were not regenerated (D-164). Run it after changing a built-in
 theme's colours, typography, shape, motion or sounds.
 
+[peppermint-snow-day](examples/peppermint-snow-day.theme.json) (S17a, D-166) is the example of the
+theme engine: a reindeer mascot and snowy pictures, a three-layer village scene (far hills, fir trees,
+cottages with lit windows and string lights; `cover`, `bottom`, `bottomStrip`), snow-drift frames with
+a candy stripe on the routine and timer and frost corners, slow snowfall and snowflake achievement
+frames. `tests/client/theme-engine.test.tsx` keeps it valid. It is an example: it is not enabled
+anywhere.
+
 - **Palette.** `bg` `#eef6f8` (sea foam) and white `surface` with `text` `#0f2430` (deep sea): 7:1+
   on both. `accent` `#0b6e8a` (sea blue) with white labels; `accent-strong` one step darker for
   links. `focus` stays a warm rust (`#a8480f`) so the focus ring is never mistaken for the accent.
@@ -427,6 +440,10 @@ console.log(report.errors, report.warnings);
 Fix every error (the `path` says where; contrast errors give the ratio and the minimum). Never put
 real people or a real school in a package. Enabling a theme stays a human action on Admin → Themes.
 
+A package can also bring a scene, frames, a background animation and sets (S17a): see
+[Scenes, frames, ambient and sets](#scenes-frames-ambient-and-sets-s17a-d-166) and its recipe, and the
+complete example [peppermint-snow-day](examples/peppermint-snow-day.theme.json).
+
 **MCP theme tools (S14h1, D-160; S16b, D-164).** An AI assistant connected to `/mcp` (personal
 token or OAuth, `docs/guides/en/ai-tools.md`) can make a package as well as an agent in the git
 folder. What it gets:
@@ -435,7 +452,7 @@ folder. What it gets:
 |---|---|
 | This guide | Resource `classcompass://docs/theming` (relative links rewritten: documents that are resources become `classcompass://` links, other files are named as repository files) |
 | `docs/theme-package.schema.json` | Resource `classcompass://themes/package-schema`, tool `theme_schema` |
-| `docs/examples/*.theme.json` | Resources `classcompass://themes/examples/<key>` (`ocean` and one per built-in theme) |
+| `docs/examples/*.theme.json` | Resources `classcompass://themes/examples/<key>` (`ocean`, `peppermint-snow-day` with a scene, frames, snowfall and sets, and one per built-in theme) |
 | Export on Admin → Themes | `export_theme`: a built-in key gives the same package as the admin page (`<key>-copy`); an imported theme its stored package (teachers: enabled themes; administrators with `themes:write`: any). Read-only |
 | `validateThemePackage` | `validate_theme` (the same report; nothing is saved) |
 | `/dev/catalog` and the admin preview | `preview_theme`: the report, the base theme, every colour token with its value and source (package, base theme, fixed print colour), every contrast pair with ratio, minimum and pass, the worst avatar hue for big and small initials, and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn |
@@ -445,6 +462,125 @@ The server's instructions (sent on `initialize`) and every theme tool's descript
 guide and the examples, so an assistant that does not read resources by itself still finds them; the
 prompt `design_theme` walks through the checklist above. Looking at the real preview and **enabling**
 a theme stay human actions on Admin → Themes.
+
+## Scenes, frames, ambient and sets (S17a, D-166)
+
+A theme can do more than recolour the app. Four optional fields (built-in themes set them in their
+`ThemeDefinition`, packages as data; format version stays 1, so older packages load unchanged):
+
+| Field | What it does | Drawn by |
+|---|---|---|
+| `scene` | 1–3 SVG layers of viewport-scale art fixed **behind** the app (a village, a meadow, a classroom wall) | `themes/Scene.tsx` (`ThemeScene`, mounted in the root layout) |
+| `frame` | Card silhouettes (`edge`), a band around chosen board boxes (`trim`) and corner accents (`corners`), **app-defined presets only** | `ui/Frame.tsx` (`FrameOverlay`) on board boxes, student cards, the top bar, the dock, dialogs; app.css for other cards |
+| `ambient` | A silent snowfall or falling leaves on one canvas between the scene and the content | `themes/Ambient.tsx` (`ThemeAmbient`) |
+| `sets` | Choose and recolour built-in sets: the achievement frame, the avatar families shown first, whose mascot to borrow | `achievements/icons.tsx`, the avatar picker, `themes/custom.tsx` |
+
+The presets and their default colour tokens (generated from `src/shared/themePackage/engine.ts`):
+
+<!-- BEGIN GENERATED engine (npm run docs:theming; do not edit by hand) -->
+
+| Field | Presets |
+|---|---|
+| `scene.layers[].fit` | `cover`, `contain`, `width`, `height` |
+| `scene.layers[].anchor` | `bottom`, `top`, `center`, `bottom-left`, `bottom-right`, `top-left`, `top-right` |
+| `scene.smallScreens` | `full`, `bottomStrip`, `hidden` |
+| `frame.edge` (default `snowColor`) | `none` (surface), `snowDrift` (art-ground), `scallop` (surface), `torn` (surface) |
+| `frame.trim` (default `trimColors`) | `none` (accent, surface); `candyStripe` (accent, surface); `garland` (deco-1, deco-2, deco-3); `lights` (deco-2, deco-3, deco-1); `frost` (art-ground, border); `stitched` (deco-2, surface); `pencil` (deco-2, deco-3, text-muted) |
+| `frame.corners` (default `cornerColors`) | `none` (border); `frost` (art-ground, border); `holly` (deco-1, deco-3); `star` (deco-2, text-muted); `compass` (deco-2, text-muted); `leaf` (deco-1, icon-accent) |
+| `frame.apply` | `boardBoxes`, `studentCards`, `topBar`, `dock`, `cards`, `dialogs`; default `boardBoxes`, `studentCards`, `topBar` |
+| `frame.trimOn` | board box keys; default `routine`, `core.timer` |
+| `ambient.preset` | `none`, `snowfall`, `leaves` |
+| `ambient.speed` / `ambient.size` | `slow`, `medium`, `fast` / `small`, `mixed`, `large` |
+| `sets.achievementFrame` | `classic`, `ornament`, `snowflake`, `star`, `shield` |
+
+<!-- END GENERATED engine -->
+
+### Scene
+
+```json
+"scene": {
+  "layers": [
+    { "art": "<path d='M0 700 C…' fill='var(--cc-art-sky)'/>", "viewBox": "0 0 1920 1080", "fit": "cover", "anchor": "bottom" },
+    { "art": "…", "viewBox": "0 0 1920 1080", "fit": "cover", "anchor": "bottom", "maxHeightVh": 60 }
+  ],
+  "opacity": 1,
+  "smallScreens": "bottomStrip"
+}
+```
+
+- **Art** is the same strict SVG as all package art (allow-list above, colours only as
+  `var(--cc-<token>)`, `none` or `currentColor`), with larger limits per layer (see Limits). It is
+  drawn back to front, `aria-hidden`, without pointer events, below the tile pattern.
+- **Fit and anchor** become the layer's `preserveAspectRatio`: `cover` fills the screen and crops
+  (the anchor stays in view: `bottom` keeps the ground), `contain` shows the whole layer, `width` /
+  `height` fit one side. `maxHeightVh` keeps a layer in the lower (or upper) part of the screen.
+  On the classroom display (1536×703 with the browser bars, 1536×864 in full screen, 1920×1080)
+  a 1920×1080 `cover` + `bottom` scene keeps its whole width at 16:9 and crops the sky when the
+  window is wider than it is tall; draw the important things in the lower half and away from the
+  far left and right edges.
+- **Small screens** (below 40rem): `full` keeps every layer, `bottomStrip` shows only the last layer
+  as a strip along the bottom, `hidden` shows none.
+- **Text never sits on the scene.** Boxes, the top bar and the dock keep their surfaces; headings and
+  lines directly on the page get a panel in `scene-scrim` (`html[data-scene]` in app.css). The
+  validator checks `text` on `scene-scrim` at 7:1. A package may leave `scene-scrim` out: it is then
+  the package's own `surface` (a note in the report).
+- A scene is never inherited from the base theme, and Export of a built-in theme leaves its scene
+  out (it is code, like the rest of its art).
+
+### Frame
+
+```json
+"frame": { "edge": "snowDrift", "trim": "candyStripe", "trimOn": ["routine", "core.timer"], "corners": "frost" }
+```
+
+- Only `edge` is required. `apply` lists the surfaces (default board boxes, student cards and the
+  top bar; also `dock`, `cards` for ordinary cards on other pages and `dialogs`). `trimOn` lists
+  board box keys (`BOX_KEYS` in `src/shared/classroomLayout.ts`; default the routine and the timer).
+- Colours are **token names**: `snowColor` (the edge), `trimColors` (2–3) and `cornerColors` (1–3).
+  Each preset has defaults (the table above). Nothing in a frame is CSS or SVG from the package.
+- The overlays sit outside the content box: the content's padding, its hit areas and the focus
+  outline are unchanged (overlays over the card fade away while keyboard focus is inside it). Student
+  cards, ordinary cards, compact density and phones get the edge only.
+
+### Ambient
+
+```json
+"ambient": { "preset": "snowfall", "density": 60, "speed": "slow", "size": "mixed", "color": "art-ground" }
+```
+
+- One canvas, at most 30 frames a second, paused while the page is hidden, sized in device pixels
+  (1.25 on the classroom PC). `density` is the number of particles on a 1920×1080 screen.
+- It runs only with full motion: with the class animation switch off or reduced motion it draws
+  **one still frame**. It is not part of the celebrations and dims while one is on screen. It is
+  silent.
+
+### Sets
+
+```json
+"sets": { "achievementFrame": "snowflake", "avatarFamiliesFirst": ["animals", "mythical"], "mascotFrom": "animals" }
+```
+
+- `achievementFrame` draws an ornament **around** the tier shape of every achievement (the tier
+  keeps its shape, its colour token and its word). Students see it on their page too.
+- `avatarFamiliesFirst` only reorders the avatar picker (families and ready-made avatars); nothing is
+  hidden and a child's saved avatar never changes with the theme.
+- `mascotFrom` is the built-in theme whose mascot a package without mascot art uses (default: the
+  base theme's).
+- **One mascot everywhere:** built-in illustrations draw the active theme's mascot (a mascot context
+  in `themes/art.tsx`), so a package that keeps base illustrations shows its own mascot in them.
+
+### Recipe for agents: a scene, frames and snow
+
+1. Start from a valid package (an export, `ocean` or [peppermint-snow-day](examples/peppermint-snow-day.theme.json)).
+2. Draw the scene in a 1920×1080 box, far to near (sky and far hills, trees, houses), only with
+   tokens (`art-sky`, `art-ground`, `deco-*`, `mascot-*`, `surface`); use `opacity` on shapes for
+   lighter tones. Keep every layer under the limits; `fit: cover`, `anchor: bottom`.
+3. Pick a frame from the presets, choose token colours that suit the palette, keep `trimOn` short
+   (one or two boxes).
+4. Add `ambient` only if it suits the world (snow, leaves) and keep `density` modest (40–80).
+5. Run `validateThemePackage` (or `validate_theme` over MCP; `preview_theme` lists the engine fields
+   with every default filled in) and fix every error. Look at the Admin → Themes preview with
+   **Motion on** and **Motion off**; enabling stays an administrator's step.
 
 ## Sound
 
