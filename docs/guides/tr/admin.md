@@ -173,7 +173,7 @@ Yedekler sunucuda kendiliğinden alınır (bilgi işlem sorumlusunun ayarladığ
 
 ## Sınıf ekranları
 
-**Bakım** → **Sınıf ekranları**, her öğretmen için sınıf panosunun en son açıldığı ekranı gösterir: ne zaman açıldığı, pencere ve ekran boyutu, piksel oranı, tarayıcı ve sistem (örneğin "Chrome 142 · Windows"), ekranın dokunmatik olup olmadığı, öğretmenin yazı boyutu ve pano ayarları ile son beş farklı boyut (böylece farklı sınıflar görünür). Okul, her sınıfa gitmeden sınıf ekranlarını planlayabilir.
+**Bakım** → **Sınıf ekranları**, her öğretmen için sınıf panosunun en son açıldığı ekranı gösterir: ne zaman açıldığı, pencere ve ekran boyutu, piksel oranı, tarayıcı ve sistem (örneğin "Chrome 142 · Windows"), ekranın dokunmatik olup olmadığı, panonun tam ekranda olup olmadığı (öğretmenler derslerde tam ekranı kendileri için kapatabilir; bu bilgi kaydedilmeye başlanmadan önce görülen ekranlarda "Kaydedilmedi" yazar), öğretmenin yazı boyutu ve pano ayarları ile son beş farklı boyut (böylece farklı sınıflar görünür). Okul, her sınıfa gitmeden sınıf ekranlarını planlayabilir.
 
 **Ne kaydedilir, neden?** Sınıf panosu her açıldığında (pencere boyutu değişince de en fazla dakikada bir) pano yalnızca bu ekran bilgilerini gönderir. Öğrencilerle ilgili hiçbir şey, tarayıcının tam kimlik metni, adres ya da yazılan bir şey kaydedilmez. Her öğretmen için yalnızca en son değer ve son beş boyut tutulur; bunları yalnızca yöneticiler görür. Tüm okul dışa aktarımında (hesap ayarları arasında) yer alır. Bu özellik ayrı bir modüldür ve ileride kaldırılabilir; verisi de tek bir veritabanı komutuyla silinir (`docs/DECISIONS.md`, D-165).
 

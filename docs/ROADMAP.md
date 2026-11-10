@@ -339,9 +339,9 @@ Brief: `docs/design/2026-11-11-theme-engine.md`; decision D-166; no migration.
 
 ## S18 Full screen during lessons (owner 2026-11-11)
 Brief: `docs/design/2026-11-11-theme-engine.md` → S18; decision D-167; no migration.
-- [ ] Start lesson enters full screen, End lesson leaves it; Full screen / Leave full screen button on the board while a lesson runs; nothing where unsupported
-- [ ] Teacher setting "Full screen during lessons" (on by default); `displayInfo` records `fullscreen`
-- [ ] Tests (stubbed Fullscreen API), guides EN/TR
+- [x] Start lesson enters full screen, End lesson leaves it; Full screen / Leave full screen button on the board while a lesson runs; nothing where unsupported
+- [x] Teacher setting "Full screen during lessons" (on by default); `displayInfo` records `fullscreen`
+- [x] Tests (stubbed Fullscreen API), guides EN/TR
 - [ ] Tried on the classroom PC (owner)
 
 ## S17b Built-in themes remade, sound styles (owner 2026-11-11)

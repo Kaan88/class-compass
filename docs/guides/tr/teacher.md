@@ -46,7 +46,7 @@ Kilit şöyle çalışır:
 
 PIN'inizi mi unuttunuz? **Profil ve PIN**'de şifrenizle yeni bir PIN belirleyin ya da yöneticinizden PIN'inizi silmesini isteyin (bu durumda bütün cihazlarda oturumunuz kapanır ve yeni bir PIN belirlersiniz).
 
-**Profil ve PIN**'de ayrıca **Dil** ve **Yazı boyutu** seçilir (yalnızca sizin gördüğünüzü değiştirir) ve **Süre doldu kaydım** kaydedilir (bkz. [Sesler ve kutlamalar](#sesler-ve-kutlamalar)).
+**Profil ve PIN**'de ayrıca **Dil** ve **Yazı boyutu** seçilir (yalnızca sizin gördüğünüzü değiştirir), derslerin tam ekranda açılıp açılmayacağı belirlenir (**Dersler** → **Derslerde tam ekran**, bkz. [Tam ekran](#tam-ekran)) ve **Süre doldu kaydım** kaydedilir (bkz. [Sesler ve kutlamalar](#sesler-ve-kutlamalar)).
 
 ## Öğretmen menüsü
 
@@ -78,9 +78,15 @@ Bütün sınıflarınızda kapalı olan bir modülün sayfaları menüde görün
    - **Bugünün yardımcısı**: bugün kimin yardım edeceği ve görevleri. Yardımcının şimdiden yaptığı görevleri işaretleyin (örneğin "Sınıfın düzenlenmesine yardım et"); işaretler ders başladığında kaydedilir.
    - **Bugünün konusu**: dersin odağı (Dinleme, Okuma, Kelime bilgisi, Dil bilgisi, Yazma, Konuşma, Sesletim ya da kendi konularınız). **Ders konuları**'ndaki haftalık plan bir öneri getirir; değiştirebilirsiniz.
    - **Rutin**: bu dersin rutinini seçin.
-4. **Derse başla**'ya basın.
+4. **Derse başla**'ya basın. Pano tüm ekranı kaplar (tam ekran); tarayıcının çubukları sınıftan yer çalmaz.
 
 ![Dersi başlat: yoklama adımı](../img/tr/start-lesson.png)
+
+### Tam ekran
+
+Ders sürerken üst çubukta bir **Tam ekran** düğmesi vardır; tam ekrandayken bu düğme küçük bir **Tam ekrandan çık** düğmesine dönüşür. Klavyedeki **Esc** tuşu da her zaman tam ekrandan çıkarır. Pencereler, PIN kilidi, kutlamalar ve bildirimler tam ekranda da çalışır. **Kaydet ve dersi bitir** tam ekrandan çıkar; **Derse dön** tam ekranı korur.
+
+Bunu istemiyorsanız **Profil ve PIN** → **Dersler** bölümünde **Derslerde tam ekran** ayarını kapatın. Bu sizin kendi ayarınızdır ve girdiğiniz her sınıf bilgisayarında geçerlidir; panodaki **Tam ekran** düğmesi yine çalışır. Tam ekranı olmayan tarayıcılarda (örneğin iPhone'da) düğme görünmez ve hiçbir şey değişmez.
 
 Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sürer. Dersi süren sınıf **Ders sürüyor** olarak işaretlenir. Kablosuz ağ koparsa dokunuşlarınız cihazda saklanır ve sonra gönderilir; kayıt göstergesinde **Çevrimdışı – N değişiklik bekliyor** yazar. Sunucunun kaydedemediği her şey **Kontrol gerekiyor** altında **Yeniden dene** ve **Kapat** düğmeleriyle görünür.
 

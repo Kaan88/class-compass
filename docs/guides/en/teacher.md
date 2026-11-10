@@ -46,7 +46,7 @@ How the lock works:
 
 Forgot your PIN? Set a new one in **Profile and PIN** with your password, or ask your administrator to clear it (you are then signed out everywhere and set a new PIN).
 
-In **Profile and PIN** you also choose your **Language** and **Text size** (they change only what you see), and you can record **My time's-up recording** (see [Sounds and celebrations](#sounds-and-celebrations)).
+In **Profile and PIN** you also choose your **Language** and **Text size** (they change only what you see), whether lessons open in full screen (**Lessons** → **Full screen during lessons**, see [Full screen](#full-screen)), and you can record **My time's-up recording** (see [Sounds and celebrations](#sounds-and-celebrations)).
 
 ## The teacher menu
 
@@ -78,9 +78,15 @@ Pages of a module that is switched off in all your classes are left out of the m
    - **Today's assistant**: who helps today, with their duties. Tick what the assistant has already done (for example "Help organise the classroom"); the ticks are saved when the lesson begins.
    - **Today's topic**: the focus of the lesson (Listening, Reading, Vocabulary, Grammar, Writing, Speaking, Phonics or your own topics). The weekly plan from **Lesson topics** suggests it; you can change it.
    - **Routine**: choose the routine for this lesson.
-4. Press **Begin lesson**.
+4. Press **Begin lesson**. The board fills the whole screen (full screen), so the browser's bars do not take space from the class.
 
 ![Start lesson: the attendance step](../img/en/start-lesson.png)
+
+### Full screen
+
+While a lesson runs, the top bar has a **Full screen** button; in full screen it becomes a small **Leave full screen** button. **Esc** on the keyboard always leaves full screen too. Dialogs, the PIN lock, celebrations and messages all keep working in full screen. **Save and end lesson** leaves full screen; **Back to the lesson** keeps it.
+
+If you do not want this, switch off **Full screen during lessons** in **Profile and PIN** → **Lessons**. It is your own setting and follows you to every classroom computer; the **Full screen** button on the board still works. Browsers without full screen (for example on an iPhone) show no button and nothing changes.
 
 A lesson keeps running when you refresh the page or switch to another class and back. A class with a running lesson is marked **Lesson in progress**. If the Wi-Fi drops, your taps are kept on the device and sent later; the save status shows **Offline – N changes waiting**. Anything the server could not save appears under **Needs attention** with **Try again** and **Dismiss**.
 

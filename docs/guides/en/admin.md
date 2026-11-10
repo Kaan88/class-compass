@@ -173,7 +173,7 @@ Backups are made automatically on the server (hourly local copies and a nightly 
 
 ## Classroom screens
 
-**Maintenance** → **Classroom screens** lists, for each teacher, the last screen their classroom board was opened on: when, the window and screen size, the pixel ratio, the browser and system (for example "Chrome 142 · Windows"), whether the screen is touch, the teacher's text size and board settings, and up to five recent sizes (so different classrooms show up). It helps the school plan the classroom displays without visiting every room.
+**Maintenance** → **Classroom screens** lists, for each teacher, the last screen their classroom board was opened on: when, the window and screen size, the pixel ratio, the browser and system (for example "Chrome 142 · Windows"), whether the screen is touch, whether the board was in full screen (teachers can turn full screen during lessons off for themselves; "Not recorded" for screens seen before this was recorded), the teacher's text size and board settings, and up to five recent sizes (so different classrooms show up). It helps the school plan the classroom displays without visiting every room.
 
 **What is recorded and why.** Each time the classroom board opens (and at most once a minute when the window is resized) the board sends only these screen facts. Nothing about students, no full browser identification string, no address, nothing typed. Only the newest value and the last five sizes are kept per teacher, and only administrators can see them. They are part of the full school export (as account settings). The feature is a separate module that can be removed later; its data then goes with one database command (`docs/DECISIONS.md`, D-165).
 
