@@ -38,6 +38,7 @@
     "on-strong": "#ffffff",
     "overlay": "#14182b8c",
     "shadow-color": "#14182b1f",
+    "scene-scrim": "#fffaf0",
     "display-banner-bg": "#fff1d1",
     "display-banner-text": "#14182b",
     "display-banner-border": "#8a5100",

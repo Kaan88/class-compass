@@ -16,9 +16,26 @@ import * as S from '../../../shared/contracts/school.ts';
 import * as T from '../../../shared/contracts/themes.ts';
 import { DEFAULT_THEME, THEME_KEYS, type BuiltinThemeKey } from '../../../shared/themes.ts';
 import { AA, AA_LARGE, CONTRAST_PAIRS, contrast as contrastRatio, hslToRgb, isOpaqueHex, pairContrast } from '../../../shared/themePackage/contrast.ts';
-import { Art, themePackageJsonSchema, ThemeSlug } from '../../../shared/themePackage/schema.ts';
-import { COLOR_TOKENS, ILLUSTRATIONS, MASCOT_POSES } from '../../../shared/themePackage/tokens.ts';
-import { FIXED_COLORS, packageArt, validateThemePackage } from '../../../shared/themePackage/validate.ts';
+import { Ambient, Art, Frame, Scene, Sets, themePackageJsonSchema, ThemeSlug } from '../../../shared/themePackage/schema.ts';
+import {
+  ACHIEVEMENT_FRAMES,
+  AMBIENT_PRESETS,
+  AMBIENT_SIZES,
+  AMBIENT_SPEEDS,
+  FRAME_BOX_KEYS,
+  FRAME_CORNERS,
+  FRAME_EDGES,
+  FRAME_SURFACES,
+  FRAME_TRIMS,
+  resolveFrame,
+  type ResolvedFrame,
+  SCENE_ANCHORS,
+  SCENE_FITS,
+  SCENE_SMALL_SCREENS,
+} from '../../../shared/themePackage/engine.ts';
+import { CREATURE_FAMILY_KEYS, type CreatureFamily } from '../../../shared/avatars.ts';
+import { COLOR_TOKENS, DERIVED_PACKAGE_TOKENS, ILLUSTRATIONS, isDerivedPackageToken, MASCOT_POSES } from '../../../shared/themePackage/tokens.ts';
+import { FIXED_COLORS, packageArt, parseSceneSvg, validateThemePackage } from '../../../shared/themePackage/validate.ts';
 import { executeCommand } from '../../lib/commands.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
@@ -184,12 +201,12 @@ const classroomCommand = handTool({
 const ThemeReportOut = T.ThemeReport;
 /** Where an MCP agent learns theme work (D-164): said in every theme tool's description. */
 const THEME_GUIDE =
-  'Guide: the resource classcompass://docs/theming; complete example packages: classcompass://themes/examples/<key> (ocean, and one per built-in theme), or export_theme.';
+  'Guide: the resource classcompass://docs/theming; complete example packages: classcompass://themes/examples/<key> (ocean; peppermint-snow-day with a scene, frames, snowfall and sets; one per built-in theme), or export_theme.';
 
 const themeSchema = handTool({
   name: 'theme_schema',
   description:
-    'The JSON Schema of a Class Compass theme package (format, key slug, names in English and Turkish, base theme, every colour token, typography and shape presets, motion presets, sound parameters and optional SVG art). Read the theming guide resource (classcompass://docs/theming) for palette design, contrast rules and the SVG allow-list. Holds no school data. ' + THEME_GUIDE,
+    'The JSON Schema of a Class Compass theme package (format, key slug, names in English and Turkish, base theme, every colour token, typography and shape presets, motion presets, sound parameters, optional SVG art, and the optional theme engine fields: scene (up to 3 SVG layers behind the app), frame (edge, trim and corner presets with colour token names), ambient (snowfall or leaves) and sets (achievement frame, avatar families first, mascotFrom)). Read the theming guide resource (classcompass://docs/theming) for palette design, contrast rules and the SVG allow-list. Holds no school data. ' + THEME_GUIDE,
   scope: null,
   role: 'any',
   readOnly: true,
@@ -201,7 +218,7 @@ const themeSchema = handTool({
 const validateTheme = handTool({
   name: 'validate_theme',
   description:
-    'Checks a theme package (JSON object or text) with the same validator the admin page uses: schema, colour contrast (WCAG pairs), sound limits, SVG allow-list and size. Returns the report (errors with a path and message, warnings, stats); nothing is saved. Fix every error before import_theme_draft; preview_theme shows every contrast ratio and what falls back to the base theme. ' + THEME_GUIDE,
+    'Checks a theme package (JSON object or text) with the same validator the admin page uses: schema, colour contrast (WCAG pairs), sound limits, SVG allow-list and size, scene layers with the scene limits (60 KB, 1500 elements per layer). Returns the report (errors with a path and message, warnings, stats including the scene layers, bytes and elements); nothing is saved. Fix every error before import_theme_draft; preview_theme shows every contrast ratio and what falls back to the base theme. ' + THEME_GUIDE,
   scope: null,
   role: 'any',
   readOnly: true,
@@ -248,7 +265,68 @@ const exportTheme = handTool({
 });
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const Source = z.enum(['package', 'base', 'fixed']);
+const Source = z.enum(['package', 'base', 'fixed', 'derived']);
+
+/**
+ * What a package asks of the theme engine (S17a, D-166), with every default filled in: the scene's
+ * layers (size and element count each), the frame, the ambient animation and the sets. Null where the
+ * package has none or the part does not pass the schema (the report says why).
+ */
+const mutableFrame = (f: ResolvedFrame) => ({ ...f, apply: [...f.apply], trimOn: [...f.trimOn], trimColors: [...f.trimColors], cornerColors: [...f.cornerColors] });
+
+function engineSummary(obj: Record<string, unknown>) {
+  const scene = Scene.safeParse(obj.scene);
+  const frame = Frame.safeParse(obj.frame);
+  const ambient = Ambient.safeParse(obj.ambient);
+  const sets = Sets.safeParse(obj.sets);
+  return {
+    scene: scene.success
+      ? {
+          opacity: scene.data.opacity,
+          smallScreens: scene.data.smallScreens,
+          layers: scene.data.layers.map((l) => {
+            const r = parseSceneSvg(l.art);
+            return { viewBox: l.viewBox, fit: l.fit, anchor: l.anchor, maxHeightVh: l.maxHeightVh ?? null, bytes: new TextEncoder().encode(l.art).length, elements: r.ok ? r.count : null };
+          }),
+        }
+      : null,
+    frame: frame.success ? mutableFrame(resolveFrame(frame.data)) : null,
+    ambient: ambient.success ? ambient.data : null,
+    sets: sets.success ? { achievementFrame: sets.data.achievementFrame, avatarFamiliesFirst: sets.data.avatarFamiliesFirst, mascotFrom: sets.data.mascotFrom ?? null } : null,
+  };
+}
+
+const EngineOut = z.object({
+  scene: z
+    .object({
+      opacity: z.number(),
+      smallScreens: z.enum(SCENE_SMALL_SCREENS),
+      layers: z.array(
+        z.object({ viewBox: z.string().meta(pii('none')), fit: z.enum(SCENE_FITS), anchor: z.enum(SCENE_ANCHORS), maxHeightVh: z.number().nullable(), bytes: z.number(), elements: z.number().nullable() }),
+      ),
+    })
+    .nullable(),
+  frame: z
+    .object({
+      edge: z.enum(FRAME_EDGES),
+      trim: z.enum(FRAME_TRIMS),
+      corners: z.enum(FRAME_CORNERS),
+      apply: z.array(z.enum(FRAME_SURFACES)),
+      trimOn: z.array(z.enum(FRAME_BOX_KEYS)),
+      snowColor: z.enum(COLOR_TOKENS),
+      trimColors: z.array(z.enum(COLOR_TOKENS)),
+      cornerColors: z.array(z.enum(COLOR_TOKENS)),
+    })
+    .nullable(),
+  ambient: z.object({ preset: z.enum(AMBIENT_PRESETS), density: z.number(), speed: z.enum(AMBIENT_SPEEDS), color: z.enum(COLOR_TOKENS).optional(), size: z.enum(AMBIENT_SIZES) }).nullable(),
+  sets: z
+    .object({
+      achievementFrame: z.enum(ACHIEVEMENT_FRAMES),
+      avatarFamiliesFirst: z.array(z.enum(CREATURE_FAMILY_KEYS as [CreatureFamily, ...CreatureFamily[]])),
+      mascotFrom: z.enum(THEME_KEYS).nullable(),
+    })
+    .nullable(),
+});
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -273,6 +351,9 @@ export function previewPackage(source: string) {
     if (token in fixed) return { token, value: fixed[token]!, source: 'fixed' as const };
     const v = own[token];
     if (typeof v === 'string' && /^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/u.test(v)) return { token, value: v, source: 'package' as const };
+    // S17a: an optional token the package left out follows the package's own colour (scene-scrim = surface).
+    const from = isDerivedPackageToken(token) ? own[DERIVED_PACKAGE_TOKENS[token]] : undefined;
+    if (typeof from === 'string' && /^#[0-9a-fA-F]{6}$/u.test(from)) return { token, value: from, source: 'derived' as const };
     return { token, value: baseColors[token] ?? '#000000', source: 'base' as const };
   });
   const value = Object.fromEntries(colors.map((c) => [c.token, c.value])) as Record<string, string>;
@@ -308,13 +389,14 @@ export function previewPackage(source: string) {
       pattern: parsed.pattern ? ('package' as const) : ('base' as const),
     },
     sounds: obj.sounds === null ? ('silent' as const) : isRecord(obj.sounds) ? ('package' as const) : ('base' as const),
+    engine: engineSummary(obj),
   };
 }
 
 const previewTheme = handTool({
   name: 'preview_theme',
   description:
-    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, the worst avatar hue for big and small avatar initials (the validator checks every hue), and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
+    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, derived from another package colour such as scene-scrim from surface, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, the worst avatar hue for big and small avatar initials (the validator checks every hue), and which mascot poses, illustrations, decoration and pattern come from the base theme, and the theme engine fields with every default filled in (scene layers with size and element count, frame, ambient, sets). No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
     THEME_GUIDE,
   scope: null,
   role: 'any',
@@ -338,6 +420,7 @@ const previewTheme = handTool({
       pattern: Source,
     }),
     sounds: z.enum(['package', 'silent', 'base']),
+    engine: EngineOut,
   }),
   run: (_env, input) => previewPackage(packageText(input.package)),
 });

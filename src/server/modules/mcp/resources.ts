@@ -145,7 +145,7 @@ export function allResources(): McpResource[] {
       title: builtin ? `Theme package of the built-in theme "${key}"` : `Example theme package "${key}"`,
       description: builtin
         ? `docs/examples/${key}.theme.json: the package Admin → Themes → Export gives for the built-in theme "${key}" (key "${key}-copy", "(copy)" names; its art stays with the base theme). A starting point: change the key, names and colours, then validate_theme. No school data.`
-        : `docs/examples/${key}.theme.json: the worked example of the theming guide, a complete valid package. A starting point: change the key, names and colours, then validate_theme. No school data.`,
+        : `docs/examples/${key}.theme.json: an example of the theming guide, a complete valid package${typeof readExample(key)?.scene === 'object' ? ' with a scene, frames, a background animation and sets (S17a)' : ''}. A starting point: change the key, names and colours, then validate_theme. No school data.`,
       mimeType: 'application/json',
       scope: null,
       role: 'any',

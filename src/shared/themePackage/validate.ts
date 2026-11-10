@@ -9,14 +9,14 @@
  * Messages are plain English for tools and logs; the admin page translates `code` and shows `params`.
  */
 import { contrastFailures } from './contrast.ts';
-import { PACKAGE_LIMITS } from './limits.ts';
+import { PACKAGE_LIMITS, SCENE_LIMITS } from './limits.ts';
 import { THEME_PACKAGE_FORMAT, ThemePackage } from './schema.ts';
 import { makeSoundPack, soundPackProblems } from './sound.ts';
 import { parseSvg, svgToString, type SvgNode } from './svg.ts';
-import { FIXED_COLOR_TOKENS, ILLUSTRATIONS, MASCOT_POSES, type IllustrationName, type MascotPose, type ThemeColors } from './tokens.ts';
+import { DERIVED_PACKAGE_TOKENS, FIXED_COLOR_TOKENS, ILLUSTRATIONS, MASCOT_POSES, type IllustrationName, type MascotPose, type ThemeColors } from './tokens.ts';
 import { THEME_KEYS } from '../themes.ts';
 
-export const THEME_ISSUE_CODES = ['TOO_LARGE', 'NOT_JSON', 'SCHEMA', 'KEY_BUILTIN', 'CONTRAST', 'SOUND', 'SVG', 'MASCOT_POSES_SAME', 'ART_FROM_BASE', 'SILENT'] as const;
+export const THEME_ISSUE_CODES = ['TOO_LARGE', 'NOT_JSON', 'SCHEMA', 'KEY_BUILTIN', 'CONTRAST', 'SOUND', 'SVG', 'MASCOT_POSES_SAME', 'ART_FROM_BASE', 'SILENT', 'SCRIM_DEFAULT', 'MASCOT_FROM_UNUSED'] as const;
 export type ThemeIssueCode = (typeof THEME_ISSUE_CODES)[number];
 
 export interface ThemeIssue {
@@ -34,14 +34,31 @@ export interface ThemeReport {
   key: string | null;
   errors: ThemeIssue[];
   warnings: ThemeIssue[];
-  stats: { bytes: number; pictures: number; svgNodes: number };
+  /** S17a (D-166): `sceneLayers`, `sceneBytes` and `sceneNodes` describe the scene (0 without one). */
+  stats: { bytes: number; pictures: number; svgNodes: number; sceneLayers: number; sceneBytes: number; sceneNodes: number };
 }
 
 /** The fixed print colours (D-120), the same in every theme. */
 export const FIXED_COLORS: Record<(typeof FIXED_COLOR_TOKENS)[number], string> = { 'print-ink': '#000000', 'print-paper': '#ffffff' };
 
 /** A package's complete colour set (the fixed print colours added). */
-export const packageColors = (pkg: ThemePackage): ThemeColors => ({ ...pkg.colors, ...FIXED_COLORS }) as ThemeColors;
+export const packageColors = (pkg: Pick<ThemePackage, 'colors'>): ThemeColors => ({ ...derivedColors(pkg.colors), ...pkg.colors, ...FIXED_COLORS }) as ThemeColors;
+
+/**
+ * Values of the optional package tokens a package left out (S17a: `scene-scrim` = its own `surface`).
+ * Only tokens whose source colour the package has are returned.
+ */
+export function derivedColors(colors: Partial<Record<string, string | undefined>>): Partial<ThemeColors> {
+  const out: Partial<Record<string, string>> = {};
+  for (const [token, from] of Object.entries(DERIVED_PACKAGE_TOKENS)) {
+    const v = colors[from];
+    if (colors[token] === undefined && v !== undefined) out[token] = v;
+  }
+  return out as Partial<ThemeColors>;
+}
+
+/** Parses one scene layer with the scene limits (S17a). */
+export const parseSceneSvg = (src: string) => parseSvg(src, { maxNodes: SCENE_LIMITS.svgMaxNodes, maxBytes: SCENE_LIMITS.svgMaxBytes, maxDepth: SCENE_LIMITS.svgMaxDepth });
 
 /** The parsed art of a package: only pictures that pass the sanitiser (the rest come from the base theme). */
 export interface PackageArt {
@@ -49,9 +66,11 @@ export interface PackageArt {
   illustrations: Partial<Record<IllustrationName, SvgNode[]>>;
   decoration: SvgNode[] | null;
   pattern: SvgNode[] | null;
+  /** S17a: every scene layer's tree, or null when there is no scene or a layer does not pass. */
+  scene: SvgNode[][] | null;
 }
 
-export function packageArt(pkg: Pick<ThemePackage, 'art'>): PackageArt {
+export function packageArt(pkg: Pick<ThemePackage, 'art'> & Partial<Pick<ThemePackage, 'scene'>>): PackageArt {
   const tree = (src: string | undefined) => {
     if (src === undefined) return null;
     const r = parseSvg(src);
@@ -68,7 +87,19 @@ export function packageArt(pkg: Pick<ThemePackage, 'art'>): PackageArt {
     illustrations,
     decoration: tree(pkg.art?.decoration),
     pattern: tree(pkg.art?.pattern),
+    scene: sceneTrees(pkg.scene),
   };
+}
+
+function sceneTrees(scene: ThemePackage['scene']): SvgNode[][] | null {
+  if (!scene) return null;
+  const out: SvgNode[][] = [];
+  for (const layer of scene.layers) {
+    const r = parseSceneSvg(layer.art);
+    if (!r.ok) return null;
+    out.push(r.nodes);
+  }
+  return out;
 }
 
 const SVG_REASONS: Record<string, string> = {
@@ -110,8 +141,11 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
   const warnings: ThemeIssue[] = [];
   let svgNodes = 0;
   let pictures = 0;
+  let sceneLayers = 0;
+  let sceneBytes = 0;
+  let sceneNodes = 0;
   const done = (key: string | null, bytes: number, pkg: ThemePackage | null) => ({
-    report: { ok: errors.length === 0, key, errors, warnings, stats: { bytes, pictures, svgNodes } },
+    report: { ok: errors.length === 0, key, errors, warnings, stats: { bytes, pictures, svgNodes, sceneLayers, sceneBytes, sceneNodes } },
     pkg: errors.length === 0 ? pkg : null,
   });
 
@@ -177,12 +211,13 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
     }
   }
 
-  const checkSvg = (path: string, src: string | undefined): SvgNode[] | null => {
+  const checkSvg = (path: string, src: string | undefined, scene = false): SvgNode[] | null => {
     if (src === undefined) return null;
     pictures += 1;
-    const r = parseSvg(src);
+    const r = scene ? parseSceneSvg(src) : parseSvg(src);
     if (r.ok) {
       svgNodes += r.count;
+      if (scene) sceneNodes += r.count;
       return r.nodes;
     }
     const why = SVG_REASONS[r.error.reason] ?? r.error.reason;
@@ -204,8 +239,26 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
   checkSvg('art.decoration', art?.decoration);
   checkSvg('art.pattern', art?.pattern);
 
+  // S17a (D-166): scene layers go through the same sanitiser with the scene limits.
+  if (pkg.scene) {
+    sceneLayers = pkg.scene.layers.length;
+    pkg.scene.layers.forEach((layer, i) => {
+      sceneBytes += utf8Length(layer.art);
+      checkSvg(`scene.layers.${i}.art`, layer.art, true);
+    });
+    if (pkg.colors['scene-scrim'] === undefined)
+      warnings.push({ code: 'SCRIM_DEFAULT', path: 'colors.scene-scrim', message: 'scene-scrim is not set: headings on the scene get a panel in the package surface colour.' });
+  }
+  if (pkg.sets?.mascotFrom && art?.mascot)
+    warnings.push({
+      code: 'MASCOT_FROM_UNUSED',
+      path: 'sets.mascotFrom',
+      message: `The package has its own mascot, so sets.mascotFrom "${pkg.sets.mascotFrom}" is not used.`,
+      params: { theme: pkg.sets.mascotFrom },
+    });
+
   const fromBase = [
-    ...(art?.mascot ? [] : ['mascot']),
+    ...(art?.mascot ? [] : [pkg.sets?.mascotFrom ? `mascot (from ${pkg.sets.mascotFrom})` : 'mascot']),
     ...ILLUSTRATIONS.filter((n) => !art?.illustrations?.[n]),
     ...(art?.decoration ? [] : ['decoration']),
     ...(art?.pattern ? [] : ['pattern']),

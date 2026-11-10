@@ -32,6 +32,7 @@ export const baseColors: ThemeColors = {
   'on-strong': '#ffffff',
   overlay: '#14182b8c',
   'shadow-color': '#14182b1f',
+  'scene-scrim': '#ffffff',
   'display-banner-bg': '#fff1d1',
   'display-banner-text': '#14182b',
   'display-banner-border': '#8a5100',
@@ -135,6 +136,8 @@ export function themeColors(overrides: Partial<ThemeColors>): ThemeColors {
     'segment-off': overrides['segment-off'] ?? c['surface-2'],
     'icon-accent': overrides['icon-accent'] ?? c.accent,
     pattern: overrides.pattern ?? c.accent,
+    // The panel behind headings on a scene (S17a, D-166): the card surface unless the theme sets one.
+    'scene-scrim': overrides['scene-scrim'] ?? c.surface,
     // Printed QR codes scan best as pure black on white: no theme may change them (D-120).
     'print-ink': baseColors['print-ink'],
     'print-paper': baseColors['print-paper'],

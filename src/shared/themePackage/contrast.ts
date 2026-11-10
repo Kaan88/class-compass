@@ -76,6 +76,7 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   { fg: 'print-ink', bg: 'print-paper', min: AAA, why: 'printed link cards and QR codes' },
   { fg: 'text', bg: 'bg', min: AAA, why: 'classroom text on the page (AAA)' },
   { fg: 'text', bg: 'surface', min: AAA, why: 'classroom text on cards (AAA)' },
+  { fg: 'text', bg: 'scene-scrim', min: AAA, why: 'classroom headings on a scene (AAA, S17a)' },
   { fg: 'text', bg: 'surface-2', min: AA, why: 'text on secondary surfaces' },
   { fg: 'text', bg: 'accent-soft', min: AA, why: 'active nav / selected rows' },
   { fg: 'text-muted', bg: 'bg', min: AA, why: 'hints on the page' },

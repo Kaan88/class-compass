@@ -31,6 +31,8 @@ export const COLOR_TOKENS = [
   'on-strong',
   'overlay',
   'shadow-color',
+  // panel behind headings that sit on a theme scene (S17a, D-166); packages may leave it out (= surface)
+  'scene-scrim',
   // "visible on the classroom display" banner (PIN-5)
   'display-banner-bg',
   'display-banner-text',
@@ -144,6 +146,13 @@ export const isTranslucentToken = (t: string): boolean => (TRANSLUCENT_COLOR_TOK
 export const PACKAGE_COLOR_TOKENS = COLOR_TOKENS.filter((t): t is Exclude<ColorToken, FixedColorToken> => !(FIXED_COLOR_TOKENS as readonly string[]).includes(t));
 export type PackageColorToken = (typeof PACKAGE_COLOR_TOKENS)[number];
 export const isColorToken = (v: string): v is ColorToken => (COLOR_TOKENS as readonly string[]).includes(v);
+/**
+ * Package colour tokens that may be left out (S17a, D-166): their value then comes from another token
+ * of the same package (never from the base theme, whose colours may not suit the package's text).
+ */
+export const DERIVED_PACKAGE_TOKENS = { 'scene-scrim': 'surface' } as const satisfies Partial<Record<PackageColorToken, PackageColorToken>>;
+export type DerivedPackageToken = keyof typeof DERIVED_PACKAGE_TOKENS;
+export const isDerivedPackageToken = (t: string): t is DerivedPackageToken => Object.hasOwn(DERIVED_PACKAGE_TOKENS, t);
 
 export const MASCOT_POSES = ['idle', 'cheer', 'thinking', 'celebrate', 'sleepy'] as const;
 export type MascotPose = (typeof MASCOT_POSES)[number];
@@ -253,6 +262,7 @@ export const TOKEN_DOCS: Record<ColorToken, TokenDoc> = {
   'on-strong': { group: 'accent', use: 'Text on danger and success fills.' },
   overlay: { group: 'page', use: 'Dim layer behind dialogs (usually translucent, #rrggbbaa).' },
   'shadow-color': { group: 'page', use: 'Colour of card and dialog shadows (usually translucent).' },
+  'scene-scrim': { group: 'page', use: 'Panel behind headings and text that sit on a theme scene (S17a). Classroom text on it needs 7:1 (AAA). Optional in packages: then the package surface.' },
   'display-banner-bg': { group: 'banner', use: 'Background of the "visible on the classroom display" banner.' },
   'display-banner-text': { group: 'banner', use: 'Text of the display banner (4.5:1 on its background).' },
   'display-banner-border': { group: 'banner', use: 'Border of the display banner.' },

@@ -3,6 +3,7 @@
  * (S14h) and the tests. See docs/THEMING.md.
  */
 export * from './contrast.ts';
+export * from './engine.ts';
 export * from './limits.ts';
 export * from './motion.ts';
 export * from './presets.ts';

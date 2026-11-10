@@ -24,7 +24,7 @@ import { DEFAULT_THEME } from '../../src/shared/themes.ts';
 import { ThemePackage } from '../../src/shared/themePackage/schema.ts';
 import { parseSvg, SVG_ATTRIBUTES, SVG_ELEMENTS, svgToString, type SvgNode } from '../../src/shared/themePackage/svg.ts';
 import { contrastFailures, CONTRAST_PAIRS, pairContrast } from '../../src/shared/themePackage/contrast.ts';
-import { PACKAGE_COLOR_TOKENS, TRANSLUCENT_COLOR_TOKENS } from '../../src/shared/themePackage/tokens.ts';
+import { isDerivedPackageToken, PACKAGE_COLOR_TOKENS, TRANSLUCENT_COLOR_TOKENS } from '../../src/shared/themePackage/tokens.ts';
 import { validateThemePackage } from '../../src/shared/themePackage/validate.ts';
 
 const OCEAN = readFileSync(join(import.meta.dirname, '..', '..', 'docs', 'examples', 'ocean.theme.json'), 'utf8');
@@ -153,7 +153,8 @@ describe('package validator', () => {
     const q = ocean();
     q.colors['print-ink'] = '#ff0000';
     expect(validateThemePackage(q).report.errors[0]?.code).toBe('SCHEMA');
-    expect(Object.keys(ocean().colors).sort()).toEqual([...PACKAGE_COLOR_TOKENS].sort());
+    // S17a (D-166): optional tokens (scene-scrim) may be left out; ocean predates them.
+    expect(Object.keys(ocean().colors).sort()).toEqual(PACKAGE_COLOR_TOKENS.filter((t) => !isDerivedPackageToken(t)).sort());
   });
 
   it('only the translucent layers may have an alpha channel: transparent text, surfaces, focus or accent text are refused (UX-6, review fix)', () => {

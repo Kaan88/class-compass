@@ -11,7 +11,25 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { THEME_KEYS } from '../src/shared/themes.ts';
 import { CONTRAST_PAIRS } from '../src/shared/themePackage/contrast.ts';
-import { ART_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS, SOUND_LIMITS, SOUND_PARAM_LIMITS, STYLE_LIMITS } from '../src/shared/themePackage/limits.ts';
+import {
+  ACHIEVEMENT_FRAMES,
+  AMBIENT_PRESETS,
+  AMBIENT_SIZES,
+  AMBIENT_SPEEDS,
+  CORNER_COLORS,
+  DEFAULT_FRAME_SURFACES,
+  DEFAULT_TRIM_ON,
+  EDGE_COLOR,
+  FRAME_CORNERS,
+  FRAME_EDGES,
+  FRAME_SURFACES,
+  FRAME_TRIMS,
+  SCENE_ANCHORS,
+  SCENE_FITS,
+  SCENE_SMALL_SCREENS,
+  TRIM_COLORS,
+} from '../src/shared/themePackage/engine.ts';
+import { AMBIENT_LIMITS, ART_LIMITS, FRAME_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS, SCENE_LIMITS, SETS_LIMITS, SOUND_LIMITS, SOUND_PARAM_LIMITS, STYLE_LIMITS } from '../src/shared/themePackage/limits.ts';
 import { themePackageJsonSchema } from '../src/shared/themePackage/schema.ts';
 import { COLOR_TOKENS, FIXED_COLOR_TOKENS, TOKEN_DOCS, TOKEN_GROUPS, type ColorToken, type TokenGroup } from '../src/shared/themePackage/tokens.ts';
 
@@ -71,8 +89,35 @@ export function renderLimits(): string {
     ['Shape', `radius ${r(STYLE_LIMITS.radiusRem, ' rem')} (small ${r(STYLE_LIMITS.radiusSmRem, ' rem')}); borders ${r(STYLE_LIMITS.borderPx, ' px')} (strong ${r(STYLE_LIMITS.borderStrongPx, ' px')}); shadow presets only`],
     ['Icons and avatars', `icon stroke ${r(STYLE_LIMITS.iconStroke)}; avatar saturation ${r(STYLE_LIMITS.avatarSaturation, ' %')}, lightness ${r(STYLE_LIMITS.avatarLightness, ' %')}`],
     ['Celebration colours', `${r(PACKAGE_LIMITS.celebrationColors)} colour tokens`],
+    [
+      'Scene (S17a)',
+      `${r(SCENE_LIMITS.layers)} layers; each ≤ ${SCENE_LIMITS.svgMaxNodes} elements, ≤ ${SCENE_LIMITS.svgMaxBytes / 1024} KB, groups nested ≤ ${SCENE_LIMITS.svgMaxDepth} deep; opacity ${r(SCENE_LIMITS.opacity)}; maxHeightVh ${r(SCENE_LIMITS.maxHeightVh)}`,
+    ],
+    ['Frames (S17a)', `presets only; trimColors ${r(FRAME_LIMITS.trimColors)} colour tokens, cornerColors ${r(FRAME_LIMITS.cornerColors)}`],
+    ['Ambient (S17a)', `density ${r(AMBIENT_LIMITS.density)} particles on 1920×1080 (fewer on smaller screens); ≤ ${AMBIENT_LIMITS.maxFps} frames a second; one still frame without full motion`],
+    ['Sets (S17a)', `avatarFamiliesFirst ${r(SETS_LIMITS.avatarFamiliesFirst)} families`],
   ];
   return [begin('limits'), '', '| What | Limit |', '|---|---|', ...rows.map(([a, b]) => `| ${a} | ${b} |`), '', end('limits')].join('\n');
+}
+
+const names = (list: readonly string[]) => list.map((x) => `\`${x}\``).join(', ');
+
+/** The theme engine presets (S17a, D-166) with their default colour tokens. */
+export function renderEngine(): string {
+  const rows: Array<[string, string]> = [
+    ['`scene.layers[].fit`', names(SCENE_FITS)],
+    ['`scene.layers[].anchor`', names(SCENE_ANCHORS)],
+    ['`scene.smallScreens`', names(SCENE_SMALL_SCREENS)],
+    ['`frame.edge` (default `snowColor`)', FRAME_EDGES.map((e) => `\`${e}\` (${EDGE_COLOR[e]})`).join(', ')],
+    ['`frame.trim` (default `trimColors`)', FRAME_TRIMS.map((t) => `\`${t}\` (${TRIM_COLORS[t].join(', ')})`).join('; ')],
+    ['`frame.corners` (default `cornerColors`)', FRAME_CORNERS.map((c) => `\`${c}\` (${CORNER_COLORS[c].join(', ')})`).join('; ')],
+    ['`frame.apply`', `${names(FRAME_SURFACES)}; default ${names(DEFAULT_FRAME_SURFACES)}`],
+    ['`frame.trimOn`', `board box keys; default ${names(DEFAULT_TRIM_ON)}`],
+    ['`ambient.preset`', names(AMBIENT_PRESETS)],
+    ['`ambient.speed` / `ambient.size`', `${names(AMBIENT_SPEEDS)} / ${names(AMBIENT_SIZES)}`],
+    ['`sets.achievementFrame`', names(ACHIEVEMENT_FRAMES)],
+  ];
+  return [begin('engine'), '', '| Field | Presets |', '|---|---|', ...rows.map(([a, b]) => `| ${a} | ${b} |`), '', end('engine')].join('\n');
 }
 
 export const renderSchema = () => `${JSON.stringify(themePackageJsonSchema(), null, 2)}\n`;
@@ -85,7 +130,7 @@ export function renderThemingMd(current: string, colors: Record<string, Record<C
     if (a === -1 || b === -1 || b < a) throw new Error(`docs/THEMING.md has no ${name} markers`);
     return text.slice(0, a) + block + text.slice(b + end(name).length);
   };
-  return swap(swap(current, 'tokens', renderTokenTable(colors)), 'limits', renderLimits());
+  return swap(swap(swap(current, 'tokens', renderTokenTable(colors)), 'limits', renderLimits()), 'engine', renderEngine());
 }
 
 if (import.meta.main) {

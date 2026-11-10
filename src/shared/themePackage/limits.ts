@@ -56,6 +56,36 @@ export const ART_LIMITS = {
   svgMaxDepth: 12,
 } as const;
 
+/**
+ * Scenes (S17a, D-166): viewport-scale art behind the app, checked by the same sanitiser with larger
+ * per-layer limits (a village with trees and cottages needs more than a 100×100 mascot).
+ */
+export const SCENE_LIMITS = {
+  layers: [1, 3] as const,
+  svgMaxBytes: 60 * 1024,
+  svgMaxNodes: 1500,
+  svgMaxDepth: 12,
+  opacity: [0.3, 1] as const,
+  maxHeightVh: [20, 100] as const,
+} as const;
+
+/** Frames (S17a): colours are token names; trims take 2–3, corners 1–3. */
+export const FRAME_LIMITS = {
+  trimColors: [2, 3] as const,
+  cornerColors: [1, 3] as const,
+} as const;
+
+/** Ambient animation (S17a): particle count, frame rate cap. */
+export const AMBIENT_LIMITS = {
+  density: [10, 150] as const,
+  maxFps: 30,
+} as const;
+
+/** Sets (S17a): how many avatar families a theme may put first. */
+export const SETS_LIMITS = {
+  avatarFamiliesFirst: [0, 4] as const,
+} as const;
+
 /** Typography, shape, avatar and icon numbers. */
 export const STYLE_LIMITS = {
   weight: [400, 900] as const,

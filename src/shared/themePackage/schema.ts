@@ -10,11 +10,27 @@
  */
 import { z } from 'zod';
 import { THEME_KEYS, THEME_SLUG } from '../themes.ts';
-import { ART_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS, SOUND_PARAM_LIMITS, STYLE_LIMITS } from './limits.ts';
+import { CREATURE_FAMILY_KEYS, type CreatureFamily } from '../avatars.ts';
+import { BOX_KEYS } from '../classroomLayout.ts';
+import {
+  ACHIEVEMENT_FRAMES,
+  AMBIENT_PRESETS,
+  AMBIENT_SIZES,
+  AMBIENT_SPEEDS,
+  FRAME_CORNERS,
+  FRAME_EDGES,
+  FRAME_SURFACES,
+  FRAME_TRIMS,
+  SCENE_ANCHORS,
+  SCENE_FITS,
+  SCENE_SMALL_SCREENS,
+  SCENE_VIEWBOX,
+} from './engine.ts';
+import { AMBIENT_LIMITS, ART_LIMITS, FRAME_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS, SCENE_LIMITS, SETS_LIMITS, SOUND_PARAM_LIMITS, STYLE_LIMITS } from './limits.ts';
 import { EASINGS, MOTION_PRESETS } from './motion.ts';
 import { FONT_PRESETS, SHADOW_PRESETS } from './presets.ts';
 import { SOUND_SCALES, SOUND_WAVES } from './sound.ts';
-import { COLOR_TOKENS, ILLUSTRATIONS, isTranslucentToken, MASCOT_POSES, PACKAGE_COLOR_TOKENS, SOUND_EVENTS, type PackageColorToken } from './tokens.ts';
+import { COLOR_TOKENS, ILLUSTRATIONS, isDerivedPackageToken, isTranslucentToken, MASCOT_POSES, PACKAGE_COLOR_TOKENS, SOUND_EVENTS, type PackageColorToken } from './tokens.ts';
 
 export const THEME_PACKAGE_FORMAT = 'class-compass-theme';
 export const THEME_PACKAGE_VERSION = 1;
@@ -40,8 +56,12 @@ export const OpaqueHexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/u, '#rrggbb (o
 const colorSchemaOf = (t: PackageColorToken) => (isTranslucentToken(t) ? HexColor : OpaqueHexColor);
 
 export const PackageColors = z
-  .strictObject(Object.fromEntries(PACKAGE_COLOR_TOKENS.map((t) => [t, colorSchemaOf(t)])) as Record<PackageColorToken, typeof HexColor>)
-  .describe('Every colour token except print-ink and print-paper (always black on white). Opaque #rrggbb, except overlay, shadow-color and avatar-outline (#rrggbb or #rrggbbaa). See the token table in docs/THEMING.md.');
+  .strictObject(
+    Object.fromEntries(PACKAGE_COLOR_TOKENS.map((t) => [t, isDerivedPackageToken(t) ? colorSchemaOf(t).optional() : colorSchemaOf(t)])) as Record<PackageColorToken, typeof HexColor>,
+  )
+  .describe(
+    'Every colour token except print-ink and print-paper (always black on white). Opaque #rrggbb, except overlay, shadow-color and avatar-outline (#rrggbb or #rrggbbaa). scene-scrim may be left out (it is then the package surface). See the token table in docs/THEMING.md.',
+  );
 
 export const Typography = z.strictObject({
   body: z.enum(keysOf(FONT_PRESETS)).describe('Font preset of body text.'),
@@ -123,6 +143,71 @@ export const Art = z.strictObject({
   patternSize: intRange(...ART_LIMITS.patternSize).optional(),
 });
 
+// ---------------------------------------------------------------- S17a (D-166): scene, frame, ambient, sets
+export const SceneSvgSource = z
+  .string()
+  .min(1)
+  .max(SCENE_LIMITS.svgMaxBytes)
+  .describe(`An SVG fragment for one scene layer (no <svg> element), the same allow-list as other art; at most ${SCENE_LIMITS.svgMaxBytes / 1024} KB and ${SCENE_LIMITS.svgMaxNodes} elements.`);
+
+export const SceneLayer = z.strictObject({
+  art: SceneSvgSource,
+  viewBox: z.string().regex(SCENE_VIEWBOX, '"0 0 W H" with a positive width and height').describe('The coordinate box of the art, e.g. "0 0 1920 1080".'),
+  fit: z.enum(SCENE_FITS).describe('cover crops to fill the screen, contain shows all of it, width / height fit one side.'),
+  anchor: z.enum(SCENE_ANCHORS).describe('Which part stays in view when cropped, or where a smaller layer sits.'),
+  maxHeightVh: range(...SCENE_LIMITS.maxHeightVh).optional().describe('Highest the layer may be, in percent of the screen height (e.g. 45 keeps a village in the lower part).'),
+});
+
+export const Scene = z
+  .strictObject({
+    layers: z.array(SceneLayer).min(SCENE_LIMITS.layers[0]).max(SCENE_LIMITS.layers[1]).describe('Drawn back to front: the first layer is the farthest.'),
+    opacity: range(...SCENE_LIMITS.opacity),
+    smallScreens: z.enum(SCENE_SMALL_SCREENS).describe('Below the phone breakpoint: full, only the last layer as a strip at the bottom (bottomStrip), or none (hidden).'),
+  })
+  .describe('Viewport-scale artwork fixed behind the app (decorative). Text never sits on it: boxes and bars keep their surfaces and headings on the page get a scene-scrim panel.');
+
+const tokenName = z.enum(COLOR_TOKENS);
+export const Frame = z
+  .strictObject({
+    edge: z.enum(FRAME_EDGES).describe('Card silhouette: snow piled on top, a scalloped edge, a torn paper edge.'),
+    trim: z.enum(FRAME_TRIMS).optional().describe('A band around the boxes listed in trimOn (default none).'),
+    corners: z.enum(FRAME_CORNERS).optional().describe('Small accents at the corners (default none).'),
+    apply: z
+      .array(z.enum(FRAME_SURFACES))
+      .min(1)
+      .max(FRAME_SURFACES.length)
+      .optional()
+      .describe('Surfaces that get the edge and corners (default boardBoxes, studentCards, topBar). cards and dialogs get the edge only.'),
+    trimOn: z.array(z.enum(BOX_KEYS)).max(BOX_KEYS.length).optional().describe('Board boxes that get the trim (box keys of the classroom board; default routine and core.timer).'),
+    snowColor: tokenName.optional().describe('Colour token of the edge shape (default per edge: art-ground for snowDrift, surface otherwise).'),
+    trimColors: z.array(tokenName).min(FRAME_LIMITS.trimColors[0]).max(FRAME_LIMITS.trimColors[1]).optional().describe('Colour tokens of the trim (default per trim, e.g. accent and surface for candyStripe).'),
+    cornerColors: z.array(tokenName).min(FRAME_LIMITS.cornerColors[0]).max(FRAME_LIMITS.cornerColors[1]).optional().describe('Colour tokens of the corners (default per corner preset).'),
+  })
+  .describe('App-drawn frames from presets only (no SVG in the package). Colours are token names. Phones and compact density get the edge only.');
+
+export const Ambient = z
+  .strictObject({
+    preset: z.enum(AMBIENT_PRESETS),
+    density: intRange(...AMBIENT_LIMITS.density).describe('Number of particles on a 1920x1080 screen (fewer on smaller screens).'),
+    speed: z.enum(AMBIENT_SPEEDS),
+    color: tokenName.optional().describe('Colour token of the particles (default: surface for snowfall, deco-1..3 for leaves).'),
+    size: z.enum(AMBIENT_SIZES),
+  })
+  .describe(`A silent background animation on one canvas between the scene and the content, at most ${AMBIENT_LIMITS.maxFps} frames a second. With the class animation switch off or reduced motion it draws one still frame.`);
+
+const families = CREATURE_FAMILY_KEYS as [CreatureFamily, ...CreatureFamily[]];
+export const Sets = z
+  .strictObject({
+    achievementFrame: z.enum(ACHIEVEMENT_FRAMES).describe('A frame around the badge art; the tier keeps its shape, colour token and word.'),
+    avatarFamiliesFirst: z
+      .array(z.enum(families))
+      .min(SETS_LIMITS.avatarFamiliesFirst[0])
+      .max(SETS_LIMITS.avatarFamiliesFirst[1])
+      .describe('Creature families shown first in the avatar picker; nothing is hidden and saved avatars never change.'),
+    mascotFrom: z.enum(THEME_KEYS).optional().describe('A built-in theme whose mascot to use when the package has no mascot art (default: the base theme).'),
+  })
+  .describe('Choose and recolour built-in sets (no custom avatar or badge art).');
+
 export const ThemePackage = z.strictObject({
   format: z.literal(THEME_PACKAGE_FORMAT),
   version: z.literal(THEME_PACKAGE_VERSION),
@@ -148,8 +233,16 @@ export const ThemePackage = z.strictObject({
       .describe('Colour tokens of the celebration fireworks.'),
   }),
   art: Art.optional(),
+  scene: Scene.optional(),
+  frame: Frame.optional(),
+  ambient: Ambient.optional(),
+  sets: Sets.optional(),
 });
 export type ThemePackage = z.infer<typeof ThemePackage>;
+export type ThemePackageScene = z.infer<typeof Scene>;
+export type ThemePackageFrame = z.infer<typeof Frame>;
+export type ThemePackageAmbient = z.infer<typeof Ambient>;
+export type ThemePackageSets = z.infer<typeof Sets>;
 
 /**
  * A package as stored (it passed `ThemePackage` when imported). Read leniently on the client: colour

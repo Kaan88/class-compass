@@ -23,7 +23,11 @@ export const ThemeReport = z.object({
   key: z.string().nullable(),
   errors: z.array(Issue),
   warnings: z.array(Issue),
-  stats: z.object({ bytes: z.number(), pictures: z.number(), svgNodes: z.number() }),
+  stats: z.object({ bytes: z.number(), pictures: z.number(), svgNodes: z.number(), // Scene stats (S17a, D-166); reports stored before S17a have none.
+    sceneLayers: z.number().default(0),
+    sceneBytes: z.number().default(0),
+    sceneNodes: z.number().default(0),
+  }),
 });
 export type ThemeReportDto = z.infer<typeof ThemeReport>;
 

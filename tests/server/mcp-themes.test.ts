@@ -129,6 +129,90 @@ describe('preview_theme (D-164)', () => {
   });
 });
 
+describe('theme engine fields over MCP (S17a, D-166)', () => {
+  it('theme_schema exposes scene, frame, ambient and sets with their presets', async () => {
+    const r = await teacher.call('theme_schema', {});
+    expect(r.isError, r.text).toBe(false);
+    const props = r.data.schema.properties as Record<string, any>;
+    for (const k of ['scene', 'frame', 'ambient', 'sets']) expect(props[k], k).toBeDefined();
+    const text = JSON.stringify(props);
+    for (const preset of ['snowDrift', 'scallop', 'torn', 'candyStripe', 'garland', 'lights', 'stitched', 'pencil', 'holly', 'compass', 'leaf', 'snowfall', 'leaves', 'snowflake', 'ornament', 'shield', 'bottomStrip'])
+      expect(text, preset).toContain(`"${preset}"`);
+    expect(r.data.schema.required).not.toContain('scene');
+  });
+
+  it('validate_theme accepts the Snow Day example and reports its scene', async () => {
+    const r = await teacher.call('validate_theme', { package: example('peppermint-snow-day') });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.data.report.ok).toBe(true);
+    expect(r.data.report.stats).toMatchObject({ sceneLayers: 3 });
+    expect(r.data.report.stats.sceneNodes).toBeGreaterThan(0);
+  });
+
+  it('validate_theme rejects unknown presets, raw colours and over-limit scenes', async () => {
+    const bad = (patch: (p: Record<string, any>) => void) => {
+      const p = example('peppermint-snow-day');
+      patch(p);
+      return p;
+    };
+    const cases: Array<[string, Record<string, any>]> = [
+      ['frame.edge', bad((p) => (p.frame.edge = 'icicles'))],
+      ['frame.trimColors', bad((p) => (p.frame.trimColors = ['#ff0000', 'surface']))],
+      ['frame.snowColor', bad((p) => (p.frame.snowColor = 'red;}body{color:red'))],
+      ['ambient.preset', bad((p) => (p.ambient.preset = 'confetti'))],
+      ['ambient.density', bad((p) => (p.ambient.density = 500))],
+      ['sets.avatarFamiliesFirst', bad((p) => (p.sets.avatarFamiliesFirst = ['dragons']))],
+      ['scene.layers', bad((p) => (p.scene.layers = [...p.scene.layers, p.scene.layers[0]]))],
+      ['scene.layers.0.viewBox', bad((p) => (p.scene.layers[0].viewBox = '0 0 -5 10'))],
+    ];
+    for (const [path, pkg] of cases) {
+      const r = await teacher.call('validate_theme', { package: pkg });
+      expect(r.data.report.ok, path).toBe(false);
+      expect(r.data.report.errors.map((e: { path: string }) => e.path).some((p: string) => p.startsWith(path)), `${path}: ${JSON.stringify(r.data.report.errors)}`).toBe(true);
+    }
+    const svg = await teacher.call('validate_theme', { package: bad((p) => (p.scene.layers[1].art = "<rect x='0' y='0' width='10' height='10' style='fill:red'/>")) });
+    expect(svg.data.report.errors[0]).toMatchObject({ code: 'SVG', path: 'scene.layers.1.art' });
+  });
+
+  it('preview_theme fills in the engine defaults and the derived scene-scrim', async () => {
+    const pkg = example('peppermint-snow-day');
+    delete pkg.colors['scene-scrim'];
+    pkg.frame = { edge: 'scallop' };
+    const r = await teacher.call('preview_theme', { package: pkg });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.data.report.ok).toBe(true);
+    expect(r.data.report.warnings.map((w: { code: string }) => w.code)).toContain('SCRIM_DEFAULT');
+    expect(r.data.colors.find((c: { token: string }) => c.token === 'scene-scrim')).toEqual({ token: 'scene-scrim', value: pkg.colors.surface, source: 'derived' });
+    expect(r.data.engine.frame).toEqual({
+      edge: 'scallop',
+      trim: 'none',
+      corners: 'none',
+      apply: ['boardBoxes', 'studentCards', 'topBar'],
+      trimOn: ['routine', 'core.timer'],
+      snowColor: 'surface',
+      trimColors: ['accent', 'surface'],
+      cornerColors: ['border'],
+    });
+    expect(r.data.engine.scene.layers).toHaveLength(3);
+    expect(r.data.engine.scene.layers.every((l: { elements: number | null }) => typeof l.elements === 'number')).toBe(true);
+    expect(r.data.engine.ambient).toMatchObject({ preset: 'snowfall', speed: 'slow' });
+    expect(r.data.engine.sets).toMatchObject({ achievementFrame: 'snowflake', mascotFrom: null });
+    const plain = await teacher.call('preview_theme', { package: example('ocean') });
+    expect(plain.data.engine).toEqual({ scene: null, frame: null, ambient: null, sets: null });
+  });
+
+  it('import_theme_draft keeps the new fields (administrators)', async () => {
+    const pkg = example('peppermint-snow-day');
+    pkg.key = 'mcp-snow-draft';
+    const r = await admin.call('import_theme_draft', { package: pkg });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.data.status).toBe('draft');
+    const back = await admin.call('export_theme', { key: 'mcp-snow-draft' });
+    expect(back.data.package.scene.layers).toHaveLength(3);
+    expect(back.data.package.frame).toEqual(pkg.frame);
+  });
+});
+
 describe('server instructions (D-164)', () => {
   it('tell the agent where theme work starts', async () => {
     const c = new Mcp(env, (await makeToken(school.teacherA, { scopes: ['classes:read'], name: 'Instr' })).secret);
