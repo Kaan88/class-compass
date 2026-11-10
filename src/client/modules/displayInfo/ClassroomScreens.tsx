@@ -35,6 +35,8 @@ export function ClassroomScreens() {
           { key: 'ratio', header: t('displayInfo.col.ratio'), render: (r) => String(r.last.pixelRatio) },
           { key: 'browser', header: t('displayInfo.col.browser'), render: (r) => `${r.last.browser} · ${r.last.os}` },
           { key: 'touch', header: t('displayInfo.col.touch'), render: (r) => yesNo(r.last.touch) },
+          // S18 (D-167): null = sampled before full screen was recorded.
+          { key: 'fullscreen', header: t('displayInfo.col.fullscreen'), render: (r) => (r.last.fullscreen === null ? t('displayInfo.notRecorded') : yesNo(r.last.fullscreen)) },
           { key: 'text', header: t('displayInfo.col.textScale'), render: (r) => `${r.last.textScale} %` },
           {
             key: 'board',

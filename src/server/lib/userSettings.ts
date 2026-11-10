@@ -12,7 +12,7 @@
  * secrets or anything another account must see (per-device conveniences stay in localStorage).
  */
 import { and, eq } from 'drizzle-orm';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { DisplayInfoRecord, EMPTY_DISPLAY_INFO } from '../../shared/contracts/displayInfo.ts';
 import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings } from '../../shared/notifications.ts';
 import { DEFAULT_VIEW_REF, ViewRef } from '../../shared/reportViews.ts';
@@ -34,6 +34,8 @@ export const USER_SETTINGS = {
   'notifications.settings': setting(NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS),
   /** S16c (D-165): the last classroom screen seen by this account (removable module `displayInfo`; not a preference, account metadata only the admin sees). */
   'displayInfo.lastSeen': setting(DisplayInfoRecord, EMPTY_DISPLAY_INFO),
+  /** S18 (D-167): Start lesson enters full screen and End lesson leaves it (on by default; the board's button works either way). */
+  'lessons.fullscreen': setting(z.boolean(), true),
 } as const;
 
 export type UserSettingKey = keyof typeof USER_SETTINGS;

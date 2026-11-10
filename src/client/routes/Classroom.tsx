@@ -30,6 +30,7 @@ import { classLabel } from '../modules/lessons/labels.ts';
 import { EndLessonFlow, LessonSummaryView, type EndDraft } from '../modules/lessons/EndLesson.tsx';
 import { serverNow, useActiveLessons, useLessonState, useServerOffset } from '../modules/lessons/lessonClient.ts';
 import { emptyStartDraft, StartLessonFlow, type StartDraft } from '../modules/lessons/StartLesson.tsx';
+import { FullscreenButton } from '../modules/lessons/fullscreen.tsx';
 import { preloadTimeUp } from '../modules/lessons/timeUp.ts';
 import { BigButton, Button, buttonClass } from '../ui/Button.tsx';
 import { EmptyState, OutboxAttentionTray, OutboxSaveBadge, registerCommandDescription } from '../ui/Feedback.tsx';
@@ -250,9 +251,12 @@ function ClassroomScreen({
     );
   };
 
+  // Full screen / Leave full screen while a lesson runs (S18, D-167); hidden where the browser has none.
+  const lessonRunning = Boolean(lesson && active) && mode.kind !== 'summary';
   const tools = (
     <>
       <OutboxSaveBadge />
+      {lessonRunning ? <FullscreenButton /> : null}
       <Button onPress={() => void navigate({ to: '/teacher' })}>
         <IconLock />
         {t('classroom.teacherArea')}

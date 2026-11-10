@@ -3527,6 +3527,13 @@ export const en = {
   'displayInfo.layout.all': 'Own layout for all classes',
   'displayInfo.reducedMotion': 'Reduced motion',
   'displayInfo.recentItem': '{window} in {screen} at {ratio}× ({seen})',
+  'displayInfo.col.fullscreen': 'Full screen',
+  'displayInfo.notRecorded': 'Not recorded',
+  'fullscreen.enter': 'Full screen',
+  'fullscreen.leave': 'Leave full screen',
+  'fullscreen.settingsTitle': 'Lessons',
+  'fullscreen.setting': 'Full screen during lessons',
+  'fullscreen.settingHint': 'Begin lesson fills the whole screen with the board, and Save and end lesson leaves full screen. On every classroom computer you sign in to. The Full screen button on the board works either way, and Esc always leaves.',
 } as const;
 
 export type MessageKey = keyof typeof en;

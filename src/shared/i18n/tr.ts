@@ -3525,4 +3525,11 @@ export const tr = {
   'displayInfo.layout.all': 'Tüm sınıflar için özel yerleşim',
   'displayInfo.reducedMotion': 'Azaltılmış hareket',
   'displayInfo.recentItem': '{window}, ekran {screen}, {ratio}× ({seen})',
+  'displayInfo.col.fullscreen': 'Tam ekran',
+  'displayInfo.notRecorded': 'Kaydedilmedi',
+  'fullscreen.enter': 'Tam ekran',
+  'fullscreen.leave': 'Tam ekrandan çık',
+  'fullscreen.settingsTitle': 'Dersler',
+  'fullscreen.setting': 'Derslerde tam ekran',
+  'fullscreen.settingHint': 'Derse başla dediğinizde pano tüm ekranı kaplar; Kaydet ve dersi bitir dediğinizde tam ekran kapanır. Giriş yaptığınız her sınıf bilgisayarında geçerlidir. Panodaki Tam ekran düğmesi her durumda çalışır, Esc tuşu da her zaman tam ekrandan çıkarır.',
 } as const satisfies Messages;

@@ -79,6 +79,24 @@ describe('DisplayReporter (S16c, D-165)', () => {
     act(() => void vi.advanceTimersByTime(1));
     expect(calls).toHaveLength(3);
   });
+
+  it('sends again after a full screen change and records it (S18, D-167)', () => {
+    let element: Element | null = null;
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => element });
+    try {
+      mount();
+      act(() => void vi.advanceTimersByTime(MOUNT_DELAY_MS));
+      expect(DisplaySample.parse(calls[0]).fullscreen).toBe(false);
+      act(() => void vi.advanceTimersByTime(MIN_GAP_MS));
+      element = document.documentElement;
+      act(() => void document.dispatchEvent(new Event('fullscreenchange')));
+      act(() => void vi.advanceTimersByTime(RESIZE_SETTLE_MS));
+      expect(calls).toHaveLength(2);
+      expect(DisplaySample.parse(calls[1]).fullscreen).toBe(true);
+    } finally {
+      delete (document as unknown as Record<string, unknown>).fullscreenElement;
+    }
+  });
 });
 
 describe('parseUserAgent (S16c)', () => {

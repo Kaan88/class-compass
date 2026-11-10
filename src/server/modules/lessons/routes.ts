@@ -4,6 +4,7 @@ import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
 import * as svc from './service.ts';
 import * as topics from './topics.ts';
+import * as prefs from './prefs.ts';
 
 export function registerLessonRoutes(app: FastifyInstance, deps: AppDeps) {
   // classroom (polling with ETag/304, LES-2)
@@ -20,6 +21,9 @@ export function registerLessonRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.lessonRoutines, (ctx, input) => svc.lessonRoutines(ctx, input.contextId));
   route(app, deps, C.lessonRoster, (ctx, input) => svc.lessonRoster(ctx, input.contextId, input.lessonId));
   route(app, deps, C.lessonSummary, (ctx, input) => svc.lessonSummary(ctx, input.lessonId));
+  // S18 (D-167): the teacher's own "Full screen during lessons" preference.
+  route(app, deps, C.getLessonPrefs, (ctx) => prefs.getLessonPrefs(ctx));
+  route(app, deps, C.setLessonPrefs, (ctx, input) => prefs.setLessonPrefs(ctx, input));
   // lesson topics (S13a, D-101)
   route(app, deps, C.classroomTopics, (ctx, input) => topics.classroomTopics(ctx, input.contextId));
   route(app, deps, C.getTopicPlan, (ctx, input) => topics.getPlan(ctx, input.contextId));

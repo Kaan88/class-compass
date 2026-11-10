@@ -157,6 +157,19 @@ export const lessonSummary = endpoint({
   mcp: { scope: 'reports:read', tool: 'lesson_summary', readOnly: true, description: 'One lesson of yours: class, subject, date, routine and how far it got, attendance counts and your own end-of-lesson reflection (rating and note). Counts only for students.' },
 });
 
+// ---------------------------------------------------------------- lesson preferences (S18, D-167)
+
+/**
+ * The teacher's own lesson preferences (per account, user setting `lessons.fullscreen`): whether Start
+ * lesson enters full screen and End lesson leaves it. Read on the classroom board (`classroom`, works
+ * while the teacher area is locked; nothing about students), changed on the teacher's profile page
+ * (`teacher`, PIN-gated in classroom mode). No `mcp` field: a device preference, not school data.
+ */
+export const LessonPrefs = z.object({ fullscreen: z.boolean() }).strict();
+export type LessonPrefs = z.infer<typeof LessonPrefs>;
+export const getLessonPrefs = endpoint({ method: 'GET', path: '/api/classroom/lesson-prefs', access: 'classroom', input: z.object({}), output: LessonPrefs });
+export const setLessonPrefs = endpoint({ method: 'PUT', path: '/api/teacher/lesson-prefs', access: 'teacher', input: LessonPrefs, output: LessonPrefs });
+
 // ---------------------------------------------------------------- commands (POST /api/commands)
 const LessonRef = { contextId: Id, lessonId: Id };
 const Stages = z.array(z.object({ id: z.string().max(64).optional(), name: RequiredLocalizedText })).min(1).max(MAX_STAGES);

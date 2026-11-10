@@ -1,7 +1,8 @@
 /**
  * End Lesson (LES-3): the screens of the End Lesson steps the server lists for this lesson (module
  * steps first, then the core reflection), then one 'lesson.end' command and a summary. Works with
- * every optional module switched off (only the reflection remains).
+ * every optional module switched off (only the reflection remains). Save and end leaves full screen
+ * when the teacher's "Full screen during lessons" is on (S18, D-167).
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -19,6 +20,7 @@ import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { playEvent } from '../../themes/index.tsx';
 import { awaitCommand, sendLessonCommand } from './lessonClient.ts';
+import { exitLessonFullscreen, useLessonPrefs } from './fullscreen.tsx';
 import { endStepUis, type ClassroomContext } from '../registry.ts';
 import type { ReflectionValue } from './ReflectionStep.tsx';
 
@@ -50,8 +52,11 @@ export function EndLessonFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const label = classLabel(context, locale);
+  const prefs = useLessonPrefs();
 
   const finish = async () => {
+    // S18 (D-167): Save and end leaves full screen (Back to lesson keeps it).
+    exitLessonFullscreen(prefs);
     setBusy(true);
     setError(null);
     playEvent('lessonEnd');

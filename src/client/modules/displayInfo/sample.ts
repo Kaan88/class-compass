@@ -58,6 +58,7 @@ export function readSample(inputs: SampleInputs, w: Window = window): DisplaySam
     touch: (w.navigator.maxTouchPoints ?? 0) > 0,
     reducedMotion: reduced,
     textScale: clampInt(inputs.textScale, 50, 300),
+    fullscreen: Boolean(w.document?.fullscreenElement),
   };
   const parsed = DisplaySample.safeParse(candidate);
   return parsed.success ? parsed.data : null;

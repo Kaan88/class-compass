@@ -1,6 +1,6 @@
 /**
- * Sends the classroom screen's size once per board mount and after a window resize, at most once a
- * minute (S16c, D-165). Renders nothing. A failed send is dropped: the next mount sends again.
+ * Sends the classroom screen's size once per board mount and after a window resize or a full screen
+ * change (S18), at most once a minute (S16c, D-165). Renders nothing. A failed send is dropped: the next mount sends again.
  */
 import { useEffect, useRef } from 'react';
 import * as C from '../../../shared/contracts/displayInfo.ts';
@@ -41,8 +41,10 @@ export function DisplayReporter({ layoutSource }: Props) {
       timer = setTimeout(send, Math.max(RESIZE_SETTLE_MS, lastSent + MIN_GAP_MS - Date.now()));
     };
     window.addEventListener('resize', onResize);
+    document.addEventListener('fullscreenchange', onResize);
     return () => {
       window.removeEventListener('resize', onResize);
+      document.removeEventListener('fullscreenchange', onResize);
       if (timer) clearTimeout(timer);
     };
   }, []);

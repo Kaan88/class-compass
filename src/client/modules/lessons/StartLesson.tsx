@@ -3,7 +3,8 @@
  * attendance (everyone present by default; one tap per change), today's assistant, the routine
  * choice — then the lesson begins. Each step adds its part to ONE 'lesson.start' outbox command
  * (e.g. the confirmed attendance, the routine), so the start is idempotent and never creates a
- * second lesson; if one is already running the device simply resumes it (LES-2).
+ * second lesson; if one is already running the device simply resumes it (LES-2). Begin also enters
+ * full screen when the teacher's "Full screen during lessons" is on (S18, D-167).
  */
 import { useState } from 'react';
 import type { StartLessonResult } from '../../../shared/contracts/lessons.ts';
@@ -17,6 +18,7 @@ import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { playEvent } from '../../themes/index.tsx';
 import { awaitCommand, sendLessonCommand } from './lessonClient.ts';
+import { enterLessonFullscreen, useLessonPrefs } from './fullscreen.tsx';
 import { initialStartValues, startStepsFor, useStartContributions, type ClassroomContext } from '../registry.ts';
 
 /**
@@ -52,8 +54,11 @@ export function StartLessonFlow({
   const contribution = useStartContributions(context, values);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const prefs = useLessonPrefs();
 
   const start = async () => {
+    // S18 (D-167): full screen needs the user gesture, so it is asked for before anything is awaited.
+    enterLessonFullscreen(prefs);
     setStarting(true);
     setError(null);
     playEvent('lessonStart');

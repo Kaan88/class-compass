@@ -3,6 +3,7 @@
  * the teacher area is locked), an admin-only read, tight validation, last value + ring of 5 sizes.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { userSettings } from '../../src/server/db/schema.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
 
@@ -20,6 +21,7 @@ const sample = (over: Record<string, unknown> = {}) => ({
   touch: true,
   reducedMotion: false,
   textScale: 100,
+  fullscreen: false,
   ...over,
 });
 
@@ -62,6 +64,8 @@ describe('displayInfo (S16c, D-165)', () => {
     ['an odd theme', { theme: '<script>' }],
     ['an unknown density', { density: 'huge' }],
     ['an extra field', { userAgent: 'x' }],
+    ['a missing full screen flag (S18)', { fullscreen: undefined }],
+    ['a full screen flag that is not a boolean (S18)', { fullscreen: 'yes' }],
   ])('refuses %s', async (_name, over) => {
     expect((await s.teacherA.post('/api/classroom/display-info', sample(over))).status).toBe(400);
   });
@@ -77,6 +81,25 @@ describe('displayInfo (S16c, D-165)', () => {
     expect(teachers[0].last.innerWidth).toBe(1024);
     expect(teachers[0].last.seenAt).toBe(env.clock.now());
     expect(teachers[0].recent.map((r: { innerWidth: number }) => r.innerWidth)).toEqual([1024, 1600, 1440, 1366, 1280]);
+  });
+
+  it('records whether the board was in full screen (S18, D-167)', async () => {
+    await ok(s.teacherA.post('/api/classroom/display-info', sample({ fullscreen: true })));
+    const { teachers } = await ok(s.admin.get('/api/admin/display-info'));
+    expect(teachers[0].last.fullscreen).toBe(true);
+  });
+
+  it('keeps a sample stored before S18 and shows its full screen flag as not recorded (D-167)', async () => {
+    await ok(s.teacherA.post('/api/classroom/display-info', sample()));
+    // Rewrite the stored row as an S16c version stored it: no `fullscreen` field.
+    const row = env.db.select().from(userSettings).all().find((r) => r.key === 'displayInfo.lastSeen')!;
+    const old = structuredClone(row.valueJson) as { last: Record<string, unknown> };
+    delete old.last.fullscreen;
+    env.db.update(userSettings).set({ valueJson: old }).run();
+    const { teachers } = await ok(s.admin.get('/api/admin/display-info'));
+    expect(teachers).toHaveLength(1);
+    expect(teachers[0].last.fullscreen).toBeNull();
+    expect(teachers[0].last.innerWidth).toBe(1920);
   });
 
   it('is rate-limited per address', async () => {

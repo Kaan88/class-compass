@@ -19,6 +19,7 @@ import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
 import { SignInMethodSection } from '../SignIn.tsx';
 import { TimeUpClipSection } from './ClassDisplay.tsx';
+import { LessonPrefsSection } from '../../modules/lessons/fullscreen.tsx';
 import * as School from '../../../shared/contracts/school.ts';
 import { SensitiveGate } from '../Lock.tsx';
 import { StudentStatsProvider } from '../../ui/StudentName.tsx';
@@ -300,6 +301,8 @@ export function ProfilePage() {
       </section>
       {/* Teachers: the classroom PIN. Administrators: the PIN that confirms Maintenance actions (D-138). */}
       <PinSection me={me} />
+      {/* "Full screen during lessons" (S18, D-167): follows the account to every classroom computer. */}
+      {me.role === 'teacher' ? <LessonPrefsSection /> : null}
       {me.role === 'teacher' ? <ClipSection /> : null}
       {me.signInMethod === 'password' ? (
         <section className="cc-card cc-stack">

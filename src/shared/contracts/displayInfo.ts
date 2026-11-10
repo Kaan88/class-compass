@@ -3,9 +3,9 @@
  * header of `src/server/modules/displayInfo/manifest.ts` for how to take it out.
  *
  * The classroom board sends what it sees of the screen (sizes, pixel ratio, a short browser/OS text,
- * a few display preferences); the server keeps the last sample per teacher account plus the last five
- * distinct sizes. Nothing about students. Every field is bounded and short texts follow an allow-list
- * pattern, so the endpoint cannot be used to store arbitrary text.
+ * a few display preferences, whether it is in full screen since S18); the server keeps the last
+ * sample per teacher account plus the last five distinct sizes. Nothing about students. Every field
+ * is bounded and short texts follow an allow-list pattern, so the endpoint cannot be used to store arbitrary text.
  */
 import { z } from 'zod';
 import { Empty, Ok, endpoint } from './define.ts';
@@ -36,11 +36,14 @@ export const DisplaySample = z
     touch: z.boolean(),
     reducedMotion: z.boolean(),
     textScale: z.number().int().min(50).max(300),
+    /** S18 (D-167): whether the page was in full screen when the sample was taken. */
+    fullscreen: z.boolean(),
   })
   .strict();
 export type DisplaySample = z.infer<typeof DisplaySample>;
 
-export const DisplaySeen = DisplaySample.extend({ seenAt: z.number().int() });
+/** A stored sample. Samples stored before S18 have no `fullscreen`: read as null ("not recorded"), so they are kept. */
+export const DisplaySeen = DisplaySample.extend({ seenAt: z.number().int(), fullscreen: z.boolean().nullable().default(null) });
 export type DisplaySeen = z.infer<typeof DisplaySeen>;
 
 export const DisplaySize = z.object({

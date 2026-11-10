@@ -411,3 +411,14 @@ export const IconSliders = () => (
     <circle cx="17" cy="18" r="2" />
   </Icon>
 );
+/** Full screen during lessons (S18, D-167): enter (corners outwards) and leave (corners inwards). */
+export const IconFullscreen = () => (
+  <Icon>
+    <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+  </Icon>
+);
+export const IconFullscreenExit = () => (
+  <Icon>
+    <path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" />
+  </Icon>
+);
