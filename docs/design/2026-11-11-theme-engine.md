@@ -1,6 +1,6 @@
 # Theme engine: scenes, frames, ambient, sets and sound styles; full screen in lessons (2026-11-11): S17/S18 brief
 
-The owner imported the "Peppermint Parade: Snow Day" package and the classroom board still looked like the standard layout in other colours. The owner asked for a much more powerful theme engine, approved the mockups and asked for the built-in themes to be remade with it. Stages S17a, S17b and S18; decisions D-166 to D-168; **no migrations**.
+The owner imported the "Peppermint Parade: Snow Day" package and the classroom board still looked like the standard layout in other colours. The owner asked for a much more powerful theme engine, approved the mockups and asked for the built-in themes to be remade with it. Stages S17a, S17b, S17c and S18; decisions D-166 to D-169; **no migrations**.
 
 Mockups (approved 2026-11-11): the canvas "Snow Day theme mockups" (owner's private artifact); copies of the artboards are in `docs/design/mockups/2026-11-11-theme-engine/`:
 
@@ -43,12 +43,14 @@ They are design references (static HTML in a canvas format), not code to copy; s
 | 1 | **S17a** Theme engine | Package fields `scene`, `frame`, `ambient`, `sets`; rendering on the board and elsewhere; mascot context; Admin preview; validator, schema, docs; the Snow Day example package | D-166 |
 | 1 | **S18** Full screen during lessons | Start/End lesson full screen, re-enter button, teacher setting, `displayInfo.fullscreen` | D-167 |
 | 2 | **S17b** Built-ins remade + sound styles | Explorer, Animals, Classroom get scenes/frames/ambient/sets per the mockups; `sounds.style` with app-defined instrument styles; Snow Day gets `bells` | D-168 |
+| 2 | **S17c** Avatars: frozen defaults, readability, picture picker, richer families | From the avatar review (2026-11-11); no stored avatar changes | D-169 |
 
-S17a and S18 run at the same time in separate worktrees. S17b starts after S17a is on main.
+S17a and S18 run at the same time in separate worktrees. S17b and S17c start after S17a is on main and run at the same time (S17c needs S17a's picker ordering; it touches no theme files).
 
 ### Hot files
 - **S17a**: `src/shared/themePackage/*` (schema, limits, validate, svg, tokens docs), `src/client/themes/*` (types, index, custom, css, art, new `Scene`/`Ambient` components), new `src/client/ui/Frame.tsx`, `src/client/routes/Root.tsx`, `src/client/modules/lessons/board/Box.tsx` and `Board.tsx` (frames only), the student card in `src/client/ui/` (frames only), `src/client/achievements/icons.tsx`, the avatar picker (ordering only), `src/client/routes/admin/Themes.tsx`, `docs/THEMING.md`, `docs/theme-package.schema.json`, `docs/examples/`, `app.css` (frame/scene/ambient section).
 - **S18**: `src/client/modules/lessons/StartLesson.tsx`, `EndLesson.tsx`, the board top bar where the lesson controls live (a small button only; S17a wraps boxes, not the controls inside), `src/server/lib/userSettings.ts` (one key), the teacher settings page, the `displayInfo` module (contract + client watcher + admin table column), i18n `fullscreen.*` / `lessons.fullscreen*` keys, guides.
+- **S17c**: `src/shared/avatars.ts`, `src/shared/contracts/avatars.ts` (no enum removals), `src/client/avatars/*` (`AvatarArt.tsx`), the avatar picker (`AvatarPanel.tsx`), the `avatar.*` i18n keys, avatar tests. Not the theme token files (no new tokens).
 - **S17b**: `src/client/themes/{explorer,animals,classroom}/*`, the sound engine (`src/shared/themePackage/sound.ts`, `src/client/themes/sound*.ts`), schema `Sounds`, `docs/examples/*.theme.json` (regenerated), THEMING.
 
 ## S17a: Theme engine (D-166)
@@ -130,6 +132,30 @@ Each built-in gets a scene, frames, ambient and sets, using only the S17a engine
 - The schema, validator, docs, the generated schema and the MCP theme tools include it; a test checks the MCP `theme_schema` lists the styles and `validate_theme` rejects an unknown one.
 - Choices: Snow Day `bells` (update the example package and the Downloads copy), Explorer `marimba`, Animals `musicBox`, Classroom `chimes`.
 - Admin preview: the existing sound preview plays the style.
+
+## S17c: Avatars (D-169)
+From a read-only avatar review on 2026-11-11 (sheets of every species and colour at 46–96 px, pixel ratio 1.25). The owner's rule: **a child's avatar never changes or disappears**. Every item below keeps stored specs valid and drawn as the same character.
+
+Findings that drive this stage:
+- `generatedAvatar(id)` (the class fallback default 'generated') and `READY_MADE` draw from the live catalogue lists, so **any** new family, species, colour or option silently changes the creature of every child who never chose one. Only determinism within one catalogue is tested.
+- Faces are tiny at board size (dot eyes r 2.4 of 100, about 1 px at 46 px; side-view dinosaur faces scaled 0.55–0.75); most expressions are indistinguishable at 46–58 px.
+- Features are always `avatar-ink` (#1d2033): contrast against navy 1.59:1, brown 2.83:1, purple 3.36:1, red 3.78:1, blue 3.91:1; on person skin tones 10–12 the face nearly disappears (a fairness problem). No test covers ink against body colours or skins.
+- Body and background colours are picked independently: 13 of 120 ready-made and about 7.6 % of generated avatars have the same body and background colour.
+- Sports, space, fruits and robots are bare geometry next to the S14 dinosaurs and mythical creatures (football disc, pilot without a rocket, plain carrot, strawberry like a shield).
+- Hats cover the cat/bunny ears and sit across the face on some species; scarves float on the carrot and strawberry.
+- The creator is text-only native selects; the 120 ready-made avatars are not grouped by family.
+- Turkish: `teal` "çam yeşili" → "petrol yeşili"; `hat.cap` "kep" → "şapka"; more natural accessible names ("Kepli ve atkılı mavi kedi" style).
+
+Scope:
+1. **Freeze the defaults** (first, before any catalogue change): a frozen copy of the v1 catalogue lists used only by `generatedAvatar` and `READY_MADE`; golden tests with about 20 fixed student ids and all 120 ready-made specs exactly as today. A test and a CONVENTIONS rule: catalogue keys are never removed or renamed (only added).
+2. **Readability and fairness in the renderer** (same specs, re-rendered): creature faces about 1.4× larger at the same anchors (bigger eyes and pupils, stroke 2.4–2.6), dinosaur faces not below 0.75; every eye style gets a light rim or catch-light so it reads on dark bodies and dark skins (no new theme tokens); when body and background are equal or a near pair, a lighter background veil or a 2 px `avatar-outline` rim; hats and scarves placed per species (cat and bunny ears, fluffy, round robot, carrot, strawberry). A contrast test: features vs every body colour and skin tone ≥ 3:1 in every built-in theme and the Snow Day example.
+3. **Richer plain families** to the S14 level: football with a hexagon pattern and the face on white, pilot with helmet, visor and a small rocket (or rename it), astronaut with visor glint, carrot with taper and ridges, heart-shaped strawberry with seeds, star kid with rounded points; robots and the remaining plain species checked the same way.
+4. **Picture-based picker** (`AvatarPanel.tsx`): colour swatches and picture buttons for eyes, mouth, hat and accessory (radio groups with labels, keyboard and screen-reader friendly, touch targets ≥ `var(--cc-touch)`); family tabs with species thumbnails; ready-made avatars grouped by family and honouring the theme's `avatarFamiliesFirst`; Randomise never gives body = background. Choosing a family keeps the chosen species when possible.
+5. **Turkish and names**: the fixes above; accessible names in natural Turkish; EN names checked.
+
+Not in this stage (later, owner to choose): new families (arctic, forest, farm, bugs, a sea turtle), seasonal hats and accessories, a theme-chosen avatar style (outline, shading, face scale), more expressions. All of them become safe additions once the defaults are frozen.
+
+Tests: the golden defaults, the contrast test, picker unit tests (grouping, order, Randomise rule), axe on the picker, Playwright screenshots of all species × 12 colours at 48 px before and after (saved for the owner), the student page size budget (the student page shows avatars and may host the picker).
 
 ## Verification (lead, after each wave)
 `npm run check`, `npm run build` (student budget), the full `npx playwright test`, screenshots of the board in all four themes at the test matrix sizes with motion on and off, the Admin preview, and a phone. Real-device checks (the classroom display, speakers) stay open for the owner.

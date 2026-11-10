@@ -350,6 +350,16 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17b; decision D-168; after 
 - [ ] `sounds.style` (tones, bells, marimba, chimes, musicBox) in packages, the validator, docs and the MCP tools; built-ins and Snow Day choose a style
 - [ ] Heard on the classroom speakers (owner)
 
+## S17c Avatars: frozen defaults, readability, picture picker (owner 2026-11-11)
+Brief: `docs/design/2026-11-11-theme-engine.md` → S17c; decision D-169; after S17a, alongside S17b. No stored avatar changes.
+- [ ] Generated and ready-made defaults frozen to the v1 catalogue (golden tests); rule: catalogue keys only added, never removed or renamed
+- [ ] Readability and fairness: larger faces, eyes readable on dark bodies and skin tones 10–12, no body lost in its background, hat and scarf placement; contrast test
+- [ ] Plain families (sports, space, fruits, robots) redrawn to the S14 level
+- [ ] Picture-based picker: swatches and picture buttons, family tabs, ready-made grouped by family with `avatarFamiliesFirst`, Randomise avoids body = background
+- [ ] Turkish names and accessible names fixed
+- [ ] Avatars named and chosen by children on the real devices (owner, Sare)
+- [ ] Later, owner to choose: new families (arctic, forest, farm, bugs), seasonal hats and accessories, theme avatar style, more expressions
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site
