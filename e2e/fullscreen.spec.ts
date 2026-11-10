@@ -1,9 +1,10 @@
 /**
  * S18 (D-167): full screen during lessons, with a stubbed Fullscreen API (headless Chromium has no
  * real full screen). Begin lesson enters full screen and Save and end lesson leaves it (LES-1, LES-3);
- * the top bar offers Full screen / Leave full screen while the lesson runs; with the teacher's
- * "Full screen during lessons" off (profile page, UX-4) neither touches full screen, the button still
- * works. The preference is put back on in `finally`; a lesson this test starts is ended. Fictional
+ * the top bar offers Full screen while the lesson runs and Leave full screen whenever the page is in
+ * full screen; with the teacher's "Full screen during lessons" off (profile page, UX-4) neither touches
+ * full screen, the button still works. The stub refuses requests made outside a user gesture, as
+ * Chrome does, and counts them in `withoutGesture` (the exact log comparisons fail if one happens). The preference is put back on in `finally`; a lesson this test starts is ended. Fictional
  * demo data only.
  */
 import { randomUUID } from 'node:crypto';
@@ -12,12 +13,12 @@ import { expect, test, type Browser, type BrowserContext, type Page } from '@pla
 import { api, ensurePin, login } from './helpers.ts';
 
 type Ctx = { id: string; className: string; subjectName: { en: string } };
-type FsLog = { requests: number; exits: number };
+type FsLog = { requests: number; exits: number; withoutGesture?: number };
 
 /** Installs a Fullscreen API that only records calls and fires `fullscreenchange`, like a browser. */
 function stubFullscreen() {
   let element: Element | null = null;
-  const log = { requests: 0, exits: 0 };
+  const log: { requests: number; exits: number; withoutGesture?: number } = { requests: 0, exits: 0 };
   (window as unknown as { __fs: typeof log }).__fs = log;
   Object.defineProperty(Document.prototype, 'fullscreenEnabled', { configurable: true, get: () => true });
   Object.defineProperty(Document.prototype, 'fullscreenElement', { configurable: true, get: () => element });
@@ -33,6 +34,11 @@ function stubFullscreen() {
   Object.defineProperty(Element.prototype, 'requestFullscreen', {
     configurable: true,
     value: function requestFullscreen() {
+      // Like Chrome: refuse a request made outside a user gesture (e.g. after an awaited command).
+      if (!navigator.userActivation.isActive) {
+        log.withoutGesture = (log.withoutGesture ?? 0) + 1;
+        return Promise.reject(new TypeError('Permissions check failed'));
+      }
       log.requests += 1;
       element = document.documentElement;
       document.dispatchEvent(new Event('fullscreenchange'));
@@ -138,6 +144,11 @@ test('with "Full screen during lessons" off, Start and End lesson leave full scr
     expect(await fsLog(page)).toEqual({ requests: 1, exits: 0 });
     await saveAndEnd(page);
     expect(await fsLog(page)).toEqual({ requests: 1, exits: 0 });
+    // Still in full screen on the summary: Leave full screen stays offered (a touch panel has no Esc).
+    await expect(page.getByTestId('fullscreen-enter')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Leave full screen' }).click();
+    expect(await fsLog(page)).toEqual({ requests: 1, exits: 1 });
+    await expect(page.getByTestId('fullscreen-leave')).toHaveCount(0);
   } finally {
     await endLesson(page, ctx.id);
     await context.close();

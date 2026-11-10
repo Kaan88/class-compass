@@ -251,12 +251,13 @@ function ClassroomScreen({
     );
   };
 
-  // Full screen / Leave full screen while a lesson runs (S18, D-167); hidden where the browser has none.
+  // Full screen while a lesson runs; Leave full screen whenever the page is in full screen, in any mode
+  // (S18, D-167); hidden where the browser has none.
   const lessonRunning = Boolean(lesson && active) && mode.kind !== 'summary';
   const tools = (
     <>
       <OutboxSaveBadge />
-      {lessonRunning ? <FullscreenButton /> : null}
+      <FullscreenButton canEnter={lessonRunning} />
       <Button onPress={() => void navigate({ to: '/teacher' })}>
         <IconLock />
         {t('classroom.teacherArea')}

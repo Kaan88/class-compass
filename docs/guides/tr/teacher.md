@@ -84,7 +84,7 @@ Bütün sınıflarınızda kapalı olan bir modülün sayfaları menüde görün
 
 ### Tam ekran
 
-Ders sürerken üst çubukta bir **Tam ekran** düğmesi vardır; tam ekrandayken bu düğme küçük bir **Tam ekrandan çık** düğmesine dönüşür. Klavyedeki **Esc** tuşu da her zaman tam ekrandan çıkarır. Pencereler, PIN kilidi, kutlamalar ve bildirimler tam ekranda da çalışır. **Kaydet ve dersi bitir** tam ekrandan çıkar; **Derse dön** tam ekranı korur.
+Ders sürerken üst çubukta bir **Tam ekran** düğmesi vardır; tam ekrandayken bu düğme küçük bir **Tam ekrandan çık** düğmesine dönüşür. Sayfa tam ekranda kaldığı sürece bu düğme üst çubukta (ve öğretmen alanında) durur, ders bittikten sonra da; böylece dokunarak her zaman çıkabilirsiniz. Klavyedeki **Esc** tuşu da her zaman tam ekrandan çıkarır. Pencereler, PIN kilidi, kutlamalar ve bildirimler tam ekranda da çalışır. **Kaydet ve dersi bitir** tam ekrandan çıkar; **Derse dön** tam ekranı korur.
 
 Bunu istemiyorsanız **Profil ve PIN** → **Dersler** bölümünde **Derslerde tam ekran** ayarını kapatın. Bu sizin kendi ayarınızdır ve girdiğiniz her sınıf bilgisayarında geçerlidir; panodaki **Tam ekran** düğmesi yine çalışır. Tam ekranı olmayan tarayıcılarda (örneğin iPhone'da) düğme görünmez ve hiçbir şey değişmez.
 

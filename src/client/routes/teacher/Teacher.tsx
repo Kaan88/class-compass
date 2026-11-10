@@ -19,7 +19,7 @@ import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
 import { SignInMethodSection } from '../SignIn.tsx';
 import { TimeUpClipSection } from './ClassDisplay.tsx';
-import { LessonPrefsSection } from '../../modules/lessons/fullscreen.tsx';
+import { FullscreenButton, LessonPrefsSection } from '../../modules/lessons/fullscreen.tsx';
 import * as School from '../../../shared/contracts/school.ts';
 import { SensitiveGate } from '../Lock.tsx';
 import { StudentStatsProvider } from '../../ui/StudentName.tsx';
@@ -165,6 +165,8 @@ function TeacherNav() {
           </div>
         </>
       )}
+      {/* Leave full screen only (S18, D-167): reached from a lesson in full screen, the page may still be in it. */}
+      <FullscreenButton canEnter={false} />
       <Bell />
     </nav>
   );

@@ -84,7 +84,7 @@ Pages of a module that is switched off in all your classes are left out of the m
 
 ### Full screen
 
-While a lesson runs, the top bar has a **Full screen** button; in full screen it becomes a small **Leave full screen** button. **Esc** on the keyboard always leaves full screen too. Dialogs, the PIN lock, celebrations and messages all keep working in full screen. **Save and end lesson** leaves full screen; **Back to the lesson** keeps it.
+While a lesson runs, the top bar has a **Full screen** button; in full screen it becomes a small **Leave full screen** button. That button stays on the top bar (and in the teacher area) as long as the page is in full screen, also after the lesson ends, so you can always leave by touch. **Esc** on the keyboard always leaves full screen too. Dialogs, the PIN lock, celebrations and messages all keep working in full screen. **Save and end lesson** leaves full screen; **Back to the lesson** keeps it.
 
 If you do not want this, switch off **Full screen during lessons** in **Profile and PIN** → **Lessons**. It is your own setting and follows you to every classroom computer; the **Full screen** button on the board still works. Browsers without full screen (for example on an iPhone) show no button and nothing changes.
 

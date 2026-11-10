@@ -3,7 +3,8 @@
  * S18 (D-167): full screen during lessons with a stubbed Fullscreen API (jsdom has none). Begin lesson
  * asks for full screen inside the press (LES-1), Save and end lesson leaves it (LES-3); neither touches
  * full screen when the teacher's preference is off or the browser has no full screen (UX-2); the board
- * button shows "Full screen" or "Leave full screen" and nothing where unsupported.
+ * button shows "Full screen" (while a lesson runs) or "Leave full screen" (whenever the page is in full
+ * screen) and nothing where unsupported.
  */
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -86,14 +87,17 @@ describe('full screen during lessons (S18, D-167)', () => {
 
   it('Begin lesson asks for full screen before the start command is sent (LES-1)', async () => {
     const fs = stubFullscreen(true);
+    // Record what had been sent when full screen was asked for (an expect inside the stub would be
+    // swallowed by enterFullscreen's try/catch).
+    let sentAtRequest: string[] | null = null;
     fs.request.mockImplementation(() => {
-      // Called inside the press, before the command went out.
-      expect(sent).toEqual([]);
+      sentAtRequest = [...sent];
       return Promise.resolve();
     });
     start();
     await press('Begin lesson');
     expect(fs.request).toHaveBeenCalledTimes(1);
+    expect(sentAtRequest).toEqual([]);
     expect(sent).toEqual(['lesson.start']);
   });
 
@@ -174,5 +178,18 @@ describe('full screen during lessons (S18, D-167)', () => {
     stubFullscreen(false);
     const r = wrap(<FullscreenButton />);
     expect(r.container.innerHTML).toBe('');
+  });
+
+  it('Leave full screen stays offered whenever the page is in full screen, also where entering is not (summary, failed start, teacher area)', async () => {
+    const fs = stubFullscreen(true);
+    const r = wrap(<FullscreenButton canEnter={false} />);
+    // Not in full screen and no lesson running: nothing.
+    expect(r.container.innerHTML).toBe('');
+    fs.set(true);
+    act(() => void document.dispatchEvent(new Event('fullscreenchange')));
+    await press('Leave full screen');
+    expect(fs.exit).toHaveBeenCalledTimes(1);
+    expect(r.container.innerHTML).toBe('');
+    expect(fs.request).not.toHaveBeenCalled();
   });
 });

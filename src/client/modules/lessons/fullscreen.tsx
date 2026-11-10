@@ -35,19 +35,20 @@ export function exitLessonFullscreen(prefs: L.LessonPrefs) {
 }
 
 /**
- * The top bar button while a lesson runs: "Full screen" outside full screen, a small "Leave full
- * screen" icon button inside. Nothing where the browser has no full screen. Works whatever the
- * preference says.
+ * The top bar button: "Full screen" outside full screen (only where `canEnter`, i.e. while a lesson
+ * runs on the board), a small "Leave full screen" icon button whenever the page is in full screen,
+ * whatever the lesson state or the screen, so a touch panel without Esc is never left without a way
+ * out (after the summary, a failed start, a lesson ended elsewhere, the teacher area). Nothing where
+ * the browser has no full screen. Works whatever the preference says.
  */
-export function FullscreenButton() {
+export function FullscreenButton({ canEnter = true }: { canEnter?: boolean }) {
   const { t } = useI18n();
   const active = useIsFullscreen();
   if (!fullscreenSupported()) return null;
-  return active ? (
-    <IconButton icon={<IconFullscreenExit />} label={t('fullscreen.leave')} hideLabel onPress={() => exitFullscreen()} data-testid="fullscreen-leave" />
-  ) : (
-    <IconButton icon={<IconFullscreen />} label={t('fullscreen.enter')} onPress={() => enterFullscreen()} data-testid="fullscreen-enter" />
-  );
+  if (active) {
+    return <IconButton icon={<IconFullscreenExit />} label={t('fullscreen.leave')} hideLabel onPress={() => exitFullscreen()} data-testid="fullscreen-leave" />;
+  }
+  return canEnter ? <IconButton icon={<IconFullscreen />} label={t('fullscreen.enter')} onPress={() => enterFullscreen()} data-testid="fullscreen-enter" /> : null;
 }
 
 /** Profile page (teachers): "Full screen during lessons". Saved at once. */
