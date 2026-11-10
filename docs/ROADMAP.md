@@ -361,6 +361,12 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17c; decision D-169; after 
 - [ ] Avatars named and chosen by children on the real devices (owner, Sare)
 - [ ] Later, owner to choose: new families (arctic, forest, farm, bugs), seasonal hats and accessories, theme avatar style, more expressions
 
+## S19 AI assistant chat in the teacher area (proposal, owner 2026-11-11)
+Proposal: `docs/design/2026-11-11-teacher-ai-chat.md`; not started; after S17/S18. Decision and migration numbers assigned when it is planned.
+- [ ] S19a: chat page with streaming on the existing AI tool layer, confirmation before any change, real names on screen with pseudonyms to the provider, chats kept on the server with retention, Anthropic and OpenAI-compatible (any base URL) connections with sealed keys and limits, guides EN/TR
+- [ ] S19b: Gemini, "Connect OpenRouter" (OAuth PKCE), per-teacher connections, model test matrix; "Sign in with ChatGPT" only if OpenAI grants access
+- [ ] Owner decisions: default model and connection, teachers' own connections, chat retention
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site
