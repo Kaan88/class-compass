@@ -322,7 +322,10 @@ The owner cannot see the real classroom display, so the board records its last s
 - [x] Last sample overwritten per account plus the last 5 distinct sizes; Admin → Maintenance → Classroom screens (read-only table, admin only, not an AI tool); in the full export as a `user_settings` row
 - [x] Generic client hooks `boardWatchers` and `maintenanceTabs`, so removal is deleting the module's folders and list lines (steps in the server manifest and D-165)
 - [x] Tests: `tests/server/displayInfo.test.ts` (locked classroom, admin-only read, bounds, ring of 5, rate limit), `tests/client/displayInfo.test.tsx` (once on mount, debounce, user agent parsing), `e2e/display-info.spec.ts` (1366×768 board seen by the admin, axe); admin guide EN/TR privacy note
-- [ ] Read on the real classroom display after deployment (owner)
+- [x] Read on the real classroom display after deployment (sareteacher.com, Sare's account, read 2026-11-10):
+  - **Classroom display** (last sample 2026-11-10 11:20 Turkey time): Windows, Chrome 156, touch screen, pixel ratio 1.25, so a 1920×1080 panel at 125 % scaling. Screen 1536×864 CSS px; the board window is **1536×703** (browser bars visible, not full screen). Normal density, default layout, text scale 100 %, reduced motion off, theme `peppermint-snow-day`.
+  - **Earlier the same morning:** Sare's MacBook, 1440×900 CSS px at pixel ratio 2, window 1440×825 and 1440×787.
+  - **To act on:** design and test the board for 1536×703 (not only 1920×1080 and 1366×768); the S17 theme engine adds this size to its e2e set. Full screen (F11) on the classroom PC would give the board 161 px more height.
 
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
