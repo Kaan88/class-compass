@@ -112,7 +112,7 @@ Press **Save and end lesson**. The summary **Lesson saved** shows the time, the 
 - The save state.
 - **Display** opens the settings of this screen:
   - **Class language**: only when the class uses two languages, to switch the screen between them.
-  - **Size**: **Compact**, **Normal** or **Large**. Pick what is readable from the back of the room; the screen also fits itself to the display. The choice is remembered on this device.
+  - **Size**: **Compact**, **Normal** or **Large**. Pick what is readable from the back of the room; the screen also fits itself to the display. On the lesson screen the size is where the student cards start: a small class grows its cards into the free space (up to Large), a large class gets smaller cards so that at least two rows show, and a name never breaks inside a word. The choice is remembered on this device.
   - **Sounds on this device**.
   - **Customise layout** (see [Customise layout](#customise-layout)).
   - **Sound check** (see [Sounds and celebrations](#sounds-and-celebrations)).
@@ -122,7 +122,7 @@ Under the top bar the lesson board is built from boxes, from top to bottom:
 
 1. **A wide row** with the **routine**, every stage visible, next to a big **timer**.
 2. **Today's focus** (the lesson topic, with **Change**) and the **counter bar**.
-3. **The student cards**, across the whole width. **Hide students** / **Show students** above them folds the cards away (for example while you show something on the board). On a smaller screen (a 1280×720 projector) not every card fits: the cards scroll inside their box, and a **… more students below** button at the end of the line with **Hide students** says how many are hidden and scrolls to them.
+3. **The student cards**, across the whole width. **Hide students** / **Show students** above them folds the cards away (for example while you show something on the board). The cards take the size that fits their box: bigger for a small class, smaller for a large one. When not every card fits (a class of 40 on a 1280×720 projector), the cards scroll inside their box, and a **… more students below** button at the end of the line with **Hide students** says how many are hidden and scrolls to them. A card can also show small marks next to the count: a trophy with the number of achievements the student got in this lesson, and the group number while groups are shown (the groups icon and the number). They show only something positive, never a zero, and disappear when the module is switched off for the class.
 4. **Lesson tools**: a row of big buttons at the bottom: **Attendance**, **Daily Assistant**, **Secret Students**, **Groups**, **Homework** and **Achievements**. A button opens its panel full screen; the board under it waits until you close the panel with **Close** (or the Escape key). Messages and **Undo** for what you do in a panel appear inside the panel. A small number on a button counts something for the class, for example the secret students chosen; it never shows anything private. **End lesson** always stays at the end of the row.
 
 A box whose module is switched off for this class is simply not there, and its neighbours take the space. Short messages (for example **Lesson started: 3-A · English**) appear for a moment at the bottom left. Messages with **Undo** stay a little longer.

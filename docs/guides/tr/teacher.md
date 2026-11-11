@@ -112,7 +112,7 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
 - Kayıt durumu.
 - **Ekran** bu ekranın ayarlarını açar:
   - **Sınıf dili**: yalnızca sınıf iki dil kullanıyorsa; ekranı iki dil arasında değiştirir.
-  - **Boyut**: **Küçük**, **Normal** ya da **Büyük**. Sınıfın arkasından okunabilen boyutu seçin; ekran ayrıca kendini görüntü alanına uydurur. Seçim bu cihazda hatırlanır.
+  - **Boyut**: **Küçük**, **Normal** ya da **Büyük**. Sınıfın arkasından okunabilen boyutu seçin; ekran ayrıca kendini görüntü alanına uydurur. Ders ekranında bu boyut öğrenci kartlarının başlangıç boyutudur: kalabalık olmayan bir sınıfın kartları boş alanı dolduracak kadar büyür (en fazla Büyük'e kadar), kalabalık bir sınıfın kartları en az iki sıra görünecek kadar küçülür ve bir ad hiçbir zaman bir kelimenin ortasından bölünmez. Seçim bu cihazda hatırlanır.
   - **Bu cihazda sesler**.
   - **Yerleşimi düzenle** (bkz. [Yerleşimi düzenlemek](#yerleşimi-düzenlemek)).
   - **Ses kontrolü** (bkz. [Sesler ve kutlamalar](#sesler-ve-kutlamalar)).
@@ -122,7 +122,7 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
 
 1. **Geniş bir satır**: bütün aşamaları görünen **rutin** ve yanında büyük bir **zamanlayıcı**.
 2. **Bugünün odağı** (dersin konusu, **Değiştir** ile) ve **sınıf çubuğu** (sayaç).
-3. Bütün genişliği kaplayan **öğrenci kartları**. Üstlerindeki **Öğrencileri gizle** / **Öğrencileri göster** kartları katlar (örneğin tahtada bir şey gösterirken). Daha küçük bir ekranda (1280×720 bir projeksiyon) kartların hepsi sığmaz: kartlar kendi kutularının içinde kayar, **Öğrencileri gizle** satırının sonundaki **Aşağıda … öğrenci daha var** düğmesi kaç öğrencinin görünmediğini söyler ve onlara kaydırır.
+3. Bütün genişliği kaplayan **öğrenci kartları**. Üstlerindeki **Öğrencileri gizle** / **Öğrencileri göster** kartları katlar (örneğin tahtada bir şey gösterirken). Kartlar kutularına sığan boyutu alır: az öğrencili bir sınıfta daha büyük, kalabalık bir sınıfta daha küçük. Kartların hepsi sığmadığında (1280×720 bir projeksiyonda 40 kişilik bir sınıf) kartlar kendi kutularının içinde kayar, **Öğrencileri gizle** satırının sonundaki **Aşağıda … öğrenci daha var** düğmesi kaç öğrencinin görünmediğini söyler ve onlara kaydırır. Kartta sayının yanında küçük işaretler de görünebilir: öğrencinin bu derste aldığı başarı sayısıyla bir kupa ve gruplar gösterilirken grup numarası (grup simgesi ve numara). Yalnızca olumlu bir şey gösterirler, asla sıfır göstermezler; modül o sınıf için kapatılınca kaybolurlar.
 4. **Ders araçları**: altta büyük düğmelerden oluşan bir satır: **Yoklama**, **Günün Yardımcısı**, **Gizli Öğrenciler**, **Gruplar**, **Ödevler** ve **Başarılar**. Bir düğme kendi panelini tam ekran açar; siz paneli **Kapat** düğmesiyle (ya da Esc tuşuyla) kapatana kadar alttaki pano bekler. Bir panelde yaptığınız işlerin mesajları ve **Geri al** düğmesi panelin içinde görünür. Bir düğmenin üstündeki küçük sayı sınıfla ilgili bir şeyi sayar, örneğin seçilen gizli öğrencileri; özel hiçbir şey göstermez. **Dersi bitir** her zaman satırın sonunda kalır.
 
 Modülü bu sınıfta kapalı olan bir kutu hiç görünmez; boşalan yeri yanındaki kutular alır. Kısa mesajlar (örneğin **Ders başladı: 3-A · İngilizce**) sol altta kısa bir süre görünür. **Geri al** içeren mesajlar biraz daha uzun kalır.
