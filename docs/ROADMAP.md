@@ -360,7 +360,7 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17b; decision D-168; after 
 - [x] Review fixes (S17b review, D-168): corners never on a control (top bar edge only, small box corners in the gaps, e2e check), the Admin preview's ambient kept inside its sample, styled notes really peak at their gain (rendered test of every style and of every built-in tap and Snow Day), phone dock buttons scroll beside End lesson (never under it), `--cc-touch` and axe checked at 375 px
 - [x] Usability screen crawl, classroom area (where scenes, frames and ambient show), before (c3e66f8, the commit before S17b) and after the review fixes: the same 333 screens; spot-checked the dashboards at 1280×720, 1920×1080 and the 768 px tablet and the dock views: same visible class, same cut-off cue, no overlay on a control (the crawl has no phone size; the 375 px phone is covered by `e2e/theme-builtins.spec.ts`)
 - [ ] Usability screen crawl of the other areas (teacher, admin, student, Super Speakers) before/after S17b: not run (the default theme's scene and ambient are only on the classroom screen; ordinary cards are not in the built-ins' frame surfaces)
-- [ ] The review measured plain tones about 7 dB under `outputPeakDb` through Chromium's compressor (before S17b too): check the loudness model against a rendered chain
+- [x] The review measured plain tones about 7 dB under `outputPeakDb` through Chromium's compressor (before S17b too): check the loudness model against a rendered chain (S21a, D-173: `e2e/sound-loudness.spec.ts` renders every event of the built-ins, Snow Day and every style at volume 80 and 100 in Chromium; the 7 dB was a new compressor that had not settled, now the first sound waits 300 ms; oscillators started at 440 Hz for one block, fixed; 1 ms attack and a soft ceiling at −1 dBFS. Taps now within 0.25 dB of the model, nothing over it by more than 0.31 dB, nothing at −1 dBFS or above)
 - [ ] Seen on the real classroom display (owner)
 - [ ] Heard on the classroom speakers (owner)
 
@@ -372,7 +372,7 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17c; decision D-169; after 
 - [x] Picture-based picker: swatches and picture buttons, family tabs, ready-made grouped by family with `avatarFamiliesFirst`, Randomise avoids body = background, tab order follows the drawing
 - [x] Turkish names and accessible names fixed
 - [ ] The guide screenshots of the avatar picker (`docs/guides/img/*/student-avatar.png`) still show the old select boxes: regenerate with `npm run docs:screenshots`
-- [ ] The theme package validator does not yet check `avatar-ink` / `avatar-white` against the avatar colours and skin tones (the test covers the built-ins and Snow Day only)
+- [x] The theme package validator checks `avatar-ink` / `avatar-white` against the avatar colours and skin tones (S21a, D-173: `avatarFeatureFailures`, `CONTRAST` errors on `colors.avatar-ink`, `preview_theme` shows the worst body; `tests/client/theme-package-avatar-features.test.ts`, `tests/server/mcp-themes.test.ts`; every built-in and `docs/examples` package passes)
 - [ ] Avatars named and chosen by children on the real devices (owner, Sare)
 - [ ] Later, owner to choose: new families (arctic, forest, farm, bugs), seasonal hats and accessories, theme avatar style, more expressions
 

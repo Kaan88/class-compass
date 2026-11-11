@@ -109,7 +109,7 @@ numbers; loosening one is a decision in DECISIONS.md):
 - **Add a badge icon:** add the key to `BADGE_ICONS` (`src/shared/achievements.ts`) and its 24×24 single-path glyph to `GLYPHS` (`src/client/achievements/icons.tsx`); the Record type and `tests/client/avatars-badges.test.tsx` make sure every key has a distinct glyph. Draw it yourself in the same line style (round caps, 1.8 stroke); never copy an icon set.
 - **Add an avatar part:** add the option to `PERSON_PARTS` / `CREATURE_PARTS` (and `OPTION_NAMES` in EN and TR for the accessible name) in `src/shared/avatars.ts`, then draw it in `AvatarArt.tsx` with `var(--cc-avatar-*)` colours only, no ids, filters or `<image>`. The server validates specs against the same catalogue, so an unknown value is refused until it is added there. An option can unlock with a default badge through `AVATAR_UNLOCKS`.
 - **Creature faces (S14a, D-146):** `SPECIES_FACE` in `AvatarArt.tsx` says where each species' eyes go (centre, height, spacing, size), which mouth it has (`person`, `beak`, `snout`, `muzzle`, `jaw`) and where a hat sits; the unicorn's horn is drawn over the hat. A new species gets an entry there (a species without one gets the front-facing default) and a body in `CreatureBody` that is more than one plain ellipse (test-enforced: every species has its own outline). Darker parts of a creature use `Shade` (the body colour under a thin ink layer), so they follow the chosen colour.
-- **Readable, fair faces and frozen defaults (S17c, D-169):** every eye and mouth is drawn in `avatar-ink` on a thin `avatar-white` rim, so features read on dark bodies and the darkest skin tones. When you change avatar colours, keep `avatar-ink` or `avatar-white` at **3:1 or more** against every `avatar-<colour>` and `avatar-skin-*`, and the two against each other (`tests/client/avatars-readability.test.tsx` checks the built-in themes and the Snow Day example; the package validator does not check this yet). A body on a background of the same or a near colour (`AVATAR_NEAR_COLOURS`) gets a light veil and an `avatar-outline` rim. Catalogue keys are only ever added (a child's stored avatar must stay valid); `generatedAvatar` and `READY_MADE` come from the frozen v1 lists in `src/shared/avatarDefaults.ts`, so a new family or option never changes anybody's default avatar. Hats sit at each species' `hat.top`; ears, horns and leaves can be drawn over a hat (`overHat`); a narrow neck gets a `neck` anchor for the scarf. `/dev/avatars` and `e2e/avatar-sheets.spec.ts` draw review sheets of every species in every colour.
+- **Readable, fair faces and frozen defaults (S17c, D-169):** every eye and mouth is drawn in `avatar-ink` on a thin `avatar-white` rim, so features read on dark bodies and the darkest skin tones. When you change avatar colours, keep `avatar-ink` or `avatar-white` at **3:1 or more** against every `avatar-<colour>` and `avatar-skin-*`, and the two against each other (`avatarFeatureFailures` in `src/shared/themePackage/contrast.ts`: the package validator reports every avatar colour or skin tone that breaks it as a `CONTRAST` error on `colors.avatar-ink`, `preview_theme` shows the worst body, and `tests/client/avatars-readability.test.tsx` checks the built-in themes and the Snow Day example; S21a, D-173). A body on a background of the same or a near colour (`AVATAR_NEAR_COLOURS`) gets a light veil and an `avatar-outline` rim. Catalogue keys are only ever added (a child's stored avatar must stay valid); `generatedAvatar` and `READY_MADE` come from the frozen v1 lists in `src/shared/avatarDefaults.ts`, so a new family or option never changes anybody's default avatar. Hats sit at each species' `hat.top`; ears, horns and leaves can be drawn over a hat (`overHat`); a narrow neck gets a `neck` anchor for the scarf. `/dev/avatars` and `e2e/avatar-sheets.spec.ts` draw review sheets of every species in every colour.
 - Theme-specific glyph variants and extra avatar families or parts are still not supported (ROADMAP S13c); since S17a a theme can draw a frame around the achievement art (`sets.achievementFrame`) and put avatar families first (`sets.avatarFamiliesFirst`), see [Scenes, frames, ambient and sets](#scenes-frames-ambient-and-sets-s17a-d-166). Otherwise a theme changes badges and avatars through the tokens above.
 
 ## Palette design and contrast
@@ -237,30 +237,30 @@ Design the palette in this order; the validator and `tests/client/themes.test.ts
 | Token | Used for | Contrast | explorer | animals | classroom |
 |---|---|---|---|---|---|
 | `avatar-text` | Initials on generated avatar circles (checked over every hue). | on every avatar hue ≥ 3 (big) / 4.5 (small) | `#ffffff` | `#ffffff` | `#ffffff` |
-| `avatar-red` | Avatar colour "red" (clothes, creature bodies, backgrounds). | – | `#d9483b` | `#d9483b` | `#d9483b` |
-| `avatar-orange` | Avatar colour "orange" (clothes, creature bodies, backgrounds). | – | `#e8833a` | `#e8833a` | `#e8833a` |
-| `avatar-yellow` | Avatar colour "yellow" (clothes, creature bodies, backgrounds). | – | `#f2c94c` | `#f2c94c` | `#f2c94c` |
-| `avatar-green` | Avatar colour "green" (clothes, creature bodies, backgrounds). | – | `#4caf6a` | `#4caf6a` | `#4caf6a` |
-| `avatar-teal` | Avatar colour "teal" (clothes, creature bodies, backgrounds). | – | `#2a9d8f` | `#2a9d8f` | `#2a9d8f` |
-| `avatar-blue` | Avatar colour "blue" (clothes, creature bodies, backgrounds). | – | `#3b7dd8` | `#3b7dd8` | `#3b7dd8` |
-| `avatar-navy` | Avatar colour "navy" (clothes, creature bodies, backgrounds). | – | `#2c3e7a` | `#2c3e7a` | `#2c3e7a` |
-| `avatar-purple` | Avatar colour "purple" (clothes, creature bodies, backgrounds). | – | `#8a5cc2` | `#8a5cc2` | `#8a5cc2` |
-| `avatar-pink` | Avatar colour "pink" (clothes, creature bodies, backgrounds). | – | `#e46aa6` | `#e46aa6` | `#e46aa6` |
-| `avatar-brown` | Avatar colour "brown" (clothes, creature bodies, backgrounds). | – | `#8d5b3e` | `#8d5b3e` | `#8d5b3e` |
-| `avatar-grey` | Avatar colour "grey" (clothes, creature bodies, backgrounds). | – | `#8a93a6` | `#8a93a6` | `#8a93a6` |
-| `avatar-mint` | Avatar colour "mint" (clothes, creature bodies, backgrounds). | – | `#8fd6c0` | `#8fd6c0` | `#8fd6c0` |
-| `avatar-skin-1` | Skin tone 1 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#fde3cf` | `#fde3cf` | `#fde3cf` |
-| `avatar-skin-2` | Skin tone 2 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#f8d5b8` | `#f8d5b8` | `#f8d5b8` |
-| `avatar-skin-3` | Skin tone 3 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#f1c29a` | `#f1c29a` | `#f1c29a` |
-| `avatar-skin-4` | Skin tone 4 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#e8b07f` | `#e8b07f` | `#e8b07f` |
-| `avatar-skin-5` | Skin tone 5 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#d99a68` | `#d99a68` | `#d99a68` |
-| `avatar-skin-6` | Skin tone 6 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#c68652` | `#c68652` | `#c68652` |
-| `avatar-skin-7` | Skin tone 7 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#b07142` | `#b07142` | `#b07142` |
-| `avatar-skin-8` | Skin tone 8 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#965c35` | `#965c35` | `#965c35` |
-| `avatar-skin-9` | Skin tone 9 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#7d4a2a` | `#7d4a2a` | `#7d4a2a` |
-| `avatar-skin-10` | Skin tone 10 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#653a22` | `#653a22` | `#653a22` |
-| `avatar-skin-11` | Skin tone 11 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#4f2d1b` | `#4f2d1b` | `#4f2d1b` |
-| `avatar-skin-12` | Skin tone 12 of 12 (keep the 12 a wide, realistic range, light to dark). | – | `#3b2115` | `#3b2115` | `#3b2115` |
+| `avatar-red` | Avatar colour "red" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#d9483b` | `#d9483b` | `#d9483b` |
+| `avatar-orange` | Avatar colour "orange" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#e8833a` | `#e8833a` | `#e8833a` |
+| `avatar-yellow` | Avatar colour "yellow" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#f2c94c` | `#f2c94c` | `#f2c94c` |
+| `avatar-green` | Avatar colour "green" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#4caf6a` | `#4caf6a` | `#4caf6a` |
+| `avatar-teal` | Avatar colour "teal" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#2a9d8f` | `#2a9d8f` | `#2a9d8f` |
+| `avatar-blue` | Avatar colour "blue" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#3b7dd8` | `#3b7dd8` | `#3b7dd8` |
+| `avatar-navy` | Avatar colour "navy" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#2c3e7a` | `#2c3e7a` | `#2c3e7a` |
+| `avatar-purple` | Avatar colour "purple" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#8a5cc2` | `#8a5cc2` | `#8a5cc2` |
+| `avatar-pink` | Avatar colour "pink" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#e46aa6` | `#e46aa6` | `#e46aa6` |
+| `avatar-brown` | Avatar colour "brown" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#8d5b3e` | `#8d5b3e` | `#8d5b3e` |
+| `avatar-grey` | Avatar colour "grey" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#8a93a6` | `#8a93a6` | `#8a93a6` |
+| `avatar-mint` | Avatar colour "mint" (clothes, creature bodies, backgrounds). | under avatar-ink or avatar-white ≥ 3 | `#8fd6c0` | `#8fd6c0` | `#8fd6c0` |
+| `avatar-skin-1` | Skin tone 1 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#fde3cf` | `#fde3cf` | `#fde3cf` |
+| `avatar-skin-2` | Skin tone 2 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#f8d5b8` | `#f8d5b8` | `#f8d5b8` |
+| `avatar-skin-3` | Skin tone 3 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#f1c29a` | `#f1c29a` | `#f1c29a` |
+| `avatar-skin-4` | Skin tone 4 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#e8b07f` | `#e8b07f` | `#e8b07f` |
+| `avatar-skin-5` | Skin tone 5 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#d99a68` | `#d99a68` | `#d99a68` |
+| `avatar-skin-6` | Skin tone 6 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#c68652` | `#c68652` | `#c68652` |
+| `avatar-skin-7` | Skin tone 7 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#b07142` | `#b07142` | `#b07142` |
+| `avatar-skin-8` | Skin tone 8 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#965c35` | `#965c35` | `#965c35` |
+| `avatar-skin-9` | Skin tone 9 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#7d4a2a` | `#7d4a2a` | `#7d4a2a` |
+| `avatar-skin-10` | Skin tone 10 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#653a22` | `#653a22` | `#653a22` |
+| `avatar-skin-11` | Skin tone 11 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#4f2d1b` | `#4f2d1b` | `#4f2d1b` |
+| `avatar-skin-12` | Skin tone 12 of 12 (keep the 12 a wide, realistic range, light to dark). | under avatar-ink or avatar-white ≥ 3 | `#3b2115` | `#3b2115` | `#3b2115` |
 | `avatar-hair-black` | Hair colour "black". | – | `#1f1a17` | `#1f1a17` | `#1f1a17` |
 | `avatar-hair-darkBrown` | Hair colour "darkBrown". | – | `#3e2a1f` | `#3e2a1f` | `#3e2a1f` |
 | `avatar-hair-brown` | Hair colour "brown". | – | `#6b4428` | `#6b4428` | `#6b4428` |
@@ -273,9 +273,9 @@ Design the palette in this order; the validator and `tests/client/themes.test.ts
 | `avatar-hair-blue` | Hair colour "blue". | – | `#3b6fd1` | `#3b6fd1` | `#3b6fd1` |
 | `avatar-hair-pink` | Hair colour "pink". | – | `#e07bb0` | `#e07bb0` | `#e07bb0` |
 | `avatar-hair-purple` | Hair colour "purple". | – | `#7d4fc0` | `#7d4fc0` | `#7d4fc0` |
-| `avatar-ink` | Avatar eyes, mouths and fine lines. | – | `#1d2033` | `#1d2033` | `#1d2033` |
+| `avatar-ink` | Avatar eyes, mouths and fine lines. | on avatar-white ≥ 3; it or avatar-white on every avatar colour and skin tone ≥ 3 | `#1d2033` | `#1d2033` | `#1d2033` |
 | `avatar-outline` | Thin avatar outlines (usually translucent ink). | – | `#1d203340` | `#1d203340` | `#1d203340` |
-| `avatar-white` | Eye whites, teeth and highlights in avatars. | – | `#ffffff` | `#ffffff` | `#ffffff` |
+| `avatar-white` | Eye whites, teeth and highlights in avatars. | under avatar-ink ≥ 3; it or avatar-ink on every avatar colour and skin tone ≥ 3 | `#ffffff` | `#ffffff` | `#ffffff` |
 | `avatar-blush` | Avatar cheeks. | – | `#f0807f` | `#f0807f` | `#f0807f` |
 
 #### Achievements (S13c)
@@ -457,7 +457,7 @@ folder. What it gets:
 | `docs/examples/*.theme.json` | Resources `classcompass://themes/examples/<key>` (`ocean`, `peppermint-snow-day` with a scene, frames, snowfall and sets, and one per built-in theme) |
 | Export on Admin → Themes | `export_theme`: a built-in key gives the same package as the admin page (`<key>-copy`); an imported theme its stored package (teachers: enabled themes; administrators with `themes:write`: any). Read-only |
 | `validateThemePackage` | `validate_theme` (the same report; nothing is saved) |
-| `/dev/catalog` and the admin preview | `preview_theme`: the report, the base theme, every colour token with its value and source (package, base theme, fixed print colour), every contrast pair with ratio, minimum and pass, the worst avatar hue for big and small initials, and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn |
+| `/dev/catalog` and the admin preview | `preview_theme`: the report, the base theme, every colour token with its value and source (package, base theme, fixed print colour), every contrast pair with ratio, minimum and pass, the worst avatar hue for big and small initials, the avatar faces (ink on its rim and the worst avatar colour or skin tone, S21a), and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn |
 | Import on Admin → Themes | `import_theme_draft` (administrators with `themes:write`): saves a **draft** only |
 
 The server's instructions (sent on `initialize`) and every theme tool's description point at this
@@ -680,11 +680,13 @@ frequency ratio, a share of the note's gain and how long it lasts inside the not
 The shares add up to 1 and every partial ends by the note's end. Partials with their own attacks,
 decays and (for bells and chimes) inharmonic ratios never line up, so their sum would peak 1 to 3 dB
 under the note's gain; `notePartials` therefore simulates the note as the SoundManager plays it
-(`partialsPeak`, 48 kHz) and scales the shares so the sum really peaks at the note's gain. So every
+(`partialsPeak`, at 192 kHz so it finds the peak of the continuous wave, wherever the output samples
+fall: S21a) and scales the shares so the sum really peaks at the note's gain. So every
 limit above (note gain, cue length, loudness at volume 80 and 100, the switches, the volume, the
 unlock path) applies unchanged and `soundPackProblems` checks a styled pack exactly like a plain one;
 a test renders what the SoundManager schedules and checks the tap of every built-in theme and Snow
-Day against −12..−6 dBFS. Partials above
+Day against −12..−6 dBFS, and `e2e/sound-loudness.spec.ts` renders every cue through Chromium's real
+chain (S21a). Partials above
 8,000 Hz are left out. Noise notes (claps, drum rolls, crackle) are not styled. A package never puts
 a style inside a note; its `overrides` play in the theme's style. In Admin → Themes the preview says
 "Instrument: …" and its sound buttons play in that style; over MCP `theme_schema` lists the styles,
@@ -708,11 +710,31 @@ closer than 50 ms merged. Never create an `AudioContext` or call `speechSynthesi
   listening until the context really runs; it arms again when the browser suspends or interrupts the
   context or the page is shown again. `sounds.unlocked` is the context state, never a guess. A control
   that unlocks audio in its own press handler carries `data-unlocks-sound` (`SELF_UNLOCK_ATTR`).
-- **Loudness.** Master (class volume, squared curve) → compressor (−24 dB, ratio 6, hard knee; the
-  browser adds about +12 dB makeup) → makeup ×2.2 → speakers. Notes stay ≤ 0.3 each. A tap at volume 80
-  must peak between −12 and −6 dBFS and no cue may reach 0 dBFS at volume 100: `outputPeakDb(peak,
-  volume)` models it and `tests/client/themes.test.tsx` checks every theme's pack. A theme that makes
-  its taps much quieter or its chords much louder fails there; change `gain` in `makeSoundPack`.
+- **Loudness.** Master (class volume, squared curve) → compressor (−24 dB, ratio 6, hard knee,
+  attack 1 ms; the browser adds about +12 dB makeup) → makeup ×2.2 → soft ceiling → speakers. Notes
+  stay ≤ 0.3 each. A tap at volume 80 must peak between −12 and −6 dBFS and no cue may reach 0 dBFS at
+  volume 100: `outputPeakDb(peak, volume)` models it (`compressedPeakDb` is the level before the
+  ceiling, which the clip check uses) and `tests/client/themes.test.tsx` checks every theme's pack. A
+  theme that makes its taps much quieter or its chords much louder fails there; change `gain` in
+  `makeSoundPack`.
+- **What really plays (S21a, D-173).** `e2e/sound-loudness.spec.ts` runs the SoundManager in Chromium
+  on an OfflineAudioContext for every event of every built-in theme, Snow Day and every style at
+  volume 80 and 100. A single note (every tap) peaks within 0.35 dB of `outputPeakDb`, on the first
+  sound of a page too; chords and noise (claps, drum rolls) play at or under the model, because the
+  model adds the gains of the notes that sound together and filtered noise peaks under its gain. Three
+  things in the chain explain the "7 dB under" of the S17b review and are now handled:
+  - a **new compressor** reaches its makeup gain only after it has run for a while (its level detector
+    starts at zero), so a cue started at once played up to 12 dB quieter. The SoundManager plays the
+    first sound of a new chain `LOUDNESS.settleMs` (300 ms) after it built the chain; later cues start
+    at once;
+  - Chromium reads an oscillator frequency that is set only by an event at the note's start once per
+    128-sample block: the first block played at the default 440 Hz, every partial of a styled note in
+    phase, up to 2.7 dB over the note's gain. Oscillators now start at their own frequency;
+  - over the threshold the compressor needs its **attack** to pull a sudden start down, so the first
+    milliseconds pass over the settled curve: 1.7 dB with the old 3 ms attack, at most 0.75 dB (0.3 dB
+    measured for the packs above) with 1 ms. A **soft ceiling** (a WaveShaper, linear up to −3 dBFS,
+    never reaching −1 dBFS) catches what is left, so no transient, chord of notes at the cap or loud
+    clip can reach 0 dBFS. Taps (about −9 dBFS at volume 80) never reach its knee.
 - **Status.** `useSoundStatus()` (from `themes/index.tsx`) returns `running`, `locked`, `unavailable`,
   `mutedClass`, `mutedDevice` or `volumeZero` plus a snapshot (context state, last cue). The classroom
   top bar shows "Sound is off · Turn sound on" for `locked` and `mutedDevice`, and the Display popover

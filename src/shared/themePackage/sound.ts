@@ -6,7 +6,7 @@
  * `soundPackProblems` checks a pack against `SOUND_LIMITS` (built-in theme tests and the package
  * validator use the same function).
  */
-import { outputPeakDb, SOUND_LIMITS } from './limits.ts';
+import { compressedPeakDb, outputPeakDb, SOUND_LIMITS } from './limits.ts';
 import { SOUND_EVENTS, SOUND_STYLES, type SoundEvent, type SoundSpec, type SoundStyle, type ThemeSoundPack, type ToneNote } from './tokens.ts';
 
 export const SOUND_WAVES = ['sine', 'triangle', 'square'] as const;
@@ -91,8 +91,13 @@ export interface NotePartial {
   attackMs: number;
 }
 
-/** Sample rate of the peak simulation (the classroom PCs and iPads run at 44.1 or 48 kHz). */
-const PEAK_RATE = 48_000;
+/**
+ * Sample rate of the peak simulation: four times 48 kHz, so it finds the peak of the continuous
+ * waveform (S21a, D-173). A note starts at any point between two output samples, so the samples the
+ * browser renders can land on that peak; sampled at 48 kHz from the note's start the simulation
+ * missed it, and a rendered styled note came out up to 1.8 dB over its gain.
+ */
+const PEAK_RATE = 192_000;
 /** The floor every envelope starts from and falls back to (an exponential ramp cannot reach 0). */
 const ENV_FLOOR = 0.0001;
 
@@ -100,8 +105,9 @@ const ENV_FLOOR = 0.0001;
  * The real peak of the summed partials of a note `dur` ms long, played exactly as the SoundManager
  * schedules them: each a sine starting at phase 0, its gain ramping exponentially from 0.0001 to its
  * peak over `min(attack, dur / 4)` and back to 0.0001 by `min(dur, max(10 ms, dur × decay))`, its
- * frequency gliding exponentially to `to` over the whole note. Sampled at 48 kHz; it stops once the
- * envelopes together can no longer beat the peak found so far (they only fall after the attacks).
+ * frequency gliding exponentially to `to` over the whole note. Sampled at 192 kHz (the peak of the
+ * continuous waveform, wherever the output samples fall); it stops once the envelopes together can no
+ * longer beat the peak found so far (they only fall after the attacks).
  */
 export function partialsPeak(parts: readonly NotePartial[], dur: number): number {
   const T = dur / 1000;
@@ -299,7 +305,8 @@ export function soundPackProblems(pack: Partial<ThemeSoundPack>): SoundProblem[]
         else if (f > max) out.push({ event, kind: 'frequency', value: f, limit: max });
       }
     }
-    const db = outputPeakDb(loudestMoment(spec), 100);
+    // Before the soft ceiling (S21a, D-173): the ceiling catches transients, not cues written too loud.
+    const db = compressedPeakDb(loudestMoment(spec), 100);
     if (db >= L.clipDbAt100) out.push({ event, kind: 'clips', value: Math.round(db * 10) / 10, limit: L.clipDbAt100 });
   }
   const tap = pack.tap;

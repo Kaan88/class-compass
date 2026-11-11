@@ -7,9 +7,10 @@
  *   or the browser suspends or interrupts the context (Safari). WebKit also gets a 1-sample silent
  *   buffer inside the gesture, and `navigator.audioSession.type = 'playback'` where it exists;
  * - loudness: every cue goes master (class volume on a perceptual curve) → DynamicsCompressor →
- *   makeup gain → speakers, so cues are clearly audible on laptop speakers and never clip. The
- *   per-note cap stays 0.3; `outputPeakDb` models the chain and a test keeps a tap at volume 80
- *   between −12 and −6 dBFS;
+ *   makeup gain → soft ceiling → speakers, so cues are clearly audible on laptop speakers and never
+ *   clip. The per-note cap stays 0.3; `outputPeakDb` models the chain and a test keeps a tap at volume
+ *   80 between −12 and −6 dBFS. A new chain plays its first sound `LOUDNESS.settleMs` after it was
+ *   built, once its compressor has settled (S21a, D-173; rendered in `e2e/sound-loudness.spec.ts`);
  * - class volume (0..100), class switch and device switch (THM-5);
  * - priorities: celebration and time's-up cues (4) > reveals and thresholds (3) > stage changes,
  *   shuffles, checks (2) > taps (1). A new cue ducks quieter-priority cues still playing, and a cue
@@ -23,7 +24,7 @@
 import type { SoundEvent, SoundSpec } from './types.ts';
 import { soundLength } from './soundPack.ts';
 import { notePartials } from '../../shared/themePackage/sound.ts';
-import { LOUDNESS, SOUND_LIMITS, volumeGain } from '../../shared/themePackage/limits.ts';
+import { LOUDNESS, SOUND_LIMITS, softCeilingCurve, volumeGain } from '../../shared/themePackage/limits.ts';
 
 export const SOUND_PRIORITY: Record<SoundEvent, number> = {
   tap: 1,
@@ -57,7 +58,7 @@ export const NOTE_GAIN_CAP = SOUND_LIMITS.noteGainCap;
  * The loudness chain (D-145) and its model (`outputPeakDb`) live in the shared theme limits since
  * S14g (D-158), so the theme package validator checks a package's loudness with the same numbers.
  */
-export { compressorCurveDb, compressorMakeupDb, LOUDNESS, outputPeakDb, volumeGain } from '../../shared/themePackage/limits.ts';
+export { compressedPeakDb, compressorCurveDb, compressorMakeupDb, LOUDNESS, outputPeakDb, softCeiling, volumeGain } from '../../shared/themePackage/limits.ts';
 
 export interface Voice {
   priority: number;
@@ -80,6 +81,7 @@ export type AudioContextLike = Pick<
   readonly state: AudioContextState | 'interrupted';
   onstatechange?: ((this: BaseAudioContext, ev: Event) => unknown) | null;
   createDynamicsCompressor?: () => DynamicsCompressorNode;
+  createWaveShaper?: () => WaveShaperNode;
 };
 
 /** Whether audio can play here at all (`unavailable`), is waiting for a gesture (`locked`) or runs. */
@@ -139,6 +141,8 @@ export class SoundManager {
   private ctx: AudioContextLike | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  /** Context time (s) from which the chain may sound: built + `LOUDNESS.settleMs` (S21a, D-173). */
+  private readyAt = 0;
   private voices: Voice[] = [];
   private lastTap = -Infinity;
   private clips = new Map<string, Promise<AudioBuffer | null>>();
@@ -265,7 +269,22 @@ export class SoundManager {
     } else {
       this.master.connect(makeup);
     }
-    makeup.connect(ctx.destination);
+    // S21a (D-173): a soft ceiling after the makeup gain, so the compressor's attack transients (and
+    // loud clips) can never reach 0 dBFS. Taps and ordinary cues stay in its linear part.
+    const shaper = typeof ctx.createWaveShaper === 'function' ? ctx.createWaveShaper() : null;
+    if (shaper) {
+      const scale = ctx.createGain();
+      scale.gain.value = 1 / LOUDNESS.ceilingRange;
+      shaper.curve = softCeilingCurve();
+      shaper.oversample = 'none';
+      makeup.connect(scale);
+      scale.connect(shaper);
+      shaper.connect(ctx.destination);
+    } else {
+      makeup.connect(ctx.destination);
+    }
+    // A new compressor reaches its makeup gain only after it has run for a while: nothing sounds before.
+    this.readyAt = ctx.currentTime + LOUDNESS.settleMs / 1000;
     this.notify();
     return ctx;
   }
@@ -350,9 +369,9 @@ export class SoundManager {
       const bus = ctx.createGain();
       bus.gain.value = level;
       bus.connect(this.master);
-      const t0 = ctx.currentTime + 0.02;
+      const t0 = this.startTime(ctx);
       for (const note of spec) this.schedule(ctx, bus, note, t0);
-      const until = now + soundLength(spec) + 50;
+      const until = now + (t0 - ctx.currentTime) * 1000 + soundLength(spec) + 50;
       const voice: Voice = {
         priority,
         until,
@@ -369,6 +388,11 @@ export class SoundManager {
     } catch {
       return false;
     }
+  }
+
+  /** When a cue scheduled now starts: 20 ms ahead, and never before the chain has settled (D-173). */
+  private startTime(ctx: AudioContextLike): number {
+    return Math.max(ctx.currentTime + 0.02, this.readyAt);
   }
 
   /** When a louder cue ends, ducked voices come back up. */
@@ -400,12 +424,17 @@ export class SoundManager {
         const pg = ctx.createGain();
         const ppeak = Math.max(0.0002, p.gain * (peak / Math.max(n.gain, 0.0002)));
         const pend = Math.min(end, start + Math.max(0.01, (n.dur * p.decay) / 1000));
+        pg.gain.value = 0.0001;
         pg.gain.setValueAtTime(0.0001, start);
         pg.gain.exponentialRampToValueAtTime(ppeak, start + Math.min(p.attackMs / 1000, n.dur / 4000));
         pg.gain.exponentialRampToValueAtTime(0.0001, pend);
         pg.connect(out);
         const osc = ctx.createOscillator();
         osc.type = 'sine';
+        // The starting value too (S21a, D-173): Chromium reads a frequency set only by an event at the
+        // note's start once per 128-sample block, so the first block played every partial at 440 Hz,
+        // in phase, and a styled note peaked up to 2.7 dB over its gain.
+        osc.frequency.value = p.freq;
         osc.frequency.setValueAtTime(p.freq, start);
         if (p.to) osc.frequency.exponentialRampToValueAtTime(p.to, end);
         osc.connect(pg);
@@ -415,6 +444,7 @@ export class SoundManager {
       return;
     }
     const gain = ctx.createGain();
+    gain.gain.value = 0.0001;
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(peak, start + Math.min(0.03, n.dur / 4000));
     gain.gain.exponentialRampToValueAtTime(0.0001, end);
@@ -435,6 +465,7 @@ export class SoundManager {
     }
     const osc = ctx.createOscillator();
     osc.type = n.type;
+    osc.frequency.value = n.freq;
     osc.frequency.setValueAtTime(n.freq, start);
     if (n.to) osc.frequency.exponentialRampToValueAtTime(n.to, end);
     osc.connect(gain);
@@ -470,11 +501,12 @@ export class SoundManager {
     const ctx = this.ctx;
     if (!buf || !ctx || !this.master) return false;
     try {
-      this.duckFor(buf.duration * 1000);
+      const t0 = this.startTime(ctx);
+      this.duckFor((t0 - ctx.currentTime) * 1000 + buf.duration * 1000);
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(this.master);
-      src.start(ctx.currentTime + 0.02);
+      src.start(t0);
       this.last = { event: 'clip', at: this.clock(), contextState: String(ctx.state) };
       this.notify();
       return true;

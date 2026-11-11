@@ -7,11 +7,13 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  compressedPeakDb,
   compressorCurveDb,
   compressorMakeupDb,
   installSoundUnlock,
   LOUDNESS,
   outputPeakDb,
+  softCeiling,
   soundStatus,
   SoundManager,
   UNLOCK_EVENTS,
@@ -19,6 +21,7 @@ import {
   type AudioContextLike,
 } from '../../src/client/themes/soundManager.ts';
 import { makeSoundPack } from '../../src/client/themes/soundPack.ts';
+import { softCeilingCurve } from '../../src/shared/themePackage/limits.ts';
 
 interface Param {
   value: number;
@@ -226,13 +229,113 @@ describe('loudness chain (D-145)', () => {
     expect(compressorCurveDb(0)).toBeCloseTo(LOUDNESS.thresholdDb * (1 - 1 / LOUDNESS.ratio));
     const fullScale = compressorCurveDb(0) + compressorMakeupDb() + 20 * Math.log10(LOUDNESS.makeup);
     expect(fullScale).toBeLessThan(0);
-    // Five capped notes at once at full volume stay under 0 dBFS.
-    expect(outputPeakDb(1.5, 100)).toBeLessThan(0);
+    // Five capped notes at once at full volume stay under 0 dBFS, before the ceiling too.
+    expect(compressedPeakDb(1.5, 100)).toBeLessThan(0);
+    expect(outputPeakDb(1.5, 100)).toBeLessThan(LOUDNESS.ceilingDb);
   });
 
   it('is louder than before S14a: a default tap at volume 80 gains at least 15 dB', () => {
     const tap = makeSoundPack({ root: 523, wave: 'triangle', gain: 0.11 }).tap[0]!.gain;
     const before = 20 * Math.log10(tap * 0.8); // S13b: note → volume (linear) → speakers
     expect(outputPeakDb(tap, 80) - before).toBeGreaterThanOrEqual(15);
+  });
+});
+
+/** A context that records the nodes, values and start times the SoundManager asks for (S21a). */
+function chainContext() {
+  const log = { nodes: [] as Array<Record<string, any>>, starts: [] as number[], edges: [] as string[] };
+  const node = (kind: string, extra: Record<string, any> = {}) => {
+    const n: Record<string, any> = {
+      kind,
+      ...extra,
+      connect: (to: Record<string, any>) => (log.edges.push(`${kind}->${to?.kind ?? 'destination'}`), to),
+      start: (t: number) => void log.starts.push(t),
+      stop: () => undefined,
+    };
+    log.nodes.push(n);
+    return n;
+  };
+  const ctx = {
+    currentTime: 0,
+    sampleRate: 48000,
+    state: 'running',
+    destination: { kind: 'destination' },
+    resume: () => Promise.resolve(),
+    createGain: () => node('gain', { gain: param(1) }),
+    createDynamicsCompressor: () => node('compressor', { threshold: param(0), knee: param(30), ratio: param(12), attack: param(0.003), release: param(0.25) }),
+    createWaveShaper: () => node('shaper', { curve: null, oversample: '4x' }),
+    // Automation events leave `value` alone here (as in a browser): only an assignment changes it.
+    createOscillator: () => node('osc', { type: 'sine', frequency: { ...param(440), setValueAtTime: () => undefined } }),
+    createBiquadFilter: () => node('filter', { frequency: param(350), Q: param(1) }),
+    createBuffer: (_c: number, len: number) => ({ duration: len / 48000, getChannelData: () => new Float32Array(len) }),
+    createBufferSource: () => node('source', { buffer: null }),
+    decodeAudioData: () => Promise.resolve({ duration: 1 }),
+  };
+  return { ctx, log };
+}
+
+describe('rendered loudness check (S21a, D-173)', () => {
+  it('wires master → compressor → makeup → ceiling → speakers, with a 1 ms attack and a soft ceiling', () => {
+    const { ctx, log } = chainContext();
+    const m = new SoundManager(() => ctx as unknown as AudioContextLike, () => 0);
+    m.unlock();
+    expect(log.edges.slice(0, 5)).toEqual(['gain->compressor', 'compressor->gain', 'gain->gain', 'gain->shaper', 'shaper->destination']);
+    const comp = log.nodes.find((n) => n.kind === 'compressor')!;
+    expect(comp.attack.value).toBe(0.001);
+    expect(LOUDNESS.attack).toBe(0.001);
+    const shaper = log.nodes.find((n) => n.kind === 'shaper')!;
+    expect(shaper.oversample).toBe('none');
+    expect(shaper.curve).toEqual(softCeilingCurve());
+    // The gain in front of the shaper maps ±ceilingRange onto the shaper's −1..1.
+    expect(log.nodes.filter((n) => n.kind === 'gain').map((n) => n.gain.value)).toContain(1 / LOUDNESS.ceilingRange);
+  });
+
+  it('the soft ceiling is exact below its knee, smooth and rising above it, and never reaches −1 dBFS', () => {
+    const knee = 10 ** (LOUDNESS.ceilingKneeDb / 20);
+    const ceiling = 10 ** (LOUDNESS.ceilingDb / 20);
+    for (const x of [0, 0.01, 0.1, 0.35, knee]) {
+      expect(softCeiling(x)).toBe(x);
+      expect(softCeiling(-x)).toBe(-x);
+    }
+    let last = 0;
+    for (let x = 0; x <= 4; x += 0.001) {
+      const y = softCeiling(x);
+      expect(y).toBeGreaterThanOrEqual(last);
+      expect(y).toBeLessThan(ceiling);
+      last = y;
+    }
+    const curve = softCeilingCurve();
+    expect(curve.length % 2).toBe(1);
+    expect(curve[(curve.length - 1) / 2]).toBe(0);
+    expect(Math.max(...curve)).toBeLessThan(ceiling);
+    expect(curve[curve.length - 1]).toBeCloseTo(-curve[0]!, 9);
+    // A tap at volume 80 (about −9 dBFS) is below the knee: the ceiling leaves it alone.
+    expect(outputPeakDb(0.06, 80)).toBeCloseTo(compressedPeakDb(0.06, 80), 9);
+    expect(outputPeakDb(0.42, 100)).toBeLessThan(compressedPeakDb(0.42, 100));
+  });
+
+  it('a new chain plays its first sound once its compressor has settled; later cues start at once', () => {
+    const { ctx, log } = chainContext();
+    let now = 1000;
+    const m = new SoundManager(() => ctx as unknown as AudioContextLike, () => now);
+    const tap = makeSoundPack({ root: 523, wave: 'sine' }).tap;
+    expect(m.play(tap, 2)).toBe(true);
+    expect(Math.min(...log.starts)).toBeCloseTo(LOUDNESS.settleMs / 1000, 9);
+    log.starts.length = 0;
+    ctx.currentTime = 2;
+    now += 2000;
+    expect(m.play(tap, 2)).toBe(true);
+    expect(Math.min(...log.starts)).toBeCloseTo(2.02, 9);
+  });
+
+  it('every oscillator starts at its own frequency (Chromium read 440 Hz for the first 128 samples before)', () => {
+    const { ctx, log } = chainContext();
+    const m = new SoundManager(() => ctx as unknown as AudioContextLike, () => 0);
+    const pack = makeSoundPack({ root: 523, wave: 'sine', style: 'musicBox' });
+    const plain = makeSoundPack({ root: 523, wave: 'triangle' });
+    expect(m.play([...pack.achievementGiven, ...plain.timerStart], 3)).toBe(true);
+    const oscs = log.nodes.filter((n) => n.kind === 'osc');
+    expect(oscs.length).toBeGreaterThan(5);
+    for (const o of oscs) expect(o.frequency.value).not.toBe(440);
   });
 });

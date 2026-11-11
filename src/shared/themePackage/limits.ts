@@ -116,18 +116,38 @@ export const PACKAGE_LIMITS = {
 } as const;
 
 /**
- * The loudness chain (D-145). The compressor has a hard knee so its curve is exact; browsers add
- * their own makeup gain to a DynamicsCompressorNode (Web Audio spec: (1 / curve(0 dBFS))^0.6), which
- * `outputPeakDb` includes. Below the threshold the whole chain is about ×8.8 (+18.9 dB); a full-scale
- * input comes out near −1 dBFS, so nothing clips.
+ * The loudness chain (D-145, S21a D-173): master (class volume) → DynamicsCompressor → makeup gain →
+ * soft ceiling → speakers. The compressor has a hard knee so its curve is exact; browsers add their own
+ * makeup gain to a DynamicsCompressorNode (Web Audio spec: (1 / curve(0 dBFS))^0.6), which the model
+ * includes. Below the threshold the whole chain is about ×8.8 (+18.9 dB).
+ *
+ * S21a (D-173), from the real chain rendered in Chromium (`e2e/sound-loudness.spec.ts`):
+ * - a new compressor reaches its makeup gain only after it has run for a while (its level detector
+ *   starts at zero): a cue started at once played up to 12 dB quieter (the "7 dB under" of the S17b
+ *   review). The SoundManager starts nothing until `settleMs` after it built the chain;
+ * - above the threshold the compressor needs its attack time to pull a sudden start down, so the first
+ *   milliseconds pass over the settled curve: 1.7 dB with the old 3 ms attack, at most 0.7 dB with
+ *   1 ms for packs within the limits, and up to 3 dB for chords of notes at the gain cap;
+ * - the soft ceiling (a WaveShaper after the makeup gain) is linear up to `ceilingKneeDb` and never
+ *   goes above `ceilingDb`, so no transient, chord or clip can reach 0 dBFS. Taps (about −9 dBFS at
+ *   volume 80) never reach it.
  */
 export const LOUDNESS = {
   thresholdDb: -24,
   kneeDb: 0,
   ratio: 6,
-  attack: 0.003,
+  /** Seconds. 1 ms since S21a (3 ms before): less overshoot over the settled curve. */
+  attack: 0.001,
   release: 0.25,
   makeup: 2.2,
+  /** The soft ceiling is linear up to this level (dBFS) … */
+  ceilingKneeDb: -3,
+  /** … and never reaches this level (dBFS). */
+  ceilingDb: -1,
+  /** The ceiling curve covers inputs up to this amplitude (+6 dBFS); anything louder sits at the ceiling. */
+  ceilingRange: 2,
+  /** A newly built chain plays its first sound this long after it was built (ms): the compressor settles. */
+  settleMs: 300,
 } as const;
 
 /** Class volume 0..100 → master gain. Squared, so the slider feels even to the ear (perceptual). */
@@ -137,6 +157,7 @@ export function volumeGain(volume: number): number {
 }
 
 const toDb = (x: number) => 20 * Math.log10(Math.max(1e-9, x));
+const fromDb = (db: number) => 10 ** (db / 20);
 
 /** Static compressor curve (hard knee) in dB. */
 export function compressorCurveDb(inputDb: number): number {
@@ -147,10 +168,47 @@ export function compressorCurveDb(inputDb: number): number {
 export const compressorMakeupDb = () => -compressorCurveDb(0) * 0.6;
 
 /**
- * Peak level in dBFS at the speakers of a cue whose notes add up to `peak` (one note: its gain, capped
- * at the note gain cap when played) at class volume `volume` (0..100), once the compressor has settled.
+ * The soft ceiling's transfer (S21a, D-173) for one sample value: unchanged up to the knee, then a
+ * tanh bend with slope 1 at the knee that approaches the ceiling and never reaches it.
  */
-export function outputPeakDb(peak: number, volume: number): number {
+export function softCeiling(x: number): number {
+  const knee = fromDb(LOUDNESS.ceilingKneeDb);
+  const room = fromDb(LOUDNESS.ceilingDb) - knee;
+  const a = Math.abs(x);
+  if (a <= knee) return x;
+  return Math.sign(x) * (knee + room * Math.tanh((a - knee) / room));
+}
+
+/**
+ * The WaveShaper curve of the soft ceiling: `points` samples of `softCeiling` over the inputs
+ * −ceilingRange..+ceilingRange (the SoundManager scales the signal by 1 / ceilingRange in front of the
+ * shaper, which reads −1..1). An odd number of points puts 0 exactly on a point, and the linear part
+ * stays exact under the shaper's linear interpolation.
+ */
+export function softCeilingCurve(points = 4097): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(points);
+  for (let i = 0; i < points; i++) curve[i] = softCeiling(LOUDNESS.ceilingRange * ((2 * i) / (points - 1) - 1));
+  return curve;
+}
+
+/**
+ * Peak level in dBFS after the compressor and its makeup gains (before the ceiling) of a cue whose
+ * notes add up to `peak` at class volume `volume`, once the compressor has settled. The clip check of
+ * `soundPackProblems` uses this level: a cue must stay under 0 dBFS here, so the ceiling only ever
+ * catches transients, never a cue that is too loud as written.
+ */
+export function compressedPeakDb(peak: number, volume: number): number {
   const input = toDb(peak * volumeGain(volume));
   return compressorCurveDb(input) + compressorMakeupDb() + toDb(LOUDNESS.makeup);
+}
+
+/**
+ * Peak level in dBFS at the speakers of a cue whose notes add up to `peak` (one note: its gain, capped
+ * at the note gain cap when played) at class volume `volume` (0..100), once the compressor has settled:
+ * `compressedPeakDb` through the soft ceiling. Rendered in Chromium (S21a): a single note within
+ * 0.3 dB of it; chords and noise at or under it, except the first milliseconds over the threshold
+ * (see LOUDNESS), which the ceiling bounds.
+ */
+export function outputPeakDb(peak: number, volume: number): number {
+  return toDb(softCeiling(fromDb(compressedPeakDb(peak, volume))));
 }
