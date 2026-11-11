@@ -39,6 +39,7 @@ const AiToolsAdminPage = lazyRouteComponent(() => import('./routes/admin/AiTools
 const MaintenancePage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'MaintenancePage');
 const AdminReportsPage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'AdminReportsPage');
 const CatalogPage = lazyRouteComponent(() => import('./dev/Catalog.tsx'), 'CatalogPage');
+const AvatarSheetPage = lazyRouteComponent(() => import('./dev/AvatarSheet.tsx'), 'AvatarSheetPage');
 // User guides (Help): bundled Markdown, loaded only when opened.
 const HelpPage = lazyRouteComponent(() => import('./help/HelpPage.tsx'), 'HelpPage');
 
@@ -177,6 +178,8 @@ const oauthConsentRoute = createRoute({
 
 /** Component catalog: signed-in users only; fictional data only. */
 const catalogRoute = createRoute({ getParentRoute: () => rootRoute, path: '/dev/catalog', beforeLoad: requireSession, component: CatalogPage });
+/** Avatar review sheets (S17c, D-169): signed-in users only; catalogue keys only. */
+const avatarSheetRoute = createRoute({ getParentRoute: () => rootRoute, path: '/dev/avatars', beforeLoad: requireSession, component: AvatarSheetPage });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -191,6 +194,7 @@ const routeTree = rootRoute.addChildren([
   helpRoute,
   oauthConsentRoute,
   catalogRoute,
+  avatarSheetRoute,
 ]);
 
 export const router = createRouter({

@@ -5228,6 +5228,30 @@ li > .cc-admin-list {
     grid-area: surprise;
   }
 }
+/* Review sheets (/dev/avatars, S17c): rows of 48 px avatars on the page background. */
+.cc-avatar-sheet {
+  display: grid;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: var(--cc-bg);
+  color: var(--cc-text);
+}
+.cc-avatar-sheet section {
+  display: grid;
+  gap: 0.25rem;
+  width: max-content;
+  padding: 0.5rem;
+  background: var(--cc-surface);
+}
+.cc-avatar-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.cc-avatar-sheet__label {
+  width: 12rem;
+  font-size: 0.75rem;
+}
 .cc-badge-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));

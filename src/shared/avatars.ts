@@ -350,27 +350,11 @@ export function lockedPartsOf(spec: AvatarSpecValue): string[] {
 }
 
 // ---------------------------------------------------------------- generation
-/** FNV-1a: a small stable hash. */
-export function hashOf(seed: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-/** Deterministic random numbers from a seed (mulberry32). */
-export function seededRandom(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// The stable defaults (the generated avatar of a child who never chose one, the 120 ready-made
+// avatars) and their hash and random numbers are FROZEN in `avatarDefaults.ts` (S17c, D-169), so
+// this catalogue can grow without changing anybody's avatar. Keys here are only ever added, never
+// removed or renamed (CONVENTIONS "Avatars"; `tests/client/avatars-defaults.test.ts`).
+export { generatedAvatar, hashOf, READY_MADE, seededRandom } from './avatarDefaults.ts';
 
 const pick = <T,>(xs: readonly T[], rnd: () => number): T => xs[Math.floor(rnd() * xs.length)]!;
 const withoutLocked = <T extends string>(part: string, xs: readonly T[]) => xs.filter((x) => !(`${part}.${x}` in AVATAR_UNLOCKS));
@@ -421,20 +405,6 @@ export function randomCreature(rnd: () => number, family?: CreatureFamily): Crea
     bgColor: pick(AVATAR_COLOURS, rnd),
   };
 }
-
-/** The avatar shown before a student chooses one: a creature generated from a stable hash of the id (item 9). */
-export const generatedAvatar = (studentId: string): CreatureSpec => randomCreature(seededRandom(hashOf(`avatar:${studentId}`)));
-
-/** Ready-made avatars: 10 families × 3 characters × 4 looks = 120 (test-enforced ≥ 120). */
-export const READY_MADE: readonly CreatureSpec[] = CREATURE_FAMILY_KEYS.flatMap((family) =>
-  (CREATURE_FAMILIES[family] as readonly string[]).flatMap((species) =>
-    [0, 1, 2, 3].map((look): CreatureSpec => {
-      const rnd = seededRandom(hashOf(`${family}.${species}.${look}`));
-      const base = randomCreature(rnd, family);
-      return { ...base, species, color: AVATAR_COLOURS[(hashOf(species) + look * 3) % AVATAR_COLOURS.length]!, bg: (['circle', 'rings', 'dots', 'waves'] as const)[look]! };
-    }),
-  ),
-);
 
 // ---------------------------------------------------------------- accessible name
 const nameOf = (key: string, locale: 'en' | 'tr') => OPTION_NAMES[key]?.[locale] ?? '';
