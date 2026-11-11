@@ -17,7 +17,7 @@ One TypeScript modular monolith, one SQLite database file, one uploads folder, o
 | Auth | In-house (~500 lines, fully tested): argon2id, server-side sessions, `__Host-` cookies, Origin+header CSRF, CLI-only first admin | Small surface, no deprecated libs, no external IdP |
 | Files | Type sniffing + allow-list, images re-encoded (EXIF/GPS stripped), random names outside web root, served only via policy-checked endpoint with sandbox CSP / nosniff | STU-8: uploads can never execute |
 | Import/OCR | papaparse, SheetJS (xls/xlsx), mammoth (docx), unpdf (pdf), **tesseract.js local OCR** (tur+eng) in a worker thread | No student data leaves the server (IMP-7) |
-| i18n | Typed EN/TR dictionaries (TR must match EN keys at compile time); editable labels stored as `{en,tr}`; one Turkish text module (`Intl.Collator('tr')`, tr-TR casing, NFC) | UX-3/4/5 |
+| i18n | Typed EN/TR dictionaries (TR must match EN keys at compile time): the main dictionary holds only what the student page shows, the staff dictionary and smaller area dictionaries the rest (D-179, D-182); editable labels stored as `{en,tr}`; one Turkish text module (`Intl.Collator('tr')`, tr-TR casing, NFC) | UX-3/4/5 |
 | Charts/print | Recharts (SVG) + data table under each chart; print-specific routes; CSV with BOM and formula-injection escaping | RPT-4/5 |
 | Testing | Vitest (unit/integration on real SQLite), fast-check (property tests for rotations, weeks, grouping), Playwright (touch, mobile, PIN bypass attempts, screenshot matrix themes×languages×text sizes), axe | ENG-3/4 |
 | Deploy | Caddy (HTTPS) → one hardened systemd service; releases + `current` symlink; pre-migration snapshot; health-check rollback | Two services total |

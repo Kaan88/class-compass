@@ -431,6 +431,12 @@ Decision D-177; no migration.
 - [ ] Card marks on the count line at the fitted sizes (narrower chips or pills) so they do not add a line to the card (S22c review; needs room in the student page budget), and on phone cards
 - [ ] Seen on the classroom display (owner): cards of a class of 8 and of a large class at 1536×703, and whether Compact / Normal / Large should still pick a fixed size (D-177, owner question)
 
+## S23a Student page budget headroom without behaviour change (2026-11-11)
+Decision D-182; no migration. The student page was at 459 997 of 460 000 B gzip.
+- [x] Strings split: the main dictionary (`en.ts` / `tr.ts`) keeps only the 540 keys the student page can show, the other 3167 are the staff dictionary (`areas/staff/`), registered first by the teacher/admin, scorer and board entries and by the server (`server/lib/i18n.ts`); the student page is at 362.7 kB gzip, 97.3 kB under the unchanged budget (`npm run size:student`)
+- [x] Checks: `tests/scripts/i18n-split.test.ts` fails when a key sits in the wrong dictionary (computed from the student entry's imports by `scripts/i18n-split.ts`), when an entry or the server does not register the staff dictionary, or when a key does not translate; tests and e2e look texts up in `tests/messages.ts`; the scaffolds write to the right dictionary; rule in CONVENTIONS
+- [ ] Unused shared code on the student page (`shared/themePackage/validate.ts`, `shared/mcp.ts` through the theme code) and more lazy student screens: not needed for the target, next if the budget runs short (D-182)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site

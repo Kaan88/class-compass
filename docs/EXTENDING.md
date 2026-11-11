@@ -22,7 +22,7 @@ npm run new:module -- homeworkTracker
 
 It creates:
 - a line in `CONTEXT_MODULE_CATALOG`, disabled by default;
-- `module.<key>`, `<key>.title` and `<key>.placeholder` in `en.ts` and `tr.ts`, with the Turkish lines marked `// TODO(tr)`;
+- `module.<key>` in `en.ts` and `tr.ts` (the student page names modules), `<key>.title` and `<key>.placeholder` in the staff dictionary `areas/staff/en.ts` and `tr.ts` (D-182), with the Turkish lines marked `// TODO(tr)`;
 - the server manifest and an empty `commands.ts`;
 - the client manifest with a placeholder dashboard slot;
 - `tests/server/<key>.test.ts`, with `it.todo` entries.
@@ -92,7 +92,7 @@ exports, erasure, backups, credentials, link tokens or files.
 | Field | What it does |
 |---|---|
 | `key`, `policyKey` | Same meaning as on the server. Every client `policyKey` needs a server manifest with the same key (test-enforced). |
-| `i18nNamespace` | Prefix of the module's strings. Keys under it must exist in en and tr. |
+| `i18nNamespace` | Prefix of the module's strings. Keys under it must exist in en and tr (the staff dictionary, unless the student page shows them: D-182). |
 | `dashboardSlots` | `{ key, module, order, dock?, Component }` on the classroom board (S14b, D-148), shown only while the module is enabled. `key` is the slot's box in `BOX_CATALOGUE` (`src/shared/classroomLayout.ts`): add an entry there with its default place (`row` or `dock`), whether it may be a box and/or a dock button, and its minimum width/height (test-enforced). `dock: { Icon, label, useBadge? }` is its dock button (a badge is a short count the class may see); a slot without `dock` renders its own control in the dock (the attendance button). `Component` gets `{ context, lesson, presentation }`: `'box'` on the board, `'dock'` in the full-screen view its dock button opens (show feedback and undo inside it). A slot may render `null` when it has nothing to show (its box then disappears). |
 | `startSteps` | `startStep({ key, module, order, title, initial, Component, useContribution? })` in Start Lesson. `Component` gets `{ context, value, onChange }`; the value is kept in the per-class start draft. `useContribution(context, value, enabled)` is a hook (called for every registered step, with `enabled` false when the module is off, and then it must add nothing) that returns `{ input, ready }`: `input` is the step's part of the one `lesson.start` command (attendance adds `attendance` + `othersPresent`, routines add `routineTemplateId`, the assistant adds `steps.assistant`), and `ready: false` keeps "Begin" disabled (e.g. while loading). A module's own data goes under `steps[<key>]` with a server `startSteps` entry (S14b; `steps` is merged key by key); only core fields extend `LessonCommands['lesson.start']` itself. |
 | `endSteps` | `endStepUi({ key, title, initial, Component })`. `key` equals the server step key; every server step needs one (test-enforced). |
@@ -282,7 +282,7 @@ labels, the same counter levels (number + pattern + word) and the same flows.
 Not scaffolded yet. English and Turkish are the supported pair, and much of the code assumes exactly
 these two.
 
-- `src/shared/i18n/<lang>.ts` must satisfy `Messages` (every key, type-checked). Extend the `Locale` type and `translate()` in `src/shared/i18n/index.ts`, including plural rules via `Intl.PluralRules` (`_one`/`_other` keys).
+- `src/shared/i18n/<lang>.ts` must satisfy `Messages` and `src/shared/i18n/areas/staff/<lang>.ts` `StaffMessages` (every key, type-checked; D-182), and every other area file gets the language too. Extend the `Locale` type and `translate()` in `src/shared/i18n/index.ts`, including plural rules via `Intl.PluralRules` (`_one`/`_other` keys).
 - `tests/client/lint-rules.test.ts` compares en and tr keys and placeholders. Extend it to the new dictionary.
 - Teacher-editable labels are `{en, tr}` JSON (`pickText`). A new language needs a schema change for those labels and a migration. Record that as a decision first.
 - Names are sorted with Turkish collation (`sortByName`). Check that this is still right for the new language's users.

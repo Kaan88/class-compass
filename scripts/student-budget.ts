@@ -21,6 +21,9 @@ import { gzipSync } from 'node:zlib';
  * 36 kB, the whole EN+TR dictionary 98 kB, which every stage's strings make larger, the shared app
  * chunk 41 kB, the stylesheet 17 kB), and 16 kB → 19 kB for the student entry itself. The budgets
  * leave about 10 % and 35 % room. Raise a budget only with a DECISIONS entry that says why.
+ * S23a (D-182, 2026-11-11): the page had reached 460.0 kB (459 997 B); the dictionary it loads now holds
+ * only the strings it can show (EN+TR 119.5 kB → 22.2 kB gzip; the rest is the staff dictionary), so
+ * the page is at 362.7 kB, about 97 kB under the unchanged budget.
  */
 export const STUDENT_BUDGET = { total: 460_000, entry: 26_000 } as const;
 
