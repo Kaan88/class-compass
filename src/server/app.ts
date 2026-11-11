@@ -29,6 +29,13 @@ const BOARD_HTML = 'board.html';
 const isSpeakersPagePath = (url: string) =>
   /^\/(?:p|p\/app|board)(?:[?#]|$)/u.test(url) || url.startsWith(`/${SCORER_HTML}`) || url.startsWith(`/${BOARD_HTML}`) || url.startsWith('/scorer-sw.js');
 
+/**
+ * The teacher and classroom app's service worker (S26b, D-190), built into `dist/client`. Never cached
+ * by browsers or proxies, so a new deploy's worker is found on the next load.
+ */
+export const APP_WORKER_PATH = '/app-sw.js';
+const isAppWorkerPath = (url: string) => url === APP_WORKER_PATH || url.startsWith(`${APP_WORKER_PATH}?`);
+
 /** Log redaction: never log cookies, auth headers, PINs, passwords or tokens (STU-6). */
 const REDACT = [
   'req.headers.cookie',
@@ -81,6 +88,8 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
         imgSrc: ["'self'", 'data:', 'blob:'],
         mediaSrc: ["'self'", 'blob:'],
         connectSrc: ["'self'"],
+        // The app's service worker (S26b, D-190) and the scorer's: same origin only.
+        workerSrc: ["'self'"],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
@@ -100,7 +109,7 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
     // approved avatar pictures, whose address changes with every new picture).
     const cache = reply.getHeader('Cache-Control');
     const keep = typeof cache === 'string' && cache.startsWith('private, max-age=');
-    if ((req.url.startsWith('/api/') || isStudentPagePath(req.url) || isSpeakersPagePath(req.url)) && !keep) reply.header('Cache-Control', 'no-store');
+    if ((req.url.startsWith('/api/') || isStudentPagePath(req.url) || isSpeakersPagePath(req.url) || isAppWorkerPath(req.url)) && !keep) reply.header('Cache-Control', 'no-store');
     // The student page and its API never send a referrer (STU-6; helmet sets it globally, kept explicit here).
     if (isStudentPagePath(req.url) || req.url.startsWith('/api/student/')) reply.header('Referrer-Policy', 'no-referrer');
   });

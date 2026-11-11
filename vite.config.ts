@@ -3,6 +3,7 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { stripMcpPlugin } from './scripts/stripMcp.ts';
+import { appWorkerPlugin } from './scripts/appWorker.ts';
 
 /**
  * The personal student page (S10) is its own small entry (student.html), served by the server at
@@ -24,7 +25,8 @@ const studentPageInDev = (): Plugin => ({
 
 export default defineConfig({
   // stripMcpPlugin (S14i): the AI tool descriptions on the shared contracts are for the server only.
-  plugins: [stripMcpPlugin(), react(), tailwindcss(), studentPageInDev()],
+  // appWorkerPlugin (S26b, D-190): the teacher and classroom app's service worker, `/app-sw.js`.
+  plugins: [stripMcpPlugin(), react(), tailwindcss(), studentPageInDev(), appWorkerPlugin()],
   // `.env` belongs to the Node server (`--env-file-if-exists=.env`) and sets NODE_ENV=development for
   // local runs. Vite must not read it: a NODE_ENV from `.env` makes `vite build` emit React's
   // development build (twice the size; caught by the S14d student budget). The client uses no VITE_ vars.

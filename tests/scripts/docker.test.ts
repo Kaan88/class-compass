@@ -264,6 +264,22 @@ describe('Docker build context and image layout (S14i)', () => {
     expect(df).toMatch(/^COPY --from=build \S+ \/app\/dist\/client \.\/dist\/client$/mu);
     expect(df).toMatch(/^CMD \["node", "src\/server\/main\.ts"\]$/mu);
   });
+
+  it('the app service worker (S26b, D-190): its code and builder reach the build, and the built /app-sw.js lands in the image', () => {
+    // `vite build` writes dist/client/app-sw.js from the worker's code (scripts/appWorker.ts).
+    expect(read('vite.config.ts')).toMatch(/import \{ appWorkerPlugin \} from '\.\/scripts\/appWorker\.ts'/u);
+    expect(read('vite.config.ts')).toContain('appWorkerPlugin()');
+    expect(read('scripts/appWorker.ts')).toContain("WORKER_FILE = 'app-sw.js'");
+    for (const f of ['scripts/appWorker.ts', 'src/client/sw/appWorker.ts']) {
+      expect(existsSync(join(ROOT, f)), f).toBe(true);
+      expect(inContext(f), `${f} is in the build context`).toBe(true);
+    }
+    // The build stage copies everything; the runtime image takes the whole built client.
+    const df = read('Dockerfile');
+    expect(df.slice(df.indexOf('AS build'), df.indexOf('AS runtime'))).toMatch(/^COPY \. \.$/mu);
+    expect(df).toMatch(/^COPY --from=build \S+ \/app\/dist\/client \.\/dist\/client$/mu);
+    expect(read('src/server/app.ts')).toMatch(/APP_WORKER_PATH = '\/app-sw\.js'/u);
+  });
 });
 
 describe('docker-compose.example.yml', () => {
