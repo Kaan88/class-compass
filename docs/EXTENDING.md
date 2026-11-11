@@ -115,6 +115,7 @@ Ordering is deterministic: lists are sorted by `order`, then by `key`. Orders mu
 - [ ] Gate with `assertModuleEnabled`. Disabled modules keep their data.
 - [ ] Schema changes appended to `src/server/db/schema.ts`, then `npm run db:generate -- --name <stage_desc>`.
 - [ ] Every string in en **and** tr. Translate the scaffold's `TODO(tr)` lines.
+- [ ] Teacher-editable class-facing labels are edited with `LangFields` + `useEditorLocales`; defaults seeded as rows for a class+subject are written with `inLocales(…, seedLocales(cls))` and completed by an `onClassLanguageChanged` listener registered in `routes` (CONVENTIONS → Class language, D-172).
 - [ ] UI from `src/client/ui`, semantic tokens only, theme slots via `useTheme()`, `<ThemeIllustration>` and `<Mascot>`. Never branch on a theme key.
 - [ ] Tests: HTTP behaviour, permissions (`permissions.test.ts` covers new endpoints automatically), audit, replay. Name requirement IDs in the tests.
 - [ ] ROADMAP: add the boxes and tick only what is done. Add DECISIONS entries for new patterns.
