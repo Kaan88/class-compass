@@ -31,6 +31,7 @@ import { FrameOverlay } from '../../ui/Frame.tsx';
 import { customThemesVersion, getCustomTheme, removeCustomTheme, subscribeCustomThemes } from '../../themes/registry.ts';
 import { ILLUSTRATIONS, MASCOT_POSES, SOUND_EVENTS, type ThemeDefinition } from '../../themes/types.ts';
 import { Button } from '../../ui/Button.tsx';
+import { FilePick } from '../../ui/FilePick.tsx';
 import { ConfirmDestructive } from '../../ui/Dialog.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { TextArea } from '../../ui/Fields.tsx';
@@ -529,6 +530,7 @@ function ImportPanel({ onSaved }: { onSaved: (key: string) => void }) {
   const run = useRun();
   const [source, setSource] = useState('');
   const [fileError, setFileError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [checked, setChecked] = useState<{ source: string; report: Report; pkg: Th.PackageDto | null; exists: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const preview = checked?.pkg ? previewKey(checked.pkg.key) : null;
@@ -550,6 +552,7 @@ function ImportPanel({ onSaved }: { onSaved: (key: string) => void }) {
     if (done) {
       setChecked(null);
       setSource('');
+      setFileName(null);
       onSaved(key);
     }
   };
@@ -560,26 +563,25 @@ function ImportPanel({ onSaved }: { onSaved: (key: string) => void }) {
         {t('themes.import.heading')}
       </h2>
       <p className="cc-muted">{t('themes.import.intro')}</p>
-      <label className="cc-field">
-        <span className="cc-field__label">{t('themes.import.file')}</span>
-        <input
-          type="file"
-          className="cc-file-input"
-          accept=".json,application/json"
-          data-testid="theme-file"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            setFileError(null);
-            if (!file) return;
-            if (file.size > PACKAGE_LIMITS.maxBytes) {
-              setFileError(t('themes.import.fileTooBig', { limit: Math.round(PACKAGE_LIMITS.maxBytes / 1024) }));
-              return;
-            }
-            setSource(await file.text());
-            setChecked(null);
-          }}
-        />
-      </label>
+      <FilePick
+        id="theme-import-file"
+        label={t('themes.import.file')}
+        icon={<IconUpload />}
+        accept=".json,application/json"
+        testId="theme-file"
+        status={fileName ? t('file.chosen', { name: fileName }) : t('file.none')}
+        onFiles={async ([file]) => {
+          setFileError(null);
+          if (!file) return;
+          if (file.size > PACKAGE_LIMITS.maxBytes) {
+            setFileError(t('themes.import.fileTooBig', { limit: Math.round(PACKAGE_LIMITS.maxBytes / 1024) }));
+            return;
+          }
+          setFileName(file.name);
+          setSource(await file.text());
+          setChecked(null);
+        }}
+      />
       {fileError ? <Alert kind="danger">{fileError}</Alert> : null}
       <TextArea label={t('themes.import.paste')} description={t('themes.import.pasteHint')} value={source} onChange={setSource} rows={10} />
       <div className="cc-row">

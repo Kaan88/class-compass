@@ -163,3 +163,20 @@ describe('no untranslated text in JSX', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('file pickers (owner feedback 2026-11-11)', () => {
+  // The browser's own file input looks like plain text ("Choose File · No file chosen", in the
+  // browser's language), so nobody sees it opens a picker. Every picker is the shared FilePick button
+  // (src/client/ui/FilePick.tsx) or, beside other buttons, a button-styled label around a hidden input.
+  it('every <input type="file"> is visually hidden and drawn as a button', () => {
+    const offenders: string[] = [];
+    for (const f of walk(CLIENT)) {
+      if (!f.endsWith('.tsx')) continue;
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/<input\b[^>]*?type="file"[^>]*?>/gs)) {
+        if (!/cc-visually-hidden/.test(m[0])) offenders.push(`${rel(f)}: ${m[0].slice(0, 80).replace(/\s+/g, ' ')}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});

@@ -9,7 +9,7 @@
  * matched, a choice for unknown ones); confirming that makes one draft per class, and each class is
  * then checked, confirmed, reported and undone on its own like a one-class import.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import { ACCEPT_HINT, uploadFile } from '../../../shared/contracts/files.ts';
@@ -29,7 +29,8 @@ import { ConfirmDestructive, DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextArea, TextField, Toggle } from '../../ui/Fields.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
-import { IconAlert, IconCheck, IconDot, IconMinus, IconNote, IconUsers } from '../../ui/icons.tsx';
+import { IconAlert, IconCheck, IconDot, IconMinus, IconNote, IconUpload, IconUsers } from '../../ui/icons.tsx';
+import { FilePick } from '../../ui/FilePick.tsx';
 
 type Batch = Imp.ImportBatch;
 type Row = Imp.ImportRow;
@@ -444,13 +445,11 @@ function Start({
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [picking, setPicking] = useState<{ fileId: string; sheets: Imp.ImportSheet[] } | null>(null);
   const reset = () => {
     setText('');
     setFile(null);
     setPicking(null);
-    if (fileRef.current) fileRef.current.value = '';
   };
   const readSheets = async (fileId: string, sheets: string[]) => {
     setBusy(true);
@@ -507,10 +506,14 @@ function Start({
           {t('import.fileTitle')}
         </h2>
         <p className="cc-muted">{t('import.fileHint')}</p>
-        <label className="cc-field">
-          <span className="cc-field__label">{t('import.fileLabel')}</span>
-          <input ref={fileRef} type="file" className="cc-file-input" accept={ACCEPT_HINT.import_source} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        </label>
+        <FilePick
+          id="import-file"
+          label={t('import.fileLabel')}
+          icon={<IconUpload />}
+          accept={ACCEPT_HINT.import_source}
+          status={file ? t('file.chosen', { name: file.name }) : t('file.none')}
+          onFiles={([f]) => setFile(f ?? null)}
+        />
         <div className="cc-row">
           <Button variant="primary" isDisabled={!file || (!several && !cid) || busy} onPress={() => void go('file')}>
             {busy ? t('import.reading') : t('import.readFile')}

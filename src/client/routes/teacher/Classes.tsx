@@ -12,6 +12,8 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
 import { showToast } from '../../lib/toast.ts';
 import { Button } from '../../ui/Button.tsx';
+import { FilePick } from '../../ui/FilePick.tsx';
+import { IconImage } from '../../ui/icons.tsx';
 import { Modal, DialogActions } from '../../ui/Dialog.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
@@ -256,10 +258,14 @@ function StudentPhotoDialog({ student, onClose, onDone }: { student: { id: strin
     <Modal isOpen onOpenChange={(o) => (o ? null : onClose())} title={t('students.photo.dialogTitle', { name: student.fullName })}>
       <div className="cc-stack">
         <p className="cc-muted">{t('students.photo.hint')}</p>
-        <label className="cc-field">
-          <span className="cc-field__label">{t('students.photo.file')}</span>
-          <input type="file" className="cc-file-input" accept={ACCEPT_HINT.image} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        </label>
+        <FilePick
+          id={`student-photo-${student.id}`}
+          label={t('students.photo.file')}
+          icon={<IconImage />}
+          accept={ACCEPT_HINT.image}
+          status={file ? t('file.chosen', { name: file.name }) : t('file.none')}
+          onFiles={([f]) => setFile(f ?? null)}
+        />
         <label className="cc-row">
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
           <span>{t('students.photo.consent')}</span>

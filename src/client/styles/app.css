@@ -4243,11 +4243,6 @@ html:has(.cc-classroom) {
 .cc-import-row[data-heading] {
   opacity: 0.7;
 }
-.cc-file-input {
-  min-height: var(--cc-touch);
-  font: inherit;
-  color: var(--cc-text);
-}
 
 /* ------------------------------------------------------------------ goals, student page, links (S10) */
 /* Personal student page: mobile-first single column (UX-2), large touch targets, readable lines. */
@@ -4525,7 +4520,8 @@ html:has(.cc-classroom) {
 .cc-file-pick__button {
   cursor: pointer;
 }
-.cc-file-pick__input:focus-visible + .cc-file-pick__button {
+.cc-file-pick__input:focus-visible + .cc-file-pick__button,
+label:has(> input[type='file']:focus-visible) {
   outline: 3px solid var(--cc-focus);
   outline-offset: 2px;
 }
