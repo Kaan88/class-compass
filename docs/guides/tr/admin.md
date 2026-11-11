@@ -145,7 +145,7 @@ Bir ChatGPT hesabı henüz bağlanamaz: önce OpenAI'ın Sınıf Pusulası'nı "
 - **Öğretmenler asistan sohbetini kullanabilir** ancak hazır bir okul bağlantısı varsa (açık, anahtarla denenmiş, bütçesi içinde) açılabilir. Sohbet için sayfanın aşağısındaki **Yapay zekâ araçları açık** anahtarının da açık olması gerekir: asistan aynı araçları kullanır ve yapay zekâ araçlarının göndereceği bilgileri gönderir ([okuldan ne çıkar](ai-tools.md#asistan-sohbeti)). Anahtarlardan biri kapalıysa öğretmenler nedenini kendi sayfalarında görür.
 - Asistan bilgilere her öğretmenin kendi yetkileriyle bakar ve bir şeyi ancak öğretmen kartındaki **Evet**’e bastığında değiştirir. Değişiklikler denetim kaydında öğretmenin adıyla, "yapay zekâ aracı üzerinden" diye yer alır.
 - **Bir sohbeti son mesajından sonra sil**: başlangıçta bir öğretim yılı (365 gün); 30 gün ile iki yıl arasında seçilebilir. Eski sohbetler her saat silinir.
-- Yalnızca kaç sohbet olduğunu ve kaç öğretmenin sohbeti olduğunu görürsünüz. Sohbetler özeldir: onları okuyamazsınız ve okulun tam dışa aktarımında yer almazlar (yedeklerde vardır). Her öğretmen kendi sohbetlerini indirebilir. Bir öğrenciyi silmek, adını kayıtlı sohbetlerden de kaldırır.
+- Yalnızca kaç sohbet olduğunu ve kaç öğretmenin sohbeti olduğunu görürsünüz. Sohbetler özeldir: onları okuyamazsınız ve okulun tam dışa aktarımında yer almazlar (yedeklerde vardır). Her öğretmen kendi sohbetlerini indirebilir. Bir öğrenciyi silmek, adını kayıtlı sohbetlerden de kaldırır. Devre dışı bırakılan bir öğretmenin sohbetleri, devre dışı bırakıldıktan 30 gün sonra silinir (hesap bu süre dolmadan yeniden etkinleştirilirse sohbetler kalır).
 
 ## Hava durumu
 

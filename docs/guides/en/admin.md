@@ -145,7 +145,7 @@ A ChatGPT account cannot be connected yet: OpenAI must first approve Class Compa
 - **Teachers can use the assistant chat** can be switched on only when there is a school connection that is ready (on, tested with a key, within its budget). The chat also needs **AI tools are on** further down the page: it uses the same tools and sends what the AI tools would send ([what leaves the school](ai-tools.md#the-assistant-chat)). With either switch off, teachers see why on their page.
 - The assistant reads with each teacher's own permissions and changes something only after the teacher presses **Yes** on its card. Changes are in the audit log under the teacher's name, "through an AI tool".
 - **Delete a chat after its last message**: one school year (365 days) by default; 30 days to two years can be chosen. Old chats are deleted every hour.
-- You see only how many chats there are and how many teachers have one. Chats are private: you cannot read them, and they are not in the school's full export (they are in backups). Each teacher can download their own. Erasing a student also removes their name from stored chats.
+- You see only how many chats there are and how many teachers have one. Chats are private: you cannot read them, and they are not in the school's full export (they are in backups). Each teacher can download their own. Erasing a student also removes their name from stored chats. The chats of a deactivated teacher are deleted 30 days after the deactivation (activating the account again before then keeps them).
 
 ## Weather
 
