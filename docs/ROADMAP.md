@@ -371,7 +371,7 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17c; decision D-169; after 
 - [x] Plain families (sports, space, fruits, robots) redrawn to the S14 level (before/after sheets: `e2e/avatar-sheets.spec.ts` into the git-ignored `review-sheets/s17c/`, `/dev/avatars`)
 - [x] Picture-based picker: swatches and picture buttons, family tabs, ready-made grouped by family with `avatarFamiliesFirst`, Randomise avoids body = background, tab order follows the drawing
 - [x] Turkish names and accessible names fixed
-- [ ] The guide screenshots of the avatar picker (`docs/guides/img/*/student-avatar.png`) still show the old select boxes: regenerate with `npm run docs:screenshots`
+- [x] The guide screenshots of the avatar picker (`docs/guides/img/*/student-avatar.png`) regenerated with `npm run docs:screenshots` (S21, 2026-11-11): they show the picture picker (Make my own, A character, family pictures), EN and TR
 - [x] The theme package validator checks `avatar-ink` / `avatar-white` against the avatar colours and skin tones (S21a, D-173: `avatarFeatureFailures`, `CONTRAST` errors on `colors.avatar-ink`, `preview_theme` shows the worst body; `tests/client/theme-package-avatar-features.test.ts`, `tests/server/mcp-themes.test.ts`; every built-in and `docs/examples` package passes)
 - [ ] Avatars named and chosen by children on the real devices (owner, Sare)
 - [ ] Later, owner to choose: new families (arctic, forest, farm, bugs), seasonal hats and accessories, theme avatar style, more expressions
@@ -418,4 +418,4 @@ Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in t
 - [ ] Read through by the owner and a Turkish-speaking teacher (wording, anything unclear for colleagues)
 - [x] Administrators set their Maintenance PIN in Profile (asked by "Back up now" and "Verify the latest backup"); the admin guide is updated (D-138)
 - [x] The sign-in pages have an English | Türkçe switch, remembered per device; without a choice they follow a Turkish browser, then the school's language for new accounts; the Turkish teacher guide quotes the Turkish labels (D-142)
-- [ ] Re-run `npm run docs:screenshots` after visible UI changes (no automatic check that the pictures are current)
+- [ ] Re-run `npm run docs:screenshots` after visible UI changes (standing rule, no automatic check that the pictures are current; last full run S21, 2026-11-11 on main after S17–S21: 34 of 44 pictures per language changed and were committed)
