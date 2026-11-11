@@ -113,7 +113,7 @@ When you get a new achievement, your page celebrates it once, and its tile says 
 Your avatar is the little picture of you that your class sees on the classroom screen. It is a drawing, never a photo.
 
 1. Open **My avatar** and press **Change my avatar**.
-2. Choose **Ready-made**, or **Make my own**: **A person** or **A character** (for example a dinosaur, a unicorn or a dragon). Pick the face, hair, clothes and more. **Surprise me** picks one part for you, **Randomise all** changes everything, **Undo** goes back.
+2. Choose **Ready-made**, or **Make my own**: **A person** or **A character** (for example a dinosaur, a unicorn or a dragon). Tap a family picture to see its characters, then tap the pictures and colours you like for the face, hair, clothes and more; the one you chose has a tick. **Surprise me** picks one part for you, **Randomise all** changes everything, **Undo** goes back.
 3. Press **Save my avatar**.
 
 Some parts say **earn "…" to unlock**: earn that achievement first. If you see **Your teacher has paused avatar changes for now**, you can change it later.

@@ -113,7 +113,7 @@ Yeni bir başarı kazandığında sayfan onu bir kez kutlar ve kutucuğunda **Ye
 Avatarın, sınıfının sınıf ekranında gördüğü küçük resmindir. Bir çizimdir, asla fotoğraf değildir.
 
 1. **Avatarım**'ı açıp **Avatarımı değiştir**'e bas.
-2. **Hazır**'ı ya da **Kendim yapayım**'ı seç: **Bir kişi** ya da **Bir karakter** (örneğin bir dinozor, tek boynuzlu at ya da ejderha). Yüzü, saçı, kıyafetleri ve daha fazlasını seç. **Sürpriz yap** senin için bir parça seçer, **Hepsini rastgele seç** her şeyi değiştirir, **Geri al** geri götürür.
+2. **Hazır**'ı ya da **Kendim yapayım**'ı seç: **Bir kişi** ya da **Bir karakter** (örneğin bir dinozor, tek boynuzlu at ya da ejderha). Bir ailenin resmine dokunup karakterlerini gör, sonra yüz, saç, kıyafet ve daha fazlası için beğendiğin resimlere ve renklere dokun; seçtiğinin üstünde bir onay işareti olur. **Sürpriz yap** senin için bir parça seçer, **Hepsini rastgele seç** her şeyi değiştirir, **Geri al** geri götürür.
 3. **Avatarımı kaydet**'e bas.
 
 Bazı parçalarda **açmak için "…" başarısını kazan** yazar: önce o başarıyı kazanman gerekir. **Öğretmenin avatar değişikliklerini şimdilik durdurdu.** yazıyorsa avatarını daha sonra değiştirebilirsin.
