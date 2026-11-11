@@ -35,6 +35,7 @@ import { LessonTimer } from '../lessons/LessonTimer.tsx';
 import { lessonKey, useLessonState, type LessonQueryData } from '../lessons/lessonClient.ts';
 import type { ClassroomContext, DashboardSlot, DashboardSlotProps, StudentCardAddon } from '../types.ts';
 import { playEvent } from '../../themes/index.tsx';
+import '../../../shared/i18n/areas/classroomCards.ts';
 
 const arrangementsKey = (contextId: string) => ['classroom', 'grouping', 'arrangements', contextId] as const;
 /** Group card colours: the counter colour tokens, in this order (with the number and name, never colour alone). */

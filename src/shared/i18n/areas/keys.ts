@@ -4,4 +4,5 @@
  */
 export type AreaMessageKey =
   | keyof typeof import('./aiConnections.ts').en
-  | keyof typeof import('./aiConnect.ts').en;
+  | keyof typeof import('./aiConnect.ts').en
+  | keyof typeof import('./classroomCards.ts').en;

@@ -30,6 +30,7 @@ import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { awaitCommand, useLessonRoster } from '../lessons/lessonClient.ts';
 import { endStepUi, type ClassroomContext, type DashboardSlot, type DashboardSlotProps, type StudentCardAddon } from '../types.ts';
+import '../../../shared/i18n/areas/classroomCards.ts';
 
 export const achievementsKey = (contextId: string, lessonId?: string) => ['classroom', 'achievements', contextId, lessonId ?? null] as const;
 

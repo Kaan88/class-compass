@@ -1247,7 +1247,6 @@ export const en = {
   'grouping.leftClass': 'Student who left the class',
   'grouping.levelChip': 'Level {level}',
   'grouping.groupN': 'Group {n}',
-  'grouping.cardGroup': 'In group {n}',
   'grouping.groupName': 'Group name',
   'grouping.roleOf': 'Role of {name}',
   'grouping.roleHint': 'Roles are optional, for example Leader, Writer, Reporter or Timekeeper.',
@@ -2613,9 +2612,6 @@ export const en = {
   // S13c: achievements, avatars, kind words check
   'module.achievements': 'Achievements',
   'achievements.title': 'Achievements',
-  'achievements.cardCount': '{count} achievements this lesson',
-  'achievements.cardCount_one': '{count} achievement this lesson',
-  'achievements.cardCount_other': '{count} achievements this lesson',
   'teacher.achievements': 'Achievements',
   'teacher.avatars': 'Avatars',
   'teacher.textChecks': 'Kind words check',

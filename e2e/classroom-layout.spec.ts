@@ -279,7 +279,9 @@ test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Nor
     await setReminderBoxes(office, ctx.id, true);
     expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false })).status).toBe(200);
 
-    // Compact / Normal / Large on this device: the cards change size and the choice survives a reload.
+    // Compact / Normal / Large on this device: the choice survives a reload. On the board the density is
+    // where the cards' fit starts (S22c, D-177): a class whose cards all fit grows them into the free
+    // height at any density, so Large is never smaller than Normal and Compact never larger.
     const { ctx: c, p } = await onDevice(browser, page, VIEWPORTS[3]!);
     try {
       await openClassroom(p);
@@ -292,12 +294,14 @@ test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Nor
       await openSettings();
       await control.getByRole('button', { name: 'Large' }).click();
       await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'large');
-      await expect.poll(size).toBeGreaterThan(normal);
+      await expect(p.locator('.cc-student-grid')).toHaveAttribute('data-fit', /.+/u);
+      await expect.poll(size).toBeGreaterThanOrEqual(normal);
       await p.reload();
       await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'large');
       await openSettings();
       await control.getByRole('button', { name: 'Compact' }).click();
-      await expect.poll(size).toBeLessThan(normal);
+      await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'compact');
+      await expect.poll(size).toBeLessThanOrEqual(normal);
       expect((await layoutFacts(p)).hScroll).toBe(false);
       await openSettings();
       await control.getByRole('button', { name: 'Normal' }).click();
