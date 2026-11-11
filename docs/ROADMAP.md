@@ -358,9 +358,9 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17b; decision D-168; after 
 ## S17c Avatars: frozen defaults, readability, picture picker (owner 2026-11-11)
 Brief: `docs/design/2026-11-11-theme-engine.md` → S17c; decision D-169; after S17a, alongside S17b. No stored avatar changes.
 - [x] Generated and ready-made defaults frozen to the v1 catalogue (golden tests); rule: catalogue keys only added, never removed or renamed
-- [x] Readability and fairness: larger faces, eyes readable on dark bodies and skin tones 10–12, no body lost in its background, hat and scarf placement; contrast test
-- [x] Plain families (sports, space, fruits, robots) redrawn to the S14 level (before/after sheets: `e2e/avatar-sheets.spec.ts`, `/dev/avatars`)
-- [x] Picture-based picker: swatches and picture buttons, family tabs, ready-made grouped by family with `avatarFamiliesFirst`, Randomise avoids body = background
+- [x] Readability and fairness: larger faces, eyes readable on dark bodies and skin tones 10–12, no body lost in its background, hats and extras edged when their colour is near the body or background (review fix), hat and scarf placement; contrast test
+- [x] Plain families (sports, space, fruits, robots) redrawn to the S14 level (before/after sheets: `e2e/avatar-sheets.spec.ts` into the git-ignored `review-sheets/s17c/`, `/dev/avatars`)
+- [x] Picture-based picker: swatches and picture buttons, family tabs, ready-made grouped by family with `avatarFamiliesFirst`, Randomise avoids body = background, tab order follows the drawing
 - [x] Turkish names and accessible names fixed
 - [ ] The guide screenshots of the avatar picker (`docs/guides/img/*/student-avatar.png`) still show the old select boxes: regenerate with `npm run docs:screenshots`
 - [ ] The theme package validator does not yet check `avatar-ink` / `avatar-white` against the avatar colours and skin tones (the test covers the built-ins and Snow Day only)

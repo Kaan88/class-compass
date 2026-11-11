@@ -59,6 +59,21 @@ export function apartFrom(body: AvatarColour, bg: AvatarColour): AvatarColour {
   return bg;
 }
 
+/**
+ * The hat and extra colour to use: `accent` itself, or the first colour half the wheel away that is
+ * near neither the body nor the background (S17c review), so a random hat never vanishes.
+ */
+export function accentApart(accent: AvatarColour, body: AvatarColour, bg: AvatarColour): AvatarColour {
+  const ok = (c: AvatarColour) => !coloursClash(c, body) && !coloursClash(c, bg);
+  if (ok(accent)) return accent;
+  const start = AVATAR_COLOURS.indexOf(accent);
+  for (let i = 0; i < AVATAR_COLOURS.length; i++) {
+    const c = AVATAR_COLOURS[(start + AVATAR_COLOURS.length / 2 + i) % AVATAR_COLOURS.length]!;
+    if (ok(c)) return c;
+  }
+  return accent;
+}
+
 /** A wide, inclusive range of skin tones (tokens `--cc-avatar-skin-1` … `-12`). */
 export const SKIN_TONES = ['skin1', 'skin2', 'skin3', 'skin4', 'skin5', 'skin6', 'skin7', 'skin8', 'skin9', 'skin10', 'skin11', 'skin12'] as const;
 export type SkinTone = (typeof SKIN_TONES)[number];
@@ -389,11 +404,13 @@ const withoutLocked = <T extends string>(part: string, xs: readonly T[]) => xs.f
 
 /**
  * A random person (only parts that need no unlock). The background never has the clothes' colour or
- * a near one (S17c, D-169); the fix-up draws no extra numbers, so seeded results stay the same otherwise.
+ * a near one (S17c, D-169), and the hat and extra colour is near neither (S17c review); the fix-ups
+ * draw no extra numbers, so seeded results stay the same otherwise.
  */
 export function randomPerson(rnd: () => number): PersonSpec {
   const s = drawPerson(rnd);
-  return { ...s, bgColor: apartFrom(s.topColor, s.bgColor) };
+  const bgColor = apartFrom(s.topColor, s.bgColor);
+  return { ...s, bgColor, accentColor: accentApart(s.accentColor, s.topColor, bgColor) };
 }
 
 function drawPerson(rnd: () => number): PersonSpec {
@@ -422,10 +439,11 @@ function drawPerson(rnd: () => number): PersonSpec {
   };
 }
 
-/** A random creature of a family (any family when omitted); never on a background of its own colour or a near one (D-169). */
+/** A random creature of a family (any family when omitted); never on a background of its own colour or a near one (D-169), hat and extra apart from both (S17c review). */
 export function randomCreature(rnd: () => number, family?: CreatureFamily): CreatureSpec {
   const s = drawCreature(rnd, family);
-  return { ...s, bgColor: apartFrom(s.color, s.bgColor) };
+  const bgColor = apartFrom(s.color, s.bgColor);
+  return { ...s, bgColor, accentColor: accentApart(s.accentColor, s.color, bgColor) };
 }
 
 function drawCreature(rnd: () => number, family?: CreatureFamily): CreatureSpec {
@@ -468,7 +486,7 @@ export const TR_WITH: Readonly<Record<string, string>> = {
   'accessory.headphones': 'kulaklıklı',
   'accessory.backpack': 'sırt çantalı',
   'accessory.wand': 'sihirli değnekli',
-  'accessory.ball': 'toplu',
+  'accessory.ball': 'top tutan', // not "toplu", which reads as "plump" or "collective" before a noun
   'accessory.book': 'kitaplı',
   'accessory.medal': 'madalyalı',
   'glasses.round': 'yuvarlak gözlüklü',

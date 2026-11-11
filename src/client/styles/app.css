@@ -5317,7 +5317,6 @@ li > .cc-admin-list {
   font-weight: var(--cc-weight-strong);
 }
 .cc-avatar-options {
-  order: 1;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 3.5rem), 1fr));
   gap: 0.45rem;
@@ -5326,13 +5325,11 @@ li > .cc-admin-list {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cc-touch)), 1fr));
 }
 .cc-avatar-unlocks {
-  order: 2;
   margin: 0;
   padding-left: 1.1rem;
   font-size: 0.85rem;
 }
 .cc-avatar-part__surprise {
-  order: 3;
   justify-self: end;
 }
 .cc-avatar-opt {

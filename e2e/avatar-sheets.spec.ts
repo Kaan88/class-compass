@@ -1,8 +1,10 @@
 /**
  * Avatar review sheets (S17c, D-169): every species in all 12 colours at 48 px, the body-coloured
  * backgrounds, hats and extras on every species and every skin tone, in every built-in theme, plus
- * the picker on a 375 px phone. The pictures are saved for the owner under `test-results/s17c/<phase>/`
- * (`S17C_PHASE=before` was taken on the v1 art before the stage changed it; the default is `after`).
+ * the picker on a 375 px phone. The pictures are saved for the owner under `review-sheets/s17c/<phase>/`
+ * (git-ignored, and outside Playwright's `test-results/`, which every run empties, so a rerun never
+ * wipes an earlier set; `S17C_PHASE=before` was taken on the v1 art before the stage changed it; the
+ * default is `after`).
  * The checks: every species renders in every colour, as an image with a name, and the sheet has no
  * serious axe violations. Fictional demo data only.
  */
@@ -13,7 +15,7 @@ import { THEME_KEYS } from '../src/shared/themes.ts';
 import { api, ensurePin, login, studentLinkUrl } from './helpers.ts';
 
 const PHASE = process.env.S17C_PHASE ?? 'after';
-const out = (name: string) => `test-results/s17c/${PHASE}/${name}.png`;
+const out = (name: string) => `review-sheets/s17c/${PHASE}/${name}.png`;
 
 async function context3A(page: Page) {
   const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; classId: string; className: string; subjectName: { en: string } }>;

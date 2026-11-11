@@ -71,9 +71,6 @@ function PartChoice({ part, draft, onChoose, isLocked, unlockOf, onSurprise }: {
   return (
     <fieldset className="cc-avatar-part" data-testid={`avatar-part-${part.key}`}>
       <legend className="cc-avatar-part__legend">{label}</legend>
-      <Button size="small" variant="ghost" className="cc-avatar-part__surprise" onPress={onSurprise} aria-label={t('avatar.surprisePart', { part: label })}>
-        {t('avatar.surprise')}
-      </Button>
       <div className={`cc-avatar-options cc-avatar-options--${part.kind === 'picture' || part.kind === 'face' ? 'pictures' : 'swatches'}`}>
         {part.options.map((o) => {
           const name = optionName(part, o, locale);
@@ -106,6 +103,10 @@ function PartChoice({ part, draft, onChoose, isLocked, unlockOf, onSurprise }: {
           })}
         </ul>
       ) : null}
+      {/* After the options in the DOM too, so the tab order matches what is drawn (WCAG 2.4.3). */}
+      <Button size="small" variant="ghost" className="cc-avatar-part__surprise" onPress={onSurprise} aria-label={t('avatar.surprisePart', { part: label })}>
+        {t('avatar.surprise')}
+      </Button>
     </fieldset>
   );
 }

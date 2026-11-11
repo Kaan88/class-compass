@@ -49,6 +49,11 @@ describe('picker logic', () => {
     expect(surpriseOptions(cat, hats, (_p, o) => o === 'crown')).not.toContain('crown');
     expect(clashesWith(cat, 'color', 'yellow')).toBe(true);
     expect(clashesWith(cat, 'eyes', 'big')).toBe(false);
+    // The extra colour stays apart from the body and the background (S17c review).
+    const accent = pickerParts(cat).find((p) => p.key === 'accentColor')!;
+    for (const o of surpriseOptions(cat, accent, () => false)) expect(coloursClash(cat.color, o as never) || coloursClash(cat.bgColor, o as never), o).toBe(false);
+    expect(clashesWith(cat, 'accentColor', 'blue')).toBe(true);
+    expect(clashesWith(cat, 'accentColor', 'yellow')).toBe(true);
   });
 
   it('colours are swatches, eyes and mouths close-ups of the face, the rest pictures', () => {
@@ -100,6 +105,23 @@ describe('the picker screen', () => {
     expect(r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
   });
 
+  it('in every part the options come before "Surprise me" in the DOM, so the tab order matches what is drawn (WCAG 2.4.3)', async () => {
+    const { getByTestId, container } = mount();
+    await act(async () => getByTestId('avatar-change').click());
+    await act(async () => getByTestId('avatar-tab-make').click());
+    const parts = [...container.querySelectorAll('fieldset.cc-avatar-part')];
+    expect(parts.length).toBeGreaterThan(5);
+    for (const part of parts) {
+      const children = [...part.children];
+      const at = (sel: string) => children.findIndex((c) => c.matches(sel));
+      const options = at('.cc-avatar-options');
+      const surprise = at('.cc-avatar-part__surprise');
+      expect(options, part.getAttribute('data-testid') ?? '').toBe(1); // straight after the legend
+      expect(surprise, part.getAttribute('data-testid') ?? '').toBe(children.length - 1);
+      if (at('.cc-avatar-unlocks') >= 0) expect(at('.cc-avatar-unlocks')).toBeLessThan(surprise);
+    }
+  });
+
   it('Randomise never gives a body on its own or a near background colour', async () => {
     const { getByTestId, container } = mount();
     await act(async () => getByTestId('avatar-change').click());
@@ -125,6 +147,12 @@ describe('Turkish and English names (D-169)', () => {
     expect(describeAvatar(person, 'tr')).toBe('Kısa saçlı, çok koyu tenli, tişörtlü, atkılı ve yuvarlak gözlüklü kişi');
     expect(describeAvatar(person, 'en')).toBe('Person with short hair, deep brown skin, a T-shirt, a scarf and round glasses');
     expect(describeAvatar({ ...cat, species: 'cat' }, 'en')).toBe('Blue cat with a cap and a scarf');
+  });
+
+  it('a ball is "top tutan", never the ambiguous "toplu" ("plump", "collective")', () => {
+    expect(describeAvatar({ ...cat, species: 'cat', hat: 'none', accessory: 'ball' }, 'tr')).toBe('Top tutan mavi kedi');
+    expect(describeAvatar({ ...cat, species: 'bunny', hat: 'cap', accessory: 'ball', color: 'mint' }, 'tr')).toBe('Şapkalı ve top tutan nane yeşili tavşan');
+    for (const a of READY_MADE) expect(describeAvatar(a, 'tr')).not.toMatch(/toplu/i);
   });
 
   it('every hat, extra, glasses, pet, hair and clothes option has a Turkish "with" form', () => {

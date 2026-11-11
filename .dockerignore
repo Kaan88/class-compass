@@ -13,6 +13,7 @@ test-results
 blob-report
 # Usability screenshot sets (npm run usability:screens): git-ignored output, often over a gigabyte.
 usability-shots
+review-sheets
 **/*.tsbuildinfo
 # Secrets and local configuration
 **/.env

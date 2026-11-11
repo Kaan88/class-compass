@@ -91,11 +91,15 @@ export function setPart(spec: AvatarSpecValue, key: string, value: string): Avat
   return { ...spec, [key]: value } as AvatarSpecValue;
 }
 
-const BODY_OF: Readonly<Record<string, string>> = { color: 'bgColor', topColor: 'bgColor', bgColor: '' };
-/** True when choosing `value` for `key` would put the body on a background of its own or a near colour. */
+const BODY_OF: Readonly<Record<string, string>> = { color: 'bgColor', topColor: 'bgColor', bgColor: '', accentColor: '' };
+/**
+ * True when choosing `value` for `key` would put the body on a background of its own or a near
+ * colour, or a hat and extra colour near the body or the background (S17c review).
+ */
 export function clashesWith(spec: AvatarSpecValue, key: string, value: string): boolean {
   if (!(key in BODY_OF)) return false;
   const body = spec.type === 'creature' ? spec.color : spec.topColor;
+  if (key === 'accentColor') return coloursClash(body, value as AvatarColour) || coloursClash(spec.bgColor, value as AvatarColour);
   if (key === 'bgColor') return coloursClash(body, value as AvatarColour);
   if ((spec.type === 'creature' && key === 'color') || (spec.type === 'person' && key === 'topColor')) return coloursClash(value as AvatarColour, spec.bgColor);
   return false;

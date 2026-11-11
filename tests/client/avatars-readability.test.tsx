@@ -117,6 +117,51 @@ describe('body and background never blend (D-169)', () => {
   });
 });
 
+describe('hats and extras never disappear into the body or background (S17c review)', () => {
+  const ACCENT_HATS = CREATURE_PARTS.hat.filter((h) => h !== 'none' && h !== 'crown');
+  const ACCENT_EXTRAS = CREATURE_PARTS.accessory.filter((a) => a !== 'none' && a !== 'wand');
+  const edgeOf = (out: string, part: string) => parse(out).querySelector(`[data-part="${part}"] [data-part="accent-edge"]`);
+
+  it('every accent hat and extra gets an ink-and-light edge when its colour equals the body or the background, on every species', () => {
+    for (const { family, species } of SPECIES) {
+      for (const hat of ACCENT_HATS) {
+        for (const over of [{ color: 'orange', accentColor: 'orange', bgColor: 'navy' }, { color: 'navy', accentColor: 'yellow', bgColor: 'yellow' }] as const) {
+          const edge = edgeOf(html(creature(family, species, { hat, ...over })), 'hat');
+          expect(edge, `${species} ${hat} ${JSON.stringify(over)}`).not.toBeNull();
+          expect(edge!.querySelector('path, rect, circle'), `${species} ${hat}`).not.toBeNull();
+        }
+      }
+      for (const accessory of ACCENT_EXTRAS) {
+        const edge = edgeOf(html(creature(family, species, { accessory, color: 'teal', accentColor: 'teal', bgColor: 'yellow' })), 'accessory');
+        expect(edge, `${species} ${accessory}`).not.toBeNull();
+      }
+    }
+  });
+
+  it('no edge when the accent stands apart, so ordinary avatars look as before', () => {
+    expect(coloursClash('red', 'blue') || coloursClash('red', 'yellow')).toBe(false);
+    expect(html(creature('animals', 'cat', { hat: 'cap', accessory: 'scarf', color: 'blue', accentColor: 'red', bgColor: 'yellow' }))).not.toContain('accent-edge');
+  });
+
+  it('people: hats and extras near the clothes or the background get the edge too', () => {
+    for (const hat of PERSON_PARTS.hat.filter((h) => h !== 'none' && h !== 'crown')) {
+      expect(html(person({ hat, accentColor: 'yellow', bgColor: 'yellow' })), hat).toContain('data-part="accent-edge"');
+    }
+    for (const accessory of PERSON_PARTS.accessory.filter((a) => a !== 'none' && a !== 'wand')) {
+      expect(html(person({ accessory, accentColor: 'blue', topColor: 'blue' })), accessory).toContain('data-part="accent-edge"');
+    }
+  });
+
+  it('Randomise never draws a hat and extra colour near the body or the background (1,000 draws each)', () => {
+    for (let seed = 1; seed <= 1000; seed++) {
+      const c = randomCreature(seededRandom(seed));
+      expect(coloursClash(c.accentColor, c.color) || coloursClash(c.accentColor, c.bgColor), JSON.stringify(c)).toBe(false);
+      const p = randomPerson(seededRandom(seed));
+      expect(coloursClash(p.accentColor, p.topColor) || coloursClash(p.accentColor, p.bgColor), JSON.stringify(p)).toBe(false);
+    }
+  });
+});
+
 describe('hats and scarves per species (D-169)', () => {
   it('ears, horns and carrot leaves stay in front of every hat', () => {
     const cases: Array<[CreatureFamily, string, string]> = [

@@ -20,6 +20,9 @@
  *   contrast test checks ink or rim against every body colour and skin tone in every theme. No new tokens.
  * - When body and background have the same or a near colour (`coloursClash`), the background gets a
  *   light veil and the body a soft `avatar-outline` rim.
+ * - A hat or extra drawn in a colour that is the same as or near the body or the background gets an
+ *   edge (`AccentEdge`: an ink line inside a light rim), so it never disappears and a picker picture
+ *   with a hat never looks like "no hat" (S17c review).
  * - Hats sit on each species' head (`hat.top`), ears and horns stay in front of a hat (`overHat`), and
  *   scarves go round each species' neck (`anchors.neck`).
  * - The plain families are drawn with more character: a football with patches and the face on white,
@@ -56,6 +59,34 @@ function RimLine({ d, width = 2 }: { d: string; width?: number }) {
 }
 /** A filled ink feature with a light rim around it (paint order: the rim stroke under the fill). */
 const rimmed = { stroke: WHITE, strokeWidth: FEATURE_RIM.extra, strokeLinejoin: 'round' as const, paintOrder: 'stroke' };
+
+/** Hats and extras that are not drawn in the accent colour, so they never need an edge. */
+const ACCENT_FREE = new Set(['hat.none', 'hat.crown', 'accessory.none', 'accessory.wand']);
+/** True when a hat or extra in `accent` needs an edge to stand out from the colours under it (S17c review). */
+export function needsAccentEdge(item: string, accent: string, under: readonly string[]): boolean {
+  if (ACCENT_FREE.has(item)) return false;
+  return under.some((u) => coloursClash(accent as never, u as never));
+}
+
+/**
+ * Draws its children three times: a wide light rim, an ink line inside it, then the item itself, so
+ * the outline reads on light and dark bodies alike. Only the edges show: the item covers the rest.
+ * Elements with their own stroke (a headphone band, a ball's seams) keep it.
+ */
+function AccentEdge({ on, children }: { on: boolean; children: ReactNode }) {
+  if (!on) return <>{children}</>;
+  return (
+    <>
+      <g data-part="accent-edge" stroke={WHITE} strokeWidth="6" strokeLinejoin="round" strokeLinecap="round">
+        {children}
+      </g>
+      <g stroke={INK} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round">
+        {children}
+      </g>
+      {children}
+    </>
+  );
+}
 
 // ---------------------------------------------------------------- shared layers
 function Background({ kind, colour }: { kind: string; colour: string }) {
@@ -561,6 +592,7 @@ function Person({ s }: { s: PersonSpec }) {
   const scarf = col(s.accentColor);
   const covered = s.hair === 'hijab' || s.hair === 'headscarf';
   const k = PERSON_FACE_SCALE;
+  const hatColour = s.accentColor === s.topColor ? 'yellow' : s.accentColor;
   return (
     <g>
       <Background kind={s.bg} colour={s.bgColor} />
@@ -585,8 +617,14 @@ function Person({ s }: { s: PersonSpec }) {
       </g>
       <HairFront kind={s.hair} fill={hair} scarf={scarf} />
       <Glasses kind={s.glasses} />
-      {s.hair !== 'hijab' ? <Hat kind={s.hat} colour={s.accentColor === s.topColor ? 'yellow' : s.accentColor} /> : null}
-      <Accessory kind={s.accessory} colour={s.accentColor} />
+      {s.hair !== 'hijab' ? (
+        <AccentEdge on={needsAccentEdge(`hat.${s.hat}`, hatColour, [s.topColor, s.bgColor])}>
+          <Hat kind={s.hat} colour={hatColour} />
+        </AccentEdge>
+      ) : null}
+      <AccentEdge on={needsAccentEdge(`accessory.${s.accessory}`, s.accentColor, [s.topColor, s.bgColor])}>
+        <Accessory kind={s.accessory} colour={s.accentColor} />
+      </AccentEdge>
       <Pet kind={s.pet} />
     </g>
   );
@@ -1289,12 +1327,16 @@ function Creature({ s }: { s: CreatureSpec }) {
       ) : null}
       <SpeciesMouth spot={f.mouth} kind={s.mouth} colour={s.color} k={f.mouth.style === 'person' ? Math.max(1.15, k * 0.9) : k} />
       <g data-part="hat" transform={hatMoved ? `translate(${h.x} ${h.top}) scale(${h.scale}) translate(-50 ${-h.top})` : undefined}>
-        <Hat kind={s.hat} colour={s.accentColor} top={h.top} />
+        <AccentEdge on={needsAccentEdge(`hat.${s.hat}`, s.accentColor, [s.color, s.bgColor])}>
+          <Hat kind={s.hat} colour={s.accentColor} top={h.top} />
+        </AccentEdge>
       </g>
       {f.overHat === 'horn' || (f.overHat && s.hat !== 'none') ? <OverHatPart kind={f.overHat} s={s} /> : null}
       {s.accessory !== 'none' ? (
         <g data-part="accessory" transform={accessoryTransform(s.species, s.accessory)}>
-          <Accessory kind={s.accessory} colour={s.accentColor} />
+          <AccentEdge on={needsAccentEdge(`accessory.${s.accessory}`, s.accentColor, [s.color, s.bgColor])}>
+            <Accessory kind={s.accessory} colour={s.accentColor} />
+          </AccentEdge>
         </g>
       ) : null}
     </g>

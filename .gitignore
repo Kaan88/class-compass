@@ -8,6 +8,8 @@ playwright-report/
 test-results/
 # Usability screenshot sets (npm run usability:screens) — never committed
 usability-shots/
+# Avatar review sheets (e2e/avatar-sheets.spec.ts) — kept outside test-results/, never committed
+review-sheets/
 blob-report/
 *.tsbuildinfo
 
