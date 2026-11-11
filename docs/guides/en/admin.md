@@ -12,7 +12,7 @@ In a hurry? See the [quick start for administrators](quick-start-admin.md).
 
 After you sign in you land on **Administration**. **Add classroom** and **Add a teacher account** are the two most common jobs; the tiles open every section, and on the other pages the menu bar does (on a phone or tablet it is one **Section** list). **Help** (top bar) opens these guides. On a phone, tables show each row as a card with its buttons at the bottom.
 
-Administrator accounts always sign in with a **password** (never with email links). Classroom mode and its PIN lock are for teacher accounts only, so an administrator account is never PIN-locked: do not sign in as an administrator on the classroom device. An administrator still sets a PIN in **Profile and PIN**: **Maintenance** asks for it before **Back up now** and **Verify the latest backup**.
+Administrator accounts always sign in with a **password** (never with email links). Classroom mode and its PIN lock are for teacher accounts only, so an administrator account is never PIN-locked: do not sign in as an administrator on the classroom device. An administrator still sets a PIN in **Profile and PIN**: **Maintenance** asks for it before **Back up now** and **Verify the latest backup**. **Profile and PIN** also holds your **Language**, **Text size** and **Spacing** (Compact, Normal or Large: how much room tables and cards take on the administration pages; buttons keep their size).
 
 ## First setup
 

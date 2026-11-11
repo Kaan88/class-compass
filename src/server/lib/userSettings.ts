@@ -13,6 +13,7 @@
  */
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { AreaDensity, DEFAULT_AREA_DENSITY } from '../../shared/contracts/auth.ts';
 import { DisplayInfoRecord, EMPTY_DISPLAY_INFO } from '../../shared/contracts/displayInfo.ts';
 import { DEFAULT_NOTIFICATION_SETTINGS, NotificationSettings } from '../../shared/notifications.ts';
 import { DEFAULT_VIEW_REF, ViewRef } from '../../shared/reportViews.ts';
@@ -36,6 +37,8 @@ export const USER_SETTINGS = {
   'displayInfo.lastSeen': setting(DisplayInfoRecord, EMPTY_DISPLAY_INFO),
   /** S18 (D-167): Start lesson enters full screen and End lesson leaves it (on by default; the board's button works either way). */
   'lessons.fullscreen': setting(z.boolean(), true),
+  /** S22d (D-178): Compact / Normal / Large in the teacher and admin areas (Normal by default; the classroom screen keeps its per-device size). */
+  'area.density': setting(AreaDensity, DEFAULT_AREA_DENSITY),
 } as const;
 
 export type UserSettingKey = keyof typeof USER_SETTINGS;

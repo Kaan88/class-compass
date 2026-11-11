@@ -393,7 +393,7 @@ export async function switchToPassword(deps: AppDeps, user: UserRow, session: Se
 export function meOf(deps: AppDeps, userId: string, sessionId: string) {
   const user = getUser(deps.db, userId);
   const session = deps.db.select().from(sessions).where(eq(sessions.id, sessionId)).get()!;
-  return toMe(user, session, deps.now());
+  return toMe(deps.db, user, session, deps.now());
 }
 
 /** Active email-link accounts (Maintenance warns when SMTP is off: they cannot sign in). */

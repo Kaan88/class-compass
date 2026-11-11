@@ -12,6 +12,7 @@ import type { AppDeps, Actor, SessionRow, UserRow } from '../../lib/context.ts';
 import { hashPassword, hashPin, newId, randomToken, tokenHash, verifyPassword, verifyPin } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
 import { isPinUnlocked, PIN_UNLOCK_MS } from '../../lib/http.ts';
+import { getUserSetting } from '../../lib/userSettings.ts';
 
 export const SESSION_ABSOLUTE_MS = 14 * 24 * 60 * 60 * 1000;
 const LOGIN_FREE_FAILURES = 5;
@@ -29,7 +30,7 @@ export const FRESH_SIGN_IN_MS = 15 * 60 * 1000;
 export const isFreshEmailSession = (session: SessionRow, now: number) =>
   (session.authMethod === 'email_link' || session.authMethod === 'invite') && now - session.createdAt <= FRESH_SIGN_IN_MS;
 
-export function toMe(user: UserRow, session: SessionRow, now: number): Me {
+export function toMe(db: Db, user: UserRow, session: SessionRow, now: number): Me {
   return {
     kind: 'user',
     id: user.id,
@@ -37,6 +38,7 @@ export function toMe(user: UserRow, session: SessionRow, now: number): Me {
     role: user.role,
     locale: user.locale,
     textScale: user.textScale,
+    density: getUserSetting(db, user.id, 'area.density'),
     mustChangePassword: user.mustChangePassword,
     hasPin: user.pinHash !== null,
     signInMethod: user.signInMethod,

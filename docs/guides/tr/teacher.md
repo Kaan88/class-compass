@@ -46,7 +46,7 @@ Kilit şöyle çalışır:
 
 PIN'inizi mi unuttunuz? **Profil ve PIN**'de şifrenizle yeni bir PIN belirleyin ya da yöneticinizden PIN'inizi silmesini isteyin (bu durumda bütün cihazlarda oturumunuz kapanır ve yeni bir PIN belirlersiniz).
 
-**Profil ve PIN**'de ayrıca **Dil** ve **Yazı boyutu** seçilir (yalnızca sizin gördüğünüzü değiştirir), derslerin tam ekranda açılıp açılmayacağı belirlenir (**Dersler** → **Derslerde tam ekran**, bkz. [Tam ekran](#tam-ekran)) ve **Süre doldu kaydım** kaydedilir (bkz. [Sesler ve kutlamalar](#sesler-ve-kutlamalar)).
+**Profil ve PIN**'de ayrıca **Dil**, **Yazı boyutu** ve **Aralıklar** seçilir (yalnızca sizin gördüğünüzü değiştirir; **Aralıklar** — Sık, Normal ya da Geniş — öğretmen sayfalarındaki tablo ve kartların ne kadar yer kapladığını belirler, düğmeler aynı boyutta kalır, sınıf ekranının boyutu ise **Ekran** menüsündedir), derslerin tam ekranda açılıp açılmayacağı belirlenir (**Dersler** → **Derslerde tam ekran**, bkz. [Tam ekran](#tam-ekran)) ve **Süre doldu kaydım** kaydedilir (bkz. [Sesler ve kutlamalar](#sesler-ve-kutlamalar)).
 
 ## Öğretmen menüsü
 

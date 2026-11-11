@@ -4,6 +4,17 @@ import { endpoint, Ok, Empty } from './define.ts';
 export const Locale = z.enum(['en', 'tr']);
 export type Locale = z.infer<typeof Locale>;
 
+/**
+ * S22d (D-178): how roomy the teacher and admin areas are, per account (user setting `area.density`).
+ * Compact / Normal / Large change spacing, table row height and card padding only (layout variables
+ * on `<html data-area-density>`); touch targets keep `--cc-touch`. Normal is the look before S22d.
+ * The classroom screen has its own per-device Compact / Normal / Large (D-103).
+ */
+export const AREA_DENSITIES = ['compact', 'normal', 'large'] as const;
+export const AreaDensity = z.enum(AREA_DENSITIES);
+export type AreaDensity = z.infer<typeof AreaDensity>;
+export const DEFAULT_AREA_DENSITY: AreaDensity = 'normal';
+
 export const SignInMethod = z.enum(['password', 'email_link']);
 export type SignInMethod = z.infer<typeof SignInMethod>;
 
@@ -14,6 +25,8 @@ export const Me = z.object({
   role: z.enum(['admin', 'teacher']),
   locale: Locale,
   textScale: z.number(),
+  /** S22d (D-178): Compact / Normal / Large in the teacher and admin areas (per account). */
+  density: AreaDensity,
   mustChangePassword: z.boolean(),
   hasPin: z.boolean(),
   /** S13b (D-108): password or email-link sign-in; whether the account has an email address. */
@@ -96,7 +109,7 @@ export const updatePreferences = endpoint({
   method: 'PATCH',
   path: '/api/auth/preferences',
   access: 'user',
-  input: z.object({ locale: Locale.optional(), textScale: z.number().int().min(80).max(200).optional() }),
+  input: z.object({ locale: Locale.optional(), textScale: z.number().int().min(80).max(200).optional(), density: AreaDensity.optional() }),
   output: Me,
 });
 

@@ -4,6 +4,7 @@ import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-route
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Auth from '../../../shared/contracts/auth.ts';
 import { call } from '../../lib/api.ts';
+import { useAreaDensity } from '../../lib/areaDensity.ts';
 import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { setMenuFirst } from '../../lib/menuFirst.ts';
@@ -32,6 +33,8 @@ const NOTIFICATIONS_PAGE = 'notifications';
 export function TeacherLayout() {
   const { t } = useI18n();
   const me = useMe();
+  // Compact / Normal / Large of this account (S22d, D-178).
+  useAreaDensity(me?.density);
   return (
     <SensitiveGate>
       {me && me.role !== 'teacher' ? (
@@ -266,7 +269,7 @@ export function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const signInInfo = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000 });
   if (!me) return null;
-  const update = async (patch: { locale?: 'en' | 'tr'; textScale?: number }) => {
+  const update = async (patch: { locale?: 'en' | 'tr'; textScale?: number; density?: Auth.AreaDensity }) => {
     setError(null);
     try {
       const fresh = await call(Auth.updatePreferences, patch);
@@ -298,6 +301,18 @@ export function ProfilePage() {
             value={String(me.textScale)}
             onChange={(v) => void update({ textScale: Number(v) })}
             items={TEXT_SCALES.map((s) => ({ id: String(s), label: `${s}%` }))}
+          />
+          {/* Compact / Normal / Large for the teacher and admin areas (S22d, D-178). */}
+          <Select
+            label={t('profile.density')}
+            name="density"
+            value={me.density}
+            description={t('profile.densityHint')}
+            onChange={(v) => {
+              const density = Auth.AREA_DENSITIES.find((d) => d === v);
+              if (density) void update({ density });
+            }}
+            items={Auth.AREA_DENSITIES.map((d) => ({ id: d, label: t(`profile.density.${d}`) }))}
           />
         </div>
         {error ? <Alert>{error}</Alert> : null}

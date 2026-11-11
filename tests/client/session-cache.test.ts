@@ -14,6 +14,7 @@ const turkishTeacher: Me = {
   role: 'teacher',
   locale: 'tr',
   textScale: 100,
+  density: 'normal',
   mustChangePassword: true,
   hasPin: false,
   signInMethod: 'password',

@@ -12,7 +12,7 @@ Aceleniz mi var? [Yöneticiler için hızlı başlangıç](quick-start-admin.md)
 
 Giriş yaptıktan sonra **Yönetim** sayfası açılır. En sık yapılan iki iş **Sınıf ekle** ve **Öğretmen hesabı ekle**'dir; kutucuklar bütün bölümleri açar, diğer sayfalarda bunu menü çubuğu yapar (telefonda ya da tablette tek bir **Bölüm** listesidir). Üst çubuktaki **Yardım** bu kılavuzları açar. Telefonda tablolar her satırı, düğmeleri altta olan bir kart olarak gösterir.
 
-Yönetici hesapları her zaman **şifreyle** giriş yapar (hiçbir zaman e-posta bağlantısıyla değil). Sınıf modu ve PIN kilidi yalnızca öğretmen hesapları içindir; yönetici hesabı hiçbir zaman PIN ile kilitlenmez. Bu yüzden sınıf cihazında yönetici olarak giriş yapmayın. Yönetici yine de **Profil ve PIN** sayfasında bir PIN belirler: **Bakım**, **Şimdi yedekle** ve **Son yedeği doğrula** işlemlerinden önce bu PIN'i sorar.
+Yönetici hesapları her zaman **şifreyle** giriş yapar (hiçbir zaman e-posta bağlantısıyla değil). Sınıf modu ve PIN kilidi yalnızca öğretmen hesapları içindir; yönetici hesabı hiçbir zaman PIN ile kilitlenmez. Bu yüzden sınıf cihazında yönetici olarak giriş yapmayın. Yönetici yine de **Profil ve PIN** sayfasında bir PIN belirler: **Bakım**, **Şimdi yedekle** ve **Son yedeği doğrula** işlemlerinden önce bu PIN'i sorar. **Dil**, **Yazı boyutu** ve **Aralıklar** da bu sayfadadır (Sık, Normal ya da Geniş: yönetim sayfalarında tablo ve kartların ne kadar yer kapladığı; düğmeler aynı boyutta kalır).
 
 ## İlk kurulum
 

@@ -1,6 +1,7 @@
 /** Administration area (ACC-1/2, ACC-12). PIN-gated like the teacher area on a classroom device. */
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAreaDensity } from '../../lib/areaDensity.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { signOut, useMe } from '../../lib/session.ts';
 import { Button, buttonClass } from '../../ui/Button.tsx';
@@ -35,6 +36,8 @@ export function AdminLayout() {
   const me = useMe();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  // Compact / Normal / Large of this account (S22d, D-178).
+  useAreaDensity(me?.density);
   return (
     <SensitiveGate>
       {me && me.role !== 'admin' ? (

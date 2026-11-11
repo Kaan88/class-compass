@@ -9,6 +9,7 @@ import { executeCommand } from '../../lib/commands.ts';
 import { AppError } from '../../lib/errors.ts';
 import { route, sessionCookieName } from '../../lib/http.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
+import { setUserSetting } from '../../lib/userSettings.ts';
 import { getSchoolSettings } from '../school/policy.ts';
 import * as svc from './service.ts';
 import * as email from './emailSignIn.ts';
@@ -26,7 +27,7 @@ function setSessionCookie(deps: AppDeps, reply: FastifyReply, token: string, max
 function freshMe(ctx: RequestContext) {
   const user = ctx.db.select().from(users).where(eq(users.id, requireUser(ctx).id)).get()!;
   const session = ctx.db.select().from(sessions).where(eq(sessions.id, ctx.session!.id)).get()!;
-  return svc.toMe(user, session, ctx.now());
+  return svc.toMe(ctx.db, user, session, ctx.now());
 }
 
 export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
@@ -37,7 +38,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     async (ctx, input, { reply }) => {
       const { user, session, token } = await svc.login(ctx, ctx.ip, input.login, input.password);
       setSessionCookie(deps, reply, token, svc.SESSION_ABSOLUTE_MS);
-      return svc.toMe(user, session, ctx.now());
+      return svc.toMe(ctx.db, user, session, ctx.now());
     },
     { rateLimit: { max: deps.config.loginRateLimit, timeWindow: '1 minute' } },
   );
@@ -48,7 +49,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     return { ok: true as const };
   });
 
-  route(app, deps, C.me, (ctx) => svc.toMe(requireUser(ctx), ctx.session!, ctx.now()));
+  route(app, deps, C.me, (ctx) => svc.toMe(ctx.db, requireUser(ctx), ctx.session!, ctx.now()));
 
   route(app, deps, C.changePassword, async (ctx, input) => {
     await svc.changePassword(ctx, requireUser(ctx), ctx.session!, input.currentPassword, input.newPassword);
@@ -89,6 +90,8 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     if (input.locale) patch.locale = input.locale;
     if (input.textScale) patch.textScale = input.textScale;
     ctx.db.update(users).set(patch).where(eq(users.id, user.id)).run();
+    // S22d (D-178): a preference of this account only (no audit row), kept as a user setting.
+    if (input.density) setUserSetting(ctx.db, user.id, 'area.density', input.density, ctx.now());
     return freshMe(ctx);
   });
 
@@ -115,9 +118,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
   );
 
   // ---------------------------------------------------------------- invites and email-link sign-in (S13b, D-108)
-  const signedIn = (ctx: RequestContext, reply: FastifyReply, r: { user: Parameters<typeof svc.toMe>[0]; session: Parameters<typeof svc.toMe>[1]; token: string }) => {
+  const signedIn = (ctx: RequestContext, reply: FastifyReply, r: { user: Parameters<typeof svc.toMe>[1]; session: Parameters<typeof svc.toMe>[2]; token: string }) => {
     setSessionCookie(deps, reply, r.token, svc.SESSION_ABSOLUTE_MS);
-    return svc.toMe(r.user, r.session, ctx.now());
+    return svc.toMe(ctx.db, r.user, r.session, ctx.now());
   };
   route(app, deps, C.inspectInvite, (ctx, input) => email.inspectInvite(ctx, input.token), { rateLimit: { max: 30, timeWindow: '15 minutes' } });
   route(

@@ -17,6 +17,31 @@
   --cc-text-scale: 1;
   --cc-touch: 3.5rem; /* minimum touch target (UX-6) */
   --cc-touch-big: 5rem;
+  /* S22d (D-178): spacing of the teacher and admin areas. These are the Normal values (the look before
+     S22d); html[data-area-density] (the account's Compact / Normal / Large, set only while a teacher or
+     admin layout is mounted) changes them below. Touch targets never follow them (--cc-touch stays). */
+  --cc-area-page-top: 1.25rem;
+  --cc-area-gap: 1rem;
+  --cc-area-row-gap: 0.75rem;
+  --cc-area-card-pad: 1.25rem;
+  --cc-area-cell-y: 0.55rem;
+  --cc-area-cell-x: 0.8rem;
+}
+html[data-area-density='compact'] {
+  --cc-area-page-top: 0.75rem;
+  --cc-area-gap: 0.6rem;
+  --cc-area-row-gap: 0.5rem;
+  --cc-area-card-pad: 0.8rem;
+  --cc-area-cell-y: 0.25rem;
+  --cc-area-cell-x: 0.6rem;
+}
+html[data-area-density='large'] {
+  --cc-area-page-top: 1.75rem;
+  --cc-area-gap: 1.5rem;
+  --cc-area-row-gap: 1rem;
+  --cc-area-card-pad: 1.75rem;
+  --cc-area-cell-y: 0.9rem;
+  --cc-area-cell-x: 1.05rem;
 }
 
 html {
@@ -91,24 +116,24 @@ a {
 .cc-page {
   max-width: 80rem;
   margin: 0 auto;
-  padding: 1.25rem 1rem 4rem;
+  padding: var(--cc-area-page-top) 1rem 4rem;
 }
 .cc-stack {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--cc-area-gap);
 }
 .cc-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--cc-area-row-gap);
 }
 .cc-card {
   background: var(--cc-surface);
   border: var(--cc-border-width) solid var(--cc-border);
   border-radius: var(--cc-radius);
-  padding: 1.25rem;
+  padding: var(--cc-area-card-pad);
   box-shadow: var(--cc-shadow);
 }
 .cc-muted {
@@ -1143,7 +1168,7 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
 .cc-table th,
 .cc-table td {
   text-align: left;
-  padding: 0.55rem 0.8rem;
+  padding: var(--cc-area-cell-y) var(--cc-area-cell-x);
   border-top: 1px solid var(--cc-border);
   vertical-align: middle;
 }
@@ -1198,8 +1223,9 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
   .cc-table--stack thead th.cc-table__th--plain {
     display: none;
   }
+  /* Row spacing follows the area density (S22d, D-178): 0.5rem and 0.3rem at Normal, as before. */
   .cc-table--stack tbody tr {
-    padding: 0.5rem 0;
+    padding: calc(var(--cc-area-cell-y) - 0.05rem) 0;
     border-top: 1px solid var(--cc-border);
   }
   .cc-table--stack tbody td {
@@ -1208,7 +1234,7 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
     gap: 0.5rem;
     align-items: center;
     border-top: 0;
-    padding: 0.3rem 0.8rem;
+    padding: max(0.1rem, calc(var(--cc-area-cell-y) - 0.25rem)) var(--cc-area-cell-x);
     overflow-wrap: anywhere;
   }
   .cc-table--stack tbody td::before {
@@ -6752,7 +6778,7 @@ html[data-cursor='off'] * {
     padding-inline: 0.75rem;
   }
   .cc-page:where(:not(.cc-student)) .cc-card {
-    padding: min(1.25rem, 4vw);
+    padding: min(var(--cc-area-card-pad), 4vw);
   }
   .cc-page:where(:not(.cc-student)) .cc-btn,
   .cc-page:where(:not(.cc-student)) .cc-switch,

@@ -6,7 +6,7 @@
 import { chromium, expect, test } from '@playwright/test';
 import { api, bodyText, ensurePin, login, PIN } from './helpers.ts';
 
-const SENSITIVE_WORDS = ['Language and text size', 'Accounts', 'Audit log', 'Student number', 'Teacher menu', 'Profile and PIN', 'Deniz Akın'];
+const SENSITIVE_WORDS = ['Language, text size and spacing', 'Accounts', 'Audit log', 'Student number', 'Teacher menu', 'Profile and PIN', 'Deniz Akın'];
 
 async function expectLockedAndClean(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('lock-screen')).toBeVisible();

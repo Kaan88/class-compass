@@ -97,6 +97,7 @@ describe('SensitiveGate / LockScreen', () => {
       role: 'teacher',
       locale: 'en',
       textScale: 1,
+      density: 'normal',
       mustChangePassword: false,
       hasPin: true,
       signInMethod: 'password',

@@ -159,6 +159,7 @@ describe('Profile PIN for administrators (D-138)', () => {
       role: 'admin',
       locale: 'en',
       textScale: 100,
+      density: 'normal',
       hasPin: false,
       signInMethod: 'password',
       classroomMode: false,

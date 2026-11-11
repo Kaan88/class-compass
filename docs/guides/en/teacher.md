@@ -46,7 +46,7 @@ How the lock works:
 
 Forgot your PIN? Set a new one in **Profile and PIN** with your password, or ask your administrator to clear it (you are then signed out everywhere and set a new PIN).
 
-In **Profile and PIN** you also choose your **Language** and **Text size** (they change only what you see), whether lessons open in full screen (**Lessons** → **Full screen during lessons**, see [Full screen](#full-screen)), and you can record **My time's-up recording** (see [Sounds and celebrations](#sounds-and-celebrations)).
+In **Profile and PIN** you also choose your **Language**, **Text size** and **Spacing** (they change only what you see; **Spacing** — Compact, Normal or Large — sets how much room tables and cards take in the teacher area, buttons keep their size, and the classroom screen keeps its own size under **Display**), whether lessons open in full screen (**Lessons** → **Full screen during lessons**, see [Full screen](#full-screen)), and you can record **My time's-up recording** (see [Sounds and celebrations](#sounds-and-celebrations)).
 
 ## The teacher menu
 
