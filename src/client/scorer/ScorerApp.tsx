@@ -296,7 +296,7 @@ function StudentCard({ s, onAward, hint }: { s: ScorerStudent; onAward: (s: Scor
   const { t } = useI18n();
   return (
     <li className="cc-scorer__card" data-testid="scorer-student">
-      <Avatar name={s.fullName} hue={s.avatarHue} initials={s.initials} spec={s.avatar} />
+      <Avatar name={s.fullName} hue={s.avatarHue} initials={s.initials} spec={s.avatar} pictureUrl={s.pictureUrl} />
       <span className="cc-scorer__who">
         <span className="cc-scorer__name">{s.fullName}</span>
         <span className="cc-muted">{s.className}</span>

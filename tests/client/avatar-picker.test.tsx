@@ -65,7 +65,14 @@ describe('picker logic', () => {
 });
 
 describe('the picker screen', () => {
-  const info = { spec: cat, generated: READY_MADE[0]!, locked: false, fallback: 'generated' as const, earned: [] };
+  const info = {
+    spec: cat,
+    generated: READY_MADE[0]!,
+    locked: false,
+    fallback: 'generated' as const,
+    earned: [],
+    picture: { state: 'off' as const, approvedUrl: null, pending: null, refused: null },
+  };
   const mount = (locale: 'en' | 'tr' = 'en') =>
     render(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(I18nProvider, { locale, children: createElement(AvatarPanel, { info, name: 'Ada' }) })));
 

@@ -39,6 +39,8 @@ export function deepLink(item: NotificationItem): { page: string; search: Record
       return { page: 'achievements', search: base };
     case 'avatarChanged':
       return { page: 'avatars', search: byClass };
+    case 'avatarPicture':
+      return { page: 'avatar-pictures', search: {} };
     case 'linkNewDevice':
       return { page: 'student-links', search: byClass };
     case 'textBlocked':

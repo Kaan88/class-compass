@@ -135,7 +135,7 @@ describe('subjects, classes, teaching contexts', () => {
 
 describe('module policies (CFG-1/2, ACC-5/12, D-014)', () => {
   it('defaults photo and audio media flags OFF and documents ON', async () => {
-    expect(getMediaPolicy(env.db)).toEqual({ studentPhotos: false, evidencePhotos: false, evidenceAudio: false, evidenceDocuments: true });
+    expect(getMediaPolicy(env.db)).toEqual({ studentPhotos: false, evidencePhotos: false, evidenceAudio: false, evidenceDocuments: true, avatarPictures: false });
     const p = await ok(s.admin.get('/api/admin/module-policies'));
     const byKey = Object.fromEntries(p.policies.map((x: any) => [x.module, x]));
     expect(byKey['media.studentPhotos']).toMatchObject({ availability: 'disabled', adminOnly: true });

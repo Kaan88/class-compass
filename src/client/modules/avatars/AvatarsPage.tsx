@@ -31,13 +31,19 @@ function ClassAvatars({ classId, linkedStudent }: { classId: string; linkedStude
   const [resetting, setResetting] = useState<{ id: string; name: string } | null>(null);
   const s = useQuery({ queryKey: settingsKey(classId), queryFn: () => call(Av.getAvatarSettings, { classId }) });
   const roster = useQuery({ queryKey: ['classroom', 'roster-names', classId], queryFn: () => call(classroomRoster, { classId }) });
-  const set = (patch: { locked?: boolean; fallback?: 'generated' | 'initials' }) =>
+  const set = (patch: { locked?: boolean; fallback?: 'generated' | 'initials'; uploads?: boolean }) =>
     void run(() => call(Av.setAvatarSettings, { classId, ...patch }), { success: t('common.saved'), invalidate: [settingsKey(classId), AVATARS_KEY] });
   if (!s.data) return <p className="cc-muted">{t('common.loading')}</p>;
   return (
     <div className="cc-stack">
       <section className="cc-card cc-stack">
         <Toggle label={t('avatar.lockClass')} description={t('avatar.lockHint')} isSelected={s.data.locked} onChange={(v) => set({ locked: v })} />
+        {/* S24 (D-184): students may send their own picture (a teacher checks each one); only while the school switch is on. */}
+        {s.data.picturesAvailable ? (
+          <Toggle label={t('avatar.uploads')} description={t('avatar.uploadsHint')} isSelected={s.data.uploads} onChange={(v) => set({ uploads: v })} />
+        ) : (
+          <p className="cc-muted">{t('avatar.uploadsOff')}</p>
+        )}
         <Select
           label={t('avatar.fallback')}
           items={[

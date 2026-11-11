@@ -37,6 +37,8 @@ export const MEDIA_MODULE_CATALOG = [
   { key: 'media.evidencePhotos', defaultAvailability: 'disabled' },
   { key: 'media.evidenceAudio', defaultAvailability: 'disabled' },
   { key: 'media.evidenceDocuments', defaultAvailability: 'enabled' },
+  /** S24 (D-184): students' own avatar pictures, checked by a teacher before anyone else sees them. */
+  { key: 'media.avatarPictures', defaultAvailability: 'disabled' },
 ] as const satisfies readonly CatalogEntry[];
 
 /** School-wide modules (S12, D-127): one admin switch, no teacher switch; new ones start disabled. */

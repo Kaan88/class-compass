@@ -1,0 +1,91 @@
+/*
+ * "Use my own picture" and its editor (S24, D-184): loaded with the lazy screen, never part of the
+ * student page start (budget D-151). Tokens only.
+ */
+.cc-picture-rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 0.75rem;
+}
+.cc-picture-rules__list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cc-picture-rules__title,
+.cc-picture-rules__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.cc-picture-rules__list[data-kind='fine'] .cc-picture-rules__title svg,
+.cc-picture-rules__list[data-kind='fine'] .cc-picture-rules__item svg {
+  color: var(--cc-success);
+}
+.cc-picture-rules__list[data-kind='not'] .cc-picture-rules__title svg,
+.cc-picture-rules__list[data-kind='not'] .cc-picture-rules__item svg {
+  color: var(--cc-danger);
+}
+.cc-picture-rules__list[data-kind='not'] {
+  border-style: dashed;
+}
+.cc-picture-problem {
+  font-weight: 700;
+  color: var(--cc-danger);
+}
+.cc-picture-editor__layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.cc-picture-editor__stage {
+  justify-self: center;
+  width: min(100%, 18rem);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--cc-surface-2);
+  border: var(--cc-border-width-strong) solid var(--cc-border-strong);
+}
+.cc-picture-editor__stage:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 3px;
+}
+.cc-picture-editor__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.cc-picture-editor__controls {
+  min-width: 0;
+}
+.cc-picture-editor__buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.5rem;
+}
+.cc-picture-editor__buttons > * {
+  min-width: 0;
+}
+.cc-picture-editor__previews {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1.5rem;
+}
+.cc-picture-editor__preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+.cc-avatar--picture canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

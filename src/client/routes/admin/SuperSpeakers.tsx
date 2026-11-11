@@ -154,6 +154,7 @@ function SettingsPanel({ data }: { data: C.SpeakersAdmin }) {
         />
         <ThemePicker label={t('speakers.admin.theme')} value={s.theme} onChange={(v) => set('theme', v)} switchedOff={!data.settings.themeAvailable && s.theme === data.settings.theme} />
         <Toggle label={t('speakers.admin.sound')} description={t('speakers.admin.soundHint')} isSelected={s.boardSound} onChange={(v) => set('boardSound', v)} />
+        <Toggle label={t('speakers.showOwnPictures')} description={t('speakers.showOwnPicturesHint')} isSelected={s.showOwnPictures} onChange={(v) => set('showOwnPictures', v)} />
         <Select
           label={t('speakers.admin.badgeSubject')}
           description={data.badgeSubject ? t('speakers.admin.badgeSubjectNow', { name: pickText(data.badgeSubject.name, locale) }) : t('speakers.admin.badgeSubjectNone')}

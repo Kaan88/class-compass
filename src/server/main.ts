@@ -5,6 +5,7 @@ import { openDatabase } from './db/client.ts';
 import { mailerFor } from './lib/mailer.ts';
 import { purgeOldChats, RETENTION_TICK_MS } from './modules/assistantChat/retention.ts';
 import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
+import { PICTURE_SWEEP_MS, sweepAvatarPictures } from './modules/avatars/pictures.ts';
 import { runNotificationTick, TICK_MS as NOTIFICATION_TICK_MS } from './modules/notifications/digest.ts';
 import { migrateWithSnapshot, writeServerLock } from './ops/backup.ts';
 
@@ -60,11 +61,17 @@ const chatRetention = () => void purgeOldChats({ db, now }).catch((err: unknown)
 chatRetention();
 const chatRetentionTimer = setInterval(chatRetention, RETENTION_TICK_MS);
 chatRetentionTimer.unref();
+// Students' own pictures (S24, D-184): unchecked ones are deleted after 14 days; at start-up and hourly.
+const pictureSweep = () => void sweepAvatarPictures({ db, config, now }).catch((err: unknown) => app.log.warn({ err }, 'avatar picture clean-up failed'));
+pictureSweep();
+const pictureSweepTimer = setInterval(pictureSweep, PICTURE_SWEEP_MS);
+pictureSweepTimer.unref();
 
 const shutdown = async () => {
   clearInterval(exportSweep);
   clearInterval(notificationTimer);
   clearInterval(chatRetentionTimer);
+  clearInterval(pictureSweepTimer);
   await app.close();
   db.$client.close();
   releaseLock();

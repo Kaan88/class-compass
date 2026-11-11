@@ -520,7 +520,14 @@ describe('sets: avatar order and achievement frames', () => {
     registerThemePackage(snow(), 'enabled');
     const generated = { ...READY_MADE[0]! };
     const saved = READY_MADE.find((a) => a.family === 'robots')!;
-    const info = { spec: saved, generated, locked: false, fallback: 'generated' as const, earned: [] };
+    const info = {
+      spec: saved,
+      generated,
+      locked: false,
+      fallback: 'generated' as const,
+      earned: [],
+      picture: { state: 'off' as const, approvedUrl: null, pending: null, refused: null },
+    };
     const qc = new QueryClient();
     const { container, getByTestId } = render(
       createElement(QueryClientProvider, { client: qc, children: inTheme('peppermint-snow-day', createElement(AvatarPanel, { info, name: 'Ada' })) }),

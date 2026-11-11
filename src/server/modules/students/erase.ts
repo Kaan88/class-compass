@@ -32,6 +32,7 @@ import { removeKey } from '../files/storage.ts';
 import { erasePrivateNotesOf, privateNotesCount, PRIVATE_NOTES_TABLE } from '../goals/history.ts';
 import { eraseStudentSelections, SELECTIONS_TABLE_NAME } from '../secret/service.ts';
 import { scrubStudentFromChats } from '../assistantChat/store.ts';
+import { quarantineKeysOf, removeQuarantined } from '../avatars/pictures.ts';
 
 type Row = Record<string, unknown>;
 const STUDENT_COLUMNS = new Set(['student_id', 'owner_student_id', 'student_a', 'student_b', 'planned_student_id', 'actual_student_id', 'matched_student_id', 'created_student_id']);
@@ -188,6 +189,9 @@ export async function eraseStudent(ctx: RequestContext, studentId: string, confi
   const db = ctx.db;
   const sid = st.id;
   const removedKeys: string[] = [];
+  // S24 (D-184): own pictures waiting for a teacher live in the quarantine folder; their rows go with
+  // the generic student-column delete below, an approved picture is one of the student's files.
+  const quarantined = quarantineKeysOf(db, sid);
   const counts = tx(db, () => {
     const plan = planFor(db, sid, st.fullName, st.photoFileId);
     const tables: Record<string, number> = {};
@@ -250,5 +254,6 @@ export async function eraseStudent(ctx: RequestContext, studentId: string, confi
     return summary;
   });
   for (const k of removedKeys) await removeKey(ctx.config, k);
+  for (const k of quarantined) await removeQuarantined(ctx.config, k);
   return counts;
 }

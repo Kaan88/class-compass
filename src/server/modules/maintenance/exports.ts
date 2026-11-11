@@ -18,6 +18,8 @@
  * Teachers' notifications about a student (S14e3, D-155) are in the full export and, like the notes,
  * not in the per-student export (`STUDENT_EXPORT_EXCLUDED`).
  * Student link tokens are never exported: `token_cipher` is blanked like the hashes.
+ * Avatar pictures waiting for a teacher (S24, D-184) are never exported (they are not uploads); the
+ * approved picture is a `files` row of the student and travels with both exports.
  * Prepared files are removed after one download, when they expire (start-up + a timer in main.ts,
  * and before each new export), and only the administrator who prepared one can download it. CSV cells are formula-escaped and UTF-8 with BOM like report CSVs (RPT-4).
  */
@@ -50,6 +52,11 @@ export const EXPORT_TTL_MS = 60 * 60_000;
  * tokens too). Assistant chats (S19b, D-180) are private to their teacher (administrators see counts, never
  * content): they leave only through the teacher's own export, and stay in backups.
  */
+/**
+ * S24 (D-184): avatar pictures waiting for a teacher live outside the uploads (the quarantine folder)
+ * and are never kept in an export or a backup; an approved picture is an ordinary uploaded file.
+ */
+export const PENDING_PICTURES_NOTE = 'avatar pictures waiting for a teacher (never kept: only the approved picture is exported, D-184)';
 export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'command_log', 'scorer_pairings', 'oauth_requests', 'oauth_codes', 'oauth_refresh_tokens', 'ai_oauth_states', 'assistant_chats', 'assistant_messages', '__drizzle_migrations'] as const;
 /**
  * Columns blanked in every export (sign-in secrets: password/PIN/token/request/code hashes, and every
@@ -228,7 +235,7 @@ async function prepare(ctx: RequestContext, fileName: string, neverExported: rea
       appVersion: appVersion(),
       migrationLevel: levelText(migrationLevel(ctx.db.$client)),
       csv: 'UTF-8 with BOM, comma separated, CRLF; cells starting with = + - @ tab or CR are prefixed with an apostrophe',
-      neverExported: [...NEVER_EXPORTED, ...neverExported, 'Secret Student choices of rounds not revealed', 'password, PIN and token hashes and encrypted link tokens (blank)'],
+      neverExported: [...NEVER_EXPORTED, ...neverExported, 'Secret Student choices of rounds not revealed', 'password, PIN and token hashes and encrypted link tokens (blank)', PENDING_PICTURES_NOTE],
       tables: b.tables,
       ...extra,
       files: b.files,

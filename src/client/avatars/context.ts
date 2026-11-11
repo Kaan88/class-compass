@@ -10,6 +10,8 @@ import type { AvatarSpecValue } from '../../shared/avatars.ts';
 export interface AvatarEntry {
   spec: AvatarSpecValue | null;
   fallback: 'generated' | 'initials';
+  /** S24 (D-184): the student's own approved picture (classroom URL), when the school switch is on. */
+  pictureUrl?: string | null;
 }
 
 export const AvatarDirectoryContext = createContext<ReadonlyMap<string, AvatarEntry> | null>(null);

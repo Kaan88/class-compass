@@ -178,7 +178,7 @@ function PlaceCard({ place, slot, changed, waiting }: { place: BoardPlace | unde
       <ul className="cc-board__names" ref={names} data-count={place.students.length}>
         {place.students.map((s) => (
           <li key={s.id} className="cc-board__student">
-            <Avatar name={s.fullName} hue={s.avatarHue} initials={s.initials} spec={s.avatar} size="lg" />
+            <Avatar name={s.fullName} hue={s.avatarHue} initials={s.initials} spec={s.avatar} pictureUrl={s.pictureUrl} size="lg" />
             <span className="cc-board__who">
               <span className="cc-board__name">{s.fullName}</span>
               <span className="cc-board__class">{s.className}</span>

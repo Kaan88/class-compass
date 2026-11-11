@@ -74,7 +74,7 @@ export function assertModuleEnabled(db: Db, contextId: string, module: ModuleKey
   if (!isModuleEnabled(db, contextId, module)) throw new AppError('FEATURE_DISABLED', `Module ${module} is turned off`, { module });
 }
 
-export type MediaPolicy = { studentPhotos: boolean; evidencePhotos: boolean; evidenceAudio: boolean; evidenceDocuments: boolean };
+export type MediaPolicy = { studentPhotos: boolean; evidencePhotos: boolean; evidenceAudio: boolean; evidenceDocuments: boolean; avatarPictures: boolean };
 
 /** Global media flags (D-014). Upload endpoints must reject when the matching flag is off. */
 export function getMediaPolicy(db: Db): MediaPolicy {
@@ -84,6 +84,7 @@ export function getMediaPolicy(db: Db): MediaPolicy {
     evidencePhotos: a['media.evidencePhotos'],
     evidenceAudio: a['media.evidenceAudio'],
     evidenceDocuments: a['media.evidenceDocuments'],
+    avatarPictures: a['media.avatarPictures'],
   };
 }
 

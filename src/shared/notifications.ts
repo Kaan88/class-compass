@@ -28,6 +28,7 @@ export const NOTIFICATION_CATEGORIES = [
   'evidenceVoice',
   'achievementEarned',
   'avatarChanged',
+  'avatarPicture',
   'textBlocked',
   'linkNewDevice',
   'speakersPoints',
@@ -50,6 +51,8 @@ export const DEFAULT_ON: Readonly<Record<NotificationCategory, boolean>> = {
   evidenceVoice: true,
   achievementEarned: true,
   avatarChanged: false,
+  /** S24 (D-184): a student sent their own picture to check (on by default: nobody else sees it until a teacher decides). */
+  avatarPicture: true,
   textBlocked: false,
   linkNewDevice: false,
   speakersPoints: false,
@@ -74,6 +77,7 @@ export const CATEGORY_MODULE: Readonly<Record<NotificationCategory, PolicyKey | 
   evidenceVoice: 'goals',
   achievementEarned: 'achievements',
   avatarChanged: null,
+  avatarPicture: null,
   textBlocked: null,
   linkNewDevice: null,
   speakersPoints: 'superSpeakers',
@@ -84,7 +88,7 @@ export const NOTIFICATION_GROUPS = {
   goals: ['goalCreated', 'goalEdited', 'goalAchieved', 'reflection', 'note', 'selfAssessment'],
   evidence: ['evidenceText', 'evidenceLink', 'evidencePicture', 'evidenceDocument', 'evidenceVoice'],
   achievements: ['achievementEarned', 'speakersPoints'],
-  other: ['avatarChanged', 'textBlocked', 'linkNewDevice'],
+  other: ['avatarChanged', 'avatarPicture', 'textBlocked', 'linkNewDevice'],
 } as const satisfies Record<string, readonly NotificationCategory[]>;
 export type NotificationGroup = keyof typeof NOTIFICATION_GROUPS;
 export const NOTIFICATION_GROUP_KEYS = Object.keys(NOTIFICATION_GROUPS) as NotificationGroup[];

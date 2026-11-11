@@ -36,6 +36,8 @@ import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { DISPLAY_SESSION_ABSOLUTE_MS, SCORER_SESSION_ABSOLUTE_MS } from '../../lib/http.ts';
 import { createSession } from '../auth/service.ts';
 import { specOf } from '../avatars/service.ts';
+import { approvedPictureIds } from '../avatars/pictures.ts';
+import { speakersPictureUrl } from '../../../shared/contracts/avatars.ts';
 import { isModuleAvailable } from '../school/modules.ts';
 import { enrolmentActiveOn, getSchoolSettings, type ClassRow } from '../school/policy.ts';
 import { notifyBoardChange } from './events.ts';
@@ -68,6 +70,7 @@ const defaultSettingsRow = (now: number): SettingsRow => ({
   boardLanguage: 'en',
   theme: 'explorer',
   boardSound: false,
+  showOwnPictures: false,
   badgeSubjectId: null,
   updatedAt: now,
   updatedBy: null,
@@ -101,6 +104,7 @@ export const settingsDto = (s: SettingsRow): SpeakersSettings => ({
   boardLanguage: s.boardLanguage,
   theme: s.theme,
   boardSound: s.boardSound,
+  showOwnPictures: s.showOwnPictures,
   badgeSubjectId: s.badgeSubjectId,
 });
 /** The admin page's view: the stored settings plus whether the chosen theme can be shown now. */
@@ -181,12 +185,22 @@ export function avatarOf(student: StudentRow, cls: Pick<ClassRow, 'avatarFallbac
   return specOf(student) ?? (cls?.avatarFallback === 'initials' ? null : generatedAvatar(student.id));
 }
 
-const speakerStudent = (student: StudentRow, cls: ClassRow | null, className: string) => ({
+/**
+ * Students' own approved pictures for the board or the scorer (S24, D-184, owner decision d): only while
+ * the administrator's "Show students' own pictures" is on (off by default) and the school switch is on.
+ */
+export function speakerPictures(db: Db, s: SettingsRow, where: 'board' | 'scorer', studentIds: readonly string[]): Map<string, string> {
+  if (!s.showOwnPictures) return new Map();
+  return new Map([...approvedPictureIds(db, studentIds)].map(([sid, pid]) => [sid, speakersPictureUrl(where, sid, pid)]));
+}
+
+const speakerStudent = (student: StudentRow, cls: ClassRow | null, className: string, pictures: ReadonlyMap<string, string>) => ({
   id: student.id,
   fullName: student.fullName,
   initials: initials(student.fullName),
   avatarHue: student.avatarHue,
   avatar: avatarOf(student, cls),
+  pictureUrl: pictures.get(student.id) ?? null,
   classId: cls?.id ?? '',
   className,
 });
@@ -363,8 +377,9 @@ export function scorerStudents(ctx: RequestContext) {
   const now = ctx.now();
   const settings = getSettings(ctx.db);
   const list = participants(ctx.db, now, settings);
+  const pictures = speakerPictures(ctx.db, settings, 'scorer', list.map((p) => p.student.id));
   return {
-    students: list.map(({ student, cls }) => ({ ...speakerStudent(student, cls, cls.name), studentNumber: student.studentNumber })),
+    students: list.map(({ student, cls }) => ({ ...speakerStudent(student, cls, cls.name, pictures), studentNumber: student.studentNumber })),
     classes: participatingClasses(ctx.db, now, settings).map((c) => ({ id: c.id, name: c.name })),
   };
 }
@@ -512,13 +527,14 @@ export function buildBoard(db: Db, now: number): Board {
   const shownIds = top.flatMap((p) => p.students);
   const classIds = [...new Set(shownIds.map((id) => latest.get(id)!.classIdSnapshot))];
   const classRows = new Map((classIds.length ? db.select().from(classes).where(inArray(classes.id, classIds)).all() : []).map((c) => [c.id, c]));
+  const pictures = speakerPictures(db, s, 'board', shownIds);
   const places = top.map((p) => ({
     rank: p.rank,
     points: p.points,
     students: p.students.map((id) => {
       const st = studentRows.get(id)!;
       const ev = latest.get(id)!;
-      const { classId: _c, ...rest } = speakerStudent(st, classRows.get(ev.classIdSnapshot) ?? null, ev.classNameSnapshot);
+      const { classId: _c, ...rest } = speakerStudent(st, classRows.get(ev.classIdSnapshot) ?? null, ev.classNameSnapshot, pictures);
       return rest;
     }),
   }));

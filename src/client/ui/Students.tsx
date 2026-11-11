@@ -24,6 +24,7 @@ export function Avatar({
   photoAllowed = false,
   size = 'md',
   spec,
+  pictureUrl,
 }: {
   name: string;
   id?: string;
@@ -35,6 +36,11 @@ export function Avatar({
   size?: 'sm' | 'md' | 'lg';
   /** S13c: an explicit avatar (the student page); otherwise the teacher app's avatar directory is used. */
   spec?: AvatarSpecValue | null;
+  /**
+   * S24 (D-184): the student's own picture approved by a teacher (the student page, Super Speakers);
+   * otherwise the avatar directory's. A picture that cannot be loaded falls back to the avatar.
+   */
+  pictureUrl?: string | null;
 }) {
   const h = hue ?? avatarHue(id ?? name);
   const style = { '--cc-avatar-hue': String(h) } as CSSProperties;
@@ -42,6 +48,15 @@ export function Avatar({
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const showPhoto = photoAllowed && photoUrl && failedUrl !== photoUrl;
   const entry = useAvatarEntry(id);
+  const [failedPicture, setFailedPicture] = useState<string | null>(null);
+  const picture = showPhoto ? null : (pictureUrl ?? entry?.pictureUrl ?? null);
+  if (picture && failedPicture !== picture) {
+    return (
+      <span className={`cc-avatar cc-avatar--picture ${size === 'md' ? '' : `cc-avatar--${size}`}`} style={style} aria-hidden="true" data-avatar="picture">
+        <img src={picture} alt="" onError={() => setFailedPicture(picture)} />
+      </span>
+    );
+  }
   // A photo (when allowed) first, then the chosen avatar, then the class fallback (generated or initials).
   const art = showPhoto ? null : (spec ?? entry?.spec ?? (entry && entry.fallback === 'generated' && id ? generatedAvatar(id) : null));
   if (art) {

@@ -24,7 +24,7 @@ import { reasonOf } from '../lib/errors.ts';
 import { showToast } from '../lib/toast.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from '../ui/Button.tsx';
-import { IconLock } from '../ui/icons.tsx';
+import { IconClock, IconImage, IconLock } from '../ui/icons.tsx';
 import { useTheme } from '../themes/index.tsx';
 import { STUDENT_PAGE_KEY } from './keys.ts';
 import { familyOrder, pickerParts, readyMadeGroups, setPart, surpriseOptions, type PickerPart } from './avatarPicker.ts';
@@ -112,7 +112,28 @@ function PartChoice({ part, draft, onChoose, isLocked, unlockOf, onSurprise }: {
 }
 
 /** `titleId`: the screen's h1 names the panel (S14d "My avatar" screen), so the panel has no heading of its own. */
-export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; name: string; titleId?: string }) {
+/** S24 (D-184): the way to "Use my own picture" and what is happening with it (the screen itself is lazy). */
+function OwnPictureEntry({ info, onPicture }: { info: StudentAvatarInfo['picture']; onPicture: () => void }) {
+  const { t } = useI18n();
+  if (info.state === 'off') return null;
+  return (
+    <div className="cc-row" data-testid="avatar-picture-entry">
+      {info.pending ? (
+        <p className="cc-muted">
+          <IconClock /> {t('avatar.picture.waiting')}
+        </p>
+      ) : info.approvedUrl ? (
+        <p className="cc-muted">{t('avatar.picture.inUse')}</p>
+      ) : null}
+      <Button className="cc-push-right" onPress={onPicture} data-testid="avatar-picture-open">
+        <IconImage />
+        {t('avatar.picture.entry')}
+      </Button>
+    </div>
+  );
+}
+
+export function AvatarPanel({ info, name, titleId, onPicture }: { info: StudentAvatarInfo; name: string; titleId?: string; onPicture?: () => void }) {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -156,7 +177,13 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
   return (
     <section className="cc-card cc-stack cc-avatar-panel" aria-labelledby={titleId ?? 'my-avatar'} data-testid="student-avatar">
       <div className="cc-row">
-        {current ? <AvatarArt spec={current} size={titleId ? 96 : 64} title={describeAvatar(current, locale)} /> : null}
+        {info.picture.approvedUrl ? (
+          <span className="cc-avatar cc-avatar--lg cc-avatar--picture" aria-hidden="true">
+            <img src={info.picture.approvedUrl} alt="" />
+          </span>
+        ) : current ? (
+          <AvatarArt spec={current} size={titleId ? 96 : 64} title={describeAvatar(current, locale)} />
+        ) : null}
         <div className="cc-stack">
           {titleId ? null : (
             <h2 id="my-avatar" className="cc-h2">
@@ -171,6 +198,7 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
           </Button>
         ) : null}
       </div>
+      {onPicture ? <OwnPictureEntry info={info.picture} onPicture={onPicture} /> : null}
       {open && !info.locked ? (
         <div className="cc-stack" data-testid="avatar-creator">
           <div className="cc-row" role="group" aria-label={t('avatar.how')}>

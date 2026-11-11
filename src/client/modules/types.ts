@@ -13,7 +13,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { EffectiveAttendance } from '../../domain/attendance.ts';
 import type { LessonCommandPayload, LessonState } from '../../shared/contracts/lessons.ts';
-import type { ContextModule, PolicyKey } from '../../shared/modules.ts';
+import type { ContextModule, MediaModule, PolicyKey } from '../../shared/modules.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import type { CommandInvalidation } from '../lib/outbox-client.ts';
 import type { StudentCardMark } from '../ui/Students.tsx';
@@ -181,6 +181,16 @@ export interface TeacherPage {
    * URL keeps working.
    */
   module?: ContextModule | null;
+  /**
+   * S24 (D-184): an admin media flag the page needs. Its tile and link are left out of the menu while
+   * the flag is off (or still loading); the address keeps working and the page explains it.
+   */
+  media?: MediaModule;
+  /**
+   * S24 (D-184): a count shown on the page's menu tile and nav link (e.g. pictures to check). A hook,
+   * called on every render of the tile; null or 0 shows nothing. Behind the PIN gate like the menu.
+   */
+  useBadge?: () => number | null;
   Component: ComponentType<{ search: TeacherPageSearch }>;
 }
 

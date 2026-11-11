@@ -86,8 +86,8 @@ describe('client module manifests', () => {
     expect(pages.slice(0, 3).map((p) => p.key)).toEqual(['profile', 'setup', 'classes']);
   });
 
-  it('teacher menu (S14e3, D-156): Today holds Attendance, Homework, Goals, Reports, Notifications and the Assistant (S19b); every other menu page is in a Class setup tab', () => {
-    expect(todayPages().map((p) => p.key)).toEqual(['attendance', 'homework', 'goals', 'reports', 'notifications', 'assistantChat']);
+  it('teacher menu (S14e3, D-156): Today holds Attendance, Homework, Goals, Reports, Notifications, Avatar pictures (S24) and the Assistant (S19b); every other menu page is in a Class setup tab', () => {
+    expect(todayPages().map((p) => p.key)).toEqual(['attendance', 'homework', 'goals', 'reports', 'notifications', 'avatarPictures', 'assistantChat']);
     for (const p of menuTeacherPages()) {
       expect(['today', 'setup'], p.key).toContain(p.group);
       if (p.group === 'setup') expect(SETUP_TABS, p.key).toContain(p.setupTab);

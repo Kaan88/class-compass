@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export const SCREENS = ['home', 'goals', 'newGoal', 'howIsItGoing', 'showMyWork', 'achievements', 'homework', 'avatar', 'help'] as const;
+export const SCREENS = ['home', 'goals', 'newGoal', 'howIsItGoing', 'showMyWork', 'achievements', 'homework', 'avatar', 'avatarPicture', 'help'] as const;
 export type Screen = (typeof SCREENS)[number];
 
 export interface StudentNav {

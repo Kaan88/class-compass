@@ -20,6 +20,8 @@ import { studentScope } from '../links/scope.ts';
 import { assertClassWritable, assertTeachesClass, getClass, isClassWritable } from '../school/policy.ts';
 import { taughtClassIds } from '../school/service.ts';
 import { liveClassIdsOf, rosterRows } from '../students/service.ts';
+import { approvedPictureIds, picturesOn, studentPictureInfo } from './pictures.ts';
+import { classroomPictureUrl } from '../../../shared/contracts/avatars.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
@@ -43,6 +45,7 @@ export function studentAvatarInfo(db: Db, student: typeof students.$inferSelect,
     locked: classRows.some((c) => c.avatarsLocked),
     fallback: classRows.some((c) => c.avatarFallback === 'initials') ? 'initials' : 'generated',
     earned: earnedDefaultKeys(db, student.id),
+    picture: studentPictureInfo(db, student, classRows),
   };
 }
 
@@ -84,7 +87,7 @@ export function resetAvatar(ctx: RequestContext, studentId: string) {
 
 export function getSettings(ctx: RequestContext, classId: string) {
   const cls = assertTeachesClass(ctx, classId);
-  return { locked: cls.avatarsLocked, fallback: cls.avatarFallback };
+  return { locked: cls.avatarsLocked, fallback: cls.avatarFallback, uploads: cls.avatarUploads, picturesAvailable: picturesOn(ctx.db) };
 }
 
 export function setSettings(ctx: RequestContext, input: In<typeof C.setAvatarSettings>) {
@@ -94,10 +97,11 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setAvatarSet
     const patch: Partial<typeof classes.$inferInsert> = {};
     if (input.locked !== undefined) patch.avatarsLocked = input.locked;
     if (input.fallback !== undefined) patch.avatarFallback = input.fallback;
+    if (input.uploads !== undefined) patch.avatarUploads = input.uploads;
     if (Object.keys(patch).length) ctx.db.update(classes).set(patch).where(eq(classes.id, cls.id)).run();
-    audit(ctx.db, ctx.actor, { action: 'avatar.settings', entity: 'class', entityId: cls.id, before: { locked: cls.avatarsLocked, fallback: cls.avatarFallback }, after: patch }, ctx.now());
+    audit(ctx.db, ctx.actor, { action: 'avatar.settings', entity: 'class', entityId: cls.id, before: { locked: cls.avatarsLocked, fallback: cls.avatarFallback, uploads: cls.avatarUploads }, after: patch }, ctx.now());
     const next = getClass(ctx.db, cls.id);
-    return { locked: next.avatarsLocked, fallback: next.avatarFallback };
+    return { locked: next.avatarsLocked, fallback: next.avatarFallback, uploads: next.avatarUploads, picturesAvailable: picturesOn(ctx.db) };
   });
 }
 
@@ -106,7 +110,13 @@ export function classroomAvatars(ctx: RequestContext) {
   const uid = requireUser(ctx).id;
   const classIds = taughtClassIds(ctx.db, uid);
   const clsRows = classIds.length ? ctx.db.select().from(classes).where(inArray(classes.id, classIds)).all() : [];
-  const out: Array<{ id: string; classId: string; spec: AvatarSpecValue | null }> = [];
-  for (const cls of clsRows) for (const { student } of rosterRows(ctx, cls)) out.push({ id: student.id, classId: cls.id, spec: specOf(student) });
+  const out: Array<{ id: string; classId: string; spec: AvatarSpecValue | null; pictureUrl: string | null }> = [];
+  for (const cls of clsRows) for (const { student } of rosterRows(ctx, cls)) out.push({ id: student.id, classId: cls.id, spec: specOf(student), pictureUrl: null });
+  // S24 (D-184): approved own pictures, only while the school switch is on.
+  const pics = approvedPictureIds(ctx.db, [...new Set(out.map((o) => o.id))]);
+  for (const o of out) {
+    const pid = pics.get(o.id);
+    if (pid) o.pictureUrl = classroomPictureUrl(o.id, pid);
+  }
   return { classes: clsRows.map((c) => ({ classId: c.id, fallback: c.avatarFallback, locked: c.avatarsLocked })), students: out };
 }

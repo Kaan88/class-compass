@@ -9,7 +9,9 @@ import type { Locale } from '../../../shared/i18n/index.ts';
 import { audit } from '../../lib/audit.ts';
 import { executeCommand } from '../../lib/commands.ts';
 import { requireScorer, type AppDeps, type RequestContext } from '../../lib/context.ts';
-import { AppError } from '../../lib/errors.ts';
+import { AppError, notFound } from '../../lib/errors.ts';
+import * as Av from '../../../shared/contracts/avatars.ts';
+import { approvedPicturePath, sendSharedPicture } from '../avatars/pictures.ts';
 import { DISPLAY_SESSION_ABSOLUTE_MS, SCORER_SESSION_ABSOLUTE_MS, displayCookieName, loadDisplaySession, rawRoute, route, scorerCookieName } from '../../lib/http.ts';
 import { attachment, csvDelimiter, findTable, tableCsv } from '../reports/service.ts';
 import { getSchoolSettings } from '../school/policy.ts';
@@ -130,6 +132,21 @@ export function registerSpeakersRoutes(app: FastifyInstance, deps: AppDeps) {
     req.raw.on('close', close);
     send('retry: 5000\n\n');
     push();
+  });
+
+  // ---------------------------------------------------------------- own pictures
+  // S24 (D-184): own pictures on the board and the scorer, only while the setting is on and the student takes part.
+  const picture = async (ctx: RequestContext, reply: FastifyReply, studentId: string) => {
+    const settings = svc.getSettings(ctx.db);
+    if (!svc.isEnabled(ctx.db) || !settings.showOwnPictures || !svc.participants(ctx.db, ctx.now(), settings).some((p) => p.student.id === studentId)) throw notFound('Picture');
+    const abs = approvedPicturePath(ctx.db, ctx.config, studentId);
+    if (!abs) throw notFound('Picture');
+    return sendSharedPicture(reply, abs);
+  };
+  rawRoute(app, deps, Av.boardPictureImage, (ctx, input, { reply }) => picture(ctx, reply, input.studentId));
+  rawRoute(app, deps, Av.scorerPictureImage, (ctx, input, { reply }) => {
+    requireScorer(ctx);
+    return picture(ctx, reply, input.studentId);
   });
 
   // ---------------------------------------------------------------- admin

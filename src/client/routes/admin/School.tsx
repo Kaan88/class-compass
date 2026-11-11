@@ -5,7 +5,7 @@
  */
 import { AchievementDefaultsSection, TextChecksAdminSection } from './StudentContentAdmin.tsx';
 import { AdminStarters } from '../../modules/goals/StartersLibrary.tsx';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from '@tanstack/react-router';
 import type { z } from 'zod';
@@ -35,6 +35,8 @@ import { ThemeNameLabel, ThemePicker, ThemePreview } from '../../ui/ThemePreview
 import { moduleLabelKey } from '../teacher/Classes.tsx';
 import { isSchoolModule } from '../../../shared/modules.ts';
 import { ADMIN } from './Admin.tsx';
+
+const AvatarPicturesAdmin = lazy(() => import('../../modules/avatars/AvatarPicturesAdmin.tsx'));
 
 const K = {
   settings: [...ADMIN, 'settings'],
@@ -912,21 +914,34 @@ export function ModulesPage() {
     </div>
   );
   const mediaPanel = (
-    <section className="cc-card cc-stack" aria-labelledby="media-title">
-      <h2 id="media-title" className="cc-h2">
-        {t('modules.mediaTitle')}
-      </h2>
-      <Alert kind="warning">{t('modules.mediaConsent')}</Alert>
-      {media.map((p) => (
-        <Toggle
-          key={p.module}
-          label={t(moduleLabelKey(p.module))}
-          description={p.module === 'media.evidenceDocuments' ? t('modules.documentsHint') : t('modules.disabledUntilConsent')}
-          isSelected={p.availability === 'enabled'}
-          onChange={(v) => toggle(p.module, v)}
-        />
-      ))}
-    </section>
+    <div className="cc-stack">
+      <section className="cc-card cc-stack" aria-labelledby="media-title">
+        <h2 id="media-title" className="cc-h2">
+          {t('modules.mediaTitle')}
+        </h2>
+        <Alert kind="warning">{t('modules.mediaConsent')}</Alert>
+        {media.map((p) => (
+          <Toggle
+            key={p.module}
+            label={t(moduleLabelKey(p.module))}
+            description={
+              p.module === 'media.evidenceDocuments'
+                ? t('modules.documentsHint')
+                : p.module === 'media.avatarPictures'
+                  ? t('modules.avatarPicturesHint')
+                  : t('modules.disabledUntilConsent')
+            }
+            isSelected={p.availability === 'enabled'}
+            onChange={(v) => toggle(p.module, v)}
+          />
+        ))}
+      </section>
+      {/* S24 (D-184): students' own avatar pictures: the check, backups, delete all (lazy; shown also
+          while the switch is off, so an administrator can still delete what is left). */}
+      <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
+        <AvatarPicturesAdmin />
+      </Suspense>
+    </div>
   );
   // One tab per part (usability audit): the page was one very long scroll with its Save at the bottom.
   return (

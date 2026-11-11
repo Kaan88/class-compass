@@ -17,7 +17,7 @@ export function AvatarDirectoryProvider({ enabled, children }: { enabled: boolea
       const prev = m.get(s.id);
       // A student in two of the teacher's classes: initials win if either class asks for them.
       const fb = prev?.fallback === 'initials' || fallback.get(s.classId) === 'initials' ? 'initials' : 'generated';
-      m.set(s.id, { spec: s.spec, fallback: fb });
+      m.set(s.id, { spec: s.spec, fallback: fb, pictureUrl: s.pictureUrl ?? prev?.pictureUrl ?? null });
     }
     return m;
   }, [q.data]);

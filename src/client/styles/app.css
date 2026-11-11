@@ -6718,6 +6718,10 @@ html[data-cursor='off'] * {
 .cc-bell-tile__label {
   min-width: 0;
 }
+/* A teacher page's count on its menu tile and nav link (S24, D-184: pictures to check). */
+.cc-page-badge {
+  margin-left: 0.4rem;
+}
 .cc-bell-tile .cc-bell__count {
   margin-left: auto;
 }

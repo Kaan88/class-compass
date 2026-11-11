@@ -1,0 +1,36 @@
+/* Checking students' own avatar pictures (S24, D-184): loaded with the lazy teacher page and admin section. Tokens only. */
+.cc-picture-review {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--cc-area-gap);
+}
+.cc-picture-review__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.cc-picture-review__img {
+  width: 8rem;
+  height: 8rem;
+  flex: none;
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--cc-surface-2);
+  border: var(--cc-border-width-strong) solid var(--cc-border-strong);
+}
+.cc-picture-review__body {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.cc-picture-review__who {
+  gap: 0.15rem;
+}
+.cc-picture-review__reasons {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}

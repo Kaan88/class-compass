@@ -96,7 +96,11 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean; logStrea
 
   app.addHook('onSend', async (req, reply) => {
     reply.header('X-Robots-Tag', 'noindex, nofollow');
-    if (req.url.startsWith('/api/') || isStudentPagePath(req.url) || isSpeakersPagePath(req.url)) reply.header('Cache-Control', 'no-store');
+    // An API answer is never cached, except a `private, …` header a route set on purpose (S24, D-184:
+    // approved avatar pictures, whose address changes with every new picture).
+    const cache = reply.getHeader('Cache-Control');
+    const keep = typeof cache === 'string' && cache.startsWith('private, max-age=');
+    if ((req.url.startsWith('/api/') || isStudentPagePath(req.url) || isSpeakersPagePath(req.url)) && !keep) reply.header('Cache-Control', 'no-store');
     // The student page and its API never send a referrer (STU-6; helmet sets it globally, kept explicit here).
     if (isStudentPagePath(req.url) || req.url.startsWith('/api/student/')) reply.header('Referrer-Policy', 'no-referrer');
   });

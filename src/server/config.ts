@@ -174,6 +174,12 @@ export type Config = z.infer<typeof EnvSchema> & {
   origins: Origins;
   dbPath: string;
   uploadsDir: string;
+  /**
+   * S24 (D-184): students' avatar pictures waiting for a teacher. Outside `uploadsDir`, so backups and
+   * exports never contain them (a refused picture is gone for good); inside DATA_DIR, so the Docker
+   * volume keeps it and an approval is a move on the same disk.
+   */
+  avatarQuarantineDir: string;
   backupsDir: string;
   /** Local OCR language data cache (copied from the pinned @tesseract.js-data packages, D-011). */
   ocrCacheDir: string;
@@ -205,6 +211,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, overrides: Part
     origins,
     dbPath: path.join(dataDir, 'class-compass.db'),
     uploadsDir: path.join(dataDir, 'uploads'),
+    avatarQuarantineDir: path.join(dataDir, 'avatar-quarantine'),
     backupsDir: e.BACKUP_DIR ? path.resolve(e.BACKUP_DIR) : path.join(dataDir, 'backups'),
     ocrCacheDir: e.OCR_CACHE_DIR ? path.resolve(e.OCR_CACHE_DIR) : path.join(dataDir, 'ocr-cache'),
     isProd: e.NODE_ENV === 'production',

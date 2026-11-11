@@ -41,6 +41,8 @@ const SUBJECT_KEY = 'cc.studentSubject';
 export const SCREEN_TITLE_ID = 'student-screen-title';
 /** The student and parent guide (docs/guides), loaded only when "Help" is pressed. */
 const HelpPanel = lazy(() => import('../help/HelpPanel.tsx'));
+// S24 (D-184): "Use my own picture" and its editor are lazy chunks (budget D-151).
+const AvatarPictureScreen = lazy(() => import('./AvatarPictureScreen.tsx'));
 
 export function readStudentLocale(): Locale {
   try {
@@ -127,7 +129,14 @@ function Home({ page, subject, tiles, onSubject, go }: { page: StudentPage; subj
   return (
     <>
       <header className="cc-row cc-student__head">
-        <Avatar name={page.student.fullName} hue={page.student.avatarHue} initials={page.student.initials} size="lg" spec={page.avatar.spec ?? (page.avatar.fallback === 'generated' ? page.avatar.generated : null)} />
+        <Avatar
+          name={page.student.fullName}
+          hue={page.student.avatarHue}
+          initials={page.student.initials}
+          size="lg"
+          spec={page.avatar.spec ?? (page.avatar.fallback === 'generated' ? page.avatar.generated : null)}
+          pictureUrl={page.avatar.picture.approvedUrl}
+        />
         <div className="cc-stack cc-student__who">
           <h1 id={SCREEN_TITLE_ID} className="cc-h1" tabIndex={-1}>
             {t('student.hello', { name: page.student.fullName })}
@@ -225,7 +234,15 @@ function Page({ onLanguage, nav }: { onLanguage: (l: ClassLanguage) => void; nav
   else if (screen === 'avatar')
     content = (
       <ScreenFrame title={t('student.tile.avatar')} subjectName={null} back={nav.back}>
-        <AvatarPanel info={page.avatar} name={page.student.fullName} titleId={SCREEN_TITLE_ID} />
+        <AvatarPanel info={page.avatar} name={page.student.fullName} titleId={SCREEN_TITLE_ID} onPicture={() => nav.go({ screen: 'avatarPicture', subject: nav.nav.subject })} />
+      </ScreenFrame>
+    );
+  else if (screen === 'avatarPicture' && page.avatar.picture.state !== 'off')
+    content = (
+      <ScreenFrame title={t('avatar.picture.title')} subjectName={null} back={nav.back}>
+        <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
+          <AvatarPictureScreen info={page.avatar.picture} name={page.student.fullName} />
+        </Suspense>
       </ScreenFrame>
     );
   else if (tile && subject)
@@ -248,7 +265,11 @@ function Page({ onLanguage, nav }: { onLanguage: (l: ClassLanguage) => void; nav
       />
     );
   return (
-    <main className="cc-page cc-student cc-stack" data-testid="student-page" data-screen={tile || screen === 'help' || screen === 'avatar' ? screen : 'home'}>
+    <main
+      className="cc-page cc-student cc-stack"
+      data-testid="student-page"
+      data-screen={tile || screen === 'help' || screen === 'avatar' || (screen === 'avatarPicture' && page.avatar.picture.state !== 'off') ? screen : 'home'}
+    >
       {content}
     </main>
   );

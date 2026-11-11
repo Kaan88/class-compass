@@ -51,6 +51,8 @@ export const SpeakerStudent = z.object({
   avatarHue: z.number().int(),
   /** The student's own avatar, the generated one (class choice) or null for initials (S13c, D-124). */
   avatar: AvatarSpec.nullable(),
+  /** The student's own approved picture (S24, D-184), only while the admin setting is on; else null. */
+  pictureUrl: z.string().nullable(),
   classId: z.string(),
   className: z.string(),
 });
@@ -191,6 +193,8 @@ export const SpeakersSettings = z.object({
   /** The board's chosen theme as stored (D-158); the board shows the default while an imported choice is switched off. */
   theme: Theme,
   boardSound: z.boolean(),
+  /** S24 (D-184): show students' own approved pictures on the board and the scorer (off by default). */
+  showOwnPictures: z.boolean(),
   /** The subject whose class+subjects receive the Super Speakers badges (null = the subject named "English"). */
   badgeSubjectId: z.string().nullable(),
 });

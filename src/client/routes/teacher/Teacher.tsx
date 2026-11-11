@@ -69,6 +69,30 @@ export function useTeacherContexts(): School.MyContext[] | undefined {
 export const useMenuContexts = useTeacherContexts;
 
 /**
+ * S24 (D-184): menu pages that need an admin media flag are left out while it is off or loading.
+ * Returns a filter for page lists.
+ */
+function useMediaFilter(): (p: TeacherPage) => boolean {
+  const media = useContextsQuery().data?.media;
+  return (p) => !p.media || media?.[p.media] === true;
+}
+
+/** A page's count (S24): the tile's or the link's badge, spoken with the label. */
+function PageBadge({ useBadge }: { useBadge: () => number | null }) {
+  const { t } = useI18n();
+  const n = useBadge();
+  if (!n) return null;
+  return (
+    <>
+      <span className="cc-bell__count cc-page-badge" aria-hidden="true">
+        {n > 99 ? '99+' : String(n)}
+      </span>
+      <span className="cc-visually-hidden">{t('teacher.pageBadge', { count: n })}</span>
+    </>
+  );
+}
+
+/**
  * A teacher page from a manifest (the `/teacher/$page` route). A page whose module is off in every
  * class+subject of the teacher shows an empty state (S14e3, D-156); its address keeps working. When
  * the teacher switched it off, the empty state points to Class settings; when the administrator made
@@ -114,8 +138,9 @@ function TeacherNav() {
   const navigate = useNavigate();
   const contexts = useMenuContexts();
   const path = useRouterState({ select: (s) => s.location.pathname }).replace(/\/+$/u, '');
-  const today = todayPages(contexts);
-  const setup = setupPages(contexts);
+  const shown = useMediaFilter();
+  const today = todayPages(contexts).filter(shown);
+  const setup = setupPages(contexts).filter(shown);
   const onMenu = path === '/teacher';
   const current = path.startsWith('/teacher/') ? path.slice('/teacher/'.length).split('/')[0]! : '';
   const inSetup = current === 'setup' || setup.some((p) => p.path === current);
@@ -142,6 +167,7 @@ function TeacherNav() {
               .map((p) => (
                 <Link key={p.key} to="/teacher/$page" params={{ page: p.path }}>
                   {t(p.labelKey)}
+                  {p.useBadge ? <PageBadge useBadge={p.useBadge} /> : null}
                 </Link>
               ))}
             {/* On a setup page the Class setup link is the current section: said by aria-current, shown by more than colour. */}
@@ -188,6 +214,7 @@ export function TeacherMenu() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const contexts = useMenuContexts();
+  const shown = useMediaFilter();
   useEffect(() => setMenuFirst(false), []);
   if (!me) return null;
   return (
@@ -210,16 +237,19 @@ export function TeacherMenu() {
           {t('teacher.today')}
         </h2>
         <div className="cc-menu-grid" data-testid="menu-today">
-          {todayPages(contexts).map((p) =>
-            p.key === NOTIFICATIONS_PAGE ? (
-              <Bell key={p.key} tile />
-            ) : (
-              <Link key={p.key} to="/teacher/$page" params={{ page: p.path }} className="cc-menu-tile">
-                <p.Icon />
-                {t(p.labelKey)}
-              </Link>
-            ),
-          )}
+          {todayPages(contexts)
+            .filter(shown)
+            .map((p) =>
+              p.key === NOTIFICATIONS_PAGE ? (
+                <Bell key={p.key} tile />
+              ) : (
+                <Link key={p.key} to="/teacher/$page" params={{ page: p.path }} className="cc-menu-tile">
+                  <p.Icon />
+                  {t(p.labelKey)}
+                  {p.useBadge ? <PageBadge useBadge={p.useBadge} /> : null}
+                </Link>
+              ),
+            )}
         </div>
       </section>
       <div className="cc-menu-grid" data-testid="menu-setup">

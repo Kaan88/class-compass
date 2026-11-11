@@ -14,6 +14,7 @@ import { FILE_KINDS } from '../../shared/contracts/files.ts';
 import { IMPORT_SOURCE_TYPES, type ImportFlag } from '../../shared/contracts/import.ts';
 import { STARTER_KINDS } from '../../shared/text/starters.ts';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_ENTITIES } from '../../shared/notifications.ts';
+import { REFUSAL_REASONS } from '../../shared/avatarPictures.ts';
 
 export type LocalizedText = { en?: string; tr?: string };
 
@@ -122,6 +123,8 @@ export const classes = sqliteTable(
     /** Avatars (S13c, D-124): teachers can stop students changing their avatar; before a student chooses, a generated avatar or the initials. */
     avatarsLocked: integer('avatars_locked', { mode: 'boolean' }).notNull().default(false),
     avatarFallback: text('avatar_fallback', { enum: ['generated', 'initials'] }).notNull().default('generated'),
+    /** S24 (D-184): students of the class may send their own avatar picture (a teacher checks each one). Off by default. */
+    avatarUploads: integer('avatar_uploads', { mode: 'boolean' }).notNull().default(false),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -1554,6 +1557,8 @@ export const superSpeakersSettings = sqliteTable('super_speakers_settings', {
   boardLanguage: text('board_language', { enum: ['en', 'tr'] }).notNull().default('en'),
   theme: text('theme').notNull().default('explorer'),
   boardSound: integer('board_sound', { mode: 'boolean' }).notNull().default(false),
+  /** S24 (D-184, owner decision d): show students' own approved pictures on the board and the scorer. Off by default. */
+  showOwnPictures: integer('show_own_pictures', { mode: 'boolean' }).notNull().default(false),
   badgeSubjectId: text('badge_subject_id').references(() => subjects.id),
   updatedAt: integer('updated_at').notNull(),
   updatedBy: text('updated_by'),
@@ -2080,3 +2085,33 @@ export const assistantSettings = sqliteTable('assistant_settings', {
   retentionDays: integer('retention_days').notNull().default(365),
   updatedAt: integer('updated_at').notNull(),
 });
+
+// ---------------------------------------------------------------- students' own avatar pictures (S24, D-184)
+/**
+ * A student's own avatar picture. Only `server/modules/avatars/pictures.ts` reads or writes this table.
+ * - `pending`: waiting for a teacher; the bytes are in the quarantine folder (`quarantine_key`), which
+ *   is outside the uploads folder, so backups and exports never hold it; deleted after `expires_at`.
+ * - `approved`: in use; the bytes moved into the uploads as a `files` row (`file_id`, owned by the
+ *   student), so backups and exports include it. At most one per student.
+ * - `refused`: the picture is already deleted; the row only keeps the reason the student sees, until
+ *   `expires_at`, a new picture or the student closes the note.
+ * Removing a picture deletes the row and the bytes (and the files row) at once.
+ */
+export const avatarPictures = sqliteTable(
+  'avatar_pictures',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    status: text('status', { enum: ['pending', 'approved', 'refused'] }).notNull(),
+    quarantineKey: text('quarantine_key'),
+    fileId: text('file_id').references(() => files.id),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at'),
+    decidedAt: integer('decided_at'),
+    decidedBy: text('decided_by'),
+    refusalReason: text('refusal_reason', { enum: REFUSAL_REASONS }),
+  },
+  (t) => [index('avatar_pictures_student_idx').on(t.studentId), index('avatar_pictures_status_idx').on(t.status, t.expiresAt)],
+);

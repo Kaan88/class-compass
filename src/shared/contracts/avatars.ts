@@ -4,6 +4,8 @@
  * is refused with 400 VALIDATION. Avatars are not photos: no media flag applies.
  */
 import { z } from 'zod';
+import { PICTURE_STATES, REFUSAL_REASONS } from '../avatarPictures.ts';
+import { pii } from '../mcp.ts';
 import { AVATAR_COLOURS, CREATURE_FAMILIES, CREATURE_FAMILY_KEYS, CREATURE_PARTS, HAIR_COLOURS, PERSON_PARTS, SKIN_TONES, type AvatarSpecValue, type CreatureFamily } from '../avatars.ts';
 import { Ok, endpoint } from './define.ts';
 import { Id } from './school.ts';
@@ -71,9 +73,31 @@ export const classroomAvatars = endpoint({
   input: z.object({}),
   output: z.object({
     classes: z.array(z.object({ classId: z.string(), fallback: AvatarFallback, locked: z.boolean() })),
-    students: z.array(z.object({ id: z.string(), classId: z.string(), spec: AvatarSpec.nullable() })),
+    /**
+     * `pictureUrl` (S24, D-184): the student's own picture, only once a teacher approved it and only
+     * while the school's switch is on; null otherwise (the spec or the class fallback applies).
+     */
+    students: z.array(z.object({ id: z.string(), classId: z.string(), spec: AvatarSpec.nullable(), pictureUrl: z.string().nullable() })),
   }),
 });
+
+export const RefusalReason = z.enum(REFUSAL_REASONS);
+export const PictureState = z.enum(PICTURE_STATES);
+
+/**
+ * The student's own picture on their page (S24, D-184). `state`: `off` = the school switch is off
+ * (nothing shown), `classOff` = no class of theirs lets students send pictures, `locked` = avatar changes
+ * are paused (that also stops uploads), `open` = they may send one. `approvedUrl` is the picture in use;
+ * `pending` the one waiting for a teacher (only the student and their teachers see it); `refused` the
+ * teacher's reason after "Not this one" (the picture itself is already deleted).
+ */
+export const StudentPictureInfo = z.object({
+  state: PictureState,
+  approvedUrl: z.string().nullable(),
+  pending: z.object({ sentAt: z.number(), deleteAt: z.number(), url: z.string() }).nullable(),
+  refused: z.object({ reason: RefusalReason, at: z.number() }).nullable(),
+});
+export type StudentPictureInfo = z.infer<typeof StudentPictureInfo>;
 
 /** The student's own avatar on their page (studentId from the link session only). */
 export const StudentAvatarInfo = z.object({
@@ -85,6 +109,8 @@ export const StudentAvatarInfo = z.object({
   fallback: AvatarFallback,
   /** Default achievement keys the student has earned (unlocks; any class+subject). */
   earned: z.array(z.string()),
+  /** S24 (D-184): the student's own picture. */
+  picture: StudentPictureInfo,
 });
 export type StudentAvatarInfo = z.infer<typeof StudentAvatarInfo>;
 
@@ -105,7 +131,8 @@ export const resetStudentAvatar = endpoint({
   output: Ok,
 });
 
-export const AvatarClassSettings = z.object({ locked: z.boolean(), fallback: AvatarFallback });
+/** `uploads` (S24, D-184): students of the class may send their own picture; `picturesAvailable`: the school switch. */
+export const AvatarClassSettings = z.object({ locked: z.boolean(), fallback: AvatarFallback, uploads: z.boolean(), picturesAvailable: z.boolean() });
 export const getAvatarSettings = endpoint({
   method: 'GET',
   path: '/api/teacher/classes/:classId/avatar-settings',
@@ -117,6 +144,184 @@ export const setAvatarSettings = endpoint({
   method: 'PUT',
   path: '/api/teacher/classes/:classId/avatar-settings',
   access: 'teacher',
-  input: z.object({ classId: Id, locked: z.boolean().optional(), fallback: AvatarFallback.optional() }),
+  input: z.object({ classId: Id, locked: z.boolean().optional(), fallback: AvatarFallback.optional(), uploads: z.boolean().optional() }),
   output: AvatarClassSettings,
 });
+
+// ---------------------------------------------------------------- own pictures (S24, D-184)
+/**
+ * The student sends one square picture made by the editor (multipart field `file`, at most 8 MB; JPG,
+ * PNG or WebP). The server re-encodes it to a 512 px WebP without metadata and keeps it in the
+ * quarantine folder until a teacher decides; a new picture replaces (and deletes) a waiting one.
+ */
+export const studentUploadPicture = endpoint({
+  method: 'POST',
+  path: '/api/student/avatar-picture',
+  access: 'student',
+  input: z.object({}),
+  output: StudentPictureInfo,
+});
+/** `pending`: take the waiting picture back (deleted); `refused`: clear the refusal note; `approved`: stop using the picture (deleted). */
+export const studentRemovePicture = endpoint({
+  method: 'DELETE',
+  path: '/api/student/avatar-picture',
+  access: 'student',
+  input: z.object({ which: z.enum(['pending', 'refused', 'approved']) }),
+  output: StudentPictureInfo,
+});
+/** The student's own waiting or approved picture (raw image; 404 for anything else). */
+export const studentPictureImage = endpoint({
+  method: 'GET',
+  path: '/api/student/avatar-picture/:pictureId',
+  access: 'student',
+  input: z.object({ pictureId: Id }),
+  output: z.unknown(),
+});
+
+/**
+ * An approved picture for the classroom (cards, lists, groups, reveals): 404 unless the school switch
+ * is on, the picture is approved and the teacher teaches the student. Classroom access like the D-077
+ * photo, so cards keep working while the teacher area is locked; `v` busts the browser cache.
+ */
+export const classroomPictureImage = endpoint({
+  method: 'GET',
+  path: '/api/classroom/students/:studentId/avatar-picture',
+  access: 'classroom',
+  input: z.object({ studentId: Id, v: z.string().max(64).optional() }),
+  output: z.unknown(),
+});
+export const classroomPictureUrl = (studentId: string, pictureId: string) =>
+  `/api/classroom/students/${encodeURIComponent(studentId)}/avatar-picture?v=${encodeURIComponent(pictureId)}`;
+export const studentPictureUrl = (pictureId: string) => `/api/student/avatar-picture/${encodeURIComponent(pictureId)}`;
+
+export const PictureListItem = z.object({
+  id: z.string(),
+  studentId: z.string(),
+  studentName: z.string().meta(pii('studentName')),
+  classId: z.string(),
+  className: z.string(),
+  status: z.enum(['pending', 'approved']),
+  sentAt: z.number(),
+  /** Pending: when it is deleted if nobody checks it. */
+  deleteAt: z.number().nullable(),
+  decidedAt: z.number().nullable(),
+  /** The picture itself (teacher or admin access, the same checks). */
+  url: z.string(),
+});
+export type PictureListItem = z.infer<typeof PictureListItem>;
+export const PictureList = z.object({ enabled: z.boolean(), toCheck: z.array(PictureListItem), inUse: z.array(PictureListItem) });
+export type PictureList = z.infer<typeof PictureList>;
+const Confirm = z.object({ pictureId: Id, confirm: z.boolean().optional() });
+const Refuse = z.object({ pictureId: Id, reason: RefusalReason.optional() });
+
+/** Teacher side: pictures of the students the teacher teaches today (any of their classes). */
+export const teacherPictures = endpoint({
+  method: 'GET',
+  path: '/api/teacher/avatar-pictures',
+  access: 'teacher',
+  input: z.object({}),
+  output: PictureList,
+});
+/** The menu badge: the number to check (a background poll, PIN-7). */
+export const teacherPictureCount = endpoint({
+  method: 'GET',
+  path: '/api/teacher/avatar-pictures/count',
+  access: 'teacher',
+  background: true,
+  input: z.object({}),
+  output: z.object({ enabled: z.boolean(), toCheck: z.number().int() }),
+});
+/** "Yes, use it": `confirm` must be true (the teacher ticked "Not a photo of the student or anyone they know"), else 400 CONFIRM_REQUIRED. */
+export const teacherApprovePicture = endpoint({
+  method: 'POST',
+  path: '/api/teacher/avatar-pictures/:pictureId/approve',
+  access: 'teacher',
+  input: Confirm,
+  output: Ok,
+});
+/** "Not this one": `reason` is required (400 REASON_REQUIRED); the picture is deleted at once. */
+export const teacherRefusePicture = endpoint({
+  method: 'POST',
+  path: '/api/teacher/avatar-pictures/:pictureId/refuse',
+  access: 'teacher',
+  input: Refuse,
+  output: Ok,
+});
+/** Remove an approved picture (deleted at once; the student falls back to their avatar). */
+export const teacherRemovePicture = endpoint({
+  method: 'DELETE',
+  path: '/api/teacher/avatar-pictures/:pictureId',
+  access: 'teacher',
+  input: z.object({ pictureId: Id }),
+  output: Ok,
+});
+export const teacherPictureImage = endpoint({
+  method: 'GET',
+  path: '/api/teacher/avatar-pictures/:pictureId/image',
+  access: 'teacher',
+  input: z.object({ pictureId: Id }),
+  output: z.unknown(),
+});
+
+/** Admin side: every picture of the school, the same decisions, and "Delete all uploaded pictures". */
+export const adminPictures = endpoint({
+  method: 'GET',
+  path: '/api/admin/avatar-pictures',
+  access: 'admin',
+  input: z.object({}),
+  output: PictureList,
+});
+export const adminApprovePicture = endpoint({
+  method: 'POST',
+  path: '/api/admin/avatar-pictures/:pictureId/approve',
+  access: 'admin',
+  input: Confirm,
+  output: Ok,
+});
+export const adminRefusePicture = endpoint({
+  method: 'POST',
+  path: '/api/admin/avatar-pictures/:pictureId/refuse',
+  access: 'admin',
+  input: Refuse,
+  output: Ok,
+});
+export const adminRemovePicture = endpoint({
+  method: 'DELETE',
+  path: '/api/admin/avatar-pictures/:pictureId',
+  access: 'admin',
+  input: z.object({ pictureId: Id }),
+  output: Ok,
+});
+export const adminPictureImage = endpoint({
+  method: 'GET',
+  path: '/api/admin/avatar-pictures/:pictureId/image',
+  access: 'admin',
+  input: z.object({ pictureId: Id }),
+  output: z.unknown(),
+});
+/** Deletes every waiting and approved picture (typed confirmation `DELETE_ALL_PICTURES_CONFIRM`, audited with counts). */
+export const adminDeleteAllPictures = endpoint({
+  method: 'POST',
+  path: '/api/admin/avatar-pictures/delete-all',
+  access: 'admin',
+  input: z.object({ confirm: z.string().max(64) }),
+  output: z.object({ pending: z.number().int(), approved: z.number().int() }),
+});
+
+/** Super Speakers (owner decision d): the picture on the hall board and the scorer, only while the admin setting is on. */
+export const boardPictureImage = endpoint({
+  method: 'GET',
+  path: '/api/board/students/:studentId/picture',
+  access: 'display',
+  input: z.object({ studentId: Id, v: z.string().max(64).optional() }),
+  output: z.unknown(),
+});
+export const scorerPictureImage = endpoint({
+  method: 'GET',
+  path: '/api/scorer/students/:studentId/picture',
+  access: 'scorer',
+  input: z.object({ studentId: Id, v: z.string().max(64).optional() }),
+  output: z.unknown(),
+});
+export const speakersPictureUrl = (where: 'board' | 'scorer', studentId: string, pictureId: string) =>
+  `/api/${where}/students/${encodeURIComponent(studentId)}/picture?v=${encodeURIComponent(pictureId)}`;

@@ -204,6 +204,13 @@
       "when": 1794409462885,
       "tag": "0028_s19b_assistant_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1794414644060,
+      "tag": "0029_s24_avatar_pictures",
+      "breakpoints": true
     }
   ]
 }
