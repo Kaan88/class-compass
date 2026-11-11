@@ -389,6 +389,13 @@ Brief: `docs/design/2026-11-11-roadmap-sweep.md`; decisions D-170 to D-172. The 
 - [x] S20c importer: several classes in one file, HTML-table .xls (D-171)
 - [x] S20d Turkish fields in every label editor, main-language defaults, ROADMAP re-check audit (D-172)
 
+## S21b Phone top bar, toasts over the dock, evidence uploads name their class (S17b and S20b review leftovers, 2026-11-11)
+Decision D-174; no migration.
+- [x] Classroom top bar on phones: the class name ("3-A") no longer wraps and the subject no longer runs over the date line; below 60rem the bar wraps by blocks. Checked with no intersecting boxes at 320, 375 and 414 px, 100 % and 200 % text, English and Turkish, in the three built-in themes and Snow Day (`e2e/classroom-overlap.spec.ts`, which reported the overlap in every theme before the fix; screenshots under `test-results/s21b/`)
+- [x] Toasts on the lesson board stand above the measured dock: "Lesson started" never covers the dock or End lesson at 375×812, 768×1024, 1536×703 at 1.25 and 1920×1080, every frame checked (`e2e/classroom-overlap.spec.ts`; without the measurement it covered four dock buttons at 768×1024)
+- [x] Teacher evidence uploads require the class+subject: every caller of `POST /api/files` checked (the Goals page always sends it; the importer uploads student lists without a class), `contextId` and the student required in the contract for image/document/audio, ownership checked with the school policy helpers (`tests/server/goals-evidence.test.ts`: missing `contextId` → 400, another class → 403, nothing stored)
+- [ ] Seen on a real phone and the classroom tablet (owner)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site
