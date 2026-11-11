@@ -2736,7 +2736,7 @@ export const tr = {
   'avatar.makeOwn': 'Kendim yapayım',
   'avatar.person': 'Bir kişi',
   'avatar.creature': 'Bir karakter',
-  'avatar.showMore': 'Daha fazla göster ({count} kaldı)',
+  'avatar.families': 'Aileler',
   'avatar.surprise': 'Sürpriz yap',
   'avatar.surprisePart': 'Sürpriz yap: {part}',
   'avatar.randomise': 'Hepsini rastgele seç',

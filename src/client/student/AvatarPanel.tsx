@@ -1,34 +1,20 @@
 /**
- * "My avatar" on the student page (S13c items 9 and 11, D-124): choose a ready-made avatar or build
- * one (a person or a creature) with a live large preview and a card-size preview. Randomise, a
- * "Surprise me" per part and Undo; parts that need a badge show which badge unlocks them. The server
- * checks the spec again (catalogue keys only) and refuses changes while the teacher has paused them.
+ * "My avatar" on the student page (S13c items 9 and 11, D-124; picture picker S17c, D-169): choose a
+ * ready-made avatar or build one (a person or a character) with a live large preview and a card-size
+ * preview. Randomise, a "Surprise me" per part and Undo; parts that need an achievement say which one
+ * unlocks them. The server checks the spec again (catalogue keys only) and refuses changes while the
+ * teacher has paused them.
  *
- * Built from native selects and buttons: small, fast on a cheap phone and accessible (axe-checked at
- * 375×812). The ready-made list is drawn in pages of 24.
+ * S17c: the choices are pictures, not words. Families are buttons with a thumbnail, in the theme's
+ * order (S17a `avatarFamiliesFirst`); the ready-made avatars are shown one family at a time; every
+ * other part is a labelled radio group (native radios: arrow keys move, the screen reader reads the
+ * part and the option) of colour swatches, pictures of the avatar with that option, or close-ups of the
+ * face for eyes, mouth, brows, glasses and cheeks. Every choice is at least `--cc-touch` big and the
+ * chosen one is marked by a tick and a frame, not by colour alone.
  */
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  AVATAR_COLOURS,
-  AVATAR_UNLOCKS,
-  COLOUR_NAMES,
-  CREATURE_FAMILIES,
-  CREATURE_FAMILY_KEYS,
-  CREATURE_PARTS,
-  HAIR_COLOURS,
-  HAIR_COLOUR_NAMES,
-  OPTION_NAMES,
-  PART_LABELS,
-  PERSON_PARTS,
-  READY_MADE,
-  SKIN_NAMES,
-  SKIN_TONES,
-  describeAvatar,
-  randomCreature,
-  randomPerson,
-  type AvatarSpecValue,
-} from '../../shared/avatars.ts';
+import { AVATAR_UNLOCKS, COLOUR_NAMES, CREATURE_FAMILIES, HAIR_COLOUR_NAMES, OPTION_NAMES, PART_LABELS, SKIN_NAMES, describeAvatar, randomCreature, randomPerson, type AvatarSpecValue, type CreatureFamily } from '../../shared/avatars.ts';
 import { DEFAULT_ACHIEVEMENTS } from '../../shared/achievements.ts';
 import { studentSetAvatar, type StudentAvatarInfo } from '../../shared/contracts/avatars.ts';
 import { pickText } from '../../shared/i18n/index.ts';
@@ -38,65 +24,90 @@ import { reasonOf } from '../lib/errors.ts';
 import { showToast } from '../lib/toast.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from '../ui/Button.tsx';
-import { orderByFamilies, orderFamilies } from '../../shared/themePackage/engine.ts';
+import { IconLock } from '../ui/icons.tsx';
 import { useTheme } from '../themes/index.tsx';
 import { STUDENT_PAGE_KEY } from './keys.ts';
+import { familyOrder, pickerParts, readyMadeGroups, setPart, surpriseOptions, type PickerPart } from './avatarPicker.ts';
 
-type Part = { key: string; options: readonly string[]; names: (o: string) => string };
-const PAGE = 24;
+type Locale = 'en' | 'tr';
+const partLabel = (key: string, locale: Locale) => pickText(PART_LABELS[key as keyof typeof PART_LABELS], locale);
+const optionName = (p: PickerPart, o: string, locale: Locale): string => {
+  if (p.kind === 'colour') return COLOUR_NAMES[o as keyof typeof COLOUR_NAMES]?.[locale] ?? o;
+  if (p.kind === 'skin') return SKIN_NAMES[o as keyof typeof SKIN_NAMES]?.[locale] ?? o;
+  if (p.kind === 'hair') return HAIR_COLOUR_NAMES[o as keyof typeof HAIR_COLOUR_NAMES]?.[locale] ?? o;
+  return OPTION_NAMES[`${p.key}.${o}`]?.[locale] ?? o;
+};
+/** The swatch's avatar colour token (every one exists in every theme: `avatars-badges.test.tsx`). */
+const token = (t: string) => `var(--cc-${t})`;
+const swatchColour = (p: PickerPart, o: string) => token(p.kind === 'skin' ? `avatar-skin-${o.replace('skin', '')}` : p.kind === 'hair' ? `avatar-hair-${o}` : `avatar-${o}`);
 
-function partsOf(spec: AvatarSpecValue, locale: 'en' | 'tr', families: readonly string[] = CREATURE_FAMILY_KEYS): Part[] {
-  const opt = (part: string) => (o: string) => OPTION_NAMES[`${part}.${o}`]?.[locale] ?? o;
-  const colour = (o: string) => COLOUR_NAMES[o as keyof typeof COLOUR_NAMES]?.[locale] ?? o;
-  if (spec.type === 'creature') {
-    return [
-      // The theme's families first (S17a, D-166: `sets.avatarFamiliesFirst`); every family stays.
-      { key: 'family', options: families, names: opt('family') },
-      { key: 'species', options: CREATURE_FAMILIES[spec.family], names: opt('species') },
-      { key: 'color', options: AVATAR_COLOURS, names: colour },
-      { key: 'eyes', options: CREATURE_PARTS.eyes, names: opt('eyes') },
-      { key: 'mouth', options: CREATURE_PARTS.mouth, names: opt('mouth') },
-      { key: 'hat', options: CREATURE_PARTS.hat, names: opt('hat') },
-      { key: 'accessory', options: CREATURE_PARTS.accessory, names: opt('accessory') },
-      { key: 'accentColor', options: AVATAR_COLOURS, names: colour },
-      { key: 'bg', options: CREATURE_PARTS.bg, names: opt('bg') },
-      { key: 'bgColor', options: AVATAR_COLOURS, names: colour },
-    ];
-  }
-  const p = PERSON_PARTS;
-  return [
-    { key: 'skin', options: SKIN_TONES, names: (o) => SKIN_NAMES[o as keyof typeof SKIN_NAMES]?.[locale] ?? o },
-    { key: 'face', options: p.face, names: opt('face') },
-    { key: 'hair', options: p.hair, names: opt('hair') },
-    { key: 'hairColor', options: HAIR_COLOURS, names: (o) => HAIR_COLOUR_NAMES[o as keyof typeof HAIR_COLOUR_NAMES]?.[locale] ?? o },
-    { key: 'eyes', options: p.eyes, names: opt('eyes') },
-    { key: 'brows', options: p.brows, names: opt('brows') },
-    { key: 'mouth', options: p.mouth, names: opt('mouth') },
-    { key: 'cheeks', options: p.cheeks, names: opt('cheeks') },
-    { key: 'glasses', options: p.glasses, names: opt('glasses') },
-    { key: 'body', options: p.body, names: opt('body') },
-    { key: 'top', options: p.top, names: opt('top') },
-    { key: 'topColor', options: AVATAR_COLOURS, names: colour },
-    { key: 'hat', options: p.hat, names: opt('hat') },
-    { key: 'accessory', options: p.accessory, names: opt('accessory') },
-    { key: 'accentColor', options: AVATAR_COLOURS, names: colour },
-    { key: 'pet', options: p.pet, names: opt('pet') },
-    { key: 'bg', options: p.bg, names: opt('bg') },
-    { key: 'bgColor', options: AVATAR_COLOURS, names: colour },
-  ];
-}
-
-const badgeName = (key: string, locale: 'en' | 'tr') => {
+const badgeName = (key: string, locale: Locale) => {
   const d = DEFAULT_ACHIEVEMENTS.find((x) => x.key === key);
   return d ? pickText(d.name, locale) : key;
 };
 
-function setPart(spec: AvatarSpecValue, key: string, value: string): AvatarSpecValue {
-  if (spec.type === 'creature' && key === 'family') {
-    const family = value as keyof typeof CREATURE_FAMILIES;
-    return { ...spec, family, species: CREATURE_FAMILIES[family][0] };
-  }
-  return { ...spec, [key]: value } as AvatarSpecValue;
+/** Family buttons with a thumbnail (the first ready-made of the family), in the theme's order. */
+function FamilyTabs({ families, value, onChange, idPrefix }: { families: readonly CreatureFamily[]; value: CreatureFamily; onChange: (f: CreatureFamily) => void; idPrefix: string }) {
+  const { t, locale } = useI18n();
+  const groups = readyMadeGroups(families);
+  return (
+    <div className="cc-avatar-families" role="group" aria-label={t('avatar.families')} data-testid={`${idPrefix}-families`}>
+      {groups.map(({ family, avatars }) => (
+        <button key={family} type="button" className="cc-avatar-family" aria-pressed={family === value} onClick={() => onChange(family)} data-testid={`${idPrefix}-family-${family}`}>
+          <AvatarArt spec={avatars[0]!} size="100%" />
+          <span>{OPTION_NAMES[`family.${family}`]?.[locale] ?? family}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** One part as a labelled radio group of swatches or pictures. */
+function PartChoice({ part, draft, onChoose, isLocked, unlockOf, onSurprise }: { part: PickerPart; draft: AvatarSpecValue; onChoose: (v: string) => void; isLocked: (p: string, o: string) => boolean; unlockOf: (p: string, o: string) => string | undefined; onSurprise: () => void }) {
+  const { t, locale } = useI18n();
+  const label = partLabel(part.key, locale);
+  const value = (draft as unknown as Record<string, string>)[part.key];
+  const locked = part.options.filter((o) => unlockOf(part.key, o));
+  return (
+    <fieldset className="cc-avatar-part" data-testid={`avatar-part-${part.key}`}>
+      <legend className="cc-avatar-part__legend">{label}</legend>
+      <Button size="small" variant="ghost" className="cc-avatar-part__surprise" onPress={onSurprise} aria-label={t('avatar.surprisePart', { part: label })}>
+        {t('avatar.surprise')}
+      </Button>
+      <div className={`cc-avatar-options cc-avatar-options--${part.kind === 'picture' || part.kind === 'face' ? 'pictures' : 'swatches'}`}>
+        {part.options.map((o) => {
+          const name = optionName(part, o, locale);
+          const off = isLocked(part.key, o);
+          return (
+            <label key={o} className="cc-avatar-opt">
+              <input type="radio" className="cc-visually-hidden" name={`avatar-${part.key}`} value={o} checked={value === o} disabled={off} onChange={() => onChoose(o)} />
+              <span className="cc-avatar-opt__pic" aria-hidden="true">
+                {part.kind === 'picture' || part.kind === 'face' ? (
+                  <AvatarArt spec={setPart(draft, part.key, o)} size="100%" zoom={part.kind === 'face' ? 'face' : undefined} />
+                ) : (
+                  <span className="cc-avatar-swatch" style={{ background: swatchColour(part, o) }} />
+                )}
+                {off ? (
+                  <span className="cc-avatar-opt__lock">
+                    <IconLock />
+                  </span>
+                ) : null}
+              </span>
+              <span className="cc-visually-hidden">{name}</span>
+            </label>
+          );
+        })}
+      </div>
+      {locked.length ? (
+        <ul className="cc-avatar-unlocks cc-muted">
+          {locked.map((o) => {
+            const k = unlockOf(part.key, o)!;
+            return <li key={o}>{`${optionName(part, o, locale)}: ${isLocked(part.key, o) ? t('avatar.unlockWith', { badge: badgeName(k, locale) }) : t('avatar.unlocked')}`}</li>;
+          })}
+        </ul>
+      ) : null}
+    </fieldset>
+  );
 }
 
 /** `titleId`: the screen's h1 names the panel (S14d "My avatar" screen), so the panel has no heading of its own. */
@@ -107,16 +118,18 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
   const [tab, setTab] = useState<'ready' | 'make'>('ready');
   const [draft, setDraft] = useState<AvatarSpecValue>(info.spec ?? info.generated);
   const [history, setHistory] = useState<AvatarSpecValue[]>([]);
-  const [shown, setShown] = useState(PAGE);
   // Theme sets (S17a, D-166): only the order changes; nothing is hidden and saved avatars never change.
   const first = useTheme().sets?.avatarFamiliesFirst;
   const firstKey = first?.join(',') ?? '';
-  const families = useMemo(() => orderFamilies(CREATURE_FAMILY_KEYS, first), [firstKey]);
-  const readyMade = useMemo(() => orderByFamilies(READY_MADE, first), [firstKey]);
+  const families = useMemo(() => familyOrder(first), [firstKey]);
+  const groups = useMemo(() => readyMadeGroups(first), [firstKey]);
+  const [readyFamily, setReadyFamily] = useState<CreatureFamily>(families[0]!);
+  const [makeFamily, setMakeFamily] = useState<CreatureFamily>(draft.type === 'creature' ? draft.family : families[0]!);
   const earned = new Set(info.earned);
   const change = (next: AvatarSpecValue) => {
     setHistory((h) => [...h.slice(-19), draft]);
     setDraft(next);
+    if (next.type === 'creature') setMakeFamily(next.family);
   };
   const save = useMutation({
     mutationFn: (spec: AvatarSpecValue) => call(studentSetAvatar, { spec }),
@@ -133,10 +146,12 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
     const k = unlockOf(part, o);
     return k !== undefined && !earned.has(k);
   };
-  const surprise = (p: Part) => {
-    const ok = p.options.filter((o) => !isLocked(p.key, o) && o !== (draft as unknown as Record<string, string>)[p.key]);
+  const surprise = (p: PickerPart) => {
+    const ok = surpriseOptions(draft, p, isLocked);
     if (ok.length) change(setPart(draft, p.key, ok[Math.floor(Math.random() * ok.length)]!));
   };
+  const readyAvatars = groups.find((g) => g.family === readyFamily)?.avatars ?? [];
+  const speciesPart: PickerPart = { key: 'species', kind: 'picture', options: CREATURE_FAMILIES[makeFamily] };
   return (
     <section className="cc-card cc-stack cc-avatar-panel" aria-labelledby={titleId ?? 'my-avatar'} data-testid="student-avatar">
       <div className="cc-row">
@@ -176,25 +191,20 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
           </div>
           {tab === 'ready' ? (
             <>
-              <ul className="cc-avatar-grid" aria-label={t('avatar.readyMade')}>
-                {readyMade.slice(0, shown).map((spec, i) => {
-                  const label = describeAvatar(spec, locale);
-                  return (
-                    <li key={i}>
-                      <button type="button" className="cc-avatar-choice" aria-label={label} aria-pressed={JSON.stringify(spec) === JSON.stringify(draft)} onClick={() => change(spec)} data-testid="avatar-ready">
-                        <AvatarArt spec={spec} size="100%" />
-                      </button>
-                    </li>
-                  );
-                })}
+              <FamilyTabs families={families} value={readyFamily} onChange={setReadyFamily} idPrefix="avatar-ready" />
+              <ul className="cc-avatar-grid" aria-label={`${t('avatar.readyMade')}: ${OPTION_NAMES[`family.${readyFamily}`]?.[locale] ?? readyFamily}`} data-testid="avatar-ready-list">
+                {readyAvatars.map((spec, i) => (
+                  <li key={i}>
+                    <button type="button" className="cc-avatar-choice" aria-label={describeAvatar(spec, locale)} aria-pressed={JSON.stringify(spec) === JSON.stringify(draft)} onClick={() => change(spec)} data-testid="avatar-ready">
+                      <AvatarArt spec={spec} size="100%" />
+                    </button>
+                  </li>
+                ))}
               </ul>
-              {shown < readyMade.length ? (
-                <Button onPress={() => setShown((n) => n + PAGE)}>{t('avatar.showMore', { count: readyMade.length - shown })}</Button>
-              ) : null}
             </>
           ) : (
             <div className="cc-stack">
-              <div className="cc-row" role="group" aria-label={pickText(PART_LABELS.type, locale)}>
+              <div className="cc-row" role="group" aria-label={partLabel('type', locale)}>
                 <Button variant={draft.type === 'person' ? 'primary' : 'secondary'} aria-pressed={draft.type === 'person'} onPress={() => change(randomPerson(Math.random))} data-testid="avatar-type-person">
                   {t('avatar.person')}
                 </Button>
@@ -202,30 +212,16 @@ export function AvatarPanel({ info, name, titleId }: { info: StudentAvatarInfo; 
                   {t('avatar.creature')}
                 </Button>
               </div>
-              {partsOf(draft, locale, families).map((p) => {
-                const id = `avatar-part-${p.key}`;
-                const value = (draft as unknown as Record<string, string>)[p.key] ?? '';
-                return (
-                  <div key={p.key} className="cc-avatar-part">
-                    <label htmlFor={id}>{pickText(PART_LABELS[p.key as keyof typeof PART_LABELS], locale)}</label>
-                    <select id={id} className="cc-select" value={value} onChange={(e) => change(setPart(draft, p.key, e.target.value))} data-testid={id}>
-                      {p.options.map((o) => {
-                        const k = unlockOf(p.key, o);
-                        const locked = isLocked(p.key, o);
-                        return (
-                          <option key={o} value={o} disabled={locked}>
-                            {p.names(o)}
-                            {k ? ` (${locked ? t('avatar.unlockWith', { badge: badgeName(k, locale) }) : t('avatar.unlocked')})` : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <Button size="small" variant="ghost" onPress={() => surprise(p)} aria-label={t('avatar.surprisePart', { part: pickText(PART_LABELS[p.key as keyof typeof PART_LABELS], locale) })}>
-                      {t('avatar.surprise')}
-                    </Button>
-                  </div>
-                );
-              })}
+              {draft.type === 'creature' ? (
+                <>
+                  {/* A family only shows its characters; the avatar changes when a character is chosen. */}
+                  <FamilyTabs families={families} value={makeFamily} onChange={setMakeFamily} idPrefix="avatar-make" />
+                  <PartChoice part={speciesPart} draft={draft} onChoose={(o) => change(setPart(draft, 'species', o))} isLocked={isLocked} unlockOf={unlockOf} onSurprise={() => surprise(speciesPart)} />
+                </>
+              ) : null}
+              {pickerParts(draft).map((p) => (
+                <PartChoice key={p.key} part={p} draft={draft} onChoose={(o) => change(setPart(draft, p.key, o))} isLocked={isLocked} unlockOf={unlockOf} onSurprise={() => surprise(p)} />
+              ))}
             </div>
           )}
           <div className="cc-row">

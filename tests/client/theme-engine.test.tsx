@@ -524,17 +524,20 @@ describe('sets: avatar order and achievement frames', () => {
       createElement(QueryClientProvider, { client: qc, children: inTheme('peppermint-snow-day', createElement(AvatarPanel, { info, name: 'Ada' })) }),
     );
     await act(async () => getByTestId('avatar-change').click());
-    const first = [...container.querySelectorAll<HTMLButtonElement>('[data-testid="avatar-ready"]')].slice(0, 24).map((b) => b.getAttribute('aria-label') ?? '');
-    const expected = orderByFamilies(READY_MADE, snow().sets.avatarFamiliesFirst).slice(0, 24).map((s) => describeAvatar(s, 'en'));
+    // S17c (D-169): the ready-made avatars are shown one family at a time; the theme's first family opens first.
+    const familyIds = (prefix: string) => [...container.querySelectorAll(`[data-testid^="${prefix}-family-"]`)].map((b) => b.getAttribute('data-testid')!.slice(prefix.length + 8));
+    expect(familyIds('avatar-ready').slice(0, 2)).toEqual(snow().sets.avatarFamiliesFirst);
+    expect(familyIds('avatar-ready')).toHaveLength(CREATURE_FAMILY_KEYS.length);
+    const first = [...container.querySelectorAll<HTMLButtonElement>('[data-testid="avatar-ready"]')].map((b) => b.getAttribute('aria-label') ?? '');
+    const expected = orderByFamilies(READY_MADE, snow().sets.avatarFamiliesFirst).slice(0, 12).map((s) => describeAvatar(s, 'en'));
     expect(first).toEqual(expected);
     expect(orderByFamilies(READY_MADE, snow().sets.avatarFamiliesFirst)[0]!.family).toBe(snow().sets.avatarFamiliesFirst[0]);
     // The current (saved) avatar is still the robot: a theme never changes it.
     expect(container.querySelector('[data-testid="student-avatar"] svg[role="img"]')?.getAttribute('aria-label')).toBe(describeAvatar(saved, 'en'));
     await act(async () => getByTestId('avatar-tab-make').click());
     await act(async () => getByTestId('avatar-type-creature').click());
-    const family = container.querySelector<HTMLSelectElement>('#avatar-part-family');
-    expect([...(family?.options ?? [])].slice(0, 2).map((o) => o.value)).toEqual(snow().sets.avatarFamiliesFirst);
-    expect(family?.options.length).toBe(CREATURE_FAMILY_KEYS.length);
+    expect(familyIds('avatar-make').slice(0, 2)).toEqual(snow().sets.avatarFamiliesFirst);
+    expect(familyIds('avatar-make')).toHaveLength(CREATURE_FAMILY_KEYS.length);
   });
 
   it('the achievement frame surrounds the tier shape; the tier keeps its shape and token', () => {

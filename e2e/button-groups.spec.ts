@@ -6,7 +6,7 @@
  * - no button sticks out of its group or off the screen;
  * - a grid has no empty tracks (auto-fill would leave holes and squeeze the buttons).
  * Covered: the student page's home tiles, subject switch, New goal categories, evidence kinds and
- * How is it going? faces (S14d), the teacher menu grid and the attendance status segments (teacher
+ * How is it going? faces (S14d), the avatar family buttons (S17c), the teacher menu grid and the attendance status segments (teacher
  * area), the topic choices (Start Lesson), the group options (group screen, opened from the board's
  * dock), the board's dock itself (S14b) and the lesson reflection (End Lesson). S14e3: no page of the
  * teacher menu scrolls sideways at 375 px with 200 % text (second test). Fictional demo data only; the
@@ -140,6 +140,12 @@ test('choice buttons fit at 375/768/1280 px, in English and Turkish, at 100 % an
       await sp.getByTestId('student-back').click();
       await sp.getByRole('link', { name: T('student.tile.showMyWork') }).click();
       await checkAll(sp, '.cc-evidence-modes', `${lang} evidence kinds`);
+      await sp.getByTestId('student-back').click();
+      // S17c (D-169): the avatar picker's family buttons.
+      await sp.getByRole('link', { name: T('student.tile.avatar') }).click();
+      await sp.getByTestId('avatar-change').click();
+      await expect(sp.locator('.cc-avatar-families')).toBeVisible();
+      await checkAll(sp, '.cc-avatar-families', `${lang} avatar families`);
       await sp.getByTestId('student-back').click();
       // The faces belong to a goal: give the student a goal once (the English pass runs first).
       await sp.getByRole('link', { name: T('student.tile.howIsItGoing') }).click();

@@ -2738,7 +2738,7 @@ export const en = {
   'avatar.makeOwn': 'Make my own',
   'avatar.person': 'A person',
   'avatar.creature': 'A character',
-  'avatar.showMore': 'Show more ({count} left)',
+  'avatar.families': 'Families',
   'avatar.surprise': 'Surprise me',
   'avatar.surprisePart': 'Surprise me: {part}',
   'avatar.randomise': 'Randomise all',

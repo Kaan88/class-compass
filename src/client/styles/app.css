@@ -5199,34 +5199,148 @@ li > .cc-admin-list {
   outline: 3px solid var(--cc-focus);
   outline-offset: 2px;
 }
+/* Picture picker (S17c, D-169): family buttons with a thumbnail, then one radio group per part of
+   colour swatches or pictures. The chosen option has a frame and a tick (never colour alone), every
+   option is at least --cc-touch, and the native radio keeps arrow keys and screen readers working. */
+.cc-avatar-families {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 5.5rem), 1fr));
+  gap: 0.4rem;
+}
+.cc-avatar-family {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
+  min-height: var(--cc-touch);
+  padding: 0.3rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.cc-avatar-family > svg {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+}
+.cc-avatar-family[aria-pressed='true'] {
+  border-color: var(--cc-accent);
+  box-shadow: 0 0 0 3px var(--cc-accent-soft);
+  font-weight: var(--cc-weight-strong);
+}
+.cc-avatar-family:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
 .cc-avatar-part {
   display: grid;
-  grid-template-columns: minmax(7rem, 1fr) minmax(0, 2fr) auto;
-  align-items: center;
-  gap: 0.5rem;
-}
-/* The choice uses its whole column, so its words are not cut (S13 usability). */
-.cc-avatar-part select {
-  width: 100%;
+  gap: 0.4rem;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
-/* Phone: the name and "Surprise me" share the first line, the choice takes the whole second line
-   (S13 usability: a half-width select cut its words, "medium ligh"). */
-@media (max-width: 30rem) {
-  .cc-avatar-part {
-    grid-template-columns: 1fr auto;
-    grid-template-areas: 'label surprise' 'choice choice';
-    row-gap: 0.25rem;
-  }
-  .cc-avatar-part label {
-    grid-area: label;
-  }
-  .cc-avatar-part select {
-    grid-area: choice;
-  }
-  .cc-avatar-part .cc-btn {
-    grid-area: surprise;
-  }
+.cc-avatar-part__legend {
+  padding: 0;
+  font-weight: var(--cc-weight-strong);
+}
+.cc-avatar-options {
+  order: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 3.5rem), 1fr));
+  gap: 0.45rem;
+}
+.cc-avatar-options--swatches {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cc-touch)), 1fr));
+}
+.cc-avatar-unlocks {
+  order: 2;
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
+.cc-avatar-part__surprise {
+  order: 3;
+  justify-self: end;
+}
+.cc-avatar-opt {
+  position: relative;
+  display: block;
+  min-width: 0;
+  max-width: 4.5rem;
+  cursor: pointer;
+}
+.cc-avatar-opt__pic {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  min-height: var(--cc-touch);
+  padding: 0.15rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: 50%;
+  background: var(--cc-surface);
+}
+.cc-avatar-opt__pic > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.cc-avatar-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--cc-avatar-outline);
+}
+.cc-avatar-opt input:checked + .cc-avatar-opt__pic {
+  border-color: var(--cc-accent);
+  box-shadow: 0 0 0 3px var(--cc-accent-soft);
+}
+.cc-avatar-opt input:checked + .cc-avatar-opt__pic::after {
+  content: '✓';
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  display: grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--cc-accent);
+  color: var(--cc-accent-text);
+  font-size: 0.8rem;
+  font-weight: var(--cc-weight-strong);
+}
+.cc-avatar-opt input:focus-visible + .cc-avatar-opt__pic {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-avatar-opt input:disabled + .cc-avatar-opt__pic {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.cc-avatar-opt__lock {
+  position: absolute;
+  right: -0.3rem;
+  bottom: -0.3rem;
+  display: grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--cc-surface);
+  color: var(--cc-text);
+}
+.cc-avatar-opt__lock svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 /* Review sheets (/dev/avatars, S17c): rows of 48 px avatars on the page background. */
 .cc-avatar-sheet {

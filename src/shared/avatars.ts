@@ -21,7 +21,7 @@ export const COLOUR_NAMES: Named<AvatarColour> = {
   orange: { en: 'orange', tr: 'turuncu' },
   yellow: { en: 'yellow', tr: 'sarı' },
   green: { en: 'green', tr: 'yeşil' },
-  teal: { en: 'teal', tr: 'çam yeşili' },
+  teal: { en: 'teal', tr: 'petrol yeşili' },
   blue: { en: 'blue', tr: 'mavi' },
   navy: { en: 'navy', tr: 'lacivert' },
   purple: { en: 'purple', tr: 'mor' },
@@ -213,7 +213,7 @@ export const OPTION_NAMES: Readonly<Record<string, LocalizedTextValue>> = {
   'face.round': { en: 'round face', tr: 'yuvarlak yüz' },
   'face.oval': { en: 'oval face', tr: 'oval yüz' },
   'face.square': { en: 'square face', tr: 'köşeli yüz' },
-  'face.heart': { en: 'heart-shaped face', tr: 'kalp yüz' },
+  'face.heart': { en: 'heart-shaped face', tr: 'kalp biçimli yüz' },
   'face.long': { en: 'long face', tr: 'uzun yüz' },
   // hair
   'hair.none': { en: 'no hair', tr: 'saçsız' },
@@ -278,11 +278,11 @@ export const OPTION_NAMES: Readonly<Record<string, LocalizedTextValue>> = {
   'top.tunic': { en: 'a tunic', tr: 'tunik' },
   // hat
   'hat.none': { en: 'no hat', tr: 'şapkasız' },
-  'hat.cap': { en: 'a cap', tr: 'kep' },
+  'hat.cap': { en: 'a cap', tr: 'şapka' },
   'hat.beanie': { en: 'a beanie', tr: 'bere' },
   'hat.crown': { en: 'a crown', tr: 'taç' },
   'hat.wizard': { en: 'a wizard hat', tr: 'büyücü şapkası' },
-  'hat.flowers': { en: 'a flower band', tr: 'çiçek taç' },
+  'hat.flowers': { en: 'a flower band', tr: 'çiçek tacı' },
   'hat.headband': { en: 'a headband', tr: 'saç bandı' },
   'hat.party': { en: 'a party hat', tr: 'parti şapkası' },
   'hat.bucket': { en: 'a bucket hat', tr: 'balıkçı şapkası' },
@@ -296,7 +296,7 @@ export const OPTION_NAMES: Readonly<Record<string, LocalizedTextValue>> = {
   'accessory.book': { en: 'a book', tr: 'kitap' },
   'accessory.medal': { en: 'a medal', tr: 'madalya' },
   // pet
-  'pet.none': { en: 'no pet', tr: 'evcil hayvan yok' },
+  'pet.none': { en: 'no pet', tr: 'evcil hayvansız' },
   'pet.cat': { en: 'a pet cat', tr: 'kedi' },
   'pet.dog': { en: 'a pet dog', tr: 'köpek' },
   'pet.bird': { en: 'a pet bird', tr: 'kuş' },
@@ -450,8 +450,82 @@ function drawCreature(rnd: () => number, family?: CreatureFamily): CreatureSpec 
 // ---------------------------------------------------------------- accessible name
 const nameOf = (key: string, locale: 'en' | 'tr') => OPTION_NAMES[key]?.[locale] ?? '';
 
-/** "Blue robot with a cap" style accessible name, in the page language. */
+/**
+ * Turkish "with …" forms (S17c, D-169): Turkish names an avatar by what it has before the noun
+ * ("Şapkalı ve atkılı mavi kedi"), not "…, şapka ve atkı ile". Every hat, accessory, glasses, pet,
+ * hair and clothes option has one (test-enforced); skin tones add "-li" to their "… ten" name.
+ */
+export const TR_WITH: Readonly<Record<string, string>> = {
+  'hat.cap': 'şapkalı',
+  'hat.beanie': 'bereli',
+  'hat.crown': 'taçlı',
+  'hat.wizard': 'büyücü şapkalı',
+  'hat.flowers': 'çiçek taçlı',
+  'hat.headband': 'saç bantlı',
+  'hat.party': 'parti şapkalı',
+  'hat.bucket': 'balıkçı şapkalı',
+  'accessory.scarf': 'atkılı',
+  'accessory.headphones': 'kulaklıklı',
+  'accessory.backpack': 'sırt çantalı',
+  'accessory.wand': 'sihirli değnekli',
+  'accessory.ball': 'toplu',
+  'accessory.book': 'kitaplı',
+  'accessory.medal': 'madalyalı',
+  'glasses.round': 'yuvarlak gözlüklü',
+  'glasses.square': 'köşeli gözlüklü',
+  'glasses.sunglasses': 'güneş gözlüklü',
+  'glasses.star': 'yıldız gözlüklü',
+  'pet.cat': 'kedili',
+  'pet.dog': 'köpekli',
+  'pet.bird': 'kuşlu',
+  'pet.bunny': 'tavşanlı',
+  'pet.fish': 'balıklı',
+  'hair.none': 'saçsız',
+  'hair.short': 'kısa saçlı',
+  'hair.spiky': 'dikenli saçlı',
+  'hair.curly': 'kıvırcık saçlı',
+  'hair.afro': 'afro saçlı',
+  'hair.long': 'uzun saçlı',
+  'hair.ponytail': 'at kuyruklu',
+  'hair.bun': 'topuzlu',
+  'hair.braids': 'örgülü',
+  'hair.bob': 'küt saçlı',
+  'hair.sidePart': 'yandan ayrık saçlı',
+  'hair.wavy': 'dalgalı saçlı',
+  'hair.buzz': 'çok kısa saçlı',
+  'hair.twoBuns': 'iki topuzlu',
+  'hair.hijab': 'başörtülü',
+  'hair.headscarf': 'eşarplı',
+  'top.tshirt': 'tişörtlü',
+  'top.hoodie': 'kapüşonlu üstlü',
+  'top.collar': 'yakalı gömlekli',
+  'top.stripes': 'çizgili üstlü',
+  'top.dungarees': 'salopetli',
+  'top.jumper': 'kalpli kazaklı',
+  'top.jersey': 'formalı',
+  'top.tunic': 'tunikli',
+};
+
+const capital = (s: string, locale: 'en' | 'tr') => (locale === 'en' ? s.charAt(0).toUpperCase() : s.charAt(0).toLocaleUpperCase('tr-TR')) + s.slice(1);
+/** "a, b ve c" */
+const listTr = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} ve ${xs[xs.length - 1]}` : (xs[0] ?? ''));
+
+/** Turkish: "Şapkalı ve atkılı mavi kedi", "Kısa saçlı, çok koyu tenli, tişörtlü ve atkılı kişi". */
+function describeTr(spec: AvatarSpecValue): string {
+  const withs = (keys: string[]) => keys.map((k) => TR_WITH[k] ?? '').filter(Boolean);
+  const extras = [`hat.${spec.hat}`, `accessory.${spec.accessory}`, ...(spec.type === 'person' ? [`glasses.${spec.glasses}`, `pet.${spec.pet}`] : [])];
+  if (spec.type === 'creature') {
+    const tail = `${COLOUR_NAMES[spec.color].tr} ${nameOf(`species.${spec.species}`, 'tr')}`;
+    const lead = listTr(withs(extras));
+    return capital(lead ? `${lead} ${tail}` : tail, 'tr');
+  }
+  const adjectives = [...withs([`hair.${spec.hair}`]), `${SKIN_NAMES[spec.skin].tr}li`, ...withs([`top.${spec.top}`, ...extras])];
+  return capital(`${listTr(adjectives)} kişi`, 'tr');
+}
+
+/** "Blue robot with a cap" style accessible name, in the page language (natural Turkish, S17c). */
 export function describeAvatar(spec: AvatarSpecValue, locale: 'en' | 'tr'): string {
+  if (locale === 'tr') return describeTr(spec);
   const extras: string[] = [];
   if (spec.hat !== 'none') extras.push(nameOf(`hat.${spec.hat}`, locale));
   if (spec.accessory !== 'none') extras.push(nameOf(`accessory.${spec.accessory}`, locale));
@@ -459,15 +533,11 @@ export function describeAvatar(spec: AvatarSpecValue, locale: 'en' | 'tr'): stri
     if (spec.glasses !== 'none') extras.push(nameOf(`glasses.${spec.glasses}`, locale));
     if (spec.pet !== 'none') extras.push(nameOf(`pet.${spec.pet}`, locale));
   }
-  const join = locale === 'tr' ? ' ve ' : ' and ';
-  const tail = extras.length ? (locale === 'tr' ? `, ${extras.join(join)} ile` : ` with ${extras.join(join)}`) : '';
+  const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : (xs[0] ?? ''));
   if (spec.type === 'creature') {
-    const colour = COLOUR_NAMES[spec.color][locale] ?? '';
-    const what = nameOf(`species.${spec.species}`, locale);
-    const head = `${colour} ${what}`;
-    return (locale === 'en' ? head.charAt(0).toUpperCase() + head.slice(1) : head.charAt(0).toLocaleUpperCase('tr-TR') + head.slice(1)) + tail;
+    const head = capital(`${COLOUR_NAMES[spec.color].en} ${nameOf(`species.${spec.species}`, 'en')}`, 'en');
+    return extras.length ? `${head} with ${list(extras)}` : head;
   }
-  const parts = [nameOf(`hair.${spec.hair}`, locale), SKIN_NAMES[spec.skin][locale] ?? '', nameOf(`top.${spec.top}`, locale)].filter(Boolean);
-  const head = locale === 'tr' ? `Kişi: ${parts.join(', ')}` : `Person with ${parts.join(', ')}`;
-  return head + (extras.length ? (locale === 'tr' ? `; ${extras.join(join)}` : `, ${extras.join(join)}`) : '');
+  const parts = [nameOf(`hair.${spec.hair}`, 'en'), SKIN_NAMES[spec.skin].en ?? '', nameOf(`top.${spec.top}`, 'en'), ...extras].filter((x): x is string => Boolean(x));
+  return `Person with ${list(parts)}`;
 }

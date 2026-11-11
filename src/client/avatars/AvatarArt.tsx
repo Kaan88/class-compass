@@ -1301,10 +1301,18 @@ function Creature({ s }: { s: CreatureSpec }) {
   );
 }
 
-/** The avatar picture (decorative: the name is always next to it). */
-export const AvatarArt = memo(function AvatarArt({ spec, size, title }: { spec: AvatarSpecValue; size?: number | string; title?: string }) {
+/** The view box of the face only (picker buttons for eyes, mouth, brows, glasses and cheeks, S17c). */
+export function faceViewBox(spec: AvatarSpecValue): string {
+  if (spec.type === 'person') return '24 22 52 52';
+  const e = faceOf(spec).eyes;
+  const s = Math.round(52 * e.scale);
+  return `${e.x - s / 2} ${e.y - s * 0.42} ${s} ${s}`;
+}
+
+/** The avatar picture (decorative: the name is always next to it). `zoom="face"` shows the face only. */
+export const AvatarArt = memo(function AvatarArt({ spec, size, title, zoom }: { spec: AvatarSpecValue; size?: number | string; title?: string; zoom?: 'face' }) {
   return (
-    <svg viewBox="0 0 100 100" width={size} height={size} className="cc-avatar-art" role={title ? 'img' : undefined} aria-hidden={title ? undefined : true} aria-label={title} focusable="false">
+    <svg viewBox={zoom === 'face' ? faceViewBox(spec) : '0 0 100 100'} width={size} height={size} className="cc-avatar-art" role={title ? 'img' : undefined} aria-hidden={title ? undefined : true} aria-label={title} focusable="false">
       {/* Clipped to a circle by CSS (.cc-avatar-art: border-radius + overflow), so no ids repeat on the page. */}
       {spec.type === 'person' ? <Person s={spec} /> : <Creature s={spec} />}
     </svg>
