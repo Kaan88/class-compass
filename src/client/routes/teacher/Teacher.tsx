@@ -307,7 +307,6 @@ export function ProfilePage() {
             label={t('profile.density')}
             name="density"
             value={me.density}
-            description={t('profile.densityHint')}
             onChange={(v) => {
               const density = Auth.AREA_DENSITIES.find((d) => d === v);
               if (density) void update({ density });
@@ -315,6 +314,10 @@ export function ProfilePage() {
             items={Auth.AREA_DENSITIES.map((d) => ({ id: d, label: t(`profile.density.${d}`) }))}
           />
         </div>
+        {/* A line of its own: as the select's description it stretched the select to its width. */}
+        <p className="cc-muted" style={{ margin: 0 }}>
+          {t('profile.densityHint')}
+        </p>
         {error ? <Alert>{error}</Alert> : null}
       </section>
       {/* Teachers: the classroom PIN. Administrators: the PIN that confirms Maintenance actions (D-138). */}
