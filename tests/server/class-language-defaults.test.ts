@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { completeDefault, inLocales, seedLocales } from '../../src/shared/classLanguage.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
+import { cmd, endLesson, lessonState, startLesson } from '../lesson-helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 
 let env: TestEnv;
@@ -109,6 +110,27 @@ describe('seeded defaults follow the class language (S20d, D-172)', () => {
     await setLanguage('tr', true);
     expect(await duties()).toEqual(after);
     expect(count("select count(*) n from audit_events where action like '%.defaults_translated'")).toBe(3);
+  });
+
+  it('groups already shown in a running lesson get the language too; an edited live name is kept (review fix)', async () => {
+    await setLanguage('tr', false);
+    const lessonId = await startLesson(s.teacherA, ctx(), { othersPresent: true });
+    const arr = await ok(s.teacherA.get(`/api/classroom/contexts/${ctx()}/grouping/arrangements`));
+    expect((await cmd(s.teacherA, 'grouping.apply', { contextId: ctx(), lessonId, templateId: arr.arrangements[0].id })).ok).toBe(true);
+    const before = await lessonState(s.teacherA, ctx());
+    expect(before.grouping.groups[0].name).toEqual({ tr: 'Grup 1' });
+    // The teacher renames the second group in the lesson only (row edited by hand in the database for the test).
+    const live = env.db.$client.prepare('select id, effective_groups_json j from lesson_groupings where lesson_id = ? and cleared_at is null').get(lessonId) as { id: string; j: string };
+    const groups = JSON.parse(live.j);
+    groups[1].name = { tr: 'Kaplanlar' };
+    env.db.$client.prepare('update lesson_groupings set effective_groups_json = ? where id = ?').run(JSON.stringify(groups), live.id);
+
+    await setLanguage('tr', true);
+    const after = await lessonState(s.teacherA, ctx());
+    expect(after.grouping.groups[0].name).toEqual({ tr: 'Grup 1', en: 'Group 1' });
+    expect(after.grouping.groups[1].name).toEqual({ tr: 'Kaplanlar' });
+    expect(after.lesson.version).toBeGreaterThan(before.lesson.version);
+    await endLesson(s.teacherA, ctx(), lessonId);
   });
 
   it('the admin class editor triggers the same completion', async () => {

@@ -120,6 +120,18 @@ test('a Turkish-only class: Turkish label fields only, and no English UI text on
     await expect(groupEditor.getByTestId('group-name').first().getByLabel('Group name (Turkish)')).toHaveValue(/\S/u);
     await expect(groupEditor.getByLabel(/\(English\)$/u)).toHaveCount(0);
 
+    // Goals library: categories, ready-made goals and own starters are stored per subject and teacher,
+    // so they reach the teacher's English-only classes of the subject too: both fields (review fix, D-172).
+    await page.goto('/teacher/goals');
+    const goals = page.getByTestId('goals-page');
+    await goals.getByLabel('Class', { exact: true }).selectOption({ label: '3-A · English' });
+    await goals.getByRole('tab', { name: 'Categories and preset goals' }).click();
+    const lib = goals.getByTestId('goals-library');
+    for (const label of ['Name', 'Goal', 'Starter']) {
+      await expect(lib.getByLabel(`${label} (Turkish)`, { exact: true })).toBeVisible();
+      await expect(lib.getByLabel(`${label} (English)`, { exact: true })).toBeVisible();
+    }
+
     // The classroom screen of the Turkish-only class: no English UI text on the board or in a dock view.
     const startOk = await api(page, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'lesson.start', contextId: ctx.id, payload: { contextId: ctx.id, othersPresent: true, attendance: [] } }] });
     expect(startOk.body.results[0].ok).toBe(true);

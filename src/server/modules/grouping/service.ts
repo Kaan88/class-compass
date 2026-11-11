@@ -166,11 +166,14 @@ function insertDefaults(ctx: RequestContext, context: ContextRow, roster: readon
 /**
  * `onClassLanguageChanged` listener (S20d, D-172): default arrangements and "Group N" names that the
  * teacher never changed get the language just switched on (the version moves on, so an editor open
- * on the old version reloads instead of saving over it). Edited names are left alone.
+ * on the old version reloads instead of saving over it). Edited names are left alone. The groups a
+ * running lesson already shows get the same completion (the lesson version moves on, so the display
+ * refreshes).
  */
 export function completeDefaultNames(ctx: RequestContext, cls: ClassRow): void {
   const locales = seedLocales(cls);
   let changed = 0;
+  let lessonsChanged = 0;
   for (const context of ctx.db.select().from(teachingContexts).where(eq(teachingContexts.classId, cls.id)).all()) {
     for (const row of templateRows(ctx.db, context.id, true)) {
       const seeded = DEFAULT_ARRANGEMENTS.find((d) => d.key === row.defaultKey);
@@ -190,8 +193,33 @@ export function completeDefaultNames(ctx: RequestContext, cls: ClassRow): void {
         .run();
       changed++;
     }
+    // The groups already shown in a running lesson are a copy (lesson_groupings): complete their
+    // untouched "Group N" names too, so the display does not fall back to the other language.
+    for (const live of ctx.db.select().from(lessonGroupings).where(and(eq(lessonGroupings.contextId, context.id), isNull(lessonGroupings.clearedAt))).all()) {
+      const lesson = ctx.db.select().from(lessons).where(eq(lessons.id, live.lessonId)).get();
+      if (!lesson || lesson.status !== 'active') continue;
+      const tpl = ctx.db.select().from(groupTemplates).where(eq(groupTemplates.id, live.templateId)).get();
+      let groupsChanged = false;
+      const groups = live.effectiveGroupsJson.map((g, i) => {
+        // The number the name was seeded with: the saved group's position, else its place in the lesson.
+        const at = tpl ? tpl.groupsJson.findIndex((x) => x.id === g.id) : -1;
+        const extra = /^extra-(\d+)$/.exec(g.id);
+        const numbers = [...(at >= 0 ? [at + 1] : []), ...(extra ? [Number(extra[1]) + 1] : []), i + 1];
+        for (const n of numbers) {
+          const filled = completeDefault(g.name, groupName(n), locales);
+          if (!filled) continue;
+          groupsChanged = true;
+          return { ...g, name: filled };
+        }
+        return g;
+      });
+      if (!groupsChanged) continue;
+      ctx.db.update(lessonGroupings).set({ effectiveGroupsJson: groups }).where(eq(lessonGroupings.id, live.id)).run();
+      updateLesson(ctx, lesson, {});
+      lessonsChanged++;
+    }
   }
-  if (changed) audit(ctx.db, ctx.actor, { action: 'grouping.defaults_translated', entity: 'class', entityId: cls.id, after: { arrangements: changed, locales } }, ctx.now());
+  if (changed || lessonsChanged) audit(ctx.db, ctx.actor, { action: 'grouping.defaults_translated', entity: 'class', entityId: cls.id, after: { arrangements: changed, lessons: lessonsChanged, locales } }, ctx.now());
 }
 
 const NEW_DEFAULT_KEYS = new Set<string>(DEFAULT_ARRANGEMENTS.map((d) => d.key));

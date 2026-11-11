@@ -32,7 +32,7 @@ describe('teacher starters (D-152)', () => {
       starter('o1', { kind: 'practice', custom: true, categoryId: 'c1', text: { en: 'Read ___ with my family.' } }),
       starter('s1', { kind: 'note', schoolArchived: true, archived: true, text: { en: 'Remember to ___.' } }),
     ];
-    render(wrap(<TeacherStarters contextId="ctx" starters={list} categories={[reading]} showArchived={true} run={run} />));
+    render(wrap(<TeacherStarters contextId="ctx" locales={['en', 'tr']} starters={list} categories={[reading]} showArchived={true} run={run} />));
     const section = screen.getByTestId('library-starters');
     expect(within(section).getByRole('heading', { name: en['goals.starters.kind.practice'] })).toBeTruthy();
     const own = screen.getAllByTestId('library-starter').find((li) => li.textContent?.includes('Read ___ with my family.'))!;
@@ -50,16 +50,24 @@ describe('teacher starters (D-152)', () => {
   it('adds a starter for the chosen kind and category', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify(starter('n1', { custom: true })), { status: 200, headers: { 'content-type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
-    render(wrap(<TeacherStarters contextId="ctx" starters={[]} categories={[reading]} showArchived={false} run={(fn) => fn()} />));
+    render(wrap(<TeacherStarters contextId="ctx" locales={['en', 'tr']} starters={[]} categories={[reading]} showArchived={false} run={(fn) => fn()} />));
     fireEvent.change(screen.getByLabelText(en['goals.starters.kind']), { target: { value: 'reflection' } });
     fireEvent.change(screen.getByLabelText(en['goals.starters.category']), { target: { value: 'c1' } });
-    fireEvent.change(screen.getByLabelText(en['goals.starters.textEn']), { target: { value: 'Today we read ___.' } });
+    fireEvent.change(screen.getByLabelText('Starter (English)'), { target: { value: 'Today we read ___.' } });
+    // The Turkish field is empty while English has text: it needs translation (D-172).
+    expect(screen.getByTestId('needs-translation').closest('[data-lang]')!.getAttribute('data-lang')).toBe('tr');
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: en['goals.starters.add'] }));
     });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain('/api/teacher/contexts/ctx/starters');
     expect(JSON.parse(String(init.body))).toEqual({ kind: 'reflection', categoryId: 'c1', text: { en: 'Today we read ___.' } });
+  });
+
+  it('a Turkish-only subject shows only the Turkish starter field (review fix, D-172)', () => {
+    render(wrap(<TeacherStarters contextId="ctx" locales={['tr']} starters={[]} categories={[reading]} showArchived={false} run={(fn) => fn()} />));
+    expect(screen.queryByLabelText('Starter (English)')).toBeNull();
+    expect(screen.getByLabelText('Starter (Turkish)')).toBeTruthy();
   });
 });
 

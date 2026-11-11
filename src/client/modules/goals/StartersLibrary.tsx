@@ -3,7 +3,8 @@
  * - Teacher: the built-in starters and the teacher's own, grouped by where students see them. Own
  *   starters are archived for everyone; a default is hidden for this teacher's classes only, and one
  *   the school archived shows "Archived by the school" (D-116). A new starter needs `___` where the
- *   student writes; the server also checks its words with a sample word in the blank.
+ *   student writes; the server also checks its words with a sample word in the blank. Its text
+ *   fields follow the languages of the teacher's classes in the subject (LangFields; S20d review fix, D-172).
  * - Admin: every built-in starter with Archive / Restore for the whole school.
  */
 import { useState } from 'react';
@@ -14,20 +15,25 @@ import { STARTER_KINDS } from '../../../shared/text/starters.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
-import { Select, TextField } from '../../ui/Fields.tsx';
+import { Select } from '../../ui/Fields.tsx';
 import { IconArchive, IconPlus, IconUndo } from '../../ui/icons.tsx';
+import { LangFields } from '../../ui/LangFields.tsx';
+import type { ClassLocale } from '../../../shared/classLanguage.ts';
 
 const kindKey = (k: StarterKind) => `goals.starters.kind.${k}` as MessageKey;
 const localized = (en: string, tr: string) => ({ ...(en.trim() ? { en: en.trim() } : {}), ...(tr.trim() ? { tr: tr.trim() } : {}) });
 
 export function TeacherStarters({
   contextId,
+  locales,
   starters,
   categories,
   showArchived,
   run,
 }: {
   contextId: string;
+  /** The languages of the teacher's classes in this subject (own starters reach all of them; D-172). */
+  locales: readonly ClassLocale[];
   starters: readonly Starter[];
   categories: readonly Category[];
   showArchived: boolean;
@@ -84,10 +90,7 @@ export function TeacherStarters({
         </h4>
         <Select label={t('goals.starters.kind')} items={STARTER_KINDS.map((k) => ({ id: k, label: t(kindKey(k)) }))} value={kind} onChange={(v) => setKind(v as StarterKind)} />
         <Select label={t('goals.starters.category')} items={[{ id: '', label: t('goals.starters.anyCategory') }, ...liveCats.map((c) => ({ id: c.id, label: pickText(c.name, locale) }))]} value={categoryId} onChange={setCategoryId} />
-        <div className="cc-row">
-          <TextField label={t('goals.starters.textEn')} value={en} onChange={setEn} maxLength={200} />
-          <TextField label={t('goals.starters.textTr')} value={tr} onChange={setTr} maxLength={200} />
-        </div>
+        <LangFields label={t('goals.starters.text')} value={{ en, tr }} onChange={(v) => (setEn(v.en ?? ''), setTr(v.tr ?? ''))} locales={locales} maxLength={200} testId="goals-starter-text" />
         <div>
           <Button
             isDisabled={!en.trim() && !tr.trim()}

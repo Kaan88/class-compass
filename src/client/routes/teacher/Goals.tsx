@@ -36,7 +36,7 @@ import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { StudentStatsButton } from '../../ui/StudentName.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
-import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
+import { LangFields, useEditorLocales, useSubjectEditorLocales } from '../../ui/LangFields.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'goals'] as const;
@@ -385,11 +385,13 @@ function Overview({ contextId, onOpen }: { contextId: string; onOpen: (studentId
   );
 }
 
-function LibraryTab({ contextId }: { contextId: string }) {
+export function LibraryTab({ contextId }: { contextId: string }) {
   const { t, locale } = useI18n();
   const run = useRun();
   const q = useQuery({ queryKey: [...ALL, 'library', contextId], queryFn: () => call(G.goalLibrary, { contextId }) });
-  const locales = useEditorLocales([contextId]);
+  // Categories and ready-made goals are stored per subject and teacher, so they reach all of the
+  // teacher's classes in this subject: offer the languages of every one of them (review fix, D-172).
+  const locales = useSubjectEditorLocales(contextId);
   const [catEn, setCatEn] = useState('');
   const [catTr, setCatTr] = useState('');
   const [presetCat, setPresetCat] = useState('');
@@ -492,7 +494,7 @@ function LibraryTab({ contextId }: { contextId: string }) {
           </Button>
         </div>
       </section>
-      <TeacherStarters contextId={contextId} starters={lib.starters} categories={lib.categories} showArchived={showArchived} run={(fn) => run(fn, opts)} />
+      <TeacherStarters contextId={contextId} locales={locales} starters={lib.starters} categories={lib.categories} showArchived={showArchived} run={(fn) => run(fn, opts)} />
     </div>
   );
 }

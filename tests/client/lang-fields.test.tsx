@@ -17,9 +17,9 @@ import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
 import { translate } from '../../src/shared/i18n/index.ts';
 import { SENSITIVE } from '../../src/client/lib/queryClient.ts';
-import { LangFields, useEditorLocales } from '../../src/client/ui/LangFields.tsx';
+import { LangFields, useEditorLocales, useSubjectEditorLocales } from '../../src/client/ui/LangFields.tsx';
 import { HomeworkSettingsPanel } from '../../src/client/routes/teacher/Homework.tsx';
-import { GoalsSettingsPanel } from '../../src/client/routes/teacher/Goals.tsx';
+import { GoalsSettingsPanel, LibraryTab } from '../../src/client/routes/teacher/Goals.tsx';
 import { RoutinesPage } from '../../src/client/routes/teacher/Routines.tsx';
 
 afterEach(cleanup);
@@ -149,5 +149,56 @@ describe('label editors in a Turkish-only class (S20d, D-172)', () => {
     expect(within(editor).queryByLabelText(field(en['routines.name'], 'en'))).toBeNull();
     fireEvent.change(within(editor).getByLabelText(en['routines.scope']), { target: { value: 'c-en' } });
     expect(within(editor).queryByLabelText(field(stage, 'tr'))).toBeNull();
+  });
+});
+
+describe('Goals library: labels stored per subject and teacher (S20d review fix, D-172)', () => {
+  // A Turkish-only class and an English-only class of the same subject; a maths class alone in its subject.
+  const SUBJECT_CONTEXTS = [ctx('g-tr', '3-A', 'tr', false), ctx('g-en', '3-B', 'en', false), { ...ctx('m-tr', '3-A', 'tr', false), subjectId: 'subject-maths' }];
+  const library = {
+    categories: [{ id: 'cat1', name: { en: 'Reading', tr: 'Okuma' }, icon: null, subjectId: null, custom: false, archived: false, schoolArchived: false }],
+    presets: [],
+    starters: [],
+    outcomes: DEFAULT_GOAL_OUTCOMES,
+  };
+  function libraryClient() {
+    const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+    qc.setQueryData(['classroom', 'contexts'], { contexts: SUBJECT_CONTEXTS, media: {}, modulesAvailable: {} });
+    for (const id of ['g-tr', 'g-en', 'm-tr']) qc.setQueryData([SENSITIVE, 'teacher', 'goals', 'library', id], library);
+    return qc;
+  }
+  const labels = [en['goals.categoryName'], en['goals.presetText'], en['goals.starters.text']];
+
+  it('a category, ready-made goal or starter added from the Turkish-only class reaches the English-only class too: both fields there and here', () => {
+    const qc = libraryClient();
+    for (const id of ['g-tr', 'g-en']) {
+      cleanup();
+      wrap(qc, <LibraryTab contextId={id} />);
+      for (const label of labels) {
+        expect(screen.getByLabelText(field(label, 'en'))).toBeTruthy();
+        expect(screen.getByLabelText(field(label, 'tr'))).toBeTruthy();
+      }
+    }
+  });
+
+  it('when every class of the subject is Turkish-only: Turkish fields only', () => {
+    const qc = libraryClient();
+    wrap(qc, <LibraryTab contextId="m-tr" />);
+    for (const label of labels) {
+      expect(screen.queryByLabelText(field(label, 'en'))).toBeNull();
+      expect(screen.getByLabelText(field(label, 'tr'))).toBeTruthy();
+    }
+  });
+
+  it('useSubjectEditorLocales: the union of the languages of the teacher classes in the subject', () => {
+    const qc = libraryClient();
+    function Show({ id }: { id: string }) {
+      return <output data-testid="locales">{useSubjectEditorLocales(id).join(',')}</output>;
+    }
+    wrap(qc, <Show id="g-en" />);
+    expect(screen.getByTestId('locales').textContent).toBe('tr,en');
+    cleanup();
+    wrap(qc, <Show id="m-tr" />);
+    expect(screen.getByTestId('locales').textContent).toBe('tr');
   });
 });

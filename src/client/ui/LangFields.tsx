@@ -6,7 +6,8 @@
  * translation" (the classroom then shows the other language as a fallback).
  * S20d (D-172): every teacher-editable class-facing label editor uses it (lesson topics, assistant
  * duties, achievements, routines and their stages, counter labels and responses, homework statuses,
- * goal categories, ready-made goals and outcomes, arrangement, group and role names). Field labels
+ * goal categories, ready-made goals, own sentence starters and outcomes, arrangement, group and role
+ * names). Field labels
  * name the language in the teacher's interface language ("Stage 1 (Turkish)").
  */
 import { useMemo } from 'react';
@@ -32,6 +33,18 @@ export function useEditorLocales(contextIds?: readonly (string | null | undefine
   }, [q.data, key]);
 }
 
+/**
+ * Languages for labels stored per subject and teacher rather than per class (goal categories,
+ * ready-made goals and the teacher's own sentence starters): they reach every one of the teacher's
+ * classes in this context's subject, so the editor offers the languages of all of them (review fix, D-172).
+ */
+export function useSubjectEditorLocales(contextId: string): ClassLocale[] {
+  const q = useQuery({ queryKey: ['classroom', 'contexts'], queryFn: () => call(School.myContexts, {}) });
+  const all = q.data?.contexts ?? [];
+  const subjectId = all.find((c) => c.id === contextId)?.subjectId;
+  return useEditorLocales(subjectId ? all.filter((c) => c.subjectId === subjectId).map((c) => c.id) : [contextId]);
+}
+
 export function LangFields({
   label,
   value,
@@ -40,6 +53,7 @@ export function LangFields({
   testId,
   description,
   autoFocus,
+  maxLength,
 }: {
   label: string;
   value: LocalizedTextValue;
@@ -49,6 +63,7 @@ export function LangFields({
   /** A hint under the first (main language) field. */
   description?: string | undefined;
   autoFocus?: boolean | undefined;
+  maxLength?: number | undefined;
 }) {
   const { t } = useI18n();
   const missing = needsTranslation(value, { mainLanguage: locales[0] ?? 'en', secondLanguageEnabled: locales.length > 1 });
@@ -62,6 +77,7 @@ export function LangFields({
             onChange={(v) => onChange({ ...value, [l]: v })}
             {...(i === 0 && description ? { description } : {})}
             {...(i === 0 && autoFocus ? { autoFocus } : {})}
+            {...(maxLength ? { maxLength } : {})}
           />
           {missing.includes(l) ? (
             <span className="cc-chip cc-chip--warning" data-testid="needs-translation">
