@@ -53,12 +53,19 @@ test('Admin → AI tools: the setup checklist ticks as the administrator works t
     await item('enabled').getByRole('button', { name: 'Switch AI tools on' }).click();
     await expect(item('enabled')).toHaveAttribute('data-status', 'done');
     await expect(item('enabled')).toContainText('Done');
+    // Another administrator removes claude.ai after this page loaded (a second tab): the one-click add
+    // appends on the server and must not put claude.ai back from this page's cached list.
+    expect((await api(page, 'PUT', '/api/admin/ai-tools/redirect-hosts', { hosts: [] })).status).toBe(200);
     await item('host-chatgpt').getByRole('button', { name: 'Allow chatgpt.com' }).click();
     await expect(page.getByText('chatgpt.com is allowed')).toBeVisible();
     await expect(item('host-chatgpt')).toHaveAttribute('data-status', 'done');
-    await expect.poll(async () => (await api(page, 'GET', '/api/admin/ai-tools')).body.redirectHosts).toEqual(['claude.ai', 'chatgpt.com']);
+    await expect.poll(async () => (await api(page, 'GET', '/api/admin/ai-tools')).body.redirectHosts).toEqual(['chatgpt.com']);
+    await expect(item('host-claude')).toHaveAttribute('data-status', 'todo');
+    await item('host-claude').getByRole('button', { name: 'Allow claude.ai' }).click();
+    await expect(item('host-claude')).toHaveAttribute('data-status', 'done');
+    await expect.poll(async () => (await api(page, 'GET', '/api/admin/ai-tools')).body.redirectHosts).toEqual(['chatgpt.com', 'claude.ai']);
     // The hosts field below shows the new list too.
-    await expect(page.getByRole('textbox', { name: 'Hosts' })).toHaveValue('claude.ai\nchatgpt.com');
+    await expect(page.getByRole('textbox', { name: 'Hosts' })).toHaveValue('chatgpt.com\nclaude.ai');
     await axeAtWidths(page);
     // The audit log names the change.
     await page.goto('/admin/audit');
@@ -82,6 +89,9 @@ test('Profile → AI tools: a teacher walks the ChatGPT and Claude Code paths, c
     const section = page.getByTestId('ai-tools');
     await expect(section.getByTestId('ai-off')).toContainText('Please ask your administrator');
     await expect(section.getByText('Open Admin → AI tools and switch on "AI tools are on".')).toBeVisible();
+    // Numbered steps really show their numbers ("I am stuck at step 3").
+    await expect(section.getByTestId('ai-off').locator('ol.cc-ai-steps')).toHaveCSS('list-style-type', 'decimal');
+    await expect(section.getByTestId('ai-off').locator('ol.cc-ai-steps > li').first()).toHaveCSS('list-style-type', 'decimal');
 
     expect((await api(admin, 'PUT', '/api/admin/ai-tools', { mcpEnabled: true })).status).toBe(200);
     await page.reload();
@@ -93,6 +103,10 @@ test('Profile → AI tools: a teacher walks the ChatGPT and Claude Code paths, c
     // ChatGPT (chosen first): OAuth, the exact address, and "ask your administrator" until chatgpt.com is allowed.
     await expect(connect.getByTestId('ai-panel')).toHaveAttribute('data-app', 'chatgpt');
     await expect(connect.getByTestId('ai-method')).toContainText('consent page');
+    await expect(connect.getByTestId('ai-steps')).toHaveCSS('list-style-type', 'decimal');
+    await expect(connect.getByTestId('ai-steps').locator('> li').first()).toHaveCSS('list-style-type', 'decimal');
+    await expect(connect.getByTestId('ai-steps').locator('> li').first()).toHaveCSS('display', 'list-item');
+    await expect(connect.getByTestId('ai-steps')).toContainText('Create as a plugin');
     await expect(connect.getByTestId('ai-host-blocked')).toContainText('Ask your administrator to add chatgpt.com');
     const url = (await connect.getByTestId('ai-copy-url-text').innerText()).trim();
     expect(url).toMatch(/^https?:\/\/[^/]+\/mcp$/u);

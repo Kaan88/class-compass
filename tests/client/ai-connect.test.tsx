@@ -138,5 +138,17 @@ describe('Connect an AI app (S19c, D-181)', () => {
     expect(screen.getByRole('heading', { name: tr['aiConnect.title'] })).toBeTruthy();
     expect(screen.getByText(tr['aiConnect.chatgpt.step3'])).toBeTruthy();
     expect(screen.getByRole('button', { name: tr['aiConnect.check'] })).toBeTruthy();
+    // Natural Turkish (review of S19c): no doubled possessive, and the app name takes "uygulamasını".
+    expect(screen.getByText('Okulunuzun Sınıf Pusulası')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'ChatGPT uygulamasını bağlayın' })).toBeTruthy();
+    expect(document.body.textContent).not.toContain('Pusulası’sı');
+  });
+
+  it('ChatGPT steps follow OpenAI’s documented flow: create as a plugin, then @ in a new chat signs in', () => {
+    mount(setup());
+    const steps = screen.getByTestId('ai-steps');
+    expect(steps.textContent).toContain('Create as a plugin');
+    expect(steps.textContent).toContain('type @');
+    expect(steps.textContent).toContain('description');
   });
 });

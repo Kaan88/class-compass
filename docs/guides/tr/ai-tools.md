@@ -52,7 +52,16 @@ Yapay zekâ araçlarını kapatmak, bütün bağlı uygulamaların bağlantısı
 
 ## Cloudflare Access
 
-Okulunuz Sınıf Pusulası’na Cloudflare Access üzerinden ulaşıyorsa, bilişim sorumlusunun `/mcp` adresini, yapay zekâ uygulamalarının giriş adreslerini (`/oauth/register`, `/oauth/token`, `/oauth/revoke`) ve bulma adreslerini (`/.well-known/oauth-…`) dışarıda bırakması gerekir (bkz. `docs/OPERATIONS.md`, "AI tools"): bir yapay zekâ aracı Cloudflare’e giriş yapamaz. ChatGPT ve Claude bu adresleri kendi sunucularından çağırır; Claude Code ise öğretmenin bilgisayarından çağırır. Bu yüzden orada çalışan bir öğretmen için ya o adresin geçirilmesi ya da bir Access hizmet anahtarı (service token) gerekir (Claude Code sayfası, iki başlığıyla birlikte komutu gösterir).
+Okulunuz Sınıf Pusulası’na Cloudflare Access üzerinden ulaşıyorsa, bilişim sorumlusunun bazı adresleri geçirmesi gerekir: bir yapay zekâ aracı Cloudflare’e giriş yapamaz. ChatGPT ve Claude bu adresleri kendi sunucularından çağırır; Claude Code ise öğretmenin bilgisayarından çağırır. Bu yüzden orada çalışan bir öğretmen için ya o adresin geçirilmesi ya da bir Access hizmet anahtarı (service token) gerekir (Claude Code sayfası, iki başlığıyla birlikte komutu gösterir). Bunu yalnızca okul yapay zekâ araçlarını kullanmak istiyorsa yapın; yapılmazsa yapay zekâ araçları bağlanamaz, Sınıf Pusulası’nın geri kalanı etkilenmez.
+
+Bilişim sorumlusunun Cloudflare Zero Trust → Access → Applications altında yapacakları (kaynak koddaki `docs/OPERATIONS.md` dosyasının "AI tools" bölümüyle aynı):
+
+1. Okulun adresinde tam olarak şu yolları kapsayan bir **self-hosted application** ekleyin: `/mcp`, `/.well-known/oauth-protected-resource`, `/.well-known/oauth-protected-resource/mcp`, `/.well-known/oauth-authorization-server`, `/oauth/register`, `/oauth/token` ve `/oauth/revoke`.
+2. Ona eylemi **Bypass** olan tek bir kural (policy) verin, kapsamı **Everyone** olsun (ya da daha sıkı olarak yalnızca yapay zekâ sağlayıcılarının yayımladığı adres aralıkları; OpenAI listesini değiştirir, en az ayda bir yenileyin).
+3. Bu yollara bunun yerine daha geniş ve daha sıkı bir uygulamanın (örneğin `*.<alan adı>`) uygulanmadığını denetleyin.
+4. `/oauth/authorize` adresini ve izin sayfası `/oauth/consent`’i normal Access girişinin arkasında bırakın: bunlar öğretmenin kendi tarayıcısında açılır ve tarayıcı, uygulamanın geri kalanında olduğu gibi Access’ten geçer.
+
+Bu adresler girişi kendileri denetler (anahtar, okul anahtarı, hesap) ve tarayıcı çerezlerini kabul etmez; böylece uygulamanın geri kalanı Access arkasında kalır.
 
 ## Bir yapay zekâ uygulaması bağlayın
 
@@ -74,10 +83,10 @@ Kişisel anahtarlarınız ve bağlı uygulamalarınız **Gelişmiş: kişisel an
 ChatGPT, **özel MCP sunucusu** olarak bağlanır (OpenAI buna uygulama ya da eklenti der) ve izin sayfasında giriş yapar; anahtar yapıştırmazsınız. Okul yöneticisinin önce `chatgpt.com` adresine izin vermiş olması gerekir. Denerken yalnızca kurgusal veriler kullanın ve yalnızca okulunuz ChatGPT kullanmayı kabul ettiyse bağlayın.
 
 1. ChatGPT’de **Plugins** sayfasını açın (`chatgpt.com/plugins`), **+** düğmesine basın ve **Add custom MCP server**’ı seçin. Business, Enterprise ya da Edu çalışma alanlarında önce bir yöneticinin özel MCP sunucularına (geliştirici modu) izin vermesi gerekebilir; her planda bu seçenek yoktur.
-2. **Name**: Class Compass. **Connection**: Public endpoint. **MCP server URL**: Profil ve PIN → Yapay zekâ araçları bölümünde görünen adres; örneğin `https://school.example.org/mcp`.
+2. **Name**: Class Compass; yanına kısa bir **Description** (açıklama; örneğin "Okuldaki sınıflarım"). **Connection**: Public endpoint. **MCP server URL**: Profil ve PIN → Yapay zekâ araçları bölümünde görünen adres; örneğin `https://school.example.org/mcp`.
 3. **Authentication**: OAuth. İstemci kimliğini ve gizli anahtarı (client ID, secret) boş bırakın: ChatGPT kendini Sınıf Pusulası’na kendisi kaydeder.
-4. Uyarıyı okuyun, onaylayın ve oluşturun. ChatGPT okulunuzun Sınıf Pusulası’nı açar: giriş yapın (sınıf bilgisayarında önce PIN), izin sayfasını okuyun ve şifrenizle **İzin ver**’e basın. ChatGPT `chatgpt.com`’a döner.
-5. Bir sohbette Class Compass’ı açın ve örneğin şunu sorun: "Sınıf Pusulası’ndaki sınıflarımı listele." Sonra Profil sayfasında **Bağlantıyı denetle**’ye basın.
+4. Risk uyarısını okuyun, **I understand and want to continue**’yu, ardından **Create as a plugin**’i seçin. ChatGPT’nin bulduğu araçlara göz atın ve eklentiyi yükleyin.
+5. Yeni bir sohbet başlatın, **@** yazıp Class Compass’ı seçin ve örneğin şunu sorun: "Sınıflarımı listele." İlk seferde ChatGPT okulunuzun Sınıf Pusulası’nı açar: giriş yapın (sınıf bilgisayarında önce PIN), izin sayfasını okuyun ve şifrenizle **İzin ver**’e basın; ChatGPT `chatgpt.com`’a döner ve yanıtlar. Sonra Profil sayfasında **Bağlantıyı denetle**’ye basın.
 
 ## Kişisel anahtar oluşturma
 

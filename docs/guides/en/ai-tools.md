@@ -52,7 +52,16 @@ Switching AI tools off disconnects every connected app.
 
 ## Cloudflare Access
 
-If your school reaches Class Compass through Cloudflare Access, the IT person must let `/mcp`, the sign-in addresses for AI apps (`/oauth/register`, `/oauth/token`, `/oauth/revoke`) and their discovery addresses (`/.well-known/oauth-…`) through (see `docs/OPERATIONS.md`, "AI tools"): an AI tool cannot sign in to Cloudflare. ChatGPT and Claude call these addresses from their own servers; Claude Code calls them from the teacher's computer, so a teacher there needs either that address let through or an Access service token (the Claude Code page shows the command with its two headers).
+If your school reaches Class Compass through Cloudflare Access, the IT person must let some addresses through: an AI tool cannot sign in to Cloudflare. ChatGPT and Claude call these addresses from their own servers; Claude Code calls them from the teacher's computer, so a teacher there needs either that address let through or an Access service token (the Claude Code page shows the command with its two headers). Do this only when the school wants AI tools; without it AI tools simply cannot connect, and the rest of Class Compass is not affected.
+
+What the IT person sets up in Cloudflare Zero Trust → Access → Applications (the same as `docs/OPERATIONS.md`, section "AI tools", in the source code):
+
+1. Add a **self-hosted application** on the school's hostname that covers exactly these paths: `/mcp`, `/.well-known/oauth-protected-resource`, `/.well-known/oauth-protected-resource/mcp`, `/.well-known/oauth-authorization-server`, `/oauth/register`, `/oauth/token` and `/oauth/revoke`.
+2. Give it one policy with the action **Bypass**, including **Everyone** (or, stricter, only the AI providers' published address ranges; OpenAI changes its list, so refresh it at least monthly).
+3. Check that no wider application (for example `*.<domain>`) with a stricter policy applies to these paths instead.
+4. Leave `/oauth/authorize` and the consent page `/oauth/consent` behind the normal Access sign-in: they open in the teacher's own browser, which passes Access as for the rest of the app.
+
+These addresses check their own sign-in (the bearer token, the school switch, the account) and refuse browser cookies, so the rest of the app stays behind Access.
 
 ## Connect an AI app
 
@@ -74,10 +83,10 @@ Your personal tokens and connected apps are under **Advanced: personal tokens an
 ChatGPT connects as a **custom MCP server** (OpenAI calls it an app or plugin) and signs in on the consent page; you do not paste a token. The school's administrator must have allowed `chatgpt.com` first. Use only fictional data while you are trying it out, and only if your school has agreed to use ChatGPT.
 
 1. In ChatGPT open **Plugins** (`chatgpt.com/plugins`), press **+** and choose **Add custom MCP server**. On a Business, Enterprise or Edu workspace an owner may have to allow custom MCP servers (developer mode) first; not every plan offers it.
-2. **Name**: Class Compass. **Connection**: Public endpoint. **MCP server URL**: the address Profile → AI tools shows, for example `https://school.example.org/mcp`.
+2. **Name**: Class Compass, with a short **Description** (for example "My classes at school"). **Connection**: Public endpoint. **MCP server URL**: the address Profile → AI tools shows, for example `https://school.example.org/mcp`.
 3. **Authentication**: OAuth. Leave the client ID and secret empty: ChatGPT registers itself with Class Compass.
-4. Read the warning, confirm and create it. ChatGPT opens your school's Class Compass: sign in (on a classroom computer the PIN first), read the consent page and press **Allow** with your password. ChatGPT returns to `chatgpt.com`.
-5. In a chat, turn Class Compass on and ask, for example: "Use Class Compass: list my classes." Then press **Check connection** on the Profile.
+4. Read the risk warning, choose **I understand and want to continue** and then **Create as a plugin**. Look over the tools ChatGPT found and install the plugin.
+5. Start a new chat, type **@**, pick Class Compass and ask, for example: "List my classes." The first time, ChatGPT opens your school's Class Compass: sign in (on a classroom computer the PIN first), read the consent page and press **Allow** with your password; ChatGPT returns to `chatgpt.com` and answers. Then press **Check connection** on the Profile.
 
 ## Make a personal token
 

@@ -95,8 +95,9 @@ function SetupChecklist({ data, onSwitchOn }: { data: M.AiToolsAdmin; onSwitchOn
   const { t, locale } = useI18n();
   const run = useRun();
   const fmt = new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-  const addHost = (host: string) =>
-    void run(() => call(O.setOAuthRedirectHosts, { hosts: [...data.redirectHosts.filter((h) => h !== host), host] }), { success: t('aiTools.admin.check.hostAdded', { host }), invalidate: [AI_ADMIN_KEY, AI_SETUP_KEY] });
+  // The server appends the documented host to its current list (never this page's cached copy).
+  const addHost = (app: AiReturnHostApp, host: string) =>
+    void run(() => call(O.addDocumentedOAuthRedirectHost, { app }), { success: t('aiTools.admin.check.hostAdded', { host }), invalidate: [AI_ADMIN_KEY, AI_SETUP_KEY] });
   const hostItem = (app: AiReturnHostApp) => {
     const host = AI_APP_RETURN_HOSTS[app];
     const ok = data.redirectHosts.includes(host);
@@ -105,7 +106,7 @@ function SetupChecklist({ data, onSwitchOn }: { data: M.AiToolsAdmin; onSwitchOn
         <p style={{ margin: 0 }}>{t(`aiTools.admin.check.hostHint.${app}` as const, { host })}</p>
         {ok ? null : (
           <div>
-            <Button onPress={() => addHost(host)} data-testid={`ai-add-host-${app}`}>
+            <Button onPress={() => addHost(app, host)} data-testid={`ai-add-host-${app}`}>
               <IconPlus />
               {t('aiTools.admin.check.addHost', { host })}
             </Button>

@@ -6,7 +6,7 @@ import { route, setMcpResolver } from '../../lib/http.ts';
 import { accountView, adminRevoke, adminView, createToken, resolveBearer, revokeOwn, setSettings } from './tokens.ts';
 import { setupView } from './setup.ts';
 import { registerMcpTransport } from './transport.ts';
-import { adminDisconnect, adminRevokeClient, decide, disconnectOwn, requestView, setRedirectHosts } from './oauth/consent.ts';
+import { addDocumentedRedirectHost, adminDisconnect, adminRevokeClient, decide, disconnectOwn, requestView, setRedirectHosts } from './oauth/consent.ts';
 import { registerOAuthProtocol } from './oauth/protocol.ts';
 
 export function registerMcpRoutes(app: FastifyInstance, deps: AppDeps) {
@@ -31,6 +31,7 @@ export function registerMcpRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, O.adminRevokeAiConnection, (ctx, input) => adminDisconnect(ctx, input.connectionId));
   route(app, deps, O.adminRevokeOAuthClient, (ctx, input) => adminRevokeClient(ctx, input.clientRowId));
   route(app, deps, O.setOAuthRedirectHosts, (ctx, input) => setRedirectHosts(ctx, input));
+  route(app, deps, O.addDocumentedOAuthRedirectHost, (ctx, input) => addDocumentedRedirectHost(ctx, input));
   // The protocol endpoints (`oauth` access class): discovery, registration, authorize, token, revoke.
   registerOAuthProtocol(app, deps);
 }

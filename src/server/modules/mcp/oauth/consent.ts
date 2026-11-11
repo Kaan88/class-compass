@@ -15,7 +15,7 @@ import type { FastifyRequest } from 'fastify';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type * as O from '../../../../shared/contracts/oauth.ts';
-import { MCP_SCOPES, MCP_TOKEN_DEFAULT_DAYS, OAUTH_CODE_SECONDS, OAUTH_CONNECTIONS_PER_USER, OAUTH_IGNORED_SCOPES, READ_SCOPES, scopesForRole, type McpScope } from '../../../../shared/mcp.ts';
+import { AI_APP_RETURN_HOSTS, MCP_SCOPES, MCP_TOKEN_DEFAULT_DAYS, OAUTH_CODE_SECONDS, OAUTH_CONNECTIONS_PER_USER, OAUTH_IGNORED_SCOPES, OAUTH_REDIRECT_HOSTS_MAX, READ_SCOPES, scopesForRole, type McpScope } from '../../../../shared/mcp.ts';
 import { tx } from '../../../db/client.ts';
 import { oauthClients, oauthCodes, oauthGrants, oauthRequests, schoolSettings } from '../../../db/schema.ts';
 import { audit } from '../../../lib/audit.ts';
@@ -207,4 +207,23 @@ export function setRedirectHosts(ctx: RequestContext, input: In<typeof O.setOAut
     audit(ctx.db, ctx.actor, { action: 'school.oauth_redirect_hosts', entity: 'school_settings', entityId: '1', before: { hosts: before }, after: { hosts } }, now);
   });
   return { hosts };
+}
+
+/**
+ * One-click "Allow <host>" of the admin setup checklist (S19c, D-181): appends the documented return host
+ * of `app` to the current allow-list read inside the transaction (never a list the browser cached), so a
+ * host removed meanwhile is not put back. Does nothing (and writes no audit row) when the host is already there.
+ */
+export function addDocumentedRedirectHost(ctx: RequestContext, input: In<typeof O.addDocumentedOAuthRedirectHost>) {
+  const host = AI_APP_RETURN_HOSTS[input.app];
+  const now = ctx.now();
+  return tx(ctx.db, () => {
+    const before = redirectHosts(ctx.db);
+    if (before.includes(host)) return { hosts: before };
+    if (before.length >= OAUTH_REDIRECT_HOSTS_MAX) throw invalid('Too many allowed hosts', { reason: 'TOO_MANY_HOSTS' });
+    const hosts = [...before, host];
+    ctx.db.update(schoolSettings).set({ oauthRedirectHostsJson: hosts, updatedAt: now }).where(eq(schoolSettings.id, 1)).run();
+    audit(ctx.db, ctx.actor, { action: 'school.oauth_redirect_hosts', entity: 'school_settings', entityId: '1', before: { hosts: before }, after: { hosts } }, now);
+    return { hosts };
+  });
 }

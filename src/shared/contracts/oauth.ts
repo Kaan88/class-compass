@@ -12,7 +12,7 @@
  *   be ended; administrators also see registered apps and edit the redirect host allow-list.
  */
 import { z } from 'zod';
-import { MCP_TOKEN_MAX_DAYS, OAUTH_PATHS, OAUTH_REDIRECT_HOSTS_MAX, OAUTH_WELL_KNOWN } from '../mcp.ts';
+import { AI_APP_RETURN_HOSTS, MCP_TOKEN_MAX_DAYS, OAUTH_PATHS, OAUTH_REDIRECT_HOSTS_MAX, OAUTH_WELL_KNOWN } from '../mcp.ts';
 import { endpoint, Ok } from './define.ts';
 import { AiPrivacyMode, McpScopeSchema } from './mcp.ts';
 export { AdminAiConnection, AiConnection, OAuthClientView } from './mcp.ts';
@@ -87,5 +87,17 @@ export const setOAuthRedirectHosts = endpoint({
   path: '/api/admin/ai-tools/redirect-hosts',
   access: 'admin',
   input: z.object({ hosts: z.array(z.string().trim().min(1).max(253)).max(OAUTH_REDIRECT_HOSTS_MAX) }),
+  output: z.object({ hosts: z.array(z.string()) }),
+});
+/**
+ * Adds the documented return host of one app (`AI_APP_RETURN_HOSTS`: `claude.ai`, `chatgpt.com`) to the
+ * allow-list on the server, inside one transaction, so the checklist's one-click button never sends the
+ * whole list back (a host another administrator removed meanwhile stays removed). Audited (S19c, D-181).
+ */
+export const addDocumentedOAuthRedirectHost = endpoint({
+  method: 'POST',
+  path: '/api/admin/ai-tools/redirect-hosts/documented',
+  access: 'admin',
+  input: z.object({ app: z.enum(Object.keys(AI_APP_RETURN_HOSTS) as [keyof typeof AI_APP_RETURN_HOSTS, ...(keyof typeof AI_APP_RETURN_HOSTS)[]]) }),
   output: z.object({ hosts: z.array(z.string()) }),
 });

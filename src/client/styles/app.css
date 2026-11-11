@@ -6802,16 +6802,24 @@ html[data-cursor='off'] * {
   font-size: 1rem;
   font-weight: 700;
 }
+/* Numbered on purpose ("I am stuck at step 3"): restore the numbers an ancestor's list reset would
+   otherwise inherit, and space the steps without flex so each li stays a list item with its marker. */
 .cc-ai-steps {
   margin: 0;
-  padding-inline-start: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+  padding-inline-start: 1.75rem;
+  list-style: decimal outside;
   overflow-wrap: anywhere;
 }
 .cc-ai-steps > li {
+  display: list-item;
+  list-style: inherit;
   min-width: 0;
+}
+.cc-ai-steps > li + li {
+  margin-block-start: 0.6rem;
+}
+.cc-ai-steps > li::marker {
+  font-weight: 700;
 }
 .cc-ai-copyable {
   display: flex;

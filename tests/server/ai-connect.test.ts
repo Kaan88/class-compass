@@ -148,6 +148,24 @@ describe('GET /api/account/ai-tools/setup (D-181)', () => {
     }
   });
 
+  it('adds a documented return host on the server, never putting back a host removed meanwhile (D-181)', async () => {
+    try {
+      // Another administrator removed claude.ai after this page loaded; the one-click add of chatgpt.com
+      // appends to the server's current list, so claude.ai stays removed.
+      await ok(s.admin.put('/api/admin/ai-tools/redirect-hosts', { hosts: ['school-app.example.org'] }));
+      const r = await ok(s.admin.post('/api/admin/ai-tools/redirect-hosts/documented', { app: 'chatgpt' }));
+      expect(r.hosts).toEqual(['school-app.example.org', 'chatgpt.com']);
+      // Adding it again changes nothing.
+      expect((await ok(s.admin.post('/api/admin/ai-tools/redirect-hosts/documented', { app: 'chatgpt' }))).hosts).toEqual(['school-app.example.org', 'chatgpt.com']);
+      // Only the documented apps: an arbitrary host or app is refused, and teachers cannot call it.
+      expect((await s.admin.post('/api/admin/ai-tools/redirect-hosts/documented', { app: 'evil.example.org' })).status).toBe(400);
+      expect((await s.teacherA.post('/api/admin/ai-tools/redirect-hosts/documented', { app: 'claude' })).status).toBe(403);
+      expect((await ok(s.admin.get('/api/admin/ai-tools'))).redirectHosts).toEqual(['school-app.example.org', 'chatgpt.com']);
+    } finally {
+      await ok(s.admin.put('/api/admin/ai-tools/redirect-hosts', { hosts: ['claude.ai'] }));
+    }
+  });
+
   it('is an account endpoint: no anonymous access, and a locked classroom device answers 423', async () => {
     const anon = new Client(env);
     expect((await anon.get('/api/account/ai-tools/setup')).status).toBe(401);
