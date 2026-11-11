@@ -98,6 +98,14 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
         </Button>
         {addons.map((a) => (a.summary ? <Fragment key={a.key}>{a.summary}</Fragment> : null))}
         {addons.map((a) => (a.header ? <div key={`${a.key}-header`} className="cc-students-box__header">{a.header}</div> : null))}
+        {/* The cue sits in the heading line, which stays at the top of the box, so it never covers a
+            card or its buttons (S21 review: at the bottom of the box it sat on the cut row). */}
+        {gridOpen && below > 0 ? (
+          <Button size="small" className="cc-students-box__more" onPress={showMore} aria-controls="cc-student-grid" data-testid="students-more">
+            <IconChevronDown />
+            {t('lesson.moreStudents', { count: below })}
+          </Button>
+        ) : null}
       </div>
       {gridOpen ? (
         <div id="cc-student-grid" className="cc-students-box__grid">
@@ -107,12 +115,6 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
             ))}
           </StudentGrid>
         </div>
-      ) : null}
-      {gridOpen && below > 0 ? (
-        <Button size="small" className="cc-students-box__more" onPress={showMore} aria-controls="cc-student-grid" data-testid="students-more">
-          <IconChevronDown />
-          {t('lesson.moreStudents', { count: below })}
-        </Button>
       ) : null}
       {cardStudent ? <StudentCardDialog contextId={context.id} student={cardStudent} onClose={() => setCardFor(null)} /> : null}
     </section>

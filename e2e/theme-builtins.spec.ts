@@ -10,6 +10,8 @@
  * - on a phone the dock is one compact row (its buttons scroll sideways beside End lesson, which stays
  *   in view), every button reachable and fully tappable, at least var(--cc-touch) high, axe clean;
  * - no frame corner sits on a control or on the class name (S17b review);
+ * - the class tabs never break a word that fits on a line of the tab, and the "N more students
+ *   below" cue covers no student card (S21 review);
  * - axe finds nothing serious on the board in any theme.
  * Screenshots go to `CC_SHOTS_DIR` (default test-results/s17b/after). With `CC_SHOTS_ONLY=1` only the
  * screenshots are taken (used once for the "before" set on the S17a code). Fictional demo data only;
@@ -112,6 +114,60 @@ async function cornersOnControls(page: Page) {
   });
 }
 
+/**
+ * The class tabs above the board (S21 review): a word of a tab ("(current)", "English", "progress")
+ * broken over two lines while it would fit on one line of the tab, parts of a tab that overlap, and
+ * a tab off the screen.
+ */
+async function splitTabWords(page: Page) {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    for (const btn of document.querySelectorAll<HTMLElement>('.cc-class-switcher .cc-btn')) {
+      const cs = getComputedStyle(btn);
+      const inner = btn.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const walker = document.createTreeWalker(btn, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = node.textContent ?? '';
+        for (const m of text.matchAll(/\S+/gu)) {
+          const range = document.createRange();
+          range.setStart(node, m.index!);
+          range.setEnd(node, m.index! + m[0].length);
+          const pieces = [...range.getClientRects()].filter((x) => x.width > 0);
+          const width = pieces.reduce((sum, x) => sum + x.width, 0);
+          if (new Set(pieces.map((x) => Math.round(x.top))).size > 1 && width <= inner + 1) out.push(`"${btn.textContent?.trim()}": "${m[0]}" split (${Math.round(width)} px in ${Math.round(inner)} px)`);
+        }
+      }
+      const parts = [...btn.children].map((c) => ({ c, r: c.getBoundingClientRect() })).filter((x) => x.r.width > 0);
+      for (const [i, a] of parts.entries())
+        for (const b of parts.slice(i + 1)) {
+          const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+          const h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+          if (w > 0.5 && h > 0.5) out.push(`"${btn.textContent?.trim()}": ${a.c.getAttribute('class') ?? a.c.tagName} over ${b.c.getAttribute('class') ?? b.c.tagName}`);
+        }
+      const r = btn.getBoundingClientRect();
+      if (r.left < -0.5 || r.right > innerWidth + 0.5) out.push(`"${btn.textContent?.trim()}" off the screen`);
+    }
+    return out;
+  });
+}
+
+/** The "N more students below" cue over a student card, its buttons or its chips (S21 review). */
+async function cueOnCards(page: Page) {
+  return page.evaluate(() => {
+    const cue = document.querySelector<HTMLElement>('[data-testid="students-more"]');
+    if (!cue) return [];
+    const a = cue.getBoundingClientRect();
+    const out: string[] = [];
+    for (const t of document.querySelectorAll<HTMLElement>('.cc-student-card, .cc-student-card button, .cc-student-card [role="button"], .cc-student-card .cc-att-chip')) {
+      const b = t.getBoundingClientRect();
+      const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (w > 0.5 && h > 0.5) out.push(`cue on ${t.getAttribute('class') ?? t.tagName} of "${t.closest('.cc-student-card')?.textContent?.trim().slice(0, 30)}" (${Math.round(w)}x${Math.round(h)} px)`);
+    }
+    return out;
+  });
+}
+
 test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', async ({ browser }) => {
   test.setTimeout(600_000);
   mkdirSync(SHOTS, { recursive: true });
@@ -155,6 +211,9 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
             await expect(page.getByTestId('theme-scene')).toBeVisible();
             expect(await stretchedEdges(page), `${theme} ${size.name}`).toEqual([]);
             expect(await cornersOnControls(page), `${theme} ${size.name} corners on controls`).toEqual([]);
+            // S21 review: tab parts wrap as whole units, and the "more students" cue covers no card.
+            expect(await splitTabWords(page), `${theme} ${size.name} class tabs`).toEqual([]);
+            expect(await cueOnCards(page), `${theme} ${size.name} more-students cue`).toEqual([]);
 
             const exp = (EXPECT as Record<string, (typeof EXPECT)['explorer'] | undefined>)[theme];
             if (exp && !phone) {
@@ -205,6 +264,12 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
                 const row = nav.querySelector<HTMLElement>('.cc-dock__items')!;
                 const end = nav.querySelector<HTMLElement>('.cc-dock__end')!;
                 const out: string[] = [];
+                // The scrolling row ends before End lesson (S21 review): a button cut at the row's edge
+                // is clipped by its own scroll box, never lying under End lesson.
+                const rowBox = row.getBoundingClientRect();
+                const endBox = end.getBoundingClientRect();
+                if (rowBox.right > endBox.left + 0.5) out.push(`row ends at ${Math.round(rowBox.right)}, under End lesson at ${Math.round(endBox.left)}`);
+                if (getComputedStyle(row).overflowX === 'visible') out.push('row does not clip its buttons');
                 for (const b of [...nav.querySelectorAll<HTMLElement>('.cc-btn')].filter((x) => x !== end && x.getClientRects().length > 0)) {
                   row.scrollLeft = 0;
                   b.focus();

@@ -109,7 +109,9 @@ export function ClassSwitcher({
         <Button key={c.id} aria-pressed={c.id === activeId} onPress={() => onSwitch(c.id)}>
           {/* The active class is marked by an icon and visible text, not by colour alone (UX-7, LES-4). */}
           {c.id === activeId ? <IconCheck /> : null}
-          {c.className} · {pickText(c.subjectName, locale)}
+          <span className="cc-class-switcher__name">
+            {c.className} · {pickText(c.subjectName, locale)}
+          </span>
           {c.id === activeId ? <span className="cc-class-switcher__current">{t('classroom.current')}</span> : null}
           {inProgress?.has(c.id) ? (
             <span className="cc-class-switcher__live" data-testid="lesson-in-progress">
