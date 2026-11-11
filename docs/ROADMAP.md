@@ -455,6 +455,7 @@ Decision D-184; migration 0029.
 - [x] Teacher page "Avatar pictures" (Today, count badge): To check with the expiry, the confirmation tick, "Yes, use it", "Not this one" with four reasons; In use with Remove; a notification category; the per-class switch on the Avatars page
 - [x] Administrator: the media flag `media.avatarPictures` (off by default), the same check for every student, "Delete all uploaded pictures" with a typed confirmation; Super Speakers "Show students' own pictures on the board and the scorer" (off by default)
 - [x] Tests: `tests/server/avatar-pictures.test.ts`, `tests/client/picture-editor.test.tsx`, `tests/scripts/docker.test.ts`, `e2e/avatar-uploads.spec.ts` (axe at 375 px and 1536×703)
+- [x] Review fixes: approved pictures kept out of the goals clean-up of loose uploads (stored as uploaded by the system; dead rows swept), nothing shown while the school switch is off (admin list without images), students without a class in the admin list, Mirror after a quarter turn, the HEIC message, the saved-for-later note, no entry for a class that does not take pictures, slider touch size, Turkish "Net görünmüyor"
 - [ ] The editor and the teacher check tried on real phones and tablets, with real camera-roll pictures (owner)
 - [ ] Guide screenshots of the new screens (`npm run docs:screenshots` after the next screenshot pass)
 

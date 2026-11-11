@@ -14,7 +14,7 @@ import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/goals.ts';
 import type { Evidence, Goal, StudentGoalsSection } from '../../../shared/contracts/goals.ts';
 import { tx } from '../../db/client.ts';
-import { evidence, files, goalEntries, goals } from '../../db/schema.ts';
+import { avatarPictures, evidence, files, goalEntries, goals } from '../../db/schema.ts';
 import { emitStudentActivity } from '../../lib/activity.ts';
 import { notify } from '../../lib/notify.ts';
 import type { NotificationCategory } from '../../../shared/notifications.ts';
@@ -329,13 +329,18 @@ export function updateEvidence(ctx: RequestContext, input: In<typeof C.studentUp
   }));
 }
 
-/** The file is this student's own upload and no live evidence shows it any more. */
+/**
+ * The file is this student's own upload and no live evidence shows it any more. Never their own avatar
+ * picture (S24, D-184): approved pictures are recorded as uploaded by the system, and a picture row
+ * pointing at the file keeps it too (review fix: the clean-up below once deleted approved pictures).
+ */
 const isOwnLooseUpload = (ctx: RequestContext, studentId: string, f: FileRow) =>
   f.deletedAt === null &&
   f.ownerStudentId === studentId &&
   f.uploadedByType === 'student' &&
   f.uploadedById === studentId &&
-  !ctx.db.select({ id: evidence.id }).from(evidence).where(and(eq(evidence.fileId, f.id), isNull(evidence.deletedAt))).get();
+  !ctx.db.select({ id: evidence.id }).from(evidence).where(and(eq(evidence.fileId, f.id), isNull(evidence.deletedAt))).get() &&
+  !ctx.db.select({ id: avatarPictures.id }).from(avatarPictures).where(eq(avatarPictures.fileId, f.id)).get();
 
 /**
  * Deleting own evidence (GOL-5) also deletes the file the student uploaded for it when nothing else

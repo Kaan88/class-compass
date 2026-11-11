@@ -375,6 +375,79 @@ describe('backups, exports and erasure (DAT-1, DAT-4, DAT-5)', () => {
   });
 });
 
+describe('review fixes (S24)', () => {
+  it('an approved picture survives the clean-up of loose evidence uploads; a dead row is not "in use" and the sweep removes it', async () => {
+    await openAll();
+    const id = await sendOne();
+    await ok(s.teacherA.post(`/api/teacher/avatar-pictures/${id}/approve`, { confirm: true }));
+    const fileId = rows()[0]!.file_id as string;
+    const file = env.db.$client.prepare('select * from files where id = ?').get(fileId) as any;
+    // Recorded as stored by the system: the student's own-upload rules never match it.
+    expect(file).toMatchObject({ uploaded_by_type: 'system', uploaded_by_id: null, owner_student_id: ada.id });
+    // More than the loose-upload grace later, the student uploads evidence (which runs the clean-up).
+    env.clock.advance(2 * 3600_000);
+    await s.teacherA.login('ayse.teacher');
+    adaPhone = await openLink(env, await linkUrl(s.teacherA, s.c3a.id, ada.id));
+    const pdf = multipart(Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n'), 'my story.pdf', 'application/pdf');
+    await ok(adaPhone.req('POST', '/api/student/files?kind=document', pdf.body, pdf.headers));
+    expect(env.db.$client.prepare('select deleted_at from files where id = ?').get(fileId)).toEqual({ deleted_at: null });
+    expect(fs.existsSync(path.join(env.config.uploadsDir, file.storage_key))).toBe(true);
+    expect(rows()[0]).toMatchObject({ status: 'approved', file_id: fileId });
+    expect((await pageOf(adaPhone)).approvedUrl).toBeTruthy();
+    expect((await ok(s.teacherA.get('/api/classroom/avatars'))).students.find((x: any) => x.id === ada.id).pictureUrl).toBeTruthy();
+    expect((await ok(s.teacherA.get('/api/teacher/avatar-pictures'))).inUse).toHaveLength(1);
+    // The approved file cannot be read or attached as the student's own upload.
+    const attach = await adaPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'file', fileId });
+    expect(attach.status).toBe(404);
+
+    // If the files row goes some other way, the picture is not listed and the sweep removes the row.
+    env.db.$client.prepare('update files set deleted_at = ? where id = ?').run(env.clock.now(), fileId);
+    expect((await ok(s.teacherA.get('/api/teacher/avatar-pictures'))).inUse).toEqual([]);
+    expect(await sweepAvatarPictures(env.deps)).toMatchObject({ dead: 1 });
+    expect(rows()).toEqual([]);
+    expect(env.db.$client.prepare('select count(*) as n from files where id = ?').get(fileId)).toEqual({ n: 0 });
+    expect(auditRows('avatar_picture.remove_missing')).toHaveLength(1);
+  });
+
+  it('while the school switch is off teachers see no pictures and every image is 404; an administrator still sees the list to remove them', async () => {
+    await openAll();
+    const kept = await sendOne();
+    await ok(s.teacherA.post(`/api/teacher/avatar-pictures/${kept}/approve`, { confirm: true }));
+    env.clock.advance(61 * 60_000);
+    const waiting = await sendOne(adaPhone, '#aa3355');
+    await setFlag(false);
+    try {
+      expect(await ok(s.teacherA.get('/api/teacher/avatar-pictures'))).toEqual({ enabled: false, toCheck: [], inUse: [] });
+      expect((await raw(s.teacherA, `/api/teacher/avatar-pictures/${waiting}/image`)).statusCode).toBe(404);
+      expect((await raw(s.teacherA, `/api/teacher/avatar-pictures/${kept}/image`)).statusCode).toBe(404);
+      expect((await raw(s.admin, `/api/admin/avatar-pictures/${kept}/image`)).statusCode).toBe(404);
+      const admin = await ok(s.admin.get('/api/admin/avatar-pictures'));
+      expect(admin.enabled).toBe(false);
+      expect(admin.toCheck.map((x: any) => x.id)).toEqual([waiting]);
+      expect(admin.inUse.map((x: any) => x.id)).toEqual([kept]);
+      // Deleting stays possible.
+      await ok(s.admin.req('DELETE', `/api/admin/avatar-pictures/${kept}`, {}));
+      expect(rows().map((x) => x.id)).toEqual([waiting]);
+    } finally {
+      await setFlag(true);
+    }
+    expect((await raw(s.teacherA, `/api/teacher/avatar-pictures/${waiting}/image`)).statusCode).toBe(200);
+  });
+
+  it('the administrator list keeps the pictures of a student without a class now, so they can be removed', async () => {
+    await openAll();
+    const id = await sendOne();
+    await ok(s.teacherA.post(`/api/teacher/avatar-pictures/${id}/approve`, { confirm: true }));
+    // The enrolment ended (e.g. the student left at the end of a term): no live class any more.
+    env.db.$client.prepare('update enrolments set to_date = from_date where student_id = ?').run(ada.id);
+    const admin = await ok(s.admin.get('/api/admin/avatar-pictures'));
+    expect(admin.inUse).toEqual([expect.objectContaining({ id, studentName: 'Ada Kurgu', classId: null, className: null })]);
+    expect((await ok(s.teacherA.get('/api/teacher/avatar-pictures'))).inUse).toEqual([]);
+    await ok(s.admin.req('DELETE', `/api/admin/avatar-pictures/${id}`, {}));
+    expect(rows()).toEqual([]);
+  });
+});
+
 describe('Super Speakers (owner decision d)', () => {
   it('the board and the scorer show the avatar until the administrator turns own pictures on', async () => {
     await openAll();

@@ -198,8 +198,9 @@ export const PictureListItem = z.object({
   id: z.string(),
   studentId: z.string(),
   studentName: z.string().meta(pii('studentName')),
-  classId: z.string(),
-  className: z.string(),
+  /** The student's current class; null (administrators only) for a student without a class now. */
+  classId: z.string().nullable(),
+  className: z.string().nullable(),
   status: z.enum(['pending', 'approved']),
   sentAt: z.number(),
   /** Pending: when it is deleted if nobody checks it. */

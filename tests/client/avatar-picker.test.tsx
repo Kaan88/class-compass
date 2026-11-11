@@ -12,6 +12,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
+import { en } from '../../src/shared/i18n/en.ts';
 import { AvatarPanel } from '../../src/client/student/AvatarPanel.tsx';
 import { clashesWith, familyOrder, pickerParts, readyMadeGroups, setPart, surpriseOptions } from '../../src/client/student/avatarPicker.ts';
 import { AVATAR_COLOURS, CREATURE_FAMILY_KEYS, PERSON_PARTS, READY_MADE, TR_WITH, coloursClash, describeAvatar, type CreatureSpec, type PersonSpec } from '../../src/shared/avatars.ts';
@@ -75,6 +76,28 @@ describe('the picker screen', () => {
   };
   const mount = (locale: 'en' | 'tr' = 'en') =>
     render(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(I18nProvider, { locale, children: createElement(AvatarPanel, { info, name: 'Ada' }) })));
+
+  // S24 review fixes (D-184): no "Use my own picture" for a class that does not take pictures, and the
+  // creator says that a saved avatar waits while the student's own picture is in use.
+  it('own picture: hidden while the class does not take pictures; in use, the saved avatar is kept for later', async () => {
+    const withPicture = (picture: Record<string, unknown>) => ({ ...info, picture: { ...info.picture, ...picture } });
+    const at = (i: ReturnType<typeof withPicture>) =>
+      render(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(I18nProvider, { locale: 'en', children: createElement(AvatarPanel, { info: i as typeof info, name: 'Ada', onPicture: () => {} }) })));
+    const classOff = at(withPicture({ state: 'classOff' }));
+    expect(classOff.queryByTestId('avatar-picture-open')).toBeNull();
+    cleanup();
+    const refusedButOff = at(withPicture({ state: 'classOff', refused: { reason: 'hardToSee', at: 1 } }));
+    expect(refusedButOff.getByTestId('avatar-picture-open')).toBeTruthy();
+    cleanup();
+    const open = at(withPicture({ state: 'open' }));
+    expect(open.getByTestId('avatar-picture-open')).toBeTruthy();
+    await act(async () => open.getByTestId('avatar-change').click());
+    expect(open.queryByTestId('avatar-saved-for-later')).toBeNull();
+    cleanup();
+    const inUse = at(withPicture({ state: 'open', approvedUrl: '/api/student/avatar-picture/p1' }));
+    await act(async () => inUse.getByTestId('avatar-change').click());
+    expect(inUse.getByTestId('avatar-saved-for-later').textContent).toContain(en['avatar.picture.savedForLater']);
+  });
 
   it('shows families with thumbnails and one family of ready-made avatars at a time', async () => {
     const { getByTestId, getAllByTestId } = mount();

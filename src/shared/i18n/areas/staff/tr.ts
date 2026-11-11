@@ -2687,6 +2687,7 @@ export const tr = {
   'audit.action.avatar_picture.refuse': 'Kendi avatar resmi reddedildi',
   'audit.action.avatar_picture.delete_all': 'Yüklenen tüm avatar resimleri silindi',
   'audit.action.avatar_picture.expire': 'Bakılmayan avatar resimleri 14 gün sonra silindi',
+  'audit.action.avatar_picture.remove_missing': 'Dosyası kalmamış avatar resimleri listeden kaldırıldı',
   'audit.action.backup.create': 'Yedek alındı',
   'audit.action.backup.verify': 'Yedek doğrulandı',
   'audit.action.class.archive': 'Sınıf arşivlendi',

@@ -13,7 +13,7 @@ import type { StudentPictureInfo } from '../../src/shared/contracts/avatars.ts';
 import { en } from '../../src/shared/i18n/en.ts';
 import { tr } from '../../src/shared/i18n/tr.ts';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
-import PictureEditor, { clampState, keyMove, KEY_STEP, scaleOf, START, turnedSize, ZOOM_MAX } from '../../src/client/student/PictureEditor.tsx';
+import PictureEditor, { applyMatrix, clampState, keyMove, KEY_STEP, pictureMatrix, scaleOf, START, turned, turnedSize, ZOOM_MAX, type EditState } from '../../src/client/student/PictureEditor.tsx';
 import AvatarPictureScreen from '../../src/client/student/AvatarPictureScreen.tsx';
 
 const wrap = (node: ReactNode, locale: 'en' | 'tr' = 'en') => createElement(QueryClientProvider, { client: new QueryClient() }, createElement(I18nProvider, { locale, children: node }));
@@ -38,6 +38,34 @@ describe('editor maths', () => {
     expect(keyMove('ArrowDown', true)).toEqual({ dx: 0, dy: 4 * KEY_STEP });
     expect(keyMove('Enter', false)).toBeNull();
   });
+
+  // Review fix: Mirror flips left-right on the screen after a quarter turn too, and Turn right keeps
+  // turning clockwise as the child sees it while mirrored.
+  it('Mirror is a left-right flip on the screen whatever the turn; turns stay clockwise on screen', () => {
+    // Where the source's top-middle, right-middle and centre land (unit square, no offset).
+    const at = (st: EditState, x: number, y: number) => {
+      const p = applyMatrix(pictureMatrix(512, 512, st, 512), x, y);
+      return { x: Math.round(p.x - 256) + 0, y: Math.round(p.y - 256) + 0 };
+    };
+    const top = (st: EditState) => at(st, 0, -100);
+    // A quarter turn right: the top goes to the right.
+    expect(top({ ...START, turns: 1 })).toEqual({ x: 100, y: 0 });
+    // Mirrored after the turn: the top is on the LEFT (a left-right flip), not at the bottom.
+    for (const turns of [0, 1, 2, 3]) {
+      const plain = top({ ...START, turns });
+      const mirrored = top({ ...START, turns, mirror: true });
+      expect(mirrored).toEqual({ x: 0 - plain.x, y: plain.y });
+    }
+    // Turn right while mirrored: what the child sees turns clockwise (screen (x, y) -> (-y, x)).
+    const m: EditState = { ...START, mirror: true };
+    const before = at(m, 100, 0);
+    const after = at(turned(m, 1), 100, 0);
+    expect(after).toEqual({ x: 0 - before.y, y: before.x });
+    const left = at(turned(m, -1), 100, 0);
+    expect(left).toEqual({ x: before.y, y: 0 - before.x });
+    // Turning puts the picture back in the middle.
+    expect(turned({ ...START, x: 40, y: 10 }, 1)).toMatchObject({ x: 0, y: 0 });
+  });
 });
 
 describe('the editor', () => {
@@ -50,10 +78,8 @@ describe('the editor', () => {
       clearRect: () => {},
       save: () => {},
       restore: () => {},
-      rotate: () => {},
-      scale: () => {},
       drawImage: () => {},
-      translate: (x: number, y: number) => void translates.push([x, y]),
+      setTransform: (_a: number, _b: number, _c: number, _d: number, e: number, f: number) => void translates.push([e, f]),
       set filter(v: string) {
         filters.push(v);
       },
@@ -73,6 +99,7 @@ describe('the editor', () => {
     const zoom = v.getByLabelText(en['avatar.picture.editor.zoom']) as HTMLInputElement;
     const bright = v.getByLabelText(en['avatar.picture.editor.brightness']) as HTMLInputElement;
     expect(zoom.type).toBe('range');
+    expect(zoom.getAttribute('aria-valuetext')).toBe('100 %');
     expect(bright.value).toBe('100');
     for (const id of ['picture-turn-left', 'picture-turn-right', 'picture-mirror', 'picture-reset', 'picture-send', 'picture-choose-another']) expect(v.getByTestId(id)).toBeTruthy();
     const stage = v.getByTestId('picture-stage');
@@ -142,7 +169,8 @@ describe('the "Use my own picture" screen', () => {
     await act(async () => {
       fireEvent.change(input, { target: { files: [new File(['x'], 'IMG_0001.HEIC', { type: 'image/heic' })] } });
     });
-    expect(v.getByRole('alert').textContent).toBe(en['error.IMAGE_HEIC']);
+    // Not the evidence message (it points to a camera button this screen does not have).
+    expect(v.getByRole('alert').textContent).toBe(en['avatar.picture.cannotOpen']);
     expect(v.queryByTestId('picture-editor')).toBeNull();
   });
 

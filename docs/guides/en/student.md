@@ -130,7 +130,7 @@ If your school and your teacher allow it, **My avatar** has a button **Use my ow
 2. Make it fit: drag it, or use the arrow keys, to move it inside the circle. Use **Zoom** and **Brightness**, **Turn left**, **Turn right**, **Mirror** or **Start again**. **How it will look** shows the large and the small card.
 3. Press **Send to my teacher**.
 
-Until your teacher says yes, your class sees your avatar (**Waiting for your teacher**). You can **Take my picture back**. A picture nobody checks is deleted after 14 days. If your teacher says **Not this one**, the picture is deleted at once and you see why; press **Choose another picture** to try again. **Stop using my picture** deletes it and brings your avatar back.
+Until your teacher says yes, your class sees your avatar (**Waiting for your teacher**). You can **Take my picture back**. A picture nobody checks is deleted after 14 days. If your teacher says **Not this one**, the picture is deleted at once and you see why; press **Choose another picture** to try again. **Stop using my picture** deletes it and brings your avatar back. While your own picture is in use you can still change your avatar: it is kept for later and comes back when you stop using your picture.
 
 ## What your teacher can see
 

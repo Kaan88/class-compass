@@ -14,11 +14,15 @@
  * 2. A teacher who teaches the student (or an administrator) decides. "Yes, use it" needs the
  *    confirmation tick (`confirm: true`, else 400 CONFIRM_REQUIRED); the picture is then copied into the
  *    uploads as a `files` row owned by the student (backed up, in both exports, erased with the
- *    student) and the quarantine copy is deleted; a picture approved earlier is deleted. "Not this one"
+ *    student) and the quarantine copy is deleted; a picture approved earlier is deleted. The row is
+ *    recorded as uploaded by the system, not by the student: the student's own-upload rules (evidence
+ *    attach, the goals clean-up of loose uploads, the generic file reads) must never touch it. "Not this one"
  *    needs a reason (400 REASON_REQUIRED) and deletes the picture at once; the row keeps only the reason
  *    for the student. Every decision and removal is audited (who, when, student, reason; never the image).
  * 3. Nobody checked it in `PENDING_DAYS` days: the sweep (start-up and hourly) deletes it.
  * Removing an approved picture deletes the row, the files row and the bytes at once.
+ * While the school switch is off nobody sees a picture: the teachers' lists are empty and every image
+ * endpoint answers 404; an administrator still sees the list without images, to remove or refuse.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -338,18 +342,19 @@ export function listPictures(ctx: RequestContext): PictureList {
   const user = requireUser(ctx);
   const enabled = picturesOn(ctx.db);
   const base = user.role === 'admin' ? 'admin' : 'teacher';
-  // Who is shown: teacher = the students in the classes they teach today; admin = everyone, with a current class.
-  const whereOf = new Map<string, { student: StudentRow; cls: ClassRow }>();
+  // Who is shown: teacher = the students in the classes they teach today (nobody while the school
+  // switch is off); admin = everyone, also students without a class now (so their pictures can be removed).
+  const whereOf = new Map<string, { student: StudentRow; cls: ClassRow | null }>();
   if (user.role === 'admin') {
     const rows = ctx.db.select().from(avatarPictures).all();
     const ids = [...new Set(rows.map((r) => r.studentId))];
     const st = ids.length ? ctx.db.select().from(students).where(inArray(students.id, ids)).all() : [];
     for (const s of st) {
       const clsId = liveClassIdsOf(ctx, s.id)[0];
-      const cls = clsId ? ctx.db.select().from(classes).where(eq(classes.id, clsId)).get() : undefined;
-      if (cls) whereOf.set(s.id, { student: s, cls });
+      const cls = clsId ? (ctx.db.select().from(classes).where(eq(classes.id, clsId)).get() ?? null) : null;
+      whereOf.set(s.id, { student: s, cls });
     }
-  } else {
+  } else if (enabled) {
     const ids = taughtClassIds(ctx.db, user.id);
     const clsRows = ids.length ? ctx.db.select().from(classes).where(inArray(classes.id, ids)).all() : [];
     for (const cls of clsRows) for (const { student } of rosterRows(ctx, cls)) if (!whereOf.has(student.id)) whereOf.set(student.id, { student, cls });
@@ -365,14 +370,19 @@ export function listPictures(ctx: RequestContext): PictureList {
         .all(),
     );
   }
+  // An approved row whose file is gone is not "in use" (the sweep removes such rows).
+  const liveFiles = liveFileIds(
+    ctx.db,
+    rows.flatMap((r) => (r.status === 'approved' && r.fileId ? [r.fileId] : [])),
+  );
   const item = (r: PictureRow): PictureListItem => {
     const w = whereOf.get(r.studentId)!;
     return {
       id: r.id,
       studentId: r.studentId,
       studentName: w.student.fullName,
-      classId: w.cls.id,
-      className: w.cls.name,
+      classId: w.cls?.id ?? null,
+      className: w.cls?.name ?? null,
       status: r.status === 'approved' ? 'approved' : 'pending',
       sentAt: r.createdAt,
       deleteAt: r.status === 'pending' ? (r.expiresAt ?? r.createdAt + PENDING_MS) : null,
@@ -389,10 +399,22 @@ export function listPictures(ctx: RequestContext): PictureList {
       .sort((a, b) => a.createdAt - b.createdAt)
       .map(item),
     inUse: rows
-      .filter((r) => r.status === 'approved')
+      .filter((r) => r.status === 'approved' && r.fileId !== null && liveFiles.has(r.fileId))
       .map(item)
       .sort(byName),
   };
+}
+
+function liveFileIds(db: Db, ids: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (let i = 0; i < ids.length; i += 500)
+    for (const f of db
+      .select({ id: files.id })
+      .from(files)
+      .where(and(inArray(files.id, ids.slice(i, i + 500)), isNull(files.deletedAt)))
+      .all())
+      out.add(f.id);
+  return out;
 }
 
 export function pictureCount(ctx: RequestContext): { enabled: boolean; toCheck: number } {
@@ -441,8 +463,9 @@ export async function approvePicture(ctx: RequestContext, pictureId: string, con
           kind: 'image',
           originalName: 'avatar-picture.webp',
           ownerStudentId: row.studentId,
-          uploadedByType: 'student',
-          uploadedById: row.studentId,
+          // Not 'student': own-upload clean-ups (goals' loose uploads) must never delete it (review fix).
+          uploadedByType: 'system',
+          uploadedById: null,
           createdAt: now,
           deletedAt: null,
         })
@@ -564,7 +587,8 @@ export async function serveStudentPicture(ctx: RequestContext, reply: FastifyRep
 
 export async function serveDeciderPicture(ctx: RequestContext, reply: FastifyReply, pictureId: string) {
   const row = ctx.db.select().from(avatarPictures).where(eq(avatarPictures.id, pictureId)).get();
-  if (!row) throw notFound('Picture');
+  // While the school switch is off nobody sees a picture, administrators included (D-014 pattern).
+  if (!row || !picturesOn(ctx.db)) throw notFound('Picture');
   assertDecider(ctx, row);
   const abs = pathOf(ctx.db, ctx.config, row);
   if (!abs) throw notFound('Picture');
@@ -588,27 +612,34 @@ export const PICTURE_SWEEP_MS = HOUR_MS;
 
 /**
  * Deletes waiting pictures nobody checked in time, refusal notes that ran out, waiting rows whose file
- * is missing (e.g. after a restore: the quarantine is never in a backup) and files in the quarantine
- * folder that no row knows (older than an hour). Counts are audited as the system; never an image.
+ * is missing (e.g. after a restore: the quarantine is never in a backup), approved rows whose files row
+ * is gone or deleted (nothing to show; the row would only keep a dead entry in "In use") and files in
+ * the quarantine folder that no row knows (older than an hour). Counts are audited as the system;
+ * never an image.
  */
-export async function sweepAvatarPictures(deps: Pick<AppDeps, 'db' | 'config' | 'now'>): Promise<{ expired: number; notes: number; orphans: number }> {
+export async function sweepAvatarPictures(deps: Pick<AppDeps, 'db' | 'config' | 'now'>): Promise<{ expired: number; notes: number; dead: number; orphans: number }> {
   const now = deps.now();
-  const rows = deps.db
-    .select()
-    .from(avatarPictures)
-    .where(inArray(avatarPictures.status, ['pending', 'refused']))
-    .all();
+  const rows = deps.db.select().from(avatarPictures).all();
+  const approved = rows.filter((r) => r.status === 'approved');
+  const live = liveFileIds(
+    deps.db,
+    approved.flatMap((r) => (r.fileId ? [r.fileId] : [])),
+  );
   const expired: PictureRow[] = [];
   const notes: PictureRow[] = [];
+  const dead: PictureRow[] = [];
   for (const r of rows) {
-    if (r.status === 'refused') {
+    if (r.status === 'approved') {
+      if (!r.fileId || !live.has(r.fileId)) dead.push(r);
+    } else if (r.status === 'refused') {
       if ((r.expiresAt ?? 0) <= now) notes.push(r);
     } else if ((r.expiresAt ?? 0) <= now || !r.quarantineKey || !fs.existsSync(quarantinePath(deps.config, r.quarantineKey))) expired.push(r);
   }
-  if (expired.length || notes.length) {
+  if (expired.length || notes.length || dead.length) {
     const purged = tx(deps.db, () => {
-      const p = purgeRows(deps.db, [...expired, ...notes]);
+      const p = purgeRows(deps.db, [...expired, ...notes, ...dead]);
       if (expired.length) audit(deps.db, { type: 'system', id: null }, { action: 'avatar_picture.expire', entity: 'avatar_picture', entityId: null, after: { deleted: expired.length } }, now);
+      if (dead.length) audit(deps.db, { type: 'system', id: null }, { action: 'avatar_picture.remove_missing', entity: 'avatar_picture', entityId: null, after: { deleted: dead.length } }, now);
       return p;
     });
     await removeBytes(deps.config as Config, purged);
@@ -646,5 +677,5 @@ export async function sweepAvatarPictures(deps: Pick<AppDeps, 'db' | 'config' | 
   };
   await scan(deps.config.avatarQuarantineDir, false);
   await scan(quarantineTmpDir(deps.config), true);
-  return { expired: expired.length, notes: notes.length, orphans };
+  return { expired: expired.length, notes: notes.length, dead: dead.length, orphans };
 }

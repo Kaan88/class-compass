@@ -13,6 +13,13 @@
   gap: 1rem;
   align-items: flex-start;
 }
+.cc-picture-review__img--hidden {
+  display: grid;
+  place-items: center;
+  padding: 0.75rem;
+  text-align: center;
+  font-size: 0.875rem;
+}
 .cc-picture-review__img {
   width: 8rem;
   height: 8rem;

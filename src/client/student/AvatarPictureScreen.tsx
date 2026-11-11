@@ -13,7 +13,6 @@ import { studentRemovePicture, studentUploadPicture, type StudentPictureInfo } f
 import { formatDate } from '../../shared/i18n/index.ts';
 import { call, upload } from '../lib/api.ts';
 import { errorText } from '../lib/errors.ts';
-import { isHeic } from '../lib/images.ts';
 import { showToast } from '../lib/toast.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from '../ui/Button.tsx';
@@ -104,7 +103,8 @@ export default function AvatarPictureScreen({ info, name }: { info: StudentPictu
     setProblem(null);
     const src = await openPicture(file);
     if (!src) {
-      setProblem(isHeic(file) ? t('error.IMAGE_HEIC') : t('avatar.picture.cannotOpen'));
+      // HEIC included: never the evidence message, which points to a camera button this screen does not have.
+      setProblem(t('avatar.picture.cannotOpen'));
       return;
     }
     setSource(src);

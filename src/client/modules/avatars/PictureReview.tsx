@@ -43,15 +43,28 @@ function useWhen() {
 }
 
 function Who({ item, scope }: { item: Av.PictureListItem; scope: ReviewScope }) {
+  const { t } = useI18n();
   return (
     <div className="cc-stack cc-picture-review__who">
-      <strong>{scope === 'teacher' ? <StudentName id={item.studentId} name={item.studentName} classId={item.classId} /> : item.studentName}</strong>
-      <span className="cc-muted">{item.className}</span>
+      <strong>{scope === 'teacher' ? <StudentName id={item.studentId} name={item.studentName} classId={item.classId ?? undefined} /> : item.studentName}</strong>
+      <span className="cc-muted">{item.className ?? t('avatarPictures.noClass')}</span>
     </div>
   );
 }
 
-function ToCheck({ item, scope, invalidate }: { item: Av.PictureListItem; scope: ReviewScope; invalidate: readonly (readonly unknown[])[] }) {
+/** The picture; while the school switch is off nobody sees it (the server answers 404 too). */
+function Picture({ item, shown }: { item: Av.PictureListItem; shown: boolean }) {
+  const { t } = useI18n();
+  return shown ? (
+    <img className="cc-picture-review__img" src={item.url} alt={t('avatarPictures.alt', { name: item.studentName })} />
+  ) : (
+    <span className="cc-picture-review__img cc-picture-review__img--hidden cc-muted" data-testid="picture-hidden">
+      {t('avatarPictures.offHidden')}
+    </span>
+  );
+}
+
+function ToCheck({ item, scope, invalidate, enabled }: { item: Av.PictureListItem; scope: ReviewScope; invalidate: readonly (readonly unknown[])[]; enabled: boolean }) {
   const { t } = useI18n();
   const run = useRun();
   const when = useWhen();
@@ -62,7 +75,7 @@ function ToCheck({ item, scope, invalidate }: { item: Av.PictureListItem; scope:
   const inv = invalidate.map((k) => [...k]);
   return (
     <li className="cc-card cc-picture-review__item" data-testid="picture-to-check">
-      <img className="cc-picture-review__img" src={item.url} alt={t('avatarPictures.alt', { name: item.studentName })} />
+      <Picture item={item} shown={enabled} />
       <div className="cc-stack cc-picture-review__body">
         <Who item={item} scope={scope} />
         <span className="cc-muted">{t('avatarPictures.sent', { when: when(item.sentAt) })}</span>
@@ -102,7 +115,7 @@ function ToCheck({ item, scope, invalidate }: { item: Av.PictureListItem; scope:
             <div className="cc-row">
               <Button
                 variant="primary"
-                isDisabled={!ticked}
+                isDisabled={!ticked || !enabled}
                 onPress={() => void run(() => call(EP[scope].approve, { pictureId: item.id, confirm: true }), { success: t('avatarPictures.approved'), invalidate: [...inv, [...AVATARS_KEY]] })}
                 data-testid="picture-approve"
               >
@@ -121,14 +134,14 @@ function ToCheck({ item, scope, invalidate }: { item: Av.PictureListItem; scope:
   );
 }
 
-function InUse({ item, scope, invalidate }: { item: Av.PictureListItem; scope: ReviewScope; invalidate: readonly (readonly unknown[])[] }) {
+function InUse({ item, scope, invalidate, enabled }: { item: Av.PictureListItem; scope: ReviewScope; invalidate: readonly (readonly unknown[])[]; enabled: boolean }) {
   const { t } = useI18n();
   const run = useRun();
   const when = useWhen();
   const [asking, setAsking] = useState(false);
   return (
     <li className="cc-card cc-picture-review__item" data-testid="picture-in-use-item">
-      <img className="cc-picture-review__img" src={item.url} alt={t('avatarPictures.alt', { name: item.studentName })} />
+      <Picture item={item} shown={enabled} />
       <div className="cc-stack cc-picture-review__body">
         <Who item={item} scope={scope} />
         {item.decidedAt ? <span className="cc-muted">{t('avatarPictures.approvedOn', { when: when(item.decidedAt) })}</span> : null}
@@ -175,7 +188,7 @@ export function PictureReview({ scope }: { scope: ReviewScope }) {
             content: toCheck.length ? (
               <ul className="cc-picture-review">
                 {toCheck.map((i) => (
-                  <ToCheck key={i.id} item={i} scope={scope} invalidate={invalidate} />
+                  <ToCheck key={i.id} item={i} scope={scope} invalidate={invalidate} enabled={q.data.enabled} />
                 ))}
               </ul>
             ) : (
@@ -188,7 +201,7 @@ export function PictureReview({ scope }: { scope: ReviewScope }) {
             content: inUse.length ? (
               <ul className="cc-picture-review">
                 {inUse.map((i) => (
-                  <InUse key={i.id} item={i} scope={scope} invalidate={invalidate} />
+                  <InUse key={i.id} item={i} scope={scope} invalidate={invalidate} enabled={q.data.enabled} />
                 ))}
               </ul>
             ) : (

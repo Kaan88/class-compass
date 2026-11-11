@@ -116,6 +116,8 @@ function PartChoice({ part, draft, onChoose, isLocked, unlockOf, onSurprise }: {
 function OwnPictureEntry({ info, onPicture }: { info: StudentAvatarInfo['picture']; onPicture: () => void }) {
   const { t } = useI18n();
   if (info.state === 'off') return null;
+  // A class that does not take pictures offers nothing to do, unless there is a picture to manage.
+  if (info.state === 'classOff' && !info.pending && !info.approvedUrl && !info.refused) return null;
   return (
     <div className="cc-row" data-testid="avatar-picture-entry">
       {info.pending ? (
@@ -157,7 +159,8 @@ export function AvatarPanel({ info, name, titleId, onPicture }: { info: StudentA
     mutationFn: (spec: AvatarSpecValue) => call(studentSetAvatar, { spec }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: STUDENT_PAGE_KEY });
-      showToast({ message: t('avatar.saved'), kind: 'success' });
+      // While their own picture is in use the saved avatar is not shown yet: say so (review fix).
+      showToast({ message: info.picture.approvedUrl ? t('avatar.savedForLater') : t('avatar.saved'), kind: 'success' });
       setOpen(false);
     },
     onError: (e) => showToast({ message: reasonOf(e) === 'AVATAR_LOCKED' ? t('avatar.lockedByTeacher') : reasonOf(e) === 'AVATAR_PART_LOCKED' ? t('avatar.partLocked') : t('common.error'), kind: 'error' }),
@@ -201,6 +204,11 @@ export function AvatarPanel({ info, name, titleId, onPicture }: { info: StudentA
       {onPicture ? <OwnPictureEntry info={info.picture} onPicture={onPicture} /> : null}
       {open && !info.locked ? (
         <div className="cc-stack" data-testid="avatar-creator">
+          {info.picture.approvedUrl ? (
+            <p className="cc-card" data-testid="avatar-saved-for-later">
+              <IconImage /> {t('avatar.picture.savedForLater')}
+            </p>
+          ) : null}
           <div className="cc-row" role="group" aria-label={t('avatar.how')}>
             <Button variant={tab === 'ready' ? 'primary' : 'secondary'} aria-pressed={tab === 'ready'} onPress={() => setTab('ready')} data-testid="avatar-tab-ready">
               {t('avatar.readyMade')}

@@ -5,7 +5,7 @@
  * picture is previewed at the large and small card sizes. "Send to my teacher" makes ONE square
  * 512 px picture and uploads it once; the server checks and re-encodes it again.
  *
- * The maths (`clampState`, `keyMove`, `scaleOf`) is pure and unit-tested; the component only draws and listens.
+ * The maths (`clampState`, `keyMove`, `scaleOf`, `pictureMatrix`, `turned`) is pure and unit-tested; the component only draws and listens.
  */
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { AVATAR_PICTURE_EDGE } from '../../shared/avatarPictures.ts';
@@ -63,21 +63,50 @@ export function keyMove(key: string, shift: boolean): { dx: number; dy: number }
 
 export type PictureSource = { width: number; height: number; draw: CanvasImageSource };
 
+/** A 2D affine matrix as the canvas takes it: x' = a·x + c·y + e, y' = b·x + d·y + f. */
+export interface Matrix {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+}
+
+/**
+ * Where a point of the source picture (relative to its centre, in source pixels) lands on a square
+ * canvas of `size` pixels: scale, then turn, then mirror ON THE SCREEN (left-right whatever the turn),
+ * then move. Mirroring after the turn keeps Mirror a left-right flip after a quarter turn.
+ */
+export function pictureMatrix(w: number, h: number, s: EditState, size: number): Matrix {
+  const f = size / AVATAR_PICTURE_EDGE;
+  const k = scaleOf(w, h, s) * f;
+  const q = ((s.turns % 4) + 4) % 4;
+  // Exact quarter turns (no rounding noise): cos and sin of q × 90°.
+  const cos = [1, 0, -1, 0][q]!;
+  const sin = [0, 1, 0, -1][q]!;
+  const m = s.mirror ? -1 : 1;
+  return { a: m * k * cos, b: k * sin, c: -m * k * sin, d: k * cos, e: size / 2 + s.x * f, f: size / 2 + s.y * f };
+}
+
+/** Where a source point (relative to the picture's centre) lands on the canvas. */
+export const applyMatrix = (M: Matrix, x: number, y: number) => ({ x: M.a * x + M.c * y + M.e, y: M.b * x + M.d * y + M.f });
+
+/** Turn right (1) or left (-1) as the child sees it: a mirrored picture turns the other way in source terms. */
+export const turned = (s: EditState, dir: 1 | -1): EditState => ({ ...s, turns: s.turns + (s.mirror ? -dir : dir) + 4, x: 0, y: 0 });
+
 /** Draws the edited picture into a square canvas of `size` pixels. */
 export function drawInto(canvas: HTMLCanvasElement, src: PictureSource, s: EditState, size: number) {
   canvas.width = size;
   canvas.height = size;
   const g = canvas.getContext('2d');
   if (!g) return;
-  const f = size / AVATAR_PICTURE_EDGE;
   g.clearRect(0, 0, size, size);
   g.save();
   g.filter = s.brightness === 100 ? 'none' : `brightness(${s.brightness}%)`;
-  g.translate(size / 2 + s.x * f, size / 2 + s.y * f);
-  g.rotate((s.turns * Math.PI) / 2);
-  if (s.mirror) g.scale(-1, 1);
-  const k = scaleOf(src.width, src.height, s) * f;
-  g.drawImage(src.draw, (-src.width * k) / 2, (-src.height * k) / 2, src.width * k, src.height * k);
+  const M = pictureMatrix(src.width, src.height, s, size);
+  g.setTransform(M.a, M.b, M.c, M.d, M.e, M.f);
+  g.drawImage(src.draw, -src.width / 2, -src.height / 2, src.width, src.height);
   g.restore();
 }
 
@@ -160,12 +189,13 @@ export default function PictureEditor({ source, busy, onSend, onCancel }: { sour
             </label>
             <input
               id={`${id}-zoom`}
-              className="cc-range"
+              className="cc-range cc-picture-editor__range"
               type="range"
               min={ZOOM_MIN * 100}
               max={ZOOM_MAX * 100}
               step={5}
               value={Math.round(state.zoom * 100)}
+              aria-valuetext={`${Math.round(state.zoom * 100)} %`}
               onChange={(e) => update((s) => ({ ...s, zoom: Number(e.target.value) / 100 }))}
               data-testid="picture-zoom"
             />
@@ -176,21 +206,22 @@ export default function PictureEditor({ source, busy, onSend, onCancel }: { sour
             </label>
             <input
               id={`${id}-bright`}
-              className="cc-range"
+              className="cc-range cc-picture-editor__range"
               type="range"
               min={50}
               max={150}
               step={5}
               value={state.brightness}
+              aria-valuetext={`${state.brightness} %`}
               onChange={(e) => update((s) => ({ ...s, brightness: Number(e.target.value) }))}
               data-testid="picture-brightness"
             />
           </div>
           <div className="cc-picture-editor__buttons">
-            <Button onPress={() => update((s) => ({ ...s, turns: s.turns + 3, x: 0, y: 0 }))} data-testid="picture-turn-left">
+            <Button onPress={() => update((s) => turned(s, -1))} data-testid="picture-turn-left">
               {t('avatar.picture.editor.turnLeft')}
             </Button>
-            <Button onPress={() => update((s) => ({ ...s, turns: s.turns + 1, x: 0, y: 0 }))} data-testid="picture-turn-right">
+            <Button onPress={() => update((s) => turned(s, 1))} data-testid="picture-turn-right">
               {t('avatar.picture.editor.turnRight')}
             </Button>
             <Button aria-pressed={state.mirror} onPress={() => update((s) => ({ ...s, mirror: !s.mirror, x: -s.x }))} data-testid="picture-mirror">

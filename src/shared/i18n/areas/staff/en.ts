@@ -2690,6 +2690,7 @@ export const en = {
   'audit.action.avatar_picture.refuse': 'Own avatar picture refused',
   'audit.action.avatar_picture.delete_all': 'All uploaded avatar pictures deleted',
   'audit.action.avatar_picture.expire': 'Unchecked avatar pictures deleted after 14 days',
+  'audit.action.avatar_picture.remove_missing': 'Avatar pictures whose file was gone removed from the list',
   'audit.action.backup.create': 'Backup made',
   'audit.action.backup.verify': 'Backup verified',
   'audit.action.class.archive': 'Class archived',
