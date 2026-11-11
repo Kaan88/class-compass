@@ -59,6 +59,8 @@ export const en = {
   'error.STUDENT_DEACTIVATED': 'This student is deactivated. An administrator can reactivate them.',
   'error.YEAR_OVERLAP': 'These dates overlap another school year.',
   'error.TERM_OUTSIDE_YEAR': 'A term would fall outside the school year. Change the term dates first.',
+  'error.CLOSURE_OUTSIDE_YEAR': 'A holiday must fall inside its school year. Change the holiday dates first.',
+  'error.TOO_MANY_CLOSURES': 'This school year has too many holidays. Delete or join some first.',
   'error.ENROLMENT_OUTSIDE_YEAR': 'Some students joined classes on dates outside the new school year dates.',
   'error.MOVE_DATE_OUTSIDE_YEAR': 'The move date must fall inside the school year of the new class.',
   'error.MOVE_DATE_BEFORE_ENROLMENT': 'The move date is before the student joined their current class.',

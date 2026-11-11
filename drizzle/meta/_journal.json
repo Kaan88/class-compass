@@ -225,6 +225,13 @@
       "when": 1794419739911,
       "tag": "0031_s25d_lesson_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1794420001290,
+      "tag": "0032_s25b_school_closures",
+      "breakpoints": true
     }
   ]
 }

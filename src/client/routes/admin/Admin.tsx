@@ -16,6 +16,7 @@ const SECTIONS = [
   { to: '/admin/users', key: 'admin.users', icon: <IconKey /> },
   { to: '/admin/settings', key: 'admin.settings', icon: <IconSettings /> },
   { to: '/admin/years', key: 'admin.years', icon: <IconCalendar /> },
+  { to: '/admin/holidays', key: 'admin.holidays', icon: <IconCalendar /> },
   { to: '/admin/subjects', key: 'admin.subjects', icon: <IconBook /> },
   { to: '/admin/classes', key: 'admin.classes', icon: <IconArchive /> },
   { to: '/admin/assignments', key: 'admin.assignments', icon: <IconSwap /> },

@@ -16,6 +16,7 @@ import {
   contextModules,
   enrolments,
   modulePolicies,
+  schoolClosures,
   schoolSettings,
   schoolYears,
   students,
@@ -149,6 +150,13 @@ export function updateYear(ctx: RequestContext, input: In<typeof C.updateYear>) 
       .all()
       .find((t) => t.startsOn < next.startsOn || t.endsOn > next.endsOn);
     if (outsideTerm) throw conflict('A term of this year would fall outside the new dates; change the term first', { reason: 'TERM_OUTSIDE_YEAR', termId: outsideTerm.id });
+    // The holiday calendar too (S25b, D-186): a closure stays inside its year.
+    const outsideClosure = ctx.db
+      .select({ id: schoolClosures.id })
+      .from(schoolClosures)
+      .where(and(eq(schoolClosures.schoolYearId, y.id), sql`(${schoolClosures.startsOn} < ${next.startsOn} or ${schoolClosures.endsOn} > ${next.endsOn})`))
+      .get();
+    if (outsideClosure) throw conflict('A holiday of this year would fall outside the new dates; change the holiday first', { reason: 'CLOSURE_OUTSIDE_YEAR', closureId: outsideClosure.id });
     const outsideEnrolment = ctx.db
       .select({ id: enrolments.id })
       .from(enrolments)

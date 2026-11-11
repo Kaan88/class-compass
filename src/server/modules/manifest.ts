@@ -52,6 +52,12 @@ export interface ReportScope {
   enrolledOn: (studentId: string, date: string) => boolean;
   /** Lessons of this class+subject that were held (ended) in the period, oldest first. */
   lessons: LessonRow[];
+  /**
+   * Closure days of the school's holiday calendar in the period (S25b, D-186). A closure day is not a
+   * school day: leave it out of every school-day count, and show a week of only closures as `CLOSED`
+   * (no school), never as 0 or not recorded (`weekKind` in `domain/holidays.ts`).
+   */
+  closed: ReadonlySet<string>;
 }
 
 /**

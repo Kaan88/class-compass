@@ -11,6 +11,7 @@ import { compareNames } from '../../../shared/text/turkish.ts';
 import { attendanceDaily, classes, counterEvents, homeworkAssignments, lessons, schoolYears, subjects, teachingContexts, users } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { AppError } from '../../lib/errors.ts';
+import { closedDatesBetween } from '../school/closures.ts';
 import { getSchoolSettings } from '../school/policy.ts';
 import { col, countOrNr, key, lbl, n, raw, table, text } from './cells.ts';
 
@@ -57,7 +58,8 @@ export function usageReport(ctx: RequestContext, input: { from?: string | undefi
     .all();
   const recordedDays = new Map<string, Set<string>>();
   for (const r of recorded) recordedDays.set(r.classId, (recordedDays.get(r.classId) ?? new Set<string>()).add(r.localDate));
-  const schoolDays = schoolDaysBetween({ from, to }, today);
+  // Closure days of the holiday calendar are not school days (S25b, D-186).
+  const schoolDays = schoolDaysBetween({ from, to }, today, undefined, closedDatesBetween(ctx.db, from, to));
 
   const rows = ctxRows
     .filter((r) => held.some((l) => l.contextId === r.c.id) || r.c.endedAt === null)

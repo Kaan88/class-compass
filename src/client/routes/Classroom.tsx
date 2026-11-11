@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LessonSummary } from '../../shared/contracts/lessons.ts';
 import * as School from '../../shared/contracts/school.ts';
 import { DEFAULT_THEME } from '../../shared/themes.ts';
-import { formatDate, type MessageKey } from '../../shared/i18n/index.ts';
+import { formatDate, pickText, type MessageKey } from '../../shared/i18n/index.ts';
 import { call } from '../lib/api.ts';
 import { useClassLocale, useDensity } from '../lib/classroomPrefs.ts';
 import { setDisplay, useDisplay } from '../lib/display.ts';
@@ -35,7 +35,7 @@ import { preloadTimeUp } from '../modules/lessons/timeUp.ts';
 import { BigButton, Button, buttonClass } from '../ui/Button.tsx';
 import { EmptyState, OutboxAttentionTray, OutboxSaveBadge, registerCommandDescription } from '../ui/Feedback.tsx';
 import { Toggle } from '../ui/Fields.tsx';
-import { IconLock, IconPlay } from '../ui/icons.tsx';
+import { IconCalendar, IconLock, IconPlay } from '../ui/icons.tsx';
 import { ClassSwitcher } from '../ui/Layout.tsx';
 import { ClassroomTopBar } from '../ui/ClassroomTopBar.tsx';
 
@@ -145,6 +145,7 @@ function ClassroomScreen({
   const inProgress = useMemo(() => new Set((activeLessons.data?.lessons ?? []).map((l) => l.contextId)), [activeLessons.data]);
   const lessonQ = useLessonState(active?.id ?? null);
   const lesson = lessonQ.data?.data.lesson ?? null;
+  const closure = lessonQ.data?.data.today.closure ?? null;
   // Per-class screen state, so switching away and back keeps each class where it was (LES-4).
   const [modes, setModes] = useState<Record<string, Mode>>({});
   const mode: Mode = (active && modes[active.id]) || { kind: 'idle' };
@@ -246,6 +247,13 @@ function ClassroomScreen({
     return (
       <section className="cc-card cc-stack" data-testid="no-lesson">
         <p className="cc-h2">{t('lesson.noneRunning', { cls: classLabel(active, locale) })}</p>
+        {closure ? (
+          // A school holiday (D-186): a calm note; starting a (make-up) lesson stays possible.
+          <p className="cc-closure-note" data-testid="closure-note">
+            <IconCalendar />
+            <span>{t('lesson.closureNote', { name: pickText(closure.name, locale) })}</span>
+          </p>
+        ) : null}
         <div>
           <BigButton variant="primary" onPress={() => setMode(active.id, { kind: 'starting', draft: emptyStartDraft() })}>
             <IconPlay />

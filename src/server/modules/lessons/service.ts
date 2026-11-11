@@ -24,6 +24,7 @@ import type { CommandMeta } from '../../lib/commands.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { attendanceStamp, dailyFor, lessonAttendanceCounts, markAllPresentCore, rosterWithAttendance, setDailyCore } from '../attendance/service.ts';
+import { closureOn } from '../school/closures.ts';
 import { assertModuleEnabled, isModuleEnabled } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, effectiveTimezone, getClass, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { endStepsFor, type LessonRow } from './endSteps.ts';
@@ -142,13 +143,15 @@ export function lessonState(ctx: RequestContext, contextId: string) {
   const lesson = active && active.localDate >= today ? active : null;
   const stamp = isModuleEnabled(ctx.db, context.id, 'attendance') ? attendanceStamp(ctx.db, cls.id, lesson?.localDate ?? today, lesson?.id ?? null) : 'off';
   const extra = contributors.map((c) => c.stamp(ctx, context, lesson)).join('.');
-  const etag = `"${lesson ? `${lesson.id}.${lesson.version}` : 'none'}.${today}.${stamp}.${extra}"`;
+  // Today's closure (holiday calendar, D-186) is in the ETag, so a holiday added for today shows its note.
+  const closure = closureOn(ctx.db, cls.schoolYearId, today);
+  const etag = `"${lesson ? `${lesson.id}.${lesson.version}` : 'none'}.${today}.${stamp}.${extra}.${closure ? `c-${closure.id}-${closure.updatedAt}` : 'open'}"`;
   const bodies = Object.fromEntries(contributors.map((c) => [c.key, c.body(ctx, context, lesson)]));
   return {
     etag,
     body: {
       lesson: lesson ? lessonDto(ctx.db, lesson) : null,
-      today: { localDate: today, weekday: weekdayOf(today), timezone: tz },
+      today: { localDate: today, weekday: weekdayOf(today), timezone: tz, closure: closure ? { name: closure.name } : null },
       serverNow: now,
       attendanceStamp: stamp,
       counters: (bodies.counters ?? null) as CountersLessonState | null,

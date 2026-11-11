@@ -13,6 +13,7 @@
  */
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { addDays } from '../../../domain/dates.ts';
+import { weekKind } from '../../../domain/holidays.ts';
 import { weekStartsBetween } from '../../../domain/periods.ts';
 import type { ReportSectionData, ReportTable, TimelineEvent } from '../../../shared/contracts/reports.ts';
 import type { Db } from '../../db/client.ts';
@@ -21,7 +22,7 @@ import type { RequestContext } from '../../lib/context.ts';
 import { lessonAttendance } from '../attendance/report.ts';
 import { isModuleEnabled } from '../school/modules.ts';
 import type { ReportScope } from '../manifest.ts';
-import { ABSENT, col, countOrNr, date, key, n, NA, NR, range, scopeIds, student, table, text } from '../reports/cells.ts';
+import { ABSENT, CLOSED, col, countOrNr, date, key, n, NA, NR, range, scopeIds, student, table, text } from '../reports/cells.ts';
 
 /** Most weekly columns in the per-student table (the newest weeks of the period). */
 export const MAX_WEEK_COLUMNS = 16;
@@ -52,6 +53,8 @@ function counterTables(ctx: RequestContext, scope: ReportScope, c: CounterRow, e
   const mine = events.filter((e) => e.counterId === c.id);
   const live = mine.filter((e) => e.voidedAt === null);
   const tables: ReportTable[] = [];
+  /** Every school weekday of the week (in the period) is a closure day of the holiday calendar (D-186). */
+  const closedWeek = (w: string) => weekKind(w, { from: scope.from, to: scope.to }, scope.closed) === 'closed';
 
   if (!scope.studentId) {
     tables.push(
@@ -78,6 +81,8 @@ function counterTables(ctx: RequestContext, scope: ReportScope, c: CounterRow, e
           const we = addDays(w, 6);
           const ls = scope.lessons.filter((l) => l.localDate >= w && l.localDate <= we);
           const lsIds = new Set(ls.map((l) => l.id));
+          // A week of holidays without a (make-up) lesson: "no school" (D-186).
+          if (!ls.length && closedWeek(w)) return { key: w, cells: [range(w, we), CLOSED, CLOSED] };
           return { key: w, cells: [range(w, we), n(ls.length), countOrNr(live.filter((e) => lsIds.has(e.lessonId)).length, ls.length > 0)] };
         }),
         chart: { kind: 'line', labelColumn: 'week', valueColumns: ['total'] },
@@ -104,7 +109,7 @@ function counterTables(ctx: RequestContext, scope: ReportScope, c: CounterRow, e
         for (let d = w; d <= we; d = addDays(d, 1)) if (d >= scope.from && d <= scope.to && scope.enrolledOn(s.id, d)) inClass = true;
         if (!inClass) return NA;
         const ls = enrolled.filter((l) => l.localDate >= w && l.localDate <= we);
-        if (!ls.length) return NR;
+        if (!ls.length) return closedWeek(w) ? CLOSED : NR;
         const lsIds = new Set(ls.map((l) => l.id));
         const count = theirs.filter((e) => lsIds.has(e.lessonId)).length;
         // Away for every lesson of the week (recorded): "absent", never a 0 that looks like a good week (RPT-5).

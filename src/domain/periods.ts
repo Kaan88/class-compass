@@ -79,12 +79,12 @@ export function datesBetween(from: string, to: string): string[] {
 
 /**
  * School days of a range for attendance coverage (RPT-5): the given weekdays (default Monday–Friday)
- * from `from` to `min(to, today)`, inside the school year. There is no holiday calendar yet, so
- * public holidays count as school days (documented; coverage is a lower bound on those weeks).
+ * from `from` to `min(to, today)`, inside the school year, without the closure days of the school's
+ * holiday calendar (S25b, D-186: a closure day is "no school", never a day without a record).
  */
-export function schoolDaysBetween(range: DateRange, today: string, weekdays: readonly number[] = [1, 2, 3, 4, 5]): string[] {
+export function schoolDaysBetween(range: DateRange, today: string, weekdays: readonly number[] = [1, 2, 3, 4, 5], closed: ReadonlySet<string> = new Set<string>()): string[] {
   const end = range.to < today ? range.to : today;
-  return datesBetween(range.from, end).filter((d) => weekdays.includes(weekdayOf(d)));
+  return datesBetween(range.from, end).filter((d) => weekdays.includes(weekdayOf(d)) && !closed.has(d));
 }
 
 /** Week starts covering a range (for weekly trends), oldest first. */

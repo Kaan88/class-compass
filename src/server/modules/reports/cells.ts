@@ -1,6 +1,6 @@
 /**
  * Builders for report cells and labels (D-091) shared by every module's report section. Only these
- * cell kinds exist; RPT-5: `nr` (not recorded), `absent` and `na` (not applicable) are never 0.
+ * cell kinds exist; RPT-5: `nr` (not recorded), `absent`, `na` (not applicable) and `closed` (no school, D-186) are never 0.
  */
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import type { ReportCell, ReportColumn, ReportLabel, ReportTable } from '../../../shared/contracts/reports.ts';
@@ -18,6 +18,8 @@ export const n = (v: number, d?: number | null): ReportCell => (d === undefined 
 export const NR: ReportCell = { t: 'nr' };
 export const ABSENT: ReportCell = { t: 'absent' };
 export const NA: ReportCell = { t: 'na' };
+/** No school that day or week (holiday calendar, S25b, D-186). */
+export const CLOSED: ReportCell = { t: 'closed' };
 export const lbl = (v: ReportLabel): ReportCell => ({ t: 'label', v });
 export const date = (v: string): ReportCell => ({ t: 'date', v });
 export const range = (from: string, to: string): ReportCell => ({ t: 'range', from, to });

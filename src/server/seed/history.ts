@@ -42,6 +42,8 @@ import { getSchoolSettings, type ClassRow } from '../modules/school/policy.ts';
 import { rosterRowsOn } from '../modules/students/service.ts';
 import { mulberry32, SeedRefused } from './demo.ts';
 import { isSchoolDay } from './history/calendar.ts';
+import { fixedHolidaysIn } from '../../domain/holidays.ts';
+import { addPublicHolidays, closedDatesOfYear } from '../modules/school/closures.ts';
 import { HISTORY_GENERATORS } from './history/generators.ts';
 import type { ContextPlan, HistoryGenerator, HistoryRun, HistoryWeek, LessonRun } from './history/types.ts';
 
@@ -97,11 +99,11 @@ function checkDemoSchool(deps: AppDeps) {
 }
 
 /** School days of the history: `weeks` full weeks before this one plus this week's days before today. */
-function historyWeeks(today: string, yearStart: string, weeks: number, weekStartsOn: number): HistoryWeek[] {
+function historyWeeks(today: string, yearStart: string, weeks: number, weekStartsOn: number, closed: ReadonlySet<string>): HistoryWeek[] {
   const first = addDays(weekStartOfDate(today, weekStartsOn), -7 * weeks);
   const out: HistoryWeek[] = [];
   for (let d = first < yearStart ? yearStart : first; d < today; d = addDays(d, 1)) {
-    if (!isSchoolDay(d)) continue;
+    if (!isSchoolDay(d, closed)) continue;
     const ws = weekStartOfDate(d, weekStartsOn);
     let w = out[out.length - 1];
     if (!w || w.weekStart !== ws) out.push((w = { index: out.length, weekStart: ws, days: [], last: false }));
@@ -129,7 +131,12 @@ export function seedDemoHistory(deps: AppDeps, opts: HistoryOptions = {}): Histo
   const tz = settings.timezone;
   const realNow = deps.now();
   const today = localDate(realNow, tz);
-  const weeks = historyWeeks(today, year.startsOn, weeksWanted, settings.weekStartsOn);
+  // The holiday calendar (S25b, D-186): a demo year without closures gets the built-in Turkish fixed-date
+  // holidays (written in the run's transaction below); the history skips every closure day.
+  const yearClosed = closedDatesOfYear(deps.db, year.id);
+  const addHolidays = yearClosed.size === 0;
+  const closed: ReadonlySet<string> = addHolidays ? new Set(fixedHolidaysIn({ from: year.startsOn, to: year.endsOn }).map((x) => x.date)) : yearClosed;
+  const weeks = historyWeeks(today, year.startsOn, weeksWanted, settings.weekStartsOn, closed);
   const days = weeks.flatMap((w) => w.days);
   if (!days.length) throw new SeedRefused('There are no past school days in this school year yet, so there is no history to fill.');
 
@@ -167,6 +174,7 @@ export function seedDemoHistory(deps: AppDeps, opts: HistoryOptions = {}): Histo
     realNow,
     weeks,
     plans,
+    schoolDay: (date) => isSchoolDay(date, closed),
     rand,
     chance: (p) => rand() < p,
     int: (min, max) => min + Math.floor(rand() * (max - min + 1)),
@@ -243,6 +251,11 @@ export function seedDemoHistory(deps: AppDeps, opts: HistoryOptions = {}): Histo
   const schoolGenerators = HISTORY_GENERATORS.filter((g) => g.module === null || isSchoolModule(g.module) || (isContextModule(g.module) && isModuleAvailable(deps.db, g.module)));
 
   return tx(deps.db, () => {
+    if (addHolidays) {
+      clock = Math.min(at(year.startsOn, '07:00'), realNow - 60_000);
+      addPublicHolidays(h.admin, year.id);
+      clock = realNow;
+    }
     // ---------------------------------------------------------------- teaching contexts and the timetable
     const yearStartAt = at(year.startsOn, '08:00');
     const rows = deps.db

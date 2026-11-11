@@ -122,6 +122,48 @@ export const updateTerm = endpoint({
 });
 export const deleteTerm = endpoint({ method: 'DELETE', path: '/api/admin/terms/:termId', access: 'admin', input: z.object({ termId: Id }), output: Ok });
 
+// ---------------------------------------------------------------- school holiday calendar (S25b, D-186)
+/** At most this many closures per school year (a year has a few dozen at most). */
+export const MAX_CLOSURES_PER_YEAR = 120;
+/** A named range of days without school (inclusive dates inside the year). `schoolDays` = Monday–Friday days it takes off. */
+export const Closure = z.object({ id: z.string(), schoolYearId: z.string(), name: LocalizedText, startsOn: z.string(), endsOn: z.string(), schoolDays: z.number().int() });
+export type Closure = z.infer<typeof Closure>;
+const ClosureName = RequiredLocalizedText.refine((t) => (t.en ?? '').length <= 120 && (t.tr ?? '').length <= 120, 'Name too long');
+export const listClosures = endpoint({
+  method: 'GET',
+  path: '/api/admin/years/:yearId/closures',
+  access: 'admin',
+  input: z.object({ yearId: Id }),
+  output: z.object({ closures: z.array(Closure), archived: z.boolean() }),
+});
+export const createClosure = endpoint({
+  method: 'POST',
+  path: '/api/admin/years/:yearId/closures',
+  access: 'admin',
+  input: z.object({ yearId: Id, name: ClosureName, startsOn: IsoDate, endsOn: IsoDate }),
+  output: Closure,
+});
+export const updateClosure = endpoint({
+  method: 'PATCH',
+  path: '/api/admin/closures/:closureId',
+  access: 'admin',
+  input: z.object({ closureId: Id, name: ClosureName.optional(), startsOn: IsoDate.optional(), endsOn: IsoDate.optional() }),
+  output: Closure,
+});
+export const deleteClosure = endpoint({ method: 'DELETE', path: '/api/admin/closures/:closureId', access: 'admin', input: z.object({ closureId: Id }), output: Ok });
+/**
+ * "Add Turkish public holidays for this school year": the built-in fixed-date national holidays that
+ * fall inside the year, each a one-day closure; a date already covered by a closure is skipped, so it
+ * can be pressed again. Religious holidays move every year and are never added here.
+ */
+export const addPublicHolidays = endpoint({
+  method: 'POST',
+  path: '/api/admin/years/:yearId/closures/public-holidays',
+  access: 'admin',
+  input: z.object({ yearId: Id }),
+  output: z.object({ added: z.number().int(), skipped: z.number().int() }),
+});
+
 // ---------------------------------------------------------------- subjects
 export const Subject = z.object({ id: z.string(), name: LocalizedText, archived: z.boolean() });
 export const listSubjects = endpoint({

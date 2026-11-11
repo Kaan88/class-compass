@@ -76,6 +76,26 @@ export const terms = sqliteTable(
   (t) => [index('terms_year_idx').on(t.schoolYearId)],
 );
 
+/**
+ * School holiday calendar (S25b, D-186): named days without school of a school year (semester break,
+ * national holidays), inclusive local dates inside the year. Calendar configuration like terms (nothing
+ * references a closure by id), so a closure is deleted, not archived; every change is audited. Only
+ * `modules/school/closures.ts` reads or writes it; everyone else asks it for the closed dates.
+ */
+export const schoolClosures = sqliteTable(
+  'school_closures',
+  {
+    id: text('id').primaryKey(),
+    schoolYearId: text('school_year_id').notNull().references(() => schoolYears.id),
+    name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    startsOn: text('starts_on').notNull(),
+    endsOn: text('ends_on').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('school_closures_year_idx').on(t.schoolYearId, t.startsOn)],
+);
+
 export const subjects = sqliteTable('subjects', {
   id: text('id').primaryKey(),
   name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),

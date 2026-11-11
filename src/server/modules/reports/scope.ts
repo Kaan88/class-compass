@@ -17,6 +17,7 @@ import { enrolments, lessons, students, subjects, teachingContexts, terms, users
 import type { RequestContext } from '../../lib/context.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import type { ReportScope } from '../manifest.ts';
+import { closedDatesBetween } from '../school/closures.ts';
 import { effectiveTimezone, getClass, getSchoolSettings, getYear, todayFor, type ContextRow } from '../school/policy.ts';
 
 export type Viewer = 'teacher' | 'admin';
@@ -162,6 +163,7 @@ export function buildScope(ctx: RequestContext, contextId: string, viewer: Viewe
     students: people,
     enrolledOn,
     lessons: held,
+    closed: closedDatesBetween(ctx.db, from, to),
   };
   return { scope, info };
 }

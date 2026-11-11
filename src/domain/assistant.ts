@@ -18,12 +18,15 @@ export interface TurnInfo {
   last: string | null;
 }
 
-/** School days of the week starting `weekStart`, limited to the school year. */
-export function weekDates(weekStart: string, schoolDays: readonly number[], yearStart: string, yearEnd: string): string[] {
+/**
+ * School days of the week starting `weekStart`, limited to the school year, without the closure days
+ * of the school's holiday calendar (S25b, D-186: nobody is the assistant on a day without school).
+ */
+export function weekDates(weekStart: string, schoolDays: readonly number[], yearStart: string, yearEnd: string, closed: ReadonlySet<string> = new Set<string>()): string[] {
   const out: string[] = [];
   for (let i = 0; i < 7; i++) {
     const d = addDays(weekStart, i);
-    if (schoolDays.includes(weekdayOf(d)) && d >= yearStart && d <= yearEnd) out.push(d);
+    if (schoolDays.includes(weekdayOf(d)) && d >= yearStart && d <= yearEnd && !closed.has(d)) out.push(d);
   }
   return out;
 }

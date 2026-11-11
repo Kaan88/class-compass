@@ -26,6 +26,8 @@ export function reportCellText(c: ReportCell, locale: Locale): string {
       return translate(locale, 'report.cell.absent');
     case 'na':
       return translate(locale, 'report.cell.na');
+    case 'closed':
+      return translate(locale, 'report.cell.closed');
     case 'label':
       return reportLabelText(c.v, locale);
     case 'date':

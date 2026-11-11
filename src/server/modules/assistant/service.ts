@@ -21,6 +21,7 @@ import { planAssistants, nextAssistant, weekDates, type TurnInfo } from '../../.
 import { isAway } from '../../../domain/attendance.ts';
 import { weekStartOfDate } from '../../../domain/counters.ts';
 import { addDays, weekdayOf } from '../../../domain/dates.ts';
+import { closedDatesOfYear, closureOn } from '../school/closures.ts';
 import type * as C from '../../../shared/contracts/assistant.ts';
 import { DEFAULT_SCHOOL_DAYS, type AssistantPlan, type AssistantStudent, type AssistantToday } from '../../../shared/contracts/assistant.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
@@ -224,7 +225,7 @@ function ensurePlan(ctx: RequestContext, context: ContextRow, cls: ClassRow, wee
   const year = getYear(ctx.db, cls.schoolYearId);
   const row: PlanRow = { id: newId(), contextId: context.id, weekStart, generatedAt: ctx.now(), generatedBy: ctx.user?.id ?? null, announcedAt: null, announcedBy: null };
   ctx.db.insert(assistantPlans).values(row).run();
-  const dates = weekDates(weekStart, schoolDaysOf(ctx.db, context.id), year.startsOn, year.endsOn).filter((d) => d >= today);
+  const dates = weekDates(weekStart, schoolDaysOf(ctx.db, context.id), year.startsOn, year.endsOn, closedDatesOfYear(ctx.db, year.id)).filter((d) => d >= today);
   fillDates(ctx, context, cls, row.id, dates);
   audit(ctx.db, ctx.actor, { action: 'assistant.plan_generate', entity: 'assistant_plan', entityId: row.id, after: { contextId: context.id, weekStart, days: dates.length } }, ctx.now());
   return row;
@@ -414,7 +415,8 @@ export function ensureToday(ctx: RequestContext, context: ContextRow): { today: 
   const cls = getClass(ctx.db, context.classId);
   const today = todayFor(ctx, cls);
   const year = getYear(ctx.db, cls.schoolYearId);
-  const schoolDay = schoolDaysOf(ctx.db, context.id).includes(weekdayOf(today)) && today >= year.startsOn && today <= year.endsOn;
+  // A closure day of the holiday calendar has no assistant (S25b, D-186), even if a make-up lesson is held.
+  const schoolDay = schoolDaysOf(ctx.db, context.id).includes(weekdayOf(today)) && today >= year.startsOn && today <= year.endsOn && closureOn(ctx.db, year.id, today) === null;
   if (!isWritable(ctx.db, cls)) return { today, schoolDay, row: getAssignment(ctx.db, context.id, today) ?? null };
   const row = tx(ctx.db, () => {
     ensureResponsibilities(ctx, context);
@@ -487,7 +489,7 @@ function weekOf(ctx: RequestContext, context: ContextRow, cls: ClassRow, weekSta
   if (weekStart && ws !== weekStart) throw invalid('Not the first day of a week', { reason: 'NOT_WEEK_START' });
   const year = getYear(ctx.db, cls.schoolYearId);
   const schoolDays = schoolDaysOf(ctx.db, context.id);
-  const dates = weekDates(ws, schoolDays, year.startsOn, year.endsOn);
+  const dates = weekDates(ws, schoolDays, year.startsOn, year.endsOn, closedDatesOfYear(ctx.db, year.id));
   const rows = ctx.db
     .select()
     .from(assistantAssignments)
@@ -595,7 +597,7 @@ export function regenerate(ctx: RequestContext, input: In<typeof C.regenerateAss
     if (plan.announcedAt) throw new AppError('CONFLICT', 'This week was announced and stays as it is', { reason: 'PLAN_ANNOUNCED' });
     const today = todayFor(ctx, cls);
     const year = getYear(ctx.db, cls.schoolYearId);
-    const dates = weekDates(input.weekStart, schoolDaysOf(ctx.db, context.id), year.startsOn, year.endsOn).filter((d) => d > today);
+    const dates = weekDates(input.weekStart, schoolDaysOf(ctx.db, context.id), year.startsOn, year.endsOn, closedDatesOfYear(ctx.db, year.id)).filter((d) => d > today);
     const changeable = dates.filter((d) => {
       const r = getAssignment(ctx.db, context.id, d);
       return !r || r.status === 'planned';

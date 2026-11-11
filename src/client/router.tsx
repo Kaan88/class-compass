@@ -34,6 +34,7 @@ const ModulesPage = lazyRouteComponent(school, 'ModulesPage');
 const AdminStudentsPage = lazyRouteComponent(() => import('./routes/admin/StudentsAdmin.tsx'), 'AdminStudentsPage');
 const AdminImportPage = lazyRouteComponent(() => import('./routes/admin/ImportAdmin.tsx'), 'AdminImportPage');
 const SuperSpeakersPage = lazyRouteComponent(() => import('./routes/admin/SuperSpeakers.tsx'), 'SuperSpeakersPage');
+const HolidaysPage = lazyRouteComponent(() => import('./routes/admin/Holidays.tsx'), 'HolidaysPage');
 const AuditPage = lazyRouteComponent(() => import('./routes/admin/Audit.tsx'), 'AuditPage');
 const ThemesPage = lazyRouteComponent(() => import('./routes/admin/Themes.tsx'), 'ThemesPage');
 const AiToolsAdminPage = lazyRouteComponent(() => import('./routes/admin/AiToolsAdmin.tsx'), 'AiToolsAdminPage');
@@ -116,6 +117,7 @@ const adminIndex = createRoute({ getParentRoute: () => adminRoute, path: '/', co
 const adminUsers = createRoute({ getParentRoute: () => adminRoute, path: 'users', component: UsersPage });
 const adminSettings = createRoute({ getParentRoute: () => adminRoute, path: 'settings', component: SettingsPage });
 const adminYears = createRoute({ getParentRoute: () => adminRoute, path: 'years', component: YearsPage });
+const adminHolidays = createRoute({ getParentRoute: () => adminRoute, path: 'holidays', component: HolidaysPage });
 const adminSubjects = createRoute({ getParentRoute: () => adminRoute, path: 'subjects', component: SubjectsPage });
 const adminClasses = createRoute({
   getParentRoute: () => adminRoute,
@@ -209,7 +211,7 @@ const routeTree = rootRoute.addChildren([
   changePasswordRoute,
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),
-  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminImport, adminReports, adminSpeakers, adminThemes, adminAiTools, adminMaintenance, adminAudit, adminProfile]),
+  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminHolidays, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminImport, adminReports, adminSpeakers, adminThemes, adminAiTools, adminMaintenance, adminAudit, adminProfile]),
   helpRoute,
   oauthConsentRoute,
   aiConnectionReturnRoute,

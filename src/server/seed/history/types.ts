@@ -75,6 +75,8 @@ export interface HistoryRun {
   realNow: number;
   weeks: readonly HistoryWeek[];
   plans: readonly ContextPlan[];
+  /** Monday–Friday and not a closure day of the holiday calendar (S25b, D-186). */
+  schoolDay(date: string): boolean;
   // ---- deterministic randomness (mulberry32)
   rand(): number;
   chance(p: number): boolean;

@@ -1,11 +1,12 @@
-/** School calendar of the demo history: weekends and a few fictional fixed holidays have no school. */
-import { weekdayOf } from '../../../domain/dates.ts';
+/**
+ * School calendar of the demo history: weekends and the school's holiday calendar (S25b, D-186) have
+ * no school. The history adds the built-in Turkish fixed-date holidays to the demo year first (as an
+ * administrator pressing "Add Turkish public holidays" would), so it skips exactly the days the reports
+ * leave out.
+ */
+import { isSchoolDayOn } from '../../../domain/holidays.ts';
 
-/** Days without lessons (MM-DD): fictional fixed holidays (Republic Day, New Year, …). */
-export const HOLIDAYS: ReadonlySet<string> = new Set(['10-29', '01-01', '04-23', '05-01', '05-19']);
-
-/** True when the local date `YYYY-MM-DD` is a school day (not a weekend, not a holiday). */
-export function isSchoolDay(date: string): boolean {
-  const wd = weekdayOf(date);
-  return wd !== 0 && wd !== 6 && !HOLIDAYS.has(date.slice(5));
+/** True when the local date `YYYY-MM-DD` is a school day: Monday–Friday and not a closure day. */
+export function isSchoolDay(date: string, closed: ReadonlySet<string>): boolean {
+  return isSchoolDayOn(date, closed);
 }

@@ -32,6 +32,8 @@ export const ReportCell = z.discriminatedUnion('t', [
   z.object({ t: z.literal('nr') }),
   z.object({ t: z.literal('absent') }),
   z.object({ t: z.literal('na') }),
+  /** A day or week without school on the holiday calendar (S25b, D-186): never 0, never not recorded. */
+  z.object({ t: z.literal('closed') }),
   z.object({ t: z.literal('label'), v: ReportLabel }),
   z.object({ t: z.literal('date'), v: z.string().meta(pii('none')) }),
   z.object({ t: z.literal('range'), from: z.string(), to: z.string() }),

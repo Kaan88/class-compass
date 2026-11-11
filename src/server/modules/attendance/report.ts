@@ -1,7 +1,8 @@
 /**
  * Attendance report section and timeline (RPT-1, RPT-3, RPT-5, ATT-2).
  * - Coverage = school days with any attendance record for the class / school days in the period
- *   (Monday–Friday up to today; there is no holiday calendar, so holidays count as school days).
+ *   (Monday–Friday up to today, without the closure days of the holiday calendar: S25b, D-186; a week
+ *   of only closures reads "no school", never 0 or not recorded).
  * - Per student, every school day they were in the class is present / late / absent / excused /
  *   not recorded, each shown out of those days. Not recorded is never counted as present or absent.
  * Also the lesson attendance helper other sections use ("per attended lesson", exceptions first).
@@ -9,13 +10,14 @@
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { effectiveAttendance, type AttendanceStatus, type EffectiveAttendance } from '../../../domain/attendance.ts';
 import { addDays } from '../../../domain/dates.ts';
+import { weekKind } from '../../../domain/holidays.ts';
 import { schoolDaysBetween, weekStartsBetween } from '../../../domain/periods.ts';
 import type { ReportSectionData, TimelineEvent } from '../../../shared/contracts/reports.ts';
 import type { Db } from '../../db/client.ts';
 import { attendanceDaily, attendanceLessonExceptions } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
-import { col, key, n, NA, range, scopeIds, student, table } from '../reports/cells.ts';
+import { CLOSED, col, key, n, NA, range, scopeIds, student, table } from '../reports/cells.ts';
 
 const STATUSES: readonly AttendanceStatus[] = ['present', 'late', 'absent', 'excused'];
 
@@ -52,7 +54,7 @@ export function lessonAttendance(db: Db, scope: ReportScope): Map<string, Effect
 
 export function attendanceSection(ctx: RequestContext, scope: ReportScope): ReportSectionData {
   const ids = scopeIds(scope);
-  const schoolDays = schoolDaysBetween({ from: scope.from, to: scope.to }, scope.today);
+  const schoolDays = schoolDaysBetween({ from: scope.from, to: scope.to }, scope.today, undefined, scope.closed);
   const daily = dailyMap(ctx.db, scope.cls.id, ids, scope.from, scope.to);
   const recordedDays = new Set([...daily.keys()].map((k) => k.split('|')[1]!));
   const covered = schoolDays.filter((d) => recordedDays.has(d)).length;
@@ -122,7 +124,9 @@ export function attendanceSection(ctx: RequestContext, scope: ReportScope): Repo
             const t = perDay.get(d);
             if (t) for (const st of STATUSES) tally[st] += t[st];
           }
-          return { key: w, cells: [range(w, we), n(recordedInWeek, schoolDaysInWeek), n(tally.present), n(tally.absent), n(tally.late), n(tally.excused)] };
+          // A week of holidays (D-186): "no school" instead of 0 / 0.
+          const closedWeek = schoolDaysInWeek === 0 && weekKind(w, { from: scope.from, to: scope.to }, scope.closed) === 'closed';
+          return { key: w, cells: [range(w, we), closedWeek ? CLOSED : n(recordedInWeek, schoolDaysInWeek), n(tally.present), n(tally.absent), n(tally.late), n(tally.excused)] };
         }),
         chart: { kind: 'bar', labelColumn: 'week', valueColumns: ['present', 'absent', 'late', 'excused'] },
       }),

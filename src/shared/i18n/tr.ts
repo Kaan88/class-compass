@@ -52,6 +52,8 @@ export const tr = {
   'error.STUDENT_DEACTIVATED': 'Bu öğrenci pasif durumda. Bir yönetici yeniden etkinleştirebilir.',
   'error.YEAR_OVERLAP': 'Bu tarihler başka bir eğitim yılıyla çakışıyor.',
   'error.TERM_OUTSIDE_YEAR': 'Bir dönem eğitim yılının dışında kalır. Önce dönem tarihlerini değiştirin.',
+  'error.CLOSURE_OUTSIDE_YEAR': 'Tatil, kendi eğitim yılının içinde olmalıdır. Önce tatilin tarihlerini değiştirin.',
+  'error.TOO_MANY_CLOSURES': 'Bu eğitim yılında çok fazla tatil var. Önce bazılarını silin ya da birleştirin.',
   'error.ENROLMENT_OUTSIDE_YEAR': 'Bazı öğrenciler sınıflarına yeni eğitim yılı tarihlerinin dışında bir tarihte katıldı.',
   'error.MOVE_DATE_OUTSIDE_YEAR': 'Taşıma tarihi yeni sınıfın eğitim yılı içinde olmalıdır.',
   'error.MOVE_DATE_BEFORE_ENROLMENT': 'Taşıma tarihi, öğrencinin şu anki sınıfına katıldığı tarihten önce.',

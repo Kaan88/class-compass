@@ -48,7 +48,11 @@ export const LessonState = z.object({
 });
 export type LessonState = z.infer<typeof LessonState>;
 
-export const Today = z.object({ localDate: z.string(), weekday: z.number().int(), timezone: z.string() });
+/**
+ * Today in the class timezone. `closure`: today is a day without school on the holiday calendar (S25b,
+ * D-186); the classroom shows a calm note and a lesson can still be started (a make-up lesson).
+ */
+export const Today = z.object({ localDate: z.string(), weekday: z.number().int(), timezone: z.string(), closure: z.object({ name: LocalizedText }).nullable() });
 
 /**
  * Polled every 5 s while the classroom is visible. Answers 304 when `If-None-Match` equals the

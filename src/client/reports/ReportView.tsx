@@ -55,6 +55,12 @@ export function CellView({ cell }: { cell: ReportCell }) {
           {reportCellText(cell, locale)}
         </span>
       );
+    case 'closed':
+      return (
+        <span className="cc-metric" data-state="closed">
+          {reportCellText(cell, locale)}
+        </span>
+      );
     case 'days':
       return (
         <span className="cc-metric" data-state={cell.v === null ? 'not-recorded' : 'value'}>

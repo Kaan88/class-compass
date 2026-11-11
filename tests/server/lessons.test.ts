@@ -41,7 +41,7 @@ describe('start and resume (LES-1, LES-2)', () => {
   it('starts a lesson with the default routine; refresh and a second start resume it instead of creating another', async () => {
     const before = await state(s.teacherA, s.ctxA.id);
     expect(before.lesson).toBeNull();
-    expect(before.today).toEqual({ localDate: '2026-11-09', weekday: 1, timezone: 'Europe/Istanbul' });
+    expect(before.today).toEqual({ localDate: '2026-11-09', weekday: 1, timezone: 'Europe/Istanbul', closure: null });
 
     const first = await start(s.teacherA, s.ctxA.id);
     expect(first.started).toBe(true);

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import * as C from '../../../shared/contracts/school.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
+import * as closures from './closures.ts';
 import * as svc from './service.ts';
 
 export function registerSchoolRoutes(app: FastifyInstance, deps: AppDeps) {
@@ -21,6 +22,16 @@ export function registerSchoolRoutes(app: FastifyInstance, deps: AppDeps) {
     svc.deleteTerm(ctx, input.termId);
     return { ok: true as const };
   });
+
+  // school holiday calendar (S25b, D-186)
+  route(app, deps, C.listClosures, (ctx, input) => closures.listClosures(ctx.db, input.yearId));
+  route(app, deps, C.createClosure, (ctx, input) => closures.createClosure(ctx, input));
+  route(app, deps, C.updateClosure, (ctx, input) => closures.updateClosure(ctx, input));
+  route(app, deps, C.deleteClosure, (ctx, input) => {
+    closures.deleteClosure(ctx, input.closureId);
+    return { ok: true as const };
+  });
+  route(app, deps, C.addPublicHolidays, (ctx, input) => closures.addPublicHolidays(ctx, input.yearId));
 
   // subjects
   route(app, deps, C.listSubjects, (ctx, input) => ({ subjects: svc.listSubjects(ctx.db, input.includeArchived ?? false) }));

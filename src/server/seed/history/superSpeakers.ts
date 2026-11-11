@@ -19,7 +19,6 @@ import { pointEvents } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { setModulePolicy } from '../../modules/school/service.ts';
 import { adminVoid, buildBoard, createDisplay, createScorer, ensureSettings, getSettings, participants } from '../../modules/superSpeakers/service.ts';
-import { isSchoolDay } from './calendar.ts';
 import type { HistoryGenerator, HistoryRun } from './types.ts';
 
 const KEY = 'superSpeakers';
@@ -130,7 +129,7 @@ export const superSpeakersGenerator: HistoryGenerator = {
     const lastDay = thisWeekDays[thisWeekDays.length - 1];
     let from: number;
     let to: number;
-    if (isSchoolDay(h.today) && h.at(h.today, '08:35') < latest) [from, to] = [h.at(h.today, '08:30'), Math.min(latest, h.at(h.today, '15:30'))];
+    if (h.schoolDay(h.today) && h.at(h.today, '08:35') < latest) [from, to] = [h.at(h.today, '08:30'), Math.min(latest, h.at(h.today, '15:30'))];
     else if (lastDay) [from, to] = [h.at(lastDay, '15:31'), h.at(lastDay, '15:59')];
     else return;
     if (to - from < 60_000) return;

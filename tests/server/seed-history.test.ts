@@ -77,6 +77,14 @@ describe('seed:demo-history', () => {
     expect(rows(`goal_entries where kind = 'self_assessment'`)).toBeGreaterThan(0);
     expect(rows(`evidence where kind = 'link'`)).toBeGreaterThan(0);
 
+    // Holiday calendar (S25b, D-186): the demo year got the Turkish fixed-date holidays (audited once),
+    // and no lesson or attendance falls on a closure day (29 October 2026 is a Thursday in the history).
+    const closures = env.db.$client.prepare('select starts_on as d from school_closures order by starts_on').all() as Array<{ d: string }>;
+    expect(closures.map((c) => c.d)).toContain('2026-10-29');
+    expect(rows(`audit_events where action = 'closure.add_public_holidays'`)).toBe(1);
+    expect(rows(`lessons where local_date in (select starts_on from school_closures)`)).toBe(0);
+    expect(rows(`attendance_daily where local_date in (select starts_on from school_closures)`)).toBe(0);
+
     // Achievements (S13c): the quiet backfill and later automatic badges, about 40 manual badges (some
     // given in class), the teachers' own badges and one mistaken award revoked with a reason.
     expect(rows(`student_achievements where source = 'backfill' and quiet = 1`)).toBeGreaterThan(0);

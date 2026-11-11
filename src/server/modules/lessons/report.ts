@@ -3,6 +3,7 @@
  * Counts only, each with what it is out of; nothing is combined into a score.
  */
 import { and, eq, gte, lte } from 'drizzle-orm';
+import { weekKind } from '../../../domain/holidays.ts';
 import { weekStartsBetween } from '../../../domain/periods.ts';
 import { addDays } from '../../../domain/dates.ts';
 import type { ReportSectionData, TimelineEvent } from '../../../shared/contracts/reports.ts';
@@ -11,7 +12,7 @@ import { categoryName, categoryNamesOf, getCategory } from '../goals/library.ts'
 import { lessons } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
-import { col, date, key, lbl, n, NR, range, raw, table, text } from '../reports/cells.ts';
+import { CLOSED, col, date, key, lbl, n, NR, range, raw, table, text } from '../reports/cells.ts';
 
 export function overviewSection(ctx: RequestContext, scope: ReportScope): ReportSectionData {
   const abandoned = ctx.db
@@ -37,7 +38,12 @@ export function overviewSection(ctx: RequestContext, scope: ReportScope): Report
         key: 'lessonsPerWeek',
         title: key('report.overview.perWeek'),
         columns: [col('week', key('report.col.week')), col('lessons', key('report.col.lessonsHeld'), true)],
-        rows: weeks.map((w) => ({ key: w, cells: [range(w, addDays(w, 6)), n(scope.lessons.filter((l) => l.localDate >= w && l.localDate <= addDays(w, 6)).length)] })),
+        rows: weeks.map((w) => {
+          const held = scope.lessons.filter((l) => l.localDate >= w && l.localDate <= addDays(w, 6)).length;
+          // A week of holidays without a (make-up) lesson says "no school", not 0 (D-186).
+          const closedWeek = held === 0 && weekKind(w, { from: scope.from, to: scope.to }, scope.closed) === 'closed';
+          return { key: w, cells: [range(w, addDays(w, 6)), closedWeek ? CLOSED : n(held)] };
+        }),
         chart: { kind: 'bar', labelColumn: 'week', valueColumns: ['lessons'] },
       }),
     ],

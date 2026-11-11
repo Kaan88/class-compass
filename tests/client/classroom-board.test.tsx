@@ -64,7 +64,7 @@ function renderBoard(context: ClassroomContext, stored: ClassroomLayout | null) 
     etag: null,
     data: {
       lesson,
-      today: { localDate: '2026-11-09', weekday: 1, timezone: 'Europe/Istanbul' },
+      today: { localDate: '2026-11-09', weekday: 1, timezone: 'Europe/Istanbul', closure: null },
       serverNow: Date.UTC(2026, 10, 9, 8),
       attendanceStamp: 'off',
       counters: null,
