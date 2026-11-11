@@ -25,6 +25,7 @@ const closures = async () => (await ok(s.admin.get(`/api/admin/years/${s.year.id
 const addClosure = (body: Record<string, unknown>) => s.admin.post(`/api/admin/years/${s.year.id}/closures`, body);
 const section = (r: Report, key: string): ReportSection => r.sections.find((x) => x.key === key)!;
 const metric = (sec: ReportSection, key: string): ReportCell => sec.metrics.find((m) => m.key === key)!.cell;
+const CLOSED: ReportCell = { t: 'closed' };
 const weekCell = (sec: ReportSection, table: string, week: string, i: number): ReportCell => sec.tables.find((t) => t.key === table)!.rows.find((r) => r.key === week)!.cells[i]!;
 
 describe('the holiday calendar (D-186, DAT-1)', () => {
@@ -119,6 +120,48 @@ describe('coverage and denominators leave closure days out (RPT-5, D-186)', () =
     expect(perStudent.rows[0]!.cells[col]).toEqual({ t: 'closed' });
   });
 
+  it('a period of only closure days reads "no school": coverage, every student, the weeks, goals and usage (review fix)', async () => {
+    env.db.$client.prepare("update enrolments set from_date = '2026-09-01'").run();
+    await ok(addClosure({ name: { en: 'Autumn break' }, startsOn: '2026-11-02', endsOn: '2026-11-06' }));
+    const r: Report = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?from=2026-11-02&to=2026-11-06`));
+    const att = section(r, 'attendance');
+    expect(metric(att, 'coverage')).toEqual(CLOSED);
+    // Enrolled all along: "no school", never "not in the class".
+    for (const row of att.tables.find((t) => t.key === 'students')!.rows) expect(row.cells.slice(1)).toEqual(Array(6).fill(CLOSED));
+    // Every count of a week of holidays, not just the recorded days: never a bare 0.
+    expect(att.tables.find((t) => t.key === 'weeks')!.rows.find((x) => x.key === '2026-11-02')!.cells.slice(1)).toEqual(Array(5).fill(CLOSED));
+    expect(section(r, 'goals').tables.find((t) => t.key === 'confidenceHistory')!.rows.find((x) => x.key === '2026-11-02')!.cells.slice(1)).toEqual(Array(6).fill(CLOSED));
+    const usage = (await ok(s.admin.get('/api/admin/reports/usage?from=2026-11-02&to=2026-11-06'))).sections[0] as ReportSection;
+    expect(metric(usage, 'schoolDays')).toEqual(CLOSED);
+    const ctxRow = usage.tables.find((t) => t.key === 'contexts')!.rows.find((x) => x.key === s.ctxA.id)!;
+    expect(ctxRow.cells[4]).toEqual(CLOSED);
+    for (const row of usage.tables.find((t) => t.key === 'teachers')!.rows) expect(row.cells[3]).toEqual(CLOSED);
+  });
+
+  it('the current week is decided by its days up to today: Monday a holiday reads "no school" on Monday (review fix)', async () => {
+    env.db.$client.prepare("update enrolments set from_date = '2026-09-01'").run();
+    await ok(addClosure({ name: { en: 'Snow day' }, startsOn: '2026-11-09', endsOn: '2026-11-09' }));
+    const r: Report = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?from=2026-11-02&to=2026-11-13`));
+    const att = section(r, 'attendance');
+    expect(att.tables.find((t) => t.key === 'weeks')!.rows.find((x) => x.key === '2026-11-09')!.cells.slice(1)).toEqual(Array(5).fill(CLOSED));
+    expect(metric(att, 'coverage')).toEqual({ t: 'n', v: 0, d: 5 });
+  });
+
+  it('attendance taken on a closure day (a make-up lesson) is left out of every attendance table, so they agree (review fix)', async () => {
+    env.db.$client.prepare("update enrolments set from_date = '2026-09-01'").run();
+    const [ece, arda] = (env.db.$client.prepare('select id from students order by full_name').all() as Array<{ id: string }>).map((x) => x.id);
+    const ins = env.db.$client.prepare('insert into attendance_daily (id, student_id, class_id, local_date, status, recorded_by, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)');
+    const now = env.clock.now();
+    for (const [sid, d, st] of [[arda, '2026-10-19', 'present'], [ece, '2026-10-19', 'absent'], [arda, '2026-10-20', 'present'], [ece, '2026-10-20', 'present']] as const) ins.run(crypto.randomUUID(), sid, s.c3a.id, d, st, s.ayse.id, now, now);
+    await ok(addClosure({ name: { en: 'Make-up Monday' }, startsOn: '2026-10-19', endsOn: '2026-10-19' }));
+    const att = section(await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?from=2026-10-19&to=2026-10-23`)), 'attendance');
+    expect(att.tables.find((t) => t.key === 'weeks')!.rows[0]!.cells.slice(1)).toEqual([{ t: 'n', v: 1, d: 4 }, { t: 'n', v: 2 }, { t: 'n', v: 0 }, { t: 'n', v: 0 }, { t: 'n', v: 0 }]);
+    const students = att.tables.find((t) => t.key === 'students')!;
+    const present = students.rows.map((row) => row.cells[2] as { v: number }).reduce((a, c) => a + c.v, 0);
+    const absent = students.rows.map((row) => row.cells[4] as { v: number }).reduce((a, c) => a + c.v, 0);
+    expect([present, absent]).toEqual([2, 0]);
+  });
+
   it('"no school" is a word in both languages, never 0', () => {
     expect(reportCellText({ t: 'closed' }, 'en')).toBe('no school');
     expect(reportCellText({ t: 'closed' }, 'tr')).toBe('okul yok');
@@ -133,6 +176,17 @@ describe('the classroom on a closure day (LES-1, AST-1, D-186)', () => {
     expect(st.assistant).toMatchObject({ schoolDay: false, assistant: null });
     const l = await startLesson(s.teacherA, s.ctxA.id, { othersPresent: true });
     expect((await lessonState(s.teacherA, s.ctxA.id)).lesson.id).toBe(l);
+  });
+
+  it('an assistant planned before the day became a closure is not shown and not counted as a turn (AST-4/5, review fix)', async () => {
+    const before = await lessonState(s.teacherA, s.ctxA.id);
+    expect(before.assistant.assistant).not.toBeNull();
+    await ok(addClosure({ name: { en: 'Teacher training day' }, startsOn: '2026-11-09', endsOn: '2026-11-09' }));
+    expect((await lessonState(s.teacherA, s.ctxA.id)).assistant).toMatchObject({ schoolDay: false, assistant: null });
+    const r: Report = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/report?from=2026-11-02&to=2026-11-09`));
+    const asst = section(r, 'assistant');
+    expect(metric(asst, 'days')).toEqual({ t: 'n', v: 0, d: 0 });
+    for (const row of asst.tables.find((t) => t.key === 'students')!.rows) expect(row.cells[1]).not.toEqual({ t: 'n', v: 1, d: 1 });
   });
 
   it('a closure added for today changes the polled ETag', async () => {

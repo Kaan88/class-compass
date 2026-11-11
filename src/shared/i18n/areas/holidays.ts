@@ -31,7 +31,10 @@ export const en = {
   'holidays.public.button': 'Add Turkish public holidays for this school year',
   'holidays.public.explain': 'Adds the fixed-date national holidays that fall inside this school year, one day each: 1 January, 23 April, 1 May, 19 May, 15 July, 30 August and 29 October. A day that is already on the calendar is skipped, so you can press it again safely.',
   'holidays.public.religious': 'Ramazan Bayramı and Kurban Bayramı move every year, so they are not in the list: add them by hand with “Add a holiday”, with the dates the ministry announces (and the semester break). Class Compass looks nothing up on the internet.',
-  'holidays.public.added': '{added} public holidays added; {skipped} were on the calendar already.',
+  'holidays.public.added': '{count} public holidays added.',
+  'holidays.public.added.one': 'One public holiday added.',
+  'holidays.public.skipped': '{count} were on the calendar already.',
+  'holidays.public.skipped.one': 'One was on the calendar already.',
   'holidays.public.nothing': 'Nothing to add: the public holidays of this school year are on the calendar already.',
 };
 
@@ -60,7 +63,10 @@ export const tr: Record<keyof typeof en, string> = {
   'holidays.public.button': 'Bu eğitim yılına resmî tatilleri ekle',
   'holidays.public.explain': 'Bu eğitim yılına denk gelen sabit tarihli millî tatilleri birer gün olarak ekler: 1 Ocak, 23 Nisan, 1 Mayıs, 19 Mayıs, 15 Temmuz, 30 Ağustos ve 29 Ekim. Takvimde zaten olan günler atlanır; düğmeye yeniden basmak sorun olmaz.',
   'holidays.public.religious': 'Ramazan Bayramı ve Kurban Bayramı her yıl başka tarihe denk gelir, bu yüzden listede yoktur: bakanlığın açıkladığı tarihlerle “Tatil ekle” ile siz ekleyin (yarıyıl tatilini de). Class Compass internette hiçbir şey aramaz.',
-  'holidays.public.added': '{added} resmî tatil eklendi; {skipped} tanesi takvimde zaten vardı.',
+  'holidays.public.added': '{count} resmî tatil eklendi.',
+  'holidays.public.added.one': 'Bir resmî tatil eklendi.',
+  'holidays.public.skipped': '{count} tanesi takvimde zaten vardı.',
+  'holidays.public.skipped.one': 'Biri takvimde zaten vardı.',
   'holidays.public.nothing': 'Eklenecek bir şey yok: bu eğitim yılının resmî tatilleri takvimde zaten var.',
 };
 

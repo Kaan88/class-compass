@@ -49,8 +49,10 @@ test('admin adds a holiday and the report denominator changes, then deletes it @
     await expect(page.getByText(/Ramazan Bayramı and Kurban Bayramı move every year/u)).toBeVisible();
     // Adds the fixed-date public holidays inside the year (or nothing, when seed:demo-history added them).
     await page.getByRole('button', { name: 'Add Turkish public holidays for this school year' }).click();
-    await expect(page.getByText(/Nothing to add|public holidays added/u).first()).toBeVisible();
+    await expect(page.getByText(/Nothing to add|public holidays? added/u).first()).toBeVisible();
     await expect(page.getByRole('row').filter({ hasText: 'Republic Day' })).toBeVisible();
+    // The toast fades in: axe reads its contrast only once the animation is over (it was flaky on mobile).
+    await page.getByTestId('toast').first().evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
     expect(await seriousViolations(page)).toEqual([]);
 
     await page.getByRole('button', { name: 'Add a holiday' }).click();

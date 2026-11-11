@@ -79,7 +79,7 @@ What a holiday changes:
 
 - **Reports** leave holidays out of every school-day count: attendance coverage (days recorded / school days), the school days of a student in the class, and the school days of the school-wide usage report. A week made only of holidays says **no school**, never 0 or "not recorded".
 - The **Daily assistant** has nobody on duty on a holiday.
-- On the **classroom screen** a calm note says that today is a holiday (with its name). A teacher can still **Start lesson**, for a make-up lesson; such a lesson counts like any other.
+- On the **classroom screen** a calm note says that today is a holiday (with its name). A teacher can still **Start lesson**, for a make-up lesson; such a lesson counts like any other, but attendance taken that day is not counted in the attendance tables (it is still no school day) and nobody is the daily assistant.
 
 Holidays of an archived year cannot be changed. Every change is in the audit log.
 

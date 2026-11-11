@@ -1651,7 +1651,7 @@ export const en = {
   'report.attendance.byStudent': 'By student',
   'report.attendance.byStudentNote': 'Each figure is out of the school days the student was in the class. Not recorded is never counted as present or absent.',
   'report.attendance.byWeek': 'By week',
-  'report.attendance.holidaysNote': 'School holidays from the holiday calendar (Admin → School holidays) are not school days: they are left out of every count, and a week of holidays says “no school”.',
+  'report.attendance.holidaysNote': 'School holidays from the holiday calendar (Admin → School holidays) are not school days: they are left out of every count, and a week of holidays says “no school”. Attendance taken on a holiday (a make-up lesson) is not counted either.',
   'report.counters.intro': 'Each counter is shown on its own. Counts are never added up across counters or turned into a score.',
   'report.counters.perLesson': 'Per lesson',
   'report.counters.perLessonNote': 'Undone taps are not counted in the total.',

@@ -1648,7 +1648,7 @@ export const tr = {
   'report.attendance.byStudent': 'Öğrenciye göre',
   'report.attendance.byStudentNote': 'Her sayı, öğrencinin sınıfta olduğu okul günleri üzerindendir. Kaydedilmeyen günler var ya da yok sayılmaz.',
   'report.attendance.byWeek': 'Haftaya göre',
-  'report.attendance.holidaysNote': 'Tatil takvimindeki tatiller (Yönetim → Okul tatilleri) okul günü sayılmaz: hiçbir sayıma girmez, tamamı tatil olan bir hafta “okul yok” olarak görünür.',
+  'report.attendance.holidaysNote': 'Tatil takvimindeki tatiller (Yönetim → Okul tatilleri) okul günü sayılmaz: hiçbir sayıma girmez, tamamı tatil olan bir hafta “okul yok” olarak görünür. Tatil gününde (telafi dersinde) alınan yoklama da sayılmaz.',
   'report.counters.intro': 'Her sayaç ayrı gösterilir. Sayılar sayaçlar arasında toplanmaz ve puana dönüştürülmez.',
   'report.counters.perLesson': 'Derse göre',
   'report.counters.perLessonNote': 'Geri alınan dokunuşlar toplama katılmaz.',

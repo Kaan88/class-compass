@@ -110,10 +110,15 @@ export function HolidaysPage() {
   const [editing, setEditing] = useState<Closure | null>(null);
   const readOnly = year?.archived ?? true;
 
+  const addedText = (added: number, skipped: number) => {
+    const a = added === 1 ? t('holidays.public.added.one') : t('holidays.public.added', { count: added });
+    if (!skipped) return a;
+    return `${a} ${skipped === 1 ? t('holidays.public.skipped.one') : t('holidays.public.skipped', { count: skipped })}`;
+  };
   const addPublic = async () => {
     if (!year) return;
     const r = await run(() => call(S.addPublicHolidays, { yearId: year.id }), { invalidate: [closuresKey(year.id)] });
-    if (r) showToast({ message: r.added ? t('holidays.public.added', { added: r.added, skipped: r.skipped }) : t('holidays.public.nothing'), kind: 'success' });
+    if (r) showToast({ message: r.added ? addedText(r.added, r.skipped) : t('holidays.public.nothing'), kind: 'success' });
   };
   const daysText = (n: number) => (n === 0 ? t('holidays.schoolDays.zero') : n === 1 ? t('holidays.schoolDays.one') : t('holidays.schoolDays', { count: n }));
 

@@ -21,7 +21,7 @@ import { planAssistants, nextAssistant, weekDates, type TurnInfo } from '../../.
 import { isAway } from '../../../domain/attendance.ts';
 import { weekStartOfDate } from '../../../domain/counters.ts';
 import { addDays, weekdayOf } from '../../../domain/dates.ts';
-import { closedDatesOfYear, closureOn } from '../school/closures.ts';
+import { closedDatesBetween, closedDatesOfYear, closureOn } from '../school/closures.ts';
 import type * as C from '../../../shared/contracts/assistant.ts';
 import { DEFAULT_SCHOOL_DAYS, type AssistantPlan, type AssistantStudent, type AssistantToday } from '../../../shared/contracts/assistant.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
@@ -175,9 +175,11 @@ function turnCounts(db: Db, contextId: string, schoolYearId: string, exclude: Re
     .from(assistantAssignments)
     .where(and(eq(assistantAssignments.contextId, contextId), eq(assistantAssignments.schoolYearId, schoolYearId)))
     .all();
+  // A turn on a closure day of the holiday calendar was no turn (S25b, D-186): it does not move the rotation.
+  const closed = closedDatesOfYear(db, schoolYearId);
   const out = new Map<string, TurnInfo>();
   for (const r of rows) {
-    if (exclude.has(r.localDate)) continue;
+    if (exclude.has(r.localDate) || closed.has(r.localDate)) continue;
     const id = effective(r);
     if (!id) continue;
     const cur = out.get(id) ?? { count: 0, last: null };
@@ -416,8 +418,10 @@ export function ensureToday(ctx: RequestContext, context: ContextRow): { today: 
   const today = todayFor(ctx, cls);
   const year = getYear(ctx.db, cls.schoolYearId);
   // A closure day of the holiday calendar has no assistant (S25b, D-186), even if a make-up lesson is held.
-  const schoolDay = schoolDaysOf(ctx.db, context.id).includes(weekdayOf(today)) && today >= year.startsOn && today <= year.endsOn && closureOn(ctx.db, year.id, today) === null;
-  if (!isWritable(ctx.db, cls)) return { today, schoolDay, row: getAssignment(ctx.db, context.id, today) ?? null };
+  // An assignment planned before the day became a closure is kept in the table but not shown or used.
+  const closed = closureOn(ctx.db, year.id, today) !== null;
+  const schoolDay = schoolDaysOf(ctx.db, context.id).includes(weekdayOf(today)) && today >= year.startsOn && today <= year.endsOn && !closed;
+  if (!isWritable(ctx.db, cls)) return { today, schoolDay, row: closed ? null : (getAssignment(ctx.db, context.id, today) ?? null) };
   const row = tx(ctx.db, () => {
     ensureResponsibilities(ctx, context);
     let r: AssignmentRow | null = getAssignment(ctx.db, context.id, today) ?? null;
@@ -431,7 +435,7 @@ export function ensureToday(ctx: RequestContext, context: ContextRow): { today: 
     }
     // Today first, so later days continue the rotation after it.
     refreshLaterDays(ctx, context, cls, today);
-    return r;
+    return closed ? null : r;
   });
   return { today, schoolDay, row };
 }
@@ -470,6 +474,8 @@ export function assistantStamp(ctx: RequestContext, context: ContextRow): string
 /** End Lesson step 'assistantThanks' (optional). */
 export function endStep(ctx: RequestContext, lesson: LessonRow, data: z.infer<typeof C.AssistantEndStepInput>): void {
   if (!data.thanked) return;
+  // No assistant on a closure day (a make-up lesson, D-186).
+  if (closedDatesBetween(ctx.db, lesson.localDate, lesson.localDate).has(lesson.localDate)) return;
   const row = getAssignment(ctx.db, lesson.contextId, lesson.localDate);
   if (!row || !effective(row) || row.thankedAt) return;
   const now = ctx.now();

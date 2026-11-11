@@ -11,12 +11,13 @@
  */
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { addDays, localDate } from '../../../domain/dates.ts';
+import { weekKind } from '../../../domain/holidays.ts';
 import { weekStartsBetween } from '../../../domain/periods.ts';
 import type { ReportSectionData, TimelineEvent } from '../../../shared/contracts/reports.ts';
 import { evidence, GOAL_ENTRY_KINDS, goalEntries, goals, skillCategories, teacherAssessments } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
-import { col, date, key, lbl, n, NA, NR, range, scopeIds, student, table, text } from '../reports/cells.ts';
+import { CLOSED, col, date, key, lbl, n, NA, NR, range, scopeIds, student, table, text } from '../reports/cells.ts';
 import { categoryName, categoryNamesOf, outcomesOf } from './library.ts';
 
 const CONFIDENCE = [1, 2, 3, 4, 5] as const;
@@ -222,6 +223,8 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
         rows: weeks.map((w) => {
           const we = addDays(w, 6);
           const inWeek = selfInWeek.get(w) ?? [];
+          // A week of holidays without any self-assessment: "no school" (D-186), never 0 or not recorded.
+          if (!inWeek.length && weekKind(w, { from: scope.from, to: scope.to }, scope.closed) === 'closed') return { key: w, cells: [range(w, we), CLOSED, ...CONFIDENCE.map(() => CLOSED)] };
           // A week without any self-assessment has no distribution: "not recorded", never 0 of 0.
           return { key: w, cells: [range(w, we), n(inWeek.length), ...CONFIDENCE.map((c) => (inWeek.length ? n(inWeek.filter((e) => e.confidence === c).length, inWeek.length) : NR))] };
         }),

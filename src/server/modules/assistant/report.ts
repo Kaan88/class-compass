@@ -1,7 +1,8 @@
 /**
  * Assistant fairness report (RPT-1, RPT-5, AST-4/5). Per student, in the period: turns done (the
  * effective assistant = actual ?? planned), turns missed because they were away (kept, never lost),
- * the last turn and the days since it. Days still to come are not counted.
+ * the last turn and the days since it. Days still to come are not counted, nor closure days of the
+ * holiday calendar (S25b, D-186: nobody is the assistant on a day without school).
  */
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { daysBetween } from '../../../domain/periods.ts';
@@ -19,7 +20,8 @@ function daysIn(ctx: RequestContext, scope: ReportScope) {
     .from(assistantAssignments)
     .where(and(eq(assistantAssignments.contextId, scope.context.id), gte(assistantAssignments.localDate, scope.from), lte(assistantAssignments.localDate, end)))
     .orderBy(asc(assistantAssignments.localDate))
-    .all();
+    .all()
+    .filter((r) => !scope.closed.has(r.localDate));
 }
 
 const who = (r: { actualStudentId: string | null; plannedStudentId: string | null }) => r.actualStudentId ?? r.plannedStudentId;

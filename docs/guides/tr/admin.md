@@ -79,7 +79,7 @@ Tatil neyi değiştirir:
 
 - **Raporlar** tatilleri hiçbir okul günü sayımına katmaz: yoklama kapsamı (kaydedilen gün / okul günü), öğrencinin sınıfta olduğu okul günleri ve okul geneli kullanım raporundaki okul günleri. Yalnızca tatillerden oluşan bir hafta **okul yok** olarak görünür; asla 0 ya da "kaydedilmedi" değil.
 - **Günün Yardımcısı** tatil gününde görev almaz.
-- **Sınıf ekranında** sakin bir not bugünün tatil olduğunu (adıyla) söyler. Öğretmen yine de **Dersi başlat**'a basabilir, örneğin telafi dersi için; bu ders diğer dersler gibi sayılır.
+- **Sınıf ekranında** sakin bir not bugünün tatil olduğunu (adıyla) söyler. Öğretmen yine de **Dersi başlat**'a basabilir, örneğin telafi dersi için; bu ders diğer dersler gibi sayılır, ama o gün alınan yoklama raporun yoklama tablolarında sayılmaz (gün yine okul günü sayılmaz) ve günün yardımcısı olmaz.
 
 Arşivlenen bir yılın tatilleri değiştirilemez. Her değişiklik denetim kaydına geçer.
 

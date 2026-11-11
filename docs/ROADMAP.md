@@ -496,6 +496,7 @@ Decision D-186; migration 0032 (`school_closures`).
 - [x] Classroom on a closure day: a calm note on the no-lesson card, a lesson can still be started (make-up lesson); no assistant on duty
 - [x] Demo history: the Turkish fixed-date holidays are added to the demo year and every closure day is skipped
 - [x] Tests: `tests/domain/holidays.test.ts`, `tests/server/holidays.test.ts`, `tests/server/seed-history.test.ts`, `e2e/holidays.spec.ts`
+- [x] Review fixes: a period or current week of only closures reads "no school" in every count (attendance, goals confidence history, usage); attendance recorded on a closure day stays out of every attendance table; an assistant planned before the day became a closure is not shown, thanked or counted; the public-holiday message in singular and plural
 - [ ] Half days (the afternoon of 28 October, the eves of the religious holidays): out of scope
 - [ ] Guide screenshot of the new page (with the next screenshot pass)
 

@@ -2,7 +2,10 @@
  * Attendance report section and timeline (RPT-1, RPT-3, RPT-5, ATT-2).
  * - Coverage = school days with any attendance record for the class / school days in the period
  *   (Monday–Friday up to today, without the closure days of the holiday calendar: S25b, D-186; a week
- *   of only closures reads "no school", never 0 or not recorded).
+ *   of only closures reads "no school", never 0 or not recorded). A period, a student's days in the class
+ *   or a week whose weekdays up to today are all closures reads "no school" too (CLOSED).
+ * - Records on a closure day (a make-up lesson, D-186) are left out of every table of this section, the
+ *   weekly tallies included, so the per-student and the weekly numbers always agree.
  * - Per student, every school day they were in the class is present / late / absent / excused /
  *   not recorded, each shown out of those days. Not recorded is never counted as present or absent.
  * Also the lesson attendance helper other sections use ("per attended lesson", exceptions first).
@@ -55,6 +58,9 @@ export function lessonAttendance(db: Db, scope: ReportScope): Map<string, Effect
 export function attendanceSection(ctx: RequestContext, scope: ReportScope): ReportSectionData {
   const ids = scopeIds(scope);
   const schoolDays = schoolDaysBetween({ from: scope.from, to: scope.to }, scope.today, undefined, scope.closed);
+  // Weekdays up to today with the closures still in: tells "only holidays" (CLOSED) from "nothing yet".
+  const weekdays = schoolDaysBetween({ from: scope.from, to: scope.to }, scope.today);
+  const lastDay = scope.to < scope.today ? scope.to : scope.today;
   const daily = dailyMap(ctx.db, scope.cls.id, ids, scope.from, scope.to);
   const recordedDays = new Set([...daily.keys()].map((k) => k.split('|')[1]!));
   const covered = schoolDays.filter((d) => recordedDays.has(d)).length;
@@ -62,26 +68,30 @@ export function attendanceSection(ctx: RequestContext, scope: ReportScope): Repo
     const days = schoolDays.filter((d) => scope.enrolledOn(s.id, d));
     const counts: Record<EffectiveAttendance, number> = { present: 0, late: 0, absent: 0, excused: 0, not_recorded: 0 };
     for (const d of days) counts[daily.get(`${s.id}|${d}`) ?? 'not_recorded'] += 1;
-    return { s, days: days.length, counts };
+    // In the class only on closure days: "no school", not "not in the class".
+    const onlyClosed = !days.length && weekdays.some((d) => scope.closed.has(d) && scope.enrolledOn(s.id, d));
+    return { s, days: days.length, counts, onlyClosed };
   });
   const lessonsRecorded = scope.lessons.filter((l) => ids.some((sid) => daily.has(`${sid}|${l.localDate}`))).length;
   const weeks = weekStartsBetween({ from: scope.from, to: scope.to }, scope.weekStartsOn);
   // The daily rows tallied per day once (D-162); a week then adds up its seven days instead of scanning
   // every row again for every week.
   const perDay = new Map<string, Record<AttendanceStatus, number>>();
+  const schoolDaySet = new Set(schoolDays);
   for (const [k, st] of daily) {
     const d = k.slice(k.indexOf('|') + 1);
+    if (!schoolDaySet.has(d)) continue;
     let t = perDay.get(d);
     if (!t) perDay.set(d, (t = { present: 0, late: 0, absent: 0, excused: 0 }));
     t[st] += 1;
   }
-  const schoolDaySet = new Set(schoolDays);
+  const allClosed = !schoolDays.length && weekdays.length > 0;
   return {
     key: 'attendance',
     title: key('report.section.attendance'),
     intro: key('report.attendance.intro'),
     metrics: [
-      { key: 'coverage', label: key('report.attendance.coverage'), cell: n(covered, schoolDays.length) },
+      { key: 'coverage', label: key('report.attendance.coverage'), cell: allClosed ? CLOSED : n(covered, schoolDays.length) },
       { key: 'lessonsRecorded', label: key('report.attendance.lessonsRecorded'), cell: n(lessonsRecorded, scope.lessons.length) },
     ],
     tables: [
@@ -95,10 +105,10 @@ export function attendanceSection(ctx: RequestContext, scope: ReportScope): Repo
           ...STATUSES.map((st) => col(st, key(`attendance.status.${st}`), true)),
           col('not_recorded', key('attendance.status.not_recorded'), true),
         ],
-        rows: perStudent.map(({ s, days, counts }) => ({
-          key: s.id,
-          cells: [student(s), days ? n(days) : NA, ...[...STATUSES, 'not_recorded' as const].map((st) => (days ? n(counts[st], days) : NA))],
-        })),
+        rows: perStudent.map(({ s, days, counts, onlyClosed }) => {
+          const empty = onlyClosed ? CLOSED : NA;
+          return { key: s.id, cells: [student(s), days ? n(days) : empty, ...[...STATUSES, 'not_recorded' as const].map((st) => (days ? n(counts[st], days) : empty))] };
+        }),
       }),
       table({
         key: 'weeks',
@@ -124,9 +134,12 @@ export function attendanceSection(ctx: RequestContext, scope: ReportScope): Repo
             const t = perDay.get(d);
             if (t) for (const st of STATUSES) tally[st] += t[st];
           }
-          // A week of holidays (D-186): "no school" instead of 0 / 0.
-          const closedWeek = schoolDaysInWeek === 0 && weekKind(w, { from: scope.from, to: scope.to }, scope.closed) === 'closed';
-          return { key: w, cells: [range(w, we), closedWeek ? CLOSED : n(recordedInWeek, schoolDaysInWeek), n(tally.present), n(tally.absent), n(tally.late), n(tally.excused)] };
+          // A week of holidays (D-186): "no school" instead of 0 / 0 in every count. Decided from the days
+          // up to today (the current week); a week still to come by all its days.
+          const sofar = weekKind(w, { from: scope.from, to: lastDay }, scope.closed);
+          const closedWeek = schoolDaysInWeek === 0 && (sofar === 'closed' || (sofar === 'none' && weekKind(w, { from: scope.from, to: scope.to }, scope.closed) === 'closed'));
+          if (closedWeek) return { key: w, cells: [range(w, we), CLOSED, CLOSED, CLOSED, CLOSED, CLOSED] };
+          return { key: w, cells: [range(w, we), n(recordedInWeek, schoolDaysInWeek), n(tally.present), n(tally.absent), n(tally.late), n(tally.excused)] };
         }),
         chart: { kind: 'bar', labelColumn: 'week', valueColumns: ['present', 'absent', 'late', 'excused'] },
       }),
