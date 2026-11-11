@@ -31,7 +31,7 @@ import { CelebrationLayer } from '../themes/Celebration.tsx';
 import { useCelebrateNewAchievements } from './AchievementsSection.tsx';
 import { AvatarPanel } from './AvatarPanel.tsx';
 import { navHref, useStudentNav, type NavApi, type Screen } from './nav.ts';
-import { tilesOf, type Tile } from './sections.tsx';
+import { preloadWritingScreens, tilesOf, type Tile } from './sections.tsx';
 import { displayLocale, type ClassLanguage } from '../../shared/classLanguage.ts';
 
 const LOCALE_KEY = 'cc.studentLocale';
@@ -199,6 +199,11 @@ function Page({ onLanguage, nav }: { onLanguage: (l: ClassLanguage) => void; nav
     if (q.data) setDisplay({ theme: q.data.theme });
     if (q.data) onLanguage(q.data.language);
   }, [q.data, onLanguage]);
+  // S26c (D-191): once the page has rendered, fetch the lazy writing screens so opening one does not wait.
+  const loaded = Boolean(q.data);
+  useEffect(() => {
+    if (loaded) preloadWritingScreens();
+  }, [loaded]);
   // New achievements are celebrated on whichever screen the page opens (D-122).
   useCelebrateNewAchievements(
     (q.data?.subjects ?? []).flatMap((s) => s.sections.flatMap((x) => (x.key === 'achievements' ? [{ subjectId: s.subjectId, data: x.data }] : []))),
@@ -248,7 +253,10 @@ function Page({ onLanguage, nav }: { onLanguage: (l: ClassLanguage) => void; nav
   else if (tile && subject)
     content = (
       <ScreenFrame title={t(tile.label)} subjectName={subjectName} back={nav.back}>
-        {tile.render({ subjectId: subject.subjectId, media: page.media, nav: nav.nav, go: nav.go, finish: nav.finish, titleId: SCREEN_TITLE_ID })}
+        {/* S26c (D-191): the writing screens are lazy chunks, normally preloaded by then. */}
+        <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
+          {tile.render({ subjectId: subject.subjectId, media: page.media, nav: nav.nav, go: nav.go, finish: nav.finish, titleId: SCREEN_TITLE_ID })}
+        </Suspense>
       </ScreenFrame>
     );
   else

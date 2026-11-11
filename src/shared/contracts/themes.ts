@@ -4,8 +4,7 @@
  * built-in themes for classes and the Super Speakers board.
  */
 import { z } from 'zod';
-import { THEME_ISSUE_CODES } from '../themePackage/validate.ts';
-import { ThemeSlug } from '../themePackage/schema.ts';
+import { THEME_ISSUE_CODES, ThemeSlug } from '../themePackage/contractParts.ts';
 import { THEME_KEYS } from '../themes.ts';
 import { endpoint, Empty, pii } from './define.ts';
 

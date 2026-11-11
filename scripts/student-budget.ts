@@ -24,6 +24,8 @@ import { gzipSync } from 'node:zlib';
  * S23a (D-182, 2026-11-11): the page had reached 460.0 kB (459 997 B); the dictionary it loads now holds
  * only the strings it can show (EN+TR 119.5 kB → 22.2 kB gzip; the rest is the staff dictionary), so
  * the page is at 362.7 kB, about 97 kB under the unchanged budget.
+ * S26c (D-191): shared code it never used split off and the writing screens lazy: 368.6 → 345.1 kB, entry
+ * 21.3 → 10.2 kB (`tests/scripts/student-imports.test.ts` keeps it that way).
  */
 export const STUDENT_BUDGET = { total: 460_000, entry: 26_000 } as const;
 

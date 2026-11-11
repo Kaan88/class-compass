@@ -22,7 +22,8 @@ import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { IconCheck, IconFace, IconPencil, IconPlus, IconTrash, IconUpload } from '../../ui/icons.tsx';
 import { InlineConfirmButton } from '../../ui/InlineConfirm.tsx';
-import { startersOf, useSaveCheck, useStudentRun } from '../common.tsx';
+import { startersOf, useSaveCheck } from '../common.tsx';
+import { useStudentRun } from '../run.ts';
 import { SentenceStarters } from '../SentenceStarters.tsx';
 import type { ScreenProps } from '../sections.tsx';
 

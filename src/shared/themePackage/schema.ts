@@ -9,7 +9,8 @@
  * Objects are strict: an unknown or misspelt field is an error rather than silently ignored.
  */
 import { z } from 'zod';
-import { THEME_KEYS, THEME_SLUG } from '../themes.ts';
+import { THEME_KEYS } from '../themes.ts';
+import { ThemeSlug } from './contractParts.ts';
 import { CREATURE_FAMILY_KEYS, type CreatureFamily } from '../avatars.ts';
 import { BOX_KEYS } from '../classroomLayout.ts';
 import {
@@ -49,7 +50,7 @@ const plainText = (max: number) =>
     .regex(/^[^\p{Cc}\p{Cf}]*$/u, 'no control or format characters');
 const Labels = (max: number) => z.strictObject({ en: plainText(max), tr: plainText(max) });
 
-export const ThemeSlug = z.string().regex(THEME_SLUG, 'a slug: 3-32 lower-case letters, digits and single hyphens, starting with a letter');
+export { ThemeSlug };
 export const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/u, '#rrggbb or #rrggbbaa');
 /** An opaque colour: every token except the translucent layers (`TRANSLUCENT_COLOR_TOKENS`). */
 export const OpaqueHexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/u, '#rrggbb (opaque; only overlay, shadow-color and avatar-outline may be translucent)');

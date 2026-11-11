@@ -5,30 +5,33 @@
  *   in it can become arbitrary CSS), maps presets to values, builds the sound pack with
  *   `makeSoundPack`, and draws art only through the SVG sanitiser and `SvgTree`. Anything missing
  *   (art, colour tokens added after the package was made) comes from its base theme.
- * - `loadThemePackage(key)` fetches an enabled package the page needs (`GET /api/themes/custom/:key`,
- *   public, also allowed on the Super Speakers host) and registers it, and later re-checks it (ETag) so
- *   a replaced package appears without a reload; `installThemeStyles` calls it whenever the display
- *   changes, when the page becomes visible and every few minutes, so every entry (classroom, student
- *   page, board, scorer) works.
+ * - `loadThemePackage(key)` (in `customLoader.ts` since S26c, D-191, re-exported here) fetches an enabled
+ *   package the page needs (`GET /api/themes/custom/:key`, public, also allowed on the Super Speakers
+ *   host) and registers it, and later re-checks it (ETag) so a replaced package appears without a
+ *   reload; `installThemeStyles` calls it whenever the display changes, when the page becomes visible
+ *   and every few minutes, so every entry (classroom, student page, board, scorer) works. It loads this
+ *   file as a lazy chunk, so a page that shows only built-in themes never downloads it.
  * - `useAvailableThemes()` registers the enabled packages for the theme pickers.
  * - `packageFromDefinition` exports a built-in theme as a package (Admin → Themes → Export).
  */
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { availableThemes, publicCustomTheme } from '../../shared/contracts/themes.ts';
+import { availableThemes } from '../../shared/contracts/themes.ts';
 import { translate, type Locale } from '../../shared/i18n/index.ts';
-import { isThemeKey, isThemeSlug, type BuiltinThemeKey } from '../../shared/themes.ts';
+import { isThemeKey, type BuiltinThemeKey } from '../../shared/themes.ts';
 import { presetMotion, presetOf, EASINGS, motionPresetNames, type Easing } from '../../shared/themePackage/motion.ts';
 import { FONT_PRESETS, presetName, SHADOW_PRESETS, type FontPreset, type ShadowPreset } from '../../shared/themePackage/presets.ts';
 import { StoredThemePackage, THEME_PACKAGE_FORMAT, THEME_PACKAGE_VERSION, type ThemePackage, type ThemePackageSounds } from '../../shared/themePackage/schema.ts';
 import { makeSoundPack } from '../../shared/themePackage/sound.ts';
 import { PACKAGE_COLOR_TOKENS, type ThemeColors } from '../../shared/themePackage/tokens.ts';
-import { derivedColors, FIXED_COLORS, packageArt } from '../../shared/themePackage/validate.ts';
+import { derivedColors, FIXED_COLORS, packageArt } from '../../shared/themePackage/art.ts';
 import { resolveFrame } from '../../shared/themePackage/engine.ts';
-import { call, callConditional } from '../lib/api.ts';
-import { getCustomTheme, setCustomTheme, THEMES } from './registry.ts';
+import { call } from '../lib/api.ts';
+import { setCustomTheme, THEMES } from './registry.ts';
 import { SvgTree } from './SvgTree.tsx';
 import { ILLUSTRATIONS, MOTIONS, type IllustrationName, type MascotProps, type ThemeDefinition } from './types.ts';
+
+export { loadThemePackage, resetThemeLoader, THEME_RECHECK_MS } from './customLoader.ts';
 
 export type CustomStatus = NonNullable<ThemeDefinition['custom']>['status'];
 
@@ -127,58 +130,6 @@ export function registerThemePackage(raw: unknown, status: CustomStatus, key?: s
   const def = definitionFromPackage(raw, status, key);
   if (def) setCustomTheme(def);
   return def;
-}
-
-const pending = new Set<string>();
-/** ETag of each package this loader registered, for the conditional re-check. */
-const etags = new Map<string, string>();
-/** When each key was last fetched or checked (successfully or not). */
-const checkedAt = new Map<string, number>();
-let lastKey: string | null = null;
-
-/** A shown package is re-checked at most this often (a replaced package then appears without a reload). */
-export const THEME_RECHECK_MS = 30_000;
-
-/**
- * Makes sure the imported theme the page shows is registered and current (D-158). Built-in keys are
- * skipped. A key that is not registered yet is fetched; one that is registered is re-checked with a
- * conditional GET (ETag, 304 when unchanged) at most every `THEME_RECHECK_MS`, so a package the
- * administrator replaced reaches open screens. A key the server did not have (404: a draft, a disabled
- * or deleted theme) is tried again after the same interval, or at once when the display switches to
- * another key and back. Until then, and for those, `themeOf` shows the default theme.
- */
-export async function loadThemePackage(key: string | null | undefined, now: number = Date.now()): Promise<void> {
-  if (!key) return;
-  if (key !== lastKey) {
-    // The display moved to another theme (a built-in one too): earlier "not found" answers may be stale.
-    if (lastKey !== null && !getCustomTheme(lastKey)) checkedAt.delete(lastKey);
-    if (!getCustomTheme(key)) checkedAt.delete(key);
-    lastKey = key;
-  }
-  if (isThemeKey(key) || !isThemeSlug(key) || pending.has(key)) return;
-  const last = checkedAt.get(key);
-  if (last !== undefined && now - last < THEME_RECHECK_MS) return;
-  const known = getCustomTheme(key);
-  // A package registered by a picker (useAvailableThemes) has no ETag here: the first check fetches it.
-  const etag = known ? (etags.get(key) ?? null) : null;
-  pending.add(key);
-  checkedAt.set(key, now);
-  try {
-    const r = await callConditional(publicCustomTheme, { key }, etag);
-    if (!r.notModified && registerThemePackage(r.data, 'enabled') && r.etag) etags.set(key, r.etag);
-  } catch {
-    // Not found or offline: keep what is registered (screens fall back to the default for unknown keys).
-  } finally {
-    pending.delete(key);
-  }
-}
-
-/** Forgets what the loader knows (tests). */
-export function resetThemeLoader(): void {
-  pending.clear();
-  etags.clear();
-  checkedAt.clear();
-  lastKey = null;
 }
 
 export const AVAILABLE_THEMES_KEY = ['themes', 'available'] as const;

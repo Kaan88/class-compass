@@ -1,29 +1,18 @@
 /**
- * Small pieces shared by the student screens (S14d, D-151): the save runner, the text check that runs
+ * Small pieces shared by the student screens (S14d, D-151): the text check that runs
  * when the student presses Save (hints show only then, not while typing), the sentence starters of a
  * kind, the step counter and the big choice buttons.
  */
-import { useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type { StudentGoalsSection } from '../../shared/contracts/goals.ts';
 import type { Locale } from '../../shared/i18n/index.ts';
 import { blankRange, hasBlank, starterKindsOf, type StarterKind } from '../../shared/text/starters.ts';
 import { checkStudentText, exampleKeyFor, findRiskyWord, type TextKind } from '../../shared/text/textQuality.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { useRun } from '../lib/useRun.ts';
 import { Button } from '../ui/Button.tsx';
-import { STUDENT_PAGE_KEY } from './keys.ts';
 
-/** Run a student action and refresh the page (a revoked link then shows the "no longer works" page). */
-export function useStudentRun() {
-  const run = useRun();
-  const qc = useQueryClient();
-  return async <T,>(fn: () => Promise<T>, success?: string) => {
-    const r = await run(fn, success ? { success } : {});
-    void qc.invalidateQueries({ queryKey: STUDENT_PAGE_KEY });
-    return r;
-  };
-}
+/** The save runner (S26c, D-191: in `run.ts`, so My goals loads it without the text checks). */
+export { useStudentRun } from './run.ts';
 
 /** The page's starter texts of one text kind, in every language it has (for the "only a starter" check). */
 export const starterTexts = (data: StudentGoalsSection, kind: TextKind) => {

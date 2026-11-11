@@ -11,4 +11,5 @@ export * from './schema.ts';
 export * from './sound.ts';
 export * from './svg.ts';
 export * from './tokens.ts';
+export * from './art.ts';
 export * from './validate.ts';

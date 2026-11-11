@@ -65,40 +65,8 @@ export const AI_STUDENT_DATA_CATEGORIES = ['names', 'goalText', 'reflections', '
 /** Never leaves the school in either mode (labels `aiTools.never.<key>`). */
 export const AI_NEVER_SHARED = ['files', 'notes', 'secret', 'levels', 'links', 'credentials', 'exports'] as const;
 
-/**
- * Personal-data classification of contract fields (D-161). Output schemas mark string fields with
- * `.meta(pii(kind))`; the MCP privacy filter acts on the marks and a test fails on any unmarked string
- * field of an MCP-exposed output.
- * - none: no personal data (keys, codes, mime types, school names, theme keys)
- * - label: a staff-editable label (class, category, preset, routine names); names inside are replaced
- * - teacherText: free text written by staff; names inside are replaced in pseudonymous mode
- * - staffName: a teacher's or administrator's name (kept)
- * - studentName / studentInitials: replaced by the pseudonym in pseudonymous mode
- * - studentText: withheld in pseudonymous mode, `{ untrustedText }` in named mode
- * - authoredText: student text when the sibling `authorType` (or `src`) is 'student', otherwise teacher text
- * - note, level, file, secret, linkToken: never leave the school (the field is removed in both modes)
- */
-export const PII_KINDS = [
-  'none',
-  'label',
-  'teacherText',
-  'staffName',
-  'studentName',
-  'studentInitials',
-  'studentText',
-  'authoredText',
-  'note',
-  'level',
-  'file',
-  'secret',
-  'linkToken',
-] as const;
-export type PiiKind = (typeof PII_KINDS)[number];
-/** Kinds that are removed from every MCP result, whatever the privacy mode. */
-export const NEVER_LEAVES: readonly PiiKind[] = ['note', 'level', 'file', 'secret', 'linkToken'];
-
-/** The metadata object for `.meta()`: `z.string().meta(pii('studentName'))`. */
-export const pii = (kind: PiiKind) => ({ cc: { pii: kind } });
+/** The personal-data marks (D-161) live in `pii.ts` (S26c, D-191: the student page loads them without this file). */
+export { NEVER_LEAVES, PII_KINDS, pii, type PiiKind } from './pii.ts';
 
 /**
  * OAuth 2.1 for AI apps (S14h2, D-160): claude.ai, Claude Desktop and Claude Code connect without a

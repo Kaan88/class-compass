@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 import { PICTURE_STATES, REFUSAL_REASONS } from '../avatarPictures.ts';
-import { pii } from '../mcp.ts';
+import { pii } from '../pii.ts';
 import { AVATAR_COLOURS, CREATURE_FAMILIES, CREATURE_FAMILY_KEYS, CREATURE_PARTS, HAIR_COLOURS, PERSON_PARTS, SKIN_TONES, type AvatarSpecValue, type CreatureFamily } from '../avatars.ts';
 import { Ok, endpoint } from './define.ts';
 import { Id } from './school.ts';

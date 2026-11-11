@@ -5,17 +5,32 @@
  * (type-checked: a new key in the union needs an entry here). Kept apart from the client module
  * manifests so the student bundle does not load the teacher app.
  */
-import type { ReactNode } from 'react';
+import { lazy, type ReactNode } from 'react';
 import type { StudentPage, StudentPageSection } from '../../shared/contracts/goals.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import { IconClipboardCheck, IconFace, IconPlus, IconTarget, IconTrophy, IconUpload } from '../ui/icons.tsx';
 import { AchievementsSection } from './AchievementsSection.tsx';
 import { HomeworkSection } from './HomeworkSection.tsx';
 import type { NavApi, Screen } from './nav.ts';
-import { HowIsItGoing } from './screens/HowIsItGoing.tsx';
 import { MyGoals } from './screens/MyGoals.tsx';
-import { NewGoal } from './screens/NewGoal.tsx';
-import { ShowMyWork } from './screens/ShowMyWork.tsx';
+
+/**
+ * The writing screens (New goal, How is it going?, Show my work) with the text checks and sentence
+ * starters they share are lazy chunks (S26c, D-191; budget D-151): the page renders without them and
+ * `preloadWritingScreens` fetches them as soon as the page has rendered, so opening one normally does
+ * not wait (the screen frame shows "Loading…" if it still has to). My goals, the first tile, stays eager.
+ */
+const loadNewGoal = () => import('./screens/NewGoal.tsx');
+const loadHowIsItGoing = () => import('./screens/HowIsItGoing.tsx');
+const loadShowMyWork = () => import('./screens/ShowMyWork.tsx');
+const NewGoal = lazy(() => loadNewGoal().then((m) => ({ default: m.NewGoal })));
+const HowIsItGoing = lazy(() => loadHowIsItGoing().then((m) => ({ default: m.HowIsItGoing })));
+const ShowMyWork = lazy(() => loadShowMyWork().then((m) => ({ default: m.ShowMyWork })));
+
+/** Fetches the lazy writing screens in the background (errors are ignored here; opening a screen loads it). */
+export function preloadWritingScreens(): void {
+  for (const load of [loadNewGoal, loadHowIsItGoing, loadShowMyWork]) load().catch(() => undefined);
+}
 
 export type SectionKey = StudentPageSection['key'];
 type DataOf<K extends SectionKey> = Extract<StudentPageSection, { key: K }>['data'];

@@ -14,7 +14,8 @@ import { SOUND_PRIORITY, soundStatus, sounds, type SoundSnapshot, type SoundStat
 import type { IllustrationName, MascotPose, MotionName, SoundEvent, ThemeDefinition } from './types.ts';
 
 export { THEME_LIST, THEMES, themeOf, pickerThemes, allThemeDefinitions } from './registry.ts';
-export { loadThemePackage, previewKey, registerThemePackage, useAvailableThemes } from './custom.tsx';
+// S26c (D-191): only the loader; the package code (`custom.tsx`) is a lazy chunk for the pages that only show themes.
+export { loadThemePackage } from './customLoader.ts';
 export { installThemeStyles } from './css.ts';
 export type { IllustrationName, MascotPose, MotionName, SoundEvent, SoundName, ThemeDefinition } from './types.ts';
 export { sounds, installSoundUnlock, SELF_UNLOCK_ATTR, type SoundSnapshot, type SoundStatus } from './soundManager.ts';

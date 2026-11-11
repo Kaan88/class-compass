@@ -23,8 +23,8 @@ import ts from 'typescript';
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const STUDENT_ENTRY = join(ROOT, 'src', 'client', 'student', 'main.tsx');
 
-/** Every source file the entry loads, eagerly or lazily (type-only imports excluded). */
-export function reachableFiles(entry: string): string[] {
+/** Every source file the entry loads, eagerly or lazily (type-only imports excluded); `lazy: false` follows static imports only (S26c). */
+export function reachableFiles(entry: string, opts: { lazy?: boolean } = {}): string[] {
   const seen = new Set<string>();
   const queue = [entry];
   while (queue.length) {
@@ -44,7 +44,7 @@ export function reachableFiles(entry: string): string[] {
         if (!typeOnly) add(node.moduleSpecifier.text);
       } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && !node.isTypeOnly) {
         add(node.moduleSpecifier.text);
-      } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0] && ts.isStringLiteralLike(node.arguments[0])) {
+      } else if (opts.lazy !== false && ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0] && ts.isStringLiteralLike(node.arguments[0])) {
         add(node.arguments[0].text);
       }
       ts.forEachChild(node, visit);

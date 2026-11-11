@@ -12,7 +12,7 @@
  */
 import { DEFAULT_THEME } from '../../shared/themes.ts';
 import { getDisplay, subscribeDisplay } from '../lib/display.ts';
-import { loadThemePackage } from './custom.tsx';
+import { loadThemePackage } from './customLoader.ts';
 import { allThemeDefinitions, subscribeCustomThemes } from './registry.ts';
 import { FADE_IN, MOTION_PRESETS } from '../../shared/themePackage/motion.ts';
 import { COLOR_TOKENS, MOTIONS, type MotionName, type ThemeDefinition } from './types.ts';

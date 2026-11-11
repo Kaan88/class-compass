@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { pii, type McpScope } from '../mcp.ts';
+import type { McpScope } from '../mcp.ts';
+import { pii } from '../pii.ts';
 
 /**
  * Access classes (ARCHITECTURE §3). Every endpoint MUST declare exactly one; the server refuses
