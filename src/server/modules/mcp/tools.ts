@@ -15,7 +15,7 @@ import * as R from '../../../shared/contracts/reports.ts';
 import * as S from '../../../shared/contracts/school.ts';
 import * as T from '../../../shared/contracts/themes.ts';
 import { DEFAULT_THEME, THEME_KEYS, type BuiltinThemeKey } from '../../../shared/themes.ts';
-import { AA, AA_LARGE, CONTRAST_PAIRS, contrast as contrastRatio, hslToRgb, isOpaqueHex, pairContrast } from '../../../shared/themePackage/contrast.ts';
+import { AA, AA_LARGE, AVATAR_BODY_TOKENS, AVATAR_FEATURE_INK, AVATAR_FEATURE_MIN, AVATAR_FEATURE_RIM, CONTRAST_PAIRS, contrast as contrastRatio, hslToRgb, isOpaqueHex, pairContrast } from '../../../shared/themePackage/contrast.ts';
 import { Ambient, Art, Frame, Scene, Sets, themePackageJsonSchema, ThemeSlug } from '../../../shared/themePackage/schema.ts';
 import {
   ACHIEVEMENT_FRAMES,
@@ -374,7 +374,17 @@ export function previewPackage(source: string) {
     }
     return { worstHue: hue, ratio: round2(ratio), min, pass: ratio >= min };
   };
-  const avatars = { tone: avatarTone, big: worst(avatarTone.lightness, AA_LARGE), small: worst(avatarTone.lightnessSmall, AA) };
+  // S21a (D-173): eyes and mouths (avatar-ink on its avatar-white rim) on every avatar colour and skin tone.
+  const ink = value[AVATAR_FEATURE_INK]!;
+  const rim = value[AVATAR_FEATURE_RIM]!;
+  const inkOnRim = round2(pairContrast(ink, rim));
+  const bodies = AVATAR_BODY_TOKENS.map((body) => ({ body, ratio: Math.max(pairContrast(ink, value[body]!), pairContrast(rim, value[body]!)) }));
+  const worstBody = bodies.reduce((a, b) => (b.ratio < a.ratio ? b : a));
+  const features = {
+    inkOnRim: { ratio: inkOnRim, min: AVATAR_FEATURE_MIN, pass: inkOnRim >= AVATAR_FEATURE_MIN },
+    worstBody: { body: worstBody.body, ratio: round2(worstBody.ratio), min: AVATAR_FEATURE_MIN, pass: worstBody.ratio >= AVATAR_FEATURE_MIN },
+  };
+  const avatars = { tone: avatarTone, big: worst(avatarTone.lightness, AA_LARGE), small: worst(avatarTone.lightnessSmall, AA), features };
   const art = Art.safeParse(obj.art);
   const parsed = packageArt({ art: art.success ? art.data : undefined });
   return {
@@ -399,7 +409,7 @@ export function previewPackage(source: string) {
 const previewTheme = handTool({
   name: 'preview_theme',
   description:
-    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, derived from another package colour such as scene-scrim from surface, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, the worst avatar hue for big and small avatar initials (the validator checks every hue), and which mascot poses, illustrations, decoration and pattern come from the base theme, the instrument style of the sounds, and the theme engine fields with every default filled in (scene layers with size and element count, frame, ambient, sets). No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
+    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, derived from another package colour such as scene-scrim from surface, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, the worst avatar hue for big and small avatar initials (the validator checks every hue), the avatar eyes and mouths (avatar-ink, or its avatar-white rim, at 3:1 on the worst avatar colour or skin tone, and ink on rim), and which mascot poses, illustrations, decoration and pattern come from the base theme, the instrument style of the sounds, and the theme engine fields with every default filled in (scene layers with size and element count, frame, ambient, sets). No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
     THEME_GUIDE,
   scope: null,
   role: 'any',
@@ -415,6 +425,10 @@ const previewTheme = handTool({
       tone: z.object({ saturation: z.number(), lightness: z.number(), lightnessSmall: z.number() }),
       big: z.object({ worstHue: z.number(), ratio: z.number(), min: z.number(), pass: z.boolean() }),
       small: z.object({ worstHue: z.number(), ratio: z.number(), min: z.number(), pass: z.boolean() }),
+      features: z.object({
+        inkOnRim: z.object({ ratio: z.number(), min: z.number(), pass: z.boolean() }),
+        worstBody: z.object({ body: z.enum(COLOR_TOKENS), ratio: z.number(), min: z.number(), pass: z.boolean() }),
+      }),
     }),
     art: z.object({
       mascot: z.array(z.object({ pose: z.enum(MASCOT_POSES), source: Source })),

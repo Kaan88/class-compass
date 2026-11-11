@@ -3,7 +3,8 @@
  * package, the admin page shows before a preview, and the MCP `validate_theme` tool (S14h) returns.
  *
  * Errors block saving: the file is not JSON or too big, the schema (shape, ranges, presets, unknown
- * fields), a built-in key, a WCAG contrast pair (the same pairs as the built-in themes), a sound limit
+ * fields), a built-in key, a WCAG contrast pair (the same pairs as the built-in themes, and since S21a
+ * avatar eyes and mouths on every avatar colour and skin tone, D-173), a sound limit
  * (length, gain, frequency, loudness), refused SVG, mascot poses that are not all different.
  * Warnings do not: art that comes from the base theme, a silent theme.
  * Messages are plain English for tools and logs; the admin page translates `code` and shows `params`.
@@ -204,7 +205,7 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
   for (const f of contrastFailures(packageColors(pkg), pkg.avatar)) {
     errors.push({
       code: 'CONTRAST',
-      path: f.bg.includes('hue') ? 'avatar' : `colors.${f.fg}`,
+      path: f.bg.includes('hue') ? 'avatar' : `colors.${f.token ?? f.fg}`,
       message: `${f.pair}: contrast ${f.ratio}:1, needs ${f.min}:1.`,
       params: { fg: f.fg, bg: f.bg, ratio: f.ratio, min: f.min },
     });

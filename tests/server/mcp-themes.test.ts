@@ -174,6 +174,27 @@ describe('theme engine fields over MCP (S17a, D-166)', () => {
     expect(svg.data.report.errors[0]).toMatchObject({ code: 'SVG', path: 'scene.layers.1.art' });
   });
 
+  // S21a (D-173): avatar eyes and mouths on every avatar colour and skin tone.
+  it('validate_theme reports avatar faces lost on a dark body; preview_theme shows the worst body', async () => {
+    const pkg = example('ocean');
+    pkg.colors['avatar-white'] = '#8a90a0';
+    pkg.colors['avatar-navy'] = '#4a5aa0';
+    const r = await teacher.call('validate_theme', { package: pkg });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.data.report.ok).toBe(false);
+    expect(r.data.report.errors).toContainEqual(
+      expect.objectContaining({ code: 'CONTRAST', path: 'colors.avatar-ink', params: expect.objectContaining({ fg: 'avatar-ink or avatar-white', bg: 'avatar-navy', min: 3 }) }),
+    );
+    const p = await teacher.call('preview_theme', { package: pkg });
+    // A mid-grey rim also loses mid skin tones; the worst one is among the reported bodies.
+    expect(p.data.avatars.features.worstBody).toMatchObject({ min: 3, pass: false });
+    expect(r.data.report.errors.map((e: { params?: { bg?: string } }) => e.params?.bg)).toContain(p.data.avatars.features.worstBody.body);
+    expect(p.data.avatars.features.inkOnRim.pass).toBe(true);
+    const fine = await teacher.call('preview_theme', { package: example('ocean') });
+    expect(fine.data.avatars.features.worstBody.pass).toBe(true);
+    expect(fine.data.avatars.features.inkOnRim.pass).toBe(true);
+  });
+
   it('preview_theme fills in the engine defaults and the derived scene-scrim', async () => {
     const pkg = example('peppermint-snow-day');
     delete pkg.colors['scene-scrim'];

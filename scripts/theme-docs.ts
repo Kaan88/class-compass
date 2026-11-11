@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { THEME_KEYS } from '../src/shared/themes.ts';
-import { CONTRAST_PAIRS } from '../src/shared/themePackage/contrast.ts';
+import { AVATAR_BODY_TOKENS, AVATAR_FEATURE_INK, AVATAR_FEATURE_MIN, AVATAR_FEATURE_RIM, CONTRAST_PAIRS } from '../src/shared/themePackage/contrast.ts';
 import {
   ACHIEVEMENT_FRAMES,
   AMBIENT_PRESETS,
@@ -53,6 +53,10 @@ export async function builtinColors(): Promise<Record<string, Record<ColorToken,
 function contrastOf(token: ColorToken): string {
   const rules = CONTRAST_PAIRS.filter((p) => p.fg === token || p.bg === token).map((p) => (p.fg === token ? `on ${p.bg} ≥ ${p.min}` : `under ${p.fg} ≥ ${p.min}`));
   if (token === 'avatar-text') rules.push('on every avatar hue ≥ 3 (big) / 4.5 (small)');
+  // S21a (D-173): avatar eyes and mouths.
+  if (token === AVATAR_FEATURE_INK) rules.push(`on ${AVATAR_FEATURE_RIM} ≥ ${AVATAR_FEATURE_MIN}; it or ${AVATAR_FEATURE_RIM} on every avatar colour and skin tone ≥ ${AVATAR_FEATURE_MIN}`);
+  if (token === AVATAR_FEATURE_RIM) rules.push(`under ${AVATAR_FEATURE_INK} ≥ ${AVATAR_FEATURE_MIN}; it or ${AVATAR_FEATURE_INK} on every avatar colour and skin tone ≥ ${AVATAR_FEATURE_MIN}`);
+  if (AVATAR_BODY_TOKENS.includes(token)) rules.push(`under ${AVATAR_FEATURE_INK} or ${AVATAR_FEATURE_RIM} ≥ ${AVATAR_FEATURE_MIN}`);
   return rules.length ? rules.join('; ') : '–';
 }
 

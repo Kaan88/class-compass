@@ -12,9 +12,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AvatarArt, FACE_SCALE, FEATURE_RIM, accessoryTransform, faceOf } from '../../src/client/avatars/AvatarArt.tsx';
-import { contrast } from '../../src/client/themes/contrast.ts';
+import { AVATAR_FEATURE_INK, AVATAR_FEATURE_RIM, avatarFeatureFailures, contrast } from '../../src/client/themes/contrast.ts';
+import type { ThemeColors } from '../../src/shared/themePackage/tokens.ts';
 import { THEME_LIST } from '../../src/client/themes/registry.ts';
-import { AVATAR_COLOURS, CREATURE_FAMILIES, CREATURE_FAMILY_KEYS, CREATURE_PARTS, PERSON_PARTS, SKIN_TONES, coloursClash, randomCreature, randomPerson, seededRandom, type AvatarColour, type CreatureFamily, type CreatureSpec, type PersonSpec } from '../../src/shared/avatars.ts';
+import { AVATAR_COLOURS, CREATURE_FAMILIES, CREATURE_FAMILY_KEYS, CREATURE_PARTS, PERSON_PARTS, coloursClash, randomCreature, randomPerson, seededRandom, type AvatarColour, type CreatureFamily, type CreatureSpec, type PersonSpec } from '../../src/shared/avatars.ts';
 
 const html = (spec: CreatureSpec | PersonSpec) => renderToStaticMarkup(createElement(AvatarArt, { spec, size: 48 }));
 const parse = (svg: string) => new DOMParser().parseFromString(svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"'), 'image/svg+xml');
@@ -48,15 +49,14 @@ const snowDay = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'docs/exampl
 const PALETTES: Array<[string, Record<string, string>]> = [...THEME_LIST.map((t): [string, Record<string, string>] => [t.key, t.colors as Record<string, string>]), [snowDay.key, snowDay.colors]];
 
 describe('features read on every body colour and skin tone (D-169, fairness)', () => {
+  // The rule lives in the shared contrast checks since S21a (D-173), so the theme package validator
+  // applies it to every imported package too (`tests/client/theme-package-avatar-features.test.ts`).
   it.each(PALETTES)('%s: ink or its light rim reaches 3:1 against every body and skin; ink vs rim too', (_key, c) => {
+    expect([AVATAR_FEATURE_INK, AVATAR_FEATURE_RIM]).toEqual([FEATURE_RIM.ink, FEATURE_RIM.token]);
+    expect(avatarFeatureFailures(c as ThemeColors)).toEqual([]);
     const ink = c[FEATURE_RIM.ink]!;
     const rim = c[FEATURE_RIM.token]!;
     expect(contrast(ink, rim)).toBeGreaterThanOrEqual(3);
-    const bodies = [...AVATAR_COLOURS.map((x) => `avatar-${x}`), ...SKIN_TONES.map((_, i) => `avatar-skin-${i + 1}`)];
-    for (const b of bodies) {
-      const best = Math.max(contrast(ink, c[b]!), contrast(rim, c[b]!));
-      expect(best, `${b}: ink ${contrast(ink, c[b]!).toFixed(2)}, rim ${contrast(rim, c[b]!).toFixed(2)}`).toBeGreaterThanOrEqual(3);
-    }
   });
 
   const RIM = `var(--cc-${FEATURE_RIM.token})`;

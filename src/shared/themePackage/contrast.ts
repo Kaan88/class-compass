@@ -4,6 +4,7 @@
  * preview, MCP); pure functions, no DOM. `client/themes/contrast.ts` re-exports it.
  */
 import type { ColorToken, ThemeColors } from './tokens.ts';
+import { AVATAR_COLOURS, SKIN_TONES } from '../avatars.ts';
 
 /** Avatar circles: hue from the student id, saturation/lightness from the theme (CRD-1). */
 export interface AvatarTone {
@@ -114,11 +115,45 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
 
 export interface ContrastFailure {
   pair: string;
-  /** The two tokens (`fg` is `avatar-text` for the avatar hue sweep, `bg` then names the hue). */
+  /**
+   * The two tokens (`fg` is `avatar-text` for the avatar hue sweep, `bg` then names the hue; for the
+   * avatar features `fg` is "avatar-ink or avatar-white", either of which may carry the face).
+   */
   fg: string;
   bg: string;
+  /** The colour token to change, when it is not `fg` itself (the avatar features: `avatar-ink`). */
+  token?: string;
   ratio: number;
   min: number;
+}
+
+/**
+ * Avatar faces (S17c, D-169; in the package validator since S21a, D-173): every eye and mouth is drawn
+ * in `avatar-ink` on a thin `avatar-white` rim (`FEATURE_RIM` in `client/avatars/AvatarArt.tsx`), so a
+ * feature reads when the ink or its rim reaches 3:1 against the body under it, on every catalogue
+ * colour and skin tone; and the ink must stand out from its own rim.
+ */
+export const AVATAR_FEATURE_INK = 'avatar-ink' satisfies ColorToken;
+export const AVATAR_FEATURE_RIM = 'avatar-white' satisfies ColorToken;
+export const AVATAR_FEATURE_MIN = AA_LARGE;
+/** The colours a face can sit on: the 12 catalogue colours and the 12 skin tones (from the catalogue). */
+export const AVATAR_BODY_TOKENS: readonly ColorToken[] = [...AVATAR_COLOURS.map((c) => `avatar-${c}` as const), ...SKIN_TONES.map((_, i) => `avatar-skin-${i + 1}` as ColorToken)];
+
+/** Every avatar body or skin tone on which neither the ink nor its rim reaches 3:1, and ink vs rim. */
+export function avatarFeatureFailures(colors: Pick<ThemeColors, ColorToken>): ContrastFailure[] {
+  const out: ContrastFailure[] = [];
+  const ink = colors[AVATAR_FEATURE_INK];
+  const rim = colors[AVATAR_FEATURE_RIM];
+  const round = (x: number) => Math.round(x * 100) / 100;
+  const own = pairContrast(ink, rim);
+  if (own < AVATAR_FEATURE_MIN)
+    out.push({ pair: `${AVATAR_FEATURE_INK} on ${AVATAR_FEATURE_RIM} (avatar eyes and mouths on their light rim)`, fg: AVATAR_FEATURE_INK, bg: AVATAR_FEATURE_RIM, ratio: round(own), min: AVATAR_FEATURE_MIN });
+  const fg = `${AVATAR_FEATURE_INK} or ${AVATAR_FEATURE_RIM}`;
+  for (const body of AVATAR_BODY_TOKENS) {
+    const best = Math.max(pairContrast(ink, colors[body]), pairContrast(rim, colors[body]));
+    if (best < AVATAR_FEATURE_MIN) out.push({ pair: `${fg} on ${body} (avatar eyes and mouths)`, fg, bg: body, token: AVATAR_FEATURE_INK, ratio: round(best), min: AVATAR_FEATURE_MIN });
+  }
+  return out;
 }
 
 /**
@@ -134,6 +169,7 @@ export function contrastFailures(colors: ThemeColors, avatar: AvatarTone): Contr
     const ratio = pairContrast(colors[p.fg], colors[p.bg]);
     if (ratio < p.min) out.push({ pair: `${p.fg} on ${p.bg} (${p.why})`, fg: p.fg, bg: p.bg, ratio: Math.round(ratio * 100) / 100, min: p.min });
   }
+  out.push(...avatarFeatureFailures(colors));
   // Avatars: initials on every hue. Big avatars carry large bold initials (3:1), small ones 4.5:1.
   if (!isOpaqueHex(colors['avatar-text'])) {
     out.push({ pair: 'avatar-text on avatar circles (translucent)', fg: 'avatar-text', bg: 'avatar circles', ratio: 1, min: AA });
