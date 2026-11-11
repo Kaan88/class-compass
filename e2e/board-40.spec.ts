@@ -24,7 +24,9 @@
  * to spare (a class of 8) a Compact card is never taller than a Large one (S22c review: Compact kept
  * the name across the card and grew taller). On a phone (375×812, where the page scrolls and the fit
  * does not size the cards) the classes of 8 and 19 (with marks) keep names whole and the + button a
- * touch target (S22c review). Axe on the student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
+ * touch target (S22c review); S23b (D-183): with the small mark pills a phone card stays under 120 px
+ * (before: about 164 px) and the short displays (1536×703@1.25, 1366×768) show at least 16 whole
+ * cards with marks (before: 14). Axe on the student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
  */
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -222,7 +224,11 @@ async function checkPhone(browser: Browser, cls: TestClass, label: string) {
     expect(await splitWords(p), `${label}: words split over two lines`).toEqual([]);
     expect(await smallAddButtons(p), `${label}: + buttons under a touch target`).toEqual([]);
     expect(await overlaps(p), `${label}: overlapping card parts`).toEqual([]);
-    test.info().annotations.push({ type: 'phone card height', description: `${label}: ${Math.round(await cardHeight(p))} px` });
+    const height = await cardHeight(p);
+    test.info().annotations.push({ type: 'phone card height', description: `${label}: ${Math.round(height)} px` });
+    // S23b (D-183): the count, the chip and the small mark pills share two lines beside the + button
+    // (before, one line each: a card with marks was about 164 px tall).
+    expect(height, `${label}: phone card height`).toBeLessThan(120);
   } finally {
     await ctx.close();
   }
@@ -410,6 +416,9 @@ for (const classSize of CLASS_SIZES) {
                 const label = `${size.name} ${classSize} ${density} marks`;
                 const seen = await checkMarks(p, cls, label);
                 if (classSize === 40) expect(seen.rows, `${label}: full rows of cards on screen`).toBeGreaterThanOrEqual(2);
+                // S23b (D-183): the small pills join the count's line, so the marks cost no row on the
+                // short displays (16 whole cards as without marks; 14 before).
+                if (size.name === '1536x703@1.25' || size.name === '1366x768') expect(seen.visible, `${label}: whole cards with marks`).toBeGreaterThanOrEqual(16);
               }
               await setDensity(p, 'Normal');
               if (classSize === 19 && size === SIZES[0]) await checkPhone(browser, cls, `${PHONE.name} 19 marks`);

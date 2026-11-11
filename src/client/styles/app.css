@@ -902,14 +902,17 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
   display: none;
 }
 /* S22c (D-177): a module's mark on the card (this lesson's achievements, the group number): icon and
-   number in an outlined pill, read out by its accessible name, so it never relies on colour. */
+   number in an outlined pill, read out by its accessible name, so it never relies on colour. S23b
+   (D-183): small pills (the type of the level chip, tight padding), so they join the count and the
+   chip on their line where it has room instead of taking a line of their own. */
 .cc-student-card__mark {
   display: inline-flex;
   align-items: center;
-  gap: 0.15em;
-  padding: 0 0.35em;
+  gap: 0.1em;
+  padding: 0 0.3em;
   border: var(--cc-border-width) solid var(--cc-border-strong);
   border-radius: 999px;
+  font-size: 0.82em;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1.3;
@@ -2564,11 +2567,17 @@ html:has(.cc-classroom) {
   background: var(--cc-surface);
 }
 /* Buttons share one row while they fit (labels may wrap), else the dock wraps; End lesson keeps its
-   full size at the end of the last line. The buttons' wrapper is not a box here (S17b review). */
-.cc-dock__items {
+   full size at the end of the last line. The buttons' wrapper and each item's box are not boxes here
+   (S17b review); "More" belongs to the phone only (S23b, D-183). */
+.cc-dock__items,
+.cc-dock__item {
   display: contents;
 }
-:is(.cc-dock, .cc-dock__items) > .cc-btn {
+.cc-dock__more[hidden],
+.cc-dock__item[data-dock-overflow] {
+  display: none;
+}
+:is(.cc-dock, .cc-dock__item) > .cc-btn {
   flex: 0 1 auto;
   min-width: 0;
   min-height: var(--cc-touch);
@@ -2609,46 +2618,76 @@ html:has(.cc-classroom) {
     flex: 0 0 0.75rem;
   }
 }
-/* S17b: a phone gets a compact dock: the panels' buttons are one row that scrolls sideways inside
-   itself, End lesson stays in view beside it (outside the scrolling row, so it never covers a button;
-   S17b review: a sticky End lesson hid the button beside it, also from keyboard focus). Every button
-   fits fully in the row (at most 11rem; a long label wraps at a space); the bottom strip scene and the
-   class stay visible. */
+/* S23b (D-183): a phone gets a dock of one line: the panels' buttons that fit there whole, "More"
+   and End lesson. The buttons that do not fit are folded away by the dock (Dock.tsx: not drawn, inert)
+   and "More" shows the count; opened, the dock wraps over a few lines with every button drawn in full
+   and "Fewer" and End lesson at the end. No button is cut off or drawn under another: the S17b row
+   that scrolled sideways beside End lesson clipped its next button at End lesson's edge, which read
+   as End lesson lying on top of Daily Assistant (S22 reviews at 375 px). A label wraps only at a space
+   (never inside a word); buttons share the free width of their line; type and padding are a little
+   smaller than on the classroom display. */
 @media (max-width: 40rem) {
   .cc-dock {
-    flex-wrap: nowrap;
-    gap: 0.35rem;
+    gap: 0.3rem;
     padding: 0.3rem;
   }
-  .cc-dock__items {
+  /* Folded: the buttons' own wrapping line takes the width "More" and End lesson leave (those two move
+     to a line of their own only when they do not fit beside each other, as with large text), and the
+     dock measures which buttons sit whole on its first line. */
+  .cc-dock:not([data-expanded]) > .cc-dock__items {
     display: flex;
-    flex: 1 1 auto;
+    flex-wrap: wrap;
+    flex: 1 1 0;
     min-width: 0;
-    gap: 0.35rem;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: thin;
+    gap: 0.3rem;
   }
-  .cc-dock__items > *,
-  :is(.cc-dock, .cc-dock__items) > .cc-btn {
+  .cc-dock .cc-dock__item > .cc-btn,
+  .cc-dock > .cc-btn {
+    flex: 1 1 auto;
+  }
+  .cc-dock:not([data-expanded]) :is(.cc-dock__item, .cc-dock) > .cc-btn {
+    min-width: min-content;
+  }
+  /* "More" and End lesson keep their width, so the line the buttons measure is the line they get. */
+  .cc-dock:not([data-expanded]) > .cc-btn {
     flex: none;
   }
-  /* (Stronger than the page's phone rules at the end of this file.) */
-  .cc-dock .cc-btn,
-  .cc-page .cc-dock .cc-btn {
-    max-width: 11rem;
-    overflow-wrap: normal;
-    white-space: normal;
-    line-height: 1.15;
+  /* Opened with large text it can be taller than the screen: it scrolls inside itself instead of
+     pushing its first buttons above the top of the screen (the dock row sticks to the bottom). */
+  .cc-dock[data-expanded] {
+    max-height: 70dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
-  .cc-page :is(.cc-dock, .cc-dock__items) > .cc-btn {
-    padding-inline: 0.6rem;
-    font-size: 1rem;
+  .cc-dock__items[data-empty] {
+    display: none !important;
+  }
+  .cc-dock__items[data-empty] ~ .cc-btn,
+  .cc-page .cc-dock[data-expanded] > .cc-dock__end {
+    flex: 1 1 auto;
   }
   .cc-page .cc-dock > .cc-dock__end {
     white-space: nowrap;
   }
-  .cc-dock__items > .cc-dock__spacer {
+  /* (Stronger than the page's phone rules at the end of this file.) */
+  .cc-dock .cc-btn,
+  .cc-page .cc-dock .cc-btn {
+    max-width: 100%;
+    overflow-wrap: normal;
+    white-space: normal;
+    line-height: 1.15;
+  }
+  .cc-page .cc-dock :is(.cc-dock__item, .cc-dock) > .cc-btn,
+  .cc-page .cc-dock > .cc-btn {
+    gap: 0.3rem;
+    padding-inline: 0.45rem;
+    font-size: 0.95rem;
+  }
+  .cc-dock__count {
+    min-width: 2em;
+    text-align: center;
+  }
+  .cc-dock__spacer {
     display: none;
   }
 }
@@ -2933,6 +2972,23 @@ html:has(.cc-classroom) {
 }
 .cc-lesson-board .cc-student-card__count {
   line-height: 1.1;
+}
+/* S23b (D-183): on the board the count, the level chip and the marks share as few lines as they can. */
+.cc-lesson-board .cc-student-card__meta {
+  gap: 0.25rem;
+}
+.cc-lesson-board .cc-student-card .cc-level {
+  gap: 0.2rem;
+  padding-inline: 0.4rem;
+}
+/* The + is a square touch target on a phone too (the phone's button padding made it 66 px wide and
+   left the count and the chips 77 px, one per line). */
+.cc-lesson-board .cc-student-grid .cc-student-card__add {
+  min-width: var(--cc-touch);
+  padding-inline: 0;
+}
+.cc-classroom[data-density='large'] .cc-lesson-board .cc-student-grid:not([data-fit]) .cc-student-card__add {
+  min-width: 4rem;
 }
 /* The class switcher above the board is a little lower, so the board keeps that height. */
 .cc-classroom .cc-class-switcher .cc-btn {

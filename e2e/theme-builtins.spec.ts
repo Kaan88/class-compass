@@ -7,8 +7,11 @@
  *   for Animals, falling leaves that stand still with reduced motion;
  * - frame edges keep their proportions (their SVG units are CSS pixels: no stretched path);
  * - with a scene the dock is content-width and centred on wide screens, so the scene shows beside it;
- * - on a phone the dock is one compact row (its buttons scroll sideways beside End lesson, which stays
- *   in view), every button reachable and fully tappable, at least var(--cc-touch) high, axe clean;
+ * - on a phone the dock is one compact line (S23b, D-183: the buttons that fit whole, "More" with the
+ *   count of the others, End lesson); no dock button is cut off, covered or drawn on another (every
+ *   pair of drawn buttons checked by their boxes), each is at least var(--cc-touch) and a tap at its
+ *   centre lands on it, folded or opened with "More", at 320, 375 and 414 px in English and Turkish
+ *   and at 375 px with 200 % text (the second test); axe clean;
  * - no frame corner sits on a control or on the class name (S17b review);
  * - the class tabs never break a word that fits on a line of the tab, and the "N more students
  *   below" cue covers no student card (S21 review);
@@ -90,7 +93,10 @@ async function stretchedEdges(page: Page) {
 
 /**
  * Corner ornaments drawn over a control or the class name (S17b review): every visible
- * `.cc-frame__corner` against every button, link, input and the class name on the board.
+ * `.cc-frame__corner` against every button, link, input and the class name on the board. A control is
+ * taken where it is in view: clipped to the box that scrolls it, and left out when less than half of
+ * it is in view (S23b: the top few pixels of the cut row's card under "N more students below" peek
+ * out at the box's bottom corner; that row is reached by the cue, not by those pixels).
  */
 async function cornersOnControls(page: Page) {
   return page.evaluate(() => {
@@ -104,7 +110,17 @@ async function cornersOnControls(page: Page) {
     for (const c of corners) {
       const a = c.getBoundingClientRect();
       for (const t of targets) {
-        const b = t.getBoundingClientRect();
+        let b = t.getBoundingClientRect();
+        for (let p = t.parentElement; p; p = p.parentElement) {
+          if (!/(auto|scroll|hidden|clip)/u.test(getComputedStyle(p).overflowY)) continue;
+          const s = p.getBoundingClientRect();
+          const top = Math.max(b.top, s.top);
+          const bottom = Math.min(b.bottom, s.bottom);
+          if (bottom - top < b.height / 2) b = new DOMRect(0, 0, 0, 0);
+          else b = new DOMRect(b.left, top, b.width, bottom - top);
+          break;
+        }
+        if (b.width === 0) continue;
         const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
         const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
         if (w > 0.5 && h > 0.5) out.push(`${c.getAttribute('class')} on ${t.tagName.toLowerCase()} "${(t.getAttribute('aria-label') ?? t.textContent ?? '').trim().slice(0, 40)}" (${Math.round(w)}×${Math.round(h)} px)`);
@@ -164,6 +180,65 @@ async function cueOnCards(page: Page) {
       const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
       if (w > 0.5 && h > 0.5) out.push(`cue on ${t.getAttribute('class') ?? t.tagName} of "${t.closest('.cc-student-card')?.textContent?.trim().slice(0, 30)}" (${Math.round(w)}x${Math.round(h)} px)`);
     }
+    return out;
+  });
+}
+
+/**
+ * Everything wrong with the board's dock right now (S23b, D-183; empty when nothing is): every pair of
+ * drawn dock buttons by their boxes (none may intersect another, End lesson included), each drawn
+ * button inside the dock and the screen, its label whole (no clipped text, no word split over two
+ * lines), at least var(--cc-touch) in both directions and the topmost element at its centre (a tap
+ * lands on it). A button that is not drawn must be folded behind a visible "More" that counts it,
+ * and inert (no keyboard focus on a button nobody sees). The dock is scrolled into view first; an
+ * opened dock taller than its limit (200 % text) scrolls inside itself, so each button is scrolled to
+ * before its own checks.
+ */
+async function dockProblems(page: Page) {
+  await page.getByTestId('lesson-dock').scrollIntoViewIfNeeded();
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const nav = document.querySelector<HTMLElement>('.cc-dock')!;
+    const probe = document.createElement('div');
+    probe.style.height = 'var(--cc-touch)';
+    document.body.append(probe);
+    const touch = probe.getBoundingClientRect().height;
+    probe.remove();
+    const more = nav.querySelector<HTMLElement>('[data-testid="dock-more"]');
+    const all = [...nav.querySelectorAll<HTMLElement>('.cc-btn')];
+    const drawn = all.filter((b) => b.getClientRects().length > 0);
+    const name = (b: Element) => (b.textContent ?? '').trim().replace(/\s+/gu, ' ');
+    for (const b of drawn) {
+      b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const d = nav.getBoundingClientRect();
+      const r = b.getBoundingClientRect();
+      if (r.left < d.left - 0.5 || r.right > d.right + 0.5 || r.top < d.top - 0.5 || r.bottom > d.bottom + 0.5) out.push(`"${name(b)}" outside the dock`);
+      if (r.left < -0.5 || r.right > innerWidth + 0.5 || r.top < -0.5 || r.bottom > innerHeight + 0.5) out.push(`"${name(b)}" off the screen`);
+      if (b.scrollWidth > b.clientWidth + 1) out.push(`"${name(b)}" cut off (${b.scrollWidth}px in ${b.clientWidth}px)`);
+      if (r.height < touch - 0.5 || r.width < touch - 0.5) out.push(`"${name(b)}" smaller than the touch size (${Math.round(r.width)}×${Math.round(r.height)})`);
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      if (!hit || !b.contains(hit)) out.push(`"${name(b)}" covered at its centre by ${hit?.className || hit?.tagName}`);
+      const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode())
+        for (const m of (n.textContent ?? '').matchAll(/\S+/gu)) {
+          const range = document.createRange();
+          range.setStart(n, m.index);
+          range.setEnd(n, m.index + m[0].length);
+          if (new Set([...range.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size > 1) out.push(`"${name(b)}": "${m[0]}" split over two lines`);
+        }
+    }
+    for (const [i, a] of drawn.entries())
+      for (const b of drawn.slice(i + 1)) {
+        const x = a.getBoundingClientRect();
+        const y = b.getBoundingClientRect();
+        const w = Math.min(x.right, y.right) - Math.max(x.left, y.left);
+        const h = Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top);
+        if (w > 0.5 && h > 0.5) out.push(`"${name(a)}" and "${name(b)}" overlap (${Math.round(w)}×${Math.round(h)} px)`);
+      }
+    const folded = all.filter((b) => b !== more && !drawn.includes(b));
+    for (const b of folded) if (!b.closest('[inert]')) out.push(`"${name(b)}" not drawn but not inert`);
+    if (folded.length > 0 && (!more || !drawn.includes(more))) out.push(`${folded.length} buttons folded without "More"`);
+    if (folded.length > 0 && more && !name(more).includes(`+${folded.length}`)) out.push(`"More" says "${name(more)}" for ${folded.length} folded buttons`);
     return out;
   });
 }
@@ -233,9 +308,9 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
               const row = document.querySelector<HTMLElement>('.cc-lesson-row[data-dock-row]')!.getBoundingClientRect();
               const nav = document.querySelector<HTMLElement>('.cc-dock')!;
               const d = nav.getBoundingClientRect();
-              const tops = [...nav.querySelectorAll<HTMLElement>(':scope > .cc-btn, :scope > * > .cc-btn')].filter((b) => b.getClientRects().length > 0).map((b) => Math.round(b.getBoundingClientRect().top));
+              const tops = [...nav.querySelectorAll<HTMLElement>('.cc-btn')].filter((b) => b.getClientRects().length > 0).map((b) => Math.round(b.getBoundingClientRect().top));
               const end = nav.querySelector<HTMLElement>('.cc-dock__end')!.getBoundingClientRect();
-              // Buttons keep their whole label and do not overlap (the phone row's hidden part scrolls under nothing).
+              // Buttons keep their whole label and do not overlap (on a phone those that do not fit are folded, D-183).
               const btns = [...nav.querySelectorAll<HTMLElement>('.cc-btn')].filter((b) => b.getClientRects().length > 0 && !b.classList.contains('cc-dock__end'));
               // The app's touch minimum (var(--cc-touch)), not a fixed number of pixels.
               const probe = document.createElement('div');
@@ -256,37 +331,8 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
               expect(dock.endIn).toBe(true);
               expect(dock.h).toBeLessThan(dock.vh * 0.15);
               expect(dock.r).toBeLessThanOrEqual(dock.vw + 1);
-              // Every dock button can be reached (S17b review): focused (as with Tab) it is at least
-              // partly in view and End lesson is never over it (WCAG 2.4.11); scrolled to, it is fully
-              // in view beside End lesson and a tap at its centre lands on it.
-              const hidden = await page.evaluate(() => {
-                const nav = document.querySelector<HTMLElement>('.cc-dock')!;
-                const row = nav.querySelector<HTMLElement>('.cc-dock__items')!;
-                const end = nav.querySelector<HTMLElement>('.cc-dock__end')!;
-                const out: string[] = [];
-                // The scrolling row ends before End lesson (S21 review): a button cut at the row's edge
-                // is clipped by its own scroll box, never lying under End lesson.
-                const rowBox = row.getBoundingClientRect();
-                const endBox = end.getBoundingClientRect();
-                if (rowBox.right > endBox.left + 0.5) out.push(`row ends at ${Math.round(rowBox.right)}, under End lesson at ${Math.round(endBox.left)}`);
-                if (getComputedStyle(row).overflowX === 'visible') out.push('row does not clip its buttons');
-                for (const b of [...nav.querySelectorAll<HTMLElement>('.cc-btn')].filter((x) => x !== end && x.getClientRects().length > 0)) {
-                  row.scrollLeft = 0;
-                  b.focus();
-                  const d = row.getBoundingClientRect();
-                  const e = end.getBoundingClientRect();
-                  let r = b.getBoundingClientRect();
-                  if (r.right <= d.left + 8 || r.left >= Math.min(d.right, e.left) - 8) out.push(`${b.textContent?.trim()}: focused but out of view (${Math.round(r.left)}–${Math.round(r.right)})`);
-                  b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-                  r = b.getBoundingClientRect();
-                  const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-                  if (r.left < d.left - 1 || r.right > Math.min(d.right, e.left) + 1 || !hit || !b.contains(hit)) out.push(`${b.textContent?.trim()}: ${Math.round(r.left)}–${Math.round(r.right)} beside End at ${Math.round(e.left)}`);
-                }
-                (document.activeElement as HTMLElement | null)?.blur();
-                row.scrollLeft = 0;
-                return out;
-              });
-              expect(hidden, `${theme} phone dock buttons reachable`).toEqual([]);
+              // S23b (D-183): every drawn dock button whole, uncovered, on no other; the rest behind "More".
+              expect(await dockProblems(page), `${theme} phone dock`).toEqual([]);
             } else if (size.width >= 1536) {
               // With a scene the dock is content-width and centred: the scene shows on both sides.
               const left = dock.l - dock.rowL;
@@ -294,7 +340,7 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
               expect(left, `${theme} dock left gap`).toBeGreaterThan(40);
               expect(Math.abs(left - right), `${theme} dock centred`).toBeLessThanOrEqual(2);
             }
-            // axe at the classroom display size and on the phone (the compact scrolling dock).
+            // axe at the classroom display size and on the phone (the folded dock).
             if (!reduced && (size.name === '1536x703@1.25' || phone)) expect(await seriousViolations(page), `${theme} ${size.name} axe`).toEqual([]);
           } finally {
             await ctx.close();
@@ -320,6 +366,116 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
     await t.close();
     if ((await api(admin, 'GET', `/api/admin/themes/${SNOW_KEY}`)).status === 200) await api(admin, 'DELETE', `/api/admin/themes/${SNOW_KEY}`, { confirm: SNOW_KEY });
     if (ctx3a) await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { theme: ctx3a.theme });
+    await adminCtx.close();
+  }
+});
+
+/**
+ * S23b (D-183): the phone dock in every theme (the three built-ins and Snow Day) at 320, 375 and 414 px
+ * (812 px high), in English and Turkish (3-A switched to one language), and at 375 px with 200 % text:
+ * folded it is one line ("More" counts the buttons it holds) and opened it shows every button; in
+ * both, no pair of dock buttons intersects, each is whole and a tap at its centre lands on it
+ * (`dockProblems`). Before the fix End lesson's box lay on Daily Assistant's at every width (the
+ * scrolling row clipped Daily Assistant under it). The class's language and theme and the package are
+ * put back in `finally`.
+ */
+test('phone dock: every button whole and on no other, folded and opened (S23b, D-183)', async ({ browser }) => {
+  test.setTimeout(600_000);
+  const shots = 'test-results/s23b';
+  mkdirSync(shots, { recursive: true });
+  const adminCtx = await browser.newContext();
+  const admin = await adminCtx.newPage();
+  type LangCtx = Ctx & { mainLanguage: 'en' | 'tr'; secondLanguageEnabled: boolean };
+  let ctx3a: LangCtx | null = null;
+  try {
+    await login(admin, 'admin');
+    await ensurePin(admin).catch(() => undefined);
+    if ((await api(admin, 'GET', `/api/admin/themes/${SNOW_KEY}`)).status === 200) await api(admin, 'DELETE', `/api/admin/themes/${SNOW_KEY}`, { confirm: SNOW_KEY });
+    expect((await api(admin, 'POST', '/api/admin/themes', { source: SNOW })).status).toBe(200);
+    expect((await api(admin, 'POST', `/api/admin/themes/${SNOW_KEY}/enable`)).status).toBe(200);
+    const teacherCtx = await browser.newContext();
+    const teacher = await teacherCtx.newPage();
+    await login(teacher, 'english');
+    await ensurePin(teacher);
+    ctx3a = ((await api(teacher, 'GET', '/api/teacher/contexts')).body.contexts as LangCtx[]).find((c) => c.className === '3-A' && c.subjectName.en === 'English')!;
+    await endActiveLessons(teacher);
+    const started = await api(teacher, 'POST', '/api/commands', {
+      commands: [{ opId: randomUUID(), type: 'lesson.start', contextId: ctx3a.id, payload: { contextId: ctx3a.id, othersPresent: true, attendance: [] } }],
+    });
+    expect(started.body.results[0].ok).toBe(true);
+    await teacherCtx.close();
+
+    const cases = [
+      { width: 320, scale: 1 },
+      { width: 375, scale: 1 },
+      { width: 414, scale: 1 },
+      { width: 375, scale: 2 },
+    ];
+    for (const lang of ['en', 'tr'] as const) {
+      expect((await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
+      for (const theme of [...THEME_KEYS, SNOW_KEY]) {
+        expect((await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { theme })).status).toBe(200);
+        const ctx = await browser.newContext({ viewport: { width: 320, height: 812 }, deviceScaleFactor: 2, hasTouch: true });
+        const page = await ctx.newPage();
+        try {
+          await login(page, 'english');
+          await page.goto('/classroom');
+          await page.getByRole('button', { name: /^3-A · /u }).first().click();
+          await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          const dock = page.getByTestId('lesson-dock');
+          await expect(dock).toBeVisible();
+          await expect(page.locator('.cc-student-card').first()).toBeVisible();
+          for (const c of cases) {
+            const what = `${lang} ${theme} ${c.width}px text ${c.scale * 100} %`;
+            await page.setViewportSize({ width: c.width, height: 812 });
+            await page.evaluate((s) => document.documentElement.style.setProperty('--cc-text-scale', String(s)), c.scale);
+            await page.evaluate(() => document.fonts.ready);
+            await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+            const more = page.getByTestId('dock-more');
+            // Folded: one line of whole buttons (at 200 % text "More" and End lesson may share a second line).
+            expect(await dockProblems(page), `${what} folded`).toEqual([]);
+            const tops = await dock.locator('.cc-btn').evaluateAll((els) => new Set(els.filter((e) => e.getClientRects().length > 0).map((e) => Math.round(e.getBoundingClientRect().top))).size);
+            if (c.scale === 1) {
+              expect(tops, `${what} folded lines`).toBe(1);
+              expect((await dock.boundingBox())!.height, `${what} folded height`).toBeLessThan(812 * 0.15);
+            }
+            await dock.screenshot({ path: `${shots}/dock-${lang}-${theme}-${c.width}-${c.scale}x.png` });
+            if (!(await more.isVisible())) continue;
+            await expect(more).toHaveAttribute('aria-expanded', 'false');
+            await more.click();
+            await expect(more).toHaveAttribute('aria-expanded', 'true');
+            await expect(page.locator('.cc-dock__item[data-dock-overflow]')).toHaveCount(0);
+            expect(await dockProblems(page), `${what} opened`).toEqual([]);
+            await dock.screenshot({ path: `${shots}/dock-${lang}-${theme}-${c.width}-${c.scale}x-open.png` });
+            await more.click();
+            await expect(more).toHaveAttribute('aria-expanded', 'false');
+            expect(await dockProblems(page), `${what} folded again`).toEqual([]);
+          }
+          await page.evaluate(() => document.documentElement.style.setProperty('--cc-text-scale', '1'));
+          await page.setViewportSize({ width: 375, height: 812 });
+          expect(await seriousViolations(page), `${lang} ${theme} phone dock axe`).toEqual([]);
+          // A folded panel opens from the opened dock (its dialog), and the dock stays open behind it.
+          if (await page.getByTestId('dock-more').isVisible()) {
+            await page.getByTestId('dock-more').click();
+            await page.getByTestId('dock-achievements').click();
+            await expect(page.getByTestId('dock-view-achievements')).toBeVisible();
+            await page.keyboard.press('Escape');
+            await expect(page.getByTestId('dock-view-achievements')).toHaveCount(0);
+            await expect(page.getByTestId('dock-achievements')).toBeFocused();
+          }
+        } finally {
+          await ctx.close();
+        }
+      }
+    }
+  } finally {
+    const t = await browser.newContext();
+    const p = await t.newPage();
+    await login(p, 'english');
+    await endActiveLessons(p).catch(() => undefined);
+    await t.close();
+    if (ctx3a) await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { mainLanguage: ctx3a.mainLanguage, secondLanguageEnabled: ctx3a.secondLanguageEnabled, theme: ctx3a.theme });
+    if ((await api(admin, 'GET', `/api/admin/themes/${SNOW_KEY}`)).status === 200) await api(admin, 'DELETE', `/api/admin/themes/${SNOW_KEY}`, { confirm: SNOW_KEY });
     await adminCtx.close();
   }
 });
