@@ -20,12 +20,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BadgeArt } from '../../src/client/achievements/icons.tsx';
 import { setDisplay } from '../../src/client/lib/display.ts';
-import { makeParticles, particleCount, startAmbient, stepParticles, ThemeAmbient } from '../../src/client/themes/Ambient.tsx';
+import { ambientPixelRatio, makeParticles, particleCount, startAmbient, stepParticles, ThemeAmbient } from '../../src/client/themes/Ambient.tsx';
 import { definitionFromPackage, packageFromDefinition, previewKey, registerThemePackage } from '../../src/client/themes/custom.tsx';
 import { ThemeIllustration, ThemeProvider } from '../../src/client/themes/index.tsx';
 import { removeCustomTheme, THEMES } from '../../src/client/themes/registry.ts';
 import { sceneLayers, ThemeScene } from '../../src/client/themes/Scene.tsx';
 import { FrameOverlay } from '../../src/client/ui/Frame.tsx';
+import { ThemeReport } from '../../src/shared/contracts/themes.ts';
 import { CREATURE_FAMILY_KEYS, describeAvatar, READY_MADE } from '../../src/shared/avatars.ts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AvatarPanel } from '../../src/client/student/AvatarPanel.tsx';
@@ -156,6 +157,24 @@ describe('scene art: the same sanitiser with the scene limits', () => {
     const p = snow();
     p.scene.layers[0].art = tooMany.slice(0, 61_000);
     expect(validateThemePackage(p).report.ok).toBe(false);
+  });
+
+  it('reports the bytes and elements of each scene layer for the admin report (S17a review)', () => {
+    const ok = validateThemePackage(snow()).report;
+    expect(ok.stats.sceneLayerStats).toHaveLength(3);
+    expect(ok.stats.sceneLayerStats.reduce((a, l) => a + l.bytes, 0)).toBe(ok.stats.sceneBytes);
+    expect(ok.stats.sceneLayerStats.reduce((a, l) => a + (l.nodes ?? 0), 0)).toBe(ok.stats.sceneNodes);
+    for (const l of ok.stats.sceneLayerStats) {
+      expect(l.nodes).toBeGreaterThan(0);
+      expect(l.bytes).toBeLessThanOrEqual(SCENE_LIMITS.svgMaxBytes);
+    }
+    const p = snow();
+    p.scene.layers[1].art = '<script>alert(1)</script>';
+    const bad = validateThemePackage(p).report.stats.sceneLayerStats;
+    expect(bad[1]).toEqual({ bytes: 25, nodes: null });
+    expect(bad[0]!.nodes).toBeGreaterThan(0);
+    // Reports stored before the field existed parse with an empty list.
+    expect(ThemeReport.parse({ ok: true, key: 'x', errors: [], warnings: [], stats: { bytes: 1, pictures: 0, svgNodes: 0 } }).stats.sceneLayerStats).toEqual([]);
   });
 
   it('refuses known injection payloads in a layer', () => {
@@ -302,6 +321,12 @@ describe('frames (FrameOverlay)', () => {
           expect(html, `${edge}/${trim}/${corners}`).toContain('cc-frame__edge');
           for (const m of html.matchAll(/cc-frame__([a-z-]+)/gu)) seen.add(m[1]!);
           expect(overlay('snow-test', { surface: 'topBar' })).toContain('cc-frame__edge--bottom');
+          // Dialogs get the edge AND the corners (brief: `apply` = edge + corners; only student cards
+          // and ordinary cards are edge only), as the schema description tells AI agents (S17a review).
+          const dialog = overlay('snow-test', { surface: 'dialogs' });
+          expect(dialog, `${edge}/${corners} dialog`).toContain('cc-frame__edge');
+          expect(dialog, `${edge}/${corners} dialog`).toContain('cc-frame__corner');
+          expect(dialog, `${edge}/${trim} dialog`).not.toMatch(/cc-frame__(ring|stitch|swag|pencil)/u);
         }
     for (const part of ['edge--drift', 'edge--scallop', 'edge--torn', 'ring--candy', 'ring--frost', 'stitch', 'swag', 'swag--lights', 'pencil', 'corner--bottom-left', 'corner--top-left', 'corner--top-right', 'corner--wide'])
       expect(seen, part).toContain(part);
@@ -330,6 +355,14 @@ describe('scene (ThemeScene)', () => {
     expect(scene.getAttribute('aria-hidden')).toBe('true');
     expect(scene.querySelectorAll('svg.cc-scene__layer')).toHaveLength(3);
     expect(scene.querySelector('svg')!.getAttribute('preserveAspectRatio')).toBe('xMidYMax slice');
+  });
+
+  it('on a phone the strip stands on the bar at the bottom of the screen (--cc-bottom-bar), not under it (S17a review)', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('max-width'), media: q, addEventListener: () => undefined, removeEventListener: () => undefined }));
+    const { container } = render(inTheme('peppermint-snow-day', createElement(ThemeScene, {})));
+    const scene = container.querySelector<HTMLElement>('[data-testid="theme-scene"]')!;
+    expect(scene.hasAttribute('data-strip')).toBe(true);
+    expect(scene.querySelector('svg')!.getAttribute('style')).toContain('bottom: var(--cc-bottom-bar, 0px)');
   });
 
   it('marks <html data-scene> only while the document theme has a scene', () => {
@@ -379,6 +412,59 @@ describe('ambient (ThemeAmbient): full motion only, else one still frame', () =>
     const c = render(createElement(ThemeAmbient));
     expect(c.container.querySelector('canvas')!.dataset.mode).toBe('still');
     expect(raf).not.toHaveBeenCalled();
+  });
+
+  it('stops without a reload when reduced motion is switched on while the board is open (S17a review)', () => {
+    let reduced = false;
+    const listeners = new Set<() => void>();
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      get matches() {
+        return reduced && q.includes('reduce');
+      },
+      media: q,
+      addEventListener: (_: string, fn: () => void) => listeners.add(fn),
+      removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
+    }));
+    const raf = vi.fn(() => 1);
+    const caf = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', raf);
+    vi.stubGlobal('cancelAnimationFrame', caf);
+    setDisplay({ theme: 'peppermint-snow-day', classAnimations: true });
+    const r = render(createElement(ThemeAmbient));
+    const canvas = () => r.container.querySelector('canvas')!;
+    expect(canvas().dataset.running).toBe('true');
+    expect(listeners.size).toBeGreaterThan(0);
+    act(() => {
+      reduced = true;
+      for (const fn of listeners) fn();
+    });
+    expect(canvas().dataset.mode).toBe('still');
+    expect(canvas().dataset.running).toBe('false');
+    expect(caf).toHaveBeenCalled();
+    act(() => {
+      reduced = false;
+      for (const fn of listeners) fn();
+    });
+    expect(canvas().dataset.mode).toBe('full');
+    expect(canvas().dataset.running).toBe('true');
+    r.unmount();
+    expect(listeners.size).toBe(0);
+  });
+
+  it('caps the backing-store ratio (2, or 1.5 below 40rem): the classroom PC keeps 1.25 (S17a review)', () => {
+    expect(ambientPixelRatio(1.25, 1229)).toBe(1.25);
+    expect(ambientPixelRatio(1, 1920)).toBe(1);
+    expect(ambientPixelRatio(2, 1920)).toBe(2);
+    expect(ambientPixelRatio(3, 1920)).toBe(2);
+    expect(ambientPixelRatio(3.5, 412)).toBe(1.5);
+    expect(ambientPixelRatio(0.5, 800)).toBe(1);
+    vi.stubGlobal('devicePixelRatio', 3);
+    const canvas = document.createElement('canvas');
+    Object.defineProperty(canvas, 'clientWidth', { value: 1920 });
+    Object.defineProperty(canvas, 'clientHeight', { value: 1080 });
+    startAmbient(canvas, snow().ambient, 'still')();
+    expect([canvas.width, canvas.height]).toEqual([3840, 2160]);
+    expect(canvas.dataset.dpr).toBe('2');
   });
 
   it('a still frame draws once; nothing for a theme without ambient', () => {
@@ -459,7 +545,12 @@ describe('sets: avatar order and achievement frames', () => {
     const framed = renderToStaticMarkup(inTheme('peppermint-snow-day', createElement(BadgeArt, { icon: 'star', tier: 'gold' })));
     expect(framed).toContain('data-frame="snowflake"');
     expect(framed).toContain('data-tier="gold"');
-    expect(framed).toContain('viewBox="-9 -9 66 66"');
+    // The SVG grows by the frame's reach and takes it back with negative margins: one viewBox unit is
+    // still 1 px at size 48, so the tier shape and glyph keep their pixel size (S17a review).
+    expect(framed).toContain('viewBox="-3 -7 54 62"');
+    expect(framed).toContain('width="54"');
+    expect(framed).toContain('height="62"');
+    expect(framed).toContain('margin:-7px -3px -7px -3px');
     expect((framed.match(/var\(--cc-badge-gold\)/gu) ?? []).length).toBeGreaterThanOrEqual(2);
     const tierGroup = plain.slice(plain.indexOf('<g fill='), plain.indexOf('</g>') + 4);
     expect(tierGroup).toContain('var(--cc-badge-gold)');
@@ -472,6 +563,16 @@ describe('sets: avatar order and achievement frames', () => {
       const html = renderToStaticMarkup(inTheme('snow-test', createElement(BadgeArt, { icon: 'star', tier: 'bronze' })));
       expect(html, frame).toContain(`data-frame="${frame}"`);
       expect(html, frame).toContain('<circle cx="24" cy="24" r="21"');
+      // Pixels per viewBox unit stay size / 48 for every frame (44 px badge: 44/48).
+      const small = renderToStaticMarkup(inTheme('snow-test', createElement(BadgeArt, { icon: 'star', tier: 'bronze', size: 44 })));
+      const vb = /viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/u.exec(small)!;
+      const width = Number(/width="([\d.]+)"/u.exec(small)![1]);
+      const height = Number(/height="([\d.]+)"/u.exec(small)![1]);
+      expect(width / Number(vb[3]), frame).toBeCloseTo(44 / 48, 5);
+      expect(height / Number(vb[4]), frame).toBeCloseTo(44 / 48, 5);
     }
+    // A CSS length works too.
+    const rem = renderToStaticMarkup(inTheme('peppermint-snow-day', createElement(BadgeArt, { icon: 'star', tier: 'gold', size: '3rem' })));
+    expect(rem).toContain('width="calc(3rem * 1.125)"');
   });
 });

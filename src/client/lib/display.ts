@@ -91,5 +91,20 @@ export function useDisplay(): DisplayState {
 export function prefersReducedMotion(): boolean {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
+const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
+function subscribeReducedMotion(fn: () => void): () => void {
+  if (typeof matchMedia !== 'function') return () => undefined;
+  const mq = matchMedia(REDUCED_QUERY);
+  mq.addEventListener?.('change', fn);
+  return () => mq.removeEventListener?.('change', fn);
+}
+/**
+ * `prefersReducedMotion()` that re-renders the component when the OS setting changes while the page
+ * is open. Use it where JavaScript keeps something moving (the theme's ambient layer, S17a review);
+ * CSS motion follows the media query by itself.
+ */
+export function useReducedMotion(): boolean {
+  return useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => false);
+}
 export const motionAllowed = (d: DisplayState) => d.classAnimations && !prefersReducedMotion();
 export const soundsAllowed = (d: DisplayState) => d.classSounds && d.deviceSounds;

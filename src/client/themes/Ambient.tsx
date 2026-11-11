@@ -6,8 +6,11 @@
  * - Runs only while `motionMode()` is `full`; with the class animation switch off or reduced motion it
  *   draws ONE still frame (the same particles, standing still) and no timer runs.
  * - At most 30 frames a second (`AMBIENT_LIMITS.maxFps`), paused while the page is hidden.
- * - Sized to its box in device pixels (`devicePixelRatio`, e.g. 1.25 on the classroom PC), redrawn
- *   when the box changes size.
+ * - Sized to its box in device pixels (`devicePixelRatio`, e.g. 1.25 on the classroom PC), capped at
+ *   `AMBIENT_MAX_DPR` (soft flakes gain nothing above it, and every frame clears the whole backing
+ *   store), redrawn when the box changes size.
+ * - Follows a reduced-motion change while the page is open (`useReducedMotion`): it stops and draws
+ *   the still frame without a reload.
  * - The particle count follows the screen area (`density` is for 1920×1080), so a phone gets fewer.
  * - Colours are theme tokens read from the CSS variables at run time (never raw colours in code).
  */
@@ -15,8 +18,19 @@ import { useEffect, useRef } from 'react';
 import { AMBIENT_COLORS, AMBIENT_SIZE_PX, AMBIENT_SPEED_PX, type AmbientSpec } from '../../shared/themePackage/engine.ts';
 import { AMBIENT_LIMITS } from '../../shared/themePackage/limits.ts';
 import type { ThemeKey } from '../../shared/themes.ts';
-import { useDisplay } from '../lib/display.ts';
+import { useDisplay, useReducedMotion } from '../lib/display.ts';
 import { motionMode, useTheme } from './index.tsx';
+
+/** Highest backing-store ratio of the ambient canvas (the classroom PC's 1.25 is below it). */
+export const AMBIENT_MAX_DPR = 2;
+/** Phones and small windows (< 40rem wide) draw at most at this ratio. */
+export const AMBIENT_MAX_DPR_SMALL = 1.5;
+
+/** The backing-store ratio for a canvas `cssWidth` CSS pixels wide on a `dpr` screen. */
+export function ambientPixelRatio(dpr: number, cssWidth: number): number {
+  const cap = cssWidth < 640 ? AMBIENT_MAX_DPR_SMALL : AMBIENT_MAX_DPR;
+  return Math.max(1, Math.min(cap, dpr || 1));
+}
 
 export interface Particle {
   x: number;
@@ -127,9 +141,10 @@ export function startAmbient(canvas: HTMLCanvasElement, spec: AmbientSpec, mode:
   let ps: Particle[] = [];
   let frames = 0;
   const size = () => {
-    dpr = Math.max(1, Math.min(3, globalThis.devicePixelRatio || 1));
     w = canvas.clientWidth;
     h = canvas.clientHeight;
+    dpr = ambientPixelRatio(globalThis.devicePixelRatio || 1, w);
+    canvas.dataset.dpr = String(dpr);
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     ps = makeParticles(spec, w, h, colours.length);
@@ -184,9 +199,12 @@ export function startAmbient(canvas: HTMLCanvasElement, spec: AmbientSpec, mode:
 export function ThemeAmbient({ theme, contained = false, motion }: { theme?: ThemeKey; contained?: boolean; motion?: AmbientMode }) {
   const def = useTheme(theme);
   const display = useDisplay();
+  // Subscribed so a reduced-motion switch re-renders and the effect restarts in 'still' mode
+  // (motionMode reads the media query; this makes the change reach it).
+  const reduced = useReducedMotion();
   const ref = useRef<HTMLCanvasElement>(null);
   const spec = def.ambient && def.ambient.preset !== 'none' ? def.ambient : null;
-  const mode: AmbientMode = motion ?? (motionMode(display) === 'full' ? 'full' : 'still');
+  const mode: AmbientMode = motion ?? (!reduced && motionMode(display) === 'full' ? 'full' : 'still');
   const specKey = spec ? JSON.stringify(spec) : '';
   useEffect(() => {
     const canvas = ref.current;

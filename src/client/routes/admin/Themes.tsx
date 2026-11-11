@@ -16,7 +16,7 @@ import { pickText, translate } from '../../../shared/i18n/index.ts';
 import { OPTION_NAMES } from '../../../shared/avatars.ts';
 import { DEFAULT_THEME } from '../../../shared/themes.ts';
 import { AA, CONTRAST_PAIRS, pairContrast } from '../../../shared/themePackage/contrast.ts';
-import { PACKAGE_LIMITS } from '../../../shared/themePackage/limits.ts';
+import { PACKAGE_LIMITS, SCENE_LIMITS } from '../../../shared/themePackage/limits.ts';
 import { call } from '../../lib/api.ts';
 import { getDisplay } from '../../lib/display.ts';
 import { useI18n } from '../../lib/i18n.tsx';
@@ -125,6 +125,37 @@ function IssueText({ issue }: { issue: Issue }) {
   );
 }
 
+/**
+ * The scene's size against its limits (S17a review; AdminPreview.dc.html "Checks"): the whole scene,
+ * then each layer against the per-layer limits, so an administrator sees how close a layer is.
+ */
+function SceneStats({ stats }: { stats: Report['stats'] }) {
+  const { t, locale } = useI18n();
+  if (!stats.sceneLayers) return null;
+  const num = new Intl.NumberFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { maximumFractionDigits: 1 });
+  const kb = (bytes: number) => num.format(Math.max(0.1, Math.round((bytes / 1024) * 10) / 10));
+  const limitKb = num.format(SCENE_LIMITS.svgMaxBytes / 1024);
+  const limitNodes = num.format(SCENE_LIMITS.svgMaxNodes);
+  return (
+    <div className="cc-stack" data-testid="theme-report-scene">
+      <p className="cc-theme-report__scene">
+        {t('themes.report.scene', { count: stats.sceneLayers, kb: kb(stats.sceneBytes), nodes: num.format(stats.sceneNodes), limitKb, limitNodes })}
+      </p>
+      {stats.sceneLayerStats.length ? (
+        <ul className="cc-theme-issues">
+          {stats.sceneLayerStats.map((l, i) => (
+            <li key={i} data-layer={i + 1}>
+              {l.nodes === null
+                ? t('themes.report.sceneLayerBad', { n: i + 1, kb: kb(l.bytes), limitKb })
+                : t('themes.report.sceneLayer', { n: i + 1, kb: kb(l.bytes), limitKb, nodes: num.format(l.nodes), limitNodes })}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function ReportView({ report }: { report: Report }) {
   const { t } = useI18n();
   return (
@@ -154,6 +185,7 @@ function ReportView({ report }: { report: Report }) {
           </ul>
         </>
       ) : null}
+      <SceneStats stats={report.stats} />
     </section>
   );
 }

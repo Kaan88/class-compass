@@ -540,7 +540,9 @@ The presets and their default colour tokens (generated from `src/shared/themePac
   Each preset has defaults (the table above). Nothing in a frame is CSS or SVG from the package.
 - The overlays sit outside the content box: the content's padding, its hit areas and the focus
   outline are unchanged (overlays over the card fade away while keyboard focus is inside it). Student
-  cards, ordinary cards, compact density and phones get the edge only.
+  cards, ordinary cards, compact density and phones get the edge only; dialogs get the edge and the
+  corners (drawn just inside their top, because dialogs scroll); the trim is only on the board boxes
+  in `trimOn`.
 
 ### Ambient
 
@@ -549,9 +551,10 @@ The presets and their default colour tokens (generated from `src/shared/themePac
 ```
 
 - One canvas, at most 30 frames a second, paused while the page is hidden, sized in device pixels
-  (1.25 on the classroom PC). `density` is the number of particles on a 1920×1080 screen.
+  (1.25 on the classroom PC; capped at 2, and at 1.5 on phones). `density` is the number of
+  particles on a 1920×1080 screen.
 - It runs only with full motion: with the class animation switch off or reduced motion it draws
-  **one still frame**. It is not part of the celebrations and dims while one is on screen. It is
+  **one still frame**, also when reduced motion is switched on while the page is open. It is not part of the celebrations and dims while one is on screen. It is
   silent.
 
 ### Sets

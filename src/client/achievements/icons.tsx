@@ -164,17 +164,40 @@ function ornament(frame: AchievementFrame, fill: string): ReactNode {
   }
 }
 
+/**
+ * How far each achievement frame reaches past the 48-unit tier box (top, right, bottom, left, in
+ * viewBox units). The SVG grows by exactly that much and takes it back with negative margins, so the
+ * tier shape and glyph keep their pixel size and the badge keeps its place in the layout (S17a review).
+ */
+const FRAME_REACH: Record<AchievementFrame, readonly [number, number, number, number]> = {
+  classic: [0, 0, 0, 0],
+  ornament: [9, 0, 0, 0],
+  snowflake: [7, 3, 7, 3],
+  star: [8, 5, 0, 5],
+  shield: [7, 3, 9, 3],
+};
+
+/** `size` × units/48 as a CSS length (`size` is pixels or any CSS length). */
+function scaled(size: number | string, units: number): number | string {
+  return typeof size === 'number' ? (size * units) / 48 : `calc(${size} * ${units / 48})`;
+}
+
 /** A badge: tier frame (shape) + glyph. Decorative; the badge name and tier label are written beside it. */
 export function BadgeArt({ icon, tier, size = 48, locked = false }: { icon: BadgeIcon | string; tier: AchievementTier; size?: number | string; locked?: boolean }) {
   const d = GLYPHS[icon as BadgeIcon] ?? GLYPHS.star;
   const frame = useTheme().sets?.achievementFrame ?? 'classic';
   const fill = `var(--cc-${FILL[tier]})`;
   const extra = ornament(frame, fill);
+  const [t, r, b, l] = extra ? FRAME_REACH[frame] : FRAME_REACH.classic;
+  const w = 48 + l + r;
+  const h = 48 + t + b;
+  const neg = (u: number) => (u === 0 ? 0 : typeof size === 'number' ? -((size * u) / 48) : `calc(${size} * ${-u / 48})`);
   return (
     <svg
-      viewBox={extra ? '-9 -9 66 66' : '0 0 48 48'}
-      width={size}
-      height={size}
+      viewBox={extra ? `${-l} ${-t} ${w} ${h}` : '0 0 48 48'}
+      width={extra ? scaled(size, w) : size}
+      height={extra ? scaled(size, h) : size}
+      style={extra ? { margin: `${css(neg(t))} ${css(neg(r))} ${css(neg(b))} ${css(neg(l))}`, overflow: 'visible' } : undefined}
       className={`cc-badge-art${locked ? ' cc-badge-art--locked' : ''}`}
       aria-hidden="true"
       focusable="false"
@@ -191,3 +214,5 @@ export function BadgeArt({ icon, tier, size = 48, locked = false }: { icon: Badg
     </svg>
   );
 }
+
+const css = (v: number | string) => (typeof v === 'number' ? `${v}px` : v);

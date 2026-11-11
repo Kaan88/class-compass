@@ -39,7 +39,9 @@ function ratioOf(viewBox: string): string {
 
 /** Where a layer box sits and how big it is (percent of the scene box, which is the viewport). */
 function layerStyle(l: ThemeSceneLayer, strip: boolean): CSSProperties {
-  if (strip) return { left: 0, right: 0, bottom: 0, width: '100%', height: `${Math.min(STRIP_PERCENT, l.maxHeightVh ?? STRIP_PERCENT)}%` };
+  // The strip stands on whatever bar stays at the bottom of the screen (the classroom dock publishes
+  // its height as --cc-bottom-bar), so it is not hidden under it (S17a review).
+  if (strip) return { left: 0, right: 0, bottom: 'var(--cc-bottom-bar, 0px)', width: '100%', height: `${Math.min(STRIP_PERCENT, l.maxHeightVh ?? STRIP_PERCENT)}%` };
   const h = l.maxHeightVh ?? 100;
   const top = l.anchor.startsWith('top');
   const bottom = l.anchor.startsWith('bottom');

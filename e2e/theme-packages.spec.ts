@@ -178,6 +178,20 @@ async function display(browser: Browser, size: { width: number; height: number; 
   return { ctx, page };
 }
 
+/** How much of the class the students box shows: its height, whole cards and the "more below" cue. */
+async function visibleClass(page: Page) {
+  await expect(page.locator('.cc-student-card').first()).toBeVisible();
+  return page.evaluate(() => {
+    const body = document.querySelector<HTMLElement>('.cc-lesson-box[data-box="core.students"] > .cc-lesson-box__body')!;
+    const b = body.getBoundingClientRect();
+    const whole = [...body.querySelectorAll<HTMLElement>('.cc-student-card')].filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5;
+    }).length;
+    return { height: body.clientHeight, whole, more: document.querySelector('.cc-students-box__more')?.textContent ?? '' };
+  });
+}
+
 /** Sizes of the board's tap targets: dock buttons, the name buttons and + buttons of the student cards. */
 async function tapTargets(page: Page) {
   return page.evaluate(() => {
@@ -207,6 +221,12 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
     await admin.getByTestId('theme-file').setInputFiles({ name: `${SNOW_KEY}.theme.json`, mimeType: 'application/json', buffer: Buffer.from(SNOW) });
     await admin.getByRole('button', { name: 'Check package' }).click();
     await expect(admin.getByTestId('theme-report')).toContainText('No errors.');
+    // The scene's size against its limits, per layer (S17a review).
+    const sceneReport = admin.getByTestId('theme-report-scene');
+    await expect(sceneReport).toContainText('Scene: 3 layers');
+    await expect(sceneReport).toContainText('limit per layer: 60 KB and 1,500 shapes');
+    await expect(sceneReport.locator('li')).toHaveCount(3);
+    await expect(sceneReport.locator('li').first()).toContainText(/Layer 1: [\d.]+ KB of 60 KB, [\d,]+ of 1,500 shapes/u);
     const preview = admin.getByTestId('theme-package-preview');
     const sample = preview.getByTestId('theme-sample-classroom');
     await expect(sample.getByTestId('theme-scene')).toHaveAttribute('data-layers', '3');
@@ -245,6 +265,7 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
     expect(started.body.results[0].ok).toBe(true);
 
     let framedTargets: Awaited<ReturnType<typeof tapTargets>> | null = null;
+    const framedClass: Record<string, Awaited<ReturnType<typeof visibleClass>>> = {};
     const sizes = [
       { width: 1536, height: 703, scale: 1.25, name: '1536x703@1.25' },
       { width: 1536, height: 864, scale: 1.25, name: '1536x864@1.25' },
@@ -267,9 +288,27 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
         await expect(canvas).toHaveAttribute('data-running', 'true');
         await expect(canvas).toHaveAttribute('data-frames', /\d+/u, { timeout: 5000 });
         const px = await canvas.evaluate((c: HTMLCanvasElement) => ({ w: c.width, h: c.height, cw: c.clientWidth, ch: c.clientHeight, dpr: devicePixelRatio }));
-        expect(px.w).toBe(Math.round(px.cw * px.dpr));
-        expect(px.h).toBe(Math.round(px.ch * px.dpr));
+        // Backing store capped at 2 (S17a review); the classroom PC's 1.25 is below the cap.
+        const ratio = Math.min(2, px.dpr);
+        expect(px.w).toBe(Math.round(px.cw * ratio));
+        expect(px.h).toBe(Math.round(px.ch * ratio));
         expect(px.dpr).toBe(size.scale);
+        if (size.height < 1000) framedClass[size.name] = await visibleClass(page);
+        else {
+          // Where the grid ends, the scene shows (no full-height card over it; S17a review).
+          const free = await page.evaluate(() => {
+            const body = document.querySelector<HTMLElement>('.cc-lesson-box[data-box="core.students"] > .cc-lesson-box__body')!;
+            const cards = [...body.querySelectorAll<HTMLElement>('.cc-student-card')];
+            const last = Math.max(...cards.map((c) => c.getBoundingClientRect().bottom));
+            const b = body.getBoundingClientRect();
+            const y = Math.round((last + b.bottom) / 2);
+            const hit = document.elementFromPoint(Math.round(b.right - 40), y);
+            return { space: b.bottom - last, background: getComputedStyle(body).backgroundColor, hitCard: !!hit?.closest('.cc-student-card, .cc-card') };
+          });
+          expect(free.space).toBeGreaterThan(40);
+          expect(free.background).toBe('rgba(0, 0, 0, 0)');
+          expect(free.hitCard).toBe(false);
+        }
         if (size.width === 1536 && size.height === 703) {
           // Performance: no long task (> 50 ms) while the snow falls for three seconds.
           const longTasks = await page.evaluate(
@@ -306,8 +345,11 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
         await expect.poll(async () => name.evaluate((el) => [...el.closest('.cc-student-card')!.querySelectorAll<HTMLElement>(':scope > .cc-frame--over')].every((o) => getComputedStyle(o).opacity === '0'))).toBe(true);
         expect(focus.overlays.length).toBeGreaterThan(0);
 
-        // Motion off (reduced motion): the same scene and snow, standing still.
+        // Motion off (reduced motion): the snow stops at once, without a reload (S17a review) …
         await page.emulateMedia({ reducedMotion: 'reduce' });
+        await expect(page.getByTestId('theme-ambient')).toHaveAttribute('data-mode', 'still');
+        await expect(page.getByTestId('theme-ambient')).toHaveAttribute('data-running', 'false');
+        // … and after a reload it is the same scene and snow, standing still.
         await page.reload();
         await expect(page.getByTestId('lesson-dashboard')).toBeVisible();
         await expect(page.getByTestId('theme-scene')).toBeVisible();
@@ -319,20 +361,41 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
       }
     }
 
+    // 3b. A phone: the scene's last layer is a strip standing on the dock, not hidden under it.
+    {
+      const { ctx, page } = await display(browser, { width: 375, height: 812, scale: 2 });
+      try {
+        await expect(page.getByTestId('theme-scene')).toHaveAttribute('data-strip', '');
+        const strip = await page.evaluate(() => {
+          const layer = document.querySelector<SVGElement>('[data-testid="theme-scene"] .cc-scene__layer')!.getBoundingClientRect();
+          const dock = document.querySelector<HTMLElement>('.cc-lesson-row[data-dock-row]')!.getBoundingClientRect();
+          return { layerBottom: Math.round(layer.bottom), dockTop: Math.round(dock.top), dockBottom: Math.round(dock.bottom), vh: innerHeight };
+        });
+        expect(strip.dockBottom).toBeLessThanOrEqual(strip.vh + 1);
+        expect(Math.abs(strip.layerBottom - strip.dockTop)).toBeLessThanOrEqual(2);
+        await page.screenshot({ path: 'test-results/theme-engine/board-375x812.png' });
+      } finally {
+        await ctx.close();
+      }
+    }
+
     // 4. Tap targets are the same size as without a frame: the same package without scene, frame,
-    // ambient and sets (same fonts and shapes), on the same display.
+    // ambient and sets (same fonts and shapes), on the same display. The frames take no room: the
+    // students box is as high and shows as many whole cards as without them (S17a review).
     const plainPkg = JSON.parse(SNOW) as Record<string, any>;
     for (const k of ['scene', 'frame', 'ambient', 'sets']) delete plainPkg[k];
     plainPkg.key = PLAIN_KEY;
     expect((await api(admin, 'POST', '/api/admin/themes', { source: JSON.stringify(plainPkg) })).status).toBe(200);
     expect((await api(admin, 'POST', `/api/admin/themes/${PLAIN_KEY}/enable`)).status).toBe(200);
     expect((await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { theme: PLAIN_KEY })).status).toBe(200);
-    {
-      const { ctx, page } = await display(browser, sizes[0]!);
+    for (const size of sizes.slice(0, 2)) {
+      const { ctx, page } = await display(browser, size);
       try {
         await expect(page.locator('html')).toHaveAttribute('data-theme', PLAIN_KEY);
         await expect(page.locator('.cc-frame')).toHaveCount(0);
         await expect(page.getByTestId('theme-scene')).toHaveCount(0);
+        expect(await visibleClass(page), size.name).toEqual(framedClass[size.name]);
+        if (size !== sizes[0]) continue;
         const plain = await tapTargets(page);
         // The same axe result without any theme frame or scene (the stage chips above are not new).
         expect(await seriousViolations(page)).toEqual([]);

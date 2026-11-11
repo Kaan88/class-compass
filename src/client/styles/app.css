@@ -1460,22 +1460,27 @@ html[data-scene] .cc-lesson-row[data-dock-row] {
 html[data-scene] .cc-focus-empty > .cc-btn {
   background: var(--cc-scene-scrim);
 }
-/* The student grid gets a card of its own; the padding is taken from outside the box (negative
-   margin, outline as the border), so the cards keep exactly their width and every tap target its size. */
-html[data-scene] .cc-lesson-box[data-box='core.students'] > .cc-lesson-box__body,
-.cc-lesson-box[data-box='core.students']:has(> .cc-frame) > .cc-lesson-box__body {
-  margin-inline: -0.6rem;
-  padding: 0 0.6rem 0.5rem;
-  border-radius: var(--cc-radius);
-  background: var(--cc-surface);
-  box-shadow:
-    0 0 0 var(--cc-border-width) var(--cc-border),
-    var(--cc-shadow);
-}
+/* The student grid's heading line sits on a scrim panel (it is text on the page). The grid itself gets
+   no extra card: the student cards have their own surfaces, and the scene shows between and below
+   them (S17a review: a full-height card hid the village). Nothing here adds height. */
 html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head,
 .cc-lesson-box[data-box='core.students']:has(> .cc-frame) .cc-students-box__head {
-  padding-top: 0.45rem;
-  background: var(--cc-surface);
+  padding-inline: 0.5rem;
+  border-radius: var(--cc-radius);
+  background: var(--cc-scene-scrim);
+  box-shadow: 0 0 0 var(--cc-border-width) var(--cc-border);
+}
+/* Under a frame the heading line takes 0.35rem at its top for the snow, from its bottom padding and
+   the gap under it (same total). */
+.cc-lesson-box[data-box='core.students']:has(> .cc-frame) .cc-students-box {
+  gap: 0.25rem;
+}
+.cc-lesson-box[data-box='core.students']:has(> .cc-frame) .cc-students-box__head {
+  padding-block: 0.35rem 0;
+}
+.cc-lesson-box[data-box='core.students'] > .cc-frame__edge--drift {
+  top: -9px;
+  height: 15px;
 }
 
 /* Frames: overlays placed around a card (FrameOverlay). Over the card they fade away while keyboard
@@ -1513,22 +1518,27 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
 :is(.cc-lesson-box, .cc-student-card, .cc-classroom-bar, .cc-modal):has(:focus-visible) > .cc-frame--over {
   opacity: 0;
 }
-/* Room for the overlays: the board's rows and the student grid scroll, so they would clip them. */
+/* Room for the overlays: the board's rows scroll, so they would clip what sticks out of the first row
+   and the side boxes. The room is taken from the page's own padding and gap (negative margins), and
+   the overlays fit into the existing gaps between rows and cards: the board, the rows and the student
+   grid keep exactly their sizes (S17a review: the visible class must not shrink). */
 .cc-lesson-board__rows:has(> .cc-lesson-row > .cc-lesson-box > .cc-frame) {
-  margin-inline: -0.9rem;
-  padding: 0.85rem 0.9rem 0;
-  gap: 0.9rem;
+  margin: -0.75rem -0.9rem 0;
+  padding: 0.75rem 0.9rem 0;
 }
-.cc-student-grid:has(> .cc-student-card > .cc-frame) {
-  padding-top: 0.55rem;
-  row-gap: 0.9rem;
+/* A snow drift sits over the top of its box: the box's card moves a little of its bottom padding to
+   the top (the same total), so the snow covers padding, never content. */
+.cc-lesson-box:has(> .cc-frame__edge--drift) > .cc-lesson-box__body > :is(.cc-card, .cc-counter-panel > .cc-card) {
+  padding-top: 1rem;
+  padding-bottom: 0.2rem;
 }
-/* Edges (silhouettes). */
+/* Edges (silhouettes). A box's drift: about 10px above the box (inside the 0.5rem row gap) and the
+   rest over its top padding (mockup ThemedBoard: a puffy cap, not a line). */
 .cc-frame__edge--drift {
   left: -8px;
-  top: -14px;
+  top: -12px;
   width: calc(100% + 16px);
-  height: 22px;
+  height: 30px;
 }
 .cc-frame__drip {
   left: -6px;
@@ -1554,11 +1564,12 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
 .cc-frame__edge--torn.cc-frame__edge--bottom {
   bottom: -8px;
 }
+/* A card's drift: about 6px above the card (the grid's row gap) and the rest over its top padding. */
 .cc-student-card > .cc-frame__edge--drift {
   left: -3px;
-  top: -8px;
+  top: -7px;
   width: calc(100% + 6px);
-  height: 13px;
+  height: 14px;
 }
 .cc-student-card > :is(.cc-frame__edge--scallop, .cc-frame__edge--torn) {
   left: 10px;
@@ -1605,7 +1616,7 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
 }
 .cc-frame__swag {
   left: -6px;
-  top: -18px;
+  top: -12px;
   width: calc(100% + 12px);
   height: 28px;
 }

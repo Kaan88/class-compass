@@ -27,6 +27,8 @@ export const ThemeReport = z.object({
     sceneLayers: z.number().default(0),
     sceneBytes: z.number().default(0),
     sceneNodes: z.number().default(0),
+    // Each scene layer's bytes and elements against the per-layer limits (S17a review).
+    sceneLayerStats: z.array(z.object({ bytes: z.number(), nodes: z.number().nullable() })).default([]),
   }),
 });
 export type ThemeReportDto = z.infer<typeof ThemeReport>;

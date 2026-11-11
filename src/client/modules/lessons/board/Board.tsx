@@ -25,21 +25,31 @@ import { useClassroomLayout, useLayoutEditing, useWideEnough } from './layoutCli
 /**
  * The board ends at the bottom of the screen: its height is the viewport minus where it starts on
  * the page (top bar, class switcher), measured after layout and whenever the page changes size.
+ * It also publishes the height of the dock row, which stays at the bottom of the screen, as
+ * `--cc-bottom-bar` on <html>: page decoration anchored to the bottom of the screen (a theme scene's
+ * strip on phones, S17a review) sits above it instead of under it. Theme-agnostic: just a height.
  */
 export function useBoardTop() {
   return useCallback((el: HTMLDivElement | null) => {
     if (!el) return;
+    const html = document.documentElement;
     const measure = () => {
       const top = el.getBoundingClientRect().top + window.scrollY;
       el.style.setProperty('--cc-board-top', `${Math.max(0, Math.round(top))}px`);
+      const dock = el.querySelector<HTMLElement>('.cc-lesson-row[data-dock-row]');
+      if (dock) html.style.setProperty('--cc-bottom-bar', `${Math.round(dock.getBoundingClientRect().height)}px`);
+      else html.style.removeProperty('--cc-bottom-bar');
     };
     measure();
     window.addEventListener('resize', measure);
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     ro?.observe(document.body);
+    const dock = el.querySelector<HTMLElement>('.cc-lesson-row[data-dock-row]');
+    if (dock) ro?.observe(dock);
     return () => {
       window.removeEventListener('resize', measure);
       ro?.disconnect();
+      html.style.removeProperty('--cc-bottom-bar');
     };
   }, []);
 }

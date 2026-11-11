@@ -177,7 +177,7 @@ export const Frame = z
       .min(1)
       .max(FRAME_SURFACES.length)
       .optional()
-      .describe('Surfaces that get the edge and corners (default boardBoxes, studentCards, topBar). cards and dialogs get the edge only.'),
+      .describe('Surfaces that get the edge and corners (default boardBoxes, studentCards, topBar). studentCards and cards get the edge only; dialogs get the edge and corners; the trim is only on the board boxes in trimOn.'),
     trimOn: z.array(z.enum(BOX_KEYS)).max(BOX_KEYS.length).optional().describe('Board boxes that get the trim (box keys of the classroom board; default routine and core.timer).'),
     snowColor: tokenName.optional().describe('Colour token of the edge shape (default per edge: art-ground for snowDrift, surface otherwise).'),
     trimColors: z.array(tokenName).min(FRAME_LIMITS.trimColors[0]).max(FRAME_LIMITS.trimColors[1]).optional().describe('Colour tokens of the trim (default per trim, e.g. accent and surface for candyStripe).'),

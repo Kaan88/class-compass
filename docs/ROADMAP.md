@@ -335,7 +335,9 @@ Brief: `docs/design/2026-11-11-theme-engine.md`; decision D-166; no migration.
 - [x] Admin → Themes preview with Motion on/off and the new blocks; MCP theme tools cover the new fields
 - [x] Snow Day example package (`docs/examples/peppermint-snow-day.theme.json`), validated; THEMING section and guide note
 - [x] Tests at the real display sizes (1536×703 and 1536×864 at scale 1.25, 1920×1080), axe, focus, tap targets, ambient performance
+- [x] Review fixes: frames take no room on the board (same students box height and whole cards as the plain package at 1536×703 and 1536×864), scene visible below the grid, phone strip above the dock, ambient stops on a live reduced-motion change and caps its pixel ratio, badge frames keep the tier's size, scene sizes in the admin report, dialog frame docs
 - [ ] Seen on the real classroom display (owner)
+- [ ] Found by the S17a review, not caused by themes: on a phone the classroom dock wraps into many rows and covers more than half of the screen (before S17a too); the scene strip now stands on it, but the dock itself needs a compact phone layout
 - [ ] Found by S17a's axe run of the whole lesson board, not caused by themes: the routine's stage chips are named "Go to stage N: …" while they show "N … Now" (axe `label-content-name-mismatch`); the routines module should name them by their visible text (the e2e check lists it as known)
 
 ## S18 Full screen during lessons (owner 2026-11-11)

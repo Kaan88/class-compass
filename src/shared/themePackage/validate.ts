@@ -34,8 +34,20 @@ export interface ThemeReport {
   key: string | null;
   errors: ThemeIssue[];
   warnings: ThemeIssue[];
-  /** S17a (D-166): `sceneLayers`, `sceneBytes` and `sceneNodes` describe the scene (0 without one). */
-  stats: { bytes: number; pictures: number; svgNodes: number; sceneLayers: number; sceneBytes: number; sceneNodes: number };
+  /**
+   * S17a (D-166): `sceneLayers`, `sceneBytes` and `sceneNodes` describe the scene (0 without one);
+   * `sceneLayerStats` has each layer's bytes and elements (null when the layer did not parse), to set
+   * against the per-layer limits (`SCENE_LIMITS`).
+   */
+  stats: {
+    bytes: number;
+    pictures: number;
+    svgNodes: number;
+    sceneLayers: number;
+    sceneBytes: number;
+    sceneNodes: number;
+    sceneLayerStats: Array<{ bytes: number; nodes: number | null }>;
+  };
 }
 
 /** The fixed print colours (D-120), the same in every theme. */
@@ -144,8 +156,9 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
   let sceneLayers = 0;
   let sceneBytes = 0;
   let sceneNodes = 0;
+  const sceneLayerStats: Array<{ bytes: number; nodes: number | null }> = [];
   const done = (key: string | null, bytes: number, pkg: ThemePackage | null) => ({
-    report: { ok: errors.length === 0, key, errors, warnings, stats: { bytes, pictures, svgNodes, sceneLayers, sceneBytes, sceneNodes } },
+    report: { ok: errors.length === 0, key, errors, warnings, stats: { bytes, pictures, svgNodes, sceneLayers, sceneBytes, sceneNodes, sceneLayerStats } },
     pkg: errors.length === 0 ? pkg : null,
   });
 
@@ -211,6 +224,7 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
     }
   }
 
+  let lastCount = 0;
   const checkSvg = (path: string, src: string | undefined, scene = false): SvgNode[] | null => {
     if (src === undefined) return null;
     pictures += 1;
@@ -218,6 +232,7 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
     if (r.ok) {
       svgNodes += r.count;
       if (scene) sceneNodes += r.count;
+      lastCount = r.count;
       return r.nodes;
     }
     const why = SVG_REASONS[r.error.reason] ?? r.error.reason;
@@ -243,8 +258,10 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
   if (pkg.scene) {
     sceneLayers = pkg.scene.layers.length;
     pkg.scene.layers.forEach((layer, i) => {
-      sceneBytes += utf8Length(layer.art);
-      checkSvg(`scene.layers.${i}.art`, layer.art, true);
+      const layerBytes = utf8Length(layer.art);
+      sceneBytes += layerBytes;
+      const nodes = checkSvg(`scene.layers.${i}.art`, layer.art, true);
+      sceneLayerStats.push({ bytes: layerBytes, nodes: nodes ? lastCount : null });
     });
     if (pkg.colors['scene-scrim'] === undefined)
       warnings.push({ code: 'SCRIM_DEFAULT', path: 'colors.scene-scrim', message: 'scene-scrim is not set: headings on the scene get a panel in the package surface colour.' });

@@ -1422,7 +1422,7 @@
           ]
         },
         "apply": {
-          "description": "Surfaces that get the edge and corners (default boardBoxes, studentCards, topBar). cards and dialogs get the edge only.",
+          "description": "Surfaces that get the edge and corners (default boardBoxes, studentCards, topBar). studentCards and cards get the edge only; dialogs get the edge and corners; the trim is only on the board boxes in trimOn.",
           "minItems": 1,
           "maxItems": 6,
           "type": "array",
