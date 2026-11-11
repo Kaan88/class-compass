@@ -466,8 +466,9 @@ Decision D-187; migration 0030 (`level_lists`).
 - [x] Server and solver: `PUT /api/teacher/contexts/:contextId/grouping/level-list` (teacher, owner, writable class, grouping on, audited, duplicates refused), `levelList` in the grouping overview, `levelRanks(levels, list)` / `levelOrder`; the list is in the GRP-7 classroom scan
 - [x] Tests: `tests/domain/grouping.test.ts`, `tests/server/grouping.test.ts`, `tests/client/level-list.test.tsx`, `e2e/level-list.spec.ts` (axe); teacher guide EN/TR
 - [ ] Guide screenshot of the Levels tab with a list (`npm run docs:screenshots` after the next screenshot pass)
+
 ## S25d Lesson goals per class (optional) (roadmap sweep, 2026-11-11)
-Decision D-188; migration 0030 (or the next free number).
+Decision D-188; migration 0031.
 - [x] Opt-in context modules: `contextDefault: 'off'` in the module catalogue, honoured by every module switch read (the teacher switches Lesson goals on per class+subject in Class settings → Modules, with a short explanation under the switch)
 - [x] Start Lesson step "Today's goal" (optional sentence), the board box "Today's goal" with Change / Remove (a quiet "Set a goal" without one; its own row above the student grid, dockable), the outbox command `lessonGoals.set`, the lesson state, audit
 - [x] End Lesson "Did we reach our goal?" (Yes, we did! / Partly / Not yet, optional) only for a lesson with a goal; the report section "Lesson goals" with denominators ("not recorded" for an unanswered goal)
