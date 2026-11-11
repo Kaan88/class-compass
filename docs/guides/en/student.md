@@ -126,11 +126,17 @@ If your school and your teacher allow it, **My avatar** has a button **Use my ow
 - **Fine**: a drawing you made, a cartoon or game character, a famous person (like a footballer), an animal or a thing.
 - **Not allowed**: a photo of you, a photo of a classmate, a friend or your family, names, your school or your address, anything unkind.
 
+![My own picture: what is fine and what is not allowed](../img/en/student-own-picture.png)
+
 1. Press **Choose a picture** and pick one (JPG, PNG or WebP).
 2. Make it fit: drag it, or use the arrow keys, to move it inside the circle. Use **Zoom** and **Brightness**, **Turn left**, **Turn right**, **Mirror** or **Start again**. **How it will look** shows the large and the small card.
 3. Press **Send to my teacher**.
 
+![Making the picture fit in the circle](../img/en/student-picture-editor.png)
+
 Until your teacher says yes, your class sees your avatar (**Waiting for your teacher**). You can **Take my picture back**. A picture nobody checks is deleted after 14 days. If your teacher says **Not this one**, the picture is deleted at once and you see why; press **Choose another picture** to try again. **Stop using my picture** deletes it and brings your avatar back. While your own picture is in use you can still change your avatar: it is kept for later and comes back when you stop using your picture.
+
+![The picture waits for the teacher](../img/en/student-picture-waiting.png)
 
 ## What your teacher can see
 

@@ -69,6 +69,8 @@ Single classes can also be moved with **Classes** → **Promote class**.
 
 ## School holidays
 
+![School holidays](../img/en/admin-holidays.png)
+
 **School holidays** is the holiday calendar of each school year: the days without school. Choose the **School year**, then:
 
 - **Add a holiday**: a name (in English, Turkish or both, for example *Semester break* / *Yarıyıl tatili*), a **Start date** and an **End date** (the same date for one day). The dates must be inside the school year. **Edit** and **Delete** are on each row; deleting asks once more on the page.
@@ -104,6 +106,8 @@ The page has five tabs: **Modules**, **Photos and media**, **Default goals**, **
 - **Kind words**: **Blocked words** and **Allowed words** for the whole school (one per line; an allowed word wins), and how long a goal must be (**Words a goal needs at least**, default 3, and **Letters a goal needs at least**, default 12).
 
 *Turning a module off hides it but keeps all of its data.*
+
+![Modules and media: Photos and media with the uploaded avatar pictures](../img/en/admin-media.png)
 
 ## Themes
 

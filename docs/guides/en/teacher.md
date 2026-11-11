@@ -162,6 +162,12 @@ Tap a student's **name** on their card to open a small card for the class to see
 
 The goal is shown to the class, so write it for the children. Switching the module off hides the step, the box and the report section; the goals already saved are kept.
 
+![Start lesson: the Today's goal step](../img/en/start-lesson-goal.png)
+
+![Today's goal on the board, next to today's focus](../img/en/classroom-goal.png)
+
+![End lesson: Did we reach our goal?](../img/en/end-lesson-goal.png)
+
 ### Routine and timer
 
 - **Routine**: the current stage (**Now · stage 2 of 6**), with every stage of the routine in view. Use **Next stage** and **Previous stage**, or tap a stage.
@@ -194,6 +200,8 @@ Levels, pair rules ("should / should not work together") and their notes are **n
 
 **Levels** tab: type each student's level and press **Save**. Numbers, codes such as A1 and B1, and the usual words (Beginner … Advanced, Başlangıç … İleri) are put in their real order; other words come after them in alphabetical order. **Order used** shows the order level groups will use.
 
+![The Levels tab with a level list](../img/en/grouping-levels.png)
+
 **Level list** (optional) lets you choose your own words and their order, for example Starter, Growing, Strong, Star:
 
 - **Make a list from the levels used now** starts with the levels your students already have, in the order used now. **Start an empty list** starts from nothing.
@@ -217,6 +225,8 @@ Levels, pair rules ("should / should not work together") and their notes are **n
 A chosen student who is absent is replaced; a student who was away keeps their turn for a later round.
 
 ### Achievements: giving an achievement in class
+
+![Give an achievement with a group of this lesson ticked](../img/en/award-dialog.png)
 
 1. Open **Achievements** and press **Give an achievement**.
 2. **Who gets it?**: tick students or **Whole class**. While groups are shown in the lesson, **Or tick a group from this lesson** lists them: one tap ticks everyone in that group who is here, a second tap unticks them. Students you ticked by hand stay ticked.
@@ -325,6 +335,8 @@ Achievements reward effort: none depends on attendance, speed or comparing stude
 - choose what to show **Before a student chooses**: **a friendly generated avatar** or **the initials**;
 - **Reset avatar** for one student (you confirm by typing; the student sees the generated avatar until they choose again);
 - turn on **Students may send their own picture** (off by default; only while the administrator has turned own pictures on for the school). Pausing avatar changes also stops new pictures.
+
+![Avatar pictures: a picture to check](../img/en/avatar-pictures.png)
 
 **Avatar pictures** (on the teacher menu, with the number to check): pictures your students sent as their avatar. Nobody else sees a picture until you say yes.
 

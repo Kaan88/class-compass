@@ -28,6 +28,8 @@ Yönetim menüsünden **Süper Konuşmacılar**'ı açın. **Aç ya da kapat** b
 - **Pano sesi ve kutlama**: ilk üç değiştiğinde temanın kutlamasını oynatır. Varsayılan olarak kapalıdır. Tarayıcılar ses çalmak için birinin panoya bir kez tıklamasını bekleyebilir.
 - **Başarılar bu derse verilir**: puanlar bu derste Süper Konuşmacılar başarılarını kazandırır (ilk puan, 5, 10 ve 25 puan). Varsayılan (**Otomatik: İngilizce dersi**), İngilizce adı "English" olan derstir. Böyle bir ders bulunamazsa siz bir ders seçene kadar Süper Konuşmacılar başarısı verilmez.
 
+![Öğrencilerin kendi resimlerini gösterme ayarıyla pano ayarları](../img/tr/speakers-pictures.png)
+
 ## Puanlayıcı ve pano bağlantıları
 
 ![Puanlayıcı bağlantıları ve pano bağlantıları](../img/tr/speakers-links.png)

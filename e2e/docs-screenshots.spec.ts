@@ -23,7 +23,7 @@ import '../tests/messages.ts';
 import '../src/shared/i18n/areas/assistantChat.ts';
 import { FAKE_KEYS, FakeProvider } from '../tests/ai-fake.ts';
 import { lastToolResult, script } from '../tests/assistant-fake.ts';
-import { api, ensurePin, login, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
+import { api, ensurePin, login, openDock, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
 
 const IMG_ROOT = path.resolve(import.meta.dirname, '../docs/guides/img');
 
@@ -38,13 +38,18 @@ async function save(lang: Locale, name: string, png: Buffer) {
  * `from`: scroll this element to the top first (teacher and admin pages: the page heading, so the
  * menu bar does not fill the picture). `clipTo`: photograph only this element.
  */
-async function shot(page: Page, lang: Locale, name: string, opts: { fullPage?: boolean; clipTo?: string; from?: string; until?: string } = {}) {
+async function shot(page: Page, lang: Locale, name: string, opts: { fullPage?: boolean; clipTo?: string; from?: string; until?: string; center?: string } = {}) {
   await page.waitForLoadState('networkidle').catch(() => undefined);
   await page.evaluate(() => document.fonts?.ready);
   // Short-lived messages (toasts) would cover the screen in a still picture.
   await page.addStyleTag({ content: '.cc-toast { visibility: hidden !important; }' });
   if (opts.from) {
     await page.locator(opts.from).first().evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.waitForTimeout(150);
+  }
+  // `center`: scroll this element to the middle of the window (a setting far down a long form).
+  if (opts.center) {
+    await page.locator(opts.center).first().evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(150);
   }
   // `until`: the picture runs from the top of the page to just below that element, so it ends at a
@@ -59,11 +64,54 @@ async function shot(page: Page, lang: Locale, name: string, opts: { fullPage?: b
   await save(lang, name, buf);
 }
 
+/** A picture of the area around these elements (their union, plus `pad` pixels), within the window. */
+async function shotAround(page: Page, lang: Locale, name: string, selectors: string[], pad = 16) {
+  await page.waitForLoadState('networkidle').catch(() => undefined);
+  await page.addStyleTag({ content: '.cc-toast { visibility: hidden !important; }' });
+  const boxes = [];
+  for (const sel of selectors) {
+    const b = await page.locator(sel).first().boundingBox();
+    if (b) boxes.push(b);
+  }
+  expect(boxes.length).toBeGreaterThan(0);
+  const view = page.viewportSize()!;
+  const x = Math.max(0, Math.min(...boxes.map((b) => b.x)) - pad);
+  const y = Math.max(0, Math.min(...boxes.map((b) => b.y)) - pad);
+  const right = Math.min(view.width, Math.max(...boxes.map((b) => b.x + b.width)) + pad);
+  const bottom = Math.min(view.height, Math.max(...boxes.map((b) => b.y + b.height)) + pad);
+  await save(lang, name, await page.screenshot({ animations: 'disabled', caret: 'hide', clip: { x, y, width: right - x, height: bottom - y } }));
+}
+
 interface Ctx {
   id: string;
   classId: string;
   className: string;
   subjectName: { en: string; tr: string };
+}
+
+/**
+ * A picture drawn by the script (a coloured square with a star; no person, never a real photo), used
+ * for the students' own avatar pictures (S24, D-184).
+ */
+async function drawPicture(p: Page) {
+  const dataUrl = await p.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 800;
+    c.height = 600;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#3a7bd5';
+    g.fillRect(0, 0, 800, 600);
+    g.fillStyle = '#ffd34d';
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 90 : 220;
+      const a = (Math.PI / 5) * i - Math.PI / 2;
+      g.lineTo(400 + r * Math.cos(a), 300 + r * Math.sin(a));
+    }
+    g.fill();
+    return c.toDataURL('image/png');
+  });
+  return { name: 'my-star.png', mimeType: 'image/png', buffer: Buffer.from(dataUrl.split(',')[1]!, 'base64') };
 }
 
 async function endActiveLessons(page: Page) {
@@ -114,6 +162,12 @@ for (const lang of ['en', 'tr'] as const) {
     let fake: FakeProvider | null = null;
     let connectionId: string | null = null;
     let chatId: string | null = null;
+    // S25c, S25d, S24: what the script switches on or changes, put back in `finally`.
+    let levelsBefore: { list: string[]; levels: Array<{ studentId: string; level: string | null }> } | null = null;
+    let lessonGoalsOn = false;
+    let pictureStudent: string | null = null;
+    let picturesOn = false;
+    let notifyBefore: { categories: Record<string, boolean>; digest: unknown } | null = null;
 
     try {
       // ---------------------------------------------------------------- teacher area
@@ -161,6 +215,26 @@ for (const lang of ['en', 'tr'] as const) {
       await tp.getByRole('tab', { name: T('goals.tab.library') }).click();
       await expect(tp.getByTestId('library-starters')).toBeVisible();
       await shot(tp, lang, 'goals-starters', { from: '[data-testid="library-starters"]' });
+
+      // S25c (D-187): Grouping → Levels with a level list (the guide's example words); the demo school has
+      // no levels, so the list and the levels are set here and put back in `finally`.
+      {
+        const overview = (await api(tp, 'GET', `/api/teacher/contexts/${ctx3A.id}/grouping`)).body as { levelList: string[]; students: Array<{ id: string; level: string | null }> };
+        levelsBefore = { list: overview.levelList, levels: overview.students.map((s) => ({ studentId: s.id, level: s.level })) };
+        const words = lang === 'tr' ? ['Başlıyor', 'Gelişiyor', 'Güçlü', 'Yıldız'] : ['Starter', 'Growing', 'Strong', 'Star'];
+        expect((await api(tp, 'PUT', `/api/teacher/contexts/${ctx3A.id}/grouping/level-list`, { contextId: ctx3A.id, labels: words })).status).toBe(200);
+        const levels = overview.students.map((s, i) => ({ studentId: s.id, level: words[(i * 7) % words.length]! }));
+        expect((await api(tp, 'PUT', `/api/teacher/contexts/${ctx3A.id}/levels`, { contextId: ctx3A.id, levels })).status).toBe(200);
+        await tp.goto('/teacher/grouping');
+        const gp = tp.getByTestId('grouping-page');
+        await gp.getByLabel(T('teacher.chooseClass'), { exact: true }).selectOption({ label: classLabel });
+        await gp.getByRole('tab', { name: T('grouping.tab.levels') }).click();
+        await expect(gp.getByTestId('level-list-saved').locator('li')).toHaveText(words);
+        await tp.setViewportSize({ width: 1280, height: 1250 });
+        await tp.waitForTimeout(300);
+        await shot(tp, lang, 'grouping-levels', { from: 'main h1' });
+        await tp.setViewportSize({ width: 1280, height: 900 });
+      }
 
       // S14e2 (D-154): a student's name opens the statistics drawer.
       await tp.goto('/teacher/students');
@@ -291,6 +365,10 @@ for (const lang of ['en', 'tr'] as const) {
       await shot(tp, lang, 'import', { from: 'main h1' });
 
       // ---------------------------------------------------------------- classroom (enters classroom mode)
+      // S25d (D-188): Lesson goals is off in every class until the teacher switches it on; on only here.
+      expect((await api(tp, 'PUT', `/api/teacher/contexts/${ctx3A.id}/modules/lessonGoals`, { enabled: true })).status).toBe(200);
+      lessonGoalsOn = true;
+      const goalText = lang === 'tr' ? 'Hava durumu hakkında soru sorup cevap verebiliriz.' : 'We can ask and answer about the weather.';
       await tp.goto('/classroom');
       // The switcher names subjects in the active class's language, which may be either.
       await tp.getByRole('button', { name: /^3-A · (English|İngilizce)/u }).click();
@@ -299,6 +377,11 @@ for (const lang of ['en', 'tr'] as const) {
       const start = tp.getByTestId('start-lesson');
       await expect(start).toBeVisible();
       await shot(tp, lang, 'start-lesson');
+      // The "Today's goal" step with the goal typed in.
+      const goalStep = start.getByTestId('lesson-goal-step');
+      for (let i = 0; i < 6 && !(await goalStep.isVisible()); i++) await start.getByRole('button', { name: T('common.next'), exact: true }).click();
+      await goalStep.locator('textarea, input[type="text"]').first().fill(goalText);
+      await shot(tp, lang, 'start-lesson-goal');
       for (let i = 0; i < 6 && (await start.getByRole('button', { name: T('lesson.begin') }).count()) === 0; i++) {
         await start.getByRole('button', { name: T('common.next'), exact: true }).click();
       }
@@ -308,6 +391,9 @@ for (const lang of ['en', 'tr'] as const) {
       await tp.getByRole('button', { name: T('routine.next') }).click().catch(() => undefined);
       await tp.waitForTimeout(1000);
       await shot(tp, lang, 'classroom');
+      // The board box "Today's goal" beside today's focus (the top of the board down to the box).
+      await expect(tp.getByTestId('lesson-goal')).toContainText(goalText);
+      await shotAround(tp, lang, 'classroom-goal', ['.cc-lesson-row:has([data-box="lessonGoal"])']);
 
       // S14e2 (D-154): a name on a card opens the small positive card.
       await tp.getByTestId('student-card-name').nth(2).click();
@@ -340,17 +426,53 @@ for (const lang of ['en', 'tr'] as const) {
         const screen = tp.getByTestId('dock-view-groups');
         await expect(screen).toBeVisible();
         const option = screen.getByTestId('group-options').getByRole('button').first();
-        if (await option.count()) await option.click();
+        if (await option.count()) {
+          // A tap while the screen is still opening can be lost: tap again until the groups are shown.
+          const cards = screen.getByTestId('group-card').first();
+          for (let i = 0; i < 3 && !(await cards.isVisible()); i++) {
+            await option.click();
+            await cards.waitFor({ state: 'visible', timeout: 4000 }).catch(() => undefined);
+          }
+          await expect(cards).toBeVisible();
+        }
         await tp.waitForTimeout(800);
         await shot(tp, lang, 'group-screen');
         await tp.keyboard.press('Escape');
         await expect(screen).toBeHidden();
+
+        // S25a (D-185): the award dialog ticks a group of this lesson in one tap (nothing is given here).
+        // The groups reach the dialog through the polled lesson state: wait until the server has them.
+        await expect
+          .poll(async () => ((await api(tp, 'GET', `/api/classroom/contexts/${ctx3A.id}/lesson`)).body?.grouping?.groups ?? []).length, { timeout: 30_000 })
+          .toBeGreaterThan(0);
+        const view = await openDock(tp, 'achievements');
+        await view.getByTestId('achievements-give').click();
+        const dialog = tp.getByTestId('achievements-dialog');
+        await expect(dialog.getByTestId('achievements-groups')).toBeVisible({ timeout: 30_000 });
+        await dialog.getByTestId('achievements-group').first().click();
+        await expect(dialog.getByTestId('achievements-group').first()).toHaveAttribute('aria-pressed', 'true');
+        // The tap scrolls the dialog's list; the picture starts at the dialog's title.
+        await dialog.evaluate((el) => {
+          for (const n of [el, ...el.querySelectorAll('*')]) if (n.scrollTop) n.scrollTop = 0;
+        });
+        await tp.waitForTimeout(400);
+        await shot(tp, lang, 'award-dialog', { clipTo: '[data-testid="achievements-dialog"]' });
+        await tp.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+        if (await view.isVisible()) await tp.keyboard.press('Escape');
+        await expect(view).toBeHidden();
       }
 
       await tp.getByRole('button', { name: T('lesson.end'), exact: true }).click();
       await expect(tp.getByTestId('end-lesson')).toBeVisible();
       await tp.waitForTimeout(500);
       await shot(tp, lang, 'end-lesson');
+      // "Did we reach our goal?" with an answer chosen (the lesson is not saved here).
+      const review = tp.getByTestId('lesson-goal-review');
+      await expect(review).toContainText(goalText);
+      await review.getByRole('radio', { name: T('lessonGoals.outcome.reached') }).click();
+      await tp.locator('[data-testid="lesson-goal-review"]').scrollIntoViewIfNeeded();
+      await shotAround(tp, lang, 'end-lesson-goal', ['[data-testid="end-lesson"] section:has([data-testid="lesson-goal-review"])'], 24);
       await tp.getByRole('button', { name: T('lesson.backToLesson') }).click();
       await expect(dashboard).toBeVisible();
 
@@ -383,6 +505,14 @@ for (const lang of ['en', 'tr'] as const) {
       await ap.goto('/admin/maintenance');
       await expect(ap.getByRole('heading', { name: T('admin.maintenance'), level: 1 })).toBeVisible();
       await shot(ap, lang, 'admin-maintenance', { from: 'main h1' });
+      // S25b (D-186): the holiday calendar of the demo year (the demo history adds the fixed-date holidays).
+      await ap.goto('/admin/holidays');
+      await expect(ap.getByRole('heading', { name: T('admin.holidays'), level: 1 })).toBeVisible();
+      await expect(ap.locator('main table tbody tr').first()).toBeVisible();
+      await ap.setViewportSize({ width: 1280, height: 1100 });
+      await ap.waitForTimeout(300);
+      await shot(ap, lang, 'admin-holidays', { from: 'main h1' });
+      await ap.setViewportSize({ width: 1280, height: 900 });
       // S14g (D-158): the worked example theme checked and previewed (not saved).
       await ap.goto('/admin/themes');
       await expect(ap.getByRole('heading', { name: T('themes.title'), level: 1 })).toBeVisible();
@@ -394,6 +524,9 @@ for (const lang of ['en', 'tr'] as const) {
       await ap.goto('/admin/super-speakers');
       await expect(ap.getByTestId('speakers-admin')).toBeVisible();
       await shot(ap, lang, 'speakers-admin', { from: 'main h1' });
+      // S24 (D-184): the board settings with "Show students' own pictures on the board and the scorer" (off).
+      await expect(ap.getByText(T('speakers.showOwnPictures'), { exact: true })).toBeVisible();
+      await shot(ap, lang, 'speakers-pictures', { center: `text=${JSON.stringify(T('speakers.showOwnPictures'))}` });
       await ap.getByRole('tab', { name: T('speakers.admin.links') }).click();
       await expect(ap.getByTestId('scorer-link-row').first()).toBeVisible();
       await shot(ap, lang, 'speakers-links', { from: '[data-testid="scorer-link-row"]' });
@@ -480,7 +613,64 @@ for (const lang of ['en', 'tr'] as const) {
         await page.getByTestId('avatar-tab-make').click();
         // One phone screen from the top of the avatar panel (the whole creator was a 354×2794 strip).
         await shot(page, lang, 'student-avatar', { from: '[data-testid="student-avatar"]' });
+
+        // S24 (D-184): students' own avatar pictures. The school switch and the class switch are on only
+        // here; the picture is a drawing made by the script; everything is removed in `finally`.
+        expect((await api(ap, 'PUT', '/api/admin/module-policies/media.avatarPictures', { availability: 'enabled' })).status).toBe(200);
+        picturesOn = true;
+        expect((await api(tp, 'PUT', `/api/teacher/classes/${ctx3A.classId}/avatar-settings`, { uploads: true })).status).toBe(200);
+        pictureStudent = chosen;
+        // No "sent a picture" notification for the teacher: it would outlive the deleted picture and show
+        // up in the next language's notifications picture.
+        const ns = (await api(tp, 'GET', '/api/teacher/notification-settings')).body as { categories: Record<string, boolean>; digest: unknown };
+        notifyBefore = { categories: ns.categories, digest: ns.digest };
+        expect((await api(tp, 'PUT', '/api/teacher/notification-settings', { categories: { ...ns.categories, avatarPicture: false }, digest: ns.digest })).status).toBe(200);
+        await page.goto(home);
+        await page.getByTestId('student-tile-avatar').click();
+        await page.getByTestId('avatar-picture-open').click();
+        const pictureScreen = page.getByTestId('avatar-picture-screen');
+        await expect(pictureScreen).toBeVisible();
+        // A little taller than the phone, so "Choose a picture" is in the picture too.
+        await page.setViewportSize({ width: 390, height: 980 });
+        await shot(page, lang, 'student-own-picture', { from: '#student-screen-title' });
+        await page.setViewportSize({ width: 390, height: 844 });
+        await pictureScreen.getByTestId('picture-file').setInputFiles(await drawPicture(page));
+        const pictureEditor = page.getByTestId('picture-editor');
+        await expect(pictureEditor).toBeVisible();
+        await pictureEditor.getByTestId('picture-zoom').fill('130');
+        await page.waitForTimeout(300);
+        await shot(page, lang, 'student-picture-editor', { from: '[data-testid="picture-editor"]' });
+        const sent = page.waitForResponse((r) => r.url().endsWith('/api/student/avatar-picture') && r.request().method() === 'POST');
+        await pictureEditor.getByTestId('picture-send').click();
+        expect((await sent).status()).toBe(200);
+        await expect(page.getByTestId('picture-waiting')).toBeVisible();
+        await shot(page, lang, 'student-picture-waiting', { from: '#student-screen-title' });
         await phone.close();
+
+        // The teacher's "Avatar pictures" page with the picture to check (the confirmation ticked, not
+        // approved), in a fresh session: this one went through the classroom and shows its banner.
+        {
+          // A short window, so the heading can be scrolled to the top of this short page.
+          const office = await signedIn(browser, 'english', lang, { width: 1280, height: 680 });
+          await office.page.goto('/teacher/avatar-pictures');
+          const review = office.page.getByTestId('avatar-pictures-page');
+          await expect(review).toBeVisible();
+          const toCheck = review.getByTestId('picture-to-check').first();
+          await expect(toCheck).toBeVisible();
+          await toCheck.getByTestId('picture-confirm').check();
+          await office.page.waitForTimeout(300);
+          await shot(office.page, lang, 'avatar-pictures', { from: 'main h1' });
+          await office.context.close();
+        }
+
+        // Admin → Modules and media → Photos and media: the switch and the school-wide list.
+        await ap.goto('/admin/modules');
+        await ap.getByRole('tab', { name: T('modules.tab.media') }).click();
+        await expect(ap.getByTestId('admin-avatar-pictures')).toBeVisible();
+        await ap.setViewportSize({ width: 1280, height: 1700 });
+        await ap.waitForTimeout(500);
+        await shot(ap, lang, 'admin-media', { from: 'main h1' });
+        await ap.setViewportSize({ width: 1280, height: 900 });
       }
     } finally {
       // AI tools are off in the demo school; switching them off also ends the example connection (D-160).
@@ -492,6 +682,25 @@ for (const lang of ['en', 'tr'] as const) {
       }
       await fake?.close();
       if (aiToolsOn) await api(ap, 'PUT', '/api/admin/ai-tools', { mcpEnabled: false });
+      // The teacher endpoints below need the teacher area unlocked (the classroom part locks it).
+      await api(tp, 'POST', '/api/auth/pin/unlock', { pin: PIN });
+      if (pictureStudent) {
+        const list = (await api(ap, 'GET', '/api/admin/avatar-pictures')).body as { toCheck: Array<{ id: string; studentId: string }>; inUse: Array<{ id: string; studentId: string }> } | null;
+        for (const x of [...(list?.toCheck ?? []), ...(list?.inUse ?? [])].filter((x) => x.studentId === pictureStudent)) await api(ap, 'DELETE', `/api/admin/avatar-pictures/${x.id}`, {});
+      }
+      if (notifyBefore) await api(tp, 'PUT', '/api/teacher/notification-settings', notifyBefore);
+      if (picturesOn) {
+        await api(tp, 'PUT', `/api/teacher/classes/${ctx3A.classId}/avatar-settings`, { uploads: false });
+        await api(ap, 'PUT', '/api/admin/module-policies/media.avatarPictures', { availability: 'disabled' });
+      }
+      if (lessonGoalsOn) {
+        await endActiveLessons(tp);
+        await api(tp, 'PUT', `/api/teacher/contexts/${ctx3A.id}/modules/lessonGoals`, { enabled: false });
+      }
+      if (levelsBefore) {
+        await api(tp, 'PUT', `/api/teacher/contexts/${ctx3A.id}/grouping/level-list`, { contextId: ctx3A.id, labels: levelsBefore.list });
+        await api(tp, 'PUT', `/api/teacher/contexts/${ctx3A.id}/levels`, { contextId: ctx3A.id, levels: levelsBefore.levels });
+      }
       await api(tp, 'POST', '/api/auth/pin/unlock', { pin: PIN });
       await api(tp, 'PUT', `/api/teacher/classes/${ctx3A.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false });
       await api(ap, 'PUT', '/api/admin/speakers/settings', { boardLanguage: 'en' });

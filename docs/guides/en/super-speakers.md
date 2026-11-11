@@ -28,6 +28,8 @@ The **Settings** tab:
 - **Board sound and celebration**: plays the theme's celebration when the top three change. Off by default. Browsers may only play sound after someone has clicked the board once.
 - **Achievements go to this subject**: points earn the Super Speakers achievements (first point, 5, 10 and 25 points) in this subject. By default (**Automatic: the English subject**), the subject named "English". If no subject is found, no Super Speakers achievements are given until you choose one.
 
+![Board settings with Show students' own pictures](../img/en/speakers-pictures.png)
+
 ## Scorer links and board links
 
 ![Scorer links and board links](../img/en/speakers-links.png)

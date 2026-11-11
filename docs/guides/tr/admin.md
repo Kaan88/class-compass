@@ -69,6 +69,8 @@ Tek tek sınıflar **Sınıflar** → **Sınıfı üst sınıfa taşı** ile de 
 
 ## Okul tatilleri
 
+![Okul tatilleri](../img/tr/admin-holidays.png)
+
 **Okul tatilleri**, her eğitim yılının tatil takvimidir: okulun olmadığı günler. **Eğitim yılı**'nı seçin, sonra:
 
 - **Tatil ekle**: bir ad (İngilizce, Türkçe ya da ikisi; örneğin *Yarıyıl tatili* / *Semester break*), **Başlangıç tarihi** ve **Bitiş tarihi** (tek gün için aynı tarih). Tarihler eğitim yılının içinde olmalıdır. Her satırda **Düzenle** ve **Sil** vardır; silmeden önce sayfada bir kez daha sorulur.
@@ -104,6 +106,8 @@ Sayfanın beş sekmesi vardır: **Modüller**, **Fotoğraf ve medya**, **Varsay�
 - **Nazik sözcükler**: bütün okul için **Engellenen sözcükler** ve **İzin verilen sözcükler** (satır başına bir; izin verilen sözcük her zaman kazanır) ve bir hedefin ne kadar uzun olması gerektiği (**Bir hedefte en az sözcük**, varsayılan 3, ve **Bir hedefte en az harf**, varsayılan 12).
 
 *Bir modülü kapatmak onu gizler ama tüm verilerini korur.*
+
+![Modüller ve medya: yüklenen avatar resimleriyle Fotoğraf ve medya sekmesi](../img/tr/admin-media.png)
 
 ## Temalar
 

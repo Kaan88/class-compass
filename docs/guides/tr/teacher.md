@@ -162,6 +162,12 @@ Kaydettiğiniz ya da vazgeçtiğiniz anda öğretmen alanı yeniden kilitlenir. 
 
 Hedef sınıfa gösterilir; çocuklar için yazın. Modülü kapatmak adımı, kutuyu ve rapor bölümünü gizler; kaydedilmiş hedefler saklanır.
 
+![Dersi başlat: Bugünün hedefi adımı](../img/tr/start-lesson-goal.png)
+
+![Panoda, bugünün odağının yanında Bugünkü hedefimiz](../img/tr/classroom-goal.png)
+
+![Dersi bitir: Hedefimize ulaştık mı?](../img/tr/end-lesson-goal.png)
+
 ### Rutin ve zamanlayıcı
 
 - **Rutin**: o anki aşama (**Şimdi · aşama 2 / 6**); rutinin bütün aşamaları görünür. **Sonraki aşama** ve **Önceki aşama** düğmelerini kullanın ya da bir aşamaya dokunun.
@@ -194,6 +200,8 @@ Seviyeler, eşleşme kuralları ("birlikte çalışmalı / çalışmamalı") ve 
 
 **Seviyeler** sekmesi: her öğrencinin seviyesini yazın ve **Kaydet**'e basın. Sayılar, A1 ve B1 gibi kodlar ve alışılmış sözcükler (Başlangıç … İleri, Beginner … Advanced) gerçek sıralarına konur; diğer sözcükler bunlardan sonra alfabetik sırayla gelir. **Kullanılan sıra** satırı seviye gruplarının kullanacağı sırayı gösterir.
 
+![Seviye listesiyle Seviyeler sekmesi](../img/tr/grouping-levels.png)
+
 **Seviye listesi** (isteğe bağlı) kendi sözcüklerinizi ve sıralarını seçmenizi sağlar, örneğin Başlıyor, Gelişiyor, Güçlü, Yıldız:
 
 - **Şu an kullanılan seviyelerden liste yap**, öğrencilerinizin şu anki seviyeleriyle, bugün kullanılan sırayla başlar. **Boş bir liste başlat** sıfırdan başlar.
@@ -217,6 +225,8 @@ Seviyeler, eşleşme kuralları ("birlikte çalışmalı / çalışmamalı") ve 
 Seçilen öğrenci derste yoksa yerine başkası seçilir; gelmeyen öğrencinin sırası daha sonraki bir tura kalır.
 
 ### Başarılar: derste başarı vermek
+
+![Bu dersteki bir grubun işaretlendiği Başarı ver penceresi](../img/tr/award-dialog.png)
 
 1. **Başarılar**'ı açıp **Başarı ver**'e basın.
 2. **Kim alıyor?**: öğrencileri işaretleyin ya da **Tüm sınıf**'ı seçin. Derste gruplar gösteriliyorsa **Ya da bu dersteki bir grubu işaretleyin** altında listelenir: bir dokunuş o gruptan derste olan herkesi işaretler, ikinci dokunuş işaretleri kaldırır. Elle işaretlediğiniz öğrenciler işaretli kalır.
@@ -325,6 +335,8 @@ Başarılar çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri 
 - **Öğrenci seçene kadar göster**: **otomatik oluşturulan sevimli bir avatar** ya da **baş harfler**;
 - bir öğrenci için **Avatarı sıfırla** (yazarak onaylarsınız; öğrenci yeniden seçene kadar otomatik avatarı görür);
 - **Öğrenciler kendi resimlerini gönderebilir** seçeneğini açabilirsiniz (varsayılan olarak kapalı; yalnızca yönetici kendi resimlerini okul genelinde açtıysa). Avatar değişikliklerine ara verirseniz yeni resim de gönderilemez.
+
+![Avatar resimleri: bakılacak bir resim](../img/tr/avatar-pictures.png)
 
 **Avatar resimleri** (öğretmen menüsünde, bakılacak sayısıyla): öğrencilerinizin avatar olarak gönderdiği resimler. Siz evet diyene kadar resmi başka kimse görmez.
 
