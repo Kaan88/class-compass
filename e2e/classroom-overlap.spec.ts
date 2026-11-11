@@ -3,12 +3,15 @@
  * - Top bar: at 320, 375 and 414 px, at 100 % and 200 % text, in English and Turkish (class 3-A switched
  *   to Turkish only) and in all four themes (the three built-ins and the Snow Day example package), the
  *   class name, the subject, the date, the time, the quote and weather slots and the tools never
- *   intersect, the class name stays on one line, nothing is cut off or leaves the screen (S17b review:
- *   at 375 px "3-A" wrapped and "English" ran over the date line).
- * - Toasts: the "Lesson started" note after Start lesson never covers the dock or End lesson at 375 px,
- *   768×1024, 1536×703 at 1.25 and 1920×1080; every frame while the note shows is checked.
- * Fictional demo data only; the class theme and language, the imported package and the lesson are put
- * back in `finally` (the suite shares one database). The board's screen-size reports are not sent from these
+ *   intersect, a class name word never breaks unless it is wider than the bar, nothing is cut off or
+ *   leaves the screen (S17b review: at 375 px "3-A" wrapped and "English" ran over the date line). The
+ *   same matrix runs again with a long Turkish class name (a hyphenated word and a very long one) and a
+ *   long subject (S21b review: such a name was cut off at 320 px and 200 % text).
+ * - Toasts: the "Lesson started" note after Start lesson never covers the dock or End lesson at 320 px
+ *   (200 % text), 375 px (100 and 200 % text), 768×1024, 1536×703 at 1.25 and 1920×1080, and its close
+ *   button stays inside the note; every frame while the note shows is checked.
+ * Fictional demo data only; the class name, theme and language, the subject's name, the imported
+ * package and the lesson are put back in `finally` (the suite shares one database). The board's screen-size reports are not sent from these
  * many board openings: they are rate-limited per address and `e2e/display-info.spec.ts` checks them.
  */
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -31,7 +34,8 @@ type Ctx = {
   chosenTheme: string;
   mainLanguage: 'en' | 'tr';
   secondLanguageEnabled: boolean;
-  subjectName: { en: string };
+  subjectId: string;
+  subjectName: { en: string; tr?: string };
 };
 const context3A = async (page: Page) => ((await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Ctx[]).find((c) => c.className === '3-A' && c.subjectName.en === 'English')!;
 
@@ -56,13 +60,13 @@ async function endActiveLessons(page: Page) {
 }
 
 /** Opens the classroom screen on 3-A (the switcher names the class "3-A · English" or "3-A · İngilizce"). */
-async function open3A(page: Page) {
+async function open3A(page: Page, className = '3-A') {
   await page.goto('/classroom');
   await page
-    .getByRole('button', { name: /^3-A · /u })
+    .getByRole('button', { name: new RegExp(`^${className.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')} · `, 'u') })
     .first()
     .click();
-  await expect(page.getByTestId('class-banner-class')).toHaveText('3-A');
+  await expect(page.getByTestId('class-banner-class')).toHaveText(className);
 }
 
 /** Everything wrong with the top bar's layout right now (empty when nothing overlaps). */
@@ -136,11 +140,15 @@ async function topBarProblems(page: Page, quote?: string): Promise<string[]> {
             }
         }
       }
-      // The class name never breaks ("3-A" on one line) and the subject stays inside the class block.
-      const name = document.querySelector('.cc-classroom-bar__name')!;
-      const lines = new Set(boxes(name).map((r) => Math.round(r.top)));
-      if (lines.size > 1) out.push(`the class name wraps onto ${lines.size} lines`);
+      // A class name word never breaks ("3-A" stays on one line) unless the word alone is wider than the
+      // class block (then it fills the block's whole width), and the name and subject stay inside it.
       const cls = document.querySelector('.cc-classroom-bar__class')!.getBoundingClientRect();
+      for (const word of document.querySelectorAll('.cc-classroom-bar__word')) {
+        const lines = new Set(boxes(word).map((r) => Math.round(r.top)));
+        const width = word.getBoundingClientRect().width;
+        if (lines.size > 1 && width < cls.width - 2)
+          out.push(`class name word "${word.textContent}" breaks onto ${lines.size} lines although it fits (${Math.round(width)} of ${Math.round(cls.width)} px)`);
+      }
       for (const sel of ['.cc-classroom-bar__name', '.cc-classroom-bar__subject']) {
         for (const r of boxes(document.querySelector(sel)!)) if (r.right > cls.right + 0.5 || r.left < cls.left - 0.5) out.push(`${sel} runs out of the class block`);
       }
@@ -169,9 +177,14 @@ const setTextScale = (page: Page, scale: number) =>
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   }, scale);
 
-test('classroom top bar: nothing overlaps at 320/375/414 px, 100 and 200 % text, English and Turkish, all four themes (S21b, D-174)', async ({ browser }) => {
-  test.skip(test.info().project.name === 'mobile', 'every phone width is set here, on the display project');
-  test.setTimeout(360_000);
+/** A long fictional Turkish class name (a hyphenated word and one wider than a phone at 200 % text) and a long subject. */
+const LONG_NAMES = {
+  className: 'Hazırlık-Anaokulu Kelebeklersınıfı',
+  subject: { en: 'Religious Culture and Moral Knowledge', tr: 'Din Kültürü ve Ahlak Bilgisi' },
+};
+
+/** Runs the top bar matrix on 3-A, with its own names or (`long`) for a moment with LONG_NAMES. */
+async function topBarMatrix(browser: Browser, long: boolean) {
   mkdirSync(SHOTS, { recursive: true });
   const adminCtx = await browser.newContext();
   const admin = await adminCtx.newPage();
@@ -196,6 +209,11 @@ test('classroom top bar: nothing overlaps at 320/375/414 px, 100 and 200 % text,
     await ensurePin(teacher);
     ctx3a = await context3A(teacher);
     await endActiveLessons(teacher);
+    const className = long ? LONG_NAMES.className : '3-A';
+    if (long) {
+      expect((await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { name: className })).status).toBe(200);
+      expect((await api(admin, 'PATCH', `/api/admin/subjects/${ctx3a.subjectId}`, { name: LONG_NAMES.subject })).status).toBe(200);
+    }
     // A running lesson: the bar then also holds Full screen (the widest set of tools).
     const started = await api(teacher, 'POST', '/api/commands', {
       commands: [
@@ -228,7 +246,7 @@ test('classroom top bar: nothing overlaps at 320/375/414 px, 100 and 200 % text,
           ).status,
         ).toBe(200);
         await teacher.setViewportSize({ width: 375, height: 812 });
-        await open3A(teacher);
+        await open3A(teacher, className);
         await expect(teacher.locator('html')).toHaveAttribute('data-theme', theme);
         await expect(teacher.getByTestId('lesson-dashboard')).toBeVisible();
         await expect(teacher.getByTestId('topbar-date')).toBeVisible();
@@ -236,13 +254,13 @@ test('classroom top bar: nothing overlaps at 320/375/414 px, 100 and 200 % text,
           await teacher.setViewportSize({ width, height: 812 });
           for (const scale of [1, 2]) {
             await setTextScale(teacher, scale);
-            for (const p of await topBarProblems(teacher)) problems.push(`${theme} ${lang} ${width}px text ${scale * 100} %: ${p}`);
-            for (const q of hardQuotes(lang === 'tr' ? QUOTES_TR : QUOTES_EN)) {
+            for (const p of await topBarProblems(teacher)) problems.push(`${long ? 'long names ' : ''}${theme} ${lang} ${width}px text ${scale * 100} %: ${p}`);
+            for (const q of long ? [] : hardQuotes(lang === 'tr' ? QUOTES_TR : QUOTES_EN)) {
               for (const p of await topBarProblems(teacher, q)) problems.push(`${theme} ${lang} ${width}px text ${scale * 100} % with "${q}": ${p}`);
             }
             if (width === 375)
               await teacher.locator('.cc-classroom-bar').screenshot({
-                path: `${SHOTS}/topbar-${theme}-${lang}-${width}-${scale * 100}.png`,
+                path: `${SHOTS}/topbar-${long ? 'long-' : ''}${theme}-${lang}-${width}-${scale * 100}.png`,
               });
           }
           await setTextScale(teacher, 1);
@@ -253,6 +271,12 @@ test('classroom top bar: nothing overlaps at 320/375/414 px, 100 and 200 % text,
   } finally {
     await endActiveLessons(teacher).catch(() => undefined);
     if (ctx3a) {
+      if (long) {
+        await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { name: ctx3a.className });
+        await api(admin, 'PATCH', `/api/admin/subjects/${ctx3a.subjectId}`, {
+          name: { en: ctx3a.subjectName.en, tr: ctx3a.subjectName.tr ?? ctx3a.subjectName.en },
+        });
+      }
       await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, {
         mainLanguage: ctx3a.mainLanguage,
         secondLanguageEnabled: ctx3a.secondLanguageEnabled,
@@ -268,13 +292,27 @@ test('classroom top bar: nothing overlaps at 320/375/414 px, 100 and 200 % text,
     await teacherCtx.close();
     await adminCtx.close();
   }
+}
+
+test('classroom top bar: nothing overlaps at 320/375/414 px, 100 and 200 % text, English and Turkish, all four themes (S21b, D-174)', async ({ browser }) => {
+  test.skip(test.info().project.name === 'mobile', 'every phone width is set here, on the display project');
+  test.setTimeout(360_000);
+  await topBarMatrix(browser, false);
+});
+
+test('classroom top bar: a long Turkish class name and a long subject are never cut off (S21b review, D-174)', async ({ browser }) => {
+  test.skip(test.info().project.name === 'mobile', 'every phone width is set here, on the display project');
+  test.setTimeout(300_000);
+  await topBarMatrix(browser, true);
 });
 
 const TOAST_SIZES = [
-  { width: 375, height: 812, scale: 2, name: '375x812' },
-  { width: 768, height: 1024, scale: 1, name: '768x1024' },
-  { width: 1536, height: 703, scale: 1.25, name: '1536x703@1.25' },
-  { width: 1920, height: 1080, scale: 1, name: '1920x1080' },
+  { width: 320, height: 640, scale: 2, text: 2, name: '320x640-text200' },
+  { width: 375, height: 812, scale: 2, text: 1, name: '375x812' },
+  { width: 375, height: 812, scale: 2, text: 2, name: '375x812-text200' },
+  { width: 768, height: 1024, scale: 1, text: 1, name: '768x1024' },
+  { width: 1536, height: 703, scale: 1.25, text: 1, name: '1536x703@1.25' },
+  { width: 1920, height: 1080, scale: 1, text: 1, name: '1920x1080' },
 ] as const;
 
 /** Starts 3-A's lesson through the Start lesson steps (whatever steps are on) on a fresh display. */
@@ -288,6 +326,7 @@ async function startThroughSteps(browser: Browser, size: (typeof TOAST_SIZES)[nu
   const page = await ctx.newPage();
   await login(page, 'english');
   await open3A(page);
+  if (size.text !== 1) await setTextScale(page, size.text);
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const start = page.getByTestId('start-lesson');
   await expect(start).toBeVisible();
@@ -333,6 +372,12 @@ test('the "Lesson started" note never covers the dock or End lesson (S21b, D-174
                     w.__s21b.problems.push(
                       `note "${t.textContent?.trim().slice(0, 30)}" covers ${d === dock ? 'the dock' : `"${d.textContent?.trim().slice(0, 30)}"`} (${Math.round(ow)}×${Math.round(oh)} px)`,
                     );
+                }
+                // Every button of the note (Close, Undo) stays inside the note.
+                for (const btn of t.querySelectorAll('.cc-btn')) {
+                  const r = btn.getBoundingClientRect();
+                  if ((r.left < a.left - 0.5 || r.right > a.right + 0.5 || r.top < a.top - 0.5 || r.bottom > a.bottom + 0.5) && w.__s21b.problems.length < 20)
+                    w.__s21b.problems.push(`a button of the note runs out of it (${Math.round(r.left)}–${Math.round(r.right)} in ${Math.round(a.left)}–${Math.round(a.right)})`);
                 }
                 if (a.top < 0 || a.bottom > innerHeight) w.__s21b.problems.push(`note off the screen (${Math.round(a.top)}–${Math.round(a.bottom)} of ${innerHeight})`);
               }

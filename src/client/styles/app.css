@@ -666,6 +666,10 @@ a {
 }
 .cc-toast {
   display: flex;
+  /* S21b review: at 200 % text on a 320 px phone the icon, the message and the close button do not fit
+     on one line; the buttons then move to the next line (at its end) instead of sticking out. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
@@ -677,7 +681,9 @@ a {
   animation: cc-fade-in 160ms ease-out 1;
 }
 .cc-toast__msg {
-  flex: 1;
+  flex: 1 1 4em; /* with its icon, the message keeps the first line; buttons wrap first */
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 /* On the classroom display, while a dialog is open a plain note would sit on the dialog's buttons
    (e.g. the timer keypad): only errors and notes with an Undo stay. */
@@ -700,7 +706,21 @@ html:has(.cc-lesson-board) .cc-toaster {
 html:has(.cc-classroom) .cc-toaster[data-above-dock] {
   bottom: var(--cc-dock-clear, 5.5rem);
 }
+/* S21b review: above the dock a note only fades in. The usual rise from 0.5rem lower would slide it
+   through the top of the dock for its first frames (0.5rem is 15 px at 200 % text, the gap is 8 px). */
+html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
+  animation-name: cc-fade-in-place;
+}
+@keyframes cc-fade-in-place {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 .cc-toast .cc-btn {
+  flex: none;
   background: var(--cc-surface);
   color: var(--cc-text);
 }
@@ -2126,7 +2146,17 @@ html:has(.cc-classroom) {
   font-weight: 850;
   line-height: 1.1;
 }
+/* S21b (D-174): each word of the class name is one unit: it moves to the next line whole ("3-A" never
+   breaks at its hyphen). Only a word wider than the bar itself (a long or hyphenated Turkish name at
+   200 % text on a 320 px phone) breaks inside, rather than running off the screen. */
+.cc-classroom-bar__word {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .cc-classroom-bar__subject {
+  min-width: 0;
+  overflow-wrap: break-word;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--cc-accent-strong);
@@ -2195,8 +2225,9 @@ html:has(.cc-classroom) {
    English" needs on a 375 px phone: "3-A" broke at its hyphen and the subject ran over the date line.
    Now the class block and the day/date/time share the first line only while both fit whole; otherwise
    the date and time take the next line (left, through space-between), and inside each block words
-   wrap (the subject under the class name, the date under the day), never over each other. The class
-   name's words never break (`.cc-nowrap` per word). Quote and tools keep their own lines. */
+   wrap (the subject under the class name, the date under the day), never over each other. A class
+   name word breaks only when it is wider than the bar (`.cc-classroom-bar__word`). Quote and tools
+   keep their own lines. */
 @media (max-width: 60rem) {
   .cc-classroom-bar {
     display: flex;
@@ -2208,7 +2239,7 @@ html:has(.cc-classroom) {
     flex: 0 1 auto;
     flex-wrap: wrap;
     column-gap: 0.6rem;
-    row-gap: 0;
+    row-gap: 0.25rem; /* the name's glyphs reach past its 1.1 line height: the subject keeps clear */
   }
   .cc-classroom-bar__when {
     flex: 0 1 auto;

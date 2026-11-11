@@ -203,11 +203,12 @@ export function ClassroomTopBar({
         {context ? (
           <>
             <span className="cc-classroom-bar__name" data-testid="class-banner-class">
-              {/* S21b (D-174): a class name breaks only between its words, never at "3-A"'s hyphen. */}
+              {/* S21b (D-174): a class name breaks between its words, never at "3-A"'s hyphen; only a word
+                  wider than the whole bar breaks inside, as a last resort (`.cc-classroom-bar__word`). */}
               {context.className.split(' ').map((word, i) => (
                 <Fragment key={i}>
                   {i ? ' ' : null}
-                  <span className="cc-nowrap">{word}</span>
+                  <span className="cc-classroom-bar__word">{word}</span>
                 </Fragment>
               ))}
             </span>
