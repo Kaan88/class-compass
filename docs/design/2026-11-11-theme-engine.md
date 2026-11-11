@@ -127,6 +127,12 @@ Each built-in gets a scene, frames, ambient and sets, using only the S17a engine
 - **Classroom** (Yıldız): a sunny classroom wall with windows, bunting, bookshelves and a plant; edge `scallop`, trim `pencil` on routine + timer, corners `star`; no ambient; achievement frame `star`; families first: robots, space.
 - Contrast, focus, tap targets unchanged; the usability screen crawl and screenshots compared before/after; `npm run docs:theme-examples` regenerates the built-in examples with the new fields.
 
+### Engine polish from the wave 1 screenshots (lead review, 2026-11-11)
+Screenshots of the Snow Day board after S17a (e2e `test-results/theme-engine/`) against the mockups:
+- **Snow drift reads as a thin white line**, not piled snow, on board boxes, the top bar and student cards (the path is stretched flat). Make it read like `Main.dc.html` / `ThemedBoard.dc.html`: a taller, bulging cap (about 30–38 px on board boxes, 16–20 px on student cards at 1536×703) with a soft shadow edge and small drips down the sides, proportions kept on wide boxes (tile or segment the path instead of stretching one path across 1,800 px). The same applies to `scallop`, `torn` and the `garland`/`pencil` trims: no visible horizontal stretching.
+- **The dock hides the village.** When the active theme has a scene, the classroom dock is content-width and centred on wide screens (as in the mockups), so the scene shows on both sides; without a scene it stays as today. Decide by the presence of a scene, never by a theme key. Touch targets and the End lesson button position stay easy to reach (End lesson may stay at the dock's right end).
+- **Phones**: the classroom dock wraps into many rows at 375 px and covers more than half the screen (an open S17a ROADMAP box). Give the dock a compact phone layout (one scrollable row or a "More" menu), so the bottom strip scene and the student list are visible; axe and touch targets as usual.
+
 ### Sound styles
 - `sounds.style`: `tones` (today's synthesis, the default when absent) | `bells` | `marimba` | `chimes` | `musicBox`. App-defined Web Audio synthesis only (no audio files; partials/envelopes per style), every existing limit still applies (peak level, length, the sound switches and volume, the iPad unlock path).
 - The schema, validator, docs, the generated schema and the MCP theme tools include it; a test checks the MCP `theme_schema` lists the styles and `validate_theme` rejects an unknown one.
