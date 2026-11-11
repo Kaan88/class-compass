@@ -77,6 +77,7 @@ Bütün sınıflarınızda kapalı olan bir modülün sayfaları menüde görün
    - **Yoklama**: siz değiştirmedikçe herkes "Var" sayılır. Bir öğrenciye dokunarak Yok, Geç, İzinli ve Var arasında geçiş yapın.
    - **Bugünün yardımcısı**: bugün kimin yardım edeceği ve görevleri. Yardımcının şimdiden yaptığı görevleri işaretleyin (örneğin "Sınıfın düzenlenmesine yardım et"); işaretler ders başladığında kaydedilir.
    - **Bugünün konusu**: dersin odağı (Dinleme, Okuma, Kelime bilgisi, Dil bilgisi, Yazma, Konuşma, Sesletim ya da kendi konularınız). **Ders konuları**'ndaki haftalık plan bir öneri getirir; değiştirebilirsiniz.
+   - **Bugünün hedefi** (yalnızca sınıfta **Ders hedefleri** açıksa, bkz. [Ders hedefleri](#ders-hedefleri)): sınıfın okuyabileceği kısa bir cümle, örneğin "Hava durumunu sorup cevaplayabiliriz." Bugün hedef koymayacaksanız boş bırakın.
    - **Rutin**: bu dersin rutinini seçin.
 4. **Derse başla**'ya basın. Pano tüm ekranı kaplar (tam ekran); tarayıcının çubukları sınıftan yer çalmaz.
 
@@ -97,6 +98,7 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
 - **Gizli Öğrenciler**: gizli öğrencileri açıklayın ve sonuçlarını kaydedin (bkz. [Gizli Öğrenci](#gizli-öğrenci)).
 - **Yardımcıya teşekkür**: yardımcının bugün yaptığı görevleri işaretleyin, sonra ona teşekkür edin.
 - **Aferin!**: bu derste kazanılan otomatik başarılar; yalnızca sınıf bunu Başarılar'da seçtiyse.
+- **Hedefimiz**: yalnızca dersin bir hedefi varsa. **Hedefimize ulaştık mı?** **Evet, ulaştık!**, **Kısmen** ya da **Henüz değil**. Cevaplamak isteğe bağlıdır; seçimi kaldırmak için aynı cevaba yeniden dokunun.
 - **Değerlendirme**: **Ders nasıl geçti?** (Zordu, İdare eder, İyi, Harika) ve kendiniz için isteğe bağlı bir not.
 
 **Kaydet ve dersi bitir**'e basın. **Ders kaydedildi** özeti süreyi, ulaşılan rutin aşamalarını ve yoklamayı gösterir. **Derse dön** bitirmeyi iptal eder ve süren derse geri götürür.
@@ -146,6 +148,17 @@ Kaydettiğiniz ya da vazgeçtiğiniz anda öğretmen alanı yeniden kilitlenir. 
 ![Sınıf ekranında bir öğrencinin kartı](../img/tr/classroom-card.png)
 
 Öğrenci kartındaki **ada** dokunduğunuzda sınıfın da görebileceği küçük bir kart açılır: **Son başarılar**, **Bu hafta Süper Konuşmacılar** (öğrencinin kendi puanı), **Günün yardımcısı** (bu dönem kaç gün) ve **Sayaçlar** (yalnızca hatırlatma kutuları açıkken). Kart yalnızca olumlu şeyler gösterir: devam, ödev, hedef, not, seviye ya da başka öğrencilerle karşılaştırma asla yer almaz ve istatistiklere bağlantı yoktur. Öğrenci kartındaki **+** düğmesi eskisi gibi bir hatırlatma sayar. İstatistikler yalnızca öğretmen alanındadır (bkz. [Öğrenci istatistikleri](#öğrenci-istatistikleri)).
+
+### Ders hedefleri
+
+**Ders hedefleri** her sınıfta kapalı başlar; bir sınıf ve ders için **Sınıf ayarları** → **Modüller**'den açarsınız. Açıkken:
+
+- **Dersi başlat**'ta isteğe bağlı tek bir cümlelik **Bugünün hedefi** adımı vardır.
+- Pano **Bugünkü hedefimiz**'i öğrenci kartlarının üstünde kendi satırında **Değiştir** ile gösterir (yeni cümleyi yazıp **Hedefi kaydet** ya da **Hedefi kaldır**). Hedef yoksa yalnızca küçük bir **Hedef koy** düğmesi kalır. Her kutu gibi **Yerleşimi düzenle** ile taşınabilir ya da **Ders araçları** satırına alınabilir.
+- **Dersi bitir**, dersin hedefi varsa **Hedefimize ulaştık mı?** diye sorar.
+- **Raporlar**'da bir **Ders hedefleri** bölümü vardır: her dersin hedefi ve cevabı, cevaplanan hedeflerden kaçına ulaşıldığı, kısmen ulaşıldığı ya da henüz ulaşılmadığı. Kimsenin cevaplamadığı bir hedef "kaydedilmedi" olarak görünür.
+
+Hedef sınıfa gösterilir; çocuklar için yazın. Modülü kapatmak adımı, kutuyu ve rapor bölümünü gizler; kaydedilmiş hedefler saklanır.
 
 ### Rutin ve zamanlayıcı
 
@@ -329,14 +342,14 @@ Onaylanan resimler diğer yüklemeler gibi okulun yedeklerinde tutulur; eski yed
 Üstten sınıfı ve dersi seçin.
 
 - **Sınıf dili**: **Yalnızca İngilizce**, **Yalnızca Türkçe**, **İngilizce, ikinci dil Türkçe** ya da **Türkçe, ikinci dil İngilizce**. Bu sınıfın sınıf ekranı, öğrenci sayfaları ve ad alanları için, sınıfın bütün öğretmenlerinde geçerlidir. Kapattığınız dildeki metinler silinmez. Her ad alanı (rutinler ve aşamaları, sayaçlar, ödev durumları, hedefler, gruplar, yardımcı görevleri, ders konuları) sınıfın her dili için bir kutu gösterir, önce ana dil; **Çeviri gerekli**, diğer dilde metni olan ama kendisi hâlâ boş olan kutuyu işaretler (siz doldurana kadar sınıf diğer dili görür). **Hedefler** sayfasındaki **Kategoriler ve hazır hedefler** sekmesi (yeni kategoriler, hazır hedefler ve kendi cümle başlangıçlarınız) o dersteki bütün sınıflarınızın dillerini gösterir, çünkü oraya eklediğiniz her şey bu sınıfların hepsinde görünür. Yeni bir sınıfın hazır metinleri (yardımcı görevleri, İngilizce hatırlatma sayacı, grup adları) sınıfın dillerinde yazılır; ikinci bir dili açtığınızda hiç değiştirmediğiniz metinlere o dil de eklenir. **Öğrenci sayfası dili** sınıftan farklı olabilir (örneğin İngilizce bir sınıfta Türkçe öğrenci sayfaları); aksi hâlde **Sınıfla aynı** kalsın.
-- **Modüller**: bu sınıf ve ders için modülleri açın ya da kapatın. "Yöneticiniz tarafından kapatıldı" yazan modülü açamazsınız. Bazı modüllerin ayarları anahtarın altında görünür (Sayaçlar: hatırlatma kutuları; Gruplama: grup ekranında büyük harf; Gizli Öğrenciler: kaç öğrenci seçileceği; Ödevler ve Hedefler ayarları).
+- **Modüller**: bu sınıf ve ders için modülleri açın ya da kapatın. "Yöneticiniz tarafından kapatıldı" yazan modülü açamazsınız. Bazı modüllerin ayarları anahtarın altında görünür (Sayaçlar: hatırlatma kutuları; Gruplama: grup ekranında büyük harf; Gizli Öğrenciler: kaç öğrenci seçileceği; Ödevler ve Hedefler ayarları). **Ders hedefleri** her sınıfta kapalı başlayan tek modüldür; her ders için bir hedef istediğiniz sınıflarda açın.
 - **Sınıf ekranı**: tema, sesler ve ses düzeyi, animasyonlar, günün sözü ve süre bitince ne olacağı (bkz. [Sesler ve kutlamalar](#sesler-ve-kutlamalar)).
 
 ## Raporlar ve CSV
 
 ![Raporlar](../img/tr/reports.png)
 
-**Raporlar** sayfasında **Sınıf ve ders**'i, **Süre**'yi (**Gün**, **Hafta**, **Ay**, **Dönem**, **Öğretim yılı** ya da **Özel**) ve isterseniz tek bir **Öğrenci**'yi seçin (bu durumda onun **Zaman çizelgesi** de görünür). Bölümler modülleri izler: genel bakış, yoklama, sayaçlar, ödev, hedefler ve beceriler, değerlendirmeler, yardımcı, Gizli Öğrenciler, gruplama, başarılar, Süper Konuşmacılar ve konular. Her bölüm başlığından katlanabilir; **Tüm bölümleri aç** ve **Tüm bölümleri kapat** bunu bütün bölümler için yapar.
+**Raporlar** sayfasında **Sınıf ve ders**'i, **Süre**'yi (**Gün**, **Hafta**, **Ay**, **Dönem**, **Öğretim yılı** ya da **Özel**) ve isterseniz tek bir **Öğrenci**'yi seçin (bu durumda onun **Zaman çizelgesi** de görünür). Bölümler modülleri izler: genel bakış, yoklama, sayaçlar, ödev, hedefler ve beceriler, değerlendirmeler, yardımcı, Gizli Öğrenciler, gruplama, başarılar, Süper Konuşmacılar, konular ve ders hedefleri. Her bölüm başlığından katlanabilir; **Tüm bölümleri aç** ve **Tüm bölümleri kapat** bunu bütün bölümler için yapar.
 
 ### Rapor görünümleri
 

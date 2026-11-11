@@ -77,6 +77,7 @@ Pages of a module that is switched off in all your classes are left out of the m
    - **Attendance**: everyone is present unless you change it. Tap a student to switch between absent, late, excused and present.
    - **Today's assistant**: who helps today, with their duties. Tick what the assistant has already done (for example "Help organise the classroom"); the ticks are saved when the lesson begins.
    - **Today's topic**: the focus of the lesson (Listening, Reading, Vocabulary, Grammar, Writing, Speaking, Phonics or your own topics). The weekly plan from **Lesson topics** suggests it; you can change it.
+   - **Today's goal** (only when **Lesson goals** is on for the class, see [Lesson goals](#lesson-goals)): one short sentence the class can read, for example "We can ask and answer about the weather." Leave it empty for no goal today.
    - **Routine**: choose the routine for this lesson.
 4. Press **Begin lesson**. The board fills the whole screen (full screen), so the browser's bars do not take space from the class.
 
@@ -97,6 +98,7 @@ Press **End lesson**. Depending on the modules, you go through:
 - **Secret Students**: reveal the secret students and record their result (see [Secret Student](#secret-student)).
 - **Thank the assistant**: tick the duties the assistant did today, then thank them.
 - **Well done!**: the automatic achievements earned this lesson, only if the class chose this in Achievements.
+- **Our goal**: only when the lesson has a goal. **Did we reach our goal?** **Yes, we did!**, **Partly** or **Not yet**. Answering is optional; tap the chosen answer again to clear it.
 - **Reflection**: **How did the lesson go?** (Tough, Okay, Good, Great) and an optional note for yourself.
 
 Press **Save and end lesson**. The summary **Lesson saved** shows the time, the routine stages reached and attendance. **Back to the lesson** cancels the end and returns to the running lesson.
@@ -146,6 +148,17 @@ The teacher area locks again as soon as you save or cancel. Customise layout nee
 ![A student's card on the classroom screen](../img/en/classroom-card.png)
 
 Tap a student's **name** on their card to open a small card for the class to see: **Recent achievements**, **Super Speakers this week** (their own points), **Daily assistant** (days this term) and **Counters** (only while the reminder boxes are on). It shows only positive things: never attendance, homework, goals, notes, levels or comparisons with other students, and it has no link to statistics. The **+** on the student card still counts a reminder, as before. Statistics are only in the teacher area (see [Student statistics](#student-statistics)).
+
+### Lesson goals
+
+**Lesson goals** is off in every class until you switch it on for a class and subject in **Class settings** → **Modules**. Then:
+
+- **Start lesson** has a **Today's goal** step with one optional sentence.
+- The board shows **Today's goal** in its own line above the student cards, with **Change** (type a new sentence, **Save goal**, or **Remove goal**). Without a goal only a small **Set a goal** button stays. Like any box, you can move it or put it in the **Lesson tools** row with **Customise layout**.
+- **End lesson** asks **Did we reach our goal?** (only when the lesson had a goal).
+- **Reports** has a **Lesson goals** section: each lesson's goal with the answer, and how many goals were reached, partly reached or not yet reached out of the goals that were answered. A goal nobody answered shows "not recorded".
+
+The goal is shown to the class, so write it for the children. Switching the module off hides the step, the box and the report section; the goals already saved are kept.
 
 ### Routine and timer
 
@@ -329,14 +342,14 @@ The **Kind words check** page explains how student texts are checked. You can ad
 Choose the class and subject at the top.
 
 - **Class language**: **English only**, **Turkish only**, **English, with Turkish as second language** or **Turkish, with English as second language**. It applies to the classroom screen, the student pages and the label fields of this class, for every teacher of the class. Texts in a language you switch off are kept. Every name field (routines and stages, counters, homework statuses, goals, groups, assistant duties, lesson topics) shows one box per class language, the main language first; **Needs translation** marks a box that is still empty while the other language has text (the class sees the other language until you fill it). The **Categories and preset goals** tab of **Goals** (new categories, ready-made goals and your own sentence starters) shows the languages of all your classes in that subject, because what you add there appears in each of them. The ready-made texts of a new class (assistant duties, the English reminder counter, group names) are written in its languages; when you switch a second language on, the ones you never changed get it too. **Student page language** can differ from the class (for example an English classroom with Turkish student pages); keep **Same as the class** otherwise.
-- **Modules**: switch modules on or off for this class and subject. "Turned off by your administrator" means you cannot switch it on. Some modules show their own settings under the switch (Counters: reminder boxes; Grouping: capital letters on the group screen; Secret Students: how many are chosen; Homework and Goals settings).
+- **Modules**: switch modules on or off for this class and subject. "Turned off by your administrator" means you cannot switch it on. Some modules show their own settings under the switch (Counters: reminder boxes; Grouping: capital letters on the group screen; Secret Students: how many are chosen; Homework and Goals settings). **Lesson goals** is the one module that starts off in every class; switch it on where you want a goal for each lesson.
 - **Classroom display**: theme, sounds and volume, animations, quote of the day and what happens when the timer ends (see [Sounds and celebrations](#sounds-and-celebrations)).
 
 ## Reports and CSV
 
 ![Reports](../img/en/reports.png)
 
-On the **Reports** page, choose the **Class and subject**, the **Period** (**Day**, **Week**, **Month**, **Term**, **School year** or **Custom**) and, optionally, one **Student** (then you also see their **Timeline**). Sections follow the modules: overview, attendance, counters, homework, goals and skills, reflections, assistant, Secret Students, grouping, achievements, Super Speakers and topics. Each section can be folded with its title; **Open all sections** and **Close all sections** do it for every section.
+On the **Reports** page, choose the **Class and subject**, the **Period** (**Day**, **Week**, **Month**, **Term**, **School year** or **Custom**) and, optionally, one **Student** (then you also see their **Timeline**). Sections follow the modules: overview, attendance, counters, homework, goals and skills, reflections, assistant, Secret Students, grouping, achievements, Super Speakers, topics and lesson goals. Each section can be folded with its title; **Open all sections** and **Close all sections** do it for every section.
 
 ### Report views
 
