@@ -185,22 +185,61 @@ describe('Gemini adapter', () => {
 
   it('returns function calls with their thought signature and sends function declarations', async () => {
     const es = await run(geminiAdapter, target(FAKE_KEYS.gemini), [TOOL]);
-    expect(callsOf(es)).toEqual([{ id: 'call_0', name: 'connection_check', arguments: { word: 'ready' }, signature: 'sig-fake-1' }]);
+    // The fake sends no id: one is made up, unique across replies, and marked as made up.
+    expect(callsOf(es)).toEqual([{ id: expect.stringMatching(/^cc_call_[0-9a-f-]{36}$/u), generatedId: true, name: 'connection_check', arguments: { word: 'ready' }, signature: 'sig-fake-1' }]);
+    const again = callsOf(await run(geminiAdapter, target(FAKE_KEYS.gemini), [TOOL]));
+    expect(again[0]!.id).not.toBe(callsOf(es)[0]!.id);
     expect(es[es.length - 1]).toEqual({ type: 'done', stop: 'toolUse' });
     expect(last().body.tools).toEqual([{ functionDeclarations: [{ name: 'connection_check', description: 'Test tool', parameters: { type: 'object', properties: { word: { type: 'string' } }, required: ['word'] } }] }]);
   });
 
-  it('sends the signature back and tool results as functionResponse parts', () => {
+  it('sends the signature back and tool results as functionResponse parts; only Gemini’s own ids travel back', () => {
     const c = geminiContents([
       { role: 'user', content: 'Q' },
-      { role: 'assistant', content: 'Let me look.', toolCalls: [{ id: 'call_0', name: 'x', arguments: { a: 1 }, signature: 'sig' }] },
-      { role: 'tool', toolCallId: 'call_0', name: 'x', content: 'done' },
+      {
+        role: 'assistant',
+        content: 'Let me look.',
+        toolCalls: [
+          { id: 'gem-id-1', name: 'x', arguments: { a: 1 }, signature: 'sig' },
+          { id: 'cc_call_made-up', generatedId: true, name: 'y', arguments: {} },
+        ],
+      },
+      { role: 'tool', toolCallId: 'gem-id-1', name: 'x', content: 'done' },
+      { role: 'tool', toolCallId: 'cc_call_made-up', name: 'y', content: 'also' },
     ]);
     expect(c).toEqual([
       { role: 'user', parts: [{ text: 'Q' }] },
-      { role: 'model', parts: [{ text: 'Let me look.' }, { functionCall: { name: 'x', args: { a: 1 } }, thoughtSignature: 'sig' }] },
-      { role: 'user', parts: [{ functionResponse: { name: 'x', response: { content: 'done' } } }] },
+      { role: 'model', parts: [{ text: 'Let me look.' }, { functionCall: { id: 'gem-id-1', name: 'x', args: { a: 1 } }, thoughtSignature: 'sig' }, { functionCall: { name: 'y', args: {} } }] },
+      {
+        role: 'user',
+        parts: [{ functionResponse: { id: 'gem-id-1', name: 'x', response: { content: 'done' } } }, { functionResponse: { name: 'y', response: { content: 'also' } } }],
+      },
     ]);
+  });
+
+  it('a call id Gemini sends is kept as is', async () => {
+    fake.override = (r, res) => {
+      if (!r.path.includes(':streamGenerateContent')) return false;
+      fake.override = null;
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.end(`data: ${JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { id: 'gem-42', name: 'connection_check', args: { word: 'ready' } } }] }, finishReason: 'STOP' }] })}\n\n`);
+      return true;
+    };
+    expect(callsOf(await run(geminiAdapter, target(FAKE_KEYS.gemini), [TOOL]))).toEqual([{ id: 'gem-42', name: 'connection_check', arguments: { word: 'ready' } }]);
+  });
+
+  it('a wrong key (400 API_KEY_INVALID) is KEY_REJECTED without the provider’s text; another 400 is a provider error', async () => {
+    const err = await run(geminiAdapter, target('AIza-wrong-key-123456')).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AiCallError);
+    expect(err).toMatchObject({ failure: 'KEY_REJECTED', httpStatus: 400 });
+    expect(String((err as Error).message)).not.toContain('wrong-key');
+    fake.override = (_r, res) => {
+      fake.override = null;
+      res.writeHead(400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: { code: 400, status: 'INVALID_ARGUMENT', message: 'bad schema' } }));
+      return true;
+    };
+    await expect(run(geminiAdapter, target(FAKE_KEYS.gemini))).rejects.toMatchObject({ failure: 'PROVIDER_ERROR', httpStatus: 400 });
   });
 
   it('reduces JSON Schema to Gemini’s subset (nullable unions, const, no additionalProperties)', () => {

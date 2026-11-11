@@ -115,6 +115,13 @@ export async function targetOf(deps: AppDeps, row: ConnectionRow): Promise<Provi
   }
 }
 
+/**
+ * The output cap when the caller gives none. Reasoning models count their hidden thinking against it
+ * (OpenAI's o-series and gpt-5, Gemini 2.5 and later), so it is well above a short answer; it stays at
+ * 4096 because some older models refuse a larger cap.
+ */
+export const DEFAULT_MAX_TOKENS = 4096;
+
 export interface ChatRequest {
   connection: ConnectionRow;
   model: string;
@@ -131,5 +138,5 @@ export interface ChatRequest {
  */
 export async function* streamChat(deps: AppDeps, req: ChatRequest): AsyncGenerator<ChatEvent> {
   const target = await targetOf(deps, req.connection);
-  yield* ADAPTERS[WIRE_FORMAT[req.connection.type]]({ target, model: req.model, system: req.system, messages: req.messages, tools: req.tools, maxTokens: req.maxTokens ?? 2048, signal: req.signal });
+  yield* ADAPTERS[WIRE_FORMAT[req.connection.type]]({ target, model: req.model, system: req.system, messages: req.messages, tools: req.tools, maxTokens: req.maxTokens ?? DEFAULT_MAX_TOKENS, signal: req.signal });
 }

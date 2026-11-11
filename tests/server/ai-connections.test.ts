@@ -6,6 +6,7 @@
  * and the daily message limit; OpenRouter's sign-in with PKCE (state bound to the account, single use,
  * expiry, verifier checked by the provider). Fictional data only.
  */
+import zlib from 'node:zlib';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { aiConnections, aiOauthStates, auditEvents, users } from '../../src/server/db/schema.ts';
@@ -13,7 +14,7 @@ import type { RequestContext } from '../../src/server/lib/context.ts';
 import { challengeOf } from '../../src/server/modules/aiConnections/oauth.ts';
 import { openConnectionSecret } from '../../src/server/modules/aiConnections/provider.ts';
 import { beginAssistantMessage, recordTokens } from '../../src/server/modules/aiConnections/service.ts';
-import { NEVER_EXPORTED, SECRET_COLUMN } from '../../src/server/modules/maintenance/exports.ts';
+import { TEST_MAX_TOKENS } from '../../src/server/modules/aiConnections/testConnection.ts';
 import { FAKE_KEYS, FakeProvider } from '../ai-fake.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
@@ -49,6 +50,23 @@ const okBody = async (p: Promise<{ status: number; body: any }>, status = 200) =
   return r.body;
 };
 const create = (c: Client, body: Record<string, unknown>, path = '/api/admin/ai-connections') => req(c.post(path, { kvkkConfirmed: true, models: ['fake-model'], ...body }));
+
+/** The entries of a zip as the export writes it (stored or deflated, sizes in the local headers). */
+function unzip(buf: Buffer): Record<string, Buffer> {
+  const out: Record<string, Buffer> = {};
+  let i = 0;
+  while (buf.readUInt32LE(i) === 0x04034b50) {
+    const method = buf.readUInt16LE(i + 8);
+    const csize = buf.readUInt32LE(i + 18);
+    const nlen = buf.readUInt16LE(i + 26);
+    const xlen = buf.readUInt16LE(i + 28);
+    const name = buf.subarray(i + 30, i + 30 + nlen).toString('utf8');
+    const data = buf.subarray(i + 30 + nlen + xlen, i + 30 + nlen + xlen + csize);
+    out[name] = method === 8 ? zlib.inflateRawSync(data) : Buffer.from(data);
+    i += 30 + nlen + xlen + csize;
+  }
+  return out;
+}
 
 function ctxOf(userId: string): RequestContext {
   const user = env.db.select().from(users).where(eq(users.id, userId)).get()!;
@@ -122,6 +140,37 @@ describe('OpenAI-compatible addresses', () => {
     expect(reason(await req(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'other' })))).toBe('AI_MODEL_NOT_ALLOWED');
   });
 
+  it('a model that answers text but refuses a request with tools: text works, tools failed with the reason', async () => {
+    const v = await okBody(create(s.admin, { type: 'openaiCompatible', name: 'No tools here', baseUrl: `${base}/v1`, localNetwork: true, apiKey: FAKE_KEYS.compatible, models: ['local-no-tools'] }));
+    const t = await okBody(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'local-no-tools' }));
+    expect(t).toMatchObject({ ok: false, text: true, tools: false, failure: 'PROVIDER_ERROR', httpStatus: 400 });
+    const after = (await okBody(s.admin.get('/api/admin/ai-connections'))).connections.find((c: any) => c.id === v.id);
+    expect(after.models[0]).toMatchObject({ text: true, tools: false });
+    await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
+  });
+
+  it('the test leaves room for a reasoning model’s thinking; a reply cut off before any output is OUT_OF_TOKENS', async () => {
+    const v = await okBody(create(s.admin, { type: 'openaiCompatible', name: 'Thinker', baseUrl: `${base}/v1`, localNetwork: true, apiKey: FAKE_KEYS.compatible, models: ['local-thinker'] }));
+    const caps: number[] = [];
+    // Like a reasoning model that spends the whole cap thinking: no text, no tool call, finish "length".
+    fake.override = (r, res) => {
+      if (!r.path.endsWith('/chat/completions')) return false;
+      caps.push(r.body.max_tokens);
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.end(`data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'length' }] })}\n\ndata: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 20, completion_tokens: 4096 } })}\n\ndata: [DONE]\n\n`);
+      return true;
+    };
+    try {
+      const t = await okBody(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'local-thinker' }));
+      expect(t).toMatchObject({ ok: false, text: false, tools: false, failure: 'OUT_OF_TOKENS', httpStatus: null });
+    } finally {
+      fake.override = null;
+    }
+    expect(caps).toEqual([TEST_MAX_TOKENS, TEST_MAX_TOKENS]);
+    expect(TEST_MAX_TOKENS).toBeGreaterThanOrEqual(4096);
+    await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
+  });
+
   it('a rejected key is reported as such, without the provider’s text', async () => {
     const v = await okBody(create(s.admin, { type: 'openai', name: 'OpenAI', apiKey: 'sk-wrong-fake-key-S19A-0000' }));
     const t = await okBody(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'fake-model' }));
@@ -146,6 +195,10 @@ describe('school default and edits', () => {
     await okBody(s.admin.put('/api/admin/ai-connection-settings', { defaultConnectionId: v.id, defaultModel: 'vendor/a' }));
     // The teacher sees the default by name.
     expect((await okBody(s.teacherA.get('/api/teacher/ai-connections'))).schoolDefault).toEqual({ name: 'OpenRouter', type: 'openrouter', model: 'vendor/a' });
+    // A paused default is not named to teachers as if it were in use.
+    await okBody(s.admin.patch(`/api/admin/ai-connections/${v.id}`, { enabled: false }));
+    expect((await okBody(s.teacherA.get('/api/teacher/ai-connections'))).schoolDefault).toBeNull();
+    await okBody(s.admin.patch(`/api/admin/ai-connections/${v.id}`, { enabled: true }));
     await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
     expect((await okBody(s.admin.get('/api/admin/ai-connections'))).settings).toMatchObject({ defaultConnectionId: null, defaultModel: null });
     const row = env.db.select().from(aiConnections).where(eq(aiConnections.id, v.id)).get()!;
@@ -214,12 +267,29 @@ describe('teachers’ own connections', () => {
     expect(v.usage).toMatchObject({ todayMessages: 1, monthMessages: 3 });
   });
 
-  it('switching own connections off stops their use; the owner can still delete', async () => {
+  it('switching own connections off stops their use, tests and sign-ins; the owner can still delete', async () => {
+    // A sign-in started while allowed cannot be finished after the switch goes off.
+    const router = (await okBody(create(s.teacherA, { type: 'openrouter', name: 'My OpenRouter' }, '/api/teacher/ai-connections'))).id;
+    const started = new URL((await okBody(s.teacherA.post(`/api/teacher/ai-connections/${router}/oauth`, {}))).authorizeUrl);
+    const state = new URL(started.searchParams.get('callback_url')!).searchParams.get('state')!;
+    fake.expectChallenge = started.searchParams.get('code_challenge');
     await okBody(s.admin.put('/api/admin/ai-connection-settings', { teacherConnectionsAllowed: false }));
+    const before = fake.requests.length;
     expect(() => beginAssistantMessage(ctxOf(s.ayse.id), own, null)).toThrow('Own connections are not allowed');
-    expect(reason(await req(s.teacherA.post(`/api/teacher/ai-connections/${own}/test`, { model: 'fake-model' })))).toBe(undefined); // a test is still allowed for the owner
-    expect(reason(await req(s.teacherA.patch(`/api/teacher/ai-connections/${own}`, { name: 'Renamed' })))).toBe('AI_OWN_CONNECTIONS_OFF');
+    for (const r of [
+      await req(s.teacherA.post(`/api/teacher/ai-connections/${own}/test`, { model: 'fake-model' })),
+      await req(s.teacherA.post(`/api/teacher/ai-connections/${router}/oauth`, {})),
+      await req(s.teacherA.post('/api/account/ai-connections/oauth/finish', { state, code: fake.acceptCode })),
+      await req(s.teacherA.patch(`/api/teacher/ai-connections/${own}`, { name: 'Renamed' })),
+    ]) {
+      expect(r.status).toBe(403);
+      expect(reason(r)).toBe('AI_OWN_CONNECTIONS_OFF');
+    }
+    // Nothing reached the provider and no key was stored.
+    expect(fake.requests.length).toBe(before);
+    expect(env.db.select().from(aiConnections).where(eq(aiConnections.id, router)).get()!.secretCipher).toBeNull();
     await okBody(s.teacherA.del(`/api/teacher/ai-connections/${own}`));
+    await okBody(s.teacherA.del(`/api/teacher/ai-connections/${router}`));
     expect((await okBody(s.teacherA.get('/api/teacher/ai-connections'))).connections).toEqual([]);
   });
 });
@@ -312,10 +382,25 @@ describe('secrets never leave', () => {
     expect(seen.join('\n')).not.toMatch(/S19A/u);
   });
 
-  it('exports blank the sealed key and leave out waiting sign-ins', () => {
-    expect(SECRET_COLUMN.test('secret_cipher')).toBe(true);
-    expect(SECRET_COLUMN.test('verifier_cipher')).toBe(true);
-    expect(NEVER_EXPORTED).toContain('ai_oauth_states');
+  it('the full export blanks the sealed key and leaves out waiting sign-ins', async () => {
+    const v = await okBody(create(s.admin, { type: 'gemini', name: 'Exported', apiKey: FAKE_KEYS.gemini }));
+    expect(env.db.select().from(aiConnections).where(eq(aiConnections.id, v.id)).get()!.secretCipher).not.toBeNull();
+    expect(env.db.select().from(aiOauthStates).all().length).toBeGreaterThan(0);
+    const ready = await okBody(s.admin.post('/api/admin/exports/full', { confirm: 'EXPORT', includeUploads: false }));
+    const res = await env.app.inject({ method: 'GET', url: `/api/admin/exports/${ready.token}`, headers: { cookie: [...s.admin.cookies].map(([k, val]) => `${k}=${val}`).join('; ') } });
+    expect(res.statusCode).toBe(200);
+    const entries = unzip(res.rawPayload);
+    expect(Object.keys(entries).some((n) => n.includes('ai_oauth_states'))).toBe(false);
+    const csv = entries['tables/ai_connections.csv']!.toString('utf8');
+    expect(csv).toContain('Exported');
+    expect(csv.split('\n')[0]).toContain('secret_cipher');
+    // Not one stored sealed value made it into the file (the column is there, blank).
+    const sealed = env.db.select().from(aiConnections).all().flatMap((r) => (r.secretCipher ? [r.secretCipher] : []));
+    expect(sealed.length).toBeGreaterThan(0);
+    for (const c of sealed) expect(csv).not.toContain(c);
+    const all = Object.values(entries).map((b) => b.toString('utf8')).join('\n');
+    for (const k of Object.values(FAKE_KEYS)) expect(all).not.toContain(k);
+    expect(all).not.toMatch(/v1\.[A-Za-z0-9_-]{20,}/u);
   });
 
   it('the list endpoints never carry a secret field', async () => {

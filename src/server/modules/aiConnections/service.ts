@@ -149,7 +149,8 @@ export function ownView(ctx: RequestContext): z.infer<typeof C.OwnAiConnections>
   return {
     allowed: s.teacherConnectionsAllowed,
     connections: liveRows(ctx.db, user.id).map((r) => viewOf(ctx, r)),
-    schoolDefault: def && s.defaultModel ? { name: def.name, type: def.type, model: s.defaultModel } : null,
+    // Named only while it can actually be used (not paused, keyed, within budget).
+    schoolDefault: def && s.defaultModel && statusOf(ctx, def) === 'ready' ? { name: def.name, type: def.type, model: s.defaultModel } : null,
     chatgptAvailable: chatgptAvailable(ctx.config),
   };
 }
@@ -167,7 +168,7 @@ export function loadManaged(ctx: RequestContext, id: string, scope: Scope): Conn
   return row;
 }
 
-function assertTeachersAllowed(db: Db) {
+export function assertTeachersAllowed(db: Db) {
   if (!connectionSettings(db).teacherConnectionsAllowed) throw new AppError('FEATURE_DISABLED', 'Own connections are not allowed at this school', { reason: 'AI_OWN_CONNECTIONS_OFF' });
 }
 

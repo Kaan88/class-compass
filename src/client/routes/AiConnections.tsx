@@ -55,7 +55,8 @@ function modelMark(t: T, m: C.AiModelView): string {
 
 export function testResultText(t: T, model: string, r: C.AiTestResult): string {
   if (r.ok) return t('aiConn.testOk', { model });
-  if (r.text && !r.tools && !r.failure) return t('aiConn.testTextOnly', { model });
+  // Text worked; the tool request either got no tool call or failed (e.g. a server without tool support).
+  if (r.text && !r.tools) return r.failure ? t('aiConn.testToolsFailed', { model, reason: t(`aiConn.failure.${r.failure}` as const) }) : t('aiConn.testTextOnly', { model });
   return t('aiConn.testFailed', { model, reason: r.failure ? t(`aiConn.failure.${r.failure}` as const) : '' });
 }
 
@@ -369,6 +370,9 @@ export function AiConnectionsAdminSection() {
       <p className="cc-muted" style={{ margin: 0 }}>
         {t('aiConn.intro')}
       </p>
+      <p style={{ margin: 0 }} data-testid="ai-conn-not-yet">
+        {t('aiConn.notYet')}
+      </p>
       {q.error ? <Alert>{errorText(t, q.error)}</Alert> : null}
       {data ? (
         <>
@@ -410,6 +414,9 @@ export function OwnAiConnectionsSection() {
       <h2 id="ai-own-title" className="cc-h2">
         {t('aiConn.own.title')}
       </h2>
+      <p style={{ margin: 0 }} data-testid="ai-conn-not-yet">
+        {t('aiConn.notYet')}
+      </p>
       {q.error ? <Alert>{errorText(t, q.error)}</Alert> : null}
       {data ? (
         <>

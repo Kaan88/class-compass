@@ -115,7 +115,9 @@ The full technical description (every colour, the limits, the drawing rules, a w
 
 ## Assistant connections
 
-**AI tools** → **Assistant connections** is where you connect the school's own account with an AI provider, for the assistant inside Class Compass. Nothing is connected until you add a connection.
+**AI tools** → **Assistant connections** is where you connect the school's own account with an AI provider, for the assistant inside Class Compass. Nothing is connected until you add a connection. It is the first part of the **AI tools** page, above the settings for AI apps (MCP).
+
+The assistant chat itself is not in Class Compass yet; it comes in a later update. Connections you add and test now are ready for it, and the page says so.
 
 **Add connection** asks for:
 
@@ -126,9 +128,9 @@ The full technical description (every colour, the limits, the drawing rules, a w
 - **Monthly budget (tokens)** for everyone together and **Messages a day per teacher**. Empty means no limit.
 - The **data processor confirmation** (KVKK): tick it only when the school has agreed to use this provider. Messages sent to the assistant go to the provider; while **Student data to AI tools** is off it only ever sees pseudonyms.
 
-**Test** (the button named after a model) sends two tiny requests with no school data: one asks for a word, the other asks the model to use a test tool. The result says in words whether text works and whether tools work; the assistant needs both. The list shows each model as "tested with tools", "text only, tools did not work" or "not tested", the usage this month (messages and tokens, never what was written) and the status.
+**Test** (the button named after a model) sends two tiny requests with no school data: one asks for a word, the other asks the model to use a test tool. The result says in words whether text works and whether tools work; the assistant needs both. When text works but the request with tools fails (many small local models refuse tools), the result says "text works, but the request with tools failed" with the reason. Models that think before answering get room for it; if one still runs out before writing anything, the result says the model used up its answer limit. The list shows each model as "tested with tools", "text only, tools did not work" or "not tested", the usage this month (messages and tokens, never what was written) and the status.
 
-**School default** → **Connection and model the assistant uses** chooses the connection and model the assistant uses. **Teachers may add their own connection** (off by default) lets teachers add a personal Anthropic, OpenAI, Gemini or OpenRouter connection on their Profile, used only by them; they cannot add server addresses. Switching it off again stops their use.
+**School default** → **Connection and model the assistant uses** chooses the connection and model the assistant uses. **Teachers may add their own connection** (off by default) lets teachers add a personal Anthropic, OpenAI, Gemini or OpenRouter connection on their Profile, used only by them; they cannot add server addresses. Switching it off again stops their use, their tests and their sign-ins with a provider (they can still delete them). Teachers see the school default on their Profile only while it is ready to use.
 
 **Edit** changes the name, models, limits, key or **Connection in use**; **Delete** erases the key at once (usage numbers stay). Every change is in the audit log, never with the key.
 

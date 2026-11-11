@@ -90,6 +90,8 @@ export class FakeProvider {
   /** OpenRouter's key exchange: the challenge the test expects and the code it accepts. */
   expectChallenge: string | null = null;
   acceptCode = 'fake-openrouter-code';
+  /** Models that answer 400 to a request with tools (like a local model without tool support). */
+  noToolsModels: string[] = ['local-no-tools'];
   /** Overrides the next answers (status codes, malformed bodies…). */
   override: ((r: Recorded, res: http.ServerResponse) => boolean) | null = null;
   constructor() {
@@ -118,10 +120,34 @@ export class FakeProvider {
       // A real provider may echo part of the key; the app must never pass this on.
       res.end(JSON.stringify({ error: { message: `Incorrect API key provided: ${String(r.headers.authorization ?? r.headers['x-api-key'] ?? '')}` } }));
     };
+    // Gemini answers a wrong key with 400 and the reason API_KEY_INVALID (and echoes nothing useful).
+    const geminiDeny = () => {
+      res.writeHead(400, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify([
+          {
+            error: {
+              code: 400,
+              message: `API key not valid. Please pass a valid API key. (${String(r.headers['x-goog-api-key'] ?? '')})`,
+              status: 'INVALID_ARGUMENT',
+              details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'API_KEY_INVALID', domain: 'googleapis.com' }],
+            },
+          },
+        ]),
+      );
+    };
     const bearer = String(r.headers.authorization ?? '').replace(/^Bearer /u, '');
     if (r.path === '/v1/messages') return r.headers['x-api-key'] === FAKE_KEYS.anthropic ? anthropicStream(res, r.body) : deny();
-    if (r.path.endsWith('/chat/completions')) return (Object.values(FAKE_KEYS) as string[]).includes(bearer) ? openAiStream(res, r.body) : deny();
-    if (/^\/v1beta\/models\/[^/:]+:streamGenerateContent\?alt=sse$/u.test(r.path)) return r.headers['x-goog-api-key'] === FAKE_KEYS.gemini ? geminiStream(res, r.body) : deny();
+    if (r.path.endsWith('/chat/completions')) {
+      if (!(Object.values(FAKE_KEYS) as string[]).includes(bearer)) return deny();
+      // A small local server without tool support refuses any request that has `tools`.
+      if (this.noToolsModels.includes(String(r.body?.model)) && r.body?.tools) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ error: { message: 'tools are not supported by this model', type: 'invalid_request_error' } }));
+      }
+      return openAiStream(res, r.body);
+    }
+    if (/^\/v1beta\/models\/[^/:]+:streamGenerateContent\?alt=sse$/u.test(r.path)) return r.headers['x-goog-api-key'] === FAKE_KEYS.gemini ? geminiStream(res, r.body) : geminiDeny();
     if (r.path.endsWith('/auth/keys')) {
       const ok = r.body?.code === this.acceptCode && r.body?.code_challenge_method === 'S256' && this.expectChallenge === crypto.createHash('sha256').update(String(r.body?.code_verifier ?? '')).digest('base64url');
       res.writeHead(ok ? 200 : 403, { 'content-type': 'application/json' });

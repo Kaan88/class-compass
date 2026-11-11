@@ -209,6 +209,8 @@ export function AiToolsAdminPage() {
     <main className="cc-page cc-stack" data-testid="admin-ai-tools">
       <h1 className="cc-h1">{t('aiTools.admin.title')}</h1>
       <p className="cc-muted">{t('aiTools.admin.intro')}</p>
+      {/* The in-app assistant's connections to model providers (S19a, D-179): first, so they are found. */}
+      <AiConnectionsAdminSection />
       {q.error ? <Alert>{errorText(t, q.error)}</Alert> : null}
       {data ? (
         <>
@@ -290,8 +292,6 @@ export function AiToolsAdminPage() {
             rows={data.connections}
             onDisconnect={(r) => void run(() => call(O.adminRevokeAiConnection, { connectionId: r.id }), { success: t('aiTools.disconnected'), invalidate: [AI_ADMIN_KEY] })}
           />
-          {/* The in-app assistant's connections to model providers (S19a, D-179). */}
-          <AiConnectionsAdminSection />
           <ClientsTable rows={data.clients} />
           <RedirectHosts key={data.redirectHosts.join(' ')} hosts={data.redirectHosts} />
           <ConfirmDestructive

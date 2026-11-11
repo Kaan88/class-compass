@@ -6729,12 +6729,11 @@ html[data-cursor='off'] * {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+/* The test result's status region: never hidden while empty (display: none would take it out of the
+   accessibility tree, and screen readers might then not announce the result when it appears). */
 .cc-ai-test {
   margin: 0;
   font-weight: 600;
-}
-.cc-ai-test:empty {
-  display: none;
 }
 .cc-ai-return {
   max-width: 40rem;

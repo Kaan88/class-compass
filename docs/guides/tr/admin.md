@@ -115,7 +115,9 @@ Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bi
 
 ## Asistan bağlantıları
 
-**Yapay zekâ araçları** → **Asistan bağlantıları**, Sınıf Pusulası içindeki asistan için okulun bir yapay zekâ sağlayıcısındaki kendi hesabını bağladığınız yerdir. Siz bir bağlantı eklemeden hiçbir şey bağlanmaz.
+**Yapay zekâ araçları** → **Asistan bağlantıları**, Sınıf Pusulası içindeki asistan için okulun bir yapay zekâ sağlayıcısındaki kendi hesabını bağladığınız yerdir. Siz bir bağlantı eklemeden hiçbir şey bağlanmaz. Bu bölüm **Yapay zekâ araçları** sayfasının ilk bölümüdür; yapay zekâ uygulamalarının (MCP) ayarlarının üstündedir.
+
+Asistan sohbeti henüz Sınıf Pusulası’nda yok; sonraki bir güncellemeyle gelecek. Şimdi ekleyip denediğiniz bağlantılar o zaman kullanıma hazır olur; sayfa da bunu söyler.
 
 **Bağlantı ekle** şunları sorar:
 
@@ -126,9 +128,9 @@ Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bi
 - Herkes için **Aylık bütçe (token)** ve **Öğretmen başına günlük mesaj**. Boş bırakmak sınır yok demektir.
 - **Veri işleyen onayı** (KVKK): yalnızca okul bu sağlayıcıyı kullanmayı kabul ettiyse işaretleyin. Asistana yazılan mesajlar sağlayıcıya gider; **Öğrenci verisi yapay zekâ araçlarına** kapalıyken sağlayıcı yalnızca takma adları görür.
 
-Bir modelin yanındaki **… modelini dene** düğmesi okul verisi içermeyen iki küçük istek gönderir: biri bir kelime ister, öteki modelden bir deneme aracını kullanmasını ister. Sonuç metnin ve araçların çalışıp çalışmadığını yazıyla söyler; asistanın ikisine de ihtiyacı vardır. Liste her modeli "araçlarla denendi", "yalnızca metin, araçlar çalışmadı" ya da "denenmedi" olarak, bu ayki kullanımı (mesaj ve token sayısı, yazılanlar asla) ve durumu gösterir.
+Bir modelin yanındaki **… modelini dene** düğmesi okul verisi içermeyen iki küçük istek gönderir: biri bir kelime ister, öteki modelden bir deneme aracını kullanmasını ister. Sonuç metnin ve araçların çalışıp çalışmadığını yazıyla söyler; asistanın ikisine de ihtiyacı vardır. Metin çalışıp araçlı istek başarısız olursa (küçük yerel modellerin çoğu araçları reddeder) sonuç, nedeniyle birlikte "metin çalışıyor ama araçlı istek başarısız oldu" der. Yanıt vermeden önce düşünen modellere bunun için yer bırakılır; buna rağmen bir model bir şey yazmadan sınırı doldurursa sonuç bunu söyler. Liste her modeli "araçlarla denendi", "yalnızca metin, araçlar çalışmadı" ya da "denenmedi" olarak, bu ayki kullanımı (mesaj ve token sayısı, yazılanlar asla) ve durumu gösterir.
 
-**Okulun varsayılanı** asistanın kullandığı bağlantıyı ve modeli seçer. **Öğretmenler kendi bağlantılarını ekleyebilir** (varsayılan olarak kapalı) açıkken öğretmenler Profil sayfalarında yalnızca kendilerinin kullandığı bir Anthropic, OpenAI, Gemini ya da OpenRouter bağlantısı ekleyebilir; sunucu adresi ekleyemezler. Ayarı yeniden kapatmak bu bağlantıların kullanımını durdurur.
+**Okulun varsayılanı** asistanın kullandığı bağlantıyı ve modeli seçer. **Öğretmenler kendi bağlantılarını ekleyebilir** (varsayılan olarak kapalı) açıkken öğretmenler Profil sayfalarında yalnızca kendilerinin kullandığı bir Anthropic, OpenAI, Gemini ya da OpenRouter bağlantısı ekleyebilir; sunucu adresi ekleyemezler. Ayarı yeniden kapatmak bu bağlantıların kullanımını, denenmesini ve sağlayıcıyla oturum açmayı durdurur (öğretmen bağlantısını yine silebilir). Öğretmenler okulun varsayılanını Profil sayfalarında yalnızca kullanıma hazırken görür.
 
 **Düzenle** adı, modelleri, sınırları, anahtarı ya da **Bağlantı kullanımda** ayarını değiştirir; **Sil** anahtarı hemen siler (kullanım sayıları kalır). Her değişiklik denetim kaydına geçer, anahtar asla geçmez.
 

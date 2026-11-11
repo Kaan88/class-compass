@@ -26,7 +26,7 @@ import { openSecret, randomToken, sealSecret, tokenHash } from '../../lib/crypto
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { AiCallError, aiRequest, readJson } from './http.ts';
 import { chatgptTokenRequest, fixedAddress, PROVIDER_BASE, sealChatgptTokens, sealConnectionSecret } from './provider.ts';
-import { loadManaged, type Scope } from './service.ts';
+import { assertTeachersAllowed, loadManaged, type Scope } from './service.ts';
 
 export const OAUTH_STATE_TTL_MS = 10 * 60_000;
 export const OAUTH_PENDING_MAX = 5;
@@ -41,6 +41,8 @@ export const challengeOf = (verifier: string) => crypto.createHash('sha256').upd
 export function startOAuth(ctx: RequestContext, connectionId: string, scope: Scope): { authorizeUrl: string } {
   const user = requireUser(ctx);
   const row = loadManaged(ctx, connectionId, scope);
+  // A teacher's own connection signs in only while the administrator allows own connections.
+  if (scope === 'personal') assertTeachersAllowed(ctx.db);
   if (row.type !== 'openrouter' && row.type !== 'chatgpt') throw invalid('This connection uses a key', { reason: 'AI_OAUTH_NOT_FOR_TYPE' });
   if (row.type === 'chatgpt' && !chatgptAvailable(ctx.config)) throw new AppError('FEATURE_DISABLED', 'Sign in with ChatGPT is not available', { reason: 'AI_CHATGPT_NOT_AVAILABLE' });
   const now = ctx.now();
@@ -85,6 +87,7 @@ export async function finishOAuth(ctx: RequestContext, input: { state: string; c
   const scope: Scope = row.ownerUserId ? 'personal' : 'school';
   // The account must still manage the connection (an administrator for a school one, the owner for a personal one).
   if (scope === 'school' ? user.role !== 'admin' : row.ownerUserId !== user.id) throw notFound('Sign-in request');
+  if (scope === 'personal') assertTeachersAllowed(ctx.db);
   let sealed: string;
   try {
     if (row.type === 'openrouter') {

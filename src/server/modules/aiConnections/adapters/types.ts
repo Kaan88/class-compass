@@ -5,6 +5,7 @@
  * from the existing MCP tool definitions (`tools.ts`), and translated per adapter (Anthropic tools,
  * OpenAI function calling, Gemini function declarations).
  */
+import crypto from 'node:crypto';
 import type { NetPolicy } from '../urlSafety.ts';
 
 /** A tool the model may call: the MCP tool's name, description and input JSON Schema. */
@@ -16,8 +17,13 @@ export interface ToolDefinition {
 }
 
 export interface ToolCall {
-  /** The provider's id for the call (generated when the provider has none, as Gemini may). */
+  /**
+   * The provider's id for the call. When the provider sends none (Gemini may not), the adapter makes
+   * one up that is unique across the conversation (`newCallId`) and sets `generatedId`, so it is used
+   * only to pair the result with the call here and is never sent back to the provider.
+   */
   id: string;
+  generatedId?: true;
   name: string;
   arguments: Record<string, unknown>;
   /** The model sent arguments that were not a JSON object; `arguments` is then `{}`. */
@@ -82,7 +88,18 @@ export function parseArguments(raw: unknown): { args: Record<string, unknown>; i
   return { args: v as Record<string, unknown>, invalid: false };
 }
 
-export const toolCall = (id: string, name: string, raw: unknown, signature?: string): ToolCall => {
+/** A tool call id for a provider that sent none: unique across turns, so an agent loop can key on it. */
+export const newCallId = () => `cc_call_${crypto.randomUUID()}`;
+
+/** A tool call; `id` null means the provider sent none (a unique one is made and marked `generatedId`). */
+export const toolCall = (id: string | null, name: string, raw: unknown, signature?: string): ToolCall => {
   const { args, invalid } = parseArguments(raw);
-  return { id, name, arguments: args, ...(invalid ? { invalidArguments: true as const } : {}), ...(signature ? { signature } : {}) };
+  return {
+    id: id ?? newCallId(),
+    ...(id === null ? { generatedId: true as const } : {}),
+    name,
+    arguments: args,
+    ...(invalid ? { invalidArguments: true as const } : {}),
+    ...(signature ? { signature } : {}),
+  };
 };

@@ -4,8 +4,10 @@
  * to the OpenAPI subset Gemini accepts (`geminiSchema`). The assistant is role `model`; tool results
  * are `functionResponse` parts in a user turn. Function calls may carry a `thoughtSignature`, which is
  * kept on the call (`signature`) and sent back with it, as the API requires for multi-step tool use.
+ * A call's `id` is sent back (as `functionCall.id` and `functionResponse.id`) only when Gemini gave
+ * one; an id the adapter made up (`generatedId`) stays on our side.
  */
-import { AiCallError, aiRequest, failureOfStatus, sseEvents } from '../http.ts';
+import { AiCallError, aiRequest, failureOfStatus, readText, sseEvents, type AiHttpResponse } from '../http.ts';
 import { toolCall, type Adapter, type ChatMessage, type StopReason, type ToolDefinition } from './types.ts';
 
 const KEEP = new Set(['type', 'format', 'description', 'nullable', 'enum', 'properties', 'required', 'items', 'minItems', 'maxItems', 'minimum', 'maximum', 'minLength', 'maxLength', 'pattern', 'anyOf', 'title']);
@@ -56,16 +58,39 @@ export function geminiContents(messages: ChatMessage[]): Content[] {
     if (last && last.role === role) last.parts.push(...parts);
     else out.push({ role, parts });
   };
+  // Ids Gemini itself gave (made-up ones are never sent: Gemini would not know them).
+  const providerIds = new Set(messages.flatMap((m) => (m.role === 'assistant' ? (m.toolCalls ?? []).filter((c) => !c.generatedId).map((c) => c.id) : [])));
   for (const m of messages) {
     if (m.role === 'user') push('user', [{ text: m.content }]);
     else if (m.role === 'assistant')
       push('model', [
         ...(m.content ? [{ text: m.content }] : []),
-        ...(m.toolCalls ?? []).map((c) => ({ functionCall: { name: c.name, args: c.arguments }, ...(c.signature ? { thoughtSignature: c.signature } : {}) })),
+        ...(m.toolCalls ?? []).map((c) => ({ functionCall: { ...(c.generatedId ? {} : { id: c.id }), name: c.name, args: c.arguments }, ...(c.signature ? { thoughtSignature: c.signature } : {}) })),
       ]);
-    else push('user', [{ functionResponse: { name: m.name, response: m.isError ? { error: m.content } : { content: m.content } } }]);
+    else
+      push('user', [{ functionResponse: { ...(providerIds.has(m.toolCallId) ? { id: m.toolCallId } : {}), name: m.name, response: m.isError ? { error: m.content } : { content: m.content } } }]);
   }
   return out;
+}
+
+/**
+ * The failure of a non-2xx answer. Gemini answers a wrong key with 400 and the reason
+ * `API_KEY_INVALID` in the error's details, so a 400 body (small, capped) is read for that reason
+ * only; nothing of its text is passed on.
+ */
+export async function geminiFailure(res: AiHttpResponse): Promise<AiCallError> {
+  if (res.status !== 400) {
+    res.cancel();
+    return new AiCallError(failureOfStatus(res.status), res.status);
+  }
+  try {
+    const d: any = JSON.parse(await readText(res, 64 * 1024));
+    const details: any[] = (Array.isArray(d) ? d[0] : d)?.error?.details ?? [];
+    if (Array.isArray(details) && details.some((x) => x?.reason === 'API_KEY_INVALID')) return new AiCallError('KEY_REJECTED', 400);
+  } catch {
+    res.cancel();
+  }
+  return new AiCallError(failureOfStatus(400), 400);
 }
 
 const STOP: Record<string, StopReason> = { STOP: 'end', MAX_TOKENS: 'length' };
@@ -85,11 +110,7 @@ export const geminiAdapter: Adapter = async function* (req) {
     policy: req.target.policy,
     signal: req.signal,
   });
-  if (res.status < 200 || res.status >= 300) {
-    res.cancel();
-    // Gemini answers a wrong key with 400 API_KEY_INVALID; without the body we cannot tell it from a bad request.
-    throw new AiCallError(failureOfStatus(res.status), res.status);
-  }
+  if (res.status < 200 || res.status >= 300) throw await geminiFailure(res);
   let input = 0;
   let output = 0;
   let stop: StopReason = 'other';
@@ -114,9 +135,8 @@ export const geminiAdapter: Adapter = async function* (req) {
     const cand = d?.candidates?.[0];
     for (const part of Array.isArray(cand?.content?.parts) ? cand.content.parts : []) {
       if (part?.functionCall) {
-        const id = part.functionCall.id ? String(part.functionCall.id) : `call_${calls}`;
         calls += 1;
-        yield { type: 'toolCall', call: toolCall(id, String(part.functionCall.name ?? ''), part.functionCall.args ?? {}, typeof part.thoughtSignature === 'string' ? part.thoughtSignature : undefined) };
+        yield { type: 'toolCall', call: toolCall(part.functionCall.id ? String(part.functionCall.id) : null, String(part.functionCall.name ?? ''), part.functionCall.args ?? {}, typeof part.thoughtSignature === 'string' ? part.thoughtSignature : undefined) };
       } else if (typeof part?.text === 'string' && part.text && part.thought !== true) yield { type: 'text', text: part.text };
     }
     if (cand?.finishReason) stop = STOP[String(cand.finishReason)] ?? 'other';

@@ -33,7 +33,7 @@ function* fromCompletion(d: any): Generator<ChatEvent> {
   const msg = d?.choices?.[0]?.message ?? {};
   if (typeof msg.content === 'string' && msg.content) yield { type: 'text', text: msg.content };
   const calls: any[] = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
-  for (let i = 0; i < calls.length; i++) yield { type: 'toolCall', call: toolCall(String(calls[i]?.id ?? `call_${i}`), String(calls[i]?.function?.name ?? ''), calls[i]?.function?.arguments) };
+  for (let i = 0; i < calls.length; i++) yield { type: 'toolCall', call: toolCall(calls[i]?.id ? String(calls[i].id) : null, String(calls[i]?.function?.name ?? ''), calls[i]?.function?.arguments) };
   yield { type: 'usage', inputTokens: Number(d?.usage?.prompt_tokens) || 0, outputTokens: Number(d?.usage?.completion_tokens) || 0 };
   const reason = d?.choices?.[0]?.finish_reason;
   yield { type: 'done', stop: calls.length ? 'toolUse' : (STOP[String(reason)] ?? 'other') };
@@ -111,7 +111,7 @@ export const openAiAdapter: Adapter = async function* (req) {
   // Some servers end the stream without `[DONE]`; a finish reason is enough.
   if (!finished && reason === null) throw new AiCallError('BAD_RESPONSE');
   const ordered = [...calls.entries()].sort((a, b) => a[0] - b[0]);
-  for (const [i, c] of ordered) yield { type: 'toolCall', call: toolCall(c.id || `call_${i}`, c.name, c.args) };
+  for (const [, c] of ordered) yield { type: 'toolCall', call: toolCall(c.id || null, c.name, c.args) };
   yield { type: 'usage', inputTokens: input, outputTokens: output };
   yield { type: 'done', stop: ordered.length ? 'toolUse' : (STOP[String(reason)] ?? 'other') };
 };

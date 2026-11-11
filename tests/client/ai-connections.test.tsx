@@ -6,6 +6,8 @@
  * return page posts state and code only after the button press and clears the address bar; the area
  * dictionary gives the Turkish text. Fictional data only.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -146,7 +148,9 @@ describe('Profile → My assistant connections', () => {
   it('while not allowed: the school default and the reason, no Add', async () => {
     answers['GET /api/teacher/ai-connections'] = { allowed: false, connections: [], schoolDefault: { name: 'School server', type: 'openaiCompatible', model: 'local-small' }, chatgptAvailable: false };
     wrap(<OwnAiConnectionsSection />);
-    expect(await screen.findByText('The assistant uses the school’s connection: School server (local-small).')).toBeTruthy();
+    expect(await screen.findByText('Chosen by your school for the assistant: School server (local-small).')).toBeTruthy();
+    // The chat is not built yet: the card says so instead of implying an assistant is in use.
+    expect(screen.getByTestId('ai-conn-not-yet').textContent).toContain('not in Class Compass yet');
     expect(screen.getByText('Your school has not allowed teachers’ own connections.')).toBeTruthy();
     expect(screen.queryByTestId('ai-conn-add')).toBeNull();
   });
@@ -190,5 +194,19 @@ describe('words', () => {
     const t = (k: string, v?: Record<string, string | number>) => translate('en', k, v);
     expect(testResultText(t as never, 'm', { ok: true, text: true, tools: true, failure: null, httpStatus: null, ms: 1 })).toBe('m: text works and tools work.');
     expect(testResultText(t as never, 'm', { ok: false, text: false, tools: false, failure: 'KEY_REJECTED', httpStatus: 401, ms: 1 })).toBe('m: the test failed. The provider refused the key.');
+    // Text worked and the request with tools failed (a server without tool support answers 400).
+    expect(testResultText(t as never, 'm', { ok: false, text: true, tools: false, failure: 'PROVIDER_ERROR', httpStatus: 400, ms: 1 })).toBe(
+      'm: text works, but the request with tools failed. The provider answered with an error. The assistant could answer but not use the app.',
+    );
+    expect(testResultText(t as never, 'm', { ok: false, text: false, tools: false, failure: 'OUT_OF_TOKENS', httpStatus: null, ms: 1 })).toContain('used up its answer limit');
+  });
+
+  it('the result’s status region is never display: none while empty (it must stay in the accessibility tree)', async () => {
+    const css = fs.readFileSync(path.resolve('src/client/styles/app.css'), 'utf8');
+    expect(css).not.toMatch(/\.cc-ai-test:empty\s*\{[^}]*display:\s*none/u);
+    wrap(<AiConnectionsAdminSection />);
+    const status = await screen.findByTestId('ai-conn-test-result');
+    expect(status.getAttribute('role')).toBe('status');
+    expect(screen.getByTestId('ai-conn-not-yet')).toBeTruthy();
   });
 });
