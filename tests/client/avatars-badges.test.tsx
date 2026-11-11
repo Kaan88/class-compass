@@ -143,7 +143,7 @@ describe('recognisable creatures (S14a, D-146)', () => {
   });
 
   it('dinosaurs and mythical creatures get their own mouths (jaw, snout, muzzle), people-like mouths stay elsewhere', () => {
-    const part = (family: CreatureFamily, species: string) => /data-part="(\w+)"/.exec(html(createElement(AvatarArt, { spec: base(family, species) })).replace(/data-part="hat"/g, ''))?.[1];
+    const part = (family: CreatureFamily, species: string) => /data-part="(\w+)"/.exec(html(createElement(AvatarArt, { spec: base(family, species) })).replace(/data-part="(hat|eyes)"/g, ''))?.[1];
     expect(part('dinosaurs', 'rex')).toBe('jaw');
     expect(part('dinosaurs', 'spikes')).toBe('snout');
     expect(part('dinosaurs', 'longNeck')).toBe('snout');

@@ -31,6 +31,34 @@ export const COLOUR_NAMES: Named<AvatarColour> = {
   mint: { en: 'mint', tr: 'nane yeşili' },
 };
 
+/**
+ * Colour pairs that are hard to tell apart as body and background (S17c, D-169): contrast under
+ * about 1.4:1 with a close hue in the default palette. The renderer lightens the background and rims
+ * the body for these (and for equal colours); Randomise never picks them.
+ */
+export const AVATAR_NEAR_COLOURS: ReadonlyArray<readonly [AvatarColour, AvatarColour]> = [
+  ['red', 'pink'],
+  ['red', 'brown'],
+  ['orange', 'pink'],
+  ['green', 'teal'],
+  ['teal', 'blue'],
+  ['teal', 'grey'],
+  ['blue', 'purple'],
+  ['blue', 'grey'],
+];
+/** True when a body and its background would blend: the same colour or a near pair. */
+export const coloursClash = (a: AvatarColour, b: AvatarColour): boolean => a === b || AVATAR_NEAR_COLOURS.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+/** The background colour to use with a body colour: `bg` itself, or the first colour half the wheel away that does not clash. */
+export function apartFrom(body: AvatarColour, bg: AvatarColour): AvatarColour {
+  if (!coloursClash(body, bg)) return bg;
+  const start = AVATAR_COLOURS.indexOf(bg);
+  for (let i = 0; i < AVATAR_COLOURS.length; i++) {
+    const c = AVATAR_COLOURS[(start + AVATAR_COLOURS.length / 2 + i) % AVATAR_COLOURS.length]!;
+    if (!coloursClash(body, c)) return c;
+  }
+  return bg;
+}
+
 /** A wide, inclusive range of skin tones (tokens `--cc-avatar-skin-1` … `-12`). */
 export const SKIN_TONES = ['skin1', 'skin2', 'skin3', 'skin4', 'skin5', 'skin6', 'skin7', 'skin8', 'skin9', 'skin10', 'skin11', 'skin12'] as const;
 export type SkinTone = (typeof SKIN_TONES)[number];
@@ -359,8 +387,16 @@ export { generatedAvatar, hashOf, READY_MADE, seededRandom } from './avatarDefau
 const pick = <T,>(xs: readonly T[], rnd: () => number): T => xs[Math.floor(rnd() * xs.length)]!;
 const withoutLocked = <T extends string>(part: string, xs: readonly T[]) => xs.filter((x) => !(`${part}.${x}` in AVATAR_UNLOCKS));
 
-/** A random person (only parts that need no unlock). */
+/**
+ * A random person (only parts that need no unlock). The background never has the clothes' colour or
+ * a near one (S17c, D-169); the fix-up draws no extra numbers, so seeded results stay the same otherwise.
+ */
 export function randomPerson(rnd: () => number): PersonSpec {
+  const s = drawPerson(rnd);
+  return { ...s, bgColor: apartFrom(s.topColor, s.bgColor) };
+}
+
+function drawPerson(rnd: () => number): PersonSpec {
   const p = PERSON_PARTS;
   return {
     v: 1,
@@ -386,8 +422,13 @@ export function randomPerson(rnd: () => number): PersonSpec {
   };
 }
 
-/** A random creature of a family (any family when omitted). */
+/** A random creature of a family (any family when omitted); never on a background of its own colour or a near one (D-169). */
 export function randomCreature(rnd: () => number, family?: CreatureFamily): CreatureSpec {
+  const s = drawCreature(rnd, family);
+  return { ...s, bgColor: apartFrom(s.color, s.bgColor) };
+}
+
+function drawCreature(rnd: () => number, family?: CreatureFamily): CreatureSpec {
   const f = family ?? pick(CREATURE_FAMILY_KEYS, rnd);
   const c = CREATURE_PARTS;
   return {
