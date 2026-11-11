@@ -46,6 +46,8 @@ export const MAX_RESPONSES = 8;
 export const MAX_LEVELS = 3;
 /** Client-side double-tap guard per student and counter (CNT-5, UX-11). */
 export const DOUBLE_TAP_MS = 700;
+/** A class reset of the bar can be undone for this long, and only until the next tap on that counter (S22a, D-175). */
+export const RESET_UNDO_MS = 10 * 60_000;
 
 export const ENGLISH_LABELS: CounterLabels = {
   main: { en: 'Our English Time', tr: 'İngilizce Zamanımız' },

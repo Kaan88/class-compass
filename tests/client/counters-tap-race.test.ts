@@ -41,6 +41,7 @@ const counterAt = (barValue: number): CounterLessonState => ({
   crossingCount: 0,
   crossedAt: null,
   activeResponse: null,
+  resetUndo: null,
   period: { from: '2026-11-09', to: '2026-11-15' },
   students: ['s1', 's2', 's3', 's4'].map((studentId) => ({ studentId, count: 0, level: 0 as const })),
 });

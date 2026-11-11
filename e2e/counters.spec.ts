@@ -33,6 +33,92 @@ interface CounterState {
   students: Array<{ studentId: string; count: number }>;
 }
 
+test('class reset asks first and can be undone for 10 minutes, also offline, until the next tap (S22a, D-175)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  await endActiveLessons(page);
+  const mine = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; className: string; subjectName: { en: string } }>;
+  const contextId = mine.find((c) => c.className === '3-A' && c.subjectName.en === 'English')!.id;
+  const settings = (await api(page, 'GET', `/api/teacher/contexts/${contextId}/counters`)).body.counters as Array<{ id: string; kind: string; activeResponseId: string | null }>;
+  const english = settings.find((c) => c.kind === 'english_reminders')!;
+  // "Class reset" is the chosen response for this test only; the demo setting is put back in `finally`.
+  expect((await api(page, 'PATCH', `/api/teacher/counters/${english.id}`, { activeResponseId: 'class-reset' })).status).toBe(200);
+  const counter = async () => {
+    const r = await api(page, 'GET', `/api/classroom/contexts/${contextId}/lesson`);
+    return (r.body.counters.counters as Array<{ id: string; lessonTotal: number; barValue: number; reached: boolean; crossingCount: number }>).find((c) => c.id === english.id)!;
+  };
+  try {
+    const started = await api(page, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'lesson.start', contextId, payload: { contextId } }] });
+    expect(started.body.results[0].ok).toBe(true);
+    const lessonId = started.body.results[0].result.lessonId as string;
+    // Nine class-only taps through the API (weekly student counts stay as they are); the tenth on screen.
+    const tapCmd = () => ({ opId: randomUUID(), type: 'counter.tap', contextId, lessonId, payload: { contextId, lessonId, counterId: english.id } });
+    const taps = await api(page, 'POST', '/api/commands', { commands: Array.from({ length: 9 }, tapCmd) });
+    expect(taps.body.results.every((r: { ok: boolean }) => r.ok)).toBe(true);
+
+    await page.goto('/classroom');
+    await page.getByRole('button', { name: /3-A · English/ }).click();
+    const bar = page.getByTestId('counter-bar');
+    const supporting = bar.getByTestId('counter-supporting');
+    await expect(supporting).toHaveText('9 / 10 Turkish reminders');
+    const addClass = bar.getByRole('button', { name: 'Class: add one to Our English Time' });
+    await addClass.click();
+    await expect(supporting).toHaveText('10 / 10 Turkish reminders');
+
+    // The response overlay offers the reset; the reset still asks first (D-061).
+    const overlay = page.getByRole('dialog').filter({ has: page.getByTestId('threshold-overlay') });
+    await expect(overlay).toBeVisible();
+    await overlay.getByRole('button', { name: 'Start the bar again' }).click();
+    const confirm = page.getByRole('alertdialog', { name: 'Start the class bar again?' });
+    await expect(confirm).toBeVisible();
+    await expect(confirm).toContainText('You can undo this for 10 minutes, until the next tap.');
+    await confirm.getByRole('button', { name: 'Yes, start again from 0' }).click();
+    await expect(supporting).toHaveText('0 / 10 Turkish reminders');
+    const undoRow = bar.getByTestId('counter-reset-undo');
+    await expect(undoRow).toContainText('Undo is possible for 10 minutes, until the next tap on this counter.');
+    await expect.poll(async () => (await counter()).barValue, { timeout: 15_000 }).toBe(0);
+
+    // Undo: the bar and the threshold banner come back; the overlay does not open again.
+    await undoRow.getByRole('button', { name: 'Undo the reset' }).click();
+    await expect(supporting).toHaveText('10 / 10 Turkish reminders');
+    await expect(page.getByTestId('threshold-banner')).toBeVisible();
+    await expect(undoRow).toHaveCount(0);
+    await expect.poll(async () => (await counter()).barValue, { timeout: 15_000 }).toBe(10);
+    expect(await counter()).toMatchObject({ lessonTotal: 10, reached: true, crossingCount: 1 });
+    await expect(overlay).toHaveCount(0);
+
+    // Offline: the reset and its Undo wait in the outbox and are applied in order once.
+    await page.context().setOffline(true);
+    await page.getByTestId('threshold-banner').getByRole('button', { name: 'Start the bar again' }).click();
+    await confirm.getByRole('button', { name: 'Yes, start again from 0' }).click();
+    await expect(supporting).toHaveText('0 / 10 Turkish reminders');
+    await undoRow.getByRole('button', { name: 'Undo the reset' }).click();
+    await expect(supporting).toHaveText('10 / 10 Turkish reminders');
+    await expect(page.getByText('Offline – 2 changes waiting')).toBeVisible();
+    await page.context().setOffline(false);
+    await expect(page.getByText('Offline – 2 changes waiting')).toHaveCount(0, { timeout: 20_000 });
+    await expect.poll(async () => (await counter()).barValue, { timeout: 15_000 }).toBe(10);
+    await expect(supporting).toHaveText('10 / 10 Turkish reminders');
+
+    // A tap after a reset ends its Undo.
+    await page.getByTestId('threshold-banner').getByRole('button', { name: 'Start the bar again' }).click();
+    await confirm.getByRole('button', { name: 'Yes, start again from 0' }).click();
+    await expect(undoRow).toBeVisible();
+    await addClass.click();
+    await expect(supporting).toHaveText('1 / 10 Turkish reminders');
+    await expect(undoRow).toHaveCount(0);
+    await expect.poll(async () => (await counter()).lessonTotal, { timeout: 15_000 }).toBe(11);
+    expect((await counter()).barValue).toBe(1);
+  } finally {
+    await page.context().setOffline(false);
+    await endActiveLessons(page);
+    expect((await api(page, 'POST', '/api/auth/pin/unlock', { pin: PIN })).status).toBe(200);
+    expect((await api(page, 'PATCH', `/api/teacher/counters/${english.id}`, { activeResponseId: english.activeResponseId })).status).toBe(200);
+    expect((await api(page, 'POST', '/api/classroom/leave')).status).toBe(200);
+  }
+});
+
 test('tap + on students, bar and weekly counts, undo, double tap guard, offline taps sync once, settings and history', async ({ page }) => {
   test.setTimeout(120_000);
   await login(page, 'english');

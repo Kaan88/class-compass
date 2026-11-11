@@ -467,3 +467,114 @@ describe('custom counters and settings (CNT-12, CNT-1, DAT-6)', () => {
     expect(hist.students.map((x: any) => x.id)).toContain(late.id);
   });
 });
+
+describe('undo of a class reset (S22a, D-175; CNT-11, UX-9, DAT-1, ACC-10)', () => {
+  /** A lesson of 3-A whose English bar is full (10 taps, crossing 1) with "Class reset" chosen, then reset. */
+  async function resetFullBar() {
+    const l = await start(s.teacherA, s.ctxA.id);
+    const c = await english(s.teacherA, s.ctxA.id);
+    await ok(s.teacherA.patch(`/api/teacher/counters/${c.id}`, { activeResponseId: 'class-reset' }));
+    for (let i = 0; i < 10; i += 1) await tap(s.teacherA, s.ctxA.id, l, c.id, kids[i % 4]!.id);
+    const resetId = v7();
+    const r = await cmd(s.teacherA, 'counter.resetLessonBar', { contextId: s.ctxA.id, lessonId: l, counterId: c.id }, resetId);
+    expect(r.ok).toBe(true);
+    return { l, c, resetId };
+  }
+  const undo = (c: Client, l: string, counterId: string, resetId: string, opId?: string, contextId = s.ctxA.id) =>
+    cmd(c, 'counter.undoReset', { contextId, lessonId: l, counterId, resetId }, opId);
+  const undoAudits = () => env.db.$client.prepare("select count(*) n from audit_events where action = 'counter.reset_undo'").get();
+
+  it('restores exactly the bar and the open crossing the reset took away, audited, and is idempotent', async () => {
+    const { l, c, resetId } = await resetFullBar();
+    const before = await english(s.teacherA, s.ctxA.id);
+    expect(before).toMatchObject({ lessonTotal: 10, barValue: 0, reached: false, crossingSeq: null, crossingCount: 1 });
+    expect(before.resetUndo).toEqual({ resetId, until: env.clock.now() + 10 * 60_000, barValue: 10 });
+    const opId = v7();
+    const u = await undo(s.teacherA, l, c.id, resetId, opId);
+    expect(u).toMatchObject({ ok: true, result: { alreadyUndone: false, lessonTotal: 10, barValue: 10, reached: true } });
+    const after = await english(s.teacherA, s.ctxA.id);
+    // The same crossing is open again (crossingSeq 1, no new crossing), so nothing fires twice (D-059).
+    expect(after).toMatchObject({ lessonTotal: 10, barValue: 10, reached: true, crossingSeq: 1, crossingCount: 1, resetUndo: null });
+    expect(weekly(after, kids[0]!.id)).toBe(3);
+    const audits = env.db.$client.prepare("select entity_id, op_id from audit_events where action = 'counter.reset_undo'").all();
+    expect(audits).toEqual([{ entity_id: c.id, op_id: opId }]);
+    // The marker is kept (soft), marked undone.
+    expect(env.db.$client.prepare('select undone_at is not null u, undo_op_id o from counter_lesson_resets where id = ?').get(resetId)).toEqual({ u: 1, o: opId });
+    // A replay (same opId) and a second Undo (new opId) change nothing.
+    expect(await undo(s.teacherA, l, c.id, resetId, opId)).toMatchObject({ ok: true, replayed: true });
+    expect(await undo(s.teacherA, l, c.id, resetId)).toMatchObject({ ok: true, result: { alreadyUndone: true, barValue: 10 } });
+    expect(undoAudits()).toEqual({ n: 1 });
+    // Counting goes on from the restored bar, still inside crossing 1.
+    await tap(s.teacherA, s.ctxA.id, l, c.id, kids[0]!.id);
+    expect(await english(s.teacherA, s.ctxA.id)).toMatchObject({ lessonTotal: 11, barValue: 11, reached: true, crossingSeq: 1, crossingCount: 1 });
+  });
+
+  it('an earlier reset counts again after the later one is undone; a half-full bar comes back without a crossing', async () => {
+    const { l, c } = await resetFullBar();
+    for (let i = 0; i < 4; i += 1) await tap(s.teacherA, s.ctxA.id, l, c.id);
+    const second = v7();
+    expect((await cmd(s.teacherA, 'counter.resetLessonBar', { contextId: s.ctxA.id, lessonId: l, counterId: c.id }, second)).ok).toBe(true);
+    expect((await english(s.teacherA, s.ctxA.id)).resetUndo).toMatchObject({ resetId: second, barValue: 4 });
+    expect((await undo(s.teacherA, l, c.id, second)).ok).toBe(true);
+    expect(await english(s.teacherA, s.ctxA.id)).toMatchObject({ lessonTotal: 14, barValue: 4, reached: false, crossingSeq: null, crossingCount: 1, resetUndo: null });
+  });
+
+  it('is refused after 10 minutes (the classroom stops offering it)', async () => {
+    const { l, c, resetId } = await resetFullBar();
+    env.clock.advance(9 * 60_000);
+    expect((await english(s.teacherA, s.ctxA.id)).resetUndo).not.toBeNull();
+    env.clock.advance(60_000 + 1);
+    expect((await english(s.teacherA, s.ctxA.id)).resetUndo).toBeNull();
+    expect((await undo(s.teacherA, l, c.id, resetId)).error?.reason).toBe('RESET_UNDO_PASSED');
+    expect(await english(s.teacherA, s.ctxA.id)).toMatchObject({ barValue: 0, reached: false });
+    expect(undoAudits()).toEqual({ n: 0 });
+  });
+
+  it('is refused after a later tap or a later tap undo on that counter, and for an older reset', async () => {
+    const { l, c, resetId } = await resetFullBar();
+    const t = await tap(s.teacherA, s.ctxA.id, l, c.id, kids[1]!.id);
+    expect((await english(s.teacherA, s.ctxA.id)).resetUndo).toBeNull();
+    expect((await undo(s.teacherA, l, c.id, resetId)).error?.reason).toBe('RESET_UNDO_AFTER_TAP');
+    // Undoing that tap does not bring the Undo back.
+    expect((await cmd(s.teacherA, 'counter.void', { contextId: s.ctxA.id, lessonId: l, eventId: t.result.eventId })).ok).toBe(true);
+    expect((await undo(s.teacherA, l, c.id, resetId)).error?.reason).toBe('RESET_UNDO_AFTER_TAP');
+    expect(await english(s.teacherA, s.ctxA.id)).toMatchObject({ barValue: 0, lessonTotal: 10 });
+
+    // Undoing a tap made BEFORE a reset changes the bar the reset took away, so it ends the Undo too.
+    const first = (await tap(s.teacherA, s.ctxA.id, l, c.id)).result.eventId as string;
+    const second = v7();
+    expect((await cmd(s.teacherA, 'counter.resetLessonBar', { contextId: s.ctxA.id, lessonId: l, counterId: c.id }, second)).ok).toBe(true);
+    expect((await english(s.teacherA, s.ctxA.id)).resetUndo).toMatchObject({ resetId: second, barValue: 1 });
+    expect((await cmd(s.teacherA, 'counter.void', { contextId: s.ctxA.id, lessonId: l, eventId: first })).ok).toBe(true);
+    expect((await english(s.teacherA, s.ctxA.id)).resetUndo).toBeNull();
+    expect((await undo(s.teacherA, l, c.id, second)).error?.reason).toBe('RESET_UNDO_AFTER_TAP');
+    // The first reset is not the latest one any more.
+    expect((await undo(s.teacherA, l, c.id, resetId)).error?.reason).toBe('RESET_UNDO_AFTER_TAP');
+    expect(undoAudits()).toEqual({ n: 0 });
+  });
+
+  it("refuses another teacher's class (403), another lesson's or counter's reset, and an ended lesson", async () => {
+    const { l, c, resetId } = await resetFullBar();
+    expect(await undo(s.teacherB, l, c.id, resetId)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    // Same teacher, another class+subject: that lesson has no such reset.
+    const ctxA2 = await ok(s.admin.post('/api/admin/teaching-contexts', { teacherId: s.ayse.id, classId: s.c3b.id, subjectId: s.english.id }));
+    const lb = await start(s.teacherA, ctxA2.id);
+    const cb = await english(s.teacherA, ctxA2.id);
+    expect((await undo(s.teacherA, lb, cb.id, resetId, undefined, ctxA2.id)).error?.reason).toBe('RESET_NOT_IN_LESSON');
+    expect((await undo(s.teacherA, lb, c.id, resetId, undefined, ctxA2.id)).error?.reason).toBe('WRONG_COUNTER');
+    expect((await undo(s.teacherA, l, c.id, v7())).error?.reason).toBe('RESET_NOT_IN_LESSON');
+    await end(s.teacherA, s.ctxA.id, l);
+    expect((await undo(s.teacherA, l, c.id, resetId)).error?.reason).toBe('LESSON_ENDED');
+    expect(undoAudits()).toEqual({ n: 0 });
+  });
+
+  it('is refused in an archived school year or class (DAT-1)', async () => {
+    const { l, c, resetId } = await resetFullBar();
+    await ok(s.admin.post(`/api/admin/years/${s.year.id}/archive`));
+    expect((await undo(s.teacherA, l, c.id, resetId)).error?.reason).toBe('YEAR_ARCHIVED');
+    await ok(s.admin.post(`/api/admin/years/${s.year.id}/unarchive`));
+    await ok(s.admin.post(`/api/admin/classes/${s.c3a.id}/archive`));
+    expect((await undo(s.teacherA, l, c.id, resetId)).error?.reason).toBe('CLASS_ARCHIVED');
+    expect(env.db.$client.prepare('select undone_at from counter_lesson_resets where id = ?').get(resetId)).toEqual({ undone_at: null });
+  });
+});

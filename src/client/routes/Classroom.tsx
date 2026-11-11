@@ -74,6 +74,7 @@ const COMMAND_TEXT: Record<string, MessageKey> = {
   'counter.tap': 'command.counter.tap',
   'counter.void': 'command.counter.void',
   'counter.resetLessonBar': 'command.counter.reset',
+  'counter.undoReset': 'command.counter.undoReset',
   'secret.draw': 'command.secret.draw',
   'secret.redraw': 'command.secret.redraw',
   'secret.reveal': 'command.secret.reveal',

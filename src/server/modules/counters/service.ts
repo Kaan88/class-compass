@@ -21,6 +21,7 @@ import {
   ENGLISH_RESPONSES,
   ENGLISH_THRESHOLDS,
   isEnglishSubject,
+  RESET_UNDO_MS,
   type CounterColour,
 } from '../../../shared/counters.ts';
 import { initials, normaliseName, sortByName } from '../../../shared/text/turkish.ts';
@@ -293,7 +294,7 @@ function barState(db: Db, counterId: string, lessonId: string): BarState {
   const reset = db
     .select({ afterSeq: counterLessonResets.afterSeq })
     .from(counterLessonResets)
-    .where(and(eq(counterLessonResets.counterId, counterId), eq(counterLessonResets.lessonId, lessonId)))
+    .where(and(eq(counterLessonResets.counterId, counterId), eq(counterLessonResets.lessonId, lessonId), isNull(counterLessonResets.undoneAt)))
     .orderBy(desc(counterLessonResets.afterSeq), desc(counterLessonResets.resetAt))
     .limit(1)
     .get();
@@ -350,6 +351,65 @@ function reconcileCrossing(ctx: RequestContext, counter: CounterRow, lessonId: s
   return { state, fired: false };
 }
 
+type ResetRow = typeof counterLessonResets.$inferSelect;
+
+/** The latest class reset of the lesson that was not undone (the one the bar starts from). */
+function latestReset(db: Db, counterId: string, lessonId: string): ResetRow | null {
+  return (
+    db
+      .select()
+      .from(counterLessonResets)
+      .where(and(eq(counterLessonResets.counterId, counterId), eq(counterLessonResets.lessonId, lessonId), isNull(counterLessonResets.undoneAt)))
+      .orderBy(desc(counterLessonResets.afterSeq), desc(counterLessonResets.resetAt))
+      .limit(1)
+      .get() ?? null
+  );
+}
+
+/**
+ * Why a class reset can no longer be undone (S22a, D-175), or null when it still can: it must be the
+ * latest live reset of the lesson, younger than RESET_UNDO_MS, written by S22a or later (it stored the
+ * bar it took away), and nothing may have been tapped or undone on the counter since.
+ */
+function resetUndoRefusal(db: Db, reset: ResetRow, now: number): 'RESET_UNDO_PASSED' | 'RESET_UNDO_AFTER_TAP' | null {
+  if (reset.barValueBefore === null || now - reset.resetAt > RESET_UNDO_MS) return 'RESET_UNDO_PASSED';
+  const latest = latestReset(db, reset.counterId, reset.lessonId);
+  if (!latest || latest.id !== reset.id) return 'RESET_UNDO_AFTER_TAP';
+  const sameLesson = and(eq(counterEvents.counterId, reset.counterId), eq(counterEvents.lessonId, reset.lessonId));
+  // A tap after the reset (live or already undone) ends the Undo.
+  const later = db.select({ id: counterEvents.id }).from(counterEvents).where(and(sameLesson, sql`${counterEvents.seq} > ${reset.afterSeq}`)).limit(1).get();
+  if (later) return 'RESET_UNDO_AFTER_TAP';
+  // So does undoing a tap that was on the bar the reset took away: Undo must bring back exactly that bar.
+  const prev = db
+    .select({ afterSeq: counterLessonResets.afterSeq })
+    .from(counterLessonResets)
+    .where(
+      and(
+        eq(counterLessonResets.counterId, reset.counterId),
+        eq(counterLessonResets.lessonId, reset.lessonId),
+        isNull(counterLessonResets.undoneAt),
+        sql`${counterLessonResets.id} <> ${reset.id}`,
+        sql`${counterLessonResets.afterSeq} <= ${reset.afterSeq}`,
+      ),
+    )
+    .orderBy(desc(counterLessonResets.afterSeq))
+    .limit(1)
+    .get();
+  const bar = db
+    .select({ n: sql<number>`count(*)` })
+    .from(counterEvents)
+    .where(and(sameLesson, isNull(counterEvents.voidedAt), sql`${counterEvents.seq} > ${prev?.afterSeq ?? 0}`, sql`${counterEvents.seq} <= ${reset.afterSeq}`))
+    .get();
+  return Number(bar?.n ?? 0) === reset.barValueBefore ? null : 'RESET_UNDO_AFTER_TAP';
+}
+
+/** What the classroom needs to offer Undo for the lesson's latest class reset (null when it cannot be undone). */
+function resetUndoState(db: Db, counterId: string, lessonId: string, now: number): CounterLessonState['resetUndo'] {
+  const reset = latestReset(db, counterId, lessonId);
+  if (!reset || reset.barValueBefore === null || resetUndoRefusal(db, reset, now)) return null;
+  return { resetId: reset.id, until: reset.resetAt + RESET_UNDO_MS, barValue: reset.barValueBefore };
+}
+
 function clearOpenCrossing(ctx: RequestContext, counterId: string, lessonId: string, reason: 'void' | 'reset' | 'limit') {
   ctx.db
     .update(thresholdCrossings)
@@ -397,6 +457,7 @@ export function countersLessonState(ctx: RequestContext, context: ContextRow, cl
       crossingCount: st.lastSeq,
       crossedAt: reached ? st.openCrossedAt : null,
       activeResponse: active,
+      resetUndo: c.scope === 'student' ? null : resetUndoState(ctx.db, c.id, lesson.id, ctx.now()),
       period,
       students:
         c.scope === 'lesson'
@@ -500,11 +561,65 @@ export function resetLessonBar(ctx: RequestContext, p: P<'counter.resetLessonBar
   }
   const st = barState(ctx.db, counter.id, lesson.id);
   const now = ctx.now();
-  ctx.db.insert(counterLessonResets).values({ id: meta.opId, counterId: counter.id, lessonId: lesson.id, afterSeq: st.maxEventSeq, resetAt: now, resetBy: requireUser(ctx).id }).run();
+  // What the reset takes away is stored with it, so Undo can bring exactly that back (S22a, D-175).
+  const open = ctx.db
+    .select({ id: thresholdCrossings.id })
+    .from(thresholdCrossings)
+    .where(and(eq(thresholdCrossings.counterId, counter.id), eq(thresholdCrossings.lessonId, lesson.id), isNull(thresholdCrossings.clearedAt)))
+    .get();
+  ctx.db
+    .insert(counterLessonResets)
+    .values({ id: meta.opId, counterId: counter.id, lessonId: lesson.id, afterSeq: st.maxEventSeq, resetAt: now, resetBy: requireUser(ctx).id, barValueBefore: st.barValue, clearedCrossingId: open?.id ?? null })
+    .run();
   clearOpenCrossing(ctx, counter.id, lesson.id, 'reset');
   audit(ctx.db, ctx.actor, { action: 'counter.reset_bar', entity: 'counter', entityId: counter.id, before: { lessonId: lesson.id, barValue: st.barValue }, after: { barValue: 0 }, opId: meta.opId }, now);
   updateLesson(ctx, lesson, {});
   return { counterId: counter.id, lessonTotal: st.lessonTotal, barValue: 0 };
+}
+
+/**
+ * Undo a class reset (S22a, D-175; refines D-058): the reset marker is kept but marked undone, so the
+ * bar counts from the previous marker again, and the crossing the reset cleared is open again (the
+ * same crossing number, so no device shows the overlay or plays the sound a second time). Only the
+ * lesson's latest reset, within RESET_UNDO_MS and before any later tap or tap undo on the counter.
+ * A repeated Undo of the same reset changes nothing.
+ */
+export function undoResetLessonBar(ctx: RequestContext, p: P<'counter.undoReset'>, meta: CommandMeta) {
+  const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertModuleEnabled(ctx.db, context.id, 'counters');
+  const counter = counterForLesson(ctx, context.id, p.counterId);
+  const reset = ctx.db.select().from(counterLessonResets).where(eq(counterLessonResets.id, p.resetId)).get();
+  if (!reset || reset.counterId !== counter.id || reset.lessonId !== lesson.id) {
+    throw new AppError('CONFLICT', 'This reset does not belong to the current lesson', { reason: 'RESET_NOT_IN_LESSON' });
+  }
+  const result = (alreadyUndone: boolean) => {
+    const st = barState(ctx.db, counter.id, lesson.id);
+    return { counterId: counter.id, alreadyUndone, lessonTotal: st.lessonTotal, barValue: st.barValue, reached: counter.scope !== 'student' && st.barValue >= counter.barSegments };
+  };
+  if (reset.undoneAt !== null) return result(true);
+  const now = ctx.now();
+  const refusal = resetUndoRefusal(ctx.db, reset, now);
+  if (refusal === 'RESET_UNDO_PASSED') throw new AppError('CONFLICT', 'The class reset can only be undone for 10 minutes', { reason: refusal });
+  if (refusal) throw new AppError('CONFLICT', 'The counter was used after the reset, so the reset stays', { reason: refusal });
+  ctx.db.update(counterLessonResets).set({ undoneAt: now, undoneBy: requireUser(ctx).id, undoOpId: meta.opId }).where(eq(counterLessonResets.id, reset.id)).run();
+  if (reset.clearedCrossingId) {
+    ctx.db
+      .update(thresholdCrossings)
+      .set({ clearedAt: null, clearedReason: null })
+      .where(and(eq(thresholdCrossings.id, reset.clearedCrossingId), eq(thresholdCrossings.clearedReason, 'reset')))
+      .run();
+  }
+  // The limit may have changed since the reset: the crossing follows the bar as always (D-004).
+  reconcileCrossing(ctx, counter, lesson.id, 'limit', null);
+  const after = result(false);
+  audit(
+    ctx.db,
+    ctx.actor,
+    { action: 'counter.reset_undo', entity: 'counter', entityId: counter.id, before: { lessonId: lesson.id, resetId: reset.id, barValue: 0 }, after: { barValue: after.barValue }, opId: meta.opId },
+    now,
+  );
+  updateLesson(ctx, lesson, {});
+  return after;
 }
 
 // ---------------------------------------------------------------- teacher settings

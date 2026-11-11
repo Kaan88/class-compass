@@ -3,12 +3,19 @@
  * commands naming the lesson, applied optimistically to the cached lesson state (polling pauses
  * while they are pending, D-045). A per-student double-tap guard (700 ms) stops accidental double
  * taps before they are queued; the server deduplicates retries by opId.
+ *
+ * Sounds (S22a, D-175): only the device where the teacher taps plays a cue, at the moment of the tap
+ * (`tapCounter`): `thresholdReached` for the tap that fills the class bar (once per crossing), the
+ * tap cues otherwise, `undo` for an undo. Polls, outbox replays and an Undo of a reset never play the
+ * threshold cue. `playEvent` applies the class sound switch, the device switch and the volume.
  */
 import { levelFor } from '../../../domain/counters.ts';
 import type { CounterCommandPayload, CounterCommandType, CounterLessonState, CountersLessonState } from '../../../shared/contracts/counters.ts';
-import { DOUBLE_TAP_MS } from '../../../shared/counters.ts';
+import { DOUBLE_TAP_MS, RESET_UNDO_MS } from '../../../shared/counters.ts';
+import type { SoundEvent } from '../../../shared/themePackage/tokens.ts';
 import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts';
 import { queryClient } from '../../lib/queryClient.ts';
+import { playEvent } from '../../themes/index.tsx';
 import { activeLessonsKey, lessonKey, serverNow, type LessonQueryData } from '../lessons/lessonClient.ts';
 
 /** Listed in the counters manifest. */
@@ -82,7 +89,8 @@ export function applyDelta(c: CounterLessonState, studentId: string | null, delt
         return { ...s, count, level: levelFor(count, c.thresholds) };
       })
     : c.students;
-  return { ...c, lessonTotal, barValue, reached, crossingSeq, crossingCount, crossedAt, students };
+  // Any tap or tap undo after a class reset ends its Undo (D-175).
+  return { ...c, lessonTotal, barValue, reached, crossingSeq, crossingCount, crossedAt, students, resetUndo: null };
 }
 
 /** Would one more tap on the class bar open a new threshold crossing? (scope lesson/both only) */
@@ -102,8 +110,90 @@ export function tapToastText(
   return t('counter.toast.added', { cls: a.cls, counter: a.label, name: a.studentName });
 }
 
-/** Optimistic class reset: the bar starts again from 0, the lesson total and weekly counts stay. */
-export const applyReset = (c: CounterLessonState): CounterLessonState => ({ ...c, barValue: 0, reached: false, crossingSeq: null, crossedAt: null });
+/**
+ * Optimistic class reset: the bar starts again from 0, the lesson total and weekly counts stay. The
+ * Undo it offers carries the bar it took away; its id is the reset command's opId, known once queued
+ * (an empty id until the server state names it).
+ */
+export const applyReset = (c: CounterLessonState, now = serverNow()): CounterLessonState => ({
+  ...c,
+  barValue: 0,
+  reached: false,
+  crossingSeq: null,
+  crossedAt: null,
+  resetUndo: { resetId: '', until: now + RESET_UNDO_MS, barValue: c.barValue },
+});
+
+/**
+ * Optimistic Undo of a class reset: the bar it took away comes back and, when that bar was full, the
+ * same crossing is open again (`crossingCount` does not move, so no overlay and no sound replay).
+ * `before` is the counter as this device had it just before the reset, when it still knows it.
+ */
+export function applyUndoReset(c: CounterLessonState, before?: Pick<CounterLessonState, 'crossedAt'> | null): CounterLessonState {
+  if (!c.resetUndo) return c;
+  const barValue = c.resetUndo.barValue;
+  const reached = c.scope !== 'student' && barValue >= c.barSegments;
+  return { ...c, barValue, reached, crossingSeq: reached ? c.crossingCount : null, crossedAt: reached ? (before?.crossedAt ?? null) : null, resetUndo: null };
+}
+
+/** Can the reset of this counter still be undone from this screen? (the server checks again). */
+export const canUndoReset = (c: CounterLessonState, now = serverNow()) => c.resetUndo !== null && now < c.resetUndo.until;
+
+/** The cue of one tap: the threshold cue only for the tap that opens a crossing (D-175). */
+export const tapCue = (crossed: boolean, forStudent: boolean): SoundEvent => (crossed ? 'thresholdReached' : forStudent ? 'pointAwarded' : 'tap');
+
+/**
+ * One tap on a counter (optimistic + outbox) with its cue. `crossed` is true only for the tap that
+ * fills the bar, so the threshold cue plays once per crossing; `sent` resolves to the event id.
+ */
+export function tapCounter(contextId: string, lessonId: string, counter: CounterLessonState, studentId: string | null): { crossed: boolean; sent: Promise<string> } {
+  let crossed = opensCrossing(counter);
+  patchCounters(
+    contextId,
+    (c) => {
+      const next = applyDelta(c, studentId, 1);
+      crossed = next.reached && !c.reached;
+      return next;
+    },
+    counter.id,
+  );
+  playEvent(tapCue(crossed, studentId !== null));
+  const sent = sendCounterCommand('counter.tap', { contextId, lessonId, counterId: counter.id, ...(studentId ? { studentId } : {}) });
+  return { crossed, sent };
+}
+
+/** Undo one tap (from its toast): the undo cue, -1 on screen, then the void command. */
+export async function undoTap(contextId: string, lessonId: string, counterId: string, studentId: string | null, sent: Promise<string>): Promise<void> {
+  playEvent('undo');
+  const eventId = await sent;
+  patchCounters(contextId, (c) => applyDelta(c, studentId, -1), counterId);
+  await sendCounterCommand('counter.void', { contextId, lessonId, eventId });
+}
+
+/** Resets queued on this device: their opId (= the reset id) and the counter just before. */
+const localResets = new Map<string, { sent: Promise<string>; before: CounterLessonState }>();
+
+/** A confirmed class reset (optimistic + outbox). Undo is offered on the counter card for RESET_UNDO_MS. */
+export function resetCounterBar(contextId: string, lessonId: string, counter: CounterLessonState): Promise<string> {
+  patchCounters(contextId, (c) => applyReset(c), counter.id);
+  const sent = sendCounterCommand('counter.resetLessonBar', { contextId, lessonId, counterId: counter.id });
+  localResets.set(counter.id, { sent, before: counter });
+  return sent;
+}
+
+/**
+ * Undo the class reset shown on the card (S22a, D-175): the undo cue, the bar back on screen, then
+ * the `counter.undoReset` command (outbox, so it waits for the connection like the reset itself).
+ */
+export async function undoCounterReset(contextId: string, lessonId: string, counter: CounterLessonState): Promise<void> {
+  const local = localResets.get(counter.id);
+  const resetId = counter.resetUndo?.resetId || (local ? await local.sent : '');
+  if (!resetId) return;
+  playEvent('undo');
+  localResets.delete(counter.id);
+  patchCounters(contextId, (c) => applyUndoReset(c, local?.before), counter.id);
+  await sendCounterCommand('counter.undoReset', { contextId, lessonId, counterId: counter.id, resetId });
+}
 
 // ---------------------------------------------------------------- crossings already shown on this device
 const SEEN_KEY = 'cc.seenCrossings';

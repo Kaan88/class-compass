@@ -81,6 +81,12 @@ export const CounterLessonState = z.object({
   crossingCount: z.number().int(),
   crossedAt: z.number().nullable(),
   activeResponse: ThresholdResponse.nullable(),
+  /**
+   * The class reset of this lesson that can still be undone (S22a, D-175): until `until` (server
+   * time) and only while nothing was tapped or undone on this counter since. `barValue` is the bar
+   * the Undo brings back. Null otherwise.
+   */
+  resetUndo: z.object({ resetId: z.string(), until: z.number(), barValue: z.number().int() }).nullable(),
   /** First and last local day of the current counting period; null for "never resets". */
   period: z.object({ from: z.string(), to: z.string() }).nullable(),
   students: z.array(CounterStudentCount),
@@ -106,6 +112,11 @@ export const CounterCommands = {
   'counter.void': z.object({ ...LessonRef, eventId: Id }),
   /** Only when the active threshold response is "class reset" (D-058). */
   'counter.resetLessonBar': z.object({ ...LessonRef, counterId: Id }),
+  /**
+   * Undo of a class reset (S22a, D-175): restores the bar and the crossing the reset cleared.
+   * Idempotent; refused after RESET_UNDO_MS or once the counter was tapped (or a tap undone) since.
+   */
+  'counter.undoReset': z.object({ ...LessonRef, counterId: Id, resetId: Id }),
 } as const;
 export type CounterCommandType = keyof typeof CounterCommands;
 export type CounterCommandPayload<T extends CounterCommandType> = z.input<(typeof CounterCommands)[T]>;

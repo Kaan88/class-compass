@@ -183,6 +183,13 @@
       "when": 1794401143148,
       "tag": "0025_s22b_goal_category_names",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1794402077895,
+      "tag": "0026_s22a_counter_reset_undo",
+      "breakpoints": true
     }
   ]
 }

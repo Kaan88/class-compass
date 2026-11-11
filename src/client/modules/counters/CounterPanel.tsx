@@ -7,6 +7,7 @@
  *   mascot hop, no flashing, never naming or highlighting a student), then a quiet banner while the
  *   threshold stays reached.
  * Every tap is an outbox command applied optimistically, with an undo toast naming class and student.
+ * A confirmed class reset can be undone on the card for 10 minutes, until the next tap (S22a, D-175).
  */
 import { useEffect, useRef, useState } from 'react';
 import type { CounterLessonState } from '../../../shared/contracts/counters.ts';
@@ -23,8 +24,7 @@ import { CounterBar } from '../../ui/Students.tsx';
 import { classLabel } from '../lessons/labels.ts';
 import { serverNow, useLessonState } from '../lessons/lessonClient.ts';
 import type { ClassroomContext, DashboardSlot, StudentCardAddon } from '../types.ts';
-import { applyDelta, applyReset, crossingKey, FRESH_CROSSING_MS, markShown, opensCrossing, patchCounters, sendCounterCommand, tapGuard, tapToastText, wasShown } from './countersClient.ts';
-import { playEvent } from '../../themes/index.tsx';
+import { canUndoReset, crossingKey, FRESH_CROSSING_MS, markShown, resetCounterBar, tapCounter, tapGuard, tapToastText, undoCounterReset, undoTap, wasShown } from './countersClient.ts';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -34,29 +34,15 @@ let lastUndo: number | null = null;
 function recordTap(context: ClassroomContext, lesson: LessonState, counter: CounterLessonState, student: { id: string; fullName: string } | null, t: Translate, locale: 'en' | 'tr'): boolean {
   const key = `${counter.id}:${student?.id ?? 'class'}`;
   if (!tapGuard.accept(key)) return false;
-  let crossed = opensCrossing(counter);
-  patchCounters(
-    context.id,
-    (c) => {
-      const next = applyDelta(c, student?.id ?? null, 1);
-      crossed = next.reached && !c.reached;
-      return next;
-    },
-    counter.id,
-  );
-  playEvent(crossed ? 'thresholdReached' : student ? 'pointAwarded' : 'tap');
-  const sent = sendCounterCommand('counter.tap', { contextId: context.id, lessonId: lesson.id, counterId: counter.id, ...(student ? { studentId: student.id } : {}) });
+  const { crossed, sent } = tapCounter(context.id, lesson.id, counter, student?.id ?? null);
   const cls = classLabel(context, locale);
   const label = pickText(student ? counter.labels.individual : counter.labels.main, locale);
   if (lastUndo !== null) dismissToast(lastUndo);
   lastUndo = showUndoToast(
     tapToastText(t, { cls, label, studentName: student?.fullName ?? null, crossed }),
     async () => {
-      playEvent('undo');
-      const eventId = await sent;
       tapGuard.forget(key);
-      patchCounters(context.id, (c) => applyDelta(c, student?.id ?? null, -1), counter.id);
-      await sendCounterCommand('counter.void', { contextId: context.id, lessonId: lesson.id, eventId });
+      await undoTap(context.id, lesson.id, counter.id, student?.id ?? null, sent);
     },
     { scope: 'classroom' },
   );
@@ -64,8 +50,34 @@ function recordTap(context: ClassroomContext, lesson: LessonState, counter: Coun
 }
 
 function resetBar(context: ClassroomContext, lesson: LessonState, counter: CounterLessonState) {
-  patchCounters(context.id, applyReset, counter.id);
-  void sendCounterCommand('counter.resetLessonBar', { contextId: context.id, lessonId: lesson.id, counterId: counter.id });
+  void resetCounterBar(context.id, lesson.id, counter);
+}
+
+/**
+ * Undo of a class reset (S22a, D-175), on the card itself (it works in the dock view too): shown for
+ * 10 minutes after the reset and only until the next tap on this counter, which the hint says.
+ */
+function ResetUndo({ context, lesson, counter }: { context: ClassroomContext; lesson: LessonState; counter: CounterLessonState }) {
+  const { t } = useI18n();
+  const [, setTick] = useState(0);
+  const until = counter.resetUndo?.until ?? null;
+  useEffect(() => {
+    if (until === null) return;
+    const h = setTimeout(() => setTick((n) => n + 1), Math.max(0, until - serverNow()) + 50);
+    return () => clearTimeout(h);
+  }, [until]);
+  if (!canUndoReset(counter)) return null;
+  return (
+    <div className="cc-counter__reset-undo" role="status" data-testid="counter-reset-undo">
+      <span>
+        {t('counter.resetDone')} <span className="cc-muted">{t('counter.resetUndoHint')}</span>
+      </span>
+      <Button className="cc-push-right" onPress={() => void undoCounterReset(context.id, lesson.id, counter)}>
+        <IconUndo />
+        {t('counter.resetUndo')}
+      </Button>
+    </div>
+  );
 }
 
 const responseText = (c: CounterLessonState, locale: 'en' | 'tr') => (c.activeResponse ? fillCounterText(pickText(c.activeResponse.message, locale), { count: c.barValue, limit: c.barSegments }) : '');
@@ -112,8 +124,8 @@ function ThresholdOverlay({ lesson, counter, onReset }: { lesson: LessonState; c
 }
 
 /**
- * A class reset cannot be undone (D-058), so it always asks first (UX-10, DAT-5). It is a classroom
- * action: the dialog names only the class and the counter.
+ * A class reset always asks first (UX-10, DAT-5, D-061), and can then be undone for 10 minutes until
+ * the next tap (D-175). It is a classroom action: the dialog names only the class and the counter.
  */
 function ConfirmReset({ isOpen, onOpenChange, context, counter, onConfirm }: { isOpen: boolean; onOpenChange: (v: boolean) => void; context: ClassroomContext; counter: CounterLessonState; onConfirm: () => void }) {
   const { t, locale } = useI18n();
@@ -195,6 +207,7 @@ function CounterCard({ context, lesson, counter }: { context: ClassroomContext; 
           ) : null}
         </div>
       ) : null}
+      <ResetUndo context={context} lesson={lesson} counter={counter} />
       <ThresholdOverlay lesson={lesson} counter={counter} onReset={() => setConfirming(true)} />
       <ConfirmReset isOpen={confirming && counter.reached} onOpenChange={setConfirming} context={context} counter={counter} onConfirm={() => resetBar(context, lesson, counter)} />
     </section>

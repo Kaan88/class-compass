@@ -1051,6 +1051,21 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
   background: var(--cc-surface-2);
   font-weight: 700;
 }
+/* Undo of a class reset on the counter card (S22a, D-175): wraps down to the narrowest box. */
+.cc-counter__reset-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--cc-radius);
+  border: 1px solid var(--cc-border);
+  background: var(--cc-surface-2);
+}
+.cc-counter__reset-undo > span {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
 .cc-threshold__overlay {
   display: grid;
   justify-items: center;

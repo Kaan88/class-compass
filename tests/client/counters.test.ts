@@ -40,6 +40,7 @@ const base: CounterLessonState = {
   crossingCount: 0,
   crossedAt: null,
   activeResponse: null,
+  resetUndo: null,
   period: { from: '2026-11-09', to: '2026-11-15' },
   students: [
     { studentId: 'a', count: 1, level: 0 },

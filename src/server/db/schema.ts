@@ -576,7 +576,8 @@ export const thresholdCrossings = sqliteTable(
 
 /**
  * Class bar reset markers (D-058): the bar shows live events with seq > afterSeq of the latest
- * marker; events are never deleted, so the lesson total (CNT-8) and weekly counts are unchanged.
+ * marker that was not undone; events are never deleted, so the lesson total (CNT-8) and weekly counts
+ * are unchanged. Undo (S22a, D-175) marks the row `undoneAt` and reopens the crossing it cleared.
  */
 export const counterLessonResets = sqliteTable(
   'counter_lesson_resets',
@@ -587,6 +588,13 @@ export const counterLessonResets = sqliteTable(
     afterSeq: integer('after_seq').notNull(),
     resetAt: integer('reset_at').notNull(),
     resetBy: text('reset_by').notNull().references(() => users.id),
+    // S22a (D-175): what the reset took away, so Undo restores exactly that (null on resets before S22a).
+    barValueBefore: integer('bar_value_before'),
+    clearedCrossingId: text('cleared_crossing_id'),
+    // Undo within 10 minutes and before any later tap (soft: the row stays, the bar ignores it).
+    undoneAt: integer('undone_at'),
+    undoneBy: text('undone_by').references(() => users.id),
+    undoOpId: text('undo_op_id'),
   },
   (t) => [index('counter_lesson_resets_idx').on(t.counterId, t.lessonId)],
 );
