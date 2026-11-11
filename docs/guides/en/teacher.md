@@ -158,7 +158,7 @@ Tap a student's **name** on their card to open a small card for the class to see
 
 ### Counters
 
-A counter counts something for the whole class (the **class bar**) and/or for each student, for example English reminders. Tap **+** on the class bar to add one. When the bar is full, the chosen response appears once, calmly, and never names a student. If the response is "Class reset", **Start the bar again** sets the bar back to 0 (the taps stay recorded).
+A counter counts something for the whole class (the **class bar**) and/or for each student, for example English reminders. Tap **+** on the class bar to add one. When the bar is full, the chosen response appears once, calmly, and never names a student. If the response is "Class reset", **Start the bar again** sets the bar back to 0 after you confirm (the taps stay recorded). For 10 minutes the counter then shows **Undo the reset**, which brings the bar back as it was, until the next tap on that counter. Filling the bar plays a short sound when the class sounds are on.
 
 Each student card shows the student's count with a **+** button. To hide them for a class, switch off **Reminder boxes on student cards** in Class settings → Counters. Every tap shows a short message with **Undo**. Counters are counts, never scores. Create and edit counters, their labels, limit, levels and responses on the **Counters** page; **Weekly history** shows counts per student and week.
 

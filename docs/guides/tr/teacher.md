@@ -158,7 +158,7 @@ Kaydettiğiniz ya da vazgeçtiğiniz anda öğretmen alanı yeniden kilitlenir. 
 
 ### Sayaçlar
 
-Bir sayaç bütün sınıf için (**sınıf çubuğu**) ve/veya her öğrenci için bir şey sayar; örneğin İngilizce hatırlatmalarını. Sınıf çubuğundaki **+** ile bir tane ekleyin. Çubuk dolduğunda seçilen tepki bir kez, sakin bir biçimde görünür ve hiçbir öğrencinin adını söylemez. Tepki "Sınıf yeniden başlıyor" ise **Çubuğu yeniden başlat** çubuğu 0'a döndürür (dokunuşlar kayıtlı kalır).
+Bir sayaç bütün sınıf için (**sınıf çubuğu**) ve/veya her öğrenci için bir şey sayar; örneğin İngilizce hatırlatmalarını. Sınıf çubuğundaki **+** ile bir tane ekleyin. Çubuk dolduğunda seçilen tepki bir kez, sakin bir biçimde görünür ve hiçbir öğrencinin adını söylemez. Tepki "Sınıf yeniden başlıyor" ise **Çubuğu yeniden başlat**, onayladıktan sonra çubuğu 0'a döndürür (dokunuşlar kayıtlı kalır). Ardından 10 dakika boyunca, o sayaca yeniden dokunulana kadar sayaçta **Yeniden başlatmayı geri al** görünür; çubuğu eski hâline getirir. Sınıf sesleri açıksa çubuk dolduğunda kısa bir ses çalar.
 
 Her öğrenci kartında öğrencinin sayısı ve bir **+** düğmesi görünür. Bir sınıfta gizlemek için Sınıf ayarları → Sayaçlar'daki **Öğrenci kartlarında hatırlatma kutuları** anahtarını kapatın. Her dokunuştan sonra **Geri al** düğmeli kısa bir mesaj çıkar. Sayaçlar puan değil, sayıdır. Sayaçları, adlarını, sınırını, düzeylerini ve tepkilerini **Sayaçlar** sayfasında oluşturup düzenlersiniz; **Haftalık geçmiş** öğrenci ve haftaya göre sayıları gösterir.
 
