@@ -3,7 +3,7 @@
  * direct URLs, browser back, refresh and raw API calls never show sensitive content while locked;
  * unlocking shows the teacher menu first with the display banner; returning to the classroom relocks.
  */
-import { expect, test } from '@playwright/test';
+import { chromium, expect, test } from '@playwright/test';
 import { api, bodyText, ensurePin, login, PIN } from './helpers.ts';
 
 const SENSITIVE_WORDS = ['Language and text size', 'Accounts', 'Audit log', 'Student number', 'Teacher menu', 'Profile and PIN', 'Deniz Akın'];
@@ -128,24 +128,48 @@ async function unlockToProfile(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('profile-page')).toBeVisible();
 }
 
-test('PIN-8 back/forward cache (S20a): a page restored after the lock shows the lock screen, never the teacher data', async ({ page }) => {
+test('PIN-8 back/forward cache (S20a): a page really restored after the lock shows the lock screen, never the teacher data', async ({ baseURL }) => {
+  // Playwright starts Chromium with `--disable-back-forward-cache`, and its headless shell turns the
+  // cache off on its own ("BackForwardCacheDisabledForDelegate"). This test starts its own browser:
+  // the full Chromium build (new headless) without that switch, so going back really restores the
+  // frozen page (asserted below) instead of loading it again.
+  const browser = await chromium.launch({ channel: 'chromium', ignoreDefaultArgs: ['--disable-back-forward-cache'] });
+  try {
+    const context = await browser.newContext({ baseURL, viewport: { width: 1920, height: 1080 }, locale: 'en-GB', timezoneId: 'Europe/Istanbul' });
+    const page = await context.newPage();
+    await login(page, 'english');
+    await ensurePin(page);
+    await page.goto('/classroom');
+    await expect(page.getByTestId('classroom-shell')).toBeVisible();
+    await unlockToProfile(page);
+
+    // Leave the app for another document, lock meanwhile (another tab, the server window), come back.
+    await page.evaluate(() => ((window as unknown as { __s20aMark: boolean }).__s20aMark = true));
+    // Chromium says why it did not keep a page; the reasons go into the failure message.
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Page.enable');
+    const reasons: string[] = [];
+    cdp.on('Page.backForwardCacheNotUsed', (e) => reasons.push(...e.notRestoredExplanations.map((x) => x.reason)));
+    await page.goto('/healthz');
+    expect((await api(page, 'POST', '/api/auth/lock', {})).status).toBe(200);
+    // A page restored from the cache fires no new load event: wait only for the navigation to commit.
+    await page.goBack({ waitUntil: 'commit' });
+    const restored = await page.evaluate(() => (window as unknown as { __s20aMark?: boolean }).__s20aMark === true);
+    expect(restored, `the page came back from the back/forward cache (not kept: ${reasons.join(', ') || 'no reason given'})`).toBe(true);
+    await expectLockedAndClean(page);
+    expect((await api(page, 'GET', '/api/auth/me')).body.pinUnlocked).toBe(false);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('PIN-8 restore handler (S20a): a pageshow with persisted re-runs the guards, whatever the browser cached', async ({ page }) => {
+  // The handler itself (main.tsx `pageshow` with `persisted`), on the page still showing the profile
+  // while the server has locked: a restore must not trust what is on screen.
   await login(page, 'english');
   await ensurePin(page);
   await page.goto('/classroom');
   await expect(page.getByTestId('classroom-shell')).toBeVisible();
-  await unlockToProfile(page);
-
-  // Leave the app for another document, lock meanwhile (another tab, the server window), come back.
-  await page.evaluate(() => ((window as unknown as { __s20aMark: boolean }).__s20aMark = true));
-  await page.goto('/healthz');
-  expect((await api(page, 'POST', '/api/auth/lock', {})).status).toBe(200);
-  await page.goBack();
-  const restored = await page.evaluate(() => (window as unknown as { __s20aMark?: boolean }).__s20aMark === true);
-  test.info().annotations.push({ type: 'bfcache', description: restored ? 'the page came back from the back/forward cache' : 'the browser loaded the page again (not kept in the cache)' });
-  await expectLockedAndClean(page);
-
-  // The restore handler itself (main.tsx `pageshow` with `persisted`), whatever the browser decided
-  // above: the page still shows the profile while the server has locked; a restore must not trust it.
   await unlockToProfile(page);
   expect((await api(page, 'POST', '/api/auth/lock', {})).status).toBe(200);
   await expect(page.getByTestId('profile-page')).toBeVisible();

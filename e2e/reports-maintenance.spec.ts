@@ -21,9 +21,28 @@ async function seriousViolations(page: Page) {
 /** The page itself never scrolls sideways (wide tables scroll inside `.cc-table-wrap`). */
 const sidewaysScroll = (page: Page) => page.evaluate(() => document.scrollingElement!.scrollWidth > document.scrollingElement!.clientWidth + 1);
 
-/** Visible sections of the report and their heights (a folded or empty section would print blank). */
-const sectionHeights = (page: Page) =>
-  page.getByTestId('report').locator('details[data-section]').evaluateAll((els) => els.map((e) => ({ key: e.getAttribute('data-section'), open: (e as HTMLDetailsElement).open, h: e.getBoundingClientRect().height })));
+/**
+ * The report's sections: open or folded, and their body under the summary (the summary alone is a
+ * touch target tall, so the body is measured on its own: its height and its rendered text, a table
+ * cell or a chart counting as content).
+ */
+const sectionBodies = (page: Page) =>
+  page
+    .getByTestId('report')
+    .locator('details[data-section]')
+    .evaluateAll((els) =>
+      els.map((e) => {
+        const body = e.querySelector<HTMLElement>(':scope > section');
+        const shown = body && getComputedStyle(body).display !== 'none' && getComputedStyle(body).visibility !== 'hidden';
+        return {
+          key: e.getAttribute('data-section'),
+          open: (e as HTMLDetailsElement).open,
+          bodyH: shown ? body.getBoundingClientRect().height : 0,
+          bodyText: shown ? body.innerText.trim().length : 0,
+          bodyParts: shown ? body.querySelectorAll('table, svg, img, canvas').length : 0,
+        };
+      }),
+    );
 
 test('teacher Reports: heading, report tables, period change, axe @mobile', async ({ page }) => {
   test.setTimeout(120_000);
@@ -35,13 +54,19 @@ test('teacher Reports: heading, report tables, period change, axe @mobile', asyn
   await expect(report).toBeVisible();
   await expect(report.getByRole('heading', { level: 2 }).first()).toBeVisible();
   await expect(report.getByRole('table').first()).toBeVisible();
-  expect((await sectionHeights(page)).length).toBeGreaterThan(0);
+  expect((await sectionBodies(page)).length).toBeGreaterThan(0);
 
-  // One interaction: the period. The link says which period, the report follows.
+  // One interaction: the period. The link says which period, and the report data follows: the range
+  // in the report header (from the server's `from`/`to`) changes.
+  const range = report.locator('header > p.cc-muted').first();
+  await expect(range).toContainText(/\d/u);
+  const before = await range.innerText();
   const period = page.getByLabel('Period', { exact: true });
+  await expect(period.locator('option:checked')).not.toHaveText('Month');
   await period.selectOption({ label: 'Month' });
   await expect(page).toHaveURL(/period=month/u);
   await expect(period.locator('option:checked')).toHaveText('Month');
+  await expect(range).not.toHaveText(before);
   await expect(report).toBeVisible();
   await expect(report.getByRole('table').first()).toBeVisible();
   expect(await sidewaysScroll(page)).toBe(false);
@@ -108,11 +133,12 @@ async function checkReportPrint(page: Page) {
     await expect(report.locator('.cc-print-only').first()).toBeVisible();
     const box = (await report.boundingBox())!;
     expect(box.height).toBeGreaterThan(200);
-    const sections = await sectionHeights(page);
+    const sections = await sectionBodies(page);
     expect(sections.length).toBeGreaterThan(0);
     for (const s of sections) {
       expect(s.open, `${s.key} open in print`).toBe(true);
-      expect(s.h, `${s.key} has content in print`).toBeGreaterThan(40);
+      expect(s.bodyH, `${s.key}: its body has height in print`).toBeGreaterThan(0);
+      expect(s.bodyText + s.bodyParts, `${s.key}: its body shows text, a table or a chart in print`).toBeGreaterThan(0);
     }
     // The PDF the browser would print: at least one page, A4 from the named @page rule.
     const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });

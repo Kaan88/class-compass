@@ -2709,8 +2709,10 @@ html:has(.cc-classroom) {
 }
 /* Compact cards are too narrow for a name beside both the avatar and the + button ("Şimşe / k" at
    1280×720, S14i review): the name takes the whole first line next to the avatar, the + button sits
-   beside the count under it, so a name breaks only between words. */
-.cc-classroom[data-density='compact'] .cc-lesson-board .cc-student-card {
+   beside the count under it, so a name breaks only between words. The grid's own compact mode for a
+   class of more than 24 (CRD-3) has the same narrow cards at every display density (S20a review). */
+.cc-classroom[data-density='compact'] .cc-lesson-board .cc-student-card,
+.cc-lesson-board .cc-student-grid[data-density='compact'] .cc-student-card {
   grid-template-areas:
     'avatar name name'
     'meta meta add';
