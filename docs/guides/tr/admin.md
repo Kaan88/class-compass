@@ -111,7 +111,7 @@ Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bi
 
 ## Yapay zekâ araçları
 
-**Yapay zekâ araçları** (yönetim menüsü) öğretmenlerin Claude gibi bir yapay zekâ asistanını Sınıf Pusulası'na bağlamasını sağlar. Varsayılan olarak kapalıdır; öğrenci adları da siz okulun KVKK sorumlusuyla birlikte aksine karar verene kadar okulda kalır. Ayrıntıların hepsi [Yapay zekâ araçları kılavuzu](ai-tools.md)'ndadır.
+**Yapay zekâ araçları** (yönetim menüsü) öğretmenlerin Claude gibi bir yapay zekâ asistanını Sınıf Pusulası'na bağlamasını sağlar. Varsayılan olarak kapalıdır; öğrenci adları da siz okulun KVKK sorumlusuyla birlikte aksine karar verene kadar okulda kalır. Ayrıntıların hepsi [Yapay zekâ araçları kılavuzu](ai-tools.md)'ndadır. Sayfa bir **Kurulum listesi** ile başlar: yapay zekâ araçlarını açmak, öğrenci verisi ayarının ne anlama geldiği, Claude (`claude.ai`) ve ChatGPT (`chatgpt.com`) dönüş adreslerine tek tıkla izin vermek, Cloudflare Access notu ve ilk araç çağrısının çalışıp çalışmadığı; her satır **Tamam**, **Yapılacak**, **Not** ya da **Siz denetleyin** der. Öğretmenler sonra **Profil ve PIN → Yapay zekâ araçları → Bir yapay zekâ uygulaması bağlayın** adımlarını izler ([Kurulum listesi](ai-tools.md#yöneticiler-için-açma)).
 
 ## Asistan bağlantıları
 

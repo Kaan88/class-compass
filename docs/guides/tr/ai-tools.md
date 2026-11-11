@@ -1,6 +1,6 @@
 # Yapay zekâ araçları: bir yapay zekâ asistanı bağlamak
 
-Sınıf Pusulası, **Claude Code** gibi bir yapay zekâ asistanının sınıflarınızla sizin adınıza çalışmasına izin verebilir: bir raporu okuyup kısa bir haftalık özet yazmak, hazır hedef önermek, haftanın ders konularını planlamak ya da bir tema tasarlamak gibi. Asistan, yapay zekâ araçları için açık bir standart olan **Model Context Protocol (MCP)** ile okulunuzun Sınıf Pusulası adresindeki `/mcp` bölümüne bağlanır.
+Sınıf Pusulası, **ChatGPT**, **Claude** ya da **Claude Code** gibi bir yapay zekâ asistanının sınıflarınızla sizin adınıza çalışmasına izin verebilir: bir raporu okuyup kısa bir haftalık özet yazmak, hazır hedef önermek, haftanın ders konularını planlamak ya da bir tema tasarlamak gibi. Asistan, yapay zekâ araçları için açık bir standart olan **Model Context Protocol (MCP)** ile okulunuzun Sınıf Pusulası adresindeki `/mcp` bölümüne bağlanır.
 
 Asistan, Sınıf Pusulası’nda sizin yapabildiklerinizin tam olarak aynısını yapabilir; üstelik yalnızca seçtiğiniz bölümlerde. Yaptığı her çağrı kaydedilir (neyin ne zaman çağrıldığı; içeriği asla), yaptığı her değişiklik de denetim kaydında adınızla ve "yapay zekâ aracıyla" notuyla görünür.
 
@@ -29,26 +29,59 @@ Yapay zekâ araçları bir yönetici açana kadar **kapalıdır**. Yönetici, ok
 
 ![Yönetim alanında yapay zekâ araçları](../img/tr/ai-tools-admin.png)
 
-Yönetim menüsünde **Yapay zekâ araçları**’nı açın.
+Yönetim menüsünde **Yapay zekâ araçları**’nı açın. Sayfa bir **Kurulum listesi** ile başlar; her satırda **Tamam**, **Yapılacak**, **Not** ya da **Siz denetleyin** yazar (yalnızca renkle değil, simgenin yanında bir sözcükle):
+
+1. **Yapay zekâ araçları açık**; kapalıyken bir **Yapay zekâ araçlarını aç** düğmesiyle.
+2. **Yapay zekâ uygulamaları öğrencilerden neyi görür**: aşağıdaki öğrenci verisi ayarını hatırlatır (kapalıyken yalnızca takma adlar; KVKK sorumlunuz onay verene kadar kapalı bırakın).
+3. **Claude giriş yapabilir (claude.ai)** ve 4. **ChatGPT giriş yapabilir (chatgpt.com)**: her uygulamanın kendi belgelerinde yazan dönüş adresi. **claude.ai adresine izin ver** / **chatgpt.com adresine izin ver** onu tek tıkla izinli adreslere ekler (listedeki her değişiklik gibi denetim kaydına yazılır). Yalnızca okulunuzun kullanmayı kabul ettiği uygulamalara izin verin. `claude.ai` baştan izinlidir; Claude Code’un girişini de kapsar.
+5. **Cloudflare Access yapay zekâ adreslerini geçiriyor**: Sınıf Pusulası bunu içeriden göremez, bu yüzden hep **Siz denetleyin** yazar; aşağıdaki [Cloudflare Access](#cloudflare-access) bölümüne bakın.
+6. **İlk araç çağrısı çalıştı**: okulda herhangi bir uygulama bir araç kullanır kullanmaz, sonuncusunun zamanıyla birlikte işaretlenir.
+
+Listenin altında:
 
 - **Yapay zekâ araçları açık**: `/mcp` adresini açar. Kapalıyken hiçbir anahtar çalışmaz ve yeni anahtar oluşturulamaz.
 - **Bir anahtarın en uzun geçerlilik süresi**: 7 ile 90 gün arası (varsayılan 90). Öğretmenler her anahtar için daha kısa bir süre seçer.
 - **Öğrenci verisi yapay zekâ araçlarına**: varsayılan olarak kapalı. **Yalnızca okulunuzun KVKK sorumlusu onay verdikten** ve veli aydınlatma metni bunu belirttikten sonra açın. Açılan pencere okuldan nelerin çıkacağını listeler; onaylamak için `STUDENT DATA` yazın. Kapattığınızda bütün anahtarlar için hemen geçerli olur.
 - **Okuldan ne çıkar** bölümü, yukarıdaki listeyi geçerli ayara göre tekrarlar.
 - **Okuldaki anahtarlar** her anahtarı (gizli değerini asla göstermeden) hesabı, izinleri, gizlilik ayarı ve son kullanımıyla listeler. **İptal et** bir anahtarı hemen durdurur. Bu sayfadaki değişiklikler denetim kaydına yazılır.
-- **Bu okuldaki bağlı uygulamalar**, öğretmenlerin ve yöneticilerin izin sayfası üzerinden bağladığı her uygulamayı (claude.ai, Claude Desktop, Claude Code) **Bağlantıyı kes** düğmesiyle listeler.
+- **Bu okuldaki bağlı uygulamalar**, öğretmenlerin ve yöneticilerin izin sayfası üzerinden bağladığı her uygulamayı (ChatGPT, claude.ai, Claude Desktop, Claude Code) **Bağlantıyı kes** düğmesiyle listeler.
 - **Kayıtlı yapay zekâ uygulamaları**, Sınıf Pusulası’na kendini kaydeden uygulamaları listeler. Herkes bir uygulama kaydedebilir; ancak bir kişi izin sayfasında izin vermedikçe uygulama hiçbir şey yapamaz. **İptal et**, o uygulamanın bütün bağlantılarını sona erdirir. Kimsenin kullanmadığı kayıtlar 30 gün sonra kaybolur.
-- **Yapay zekâ uygulamaları için izinli adresler**: bir uygulamanın, izin sayfasından sonra kullanıcıları geri gönderebileceği sunucular. `claude.ai` (claude.ai ve Claude Desktop için) baştan listededir; kişinin kendi bilgisayarındaki adreslere (Claude Code) her zaman izin verilir. Her satıra bir sunucu adı yazın. Yalnızca okulunuzun kullanmayı kabul ettiği bir yapay zekâ aracı için sunucu ekleyin.
+- **Yapay zekâ uygulamaları için izinli adresler**: bir uygulamanın, izin sayfasından sonra kullanıcıları geri gönderebileceği sunucular. `claude.ai` (claude.ai ve Claude Desktop için) baştan listededir; ChatGPT için `chatgpt.com` gerekir (kurulum listesi onu tek tıkla ekler); kişinin kendi bilgisayarındaki adreslere (Claude Code) her zaman izin verilir. Her satıra bir sunucu adı yazın. Yalnızca okulunuzun kullanmayı kabul ettiği bir yapay zekâ aracı için sunucu ekleyin.
 
 Yapay zekâ araçlarını kapatmak, bütün bağlı uygulamaların bağlantısını keser.
 
-Okulunuz Sınıf Pusulası’na Cloudflare Access üzerinden ulaşıyorsa, bilişim sorumlusunun `/mcp` adresini, yapay zekâ uygulamalarının giriş adreslerini (`/oauth/…`) ve bulma adreslerini (`/.well-known/oauth-…`) dışarıda bırakması gerekir (bkz. `docs/OPERATIONS.md`, "AI tools"): bir yapay zekâ aracı Cloudflare’e giriş yapamaz.
+## Cloudflare Access
+
+Okulunuz Sınıf Pusulası’na Cloudflare Access üzerinden ulaşıyorsa, bilişim sorumlusunun `/mcp` adresini, yapay zekâ uygulamalarının giriş adreslerini (`/oauth/register`, `/oauth/token`, `/oauth/revoke`) ve bulma adreslerini (`/.well-known/oauth-…`) dışarıda bırakması gerekir (bkz. `docs/OPERATIONS.md`, "AI tools"): bir yapay zekâ aracı Cloudflare’e giriş yapamaz. ChatGPT ve Claude bu adresleri kendi sunucularından çağırır; Claude Code ise öğretmenin bilgisayarından çağırır. Bu yüzden orada çalışan bir öğretmen için ya o adresin geçirilmesi ya da bir Access hizmet anahtarı (service token) gerekir (Claude Code sayfası, iki başlığıyla birlikte komutu gösterir).
+
+## Bir yapay zekâ uygulaması bağlayın
+
+![Profil ve PIN sayfasında bir yapay zekâ uygulaması bağlama](../img/tr/ai-tools-profile.png)
+
+**Profil ve PIN**’i açın (öğretmenler menüden, yöneticiler yönetim menüsünden) ve **Yapay zekâ araçları** bölümünü bulun. Sınıf bilgisayarında önce PIN sorulur. İlk sırada **Bir yapay zekâ uygulaması bağlayın** gelir:
+
+1. **Hangi uygulamayı kullanıyorsunuz?** **ChatGPT**, **Claude** (claude.ai ve Claude Desktop), **Claude Code** ya da **Başka bir MCP istemcisi**’ni seçin.
+2. Sayfa **nasıl bağlandığını** (izin sayfasında giriş ya da kişisel anahtar) söyler, bağlantının küçük bir resmini gösterir ve okulunuzun tam adresiyle, **kopyalama** düğmeleriyle numaralı adımlar verir. Adres okulun sunucu ayarlarından gelir; elle yazmak yerine kopyalayın.
+3. Uygulamadaki adımları izleyin (her uygulama için aşağıda), sonra uygulamaya sınıflarınızla ilgili bir şey sorun; örneğin "Sınıf Pusulası’ndaki sınıflarımı listele."
+4. **Bağlantıyı denetle**’ye basın. Uygulamanın kullandığı son aracı, ne zaman ve hangi bağlantı ya da anahtarla kullandığını gösterir; örneğin "ChatGPT uygulamasından son araç çağrısı: list_my_classes, 11 Kas 2026 09:30 (bağlı uygulama "ChatGPT")". Bunun için yeni bir şey kaydedilmez: var olan çağrı kaydı okunur; o kayıt neyin sorulduğunu ya da yanıtlandığını hiçbir zaman tutmaz.
+
+Yapay zekâ araçları kapalıysa sayfa bunu söyler ve yöneticinizin yapacaklarını listeler. Okul bir uygulamanın dönüş adresine (örneğin `chatgpt.com`) henüz izin vermediyse sayfa, bunu yöneticinize iletmenizi ister; kişisel anahtar (Claude Code, diğer istemciler) buna gerek duymadan çalışır.
+
+Kişisel anahtarlarınız ve bağlı uygulamalarınız **Gelişmiş: kişisel anahtarlar ve bağlı uygulamalar** altındadır. Çalışan bir anahtarınız ya da bağlı bir uygulamanız varken bu bölüm kendiliğinden açılır.
+
+## ChatGPT
+
+ChatGPT, **özel MCP sunucusu** olarak bağlanır (OpenAI buna uygulama ya da eklenti der) ve izin sayfasında giriş yapar; anahtar yapıştırmazsınız. Okul yöneticisinin önce `chatgpt.com` adresine izin vermiş olması gerekir. Denerken yalnızca kurgusal veriler kullanın ve yalnızca okulunuz ChatGPT kullanmayı kabul ettiyse bağlayın.
+
+1. ChatGPT’de **Plugins** sayfasını açın (`chatgpt.com/plugins`), **+** düğmesine basın ve **Add custom MCP server**’ı seçin. Business, Enterprise ya da Edu çalışma alanlarında önce bir yöneticinin özel MCP sunucularına (geliştirici modu) izin vermesi gerekebilir; her planda bu seçenek yoktur.
+2. **Name**: Class Compass. **Connection**: Public endpoint. **MCP server URL**: Profil ve PIN → Yapay zekâ araçları bölümünde görünen adres; örneğin `https://school.example.org/mcp`.
+3. **Authentication**: OAuth. İstemci kimliğini ve gizli anahtarı (client ID, secret) boş bırakın: ChatGPT kendini Sınıf Pusulası’na kendisi kaydeder.
+4. Uyarıyı okuyun, onaylayın ve oluşturun. ChatGPT okulunuzun Sınıf Pusulası’nı açar: giriş yapın (sınıf bilgisayarında önce PIN), izin sayfasını okuyun ve şifrenizle **İzin ver**’e basın. ChatGPT `chatgpt.com`’a döner.
+5. Bir sohbette Class Compass’ı açın ve örneğin şunu sorun: "Sınıf Pusulası’ndaki sınıflarımı listele." Sonra Profil sayfasında **Bağlantıyı denetle**’ye basın.
 
 ## Kişisel anahtar oluşturma
 
-![Profil ve PIN sayfasında yapay zekâ araçları](../img/tr/ai-tools-profile.png)
-
-**Profil**’i açın (öğretmenler menüden, yöneticiler yönetim menüsünden) ve **Yapay zekâ araçları** bölümünü bulun. Sınıf bilgisayarında önce PIN sorulur.
+**Profil ve PIN → Yapay zekâ araçları**’nı, ardından **Gelişmiş: kişisel anahtarlar ve bağlı uygulamalar**’ı açın (sınıf bilgisayarında önce PIN sorulur). **Bir yapay zekâ uygulaması bağlayın** bölümündeki Claude Code ve "Başka bir MCP istemcisi" adımlarında da aynı formu açan bir **Anahtar oluştur** düğmesi vardır.
 
 1. **Yeni anahtar**’a basın.
 2. **Ad**: nerede kullanacağınız, örneğin "Dizüstü bilgisayarımdaki Claude Code".
@@ -71,6 +104,14 @@ claude mcp add --transport http class-compass https://school.example.org/mcp --h
 
 Ardından Claude’a örneğin şunu sorun: "class-compass’ı kullan: 3-A İngilizce dersinin geçen haftasının kısa bir özetini çıkar." Claude işe **list_my_classes** ile başlar; isterseniz bir şeyi değiştirmeden önce size sorar.
 
+**Cloudflare Access arkasındaysa.** Okulunuzun adresi Cloudflare Access arkasındaysa ve bilişim sorumlunuz size bir Access hizmet anahtarı verdiyse, onun iki başlığını anahtarlı komuta ekleyin (Profil sayfasındaki Claude Code adımları bunu yer tutucularla gösterir):
+
+```
+claude mcp add --transport http class-compass https://school.example.org/mcp --header "Authorization: Bearer <your token>" --header "CF-Access-Client-Id: <id>" --header "CF-Access-Client-Secret: <secret>"
+```
+
+Bunun için kişisel anahtar kullanın: giriş yaparak bağlanmak `/oauth/…` adreslerini de gerektirir ve hizmet anahtarı bunlara ulaşamayabilir.
+
 İşe yarayan araçlar: **class_overview**, **class_report** (rapor büyükse birkaç bölüm isteyin), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** ve **set_topic_plan**, **create_homework**; temalar için **theme_schema**, **validate_theme**, **preview_theme**, **export_theme** ve yöneticiler için **import_theme_draft** (taslak kaydeder; bir temayı etkinleştirmek **Temalar** sayfasında sizin kararınız olarak kalır). Hazır istekler (prompts): haftalık özet, hazır hedefler, konu planı, tema tasarımı.
 
 **Asistanla tema hazırlamak.** Asistan tema kılavuzunu ve eksiksiz örnek temaları (her hazır tema için bir tane) okuyabilir, **export_theme** ile herhangi bir temanın kopyasını alabilir, işini **validate_theme** ile denetleyip **preview_theme** ile tüm renk kontrastlarını görebilir. Bunların hiçbirinde okul verisi yoktur. Bir yöneticinin asistanı sonucu taslak olarak kaydedebilir; önizlemeye bakıp temayı **Temalar** sayfasında siz açarsınız.
@@ -79,8 +120,8 @@ Ardından Claude’a örneğin şunu sorun: "class-compass’ı kullan: 3-A İng
 
 claude.ai ve Claude Desktop, **özel bağlayıcı** (custom connector) olarak bağlanır. Anahtar yapıştırmazsınız: Claude sizi, izin verdiğiniz bir Sınıf Pusulası sayfasına (aşağıdaki "izin sayfası") gönderir. Denerken yalnızca kurgusal veriler kullanın ve yalnızca okulunuz Claude kullanmayı kabul ettiyse bağlayın.
 
-1. claude.ai’de **Customize → Connectors** bölümünü açın (Claude Desktop’ta: **Settings → Connectors**) ve **Add custom connector**’ı seçin. Team ve Enterprise planlarında bağlayıcıyı önce Claude kuruluşunun bir sahibinin (Owner) eklemesi gerekebilir.
-2. **Name**: örneğin "Sınıf Pusulası". **Remote MCP server URL**: okulunuzun adresi ve sonuna `/mcp`, tam olarak Profil → Yapay zekâ araçları bölümünde göründüğü gibi; örneğin `https://school.example.org/mcp`. Gelişmiş ayarları (client ID ve secret) boş bırakın.
+1. claude.ai’de **Customize → Connectors** bölümünü açın (Claude Desktop’ta da aynı yer), **+** düğmesine basın ve **Add custom connector**’ı seçin. Team ve Enterprise planlarında bağlayıcıyı Claude kuruluşunun bir sahibi (Owner) **Organization settings → Connectors** altında ekler; siz sonra onda **Connect**’e basarsınız.
+2. **Name**: örneğin "Sınıf Pusulası". **Remote MCP server URL**: okulunuzun adresi ve sonuna `/mcp`, tam olarak Profil → Yapay zekâ araçları bölümünde göründüğü gibi; örneğin `https://school.example.org/mcp`. Claude’un kendisi bulduğu giriş ayarlarını ("Use Claude's published identity" ya da "Register automatically") değiştirmeyin; client ID ve secret alanlarını boş bırakın.
 3. **Add**’e, ardından **Connect**’e basın. Bir tarayıcı penceresinde okulunuzun Sınıf Pusulası açılır. İstenirse giriş yapın; sınıf bilgisayarında önce PIN sorulur.
 4. İzin sayfasını okuyun, izinleri seçin ve şifrenizle **İzin ver**’e basın (aşağıya bakın). Tarayıcı claude.ai’ye döner ve bağlayıcı bağlı olarak görünür.
 5. Bir sohbette araçlar menüsünden bağlayıcıyı açın ve örneğin şunu sorun: "Sınıf Pusulası’nı kullan: 3-A İngilizce dersinin geçen haftasının kısa bir özetini çıkar."
@@ -105,7 +146,7 @@ Bir yapay zekâ uygulaması bağlanmak istediğinde açılan sayfa sizin kararı
 
 - **"Bu uygulama okulunuz tarafından denetlenmedi"**: herkes istediği adla bir uygulama yapabilir. Yalnızca bağlanmayı az önce kendiniz başlattıysanız devam edin. Sayfa birdenbire karşınıza çıktıysa (örneğin bir e-postadaki bağlantıdan), **İzin verme**’ye basın.
 - **Kim istiyor**: uygulamanın kendine verdiği ad. Bilgileri kendi adresinden gelen uygulamalarda sayfa o adresi de gösterir.
-- **İzin verirseniz tarayıcınız şu adrese geri döner**: erişimi alacak sunucu. claude.ai ve Claude Desktop için `claude.ai`’dir; Claude Code için kendi bilgisayarınızdaki bir adrestir (`localhost` ya da `127.0.0.1` ve bir sayı) ve sayfa, o bilgisayardaki herhangi bir programın bu erişimi alabileceği konusunda uyarır.
+- **İzin verirseniz tarayıcınız şu adrese geri döner**: erişimi alacak sunucu. claude.ai ve Claude Desktop için `claude.ai`, ChatGPT için `chatgpt.com`’dur; Claude Code için kendi bilgisayarınızdaki bir adrestir (`localhost` ya da `127.0.0.1` ve bir sayı) ve sayfa, o bilgisayardaki herhangi bir programın bu erişimi alabileceği konusunda uyarır.
 - **Uygulama neler yapabilsin**: uygulamanın istediği izinler, hesabınızın yapabildikleriyle sınırlı olarak. İhtiyaç duyulmayanların işaretini kaldırın. Yönetici izinleri öğretmenlere hiç sunulmaz.
 - **Öğrenciler nasıl görünsün**: yöneticiniz öğrenci verisine izin vermedikçe takma adlar; izin verdiyse bir anahtarda olduğu gibi siz seçersiniz.
 - **Bağlantı süresi**: uygulamanın ne kadar süre bağlı kalabileceği (en fazla okulun izin verdiği kadar). Uygulama, bir saat geçerli olan ve bu süreye kadar yenilenen bir anahtar alır.
@@ -113,7 +154,7 @@ Bir yapay zekâ uygulaması bağlanmak istediğinde açılan sayfa sizin kararı
 
 ## Bir uygulamanın bağlantısını kesme
 
-**Profil → Yapay zekâ araçları → Bağlı uygulamalar**, bağladığınız uygulamaları listeler: uygulama, döndüğü adres, izinleri, öğrencilerin nasıl göründüğü, son kullanım ve bağlantının ne zamana kadar sürdüğü. **Bağlantıyı kes** uygulamayı hemen durdurur. Bağlantıyı Claude’da da kaldırabilirsiniz; ancak Sınıf Pusulası için geçerli olan, burada kesmektir.
+**Profil → Yapay zekâ araçları → Gelişmiş → Bağlı uygulamalar**, bağladığınız uygulamaları listeler: uygulama, döndüğü adres, izinleri, öğrencilerin nasıl göründüğü, son kullanım ve bağlantının ne zamana kadar sürdüğü. **Bağlantıyı kes** uygulamayı hemen durdurur. Bağlantıyı uygulamanın kendisinde de kaldırabilirsiniz; ancak Sınıf Pusulası için geçerli olan, burada kesmektir.
 
 ## Bilmekte fayda var
 

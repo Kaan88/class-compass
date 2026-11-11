@@ -111,7 +111,7 @@ The full technical description (every colour, the limits, the drawing rules, a w
 
 ## AI tools
 
-**AI tools** (administration menu) lets teachers connect an AI assistant such as Claude to Class Compass. It is off by default, and student names stay inside the school until you, with the school's KVKK contact, decide otherwise. Everything about it is in the [AI tools guide](ai-tools.md).
+**AI tools** (administration menu) lets teachers connect an AI assistant such as Claude to Class Compass. It is off by default, and student names stay inside the school until you, with the school's KVKK contact, decide otherwise. Everything about it is in the [AI tools guide](ai-tools.md). The page starts with a **Setup checklist**: switch AI tools on, what the student data switch means, allow the return hosts of Claude (`claude.ai`) and ChatGPT (`chatgpt.com`) in one click, the Cloudflare Access note and whether a first tool call worked; each line says **Done**, **To do**, **Note** or **Check yourself**. Teachers then follow **Profile → AI tools → Connect an AI app** ([setup checklist](ai-tools.md#for-administrators-switch-it-on)).
 
 ## Assistant connections
 
