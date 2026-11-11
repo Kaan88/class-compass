@@ -18,8 +18,10 @@ import { MAX_IMPORT_ROWS, type SourceRow } from '../../../../domain/importing.ts
 
 XLSX.set_cptable(cptable);
 
+/** Room for titles and repeated page headers above the row cap. */
+export const SHEET_ROW_MARGIN = 100;
 /** Rows read per sheet: the row cap plus room for titles and repeated page headers. */
-export const MAX_SHEET_ROWS = MAX_IMPORT_ROWS + 100;
+export const MAX_SHEET_ROWS = MAX_IMPORT_ROWS + SHEET_ROW_MARGIN;
 /** Student lists have a handful of columns; anything wider is cut. */
 export const MAX_SHEET_COLS = 60;
 const MAX_SHEETS = 20;
@@ -28,7 +30,7 @@ const MAX_SHEETS = 20;
  * The range to read: from the declared start (as before, so columns keep their positions) to the
  * last cell that really exists, within the row/column caps (null when the sheet is empty).
  */
-function usedRange(ws: XLSX.WorkSheet): XLSX.Range | null {
+function usedRange(ws: XLSX.WorkSheet, maxSheetRows: number): XLSX.Range | null {
   const start = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).s : { r: 0, c: 0 };
   let maxR = -1;
   let maxC = -1;
@@ -39,7 +41,7 @@ function usedRange(ws: XLSX.WorkSheet): XLSX.Range | null {
     if (c > maxC) maxC = c;
   }
   if (maxR < start.r || maxC < start.c) return null;
-  return { s: start, e: { r: Math.min(maxR, start.r + MAX_SHEET_ROWS - 1), c: Math.min(maxC, start.c + MAX_SHEET_COLS - 1) } };
+  return { s: start, e: { r: Math.min(maxR, start.r + maxSheetRows - 1), c: Math.min(maxC, start.c + MAX_SHEET_COLS - 1) } };
 }
 
 /** A sheet with content, for the sheet picker (S13b): its name, non-blank row count and the first rows. */
@@ -54,18 +56,20 @@ const PREVIEW_COLS = 6;
 /**
  * Reads every sheet with content (up to 20). Rows carry the sheet's ordinal among the sheets with
  * content as `page`, so a caller can keep only the sheets the teacher chose (`sheetInfo[page - 1]`).
+ * `maxRows`: the row cap (a list with several classes is read further, D-171).
  */
-export function parseWorkbook(buf: Buffer): { rows: SourceRow[]; sheets: number; sheetInfo: SheetInfo[] } {
+export function parseWorkbook(buf: Buffer, maxRows: number = MAX_IMPORT_ROWS): { rows: SourceRow[]; sheets: number; sheetInfo: SheetInfo[] } {
+  const maxSheetRows = maxRows + SHEET_ROW_MARGIN;
   // Old BIFF5 exports without a code page are Turkish (Windows-1254, code page 1254).
-  const wb = XLSX.read(buf, { type: 'buffer', cellFormula: false, cellHTML: false, cellStyles: false, codepage: 1254, dense: false, sheetRows: MAX_SHEET_ROWS });
+  const wb = XLSX.read(buf, { type: 'buffer', cellFormula: false, cellHTML: false, cellStyles: false, codepage: 1254, dense: false, sheetRows: maxSheetRows });
   const rows: SourceRow[] = [];
   const sheetInfo: SheetInfo[] = [];
   let sheets = 0;
   for (const name of wb.SheetNames.slice(0, MAX_SHEETS)) {
-    if (rows.length > MAX_IMPORT_ROWS) break;
+    if (rows.length > maxRows) break;
     const ws = wb.Sheets[name];
     if (!ws) continue;
-    const range = usedRange(ws);
+    const range = usedRange(ws, maxSheetRows);
     if (!range) continue;
     ws['!ref'] = XLSX.utils.encode_range(range);
     const data = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: '', blankrows: true });

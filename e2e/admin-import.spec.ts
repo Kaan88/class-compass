@@ -110,7 +110,8 @@ test('an administrator splits a list with several classes into its classes in on
     await expect(rowM).toContainText('1 row');
     await expect(rowM).toContainText(`Class 9-${m}`);
     const unknown = table.getByRole('row').filter({ hasText: '11/Ş' });
-    await expect(unknown).toContainText('Not one of your classes');
+    // An administrator is told the school has no such class (a teacher: "Not one of your classes").
+    await expect(unknown).toContainText('No class with this name');
     await expect(split.getByRole('status').filter({ hasText: 'Rows to import' })).toHaveText('Rows to import: 3, into 2 classes. Rows skipped: 1.');
     await new AxeBuilder({ page }).include('[data-testid="admin-import-page"]').analyze().then((r) => expect(r.violations).toEqual([]));
     // The unknown class can be put into a class: then every row is imported.

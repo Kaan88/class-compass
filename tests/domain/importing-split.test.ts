@@ -4,7 +4,7 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { classesMatching, classLabelKey, inferMapping, splitByClass, type SourceRow } from '../../src/domain/importing.ts';
+import { classesMatching, classifyRows, classLabelKey, crossClassDuplicates, inferMapping, splitByClass, type SourceRow } from '../../src/domain/importing.ts';
 import { multiClassRows } from '../import-fixtures.ts';
 
 const rowsOf = (cells: string[][]): SourceRow[] => cells.filter((r) => r.some((c) => c.trim())).map((c) => ({ cells: c, page: null, confidence: null }));
@@ -58,5 +58,29 @@ describe('class labels and splitting by class (IMP-2, D-171)', () => {
     const inGroups = new Set(groups.flatMap((g) => g.rows));
     expect([...inGroups].every((i) => /^\d+$/u.test(rows[i]!.cells[0]!))).toBe(true);
     expect(inGroups.size).toBe(9);
+  });
+
+  it('rows under two classes: one child twice (first copy, then repeats), two children with one name, never within one class (IMP-2, D-171)', () => {
+    const rows = rowsOf([
+      ['Adı Soyadı', 'Okul No', 'Sınıfı'],
+      ['Nehir Uydurmaca', '', '3/A'],
+      ['Ece Hayalperest', '7001', '3/A'],
+      ['Mert Kurgulu', '7010', '3/A'],
+      ['Nehir Uydurmaca', '', '3/B'],
+      ['Ece Hayalperest', '7002', '3/B'],
+      ['Başka İsim', '7010', '3/C'],
+      ['Ada Örnek', '', '3/B'],
+      ['Ada Örnek', '', '3/B'],
+    ]);
+    const mapping = inferMapping(rows);
+    const classified = classifyRows(rows, mapping);
+    const byLabel = (i: number) => rows[i]!.cells[2]!;
+    const cross = crossClassDuplicates(classified, byLabel);
+    expect(Object.fromEntries(cross)).toEqual({ 1: 'duplicate', 4: 'repeat', 2: 'same_name', 5: 'same_name', 3: 'duplicate', 6: 'repeat' });
+    // The same list where 3/B is not imported: nothing across classes for its rows.
+    const without = crossClassDuplicates(classified, (i) => (byLabel(i) === '3/B' ? null : byLabel(i)));
+    expect(Object.fromEntries(without)).toEqual({ 3: 'duplicate', 6: 'repeat' });
+    // Two labels into one class: no longer "another class".
+    expect(crossClassDuplicates(classified, () => 'one').size).toBe(0);
   });
 });

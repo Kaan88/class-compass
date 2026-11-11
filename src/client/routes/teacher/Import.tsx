@@ -65,6 +65,7 @@ const WARN_FLAGS = new Set<Imp.ImportFlag>([
   'same_name_in_file',
   'name_elsewhere',
   'number_conflict',
+  'duplicate_other_class',
 ]);
 
 /** Flags as chips: icon + text, never colour only (UX-7). */
@@ -212,6 +213,10 @@ function Preview({ batch, onChange, onClose }: { batch: Batch; onChange: (b: Bat
     if (b) {
       onChange(b);
       void qc.invalidateQueries({ queryKey: [SENSITIVE] });
+    } else {
+      // A refused confirm re-checked the rows (another class of the same list may have been confirmed
+      // since, D-171): reload them so the rows that now need a choice are shown.
+      void qc.invalidateQueries({ queryKey: [...KEY, 'batch', batch.id] });
     }
   };
   return (
@@ -540,7 +545,19 @@ const GROUP_CHIP: Record<Imp.ImportClassGroup['status'], { cls: string; Icon: ty
  * each name matched the classes the user may import into, and where each group goes (unknown and
  * unmatched groups are skipped until a class is chosen). Nothing is saved until "Make previews".
  */
-function SplitPreview({ split, source, classes, onMade, onCancel }: { split: Imp.ImportSplit; source: SplitSource; classes: ImporterClass[]; onMade: (splitId: string) => void; onCancel: () => void }) {
+function SplitPreview({
+  split,
+  source,
+  classes,
+  onMade,
+  onCancel,
+}: {
+  split: Imp.ImportSplit;
+  source: SplitSource;
+  classes: ImporterClass[];
+  onMade: (made: { splitId: string; batches: Imp.ImportBatchSummary[] }) => void;
+  onCancel: () => void;
+}) {
   const { t } = useI18n();
   const [choice, setChoice] = useState<Record<string, string>>(() => Object.fromEntries(split.groups.map((g) => [g.key, g.classId ?? ''])));
   const [busy, setBusy] = useState(false);
@@ -549,13 +566,21 @@ function SplitPreview({ split, source, classes, onMade, onCancel }: { split: Imp
   const skipped = split.groups.filter((g) => !choice[g.key]).reduce((n, g) => n + g.rows, 0);
   const total = split.groups.reduce((n, g) => n + g.rows, 0);
   const options = [{ id: '', label: t('import.split.skip') }, ...classes.map((c) => ({ id: c.id, label: c.label ?? c.name }))];
+  // Several classes with the same name (e.g. 3-A in two open school years): those first, with their year.
+  const optionsFor = (g: Imp.ImportClassGroup) => {
+    if (!g.candidates.length) return options;
+    const ids = new Set(g.candidates.map((c) => c.id));
+    return [options[0]!, ...g.candidates.map((c) => ({ id: c.id, label: c.yearName ? t('import.split.candidate', { name: c.name, year: c.yearName }) : c.name })), ...options.slice(1).filter((o) => !ids.has(o.id))];
+  };
+  const statusText = (g: Imp.ImportClassGroup) =>
+    g.status === 'matched' ? t('import.split.status.matched', { name: g.className ?? '' }) : g.status === 'unknown' && split.scope === 'school' ? t('import.split.status.unknownSchool') : t(`import.split.status.${g.status}`);
   const nameOf = (g: Imp.ImportClassGroup) => (g.labels.length ? g.labels.join(', ') : t('import.split.noClass'));
   const make = async () => {
     setBusy(true);
     setError(null);
     try {
       const res = await call(Imp.createImportSplit, { ...source, assign: split.groups.map((g) => ({ key: g.key, classId: choice[g.key] || null })) });
-      onMade(res.splitId);
+      onMade(res);
     } catch (err) {
       setError(errorText(t, err));
     } finally {
@@ -587,7 +612,27 @@ function SplitPreview({ split, source, classes, onMade, onCancel }: { split: Imp
         emptyText={t('import.noRows')}
         columns={[
           { key: 'class', header: t('import.split.col.inFile'), stackRole: 'title', render: (g) => <strong>{nameOf(g)}</strong> },
-          { key: 'rows', header: t('import.split.col.rows'), sortValue: (g) => g.rows, render: (g) => t('import.split.rows', { count: g.rows }) },
+          {
+            key: 'rows',
+            header: t('import.split.col.rows'),
+            sortValue: (g) => g.rows,
+            render: (g) => (
+              <span className="cc-stack" style={{ gap: '0.2rem' }}>
+                <span>{t('import.split.rows', { count: g.rows })}</span>
+                {g.alsoElsewhere ? (
+                  <span className="cc-chip cc-chip--warning">
+                    <IconAlert />
+                    {t('import.split.alsoElsewhere', { count: g.alsoElsewhere })}
+                  </span>
+                ) : null}
+                {g.sameNameElsewhere ? (
+                  <span className="cc-muted">
+                    <IconNote /> {t('import.split.sameNameElsewhere', { count: g.sameNameElsewhere })}
+                  </span>
+                ) : null}
+              </span>
+            ),
+          },
           {
             key: 'match',
             header: t('import.split.col.match'),
@@ -596,7 +641,7 @@ function SplitPreview({ split, source, classes, onMade, onCancel }: { split: Imp
               return (
                 <span className={`cc-chip ${chip.cls}`}>
                   <chip.Icon />
-                  {g.status === 'matched' ? t('import.split.status.matched', { name: g.className ?? '' }) : t(`import.split.status.${g.status}`)}
+                  {statusText(g)}
                 </span>
               );
             },
@@ -605,7 +650,7 @@ function SplitPreview({ split, source, classes, onMade, onCancel }: { split: Imp
             key: 'into',
             header: t('import.split.col.into'),
             render: (g) => (
-              <Select label={t('import.split.intoFor', { name: nameOf(g) })} hideLabel value={choice[g.key] ?? ''} onChange={(v) => setChoice((c) => ({ ...c, [g.key]: v }))} items={options} />
+              <Select label={t('import.split.intoFor', { name: nameOf(g) })} hideLabel value={choice[g.key] ?? ''} onChange={(v) => setChoice((c) => ({ ...c, [g.key]: v }))} items={optionsFor(g)} />
             ),
           },
         ]}
@@ -628,12 +673,14 @@ function SplitBatches({ splitId, onOpen, onDone }: { splitId: string; onOpen: (i
   const list = useQuery({ queryKey: [...KEY, 'split', splitId], queryFn: () => call(Imp.listImportBatches, { splitId }) });
   const batches = sortByName(list.data?.batches ?? [], (b) => b.className);
   const open = batches.filter((b) => b.status === 'draft').length;
+  // Announced only once the list is known: never "all handled" while it is still loading.
+  const status = !list.data ? t('common.loading') : open ? t('import.split.batchesOpen', { count: open }) : t('import.split.batchesDone');
   return (
     <section className="cc-stack" aria-labelledby="imp-split-batches" data-testid="import-split-batches">
       <h2 id="imp-split-batches" className="cc-h2">
         {t('import.split.batchesTitle')}
       </h2>
-      <p role="status">{open ? t('import.split.batchesOpen', { count: open }) : t('import.split.batchesDone')}</p>
+      <p role="status">{status}</p>
       <DataTable
         caption={t('import.split.batchesCaption')}
         rows={batches}
@@ -796,7 +843,9 @@ export function Importer({
           source={split.source}
           classes={classes}
           onCancel={() => setSplit(null)}
-          onMade={(id) => {
+          onMade={({ splitId: id, batches }) => {
+            // The drafts just made are the list's first content (no loading gap, no wrong announcement).
+            qc.setQueryData([...KEY, 'split', id], { batches });
             setSplit(null);
             setSplitId(id);
             refresh();

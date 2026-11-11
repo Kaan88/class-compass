@@ -16,7 +16,7 @@
  *   (`MAX_HTML_TABLES`), characters per cell (`MAX_HTML_CELL_CHARS`), spans (`MAX_SPAN`).
  */
 import type { SourceRow } from '../../../../domain/importing.ts';
-import { MAX_SHEET_COLS, MAX_SHEET_ROWS } from './spreadsheet.ts';
+import { MAX_SHEET_COLS, MAX_SHEET_ROWS, SHEET_ROW_MARGIN } from './spreadsheet.ts';
 import { decodeText } from './text.ts';
 
 export const MAX_HTML_TABLES = 20;
@@ -112,7 +112,8 @@ export interface HtmlTableResult {
 }
 
 /** The rows of the tables of an HTML document (see the file comment for the rules and limits). */
-export function parseHtmlTables(buf: Buffer): HtmlTableResult {
+export function parseHtmlTables(buf: Buffer, maxRows?: number): HtmlTableResult {
+  const rowLimit = maxRows === undefined ? MAX_SHEET_ROWS : maxRows + SHEET_ROW_MARGIN;
   const s = decodeText(buf).text;
   const out: SourceRow[] = [];
   const stack: TableState[] = [];
@@ -140,7 +141,7 @@ export function parseHtmlTables(buf: Buffer): HtmlTableResult {
     for (const c of t.covered) width = Math.max(width, c + 1);
     const cells = Array.from({ length: Math.min(width, MAX_SHEET_COLS) }, (_, i) => t.row![i] ?? '');
     t.row = null;
-    if (out.length >= MAX_SHEET_ROWS) {
+    if (out.length >= rowLimit) {
       truncated = true;
       return;
     }

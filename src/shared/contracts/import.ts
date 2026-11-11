@@ -30,6 +30,11 @@ export const IMPORT_FLAGS = [
   'name_elsewhere',
   /** The number matches an existing student whose name differs: needs a choice (IMP-4). */
   'number_conflict',
+  /**
+   * A list with several classes (D-171): the same child is also listed under another class of the
+   * list. The first copy needs a choice; later copies are skipped by default.
+   */
+  'duplicate_other_class',
 ] as const;
 export type ImportFlag = (typeof IMPORT_FLAGS)[number];
 export const IMPORT_DECISIONS = ['add', 'match', 'skip'] as const;
@@ -166,6 +171,12 @@ export const ImportClassGroup = z.object({
   classId: z.string().nullable(),
   className: z.string().nullable(),
   candidateIds: z.array(z.string()),
+  /** `ambiguous`: the classes with this name, with their school year so they can be told apart. */
+  candidates: z.array(z.object({ id: z.string(), name: z.string(), yearName: z.string() })),
+  /** Rows of this class that are the same child as a row under another class of the list. */
+  alsoElsewhere: z.number().int(),
+  /** Rows of this class whose name (with another number) is also under another class of the list. */
+  sameNameElsewhere: z.number().int(),
 });
 export type ImportClassGroup = z.infer<typeof ImportClassGroup>;
 
@@ -176,6 +187,8 @@ export const ImportSplit = z.object({
   sheets: z.array(z.string()).nullable(),
   /** The label of the class column the rows were split by. */
   classColumn: z.string(),
+  /** Which classes were matched: every open class of the school (admins) or the classes taught (teachers). */
+  scope: z.enum(['school', 'taught']),
   groups: z.array(ImportClassGroup),
 });
 export type ImportSplit = z.infer<typeof ImportSplit>;

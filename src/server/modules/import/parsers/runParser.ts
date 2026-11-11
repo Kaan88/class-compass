@@ -18,7 +18,8 @@ export interface ParserResults {
 
 const WORKER_URL = new URL('./worker.ts', import.meta.url);
 
-export function runParser<K extends ParserKind>(kind: K, buf: Buffer, timeoutMs: number): Promise<ParserResults[K]> {
+/** `maxRows`: the row cap for workbooks and HTML tables (default MAX_IMPORT_ROWS; a split list reads further, D-171). */
+export function runParser<K extends ParserKind>(kind: K, buf: Buffer, timeoutMs: number, maxRows?: number): Promise<ParserResults[K]> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(WORKER_URL, { resourceLimits: { maxOldGenerationSizeMb: 512 }, stdout: true, stderr: true });
     let settled = false;
@@ -39,6 +40,6 @@ export function runParser<K extends ParserKind>(kind: K, buf: Buffer, timeoutMs:
     worker.once('error', (err) => finish(() => reject(err)));
     worker.once('exit', (code) => finish(() => reject(new Error(`parser worker exited with ${code}`))));
     // Copy the bytes into the message (the caller keeps its buffer).
-    worker.postMessage({ kind, buf: new Uint8Array(buf) });
+    worker.postMessage({ kind, buf: new Uint8Array(buf), ...(maxRows === undefined ? {} : { maxRows }) });
   });
 }

@@ -53,7 +53,8 @@ export type RowFlag =
   | 'possible_heading'
   | 'same_name_in_file'
   | 'name_elsewhere'
-  | 'number_conflict';
+  | 'number_conflict'
+  | 'duplicate_other_class';
 
 export interface ClassifiedRow {
   /** Index into the source rows. */
@@ -75,6 +76,12 @@ export interface ClassifiedRow {
 
 /** At most this many rows are read from one source (D-079, notice TOO_MANY_ROWS). */
 export const MAX_IMPORT_ROWS = 2000;
+
+/**
+ * A list with several classes (S20c, D-171) is read up to this many rows; each class made from it
+ * still has at most MAX_IMPORT_ROWS. A longer list is refused (never split from a cut file).
+ */
+export const MAX_SPLIT_ROWS = 5000;
 
 /** OCR lines below this confidence are flagged for checking (IMP-2). */
 export const LOW_CONFIDENCE = 75;
@@ -585,4 +592,46 @@ export function splitByClass(rows: readonly SourceRow[], mapping: Mapping): Clas
     g.rows.push(r.source);
   }
   return [...groups.values()];
+}
+
+/** How a row of a list with several classes relates to a row filed under ANOTHER class (D-171). */
+export type CrossClassKind = 'duplicate' | 'repeat' | 'same_name';
+
+/**
+ * Rows that appear under two classes of one list (S20c, D-171). `classOf` gives the class a source
+ * row goes to (null: not imported). Same rule as `markDuplicates`, but only across classes: the same
+ * number, or the same folded name where at most one row has a number, is one child listed twice
+ * (`duplicate` for the first copy, `repeat` for later ones); the same name with two different
+ * numbers is two children (`same_name`). Keys are source row indices.
+ */
+export function crossClassDuplicates(rows: readonly ClassifiedRow[], classOf: (source: number) => string | null): Map<number, CrossClassKind> {
+  const out = new Map<number, CrossClassKind>();
+  const byName = new Map<string, ClassifiedRow[]>();
+  const byNumber = new Map<string, ClassifiedRow[]>();
+  const set = (r: ClassifiedRow, k: CrossClassKind) => {
+    const was = out.get(r.source);
+    // A duplicate (or repeat) outranks "same name"; a row once a repeat stays one.
+    if (was === 'repeat' || (was === 'duplicate' && k !== 'repeat')) return;
+    out.set(r.source, k);
+  };
+  for (const r of rows) {
+    const cls = classOf(r.source);
+    if (r.heading || cls === null || !hasLetter(r.parsed.fullName)) continue;
+    const name = foldForSearch(r.parsed.fullName);
+    const num = r.parsed.studentNumber;
+    const others = (list: ClassifiedRow[] | undefined) => (list ?? []).filter((o) => classOf(o.source) !== cls);
+    const sameNumber = num ? others(byNumber.get(num)) : [];
+    const sameName = others(byName.get(name));
+    const dup = [...sameNumber, ...sameName.filter((o) => !(num && o.parsed.studentNumber && o.parsed.studentNumber !== num))];
+    if (dup.length) {
+      for (const o of dup) set(o, 'duplicate');
+      set(r, 'repeat');
+    } else if (sameName.length) {
+      for (const o of sameName) set(o, 'same_name');
+      set(r, 'same_name');
+    }
+    byName.set(name, [...(byName.get(name) ?? []), r]);
+    if (num) byNumber.set(num, [...(byNumber.get(num) ?? []), r]);
+  }
+  return out;
 }

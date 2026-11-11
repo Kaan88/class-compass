@@ -25,17 +25,16 @@ export interface Extracted {
   notices: string[];
 }
 
-const MAX_ROWS = MAX_IMPORT_ROWS;
-
-function cap(rows: SourceRow[], notices: string[]): SourceRow[] {
-  if (rows.length <= MAX_ROWS) return rows;
+function cap(rows: SourceRow[], notices: string[], max: number): SourceRow[] {
+  if (rows.length <= max) return rows;
   notices.push('TOO_MANY_ROWS');
-  return rows.slice(0, MAX_ROWS);
+  return rows.slice(0, max);
 }
 
-export function extractPaste(text: string): Extracted {
+/** `maxRows`: the row cap (default MAX_IMPORT_ROWS; a list with several classes reads up to MAX_SPLIT_ROWS, D-171). */
+export function extractPaste(text: string, maxRows: number = MAX_IMPORT_ROWS): Extracted {
   const notices: string[] = [];
-  return { sourceType: 'paste', rows: cap(parseText(text.normalize('NFC')), notices), notices, sheets: null };
+  return { sourceType: 'paste', rows: cap(parseText(text.normalize('NFC')), notices, maxRows), notices, sheets: null };
 }
 
 /** The sheets of a workbook upload, for the sheet picker (S13b); an empty list for any other file. */
@@ -57,10 +56,12 @@ export async function listSheets(config: Pick<Config, 'PARSE_TIMEOUT_MS'>, file:
 export async function extractFile(
   config: Pick<Config, 'ocrCacheDir' | 'OCR_TIMEOUT_MS' | 'PARSE_TIMEOUT_MS'>,
   file: { path: string; mime: string; name: string | null },
-  opts: { sheets?: string[] | undefined } = {},
+  opts: { sheets?: string[] | undefined; maxRows?: number | undefined } = {},
 ): Promise<Extracted> {
   const buf = await fsp.readFile(file.path);
   const notices: string[] = [];
+  const maxRows = opts.maxRows ?? MAX_IMPORT_ROWS;
+  const capped = (rows: SourceRow[]) => cap(rows, notices, maxRows);
   const fail = (reason: string, message: string) => new AppError('VALIDATION', message, { reason });
   try {
     switch (file.mime) {
@@ -68,11 +69,11 @@ export async function extractFile(
         const { text, encoding } = decodeText(buf);
         notices.push(`ENCODING_${encoding.toUpperCase().replace(/-/gu, '_')}`);
         const csv = /\.csv$/iu.test(file.name ?? '');
-        return { sourceType: csv ? 'csv' : 'paste', rows: cap(parseText(text), notices), notices, sheets: null };
+        return { sourceType: csv ? 'csv' : 'paste', rows: capped(parseText(text)), notices, sheets: null };
       }
       case MIME.xlsx:
       case MIME.xls: {
-        const { rows, sheetInfo } = await runParser('workbook', buf, config.PARSE_TIMEOUT_MS);
+        const { rows, sheetInfo } = await runParser('workbook', buf, config.PARSE_TIMEOUT_MS, maxRows);
         const names = sheetInfo.map((s) => s.name);
         let chosen = names;
         if (opts.sheets?.length) {
@@ -84,22 +85,22 @@ export async function extractFile(
         }
         const keep = new Set(chosen.map((n) => names.indexOf(n) + 1));
         if (chosen.length > 1) notices.push('SHEETS_READ');
-        return { sourceType: file.mime === MIME.xlsx ? 'xlsx' : 'xls', rows: cap(rows.filter((r) => keep.has(r.page ?? 0)), notices), notices, sheets: chosen.length ? chosen : null };
+        return { sourceType: file.mime === MIME.xlsx ? 'xlsx' : 'xls', rows: capped(rows.filter((r) => keep.has(r.page ?? 0))), notices, sheets: chosen.length ? chosen : null };
       }
       case MIME.htmlTable: {
         // An HTML table with a .xls name (S20c, D-171): table text only, read in the parser worker.
-        const { rows, truncated } = await runParser('htmlTable', buf, config.PARSE_TIMEOUT_MS);
+        const { rows, truncated } = await runParser('htmlTable', buf, config.PARSE_TIMEOUT_MS, maxRows);
         notices.push('HTML_TABLE');
         if (truncated) notices.push('TOO_MANY_ROWS');
         if (!rows.some((r) => r.cells.some((c) => c.trim()))) throw fail('IMPORT_NO_ROWS', 'No names were found');
-        return { sourceType: 'xls', rows: cap(rows, notices), notices: [...new Set(notices)], sheets: null };
+        return { sourceType: 'xls', rows: capped(rows), notices: [...new Set(notices)], sheets: null };
       }
       case MIME.docx:
-        return { sourceType: 'docx', rows: cap(await runParser('docx', buf, config.PARSE_TIMEOUT_MS), notices), notices, sheets: null };
+        return { sourceType: 'docx', rows: capped(await runParser('docx', buf, config.PARSE_TIMEOUT_MS)), notices, sheets: null };
       case MIME.pdf: {
         const { rows, scanned } = await runParser('pdf', buf, config.PARSE_TIMEOUT_MS);
         if (scanned) throw fail('SCANNED_PDF', 'This PDF has no text (it is a scan). Upload a photo of the page instead.');
-        return { sourceType: 'pdf', rows: cap(rows, notices), notices, sheets: null };
+        return { sourceType: 'pdf', rows: capped(rows), notices, sheets: null };
       }
       case MIME.jpeg:
       case MIME.png:
@@ -107,7 +108,7 @@ export async function extractFile(
         const lines = await recognise(config, buf);
         notices.push('OCR_LOCAL');
         if (!lines.length) throw fail('OCR_NO_TEXT', 'No text was found in the picture');
-        return { sourceType: 'image', rows: cap(freeTextRows(lines.map((l) => ({ text: l.text, confidence: l.confidence }))), notices), notices, sheets: null };
+        return { sourceType: 'image', rows: capped(freeTextRows(lines.map((l) => ({ text: l.text, confidence: l.confidence })))), notices, sheets: null };
       }
       default:
         throw fail('IMPORT_TYPE_NOT_SUPPORTED', 'This file cannot be read as a student list');

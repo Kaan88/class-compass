@@ -13,7 +13,10 @@
  * - Several classes in one file (S20c, D-171): `previewSplit` groups the rows by the class column
  *   and matches each class name to the caller's writable classes; `createSplit` makes one ordinary
  *   draft batch per chosen class (same preview, confirm, report, audit and undo per class), linked by
- *   a split id kept in the batch's mapping JSON with the file's class labels for that class.
+ *   a split id kept in the batch's mapping JSON with the file's class labels for that class, and the
+ *   rows that are also listed under another class of the file (`crossClass`, flagged on every check).
+ *   A split list is read up to MAX_SPLIT_ROWS rows and refused when it is longer; each class made from
+ *   it has at most MAX_IMPORT_ROWS rows (never a class cut short without saying so).
  */
 import { and, eq, gte, inArray, or } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -24,12 +27,16 @@ import {
   classKey,
   classLabelKey,
   classifyRows,
+  crossClassDuplicates,
   splitByClass,
+  type CrossClassKind,
   type ClassGroup,
   columnLabels,
   inferMapping,
   LOW_CONFIDENCE,
   markDuplicates,
+  MAX_IMPORT_ROWS,
+  MAX_SPLIT_ROWS,
   nameSimilarity,
   parseCells,
   POSSIBLE_MATCH,
@@ -39,7 +46,7 @@ import {
   type SourceRow,
 } from '../../../domain/importing.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { assistantAssignments, assistantDutyChecks, attendanceDaily, attendanceLessonExceptions, classes, counterEvents, enrolments, files, homeworkAssignments, homeworkMarkChanges, homeworkMarks, importBatches, importRows, lessons, mcpPseudonyms, notifications, pairConstraints, pointEvents, studentAchievements, studentSubjectLevels, students, teachingContexts, textCheckAttempts, type ImportCandidateJson, users } from '../../db/schema.ts';
+import { assistantAssignments, assistantDutyChecks, attendanceDaily, attendanceLessonExceptions, classes, counterEvents, enrolments, files, homeworkAssignments, homeworkMarkChanges, homeworkMarks, importBatches, importRows, lessons, mcpPseudonyms, notifications, pairConstraints, pointEvents, schoolYears, studentAchievements, studentSubjectLevels, students, teachingContexts, textCheckAttempts, type ImportCandidateJson, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
@@ -57,8 +64,11 @@ import { extractFile, extractPaste, listSheets as listWorkbookSheets, type Extra
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 type BatchRow = typeof importBatches.$inferSelect;
-/** The mapping as stored: the field columns plus, for a split batch (D-171), its split id and class labels. */
-type StoredMapping = Mapping & { splitId?: string; classLabels?: string[] };
+/**
+ * The mapping as stored: the field columns plus, for a split batch (D-171), its split id, class labels
+ * and the batch rows (by idx) that are also listed under another class of the same file.
+ */
+type StoredMapping = Mapping & { splitId?: string; classLabels?: string[]; crossClass?: Record<string, CrossClassKind> };
 const fieldMapping = (m: StoredMapping): ImportMapping => ({
   headerRow: m.headerRow,
   fullName: m.fullName,
@@ -67,7 +77,8 @@ const fieldMapping = (m: StoredMapping): ImportMapping => ({
   studentNumber: m.studentNumber,
   className: m.className,
 });
-const splitPart = (m: StoredMapping): Pick<StoredMapping, 'splitId' | 'classLabels'> => (m.splitId ? { splitId: m.splitId, classLabels: m.classLabels ?? [] } : {});
+const splitPart = (m: StoredMapping): Pick<StoredMapping, 'splitId' | 'classLabels' | 'crossClass'> =>
+  m.splitId ? { splitId: m.splitId, classLabels: m.classLabels ?? [], ...(m.crossClass ? { crossClass: m.crossClass } : {}) } : {};
 type RowRow = typeof importRows.$inferSelect;
 type StudentRow = typeof students.$inferSelect;
 
@@ -190,6 +201,16 @@ function evaluate(ctx: RequestContext, cls: ClassRow, mapping: StoredMapping, ro
     rows[i]!.flags = v.flags as ImportFlag[];
     rows[i]!.repeat = v.repeat;
   });
+  // A split batch (D-171): rows also listed under another class of the same file.
+  for (const r of rows) {
+    const k = r.heading ? undefined : mapping.crossClass?.[String(r.idx)];
+    if (k === 'same_name') {
+      if (!r.flags.includes('same_name_in_file')) r.flags.push('same_name_in_file');
+    } else if (k) {
+      r.flags.push('duplicate_other_class');
+      if (k === 'repeat') r.repeat = true;
+    }
+  }
 
   for (const r of rows) {
     r.candidates = [];
@@ -254,7 +275,7 @@ function evaluate(ctx: RequestContext, cls: ClassRow, mapping: StoredMapping, ro
  * second identity): a similar name in their classes, the same name outside them, a number whose name
  * differs, or a number match read by OCR with low confidence. Skipped rows need nothing.
  */
-const CHOICE_FLAGS: readonly ImportFlag[] = ['possible_match', 'name_elsewhere', 'number_conflict'];
+const CHOICE_FLAGS: readonly ImportFlag[] = ['possible_match', 'name_elsewhere', 'number_conflict', 'duplicate_other_class'];
 const needsChoice = (r: Pick<RowState, 'flags' | 'decisionSource' | 'decision'>) =>
   r.decisionSource !== 'teacher' &&
   r.decision !== 'skip' &&
@@ -399,7 +420,7 @@ interface ReadSource {
 }
 
 /** Extract the rows of pasted text or an uploaded `import_source` file the caller may read. */
-async function readSource(ctx: RequestContext, input: { text?: string | undefined; fileId?: string | undefined; sheets?: string[] | undefined }): Promise<ReadSource> {
+async function readSource(ctx: RequestContext, input: { text?: string | undefined; fileId?: string | undefined; sheets?: string[] | undefined }, maxRows: number = MAX_IMPORT_ROWS): Promise<ReadSource> {
   let extracted: Extracted;
   let fileId: string | null = null;
   let fileName: string | null = null;
@@ -408,10 +429,10 @@ async function readSource(ctx: RequestContext, input: { text?: string | undefine
     if (f.kind !== 'import_source') throw invalid('This file is not a student list upload', { reason: 'NOT_AN_IMPORT_FILE' });
     fileId = f.id;
     fileName = f.originalName;
-    extracted = await extractFile(ctx.config, { path: storagePath(ctx.config, f.storageKey), mime: f.sniffedMime, name: f.originalName }, { sheets: input.sheets });
+    extracted = await extractFile(ctx.config, { path: storagePath(ctx.config, f.storageKey), mime: f.sniffedMime, name: f.originalName }, { sheets: input.sheets, maxRows });
   } else {
     if (!input.text?.trim()) throw invalid('Paste a list first', { reason: 'IMPORT_EMPTY' });
-    extracted = extractPaste(input.text);
+    extracted = extractPaste(input.text, maxRows);
   }
   // Blank rows are dropped here; the remaining rows keep their order (idx).
   const source: SourceRow[] = extracted.rows.filter((r) => r.cells.some((c) => c.trim()));
@@ -517,18 +538,37 @@ function importableClasses(ctx: RequestContext): ClassRow[] {
     .filter((c) => (vis === 'all' || vis.includes(c.id)) && isClassWritable(ctx.db, c));
 }
 
-type PlannedGroup = ClassGroup & Omit<ImportClassGroup, 'rows' | 'key' | 'labels'>;
+type PlannedGroup = ClassGroup & Omit<ImportClassGroup, 'rows' | 'key' | 'labels' | 'alsoElsewhere' | 'sameNameElsewhere'>;
+
+/**
+ * Rows of `source` also listed under another class (D-171), with `classOf` giving each row's class
+ * (null: not imported). Keys are source row indices.
+ */
+function crossClassOf(source: SourceRow[], mapping: Mapping, classOf: (i: number) => string | null) {
+  return crossClassDuplicates(classifyRows(source, mapping), classOf);
+}
 
 async function planSplit(ctx: RequestContext, input: In<typeof C.previewImportSplit>): Promise<ReadSource & { mapping: Mapping; groups: PlannedGroup[] }> {
-  const read = await readSource(ctx, input);
+  // The whole list is read further than one class (D-171); a list cut short is refused, so no class
+  // is ever made from part of its rows.
+  const read = await readSource(ctx, input, MAX_SPLIT_ROWS);
+  if (read.extracted.notices.includes('TOO_MANY_ROWS')) throw invalid('This list is too long to split', { reason: 'IMPORT_SPLIT_TOO_MANY_ROWS', max: MAX_SPLIT_ROWS });
   const mapping = inferMapping(read.source);
   if (mapping.className === null) throw invalid('No class column was found in this list', { reason: 'IMPORT_NO_CLASS_COLUMN' });
   const options = importableClasses(ctx);
+  const years = new Map(ctx.db.select({ id: schoolYears.id, name: schoolYears.name }).from(schoolYears).all().map((y) => [y.id, y.name]));
   const groups = splitByClass(read.source, mapping).map((g): PlannedGroup => {
-    if (!g.key) return { ...g, status: 'none', classId: null, className: null, candidateIds: [] };
+    if (!g.key) return { ...g, status: 'none', classId: null, className: null, candidateIds: [], candidates: [] };
     const found = options.filter((c) => classLabelKey(c.name) === g.key);
-    if (found.length === 1) return { ...g, status: 'matched', classId: found[0]!.id, className: found[0]!.name, candidateIds: [] };
-    return { ...g, status: found.length ? 'ambiguous' : 'unknown', classId: null, className: null, candidateIds: found.map((c) => c.id) };
+    if (found.length === 1) return { ...g, status: 'matched', classId: found[0]!.id, className: found[0]!.name, candidateIds: [], candidates: [] };
+    return {
+      ...g,
+      status: found.length ? 'ambiguous' : 'unknown',
+      classId: null,
+      className: null,
+      candidateIds: found.map((c) => c.id),
+      candidates: found.map((c) => ({ id: c.id, name: c.name, yearName: years.get(c.schoolYearId) ?? '' })),
+    };
   });
   return { ...read, mapping, groups };
 }
@@ -536,13 +576,29 @@ async function planSplit(ctx: RequestContext, input: In<typeof C.previewImportSp
 /** Group the rows of a source by its class column, matched to the caller's classes; nothing is saved. */
 export async function previewSplit(ctx: RequestContext, input: In<typeof C.previewImportSplit>): Promise<ImportSplit> {
   const plan = await planSplit(ctx, input);
+  // The same child (or the same name) under two classes of the list, before anything is chosen.
+  const groupOf = new Map(plan.groups.flatMap((g) => g.rows.map((i) => [i, g.key] as const)));
+  const cross = crossClassOf(plan.source, plan.mapping, (i) => groupOf.get(i) || null);
+  const count = (g: PlannedGroup, kinds: CrossClassKind[]) => g.rows.filter((i) => kinds.includes(cross.get(i)!)).length;
   return {
     sourceType: plan.extracted.sourceType,
     fileName: plan.fileName,
     notices: plan.extracted.notices,
     sheets: plan.extracted.sheets,
     classColumn: columnLabels(plan.source, plan.mapping)[plan.mapping.className!] ?? '',
-    groups: plan.groups.map((g) => ({ key: g.key, labels: g.labels, rows: g.rows.length, status: g.status, classId: g.classId, className: g.className, candidateIds: g.candidateIds })),
+    scope: isAdmin(ctx) ? 'school' : 'taught',
+    groups: plan.groups.map((g) => ({
+      key: g.key,
+      labels: g.labels,
+      rows: g.rows.length,
+      status: g.status,
+      classId: g.classId,
+      className: g.className,
+      candidateIds: g.candidateIds,
+      candidates: g.candidates,
+      alsoElsewhere: count(g, ['duplicate', 'repeat']),
+      sameNameElsewhere: count(g, ['same_name']),
+    })),
   };
 }
 
@@ -574,15 +630,29 @@ export async function createSplit(ctx: RequestContext, input: In<typeof C.create
     byClass.set(cls.id, entry);
   }
   if (!byClass.size) throw invalid('Choose a class for at least one group of rows', { reason: 'IMPORT_SPLIT_NOTHING' });
+  // One class still has at most MAX_IMPORT_ROWS rows (D-079): refused, never cut.
+  for (const { cls, rows } of byClass.values()) {
+    if (rows.length > MAX_IMPORT_ROWS) throw invalid('Too many rows for one class', { reason: 'IMPORT_SPLIT_CLASS_TOO_BIG', className: cls.name, max: MAX_IMPORT_ROWS });
+  }
   const header = plan.mapping.headerRow === null ? [] : plan.source.slice(0, plan.mapping.headerRow + 1);
+  // Rows also listed under another chosen class (D-171), by the class each row now goes to.
+  const classOfRow = new Map<number, string>();
+  for (const [id, { rows }] of byClass) for (const i of rows) classOfRow.set(i, id);
+  const cross = crossClassOf(plan.source, plan.mapping, (i) => classOfRow.get(i) ?? null);
   const splitId = newId();
   return tx(ctx.db, () => {
     const pool = buildPool(ctx);
     const ids: string[] = [];
     for (const { cls, rows, labels } of byClass.values()) {
       assertClassWritable(ctx.db, cls);
-      const source = [...header, ...[...rows].sort((a, b) => a - b).map((i) => plan.source[i]!)];
-      ids.push(insertDraft(ctx, cls, plan, source, { ...plan.mapping, splitId, classLabels: labels }, pool));
+      const order = [...rows].sort((a, b) => a - b);
+      const source = [...header, ...order.map((i) => plan.source[i]!)];
+      const crossClass: Record<string, CrossClassKind> = {};
+      order.forEach((i, n) => {
+        const k = cross.get(i);
+        if (k) crossClass[String(header.length + n)] = k;
+      });
+      ids.push(insertDraft(ctx, cls, plan, source, { ...plan.mapping, splitId, classLabels: labels, ...(Object.keys(crossClass).length ? { crossClass } : {}) }, pool));
     }
     audit(ctx.db, ctx.actor, { action: 'import.split', entity: 'import_split', entityId: splitId, after: { fileId: plan.fileId, sourceType: plan.extracted.sourceType, batchIds: ids, classIds: [...byClass.keys()], skippedRows } }, ctx.now());
     const batches = ids.map((id) => summaryOf(ctx.db, ctx.db.select().from(importBatches).where(eq(importBatches.id, id)).get()!));
@@ -766,13 +836,27 @@ function savepoint<T>(db: Db, fn: () => T): T {
 const reasonOf = (err: unknown) => (err instanceof AppError ? (((err.details as { reason?: string } | undefined)?.reason ?? err.code) as string) : 'FAILED');
 
 export function commitBatch(ctx: RequestContext, batchId: string): ImportBatch {
+  // Re-check against the current roster first and KEEP the result (another teacher, or another class
+  // of the same list, may have added students since the preview): a refused confirm then shows in
+  // the preview which rows now need a choice, instead of the old preview with none (D-171).
+  const pending = tx(ctx.db, () => {
+    const { batch, cls } = loadBatch(ctx, batchId);
+    assertDraft(batch);
+    assertCanImportInto(ctx, cls.id);
+    const states = rowsOf(ctx.db, batch.id).map(stateOf);
+    evaluate(ctx, cls, batch.mappingJson, states, buildPool(ctx));
+    saveStates(ctx.db, states);
+    touch(ctx, batch.id, states);
+    return states.filter(needsChoice).map((r) => r.idx);
+  });
+  if (pending.length) throw conflict('Decide what happens to the possible matches first', { reason: 'IMPORT_DECISIONS_NEEDED', rows: pending });
   return tx(ctx.db, () => {
     const { batch, cls } = loadBatch(ctx, batchId);
     assertDraft(batch);
     assertCanImportInto(ctx, cls.id);
     const rows = rowsOf(ctx.db, batch.id);
     const states = rows.map(stateOf);
-    // Re-check against the current roster (another teacher may have added students since the preview).
+    // Checked again inside the writing transaction.
     evaluate(ctx, cls, batch.mappingJson, states, buildPool(ctx));
     const open = states.filter(needsChoice);
     if (open.length) throw conflict('Decide what happens to the possible matches first', { reason: 'IMPORT_DECISIONS_NEEDED', rows: open.map((r) => r.idx) });

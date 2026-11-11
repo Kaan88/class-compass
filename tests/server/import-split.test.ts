@@ -8,14 +8,26 @@ import os from 'node:os';
 import path from 'node:path';
 import fsp from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
+import * as XLSX from 'xlsx';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { auditEvents } from '../../src/server/db/schema.ts';
 import { makeEnv, type Client, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
 import { htmlTableXls, multiClassCsv, multiClassRows, multiClassXlsx, multipart } from '../import-fixtures.ts';
 
-type Group = { key: string; labels: string[]; rows: number; status: string; classId: string | null; className: string | null; candidateIds: string[] };
-type Split = { sourceType: string; fileName: string | null; notices: string[]; classColumn: string; groups: Group[] };
+type Group = {
+  key: string;
+  labels: string[];
+  rows: number;
+  status: string;
+  classId: string | null;
+  className: string | null;
+  candidateIds: string[];
+  candidates: Array<{ id: string; name: string; yearName: string }>;
+  alsoElsewhere: number;
+  sameNameElsewhere: number;
+};
+type Split = { sourceType: string; fileName: string | null; notices: string[]; classColumn: string; scope: string; groups: Group[] };
 type Summary = { id: string; classId: string; className: string; status: string; counts: Record<string, number>; split: { id: string; labels: string[] } | null };
 type Row = { parsed: { fullName: string; studentNumber: string | null; className: string | null }; flags: string[]; decision: string; revertOutcome: string | null };
 type Batch = Summary & { rows: Row[]; mapping: Record<string, number | null> };
@@ -149,5 +161,133 @@ describe('several classes in one file (IMP-2, D-171)', () => {
     const batch = (await ok(s.admin.get(`/api/import/batches/${made.batches[0].id}`))) as Batch;
     expect(studentRows(batch).map((r) => r.parsed.fullName)).toEqual(['Ada Kurgu', 'Can Örnek']);
     expect(env.db.select().from(auditEvents).where(eq(auditEvents.entityId, made.splitId)).all()).toHaveLength(1);
+  });
+
+  // ---------------------------------------------------------------- review fixes (S20c)
+  it('a list longer than one batch (2000 rows) is split in full; a list past the split limit or a class past 2000 is refused, never cut (D-079, D-171)', async () => {
+    const letters = (n: number) => {
+      let s = '';
+      do {
+        s = String.fromCharCode(97 + (n % 26)) + s;
+        n = Math.floor(n / 26);
+      } while (n > 0);
+      return s;
+    };
+    const list = (counts: Array<[string, number]>) => {
+      const lines = ['Adı Soyadı\tSınıfı'];
+      let i = 0;
+      for (const [cls, n] of counts) for (let k = 0; k < n; k++) lines.push(`Elif${letters(i++)} Kurgulu\t${cls}`);
+      return lines.join('\n');
+    };
+    // 2600 rows over two classes: both whole, no "only the first 2000 rows" notice.
+    const text = list([
+      ['3/A', 1300],
+      ['3/B', 1300],
+    ]);
+    const split = (await ok(s.admin.post('/api/import/split/preview', { text }))) as Split;
+    expect(split.notices).not.toContain('TOO_MANY_ROWS');
+    expect(split.groups.map((g) => [g.key, g.rows])).toEqual([
+      ['3a', 1300],
+      ['3b', 1300],
+    ]);
+    const made = await ok(s.admin.post('/api/import/split', { text, assign: [] }));
+    for (const b of made.batches as Summary[]) {
+      const batch = (await ok(s.admin.get(`/api/import/batches/${b.id}`))) as Batch & { notices: string[] };
+      expect(studentRows(batch)).toHaveLength(1300);
+      expect(batch.notices).not.toContain('TOO_MANY_ROWS');
+    }
+    // The same list as a workbook and as an HTML-table .xls (read further in the parser worker).
+    const grid = text.split('\n').map((l) => l.split('\t'));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(grid), 'Okul');
+    for (const [buf, name, type] of [
+      [XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer, 'uzun.xlsx', 'application/octet-stream'],
+      [htmlTableXls(grid), 'uzun.xls', 'application/vnd.ms-excel'],
+    ] as const) {
+      const fileId = await uploadList(s.admin, buf, name, type);
+      const fromFile = (await ok(s.admin.post('/api/import/split/preview', { fileId }))) as Split;
+      expect(fromFile.notices).not.toContain('TOO_MANY_ROWS');
+      expect(fromFile.groups.map((g) => [g.key, g.rows])).toEqual(split.groups.map((g) => [g.key, g.rows]));
+    }
+    // Past the split limit: refused with a reason (no partial last class).
+    const tooLong = await s.admin.post('/api/import/split/preview', { text: list([['3/A', 2600], ['3/B', 2500]]) });
+    expect(tooLong.status).toBe(400);
+    expect(tooLong.body.error.details.reason).toBe('IMPORT_SPLIT_TOO_MANY_ROWS');
+    // One class with more than 2000 rows: refused when the drafts are made.
+    const big = list([['3/A', 2001], ['3/B', 1]]);
+    expect(((await ok(s.admin.post('/api/import/split/preview', { text: big }))) as Split).groups[0]!.rows).toBe(2001);
+    const refused = await s.admin.post('/api/import/split', { text: big, assign: [] });
+    expect(refused.body.error.details.reason).toBe('IMPORT_SPLIT_CLASS_TOO_BIG');
+  }, 60_000);
+
+  it('the same child or the same name under two classes is shown in the split preview and on the rows; a stale draft refreshes on confirm (IMP-4, D-171)', async () => {
+    const text = [
+      'Adı Soyadı\tOkul No\tSınıfı',
+      'Nehir Uydurmaca\t\t3/A',
+      'Ece Hayalperest\t7001\t3/A',
+      'Nehir Uydurmaca\t\t3/B',
+      'Ece Hayalperest\t7002\t3/B',
+      'Yağmur Örnekçi\t7003\t3/B',
+    ].join('\n');
+    const split = (await ok(s.admin.post('/api/import/split/preview', { text }))) as Split;
+    expect(split.groups.map((g) => [g.key, g.alsoElsewhere, g.sameNameElsewhere])).toEqual([
+      ['3a', 1, 1],
+      ['3b', 1, 1],
+    ]);
+    const made = await ok(s.admin.post('/api/import/split', { text, assign: [] }));
+    const idOf = (name: string) => (made.batches as Summary[]).find((b) => b.className === name)!.id;
+    type FullRow = Row & { id: string; needsChoice: boolean };
+    const rowsOf = async (id: string) => studentRows((await ok(s.admin.get(`/api/import/batches/${id}`))) as Batch) as FullRow[];
+    const byName = (rows: FullRow[], n: string) => rows.find((r) => r.parsed.fullName === n)!;
+    const a = await rowsOf(idOf('3-A'));
+    const b = await rowsOf(idOf('3-B'));
+    // One child under both classes: the first copy needs a choice, the later copy is skipped by default.
+    expect(byName(a, 'Nehir Uydurmaca')).toMatchObject({ decision: 'add', needsChoice: true });
+    expect(byName(a, 'Nehir Uydurmaca').flags).toContain('duplicate_other_class');
+    expect(byName(b, 'Nehir Uydurmaca')).toMatchObject({ decision: 'skip', needsChoice: false });
+    expect(byName(b, 'Nehir Uydurmaca').flags).toContain('duplicate_other_class');
+    // Two children with the same name and different numbers: both kept, both marked.
+    expect(byName(a, 'Ece Hayalperest').flags).toContain('same_name_in_file');
+    expect(byName(b, 'Ece Hayalperest').flags).toContain('same_name_in_file');
+    expect(byName(b, 'Ece Hayalperest')).toMatchObject({ decision: 'add', needsChoice: false });
+    // 3-A: refused until the flagged row is decided, then confirmed.
+    expect((await s.admin.post(`/api/import/batches/${idOf('3-A')}/commit`, {})).body.error.details.reason).toBe('IMPORT_DECISIONS_NEEDED');
+    await ok(s.admin.patch(`/api/import/batches/${idOf('3-A')}/rows/${byName(a, 'Nehir Uydurmaca').id}`, { decision: 'add' }));
+    expect(((await ok(s.admin.post(`/api/import/batches/${idOf('3-A')}/commit`, {}))) as Batch).counts).toMatchObject({ added: 2, failed: 0 });
+    // 3-B was previewed before 3-A was confirmed: its Ece is now a possible match. The refused confirm
+    // keeps the re-check, so the preview shows the row that needs a choice (not the stale preview).
+    const refused = await s.admin.post(`/api/import/batches/${idOf('3-B')}/commit`, {});
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.details.reason).toBe('IMPORT_DECISIONS_NEEDED');
+    const fresh = await rowsOf(idOf('3-B'));
+    expect(byName(fresh, 'Ece Hayalperest')).toMatchObject({ needsChoice: true });
+    expect(byName(fresh, 'Ece Hayalperest').flags).toContain('possible_match');
+    await ok(s.admin.patch(`/api/import/batches/${idOf('3-B')}/rows/${byName(fresh, 'Ece Hayalperest').id}`, { decision: 'add' }));
+    const cb = (await ok(s.admin.post(`/api/import/batches/${idOf('3-B')}/commit`, {}))) as Batch;
+    // Skipped: the header row and the later copy of Nehir.
+    expect(cb.counts).toMatchObject({ added: 2, skipped: 2, failed: 0 });
+    for (const id of [idOf('3-A'), idOf('3-B')]) await ok(s.admin.post(`/api/import/batches/${id}/revert`, { confirm: true }));
+  });
+
+  it('admin wording and same-named classes: "3-A" in two open school years is ambiguous, with both classes and their years (D-171)', async () => {
+    const text = 'Adı Soyadı\tSınıfı\nDeniz Kurgusal\t3/A\nAras Taslak\t9/Z\n';
+    const teacherView = (await ok(s.teacherA.post('/api/import/split/preview', { text }))) as Split;
+    expect(teacherView.scope).toBe('taught');
+    const year2 = await ok(s.admin.post('/api/admin/years', { name: '2027–2028', startsOn: '2027-09-01', endsOn: '2028-06-30' }));
+    try {
+      const other3a = await ok(s.admin.post('/api/admin/classes', { schoolYearId: year2.id, name: '3-A', grade: 3 }));
+      const split = (await ok(s.admin.post('/api/import/split/preview', { text }))) as Split;
+      expect(split.scope).toBe('school');
+      const g = split.groups.find((x) => x.key === '3a')!;
+      expect(g.status).toBe('ambiguous');
+      expect(g.candidateIds.sort()).toEqual([s.c3a.id, other3a.id].sort());
+      expect(g.candidates.map((c) => `${c.name} ${c.yearName}`).sort()).toEqual(['3-A 2026–2027', '3-A 2027–2028']);
+      expect(split.groups.find((x) => x.key === '9z')!.status).toBe('unknown');
+      // The chosen year's class gets the rows.
+      const made = await ok(s.admin.post('/api/import/split', { text, assign: [{ key: '3a', classId: other3a.id }] }));
+      expect((made.batches as Summary[]).map((b) => b.classId)).toEqual([other3a.id]);
+    } finally {
+      await ok(s.admin.post(`/api/admin/years/${year2.id}/archive`, {}));
+    }
   });
 });
