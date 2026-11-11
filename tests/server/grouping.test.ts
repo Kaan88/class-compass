@@ -204,6 +204,15 @@ describe('ordered level list per class+subject (S25c, D-187, GRP-3)', () => {
     expect((await s.teacherA.put(listUrl(), { labels: ['A'] })).body.error.code).toBe('FEATURE_DISABLED');
     await ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/modules/grouping`, { enabled: true }));
     expect(count('select count(*) n from level_lists')).toBe(0);
+    // Review fix: an archived class is read-only; neither setting nor removing a list writes a row or an audit event.
+    await ok(s.teacherA.put(listUrl(), { labels: ['Bronze', 'Silver'] }));
+    await ok(s.admin.post(`/api/admin/classes/${s.c3a.id}/archive`));
+    for (const labels of [['Gold'], []]) {
+      const refused = await s.teacherA.put(listUrl(), { labels });
+      expect([refused.status, refused.body.error?.details?.reason]).toEqual([409, 'CLASS_ARCHIVED']);
+    }
+    expect((env.db.$client.prepare('select labels_json from level_lists').all() as Array<{ labels_json: string }>).map((r) => JSON.parse(r.labels_json))).toEqual([['Bronze', 'Silver']]);
+    expect(count("select count(*) n from audit_events where action = 'grouping.level_list_set'")).toBe(1);
   });
 
   it('level groups follow the list order; without a list they follow the order used before', async () => {

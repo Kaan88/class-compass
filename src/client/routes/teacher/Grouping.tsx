@@ -401,6 +401,12 @@ function ArrangementsTab({ contextId }: { contextId: string }) {
   );
 }
 
+/** The first label for each level key (case and accents ignored), in the given order. */
+const distinctByKey = (labels: readonly string[]): string[] => {
+  const seen = new Set<string>();
+  return labels.filter((l) => !seen.has(levelKey(l)) && Boolean(seen.add(levelKey(l))));
+};
+
 /** A draft row of the level list editor: a stable key, so moving a row keeps its field and focus. */
 type ListRow = { key: number; label: string };
 let listRowSeq = 0;
@@ -415,6 +421,8 @@ function LevelListEditor({ contextId, list, used }: { contextId: string; list: r
   const { t } = useI18n();
   const run = useRun();
   const [rows, setRows] = useState<ListRow[] | null>(null);
+  // How many levels in use did not fit in a new list made from them (review fix): said, never silent.
+  const [cut, setCut] = useState(0);
   const focusAfterMove = useRef<string | null>(null);
   useEffect(() => {
     if (!focusAfterMove.current) return;
@@ -423,7 +431,9 @@ function LevelListEditor({ contextId, list, used }: { contextId: string; list: r
   });
   const save = (labels: string[], success: string) => void run(() => call(G.setLevelList, { contextId, labels }), { success, invalidate: [ALL] }).then((r) => r && setRows(null));
   if (!rows) {
-    const fromUsed = levelOrder(used).others;
+    // One entry per level (case and accents ignored, the first spelling in today's order), so variants
+    // such as "Expert" / "expert" do not make the new list a list of duplicates (review fix).
+    const fromUsed = distinctByKey(levelOrder(used).others);
     return (
       <section className="cc-card cc-stack" aria-labelledby="cc-level-list" data-testid="level-list">
         <h2 id="cc-level-list" className="cc-h2">
@@ -442,7 +452,12 @@ function LevelListEditor({ contextId, list, used }: { contextId: string; list: r
         <div className="cc-row">
           {list.length ? (
             <>
-              <Button onPress={() => setRows(toRows(list))}>
+              <Button
+                onPress={() => {
+                  setCut(0);
+                  setRows(toRows(list));
+                }}
+              >
                 <IconPencil />
                 {t('grouping.levelList.edit')}
               </Button>
@@ -453,11 +468,20 @@ function LevelListEditor({ contextId, list, used }: { contextId: string; list: r
             </>
           ) : (
             <>
-              <Button isDisabled={!fromUsed.length} onPress={() => setRows(toRows(fromUsed.slice(0, MAX_LEVEL_LIST)))}>
+              <Button isDisabled={!fromUsed.length} onPress={() => {
+                  setCut(Math.max(0, fromUsed.length - MAX_LEVEL_LIST));
+                  setRows(toRows(fromUsed.slice(0, MAX_LEVEL_LIST)));
+                }}
+              >
                 <IconList />
                 {t('grouping.levelList.fromUsed')}
               </Button>
-              <Button onPress={() => setRows(toRows(['']))}>
+              <Button
+                onPress={() => {
+                  setCut(0);
+                  setRows(toRows(['']));
+                }}
+              >
                 <IconPlus />
                 {t('grouping.levelList.startEmpty')}
               </Button>
@@ -486,6 +510,11 @@ function LevelListEditor({ contextId, list, used }: { contextId: string; list: r
         {t('grouping.levelList.title')}
       </h2>
       <p className="cc-muted">{t('grouping.levelList.lowestFirst')}</p>
+      {cut ? (
+        <p className="cc-field__hint" data-testid="level-list-cut">
+          {t('grouping.levelList.cut', { max: MAX_LEVEL_LIST, count: cut })}
+        </p>
+      ) : null}
       <ol className="cc-stack">
         {rows.map((r, i) => (
           <li key={r.key} className="cc-row" data-testid="level-list-row">
@@ -524,12 +553,16 @@ function NotInList({ contextId, list, students }: { contextId: string; list: rea
   const { t } = useI18n();
   const run = useRun();
   const [target, setTarget] = useState<Record<string, string>>({});
-  const others = levelOrder(
+  // One row per level, with every spelling in use (case and accents ignored: "Expert" / "expert"), so the
+  // same students are never counted twice (review fix).
+  const others = new Map<string, string[]>();
+  for (const level of levelOrder(
     students.map((s) => s.level),
     list,
-  ).others;
-  if (!list.length || !others.length) return null;
-  const holders = (level: string) => students.filter((s) => s.level?.trim() && levelKey(s.level) === levelKey(level));
+  ).others)
+    others.set(levelKey(level), [...(others.get(levelKey(level)) ?? []), level]);
+  if (!list.length || !others.size) return null;
+  const holders = (key: string) => students.filter((s) => s.level?.trim() && levelKey(s.level) === key);
   return (
     <section className="cc-card cc-stack" aria-labelledby="cc-not-in-list" data-testid="levels-not-in-list">
       <h2 id="cc-not-in-list" className="cc-h2">
@@ -537,27 +570,30 @@ function NotInList({ contextId, list, students }: { contextId: string; list: rea
       </h2>
       <p className="cc-muted">{t('grouping.notInList.intro')}</p>
       <ul className="cc-stack">
-        {others.map((level) => (
-          <li key={level} className="cc-row" style={{ alignItems: 'flex-end' }}>
-            <span>{t('grouping.notInList.students', { level, count: holders(level).length })}</span>
-            <Select
-              label={t('grouping.notInList.changeTo', { level })}
-              items={[{ id: '', label: t('grouping.notInList.keep') }, ...list.map((l) => ({ id: l, label: l }))]}
-              value={target[level] ?? ''}
-              onChange={(v) => setTarget({ ...target, [level]: v })}
-            />
-            <Button
-              isDisabled={!target[level]}
-              onPress={() =>
-                void run(() => call(St.setContextLevels, { contextId, levels: holders(level).map((s) => ({ studentId: s.id, level: target[level]! })) }), { success: t('grouping.notInList.changed'), invalidate: [ALL] }).then(
-                  (r) => r && setTarget({ ...target, [level]: '' }),
-                )
-              }
-            >
-              {t('grouping.notInList.change', { level })}
-            </Button>
-          </li>
-        ))}
+        {[...others].map(([key, spellings]) => {
+          const level = spellings.join(' / ');
+          return (
+            <li key={key} className="cc-row" style={{ alignItems: 'flex-end' }}>
+              <span>{t('grouping.notInList.students', { level, count: holders(key).length })}</span>
+              <Select
+                label={t('grouping.notInList.changeTo', { level })}
+                items={[{ id: '', label: t('grouping.notInList.keep') }, ...list.map((l) => ({ id: l, label: l }))]}
+                value={target[key] ?? ''}
+                onChange={(v) => setTarget({ ...target, [key]: v })}
+              />
+              <Button
+                isDisabled={!target[key]}
+                onPress={() =>
+                  void run(() => call(St.setContextLevels, { contextId, levels: holders(key).map((s) => ({ studentId: s.id, level: target[key]! })) }), { success: t('grouping.notInList.changed'), invalidate: [ALL] }).then(
+                    (r) => r && setTarget({ ...target, [key]: '' }),
+                  )
+                }
+              >
+                {t('grouping.notInList.change', { level })}
+              </Button>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -570,7 +606,7 @@ export function LevelsTab({ contextId }: { contextId: string }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const list = q.data.levelList;
-  const changed = q.data.students.filter((s) => draft[s.id] !== undefined && draft[s.id]!.trim() !== (s.level ?? ''));
+  const changed = q.data.students.filter((s) => draft[s.id] !== undefined && draft[s.id]!.trim() !== (s.level ?? '').trim());
   // The order the solver will use for the levels as typed or picked now (GRP-3, D-187), so it is never a surprise.
   const order = levelOrder(
     q.data.students.map((s) => draft[s.id] ?? s.level),
@@ -595,7 +631,10 @@ export function LevelsTab({ contextId }: { contextId: string }) {
       <ul className="cc-stack">
         {q.data.students.map((s) => {
           const value = draft[s.id] ?? s.level ?? '';
-          const picked = value.trim() ? (inList(value) ?? value) : '';
+          const picked = value.trim() ? (inList(value) ?? value.trim()) : '';
+          // The student's own level outside the list stays pickable after another choice, so a slip can be
+          // undone without reloading (review fix, D-187: such levels are kept).
+          const own = s.level?.trim();
           return (
             <li key={s.id} className="cc-row">
               {list.length ? (
@@ -604,7 +643,7 @@ export function LevelsTab({ contextId }: { contextId: string }) {
                   items={[
                     { id: '', label: t('grouping.noLevel') },
                     ...list.map((l) => ({ id: l, label: l })),
-                    ...(picked && !inList(picked) ? [{ id: picked, label: t('grouping.levelNotInList', { level: picked }) }] : []),
+                    ...(own && !inList(own) ? [{ id: own, label: t('grouping.levelNotInList', { level: own }) }] : []),
                   ]}
                   value={picked}
                   onChange={(v) => setDraft({ ...draft, [s.id]: v })}

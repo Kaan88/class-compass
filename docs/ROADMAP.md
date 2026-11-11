@@ -475,6 +475,7 @@ Decision D-187; migration 0030 (`level_lists`).
 - [x] With a list: each student's level is a picker ("No level", the list, the student's own level marked "not in the list"); "Levels not in the list" keeps them (ranked after the list) or changes them to a list level; the "order used" note names the list and the levels after it; without a list everything works as before
 - [x] Server and solver: `PUT /api/teacher/contexts/:contextId/grouping/level-list` (teacher, owner, writable class, grouping on, audited, duplicates refused), `levelList` in the grouping overview, `levelRanks(levels, list)` / `levelOrder`; the list is in the GRP-7 classroom scan
 - [x] Tests: `tests/domain/grouping.test.ts`, `tests/server/grouping.test.ts`, `tests/client/level-list.test.tsx`, `e2e/level-list.spec.ts` (axe); teacher guide EN/TR
+- [x] Review fixes: the own level outside the list can be picked again after a slip; case / accent variants of a level are one row and one list entry; "make a list" says when levels beyond 20 were left out; an archived class refuses the list (tested)
 - [ ] Guide screenshot of the Levels tab with a list (`npm run docs:screenshots` after the next screenshot pass)
 
 ## S25d Lesson goals per class (optional) (roadmap sweep, 2026-11-11)

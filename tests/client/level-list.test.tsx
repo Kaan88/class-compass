@@ -114,4 +114,62 @@ describe('Levels tab with a level list (D-187)', () => {
     });
     expect(sent(fetchMock, '/levels').at(-1)).toEqual({ levels: [{ studentId: 's3', level: 'Star' }] });
   });
+
+  it('review fix: the student’s own level outside the list can be picked again after a slip, and nothing is sent', async () => {
+    const fetchMock = stub(overview(['Starter', 'Growing', 'Strong', 'Star']));
+    renderTab();
+    const cem = (await screen.findByLabelText('Level of Cem Fidan')) as HTMLSelectElement;
+    fireEvent.change(cem, { target: { value: 'Star' } });
+    expect(cem.value).toBe('Star');
+    expect([...cem.options].map((o) => o.text)).toContain('Expert (not in the list)');
+    fireEvent.change(cem, { target: { value: 'Expert' } });
+    expect(cem.value).toBe('Expert');
+    expect((screen.getByRole('button', { name: en['common.save'] }) as HTMLButtonElement).disabled).toBe(true);
+    expect(sent(fetchMock, '/levels')).toEqual([]);
+  });
+
+  it('review fix: spellings of one level ("Expert" / "expert") are one row that counts each student once', async () => {
+    const o = overview(['Starter', 'Star']);
+    o.students.push(student('s5', 'Eda Hun', 'expert'));
+    const fetchMock = stub(o);
+    renderTab();
+    const panel = await screen.findByTestId('levels-not-in-list');
+    expect(within(panel).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(panel).getByText('Expert / expert: 2 students')).toBeTruthy();
+    fireEvent.change(within(panel).getByLabelText('Change Expert / expert to'), { target: { value: 'Star' } });
+    await act(async () => {
+      fireEvent.click(within(panel).getByRole('button', { name: 'Change Expert / expert' }));
+    });
+    expect(sent(fetchMock, '/levels')).toEqual([{ levels: [{ studentId: 's3', level: 'Star' }, { studentId: 's5', level: 'Star' }] }]);
+  });
+});
+
+describe('"Make a list from the levels used now" (review fixes)', () => {
+  it('keeps one spelling per level, so the new list can be saved', async () => {
+    const o = overview([]);
+    o.students.push(student('s5', 'Eda Hun', 'expert'));
+    stub(o);
+    renderTab();
+    fireEvent.click(await screen.findByRole('button', { name: en['grouping.levelList.fromUsed'] }));
+    const values = screen.getAllByTestId('level-list-row').map((r) => (within(r).getByRole('textbox') as HTMLInputElement).value);
+    expect(values).toEqual(['starter', 'Expert', 'Star']);
+    expect(screen.queryByText(en['grouping.levelList.needNames'])).toBeNull();
+    expect(screen.queryByTestId('level-list-cut')).toBeNull();
+  });
+
+  it('says so when more levels are used than a list holds (20)', async () => {
+    const o = overview([]);
+    o.students = Array.from({ length: 23 }, (_, i) => student(`s${i}`, `Kid ${i}`, `L${String(i).padStart(2, '0')}`));
+    stub(o);
+    renderTab();
+    fireEvent.click(await screen.findByRole('button', { name: en['grouping.levelList.fromUsed'] }));
+    expect(screen.getAllByTestId('level-list-row')).toHaveLength(20);
+    expect(screen.getByTestId('level-list-cut').textContent).toBe(
+      'A list holds at most 20 levels, so only the first 20 levels used now were added. The other 3 stay outside the list and come after it.',
+    );
+    // Starting again from an empty list clears the note.
+    fireEvent.click(screen.getByRole('button', { name: en['common.cancel'] }));
+    fireEvent.click(screen.getByRole('button', { name: en['grouping.levelList.startEmpty'] }));
+    expect(screen.queryByTestId('level-list-cut')).toBeNull();
+  });
 });
