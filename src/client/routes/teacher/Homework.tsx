@@ -27,6 +27,7 @@ import { IconArchive, IconCheck, IconNext, IconPlus, IconPrev, IconUndo, IconX }
 import { Avatar } from '../../ui/Students.tsx';
 import { StudentName } from '../../ui/StudentName.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
+import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'homework'] as const;
@@ -242,6 +243,7 @@ export function HomeworkSettingsPanel({ contextId }: { contextId: string }) {
   const { t } = useI18n();
   const run = useRun();
   const q = useQuery({ queryKey: [...ALL, 'settings', contextId], queryFn: () => call(H.getHomeworkSettings, { contextId }) });
+  const locales = useEditorLocales([contextId]);
   const [draft, setDraft] = useState<DraftStatus[] | null>(null);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const list = draft ?? q.data.statuses.map((s) => ({ key: s.key, kind: s.kind, en: s.label.en ?? '', tr: s.label.tr ?? '' }));
@@ -269,8 +271,7 @@ export function HomeworkSettingsPanel({ contextId }: { contextId: string }) {
       <ul className="cc-stack">
         {list.map((s, i) => (
           <li key={s.key} className="cc-row" style={{ alignItems: 'flex-end' }}>
-            <TextField label={t('homework.statusEn', { n: i + 1 })} value={s.en} onChange={(v) => patch(i, { en: v })} />
-            <TextField label={t('homework.statusTr', { n: i + 1 })} value={s.tr} onChange={(v) => patch(i, { tr: v })} />
+            <LangFields label={t('homework.statusN', { n: i + 1 })} value={{ en: s.en, tr: s.tr }} onChange={(v) => patch(i, { en: v.en ?? '', tr: v.tr ?? '' })} locales={locales} testId="homework-status" />
             {i === 0 ? (
               <span className="cc-chip">{t('homework.kind.not_checked')}</span>
             ) : (

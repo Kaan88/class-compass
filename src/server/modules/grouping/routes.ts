@@ -4,6 +4,7 @@ import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
 import type { LessonStateContributor } from '../lessons/service.ts';
 import { isModuleEnabled } from '../school/modules.ts';
+import { onClassLanguageChanged } from '../school/service.ts';
 import * as svc from './service.ts';
 
 // The groups in use ride on the polled lesson state (DSH-8): names, icons, members and roles only (GRP-7).
@@ -14,6 +15,8 @@ export const groupingLessonState: LessonStateContributor = {
 };
 
 export function registerGroupingRoutes(app: FastifyInstance, deps: AppDeps) {
+  // Seeded names follow the class language (D-172): untouched defaults get a language switched on later.
+  onClassLanguageChanged(svc.completeDefaultNames);
   route(app, deps, C.getGrouping, (ctx, input) => svc.overview(ctx, input.contextId, input.includeArchived === '1'));
   route(app, deps, C.createGroupTemplate, (ctx, input) => svc.createTemplate(ctx, input));
   route(app, deps, C.generateGroupTemplate, (ctx, input) => svc.generateTemplate(ctx, input));

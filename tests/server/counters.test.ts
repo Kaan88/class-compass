@@ -410,7 +410,7 @@ describe('custom counters and settings (CNT-12, CNT-1, DAT-6)', () => {
     await tap(s.teacherA, s.ctxA.id, l, c.id, kids[0]!.id);
     const hist = await ok(s.teacherA.get(`/api/teacher/counters/${c.id}/history?weeks=1`));
     expect(hist.weeks[0]).toMatchObject({ weekStart: '2026-11-09', weekEnd: '2026-11-15', lessons: 1, total: 2, voided: 0, classOnly: 0 });
-    expect(hist.weeks[0].labelsUsed).toEqual(expect.arrayContaining([{ en: 'Turkish reminders', tr: 'Türkçe hatırlatmaları' }, { en: 'Turkish words', tr: 'Türkçe kelimeler' }]));
+    expect(hist.weeks[0].labelsUsed).toEqual(expect.arrayContaining([{ en: 'Turkish reminders' }, { en: 'Turkish words', tr: 'Türkçe kelimeler' }]));
     expect(hist.counter.labels.individual.en).toBe('Turkish words');
     const cs = await english(s.teacherA, s.ctxA.id);
     expect(cs.students.find((x: any) => x.studentId === kids[0]!.id)).toMatchObject({ count: 2, level: 0 });

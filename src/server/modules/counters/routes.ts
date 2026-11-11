@@ -5,6 +5,7 @@ import { route } from '../../lib/http.ts';
 import { getClass } from '../school/policy.ts';
 import type { LessonStateContributor } from '../lessons/service.ts';
 import { isModuleEnabled, moduleConfig } from '../school/modules.ts';
+import { onClassLanguageChanged } from '../school/service.ts';
 import * as svc from './service.ts';
 
 // Counter bars and weekly counts ride on the polled lesson state (D-045, CNT-2/3).
@@ -23,6 +24,8 @@ export const countersLessonState: LessonStateContributor = {
 };
 
 export function registerCounterRoutes(app: FastifyInstance, deps: AppDeps) {
+  // The English reminder preset follows the class language (D-172): untouched labels get a language switched on later.
+  onClassLanguageChanged(svc.completePresetLabels);
   route(app, deps, C.listCounters, (ctx, input) => svc.listCounters(ctx, input.contextId));
   route(app, deps, C.createCounter, (ctx, input) => svc.createCounter(ctx, input));
   route(app, deps, C.createEnglishPreset, (ctx, input) => svc.createEnglishPreset(ctx, input.contextId));

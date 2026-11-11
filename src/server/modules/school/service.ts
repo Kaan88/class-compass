@@ -359,6 +359,24 @@ export function createClass(ctx: RequestContext, input: In<typeof C.createClass>
   });
 }
 
+/**
+ * Runs inside the transaction that changes a class's language mode (class or student pages; S20d,
+ * D-172): modules whose seeded defaults were written only in the class's languages complete the
+ * untouched ones with the language just switched on. Registered by module manifests (`routes`), never
+ * by import side effects; keep listeners synchronous and small.
+ */
+export type ClassLanguageListener = (ctx: RequestContext, cls: ClassRow) => void;
+const languageListeners: ClassLanguageListener[] = [];
+export function onClassLanguageChanged(fn: ClassLanguageListener): void {
+  if (!languageListeners.includes(fn)) languageListeners.push(fn);
+}
+const LANGUAGE_FIELDS = ['mainLanguage', 'secondLanguageEnabled', 'studentPageMainLanguage', 'studentPageSecondLanguageEnabled'] as const;
+function languageChanged(ctx: RequestContext, before: ClassRow): void {
+  const after = getClass(ctx.db, before.id);
+  if (LANGUAGE_FIELDS.every((k) => before[k] === after[k])) return;
+  for (const fn of languageListeners) fn(ctx, after);
+}
+
 export function updateClass(ctx: RequestContext, input: In<typeof C.updateClass>) {
   return tx(ctx.db, () => {
     const c = getClass(ctx.db, input.classId);
@@ -385,6 +403,7 @@ export function updateClass(ctx: RequestContext, input: In<typeof C.updateClass>
     ctx.db.update(classes).set({ ...patch, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
     const before = Object.fromEntries(Object.keys(patch).map((k) => [k, c[k as keyof ClassRow]]));
     audit(ctx.db, ctx.actor, { action: 'class.update', entity: 'class', entityId: c.id, before, after: patch }, ctx.now());
+    languageChanged(ctx, c);
     return classDto(ctx, getClass(ctx.db, c.id));
   });
 }
@@ -573,7 +592,8 @@ const studentPagePatch = (v: { mainLanguage: 'en' | 'tr'; secondLanguageEnabled:
 
 /**
  * Class language mode by a teacher of the class (S13a, D-099), with the optional student-page override
- * (S13b2, D-117; left unchanged when `studentPage` is not sent). Never touches label data.
+ * (S13b2, D-117; left unchanged when `studentPage` is not sent). Label data is never removed; untouched
+ * seeded defaults get the language switched on through `onClassLanguageChanged` (D-172).
  */
 export function setClassLanguage(ctx: RequestContext, input: In<typeof C.setClassLanguage>) {
   return tx(ctx.db, () => {
@@ -589,6 +609,7 @@ export function setClassLanguage(ctx: RequestContext, input: In<typeof C.setClas
     if ((Object.keys(after) as Array<keyof typeof after>).some((k) => before[k] !== after[k])) {
       ctx.db.update(classes).set({ ...after, updatedAt: ctx.now() }).where(eq(classes.id, c.id)).run();
       audit(ctx.db, ctx.actor, { action: 'class.language', entity: 'class', entityId: c.id, before, after }, ctx.now());
+      languageChanged(ctx, c);
     }
     return { classId: c.id, ...after };
   });

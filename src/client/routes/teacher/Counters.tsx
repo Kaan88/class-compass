@@ -26,6 +26,8 @@ import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
 import { IconArchive, IconCalendar, IconPlus, IconX } from '../../ui/icons.tsx';
 import { Avatar, CounterBar, MetricCell } from '../../ui/Students.tsx';
 import { StudentName } from '../../ui/StudentName.tsx';
+import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
+import type { ClassLocale } from '../../../shared/classLanguage.ts';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const countersKey = (contextId: string) => [SENSITIVE, 'teacher', 'counters', contextId] as const;
@@ -45,15 +47,12 @@ const periodKey = (p: ResetPeriod) => `counters.period.${p}` as MessageKey;
 const colourKey = (c: CounterColour) => `counters.colour.${c}` as MessageKey;
 const kindKey = (k: ResponseKind) => `counters.responseKind.${k}` as MessageKey;
 
-/** Two text fields (English + Turkish) for one teacher-editable label. */
-function TextPair({ label, en, tr, onChange, hint }: { label: string; en: string; tr: string; onChange: (en: string, tr: string) => void; hint?: string }) {
-  const { t } = useI18n();
-  return (
-    <div className="cc-row" style={{ alignItems: 'flex-start' }}>
-      <TextField label={t('counters.inEnglish', { label })} value={en} onChange={(v) => onChange(v, tr)} {...(hint ? { description: hint } : {})} />
-      <TextField label={t('counters.inTurkish', { label })} value={tr} onChange={(v) => onChange(en, v)} />
-    </div>
-  );
+/**
+ * One teacher-editable label in the class's languages (S20d, D-172: `LangFields`, main language first,
+ * "Needs translation"; a language that is off keeps its stored text).
+ */
+function TextPair({ label, en, tr, onChange, hint, locales, testId }: { label: string; en: string; tr: string; onChange: (en: string, tr: string) => void; hint?: string; locales: readonly ClassLocale[]; testId?: string }) {
+  return <LangFields label={label} value={{ en, tr }} onChange={(v) => onChange(v.en ?? '', v.tr ?? '')} locales={locales} description={hint} testId={testId} />;
 }
 
 interface ResponseDraft {
@@ -111,6 +110,7 @@ const parseLevels = (ls: string[]) => {
 function CounterEditor({ counter, onDone }: { counter: Cn.CounterConfig; onDone: () => void }) {
   const { t, locale } = useI18n();
   const run = useRun();
+  const locales = useEditorLocales([counter.contextId]);
   const [d, setD] = useState<Draft>(() => draftOf(counter));
   const set = (patch: Partial<Draft>) => setD((x) => ({ ...x, ...patch }));
   const setResponse = (i: number, patch: Partial<ResponseDraft>) => set({ responses: d.responses.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
@@ -157,9 +157,9 @@ function CounterEditor({ counter, onDone }: { counter: Cn.CounterConfig; onDone:
       }}
     >
       <h3 className="cc-h2">{t('counters.labels')}</h3>
-      <TextPair label={t('counters.mainLabel')} en={d.mainEn} tr={d.mainTr} onChange={(mainEn, mainTr) => set({ mainEn, mainTr })} />
-      <TextPair label={t('counters.supportingLabel')} en={d.supEn} tr={d.supTr} onChange={(supEn, supTr) => set({ supEn, supTr })} hint={t('counters.supportingHint')} />
-      <TextPair label={t('counters.individualLabel')} en={d.indEn} tr={d.indTr} onChange={(indEn, indTr) => set({ indEn, indTr })} />
+      <TextPair label={t('counters.mainLabel')} en={d.mainEn} tr={d.mainTr} onChange={(mainEn, mainTr) => set({ mainEn, mainTr })} locales={locales} testId="counter-main-label" />
+      <TextPair label={t('counters.supportingLabel')} en={d.supEn} tr={d.supTr} onChange={(supEn, supTr) => set({ supEn, supTr })} hint={t('counters.supportingHint')} locales={locales} />
+      <TextPair label={t('counters.individualLabel')} en={d.indEn} tr={d.indTr} onChange={(indEn, indTr) => set({ indEn, indTr })} locales={locales} />
       <CounterBar value={Math.min(3, previewLimit)} max={previewLimit} label={t('counters.preview')} colour={d.colour} />
 
       <h3 className="cc-h2">{t('counters.behaviour')}</h3>
@@ -189,8 +189,8 @@ function CounterEditor({ counter, onDone }: { counter: Cn.CounterConfig; onDone:
       <ul className="cc-response-list">
         {d.responses.map((r, i) => (
           <li key={r.key} className="cc-stack">
-            <TextPair label={t('counters.responseName', { n: i + 1 })} en={r.labelEn} tr={r.labelTr} onChange={(labelEn, labelTr) => setResponse(i, { labelEn, labelTr })} />
-            <TextPair label={t('counters.responseMessage', { n: i + 1 })} en={r.messageEn} tr={r.messageTr} onChange={(messageEn, messageTr) => setResponse(i, { messageEn, messageTr })} hint={t('counters.supportingHint')} />
+            <TextPair label={t('counters.responseName', { n: i + 1 })} en={r.labelEn} tr={r.labelTr} onChange={(labelEn, labelTr) => setResponse(i, { labelEn, labelTr })} locales={locales} />
+            <TextPair label={t('counters.responseMessage', { n: i + 1 })} en={r.messageEn} tr={r.messageTr} onChange={(messageEn, messageTr) => setResponse(i, { messageEn, messageTr })} hint={t('counters.supportingHint')} locales={locales} />
             <div className="cc-row">
               <Select label={t('counters.responseKind', { n: i + 1 })} value={r.kind} onChange={(v) => setResponse(i, { kind: v as ResponseKind })} items={RESPONSE_KINDS.map((k) => ({ id: k, label: t(kindKey(k)) }))} />
               <Toggle label={t('counters.mascot')} isSelected={r.mascot} onChange={(mascot) => setResponse(i, { mascot })} />
@@ -231,6 +231,7 @@ function CounterEditor({ counter, onDone }: { counter: Cn.CounterConfig; onDone:
 function NewCounterForm({ contextId, onDone }: { contextId: string; onDone: () => void }) {
   const { t } = useI18n();
   const run = useRun();
+  const locales = useEditorLocales([contextId]);
   const [en, setEn] = useState('');
   const [tr, setTr] = useState('');
   const [scope, setScope] = useState<CounterScope>('both');
@@ -254,7 +255,7 @@ function NewCounterForm({ contextId, onDone }: { contextId: string; onDone: () =
       }}
     >
       <h2 className="cc-h2">{t('counters.new')}</h2>
-      <TextPair label={t('counters.name')} en={en} tr={tr} onChange={(a, b) => (setEn(a), setTr(b))} />
+      <TextPair label={t('counters.name')} en={en} tr={tr} onChange={(a, b) => (setEn(a), setTr(b))} locales={locales} />
       <div className="cc-row" style={{ alignItems: 'flex-start' }}>
         <Select label={t('counters.scope')} value={scope} onChange={(v) => setScope(v as CounterScope)} items={COUNTER_SCOPES.map((s) => ({ id: s, label: t(scopeKey(s)) }))} />
         <TextField label={t('counters.segments')} inputMode="numeric" value={segments} onChange={setSegments} errorMessage={seg === null ? t('counters.segmentsInvalid') : null} />

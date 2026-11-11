@@ -4026,6 +4026,11 @@ html:has(.cc-classroom) {
   min-width: min(18rem, 100%);
   flex: 1;
 }
+/* Language fields in a row of other controls (routine stages, homework statuses, S20d) take the free width. */
+.cc-row > .cc-langfields {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
 .cc-langfields__one > .cc-chip {
   align-self: flex-start;
 }

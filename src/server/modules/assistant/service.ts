@@ -24,6 +24,7 @@ import { addDays, weekdayOf } from '../../../domain/dates.ts';
 import type * as C from '../../../shared/contracts/assistant.ts';
 import { DEFAULT_SCHOOL_DAYS, type AssistantPlan, type AssistantStudent, type AssistantToday } from '../../../shared/contracts/assistant.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
+import { completeDefault, inLocales, seedLocales } from '../../../shared/classLanguage.ts';
 import { initials, normaliseName, sortByName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { assistantAssignments, assistantPlans, assistantResponsibilities, students, teachingContexts, type AssistantAbsenceUndo } from '../../db/schema.ts';
@@ -85,14 +86,36 @@ function responsibilityRows(db: Db, contextId: string) {
 }
 export const responsibilities = (db: Db, contextId: string) => responsibilityRows(db, contextId).map((r) => ({ id: r.id, label: r.labelJson }));
 
-/** First use of the module in a context seeds the four default responsibilities (AST-6), once. */
+/**
+ * First use of the module in a context seeds the four default responsibilities (AST-6), once, in the
+ * class's languages only (S20d, D-172).
+ */
 function ensureResponsibilities(ctx: RequestContext, context: ContextRow) {
   const any = ctx.db.select({ id: assistantResponsibilities.id }).from(assistantResponsibilities).where(eq(assistantResponsibilities.contextId, context.id)).limit(1).get();
   if (any) return;
   const now = ctx.now();
+  const locales = seedLocales(getClass(ctx.db, context.classId));
   DEFAULT_RESPONSIBILITIES.forEach((label, i) => {
-    ctx.db.insert(assistantResponsibilities).values({ id: newId(), contextId: context.id, labelJson: label, sortOrder: i, archivedAt: null, createdAt: now, updatedAt: now }).run();
+    ctx.db.insert(assistantResponsibilities).values({ id: newId(), contextId: context.id, labelJson: inLocales(label, locales), sortOrder: i, archivedAt: null, createdAt: now, updatedAt: now }).run();
   });
+}
+
+/**
+ * `onClassLanguageChanged` listener (S20d, D-172): default responsibilities the teacher never changed
+ * get the language just switched on; edited ones are left alone (the editor marks them "Needs translation").
+ */
+export function completeDefaultResponsibilities(ctx: RequestContext, cls: ClassRow): void {
+  const locales = seedLocales(cls);
+  let changed = 0;
+  for (const context of ctx.db.select().from(teachingContexts).where(eq(teachingContexts.classId, cls.id)).all()) {
+    for (const row of ctx.db.select().from(assistantResponsibilities).where(eq(assistantResponsibilities.contextId, context.id)).all()) {
+      const filled = DEFAULT_RESPONSIBILITIES.map((d) => completeDefault(row.labelJson, d, locales)).find((x) => x !== null);
+      if (!filled) continue;
+      ctx.db.update(assistantResponsibilities).set({ labelJson: filled, updatedAt: ctx.now() }).where(eq(assistantResponsibilities.id, row.id)).run();
+      changed++;
+    }
+  }
+  if (changed) audit(ctx.db, ctx.actor, { action: 'assistant.defaults_translated', entity: 'class', entityId: cls.id, after: { responsibilities: changed, locales } }, ctx.now());
 }
 
 export function getSettings(ctx: RequestContext, contextId: string) {

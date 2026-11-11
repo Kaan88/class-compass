@@ -30,9 +30,10 @@ import {
   type Sizing,
 } from '../../../shared/contracts/grouping.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
+import { completeDefault, inLocales, seedLocales, type ClassLocale } from '../../../shared/classLanguage.ts';
 import { initials, normaliseName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { groupTemplates, lessonGroupings, lessons, pairConstraints, studentSubjectLevels, students, type GroupJson, type UnsatisfiedJson } from '../../db/schema.ts';
+import { groupTemplates, lessonGroupings, lessons, pairConstraints, studentSubjectLevels, students, teachingContexts, type GroupJson, type UnsatisfiedJson } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
@@ -70,8 +71,13 @@ function ruleRows(db: Db, contextId: string): RuleRow[] {
 }
 const domainRules = (rows: readonly RuleRow[]): DomainRule[] => rows.map((r) => ({ id: r.id, a: r.studentA, b: r.studentB, kind: r.kind }));
 
-/** Group n+1: a neutral "Group N" with a number badge (S13a: the cards show 'Group N' + icon + count). */
-const defaultName = (i: number) => ({ name: groupName(i + 1), icon: `g${i + 1}` });
+/**
+ * Group n+1: a neutral "Group N" with a number badge (S13a: the cards show 'Group N' + icon + count),
+ * written in the class's languages only (S20d, D-172).
+ */
+const defaultName = (i: number, locales: readonly ClassLocale[]) => ({ name: inLocales(groupName(i + 1), locales), icon: `g${i + 1}` });
+/** The languages seeded defaults of this class+subject are written in (D-172). */
+const localesOf = (db: Db, context: ContextRow) => seedLocales(getClass(db, context.classId));
 
 /** Groups for `mode` + `sizing`, keeping the names and icons of `previous` groups by position. */
 function generateGroups(ctx: RequestContext, context: ContextRow, mode: Exclude<GroupingMode, 'custom'>, sizing: Sizing, seed: string, previous: readonly GroupJson[] = []) {
@@ -82,9 +88,10 @@ function generateGroups(ctx: RequestContext, context: ContextRow, mode: Exclude<
 function generateFor(db: Db, context: ContextRow, roster: readonly StudentRow[], mode: Exclude<GroupingMode, 'custom'>, sizing: Sizing, seed: string, previous: readonly GroupJson[]) {
   const ranks = levelRanks(levelsOf(db, context.subjectId, roster.map((s) => s.id)));
   const result = solveGroups({ students: roster.map((s) => ({ id: s.id, levelRank: ranks.get(s.id) ?? null })), mode, sizing, rules: domainRules(ruleRows(db, context.id)), seed });
+  const locales = localesOf(db, context);
   const groups: GroupJson[] = result.groups.map((memberIds, i) => {
     const prev = previous[i];
-    const d = defaultName(i);
+    const d = defaultName(i, locales);
     return { id: prev?.id ?? newId(), name: prev?.name ?? { ...d.name }, icon: prev?.icon ?? d.icon, memberIds, roles: [] };
   });
   return { groups, unsatisfied: result.unsatisfied as UnsatisfiedJson[] };
@@ -143,16 +150,48 @@ export function ensureDefaultArrangements(ctx: RequestContext, context: ContextR
 /** The four default options (GRP-1 as changed in S13a, D-098), after `sortFrom` existing rows. */
 function insertDefaults(ctx: RequestContext, context: ContextRow, roster: readonly StudentRow[], sortFrom: number): void {
   const now = ctx.now();
+  const locales = localesOf(ctx.db, context);
   DEFAULT_ARRANGEMENTS.forEach((d, j) => {
     const i = sortFrom + j;
     const seed = `${context.id}:${d.key}`;
     const { groups, unsatisfied } = generateFor(ctx.db, context, roster, d.mode, d.sizing, seed, []);
     ctx.db
       .insert(groupTemplates)
-      .values({ id: newId(), contextId: context.id, name: { ...d.name }, mode: d.mode, sizingJson: d.sizing, seed, version: 1, groupsJson: groups, unsatisfiedJson: unsatisfied, defaultKey: d.key, icon: d.icon, sortOrder: i, archivedAt: null, createdAt: now, createdBy: ctx.user?.id ?? null, updatedAt: now, updatedBy: ctx.user?.id ?? null })
+      .values({ id: newId(), contextId: context.id, name: inLocales(d.name, locales), mode: d.mode, sizingJson: d.sizing, seed, version: 1, groupsJson: groups, unsatisfiedJson: unsatisfied, defaultKey: d.key, icon: d.icon, sortOrder: i, archivedAt: null, createdAt: now, createdBy: ctx.user?.id ?? null, updatedAt: now, updatedBy: ctx.user?.id ?? null })
       .run();
   });
   audit(ctx.db, ctx.actor, { action: 'grouping.defaults_created', entity: 'teaching_context', entityId: context.id, after: { count: DEFAULT_ARRANGEMENTS.length } }, now);
+}
+
+/**
+ * `onClassLanguageChanged` listener (S20d, D-172): default arrangements and "Group N" names that the
+ * teacher never changed get the language just switched on (the version moves on, so an editor open
+ * on the old version reloads instead of saving over it). Edited names are left alone.
+ */
+export function completeDefaultNames(ctx: RequestContext, cls: ClassRow): void {
+  const locales = seedLocales(cls);
+  let changed = 0;
+  for (const context of ctx.db.select().from(teachingContexts).where(eq(teachingContexts.classId, cls.id)).all()) {
+    for (const row of templateRows(ctx.db, context.id, true)) {
+      const seeded = DEFAULT_ARRANGEMENTS.find((d) => d.key === row.defaultKey);
+      const name = seeded ? completeDefault(row.name, seeded.name, locales) : null;
+      let groupsChanged = false;
+      const groups = row.groupsJson.map((g, i) => {
+        const filled = completeDefault(g.name, groupName(i + 1), locales);
+        if (!filled) return g;
+        groupsChanged = true;
+        return { ...g, name: filled };
+      });
+      if (!name && !groupsChanged) continue;
+      ctx.db
+        .update(groupTemplates)
+        .set({ ...(name ? { name } : {}), groupsJson: groups, version: row.version + 1, updatedAt: ctx.now() })
+        .where(eq(groupTemplates.id, row.id))
+        .run();
+      changed++;
+    }
+  }
+  if (changed) audit(ctx.db, ctx.actor, { action: 'grouping.defaults_translated', entity: 'class', entityId: cls.id, after: { arrangements: changed, locales } }, ctx.now());
 }
 
 const NEW_DEFAULT_KEYS = new Set<string>(DEFAULT_ARRANGEMENTS.map((d) => d.key));
@@ -230,7 +269,7 @@ function groupsFromInput(ctx: RequestContext, context: ContextRow, input: readon
     }
     const members = new Set(memberIds);
     const roles = (g.roles ?? []).filter((r) => members.has(r.studentId) && (r.label.en?.trim() || r.label.tr?.trim())).map((r) => ({ studentId: r.studentId, label: cleanText(r.label) }));
-    return { id: g.id && prevIds.has(g.id) ? g.id : newId(), name: cleanText(g.name), icon: g.icon ?? defaultName(i).icon, memberIds, roles };
+    return { id: g.id && prevIds.has(g.id) ? g.id : newId(), name: cleanText(g.name), icon: g.icon ?? `g${i + 1}`, memberIds, roles };
   });
 }
 
@@ -435,10 +474,11 @@ export function applyGrouping(ctx: RequestContext, p: z.infer<(typeof C.Grouping
       `${tpl.seed}:${lesson.id}`,
       tpl.sizingJson,
     );
+    const locales = localesOf(ctx.db, context);
     groups = fitted.groups
       .map((memberIds, i) => {
         const saved = tpl.groupsJson[i];
-        const d = defaultName(i);
+        const d = defaultName(i, locales);
         const members = new Set(memberIds);
         return { id: saved?.id ?? `extra-${i}`, name: saved?.name ?? { ...d.name }, icon: saved?.icon ?? d.icon, memberIds, roles: (saved?.roles ?? []).filter((r) => members.has(r.studentId)) };
       })

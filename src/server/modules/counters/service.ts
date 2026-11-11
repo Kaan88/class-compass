@@ -12,6 +12,7 @@ import { addDays, localDate } from '../../../domain/dates.ts';
 import type * as C from '../../../shared/contracts/counters.ts';
 import type { CounterConfig, CounterLessonState, CountersLessonState } from '../../../shared/contracts/counters.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
+import { completeDefault, inLocales, seedLocales, type ClassLocale } from '../../../shared/classLanguage.ts';
 import type { ClassroomCardItem } from '../../../shared/contracts/classroomCard.ts';
 import {
   customLabels,
@@ -32,6 +33,7 @@ import {
   lessons,
   students,
   subjects,
+  teachingContexts,
   terms,
   thresholdCrossings,
   type CounterLabelsJson,
@@ -118,17 +120,26 @@ function nextSortOrder(db: Db, contextId: string): number {
   return (row?.m ?? -1) + 1;
 }
 
-function englishPresetRow(contextId: string, uid: string, now: number, sortOrder: number): CounterRow {
+/** The English reminder preset, written in the class's languages only (S20d, D-172). */
+const presetLabels = (locales: readonly ClassLocale[]): CounterLabelsJson => ({
+  main: inLocales(ENGLISH_LABELS.main, locales),
+  supporting: inLocales(ENGLISH_LABELS.supporting, locales),
+  individual: inLocales(ENGLISH_LABELS.individual, locales),
+});
+const presetResponses = (locales: readonly ClassLocale[]): ThresholdResponseJson[] =>
+  ENGLISH_RESPONSES.map((r) => ({ ...structuredClone(r), label: inLocales(r.label, locales), message: inLocales(r.message, locales) })) as ThresholdResponseJson[];
+
+function englishPresetRow(contextId: string, uid: string, now: number, sortOrder: number, locales: readonly ClassLocale[]): CounterRow {
   return {
     id: newId(),
     contextId,
     kind: 'english_reminders',
-    labelsJson: structuredClone(ENGLISH_LABELS) as CounterLabelsJson,
+    labelsJson: presetLabels(locales),
     scope: 'both',
     barSegments: 10,
     studentResetPeriod: 'week',
     studentThresholdsJson: [...ENGLISH_THRESHOLDS],
-    responsesJson: structuredClone(ENGLISH_RESPONSES) as ThresholdResponseJson[],
+    responsesJson: presetResponses(locales),
     activeResponseId: ENGLISH_ACTIVE_RESPONSE,
     colour: 'accent',
     sortOrder,
@@ -156,10 +167,44 @@ export function ensureDefaultCounters(ctx: RequestContext, context: ContextRow, 
   tx(ctx.db, () => {
     if (ctx.db.select({ id: counters.id }).from(counters).where(eq(counters.contextId, context.id)).limit(1).get()) return;
     const now = ctx.now();
-    const row = englishPresetRow(context.id, context.teacherId, now, 0);
+    const row = englishPresetRow(context.id, context.teacherId, now, 0, seedLocales(cls));
     ctx.db.insert(counters).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'counter.create', entity: 'counter', entityId: row.id, after: { contextId: context.id, kind: row.kind, auto: true } }, now);
   });
+}
+
+/**
+ * `onClassLanguageChanged` listener (S20d, D-172): labels and threshold responses of the English
+ * reminder preset that the teacher never changed get the language just switched on; edited ones are
+ * left alone (the editor marks them "Needs translation").
+ */
+export function completePresetLabels(ctx: RequestContext, cls: ClassRow): void {
+  const locales = seedLocales(cls);
+  let changed = 0;
+  for (const context of ctx.db.select().from(teachingContexts).where(eq(teachingContexts.classId, cls.id)).all()) {
+    for (const row of ctx.db.select().from(counters).where(and(eq(counters.contextId, context.id), eq(counters.kind, 'english_reminders'))).all()) {
+      let dirty = false;
+      const fill = (stored: LocalizedTextValue, seeded: LocalizedTextValue) => {
+        const done = completeDefault(stored, seeded, locales);
+        if (!done) return stored;
+        dirty = true;
+        return done;
+      };
+      const labelsJson: CounterLabelsJson = {
+        main: fill(row.labelsJson.main, ENGLISH_LABELS.main),
+        supporting: fill(row.labelsJson.supporting, ENGLISH_LABELS.supporting),
+        individual: fill(row.labelsJson.individual, ENGLISH_LABELS.individual),
+      };
+      const responsesJson = row.responsesJson.map((r) => {
+        const seeded = ENGLISH_RESPONSES.find((d) => d.id === r.id);
+        return seeded ? { ...r, label: fill(r.label, seeded.label), message: fill(r.message, seeded.message) } : r;
+      });
+      if (!dirty) continue;
+      ctx.db.update(counters).set({ labelsJson, responsesJson, updatedAt: ctx.now() }).where(eq(counters.id, row.id)).run();
+      changed++;
+    }
+  }
+  if (changed) audit(ctx.db, ctx.actor, { action: 'counter.defaults_translated', entity: 'class', entityId: cls.id, after: { counters: changed, locales } }, ctx.now());
 }
 
 function ownCounter(ctx: RequestContext, counterId: string): { counter: CounterRow; context: ContextRow } {
@@ -519,7 +564,7 @@ export function createEnglishPreset(ctx: RequestContext, contextId: string) {
     const existing = countersOf(ctx.db, context.id).find((c) => c.kind === 'english_reminders');
     if (existing) throw new AppError('CONFLICT', 'This class already has the English reminder counter', { reason: 'ENGLISH_PRESET_EXISTS' });
     const now = ctx.now();
-    const row = englishPresetRow(context.id, requireUser(ctx).id, now, nextSortOrder(ctx.db, context.id));
+    const row = englishPresetRow(context.id, requireUser(ctx).id, now, nextSortOrder(ctx.db, context.id), seedLocales(getClass(ctx.db, context.classId)));
     ctx.db.insert(counters).values(row).run();
     audit(ctx.db, ctx.actor, { action: 'counter.create', entity: 'counter', entityId: row.id, after: { contextId: context.id, kind: row.kind } }, now);
     return configDto(row);

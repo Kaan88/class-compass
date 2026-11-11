@@ -4,6 +4,10 @@
  * is off is not shown, but its stored text is kept untouched (it comes back when the language is on
  * again). When an enabled language is empty while another has text, the field says "Needs
  * translation" (the classroom then shows the other language as a fallback).
+ * S20d (D-172): every teacher-editable class-facing label editor uses it (lesson topics, assistant
+ * duties, achievements, routines and their stages, counter labels and responses, homework statuses,
+ * goal categories, ready-made goals and outcomes, arrangement, group and role names). Field labels
+ * name the language in the teacher's interface language ("Stage 1 (Turkish)").
  */
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -34,20 +38,31 @@ export function LangFields({
   onChange,
   locales,
   testId,
+  description,
+  autoFocus,
 }: {
   label: string;
   value: LocalizedTextValue;
   onChange: (v: LocalizedTextValue) => void;
   locales: readonly ClassLocale[];
-  testId?: string;
+  testId?: string | undefined;
+  /** A hint under the first (main language) field. */
+  description?: string | undefined;
+  autoFocus?: boolean | undefined;
 }) {
   const { t } = useI18n();
   const missing = needsTranslation(value, { mainLanguage: locales[0] ?? 'en', secondLanguageEnabled: locales.length > 1 });
   return (
     <div className="cc-langfields" data-testid={testId}>
-      {locales.map((l) => (
-        <div key={l} className="cc-langfields__one">
-          <TextField label={`${label} (${t(l === 'en' ? 'language.en' : 'language.tr')})`} value={value[l] ?? ''} onChange={(v) => onChange({ ...value, [l]: v })} />
+      {locales.map((l, i) => (
+        <div key={l} className="cc-langfields__one" data-lang={l}>
+          <TextField
+            label={t(l === 'en' ? 'language.field.en' : 'language.field.tr', { label })}
+            value={value[l] ?? ''}
+            onChange={(v) => onChange({ ...value, [l]: v })}
+            {...(i === 0 && description ? { description } : {})}
+            {...(i === 0 && autoFocus ? { autoFocus } : {})}
+          />
           {missing.includes(l) ? (
             <span className="cc-chip cc-chip--warning" data-testid="needs-translation">
               {t('language.needsTranslation')}

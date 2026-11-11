@@ -54,7 +54,9 @@ describe('default arrangements (GRP-1, GRP-2)', () => {
     for (const t of o.templates) expect(t.groups.map((g: any) => g.memberIds.length).sort()).toEqual([3, 4, 4, 4, 4]); // 19 in 5 groups
     // Neutral group names "Group 1…5" with a number icon (S13a; GRP-6).
     expect(o.templates[0].groups.map((g: any) => g.name.en)).toEqual(['Group 1', 'Group 2', 'Group 3', 'Group 4', 'Group 5']);
-    expect(o.templates[0].groups[0]).toMatchObject({ name: { en: 'Group 1', tr: 'Grup 1' }, icon: 'g1' });
+    // Written in the class language only (English by default, S20d, D-172).
+    expect(o.templates[0].groups[0]).toMatchObject({ name: { en: 'Group 1' }, icon: 'g1' });
+    expect(o.templates[0].groups[0].name.tr).toBeUndefined();
 
     await overview();
     await ok(s.teacherA.get(`/api/classroom/contexts/${ctx()}/grouping/arrangements`));

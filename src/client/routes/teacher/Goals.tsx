@@ -36,6 +36,7 @@ import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { StudentStatsButton } from '../../ui/StudentName.tsx';
 import { Tabs } from '../../ui/Tabs.tsx';
+import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'goals'] as const;
@@ -388,6 +389,7 @@ function LibraryTab({ contextId }: { contextId: string }) {
   const { t, locale } = useI18n();
   const run = useRun();
   const q = useQuery({ queryKey: [...ALL, 'library', contextId], queryFn: () => call(G.goalLibrary, { contextId }) });
+  const locales = useEditorLocales([contextId]);
   const [catEn, setCatEn] = useState('');
   const [catTr, setCatTr] = useState('');
   const [presetCat, setPresetCat] = useState('');
@@ -449,10 +451,7 @@ function LibraryTab({ contextId }: { contextId: string }) {
         <h3 id="goals-new-cat" className="cc-h2">
           {t('goals.newCategory')}
         </h3>
-        <div className="cc-row">
-          <TextField label={t('goals.nameEn')} value={catEn} onChange={setCatEn} />
-          <TextField label={t('goals.nameTr')} value={catTr} onChange={setCatTr} />
-        </div>
+        <LangFields label={t('goals.categoryName')} value={{ en: catEn, tr: catTr }} onChange={(v) => (setCatEn(v.en ?? ''), setCatTr(v.tr ?? ''))} locales={locales} testId="goals-new-category" />
         <div>
           <Button
             isDisabled={!catEn.trim() && !catTr.trim()}
@@ -475,10 +474,7 @@ function LibraryTab({ contextId }: { contextId: string }) {
           {t('goals.newPreset')}
         </h3>
         <Select label={t('goals.category')} items={liveCats.map((c) => ({ id: c.id, label: pickText(c.name, locale) }))} value={pc} onChange={setPresetCat} />
-        <div className="cc-row">
-          <TextField label={t('goals.presetEn')} value={presetEn} onChange={setPresetEn} />
-          <TextField label={t('goals.presetTr')} value={presetTr} onChange={setPresetTr} />
-        </div>
+        <LangFields label={t('goals.presetText')} value={{ en: presetEn, tr: presetTr }} onChange={(v) => (setPresetEn(v.en ?? ''), setPresetTr(v.tr ?? ''))} locales={locales} testId="goals-new-preset" />
         <div>
           <Button
             isDisabled={!pc || (!presetEn.trim() && !presetTr.trim())}
@@ -501,11 +497,12 @@ function LibraryTab({ contextId }: { contextId: string }) {
   );
 }
 
-/** Outcome labels (GOL-3), EN + TR. The module's panel on the class settings page. */
+/** Outcome labels (GOL-3) in the class's languages (S20d, D-172). The module's panel on the class settings page. */
 export function GoalsSettingsPanel({ contextId }: { contextId: string }) {
   const { t } = useI18n();
   const run = useRun();
   const q = useQuery({ queryKey: [...ALL, 'settings', contextId], queryFn: () => call(G.goalSettings, { contextId }) });
+  const locales = useEditorLocales([contextId]);
   const [draft, setDraft] = useState<Array<{ key: G.GoalOutcome; en: string; tr: string }> | null>(null);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const list = draft ?? q.data.outcomes.map((o) => ({ key: o.key, en: o.label.en ?? '', tr: o.label.tr ?? '' }));
@@ -519,9 +516,8 @@ export function GoalsSettingsPanel({ contextId }: { contextId: string }) {
       <p className="cc-muted">{t('goals.outcomesHint')}</p>
       <ul className="cc-stack">
         {list.map((o, i) => (
-          <li key={o.key} className="cc-row">
-            <TextField label={t('goals.outcomeEn', { n: i + 1 })} value={o.en} onChange={(v) => patch(i, { en: v })} />
-            <TextField label={t('goals.outcomeTr', { n: i + 1 })} value={o.tr} onChange={(v) => patch(i, { tr: v })} />
+          <li key={o.key}>
+            <LangFields label={t('goals.outcomeN', { n: i + 1 })} value={{ en: o.en, tr: o.tr }} onChange={(v) => patch(i, { en: v.en ?? '', tr: v.tr ?? '' })} locales={locales} testId="goals-outcome" />
           </li>
         ))}
       </ul>

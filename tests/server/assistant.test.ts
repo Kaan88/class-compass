@@ -174,11 +174,11 @@ describe('swaps and overrides (AST-3, AST-5)', () => {
 });
 
 describe('responsibilities and End Lesson thanks (AST-6, DSH-3, LES-3)', () => {
-  it('seeds the four defaults in English and Turkish, edits keep history', async () => {
+  it('seeds the four defaults in the class language (English only by default, D-172), edits keep history', async () => {
     const st = await ok(s.teacherA.get(`/api/teacher/contexts/${ctxId()}/assistant/settings`));
     expect(st.schoolDays).toEqual([1, 2, 3, 4, 5]);
     expect(st.responsibilities.map((r: any) => r.label.en)).toEqual(['Remind classmates to prepare their English materials', 'Help organise the classroom', 'Keep extra materials ready', 'Tell the teacher about problems']);
-    expect(st.responsibilities.every((r: any) => r.label.tr)).toBe(true);
+    expect(st.responsibilities.every((r: any) => r.label.tr === undefined)).toBe(true);
     const [a, , c] = st.responsibilities;
     const next = await ok(
       s.teacherA.put(`/api/teacher/contexts/${ctxId()}/assistant/settings`, {

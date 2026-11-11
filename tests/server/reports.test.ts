@@ -139,7 +139,8 @@ describe('long-term data (DAT-2, DAT-6)', () => {
     await ok(s.admin.patch(`/api/admin/classes/${s.c3a.id}`, { name: '3-Alpha' }));
     const r = await report();
     const metric = section(r, 'counters').metrics.find((m) => m.key === counterId)!;
-    expect(metric.label).toEqual({ text: { en: 'Our English Time', tr: expect.any(String) }, now: { en: 'English only!', tr: 'Sadece İngilizce!' } });
+    // The preset was seeded in the class language only (English, D-172).
+    expect(metric.label).toEqual({ text: { en: 'Our English Time' }, now: { en: 'English only!', tr: 'Sadece İngilizce!' } });
     expect(r.context.className).toBe('3-Alpha');
     expect(r.context.classNames).toEqual(['3-A']);
     expect(section(r, 'overview').notes).toEqual([{ k: 'report.overview.formerNames', p: { names: '3-A', now: '3-Alpha' } }]);

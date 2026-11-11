@@ -9,15 +9,16 @@ import { DEFAULT_ROUTINE_ID, MAX_STAGES } from '../../../domain/routines.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import * as L from '../../../shared/contracts/lessons.ts';
 import * as School from '../../../shared/contracts/school.ts';
-import { pickText } from '../../../shared/i18n/index.ts';
+import { pickText, translate } from '../../../shared/i18n/index.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { SENSITIVE } from '../../lib/queryClient.ts';
 import { useRun } from '../../lib/useRun.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
-import { Select, TextField } from '../../ui/Fields.tsx';
+import { Select } from '../../ui/Fields.tsx';
 import { IconArchive, IconChevronDown, IconChevronUp, IconCopy, IconPlus, IconX } from '../../ui/icons.tsx';
+import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
 
 const ROUTINES_KEY = [SENSITIVE, 'teacher', 'routines'] as const;
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
@@ -49,6 +50,8 @@ const text = (en: string, tr: string): LocalizedTextValue => ({ ...(en.trim() ? 
 
 function Editor({ draft, onChange, onSave, onCancel, contexts }: { draft: Draft; onChange: (d: Draft) => void; onSave: () => void; onCancel: () => void; contexts: Array<{ id: string; label: string }> }) {
   const { t } = useI18n();
+  // The languages of the class the routine is for; a routine for all classes uses every class's languages (D-099, D-172).
+  const locales = useEditorLocales(draft.contextId ? [draft.contextId] : undefined);
   const move = (i: number, by: number) => {
     const stages = [...draft.stages];
     const [s] = stages.splice(i, 1);
@@ -67,8 +70,7 @@ function Editor({ draft, onChange, onSave, onCancel, contexts }: { draft: Draft;
       }}
     >
       <div className="cc-row" style={{ alignItems: 'flex-start' }}>
-        <TextField label={t('common.nameEn')} value={draft.en} onChange={(en) => onChange({ ...draft, en })} />
-        <TextField label={t('common.nameTr')} value={draft.tr} onChange={(tr) => onChange({ ...draft, tr })} />
+        <LangFields label={t('routines.name')} value={{ en: draft.en, tr: draft.tr }} onChange={(v) => onChange({ ...draft, en: v.en ?? '', tr: v.tr ?? '' })} locales={locales} testId="routine-name" />
         <Select
           label={t('routines.scope')}
           value={draft.contextId}
@@ -83,8 +85,7 @@ function Editor({ draft, onChange, onSave, onCancel, contexts }: { draft: Draft;
             <span className="cc-stage-list__num" aria-hidden="true">
               {i + 1}
             </span>
-            <TextField label={t('routines.stageEn', { n: i + 1 })} value={s.en} onChange={(en) => setStage(i, { en })} />
-            <TextField label={t('routines.stageTr', { n: i + 1 })} value={s.tr} onChange={(tr) => setStage(i, { tr })} />
+            <LangFields label={t('routines.stageN', { n: i + 1 })} value={{ en: s.en, tr: s.tr }} onChange={(v) => setStage(i, { en: v.en ?? '', tr: v.tr ?? '' })} locales={locales} testId="routine-stage" />
             <Button size="small" aria-label={t('routines.moveUp', { n: i + 1 })} isDisabled={i === 0} onPress={() => move(i, -1)}>
               <IconChevronUp />
             </Button>
@@ -187,7 +188,8 @@ export function RoutinesPage() {
                   <Button
                     onPress={() => {
                       const d = draftOf(x, true);
-                      setDraft({ ...d, en: d.en ? t('routines.copyOf', { name: d.en }) : '', tr: d.tr ? t('routines.copyOf', { name: d.tr }) : '' });
+                      // Each language's name gets that language's wording (S20d), not the teacher's interface language.
+                      setDraft({ ...d, en: d.en ? translate('en', 'routines.copyOf', { name: d.en }) : '', tr: d.tr ? translate('tr', 'routines.copyOf', { name: d.tr }) : '' });
                     }}
                   >
                     <IconCopy />

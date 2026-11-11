@@ -31,6 +31,7 @@ import { Tabs } from '../../ui/Tabs.tsx';
 import { GroupPicto, OptionPicto } from '../../ui/pictos.tsx';
 import { StudentDnd, StudentDropList } from '../../ui/StudentDnd.tsx';
 import { StudentName, StudentStatsButton } from '../../ui/StudentName.tsx';
+import { LangFields, useEditorLocales } from '../../ui/LangFields.tsx';
 
 const CONTEXTS_KEY = ['classroom', 'contexts'] as const;
 const ALL = [SENSITIVE, 'teacher', 'grouping'] as const;
@@ -119,6 +120,8 @@ const fromDraft = (d: Draft[]) =>
 function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextId: string; byId: Map<string, Student>; onDone: () => void }) {
   const { t, locale } = useI18n();
   const run = useRun();
+  // Group and role names in the class's languages, main language first (S20d, D-172).
+  const locales = useEditorLocales([contextId]);
   const [groups, setGroups] = useState<Draft[]>(() => toDraft(tpl, (id) => byId.has(id)));
   const [copyName, setCopyName] = useState('');
   // Tap a name, then "Move here" on a group, or drag it there (the classroom group screen's gestures, S14c).
@@ -200,16 +203,14 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
               <details className="cc-disclosure">
                 <summary>{t('grouping.nameAndRoles')}</summary>
                 <div className="cc-stack">
-                  <TextField label={t('grouping.groupNameEn')} value={g.name.en} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, en: v } }))} />
-                  <TextField label={t('grouping.groupNameTr')} value={g.name.tr} onChange={(v) => patch(i, (x) => ({ ...x, name: { ...x.name, tr: v } }))} />
+                  <LangFields label={t('grouping.groupName')} value={g.name} onChange={(v) => patch(i, (x) => ({ ...x, name: { en: v.en ?? '', tr: v.tr ?? '' } }))} locales={locales} testId="group-name" />
                   {g.memberIds.map((id) => {
                     const name = byId.get(id)?.fullName ?? t('grouping.leftClass');
                     const role = g.roles[id] ?? { en: '', tr: '' };
                     return (
                       <fieldset key={id} className="cc-fieldset cc-group-editor__role">
                         <legend>{name}</legend>
-                        <TextField label={t('grouping.roleEn', { name })} value={role.en} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, en: v } } }))} />
-                        <TextField label={t('grouping.roleTr', { name })} value={role.tr} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { ...role, tr: v } } }))} />
+                        <LangFields label={t('grouping.roleOf', { name })} value={role} onChange={(v) => patch(i, (x) => ({ ...x, roles: { ...x.roles, [id]: { en: v.en ?? '', tr: v.tr ?? '' } } }))} locales={locales} />
                       </fieldset>
                     );
                   })}
@@ -238,7 +239,7 @@ function Editor({ tpl, contextId, byId, onDone }: { tpl: GroupTemplate; contextI
         <Button
           isDisabled={!valid || !copyName.trim()}
           onPress={() =>
-            void run(() => call(G.createGroupTemplate, { contextId, name: { [locale]: copyName.trim() }, mode: 'custom', sizing: tpl.sizing, groups: fromDraft(groups) }), {
+            void run(() => call(G.createGroupTemplate, { contextId, name: { [locales[0] ?? locale]: copyName.trim() }, mode: 'custom', sizing: tpl.sizing, groups: fromDraft(groups) }), {
               success: t('grouping.toast.created'),
               invalidate: [ALL],
             }).then((r) => r && onDone())
@@ -337,6 +338,7 @@ function TypeSize({ tpl }: { tpl: GroupTemplate }) {
 function NewArrangement({ contextId }: { contextId: string }) {
   const { t } = useI18n();
   const run = useRun();
+  const locales = useEditorLocales([contextId]);
   const [name, setName] = useState({ en: '', tr: '' });
   const [mode, setMode] = useState<'level' | 'mixed'>('mixed');
   const [kind, setKind] = useState<'count' | 'size'>('size');
@@ -348,9 +350,8 @@ function NewArrangement({ contextId }: { contextId: string }) {
       <h2 id="cc-new-arrangement" className="cc-h2">
         {t('grouping.new')}
       </h2>
+      <LangFields label={t('grouping.arrangementName')} description={t('grouping.nameShownHint')} value={name} onChange={(v) => setName({ en: v.en ?? '', tr: v.tr ?? '' })} locales={locales} testId="arrangement-name" />
       <div className="cc-row" style={{ alignItems: 'flex-end' }}>
-        <TextField label={t('grouping.nameEn')} description={t('grouping.nameShownHint')} value={name.en} onChange={(v) => setName({ ...name, en: v })} />
-        <TextField label={t('grouping.nameTr')} value={name.tr} onChange={(v) => setName({ ...name, tr: v })} />
         <Select label={t('grouping.type')} items={[{ id: 'mixed', label: t('grouping.mode.mixed') }, { id: 'level', label: t('grouping.mode.level') }]} value={mode} onChange={(v) => setMode(v as 'level' | 'mixed')} />
         <Select label={t('grouping.sizeBy')} items={[{ id: 'size', label: t('grouping.groupSize') }, { id: 'count', label: t('grouping.groupsCount') }]} value={kind} onChange={(v) => setKind(v as 'count' | 'size')} />
         <TextField label={kind === 'count' ? t('grouping.groupsCount') : t('grouping.groupSize')} inputMode="numeric" value={n} onChange={setN} />
