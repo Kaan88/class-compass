@@ -117,7 +117,7 @@ Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bi
 
 **Yapay zekâ araçları** → **Asistan bağlantıları**, Sınıf Pusulası içindeki asistan için okulun bir yapay zekâ sağlayıcısındaki kendi hesabını bağladığınız yerdir. Siz bir bağlantı eklemeden hiçbir şey bağlanmaz. Bu bölüm **Yapay zekâ araçları** sayfasının ilk bölümüdür; yapay zekâ uygulamalarının (MCP) ayarlarının üstündedir.
 
-Asistan sohbeti henüz Sınıf Pusulası’nda yok; sonraki bir güncellemeyle gelecek. Şimdi ekleyip denediğiniz bağlantılar o zaman kullanıma hazır olur; sayfa da bunu söyler.
+Asistan sohbetini açtığınızda öğretmenler bu bağlantıları **Asistan** sayfalarında kullanır (aşağıdaki [Asistan sohbeti](#asistan-sohbeti) bölümüne bakın).
 
 **Bağlantı ekle** şunları sorar:
 
@@ -137,6 +137,15 @@ Bir modelin yanındaki **… modelini dene** düğmesi okul verisi içermeyen ik
 ### ChatGPT ile giriş
 
 Bir ChatGPT hesabı henüz bağlanamaz: önce OpenAI'ın Sınıf Pusulası'nı "Sign in with ChatGPT" için onaylaması gerekir. O zamana kadar bu seçenek **Henüz kullanılamıyor** olarak görünür. Başvurmak için okul (ya da sunucuyu işleten kişi) OpenAI geliştirici platformu (platform.openai.com, yardım ve iletişim sayfaları) üzerinden, öğretmenlerin ChatGPT hesaplarını kullanmasını sağlayan bir okul uygulamasını anlatarak erişim ister. OpenAI bir istemci kimliği ve oturum açma adreslerini verince sunucuyu işleten kişi sunucu ayarlarında `AI_CHATGPT_SIGNIN=true` ve öteki `AI_CHATGPT_*` değerlerini girip sunucuyu yeniden başlatır; bundan sonra **ChatGPT ile giriş** öteki türler gibi eklenebilir. O zamana kadar bir OpenAI API anahtarı **OpenAI** türüyle çalışır.
+
+## Asistan sohbeti
+
+**Yapay zekâ araçları** → **Asistan sohbeti** (**Asistan bağlantıları**nın altında), öğretmenlerin **Asistan** sayfalarında bir yapay zekâ modeliyle sohbet etmesini sağlar. Başlangıçta kapalıdır.
+
+- **Öğretmenler asistan sohbetini kullanabilir** ancak hazır bir okul bağlantısı varsa (açık, anahtarla denenmiş, bütçesi içinde) açılabilir. Sohbet için sayfanın aşağısındaki **Yapay zekâ araçları açık** anahtarının da açık olması gerekir: asistan aynı araçları kullanır ve yapay zekâ araçlarının göndereceği bilgileri gönderir ([okuldan ne çıkar](ai-tools.md#asistan-sohbeti)). Anahtarlardan biri kapalıysa öğretmenler nedenini kendi sayfalarında görür.
+- Asistan bilgilere her öğretmenin kendi yetkileriyle bakar ve bir şeyi ancak öğretmen kartındaki **Evet**’e bastığında değiştirir. Değişiklikler denetim kaydında öğretmenin adıyla, "yapay zekâ aracı üzerinden" diye yer alır.
+- **Bir sohbeti son mesajından sonra sil**: başlangıçta bir öğretim yılı (365 gün); 30 gün ile iki yıl arasında seçilebilir. Eski sohbetler her saat silinir.
+- Yalnızca kaç sohbet olduğunu ve kaç öğretmenin sohbeti olduğunu görürsünüz. Sohbetler özeldir: onları okuyamazsınız ve okulun tam dışa aktarımında yer almazlar (yedeklerde vardır). Her öğretmen kendi sohbetlerini indirebilir. Bir öğrenciyi silmek, adını kayıtlı sohbetlerden de kaldırır.
 
 ## Hava durumu
 

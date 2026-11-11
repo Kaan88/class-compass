@@ -117,7 +117,7 @@ The full technical description (every colour, the limits, the drawing rules, a w
 
 **AI tools** → **Assistant connections** is where you connect the school's own account with an AI provider, for the assistant inside Class Compass. Nothing is connected until you add a connection. It is the first part of the **AI tools** page, above the settings for AI apps (MCP).
 
-The assistant chat itself is not in Class Compass yet; it comes in a later update. Connections you add and test now are ready for it, and the page says so.
+Teachers use these connections on their **Assistant** page once you switch the assistant chat on (see [Assistant chat](#assistant-chat) below).
 
 **Add connection** asks for:
 
@@ -137,6 +137,15 @@ The assistant chat itself is not in Class Compass yet; it comes in a later updat
 ### Sign in with ChatGPT
 
 A ChatGPT account cannot be connected yet: OpenAI must first approve Class Compass for "Sign in with ChatGPT". Until then the option is shown as **Not available yet**. To apply, the school (or whoever runs the server) asks OpenAI for access through the OpenAI developer platform (platform.openai.com, the help and contact pages), describing a school app that lets teachers use their ChatGPT account. When OpenAI gives a client id and the sign-in addresses, the server's operator sets `AI_CHATGPT_SIGNIN=true` and the other `AI_CHATGPT_*` values in the server settings and restarts it; after that **Sign in with ChatGPT** can be added like the other kinds. Until then, an OpenAI API key works with **OpenAI**.
+
+## Assistant chat
+
+**AI tools** → **Assistant chat** (under **Assistant connections**) lets teachers chat with an AI model on their **Assistant** page. It is off by default.
+
+- **Teachers can use the assistant chat** can be switched on only when there is a school connection that is ready (on, tested with a key, within its budget). The chat also needs **AI tools are on** further down the page: it uses the same tools and sends what the AI tools would send ([what leaves the school](ai-tools.md#the-assistant-chat)). With either switch off, teachers see why on their page.
+- The assistant reads with each teacher's own permissions and changes something only after the teacher presses **Yes** on its card. Changes are in the audit log under the teacher's name, "through an AI tool".
+- **Delete a chat after its last message**: one school year (365 days) by default; 30 days to two years can be chosen. Old chats are deleted every hour.
+- You see only how many chats there are and how many teachers have one. Chats are private: you cannot read them, and they are not in the school's full export (they are in backups). Each teacher can download their own. Erasing a student also removes their name from stored chats.
 
 ## Weather
 

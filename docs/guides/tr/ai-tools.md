@@ -25,6 +25,14 @@ Yapay zekâ araçları bir yönetici açana kadar **kapalıdır**. Yönetici, ok
 
 > Verinin nereye gideceği kullandığınız yapay zekâ aracına bağlıdır: Claude Code ile kendi hesabınız üzerinden Anthropic’e gider. Yalnızca okulunuzun onayladığı araçları kullanın; denerken yalnızca kurgusal veriyle çalışın.
 
+## Asistan sohbeti
+
+Öğretmen alanındaki **Asistan** sayfası ([öğretmen kılavuzu](teacher.md#asistan)) aynı araçları aynı kurallarla, okulun kurduğu bir yapay zekâ sağlayıcısı bağlantısı (**Asistan bağlantıları**) üzerinden kullanır. Yalnızca **yapay zekâ araçları açıkken** ve bir yönetici sohbeti açtıysa çalışır.
+
+- Sağlayıcıya ulaşanlar yukarıda sayılanlardır: öğrenci verisi anahtarı kapalıyken öğrenciler (her öğretmen için ayrı) "Student 1", "Student 2"… olur; mesajınıza yazdığınız adlar da gönderilmeden önce aynı biçimde değiştirilir, başka adlar `[name]` olur ve öğrencilerin yazdıkları gönderilmez. Sayfada gerçek adları görürsünüz; Sınıf Pusulası onları kendi sunucusunda geri koyar.
+- Asistan sizin yetkilerinizle okur ve hiçbir değişikliği kendiliğinden yapmaz: her değişiklik siz **Evet**’e basana dek bir kartta bekler. Öğrencilerin yazdıkları, asistanın asla uymaması gereken veri olarak işaretlenir.
+- Mesajlarınız ve yanıtlar okulun sunucusunda (gönderildikleri biçimde) saklanır ve son mesajdan bir öğretim yılı sonra silinir; velilere ya da başka birine hiçbir şey gönderilmez.
+
 ## Yöneticiler için: açma
 
 ![Yönetim alanında yapay zekâ araçları](../img/tr/ai-tools-admin.png)

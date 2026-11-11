@@ -55,7 +55,7 @@ PIN'inizi mi unuttunuz? **Profil ve PIN**'de şifrenizle yeni bir PIN belirleyin
 Öğretmen menüsü, öğretmen alanının başlangıç sayfasıdır ve üç bölümden oluşur:
 
 - **Sınıf ekranını aç** (ya da **Sınıf ekranına dön**) sizi ders ekranına götürür.
-- **Bugün**: her gün kullandığınız sayfalar: **Yoklama**, **Ödevler**, **Hedefler**, **Raporlar** ve **Bildirimler** (zil simgesi; yanında yeni bildirimlerin sayısı yazar, bkz. [Bildirimler](#bildirimler)).
+- **Bugün**: her gün kullandığınız sayfalar: **Yoklama**, **Ödevler**, **Hedefler**, **Raporlar**, **Bildirimler** (zil simgesi; yanında yeni bildirimlerin sayısı yazar, bkz. [Bildirimler](#bildirimler)) ve **Asistan** (bkz. [Asistan](#asistan)).
 - **Sınıf kurulumu**: bir kez ayarlayıp arada bir değiştirdiğiniz her şey için tek bir kutucuk. Üç sekmeli bir sayfa açar:
   - **Sınıflar ve öğrenciler**: **Sınıf ayarları**, **Öğrenciler**, **Öğrenci listesi aktar**, **Öğrenci bağlantıları**, **Avatarlar**.
   - **Ders araçları**: **Ders konuları**, **Rutinler**, **Sayaçlar**, **Günün Yardımcısı**, **Gizli Öğrenciler**, **Gruplar**.
@@ -356,6 +356,19 @@ Sayfanın adresi sınıfı, öğrenciyi, görünümü ve süreyi her zaman içer
 - Satırlar öğrenciye göre gruplanır. **Göster** (**Tümü** ya da **Yalnızca yeniler**), **Tür** ve **Sınıf** ile süzün. Varsa öğrencinin yazdığından kısa bir parça görünür; gizlenen, silinen ya da durdurulan metin asla görünmez.
 - **Aç** sizi doğru sayfaya, sınıf ve öğrenci seçili olarak götürür (öğrencinin hedefleri, başarıları, rapor…). **Okundu say** bir öğrencinin satırlarını okundu sayar; **Tümünü okundu say** (süzgeç açıkken **Bunları okundu say**) kalanları.
 - **Ayarlar** sekmesi: **Zilin altında neler görünsün** (istediğiniz türleri işaretleyin) ve **Günlük e-posta**: seçtiğiniz saatten sonra **Bana günlük e-posta gönder**. E-posta yalnızca kaç yeni şey beklediğini söyler; **E-postada öğrencilerin adlarını yaz** her öğrencinin adını sayısıyla birlikte ekler. Öğrencilerin yazdıkları e-postada asla yer almaz. Günlük e-posta için hesabınızda bir e-posta adresi olmalı ve okul e-posta gönderebilmelidir; biri eksikse sekme bunu söyler.
+
+## Asistan
+
+**Asistan** (öğretmen menüsü → Bugün), sınıflarınız hakkında bir yapay zekâ modeliyle sohbettir: hangi ödevlerin teslimi geldiğini sorun, bir raporu özetletin, ders konularını planlayın ya da veliler için bir not taslağı hazırlatın. Yalnızca bir yönetici açtıysa ve okulun yapay zekâ araçları açıksa çalışır; değilse sayfa nedenini söyler. Sınıf bilgisayarında önce PIN sorulur; asistan hiçbir zaman sınıf ekranında ya da bir öğrencinin sayfasında yer almaz.
+
+- **Yeni sohbet** bir sohbet başlatır; soldaki listede (telefonda: **Tüm sohbetler**) **Sohbetlerde ara**, **Arşivdeki sohbetleri göster** ve kaldığınız yerden sürdürebileceğiniz eski sohbetler bulunur. Sohbetin içinde: **Yeniden adlandır**, **Arşive kaldır** (ya da arşivden çıkar) ve **Sohbeti sil**. **Model**, okulunuzun (izin varsa sizin) kurduğu bağlantılardan birini seçer.
+- Yanıt yazılırken görünür; **Durdur** yanıtı keser (yazılan kısım kalır, durduruldu diye işaretlenir). "Baktı: class_roster (3-A English)" gibi satırlar asistanın sizin için neye baktığını söyler; asistan sizin yetkilerinizle okur, fazlasıyla değil.
+- **Siz istemeden hiçbir şey değişmez.** Asistan bir şeyi değiştirmek istediğinde (ödev vermek, hedef yazmak, geri bildirim eklemek…) bir kart gösterir: ne değişecek, hangi sınıf ya da öğrenci için; altında **Evet, değişikliği yap** ve **Hayır**. Değişikliği yalnızca Evet yapar; kartta gösterildiği gibi ve bir kez. Kartı yanıtlamadan yeni bir mesaj yazarsanız kart yanıtsız kalır ve hiçbir şey değişmez. Değişiklikler denetim kaydında adınızla, "yapay zekâ aracı üzerinden" diye yer alır.
+- Bir yanıtın altındaki **Kopyala** onu kopyalar. Sınıf Pusulası velilere ya da başka birine hiçbir şey göndermez: veli notu, kopyalayıp kendinizin gönderdiği bir taslaktır.
+- **Yapay zekâ sağlayıcısı ne görür:** okulunuz öğrenci adlarını okulda tutarken sağlayıcı "Student 1", "Student 2"… görür, öğrencilerin yazdıklarını hiç görmez; siz sayfada gerçek adları görürsünüz. Sohbetin üstündeki satır hangisinin geçerli olduğunu söyler. Yanıtları öneri olarak görün ve denetleyin.
+- Sohbetleriniz size özeldir: yöneticiler onları okuyamaz. Son mesajdan bir öğretim yılı sonra silinirler (yöneticiniz süreyi değiştirebilir). **Sohbetlerimi indir** hepsini gerçek adlarla bir dosya olarak kaydeder.
+
+Okuldan neyin çıktığı hakkında daha fazlası: [Yapay zekâ araçları](ai-tools.md#asistan-sohbeti).
 
 ## Öğrenciler ve öğrenci listesi aktarma
 

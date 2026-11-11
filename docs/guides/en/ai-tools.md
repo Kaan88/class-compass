@@ -25,6 +25,14 @@ With **names** (only when the administrator allows student data, and only for to
 
 > Where the data goes depends on the AI tool you use: with Claude Code it goes to Anthropic under your own account. Use only the tools your school has agreed to, and only fictional data while you are trying things out.
 
+## The assistant chat
+
+The **Assistant** page in the teacher area (see the [teacher guide](teacher.md#assistant)) uses the same tools, with the same rules, through a connection to an AI provider that the school set up (**Assistant connections**). It works only while **AI tools are on** and an administrator has switched the chat on.
+
+- What reaches the provider is what is listed above: with the student data switch off, students are "Student 1", "Student 2"… (for each teacher), names you type in your message are replaced the same way before it is sent, other names become `[name]`, and what students wrote is not sent. You see real names on the page; Class Compass puts them back on its own server.
+- The assistant reads with your permissions and runs no change on its own: each change waits on a card until you press **Yes**. What students wrote is marked as data the assistant must never obey.
+- Your messages and the answers are stored on the school's server (as they were sent) and deleted a school year after the last message; nothing is sent to parents or anyone else.
+
 ## For administrators: switch it on
 
 ![AI tools in the administration area](../img/en/ai-tools-admin.png)
