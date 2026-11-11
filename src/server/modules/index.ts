@@ -30,6 +30,7 @@ import { registerLessonCloseHook, registerLessonStateContributor } from './lesso
 import type { ClassroomCardContribution, ReportContribution, ServerModuleManifest, StudentPageContribution, TimelineContribution } from './manifest.ts';
 import { maintenanceManifest } from './maintenance/manifest.ts';
 import { mcpManifest } from './mcp/manifest.ts';
+import { aiConnectionsManifest } from './aiConnections/manifest.ts';
 import { notificationsManifest } from './notifications/manifest.ts';
 import { reportsManifest } from './reports/manifest.ts';
 import { routinesManifest } from './routines/manifest.ts';
@@ -74,6 +75,7 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   themesManifest,
   notificationsManifest,
   mcpManifest,
+  aiConnectionsManifest,
   displayInfoManifest,
 ];
 

@@ -1,24 +1,41 @@
-import { en, type MessageKey } from './en.ts';
+import { en, type MessageKey as BaseMessageKey } from './en.ts';
 import { tr } from './tr.ts';
+import type { AreaMessageKey } from './areas/keys.ts';
 import type { LocalizedTextValue as LocalizedText } from '../contracts/define.ts';
 import { dateTimeFormat } from '../intl.ts';
 
 export type Locale = 'en' | 'tr';
 export const dictionaries = { en, tr } as const;
-export type { MessageKey };
+/** Every key: the main dictionary's and the area dictionaries' (S19a, D-179: `areas/`, loaded only where used). */
+export type MessageKey = BaseMessageKey | AreaMessageKey;
+
+/**
+ * Area dictionaries (S19a, D-179). Strings that only one part of the teacher or admin app shows live
+ * in `areas/<area>.ts` instead of en.ts/tr.ts: the area file registers itself when a screen imports
+ * it, so the student page (which loads the whole main dictionary, D-151 budget) never downloads them.
+ */
+const areaDicts: Record<Locale, Record<string, string>> = { en: {}, tr: {} };
+export function registerMessages(area: { en: Record<string, string>; tr: Record<string, string> }): void {
+  Object.assign(areaDicts.en, area.en);
+  Object.assign(areaDicts.tr, area.tr);
+}
+/** Whether a key exists in the main dictionary or a registered area. */
+export const hasMessage = (key: string): boolean => key in en || key in areaDicts.en;
 
 const pluralRules = { en: new Intl.PluralRules('en'), tr: new Intl.PluralRules('tr') };
 
 /** Translate a key. `{name}` placeholders are filled from vars; `count` selects `_one`/`_other`. */
 export function translate(locale: Locale, key: string, vars: Record<string, string | number> = {}): string {
   const dict = dictionaries[locale] as Record<string, string>;
+  const area = areaDicts[locale];
+  const has = (x: string) => x in dict || x in area;
   let k = key;
   if (typeof vars.count === 'number') {
     const form = pluralRules[locale].select(vars.count);
-    if (`${key}_${form}` in dict) k = `${key}_${form}`;
-    else if (`${key}_other` in dict) k = `${key}_other`;
+    if (has(`${key}_${form}`)) k = `${key}_${form}`;
+    else if (has(`${key}_other`)) k = `${key}_other`;
   }
-  const template = dict[k] ?? (en as Record<string, string>)[k] ?? key;
+  const template = dict[k] ?? area[k] ?? (en as Record<string, string>)[k] ?? areaDicts.en[k] ?? key;
   return template.replace(/\{(\w+)\}/g, (_m, v: string) => String(vars[v] ?? `{${v}}`));
 }
 

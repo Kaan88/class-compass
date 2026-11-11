@@ -11,6 +11,7 @@ import { ChangePasswordPage, LoginPage, ResetPasswordPage } from './routes/Auth.
 import { ClassroomPage } from './routes/Classroom.tsx';
 import { InvitePage, SignInLinkPage } from './routes/SignIn.tsx';
 import { OAuthConsentPage, type ConsentSearch } from './routes/OAuthConsent.tsx';
+import { AiConnectionReturnPage } from './routes/AiConnections.tsx';
 import { homeFor, requireSession, type RouterContext } from './routes/guards.ts';
 import { NotFoundPage, RootLayout } from './routes/Root.tsx';
 import { allTeacherPages } from './modules/registry.ts';
@@ -176,6 +177,24 @@ const oauthConsentRoute = createRoute({
   },
 });
 
+/**
+ * Where a provider's sign-in returns (S19a, D-179): `?state=…&code=…`, used only by a POST after a
+ * button press; behind the PIN lock in classroom mode.
+ */
+const aiConnectionReturnRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/ai-connections/return',
+  validateSearch: (s: Record<string, unknown>): { state?: string | undefined; code?: string | undefined } => ({
+    state: typeof s.state === 'string' ? s.state : undefined,
+    code: typeof s.code === 'string' ? s.code : undefined,
+  }),
+  beforeLoad: requireSession,
+  component: function AiConnectionReturnRoute() {
+    const search = aiConnectionReturnRoute.useSearch();
+    return <AiConnectionReturnPage state={search.state} code={search.code} />;
+  },
+});
+
 /** Component catalog: signed-in users only; fictional data only. */
 const catalogRoute = createRoute({ getParentRoute: () => rootRoute, path: '/dev/catalog', beforeLoad: requireSession, component: CatalogPage });
 /** Avatar review sheets (S17c, D-169): signed-in users only; catalogue keys only. */
@@ -193,6 +212,7 @@ const routeTree = rootRoute.addChildren([
   adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminImport, adminReports, adminSpeakers, adminThemes, adminAiTools, adminMaintenance, adminAudit, adminProfile]),
   helpRoute,
   oauthConsentRoute,
+  aiConnectionReturnRoute,
   catalogRoute,
   avatarSheetRoute,
 ]);

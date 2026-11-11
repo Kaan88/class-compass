@@ -1,0 +1,128 @@
+/**
+ * Google Gemini adapter (S19a, D-179): `POST {base}/v1beta/models/{model}:streamGenerateContent?alt=sse`
+ * with `x-goog-api-key`. Tools become one `functionDeclarations` list; their JSON Schemas are reduced
+ * to the OpenAPI subset Gemini accepts (`geminiSchema`). The assistant is role `model`; tool results
+ * are `functionResponse` parts in a user turn. Function calls may carry a `thoughtSignature`, which is
+ * kept on the call (`signature`) and sent back with it, as the API requires for multi-step tool use.
+ */
+import { AiCallError, aiRequest, failureOfStatus, sseEvents } from '../http.ts';
+import { toolCall, type Adapter, type ChatMessage, type StopReason, type ToolDefinition } from './types.ts';
+
+const KEEP = new Set(['type', 'format', 'description', 'nullable', 'enum', 'properties', 'required', 'items', 'minItems', 'maxItems', 'minimum', 'maximum', 'minLength', 'maxLength', 'pattern', 'anyOf', 'title']);
+
+/** A JSON Schema reduced to Gemini's OpenAPI subset: union types and `null` become `nullable`, `const` an enum, unknown keywords dropped. */
+export function geminiSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(geminiSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const s = { ...(schema as Record<string, unknown>) };
+  if ('const' in s && !('enum' in s)) s.enum = [s.const];
+  if (Array.isArray(s.type)) {
+    const types = (s.type as string[]).filter((t) => t !== 'null');
+    if (types.length < (s.type as string[]).length) s.nullable = true;
+    s.type = types[0] ?? 'string';
+  }
+  if (Array.isArray(s.anyOf)) {
+    const options = (s.anyOf as Array<Record<string, unknown>>).filter((o) => !(o && o.type === 'null'));
+    if (options.length < (s.anyOf as unknown[]).length) s.nullable = true;
+    if (options.length === 1) {
+      delete s.anyOf;
+      Object.assign(s, options[0]);
+    } else s.anyOf = options;
+  }
+  if (Array.isArray(s.enum)) s.enum = (s.enum as unknown[]).filter((v) => v !== null).map(String);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(s)) {
+    if (!KEEP.has(k)) continue;
+    if (k === 'properties' && v && typeof v === 'object') out[k] = Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([pk, pv]) => [pk, geminiSchema(pv)]));
+    else if (k === 'items' || k === 'anyOf') out[k] = geminiSchema(v);
+    else out[k] = v;
+  }
+  if (out.type === 'object' && !out.properties) out.properties = {};
+  return out;
+}
+
+export const geminiTools = (tools: ToolDefinition[]) => [{ functionDeclarations: tools.map((t) => ({ name: t.name, description: t.description, parameters: geminiSchema(t.inputSchema) })) }];
+
+interface Content {
+  role: 'user' | 'model';
+  parts: Array<Record<string, unknown>>;
+}
+
+export function geminiContents(messages: ChatMessage[]): Content[] {
+  const out: Content[] = [];
+  const push = (role: Content['role'], parts: Content['parts']) => {
+    if (!parts.length) return;
+    const last = out[out.length - 1];
+    if (last && last.role === role) last.parts.push(...parts);
+    else out.push({ role, parts });
+  };
+  for (const m of messages) {
+    if (m.role === 'user') push('user', [{ text: m.content }]);
+    else if (m.role === 'assistant')
+      push('model', [
+        ...(m.content ? [{ text: m.content }] : []),
+        ...(m.toolCalls ?? []).map((c) => ({ functionCall: { name: c.name, args: c.arguments }, ...(c.signature ? { thoughtSignature: c.signature } : {}) })),
+      ]);
+    else push('user', [{ functionResponse: { name: m.name, response: m.isError ? { error: m.content } : { content: m.content } } }]);
+  }
+  return out;
+}
+
+const STOP: Record<string, StopReason> = { STOP: 'end', MAX_TOKENS: 'length' };
+
+export const geminiAdapter: Adapter = async function* (req) {
+  const model = req.model.replace(/^models\//u, '');
+  const body = {
+    ...(req.system ? { systemInstruction: { parts: [{ text: req.system }] } } : {}),
+    contents: geminiContents(req.messages),
+    ...(req.tools.length ? { tools: geminiTools(req.tools) } : {}),
+    generationConfig: { maxOutputTokens: req.maxTokens },
+  };
+  const res = await aiRequest({
+    url: `${req.target.baseUrl}/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+    headers: { 'content-type': 'application/json', accept: 'text/event-stream', ...(req.target.secret ? { 'x-goog-api-key': req.target.secret } : {}) },
+    body: JSON.stringify(body),
+    policy: req.target.policy,
+    signal: req.signal,
+  });
+  if (res.status < 200 || res.status >= 300) {
+    res.cancel();
+    // Gemini answers a wrong key with 400 API_KEY_INVALID; without the body we cannot tell it from a bad request.
+    throw new AiCallError(failureOfStatus(res.status), res.status);
+  }
+  let input = 0;
+  let output = 0;
+  let stop: StopReason = 'other';
+  let calls = 0;
+  let any = false;
+  for await (const ev of sseEvents(res.body)) {
+    let d: any;
+    try {
+      d = JSON.parse(ev.data);
+    } catch {
+      throw new AiCallError('BAD_RESPONSE');
+    }
+    if (d?.error) {
+      res.cancel();
+      throw new AiCallError(Number(d.error.code) === 429 ? 'RATE_LIMITED' : 'PROVIDER_ERROR');
+    }
+    any = true;
+    if (d?.usageMetadata) {
+      input = Number(d.usageMetadata.promptTokenCount) || input;
+      output = (Number(d.usageMetadata.candidatesTokenCount) || 0) + (Number(d.usageMetadata.thoughtsTokenCount) || 0) || output;
+    }
+    const cand = d?.candidates?.[0];
+    for (const part of Array.isArray(cand?.content?.parts) ? cand.content.parts : []) {
+      if (part?.functionCall) {
+        const id = part.functionCall.id ? String(part.functionCall.id) : `call_${calls}`;
+        calls += 1;
+        yield { type: 'toolCall', call: toolCall(id, String(part.functionCall.name ?? ''), part.functionCall.args ?? {}, typeof part.thoughtSignature === 'string' ? part.thoughtSignature : undefined) };
+      } else if (typeof part?.text === 'string' && part.text && part.thought !== true) yield { type: 'text', text: part.text };
+    }
+    if (cand?.finishReason) stop = STOP[String(cand.finishReason)] ?? 'other';
+    if (d?.promptFeedback?.blockReason) stop = 'other';
+  }
+  if (!any) throw new AiCallError('BAD_RESPONSE');
+  yield { type: 'usage', inputTokens: input, outputTokens: output };
+  yield { type: 'done', stop: calls ? 'toolUse' : stop };
+};

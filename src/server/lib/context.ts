@@ -81,6 +81,13 @@ export interface AppDeps {
    * fake; production uses `fetchClientMetadata` in `modules/mcp/oauth/cimd.ts`.
    */
   clientMetadataFetch?: (url: string) => Promise<unknown>;
+  /**
+   * AI connections (S19a, D-179): tests point a provider's fixed address (`anthropic`, `openai`,
+   * `gemini`, `openrouter`, `chatgpt`, `chatgptToken`) at a local fake server; requests to an overridden
+   * address may then reach loopback. Production never sets it: the providers' own https APIs are used,
+   * public addresses only.
+   */
+  aiProviderUrls?: Partial<Record<'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'chatgpt' | 'chatgptToken', string>>;
 }
 
 export interface RequestContext extends AppDeps {

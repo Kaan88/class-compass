@@ -1898,3 +1898,91 @@ export const oauthRefreshTokens = sqliteTable(
   },
   (t) => [uniqueIndex('oauth_refresh_hash_uq').on(t.tokenHash), index('oauth_refresh_grant_idx').on(t.grantId)],
 );
+
+// ---------------------------------------------------------------- AI connections for the assistant (S19a, D-179)
+/** One allowed model of a connection and what the last "Test connection" found (null: never tested). */
+export type AiModelJson = { name: string; testedAt: number | null; text: boolean | null; tools: boolean | null };
+
+/**
+ * How the school (`ownerUserId` null) or one teacher (their own, when the administrator allows it)
+ * reaches a model provider. `secretCipher` is the API key (or, for "Sign in with ChatGPT", the token
+ * set as JSON) sealed with `sealSecret` under the purpose `ai-connection-secret` and the row id as AAD;
+ * it is never returned, logged, audited or exported (blanked like every `…_cipher` column). Deleting a
+ * connection keeps the row for its usage history (`deletedAt`) and erases the secret.
+ */
+export const aiConnections = sqliteTable(
+  'ai_connections',
+  {
+    id: text('id').primaryKey(),
+    ownerUserId: text('owner_user_id').references(() => users.id),
+    type: text('type', { enum: ['anthropic', 'openai', 'gemini', 'openrouter', 'openaiCompatible', 'chatgpt'] }).notNull(),
+    name: text('name').notNull(),
+    baseUrl: text('base_url'),
+    localNetwork: integer('local_network', { mode: 'boolean' }).notNull().default(false),
+    modelsJson: text('models_json', { mode: 'json' }).$type<AiModelJson[]>().notNull(),
+    secretCipher: text('secret_cipher'),
+    secretSetAt: integer('secret_set_at'),
+    secretSource: text('secret_source', { enum: ['pasted', 'oauth'] }),
+    monthlyTokenBudget: integer('monthly_token_budget'),
+    dailyMessageLimit: integer('daily_message_limit'),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    kvkkConfirmedAt: integer('kvkk_confirmed_at').notNull(),
+    kvkkConfirmedBy: text('kvkk_confirmed_by').notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [index('ai_connections_owner_idx').on(t.ownerUserId)],
+);
+
+/** Usage per connection, account and local day (school timezone): counts and tokens only, never content. */
+export const aiConnectionUsage = sqliteTable(
+  'ai_connection_usage',
+  {
+    connectionId: text('connection_id')
+      .notNull()
+      .references(() => aiConnections.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    localDate: text('local_date').notNull(),
+    messages: integer('messages').notNull().default(0),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.connectionId, t.userId, t.localDate] }), index('ai_connection_usage_date_idx').on(t.connectionId, t.localDate)],
+);
+
+/** The school default (a school connection and one of its models) and "Teachers may add their own connection" (off by default). One row, id 1, made on first write. */
+export const aiConnectionSettings = sqliteTable('ai_connection_settings', {
+  id: integer('id').primaryKey(),
+  defaultConnectionId: text('default_connection_id'),
+  defaultModel: text('default_model'),
+  teacherConnectionsAllowed: integer('teacher_connections_allowed', { mode: 'boolean' }).notNull().default(false),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/**
+ * A sign-in with a provider waiting for its return (OpenRouter's OAuth with PKCE; "Sign in with
+ * ChatGPT" when available). `id` is the HMAC of the `state` sent through the browser; the PKCE verifier
+ * is sealed (`ai-oauth-verifier`, row id as AAD) and never leaves the server. Single use, 10 minutes,
+ * bound to the account that started it and to one connection. Never exported.
+ */
+export const aiOauthStates = sqliteTable(
+  'ai_oauth_states',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    connectionId: text('connection_id')
+      .notNull()
+      .references(() => aiConnections.id),
+    verifierCipher: text('verifier_cipher').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    usedAt: integer('used_at'),
+  },
+  (t) => [index('ai_oauth_states_user_idx').on(t.userId)],
+);

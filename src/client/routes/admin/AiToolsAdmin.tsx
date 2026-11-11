@@ -18,6 +18,7 @@ import { Select, TextArea, Toggle } from '../../ui/Fields.tsx';
 import { InlineConfirmButton } from '../../ui/InlineConfirm.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { AI_ACCOUNT_KEY, AI_ADMIN_KEY, ConnectionsTable, DAY_CHOICES, statusText, useDateFormat } from '../AiTools.tsx';
+import { AiConnectionsAdminSection } from '../AiConnections.tsx';
 
 /**
  * OAuth (S14h2, D-160): the hosts an AI app's https redirect address may use (loopback is always
@@ -193,6 +194,8 @@ export function AiToolsAdminPage() {
             rows={data.connections}
             onDisconnect={(r) => void run(() => call(O.adminRevokeAiConnection, { connectionId: r.id }), { success: t('aiTools.disconnected'), invalidate: [AI_ADMIN_KEY] })}
           />
+          {/* The in-app assistant's connections to model providers (S19a, D-179). */}
+          <AiConnectionsAdminSection />
           <ClientsTable rows={data.clients} />
           <RedirectHosts key={data.redirectHosts.join(' ')} hosts={data.redirectHosts} />
           <ConfirmDestructive

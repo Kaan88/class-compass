@@ -78,7 +78,25 @@ const EnvSchema = z.object({
    * Ignored in development and production (see `testClockFile`).
    */
   CC_TEST_CLOCK_FILE: z.string().optional(),
+  /**
+   * "Sign in with ChatGPT" for the assistant's connections (S19a, D-179): off, and stays off until
+   * OpenAI grants Class Compass access. Only with `true` AND the client id and the three addresses
+   * OpenAI gives the app can an administrator or teacher start this sign-in (`chatgptAvailable`).
+   */
+  AI_CHATGPT_SIGNIN: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  AI_CHATGPT_CLIENT_ID: z.string().optional().default(''),
+  AI_CHATGPT_AUTHORIZE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  AI_CHATGPT_TOKEN_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  AI_CHATGPT_API_BASE: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  AI_CHATGPT_SCOPE: z.string().optional().default(''),
 });
+
+/** "Sign in with ChatGPT" can be offered: the switch is on and every value it needs is set (D-179). */
+export const chatgptAvailable = (c: Pick<Config, 'AI_CHATGPT_SIGNIN' | 'AI_CHATGPT_CLIENT_ID' | 'AI_CHATGPT_AUTHORIZE_URL' | 'AI_CHATGPT_TOKEN_URL' | 'AI_CHATGPT_API_BASE'>): boolean =>
+  c.AI_CHATGPT_SIGNIN && Boolean(c.AI_CHATGPT_CLIENT_ID && c.AI_CHATGPT_AUTHORIZE_URL && c.AI_CHATGPT_TOKEN_URL && c.AI_CHATGPT_API_BASE);
 
 /** The e2e clock offset file, honoured only under NODE_ENV=test. */
 export const testClockFile = (e: { NODE_ENV: string; CC_TEST_CLOCK_FILE?: string | undefined }): string | null => (e.NODE_ENV === 'test' && e.CC_TEST_CLOCK_FILE ? e.CC_TEST_CLOCK_FILE : null);

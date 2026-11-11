@@ -45,6 +45,8 @@ const REDACT = [
   '*.refresh_token',
   '*.code_verifier',
   '*.client_secret',
+  // AI connections (S19a, D-179): a pasted provider key.
+  '*.apiKey',
 ];
 
 /**

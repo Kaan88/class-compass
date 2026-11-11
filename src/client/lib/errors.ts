@@ -1,10 +1,9 @@
-import type { MessageKey } from '../../shared/i18n/index.ts';
-import { en } from '../../shared/i18n/en.ts';
+import { hasMessage, type MessageKey } from '../../shared/i18n/index.ts';
 import { ApiError } from './api.ts';
 
 type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
-const isKey = (k: string): k is MessageKey => k in en;
+const isKey = (k: string): k is MessageKey => hasMessage(k);
 
 /**
  * User-facing text for an API error: a translated business reason (`details.reason`) when there is

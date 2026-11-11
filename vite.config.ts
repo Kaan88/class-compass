@@ -57,7 +57,8 @@ export default defineConfig({
             // S10: shared by the main app and the student page entry.
             { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
             { name: 'vendor-tanstack', test: /node_modules[\\/]@tanstack[\\/]/ },
-            { name: 'i18n', test: /src[\\/]shared[\\/]i18n[\\/]/ },
+            // Area dictionaries (S19a, D-179) stay with the screens that import them.
+            { name: 'i18n', test: /src[\\/]shared[\\/]i18n[\\/](?!areas[\\/])/ },
           ],
         },
       },

@@ -12,6 +12,8 @@ import type { Mailer, MailMessage } from '../src/server/lib/mailer.ts';
 import type { WeatherFetch } from '../src/server/modules/weather/service.ts';
 
 export const TEST_ORIGIN = 'http://localhost:5173';
+/** A closed local port: what a provider address is in tests that bring no fake. */
+const OFFLINE = 'http://127.0.0.1:9';
 
 export class Clock {
   t = Date.UTC(2026, 10, 9, 7, 0, 0); // Monday 2026-11-09 10:00 Istanbul
@@ -39,7 +41,7 @@ export class FakeMailer implements Mailer {
 
 export async function makeEnv(
   overrides: Partial<Config> = {},
-  extra: { mailer?: Mailer | null; logStream?: { write: (line: string) => void }; weatherFetch?: WeatherFetch; clientMetadataFetch?: (url: string) => Promise<unknown> } = {},
+  extra: { mailer?: Mailer | null; logStream?: { write: (line: string) => void }; weatherFetch?: WeatherFetch; clientMetadataFetch?: (url: string) => Promise<unknown>; aiProviderUrls?: AppDeps['aiProviderUrls'] } = {},
 ): Promise<TestEnv> {
   const config = loadConfig(
     { NODE_ENV: 'test', SECRET_PEPPER: 'test-pepper-0123456789abcdef', PUBLIC_ORIGIN: TEST_ORIGIN, DATA_DIR: './data-test' },
@@ -51,6 +53,8 @@ export async function makeEnv(
   // No test ever reaches the internet: without a fake, the weather source is unreachable.
   const deps: AppDeps = { db, config, now: clock.now, mailer: extra.mailer ?? null, weatherFetch: extra.weatherFetch ?? (() => Promise.reject(new Error('offline in tests'))),
     clientMetadataFetch: extra.clientMetadataFetch ?? (() => Promise.reject(new Error('offline in tests'))),
+    // No test ever reaches a model provider: without a fake, every provider address is a closed local port.
+    aiProviderUrls: extra.aiProviderUrls ?? { anthropic: OFFLINE, openai: OFFLINE, gemini: OFFLINE, openrouter: OFFLINE, chatgpt: OFFLINE, chatgptToken: OFFLINE },
   };
   const app = await buildApp(deps, extra.logStream ? { logStream: extra.logStream } : {});
   await app.ready();

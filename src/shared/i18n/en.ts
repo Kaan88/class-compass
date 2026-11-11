@@ -3617,6 +3617,14 @@ export const en = {
   'aiTools.category.homeworkStatus': 'Homework statuses per student',
   'aiTools.category.attendance': 'Attendance per student',
   'aiTools.category.counts': 'Counters, achievements and goal counts per student',
+  // ---------------------------------------------------------------- Assistant connections (S19a, D-179)
+  'audit.action.ai_connection.create': 'Assistant connection added',
+  'audit.action.ai_connection.update': 'Assistant connection changed',
+  'audit.action.ai_connection.delete': 'Assistant connection deleted',
+  'audit.action.ai_connection.connect': 'Assistant connection signed in at the provider',
+  'audit.action.ai_connection.settings': 'Assistant connection settings changed',
+  'audit.entity.ai_connection': 'Assistant connection',
+  'audit.entity.ai_connection_settings': 'Assistant connection settings',
   // ---------------------------------------------------------------- OAuth for AI apps (S14h2, D-160)
   'audit.action.oauth.connect': 'AI app connected',
   'audit.action.oauth.deny': 'AI app connection refused',

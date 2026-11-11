@@ -46,9 +46,12 @@ import { exportableSelections, SELECTIONS_TABLE_NAME } from '../secret/service.t
 /** How long a prepared export can be downloaded. */
 export const EXPORT_TTL_MS = 60 * 60_000;
 /** Tables that hold sign-in secrets or request logs, never exported (S14h2: OAuth requests, codes and refresh tokens too). */
-export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'command_log', 'scorer_pairings', 'oauth_requests', 'oauth_codes', 'oauth_refresh_tokens', '__drizzle_migrations'] as const;
-/** Columns blanked in every export (sign-in secrets: password/PIN/token/request/code hashes, encrypted tokens). */
-export const SECRET_COLUMN = /(^|_)(password|pin|token|request|code)_hash$|^token_cipher$/u;
+export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'command_log', 'scorer_pairings', 'oauth_requests', 'oauth_codes', 'oauth_refresh_tokens', 'ai_oauth_states', '__drizzle_migrations'] as const;
+/**
+ * Columns blanked in every export (sign-in secrets: password/PIN/token/request/code hashes, and every
+ * sealed `…_cipher` column: link tokens, AI connection keys since S19a, D-179).
+ */
+export const SECRET_COLUMN = /(^|_)(password|pin|token|request|code)_hash$|_cipher$/u;
 /**
  * Teacher-side tables left out of the per-student export like the private notes (S14e3, D-155): a
  * teacher's notifications about the student hold ids only and are in the full export.

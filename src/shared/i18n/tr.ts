@@ -3615,6 +3615,14 @@ export const tr = {
   'aiTools.category.homeworkStatus': 'Öğrenci başına ödev durumları',
   'aiTools.category.attendance': 'Öğrenci başına yoklama',
   'aiTools.category.counts': 'Öğrenci başına sayaçlar, başarılar ve hedef sayıları',
+  // ---------------------------------------------------------------- Asistan bağlantıları (S19a, D-179)
+  'audit.action.ai_connection.create': 'Asistan bağlantısı eklendi',
+  'audit.action.ai_connection.update': 'Asistan bağlantısı değiştirildi',
+  'audit.action.ai_connection.delete': 'Asistan bağlantısı silindi',
+  'audit.action.ai_connection.connect': 'Asistan bağlantısı için sağlayıcıda giriş yapıldı',
+  'audit.action.ai_connection.settings': 'Asistan bağlantısı ayarları değiştirildi',
+  'audit.entity.ai_connection': 'Asistan bağlantısı',
+  'audit.entity.ai_connection_settings': 'Asistan bağlantısı ayarları',
   // ---------------------------------------------------------------- OAuth for AI apps (S14h2, D-160)
   'audit.action.oauth.connect': 'Yapay zekâ uygulaması bağlandı',
   'audit.action.oauth.deny': 'Yapay zekâ uygulamasının bağlanmasına izin verilmedi',

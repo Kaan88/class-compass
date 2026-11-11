@@ -59,11 +59,11 @@ describe('catalogue (ReportContribution.meta)', () => {
     const all = allReportContributions();
     expect(new Set(all.map((c) => c.key)).size).toBe(all.length);
     for (const c of all) {
-      expect(en[c.meta.title], c.key).toBeTruthy();
+      expect((en as Record<string, string>)[c.meta.title], c.key).toBeTruthy();
       expect(new Set(c.meta.tables.map((t) => t.key)).size, c.key).toBe(c.meta.tables.length);
       for (const t of c.meta.tables) {
         expect(t.key, c.key).toMatch(/^[A-Za-z][A-Za-z0-9]*$/u);
-        expect(en[t.title], `${c.key}.${t.key}`).toBeTruthy();
+        expect((en as Record<string, string>)[t.title], `${c.key}.${t.key}`).toBeTruthy();
       }
     }
     for (const id of BUILTIN_VIEW_IDS) {

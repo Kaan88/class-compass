@@ -6663,6 +6663,56 @@ html[data-cursor='off'] * {
   margin: 0;
   padding-inline-start: 1.25rem;
 }
+/* Assistant connections (S19a, D-179): a model per line with its test mark and Test button; ticks with touch-sized rows. */
+.cc-ai-models {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.375rem;
+}
+.cc-ai-models li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.cc-ai-models code {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.cc-ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.cc-ai-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-height: var(--cc-touch);
+  min-width: 0;
+}
+.cc-ai-check input {
+  margin-top: 0.3rem;
+  flex: none;
+}
+.cc-ai-check span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-ai-test {
+  margin: 0;
+  font-weight: 600;
+}
+.cc-ai-test:empty {
+  display: none;
+}
+.cc-ai-return {
+  max-width: 40rem;
+}
 /* OAuth consent page (S14h2, D-160): the app's own name as plain text, the return host prominent. */
 .cc-oauth {
   max-width: 40rem;

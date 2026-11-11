@@ -130,6 +130,35 @@ describe('en/tr dictionaries', () => {
   });
 });
 
+describe('area dictionaries (S19a, D-179)', () => {
+  const areas = import.meta.glob<{ en: Record<string, string>; tr: Record<string, string> }>('../../src/shared/i18n/areas/*.ts', { eager: true });
+  const list = Object.entries(areas).filter(([p]) => !p.endsWith('/keys.ts'));
+  it('exist, and each has the same keys, placeholders and no empty values in both languages', () => {
+    expect(list.length).toBeGreaterThan(0);
+    const ph = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+    for (const [path, a] of list) {
+      expect(Object.keys(a.tr).sort(), path).toEqual(Object.keys(a.en).sort());
+      for (const k of Object.keys(a.en)) {
+        expect(JSON.stringify(ph(a.tr[k]!)), `${path} ${k}`).toBe(JSON.stringify(ph(a.en[k]!)));
+        expect(a.en[k]!.trim() && a.tr[k]!.trim(), `${path} ${k}`).toBeTruthy();
+        expect(/\bbadges?\b/i.test(a.en[k]!) || /rozet/i.test(a.tr[k]!), `${path} ${k}`).toBe(false);
+      }
+    }
+  });
+  it('never repeat a key of the main dictionary or of another area', () => {
+    const seenKeys = new Set(Object.keys(en));
+    for (const [path, a] of list)
+      for (const k of Object.keys(a.en)) {
+        expect(seenKeys.has(k), `${path} ${k}`).toBe(false);
+        seenKeys.add(k);
+      }
+  });
+  it('are listed in keys.ts (so MessageKey knows them)', () => {
+    const keysFile = readFileSync(new URL('../../src/shared/i18n/areas/keys.ts', import.meta.url), 'utf8');
+    for (const [path] of list) expect(keysFile, path).toContain(`import('./${path.split('/').pop()}')`);
+  });
+});
+
 describe('no untranslated text in JSX', () => {
   /** Attributes whose string value is shown to (or read out for) the user. */
   const TEXT_ATTRS = new Set(['aria-label', 'aria-description', 'title', 'alt', 'label', 'placeholder', 'description', 'errorMessage', 'caption', 'emptyText', 'actionLabel']);

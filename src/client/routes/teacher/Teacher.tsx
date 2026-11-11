@@ -24,6 +24,7 @@ import * as School from '../../../shared/contracts/school.ts';
 import { SensitiveGate } from '../Lock.tsx';
 import { StudentStatsProvider } from '../../ui/StudentName.tsx';
 import { AiToolsSection } from '../AiTools.tsx';
+import { OwnAiConnectionsSection } from '../AiConnections.tsx';
 
 /** The notifications page key: the bell stands for it in the navigation and on the menu (S14e3). */
 const NOTIFICATIONS_PAGE = 'notifications';
@@ -315,6 +316,8 @@ export function ProfilePage() {
       <SignInMethodSection me={me} emailLinkEnabled={signInInfo.data?.emailLinkEnabled ?? false} />
       {/* Personal tokens for AI tools (S14h1, D-160): behind the PIN gate, with re-authentication. */}
       <AiToolsSection me={me} />
+      {/* The assistant's connections: the school default and, when allowed, the teacher's own (S19a, D-179). */}
+      {me.role === 'teacher' ? <OwnAiConnectionsSection /> : null}
     </main>
   );
 }
