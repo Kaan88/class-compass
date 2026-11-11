@@ -115,6 +115,8 @@ Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bi
 
 ## Asistan bağlantıları
 
+![Denenmiş bir okul bağlantısıyla Asistan bağlantıları](../img/tr/ai-connections.png)
+
 **Yapay zekâ araçları** → **Asistan bağlantıları**, Sınıf Pusulası içindeki asistan için okulun bir yapay zekâ sağlayıcısındaki kendi hesabını bağladığınız yerdir. Siz bir bağlantı eklemeden hiçbir şey bağlanmaz. Bu bölüm **Yapay zekâ araçları** sayfasının ilk bölümüdür; yapay zekâ uygulamalarının (MCP) ayarlarının üstündedir.
 
 Asistan sohbetini açtığınızda öğretmenler bu bağlantıları **Asistan** sayfalarında kullanır (aşağıdaki [Asistan sohbeti](#asistan-sohbeti) bölümüne bakın).

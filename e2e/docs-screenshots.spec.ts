@@ -19,6 +19,10 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { translate, type Locale, type MessageKey } from '../src/shared/i18n/index.ts';
 // Every dictionary registered, staff strings included (S23a, D-182).
 import '../tests/messages.ts';
+// The assistant chat area dictionary (S19b) is not in tests/messages.ts; importing it registers it.
+import '../src/shared/i18n/areas/assistantChat.ts';
+import { FAKE_KEYS, FakeProvider } from '../tests/ai-fake.ts';
+import { lastToolResult, script } from '../tests/assistant-fake.ts';
 import { api, ensurePin, login, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
 
 const IMG_ROOT = path.resolve(import.meta.dirname, '../docs/guides/img');
@@ -107,6 +111,9 @@ for (const lang of ['en', 'tr'] as const) {
     expect((await api(tp, 'PUT', `/api/teacher/classes/${ctx3A.classId}/language`, classLang)).status).toBe(200);
     expect((await api(ap, 'PUT', '/api/admin/speakers/settings', { boardLanguage: lang })).status).toBe(200);
     let aiToolsOn = false;
+    let fake: FakeProvider | null = null;
+    let connectionId: string | null = null;
+    let chatId: string | null = null;
 
     try {
       // ---------------------------------------------------------------- teacher area
@@ -209,7 +216,8 @@ for (const lang of ['en', 'tr'] as const) {
         await ap.goto('/admin/ai-tools');
         await expect(ap.getByTestId('admin-ai-tools')).toBeVisible();
         await ap.waitForTimeout(600);
-        await shot(ap, lang, 'ai-tools-admin', { from: 'main h1' });
+        // The page starts with Assistant connections (S19a/b); this picture shows the AI apps part.
+        await shot(ap, lang, 'ai-tools-admin', { from: '[data-testid="ai-checklist"]' });
         await tp.goto('/teacher/profile');
         await expect(tp.getByTestId('ai-tools')).toBeVisible();
         await shot(tp, lang, 'ai-tools-profile', { from: '[data-testid="ai-tools"]' });
@@ -223,6 +231,59 @@ for (const lang of ['en', 'tr'] as const) {
         await tp.goto(`/oauth/authorize?${q.toString()}`);
         await expect(tp.getByTestId('oauth-consent')).toBeVisible();
         await shot(tp, lang, 'oauth-consent', { from: 'main h1' });
+      }
+
+      // ---------------------------------------------------------------- Assistant connections and the Assistant page (S19a/b)
+      // A scripted local model on 127.0.0.1 (tests/assistant-fake.ts), never a real provider; removed in `finally`.
+      {
+        fake = new FakeProvider();
+        const base = `${await fake.start()}/v1`;
+        const name = lang === 'tr' ? 'Okulun modeli' : 'School model';
+        const conn = await api(ap, 'POST', '/api/admin/ai-connections', { type: 'openaiCompatible', name, baseUrl: base, localNetwork: true, models: ['school-model'], apiKey: FAKE_KEYS.compatible, kvkkConfirmed: true });
+        expect(conn.status).toBe(200);
+        connectionId = conn.body.id as string;
+        expect((await api(ap, 'PUT', '/api/admin/ai-connection-settings', { defaultConnectionId: connectionId, defaultModel: 'school-model' })).status).toBe(200);
+        expect((await api(ap, 'PUT', '/api/admin/assistant-chat', { enabled: true })).status).toBe(200);
+        await ap.goto('/admin/ai-tools');
+        await expect(ap.getByTestId('ai-connections')).toContainText(name);
+        await expect(ap.getByTestId('assistant-chat-admin').getByRole('switch')).toBeChecked();
+        // Test the model (two tiny requests without school data, answered by the fake), as an administrator would.
+        await ap.getByTestId('ai-connections').getByRole('button', { name: /school-model/u }).click();
+        await expect(ap.getByTestId('ai-conn-test-result')).toBeVisible();
+        await ap.waitForTimeout(400);
+        await shot(ap, lang, 'ai-connections', { from: '[data-testid="ai-connections"]' });
+
+        const text =
+          lang === 'tr'
+            ? { ask: 'Bu hafta hangi ödevlerin teslimi var?', look: 'Sınıflarınıza bakıyorum.', answer: (n: number) => `${n} sınıfınız var. Bu hafta teslimi olan ödev yok.`, answerRe: /^\d+ sınıfınız var\. Bu hafta teslimi olan ödev yok\.$/u, set: '3-A için okuma ödevi ver: 3. bölümü oku.', hw: 'Okuma: 3. bölüm' }
+            : { ask: 'Which homework is due this week in my classes?', look: 'Let me look at your classes.', answer: (n: number) => `You teach ${n} classes. Nothing is due this week.`, answerRe: /^You teach \d+ classes\. Nothing is due this week\.$/u, set: 'Set reading homework for 3-A: read chapter 3.', hw: 'Reading: chapter 3' };
+        script(fake, [
+          (body) => {
+            const last = body.messages.at(-1);
+            if (last.role === 'user' && last.content.includes(text.ask)) return { text: text.look, calls: [{ name: 'list_my_classes', args: {} }] };
+            if (last.role === 'tool' && Array.isArray(lastToolResult(body)?.contexts)) return { text: text.answer(lastToolResult(body).contexts.length) };
+            return { calls: [{ name: 'create_homework', args: { contextId: ctx3A.id, title: text.hw, dueOn: '2026-11-20' } }] };
+          },
+        ]);
+        await tp.goto('/teacher/ai-assistant');
+        await tp.getByTestId('assistant-new-chat').click();
+        await expect(tp.getByTestId('assistant-suggestions')).toBeVisible();
+        chatId = new URL(tp.url()).searchParams.get('chat');
+        const composer = tp.getByLabel(T('assistantChat.composer' as MessageKey));
+        await composer.fill(text.ask);
+        await tp.getByTestId('assistant-send').click();
+        await expect(tp.getByTestId('assistant-messages').getByText(text.answerRe)).toBeVisible();
+        await expect(tp.getByTestId('assistant-activity').first()).toBeVisible();
+        await expect(tp.getByTestId('assistant-stop')).toBeHidden();
+        await composer.fill(text.set);
+        await tp.getByTestId('assistant-send').click();
+        // The change waits on its card; it is never confirmed here (the chat is deleted in `finally`).
+        await expect(tp.getByTestId('assistant-change-card').last()).toHaveAttribute('data-state', 'pending');
+        // A taller window, so the whole waiting card is in the picture.
+        await tp.setViewportSize({ width: 1280, height: 1250 });
+        await tp.waitForTimeout(400);
+        await shot(tp, lang, 'assistant', { from: 'main h1' });
+        await tp.setViewportSize({ width: 1280, height: 900 });
       }
 
       await tp.goto('/teacher/import');
@@ -423,6 +484,13 @@ for (const lang of ['en', 'tr'] as const) {
       }
     } finally {
       // AI tools are off in the demo school; switching them off also ends the example connection (D-160).
+      if (chatId) await api(tp, 'DELETE', `/api/teacher/assistant-chat/chats/${chatId}`);
+      if (connectionId) {
+        await api(ap, 'PUT', '/api/admin/assistant-chat', { enabled: false });
+        await api(ap, 'PUT', '/api/admin/ai-connection-settings', { defaultConnectionId: null, defaultModel: null });
+        await api(ap, 'DELETE', `/api/admin/ai-connections/${connectionId}`);
+      }
+      await fake?.close();
       if (aiToolsOn) await api(ap, 'PUT', '/api/admin/ai-tools', { mcpEnabled: false });
       await api(tp, 'POST', '/api/auth/pin/unlock', { pin: PIN });
       await api(tp, 'PUT', `/api/teacher/classes/${ctx3A.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false });

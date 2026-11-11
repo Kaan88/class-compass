@@ -359,6 +359,8 @@ Sayfanın adresi sınıfı, öğrenciyi, görünümü ve süreyi her zaman içer
 
 ## Asistan
 
+![Kartında bir değişikliğin onay beklediği Asistan sayfası](../img/tr/assistant.png)
+
 **Asistan** (öğretmen menüsü → Bugün), sınıflarınız hakkında bir yapay zekâ modeliyle sohbettir: hangi ödevlerin teslimi geldiğini sorun, bir raporu özetletin, ders konularını planlayın ya da veliler için bir not taslağı hazırlatın. Yalnızca bir yönetici açtıysa ve okulun yapay zekâ araçları açıksa çalışır; değilse sayfa nedenini söyler. Sınıf bilgisayarında önce PIN sorulur; asistan hiçbir zaman sınıf ekranında ya da bir öğrencinin sayfasında yer almaz.
 
 - **Yeni sohbet** bir sohbet başlatır; soldaki listede (telefonda: **Tüm sohbetler**) **Sohbetlerde ara**, **Arşivdeki sohbetleri göster** ve kaldığınız yerden sürdürebileceğiniz eski sohbetler bulunur. Sohbetin içinde: **Yeniden adlandır**, **Arşive kaldır** (ya da arşivden çıkar) ve **Sohbeti sil**. **Model**, okulunuzun (izin varsa sizin) kurduğu bağlantılardan birini seçer.

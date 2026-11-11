@@ -115,6 +115,8 @@ The full technical description (every colour, the limits, the drawing rules, a w
 
 ## Assistant connections
 
+![Assistant connections with one tested school connection](../img/en/ai-connections.png)
+
 **AI tools** → **Assistant connections** is where you connect the school's own account with an AI provider, for the assistant inside Class Compass. Nothing is connected until you add a connection. It is the first part of the **AI tools** page, above the settings for AI apps (MCP).
 
 Teachers use these connections on their **Assistant** page once you switch the assistant chat on (see [Assistant chat](#assistant-chat) below).

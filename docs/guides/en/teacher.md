@@ -359,6 +359,8 @@ On the **Notifications** page:
 
 ## Assistant
 
+![The Assistant page with a change waiting on its card](../img/en/assistant.png)
+
 **Assistant** (teacher menu → Today) is a chat with an AI model about your classes: ask what homework is due, have a report summarised, plan lesson topics or draft a note for parents. It works only when an administrator has switched it on and the school's AI tools are on; otherwise the page says why. On a classroom computer the PIN is asked first, and the assistant is never on the classroom screen or a student's page.
 
 - **New chat** starts a chat; the list on the left (on a phone: **All chats**) has **Search chats**, **Show archived chats** and your earlier chats to continue. In a chat: **Rename**, **Archive** (or bring it back) and **Delete chat**. **Model** chooses one of the connections your school (or you, if allowed) set up.
