@@ -808,7 +808,9 @@ Open `/dev/catalog`: every pose, illustration, sound button and "Play the celebr
 **New sound event** — add the name to `SOUND_EVENTS` (`src/shared/themePackage/tokens.ts`), a
 priority to `SOUND_PRIORITY` (`soundManager.ts`), a cue in `makeSoundPack`
 (`src/shared/themePackage/sound.ts`; every theme and every package then has it), a label
-`sound.<event>` in en.ts and tr.ts, and call `playEvent('<event>')` where it happens. The theme test
+`sound.<event>` in the staff dictionary `src/shared/i18n/areas/staff/en.ts` and `tr.ts` (D-182; in the
+main dictionary `src/shared/i18n/en.ts` and `tr.ts` only if the student page shows it, which
+`tests/scripts/i18n-split.test.ts` checks), and call `playEvent('<event>')` where it happens. The theme test
 and the package validator check every pack.
 
 **New colour token** — add it to `COLOR_TOKENS` and `TOKEN_DOCS` (`src/shared/themePackage/tokens.ts`),

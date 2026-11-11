@@ -11,8 +11,8 @@
  *    `displayInfoClientManifest` from `CLIENT_MODULES` (`src/client/modules/index.ts`).
  * 3. Remove the `'displayInfo.lastSeen'` line (and its import) from `USER_SETTINGS`
  *    (`src/server/lib/userSettings.ts`).
- * 4. Delete the `displayInfo.*` keys from `src/shared/i18n/en.ts` and `tr.ts`, and the "Classroom
- *    screens" section from `docs/guides/{en,tr}/admin.md`.
+ * 4. Delete the `displayInfo.*` keys from the staff dictionary `src/shared/i18n/areas/staff/en.ts` and
+ *    `tr.ts` (D-182), and the "Classroom screens" section from `docs/guides/{en,tr}/admin.md`.
  * 5. Optionally drop the stored rows (no migration is involved):
  *    `DELETE FROM user_settings WHERE key = 'displayInfo.lastSeen';`
  * There is no catalogue line to remove: as a core module it is not in `src/shared/modules.ts`. The

@@ -216,7 +216,7 @@ export interface ClientModuleManifest {
   key: string;
   /** Policy key from `src/shared/modules.ts`, or null for core pieces that are always on. */
   policyKey: PolicyKey | null;
-  /** Prefix of the module's i18n keys (`<namespace>.…`), present in en.ts and tr.ts. */
+  /** Prefix of the module's i18n keys (`<namespace>.…`), present in en.ts and tr.ts of the staff dictionary (`src/shared/i18n/areas/staff/`, D-182). */
   i18nNamespace: string;
   dashboardSlots?: readonly DashboardSlot[];
   startSteps?: readonly StartStep[];
