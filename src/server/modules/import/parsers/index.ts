@@ -86,6 +86,14 @@ export async function extractFile(
         if (chosen.length > 1) notices.push('SHEETS_READ');
         return { sourceType: file.mime === MIME.xlsx ? 'xlsx' : 'xls', rows: cap(rows.filter((r) => keep.has(r.page ?? 0)), notices), notices, sheets: chosen.length ? chosen : null };
       }
+      case MIME.htmlTable: {
+        // An HTML table with a .xls name (S20c, D-171): table text only, read in the parser worker.
+        const { rows, truncated } = await runParser('htmlTable', buf, config.PARSE_TIMEOUT_MS);
+        notices.push('HTML_TABLE');
+        if (truncated) notices.push('TOO_MANY_ROWS');
+        if (!rows.some((r) => r.cells.some((c) => c.trim()))) throw fail('IMPORT_NO_ROWS', 'No names were found');
+        return { sourceType: 'xls', rows: cap(rows, notices), notices: [...new Set(notices)], sheets: null };
+      }
       case MIME.docx:
         return { sourceType: 'docx', rows: cap(await runParser('docx', buf, config.PARSE_TIMEOUT_MS), notices), notices, sheets: null };
       case MIME.pdf: {

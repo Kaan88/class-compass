@@ -31,7 +31,8 @@ export const EVIDENCE_IMAGE_EDGE = 2048;
 /**
  * Allow-list of sniffed types per kind. Never SVG, HTML, XML or scripts. `text/plain` covers CSV and
  * TXT (checked to be text without markup); `application/x-cfb` is accepted only when it is an
- * Excel 97-2003 workbook.
+ * Excel 97-2003 workbook. `application/x-cc-html-table` (student lists only, S20c, D-171) is an HTML
+ * table saved with a `.xls` name: only its table text is ever read, and it is never served as HTML.
  */
 export const ALLOWED_MIME: Record<FileKind, readonly string[]> = {
   image: ['image/jpeg', 'image/png', 'image/webp'],
@@ -54,6 +55,7 @@ export const ALLOWED_MIME: Record<FileKind, readonly string[]> = {
     'image/jpeg',
     'image/png',
     'image/webp',
+    'application/x-cc-html-table',
   ],
   teacher_sound: ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg'],
 };

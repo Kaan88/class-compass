@@ -2,6 +2,12 @@
  * Content sniffing (S9, STU-8). The type of an upload is decided from its bytes only, never from the
  * client's Content-Type or file name, and checked against the per-kind allow-list. Markup (SVG,
  * HTML, XML) and scripts are always refused, also when they pretend to be text or an image.
+ *
+ * The one exception (S20c, D-171): an HTML document with a table, uploaded as a student list with a
+ * `.xls` name (some school systems export lists like that), gets the internal type
+ * `application/x-cc-html-table`. Only the `import_source` kind allows it, the name is an extra
+ * condition (never a reason on its own), the importer reads only the table text in its parser worker,
+ * and the file is never served as HTML (attachment, sandbox CSP, nosniff, that internal type).
  */
 import fsp from 'node:fs/promises';
 import { fileTypeFromFile } from 'file-type';
@@ -23,6 +29,8 @@ export const MIME = {
   mp4: 'audio/mp4',
   mp3: 'audio/mpeg',
   wav: 'audio/wav',
+  /** An HTML table saved with a `.xls` name (import sources only, D-171); never served as HTML. */
+  htmlTable: 'application/x-cc-html-table',
 } as const;
 
 export type SniffResult = { ok: true; mime: string } | { ok: false; reason: 'FILE_TYPE_NOT_ALLOWED' | 'FILE_EMPTY'; detected: string | null };
@@ -85,12 +93,54 @@ export function looksLikePlainText(buf: Buffer): boolean {
   return !MARKUP.test(text);
 }
 
-/** Sniff a file on disk against the allow-list `allowed`. */
-export async function sniffFile(file: string, allowed: readonly string[]): Promise<SniffResult> {
+/**
+ * Is this an HTML document with a table (D-171)? Before the first element there may only be
+ * whitespace, a BOM, an XML declaration, an HTML doctype and comments; the first element must be
+ * `html`, `head`, `body`, `meta` or `table`, and a `<table` followed by a `<tr` must come later.
+ */
+export function looksLikeHtmlTable(buf: Buffer): boolean {
+  if (buf.length === 0) return false;
+  const le = buf[0] === 0xff && buf[1] === 0xfe;
+  const be = buf[0] === 0xfe && buf[1] === 0xff;
+  let text: string;
+  if (le || be) {
+    const body = buf.subarray(2, 2 + (Math.min(buf.length - 2, 8_000_000) & ~1));
+    text = le ? body.toString('utf16le') : Buffer.from(body).swap16().toString('utf16le');
+  } else {
+    if (buf.subarray(0, 65536).includes(0)) return false;
+    text = buf.subarray(0, 4_000_000).toString('latin1');
+  }
+  const head = text.slice(0, 65536);
+  let i = 0;
+  for (;;) {
+    while (i < head.length && /[\s﻿ï»¿]/u.test(head[i]!)) i++;
+    if (head.startsWith('<!--', i)) {
+      const e = head.indexOf('-->', i + 4);
+      if (e < 0) return false;
+      i = e + 3;
+    } else if (head.startsWith('<?xml', i) || /^<!doctype\s+html/iu.test(head.slice(i, i + 20))) {
+      const e = head.indexOf('>', i);
+      if (e < 0) return false;
+      i = e + 1;
+    } else break;
+  }
+  if (!/^<(html|head|body|meta|table)[\s>/]/iu.test(head.slice(i, i + 8))) return false;
+  const lower = text.toLowerCase();
+  const table = lower.indexOf('<table');
+  return table >= 0 && lower.indexOf('<tr', table) >= 0;
+}
+
+/**
+ * Sniff a file on disk against the allow-list `allowed`. `name` (the client's file name) is used only
+ * as an extra condition for the HTML-table exception above, never to accept anything by itself.
+ */
+export async function sniffFile(file: string, allowed: readonly string[], opts: { name?: string | null } = {}): Promise<SniffResult> {
   const stat = await fsp.stat(file);
   if (stat.size === 0) return { ok: false, reason: 'FILE_EMPTY', detected: null };
   const ft = await fileTypeFromFile(file);
   let mime: string | null = null;
+  const htmlTableAllowed = allowed.includes(MIME.htmlTable) && /\.xls$/iu.test(opts.name ?? '');
+  if ((!ft || ft.ext === 'xml') && htmlTableAllowed && looksLikeHtmlTable(await fsp.readFile(file))) return { ok: true, mime: MIME.htmlTable };
   if (ft) {
     if (ft.ext === 'cfb') {
       const buf = await fsp.readFile(file);

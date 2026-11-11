@@ -13,6 +13,7 @@ export interface ParserResults {
   workbook: { rows: SourceRow[]; sheets: number; sheetInfo: SheetInfo[] };
   docx: SourceRow[];
   pdf: { rows: SourceRow[]; scanned: boolean; pages: number };
+  htmlTable: { rows: SourceRow[]; tables: number; truncated: boolean };
 }
 
 const WORKER_URL = new URL('./worker.ts', import.meta.url);

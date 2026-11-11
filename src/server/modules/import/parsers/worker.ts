@@ -6,14 +6,17 @@
  */
 import { parentPort } from 'node:worker_threads';
 import { parseDocx } from './docx.ts';
+import { parseHtmlTables } from './html.ts';
 import { parsePdf } from './pdf.ts';
 import { parseWorkbook } from './spreadsheet.ts';
 
-export type ParserKind = 'workbook' | 'docx' | 'pdf';
+export type ParserKind = 'workbook' | 'docx' | 'pdf' | 'htmlTable';
 
 async function parse(kind: ParserKind, buf: Buffer): Promise<unknown> {
   if (kind === 'workbook') return parseWorkbook(buf);
   if (kind === 'docx') return parseDocx(buf);
+  // HTML-table .xls (S20c, D-171): table text only, never executed or fetched.
+  if (kind === 'htmlTable') return parseHtmlTables(buf);
   return parsePdf(buf);
 }
 

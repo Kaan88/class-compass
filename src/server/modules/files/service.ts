@@ -126,7 +126,7 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
   const { tmp, filename } = await receiveToTemp(ctx, req, opts.kind);
   const keys: string[] = [];
   try {
-    const sniff = await sniffFile(tmp, ALLOWED_MIME[opts.kind]);
+    const sniff = await sniffFile(tmp, ALLOWED_MIME[opts.kind], { name: filename });
     if (!sniff.ok) {
       if (sniff.detected === 'image/heic' || sniff.detected === 'image/heif') throw invalid('HEIC pictures cannot be read here', { reason: 'IMAGE_HEIC' });
       throw invalid(sniff.reason === 'FILE_EMPTY' ? 'The file is empty' : 'This type of file is not accepted', { reason: sniff.reason });
