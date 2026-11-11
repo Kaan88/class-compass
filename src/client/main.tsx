@@ -7,6 +7,8 @@ import { RouterProvider } from '@tanstack/react-router';
 import { onAuthProblem } from './lib/api.ts';
 import { setDisplay } from './lib/display.ts';
 import { getOutbox } from './lib/outbox-client.ts';
+import { registerAppWorker } from './lib/appWorker.ts';
+import { installOfflineClassroom } from './lib/offlineClassroom.ts';
 import { installClientModules } from './modules/registry.ts';
 import { purgeSensitive, queryClient } from './lib/queryClient.ts';
 import { markLocked, ME_KEY, resetSignedOut } from './lib/session.ts';
@@ -52,7 +54,12 @@ window.addEventListener('pageshow', (e) => {
 // Module manifests: register their outbox refreshes, then start the outbox so commands queued
 // before a reload are sent (UX-11).
 installClientModules();
-getOutbox();
+const outbox = getOutbox();
+
+// Offline cold start (S26b, D-190): the classroom's last data is kept on this device, and the app's
+// service worker keeps the page and its files of this build.
+installOfflineClassroom(queryClient);
+registerAppWorker({ pending: () => outbox.getStatus().pending, online: () => outbox.getStatus().online, subscribe: (fn) => void outbox.subscribe(fn) });
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

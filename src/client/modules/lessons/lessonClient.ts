@@ -8,7 +8,7 @@
  * - the server clock offset from the last full answer drives the date, day and timer display.
  */
 import { useQuery, type QueryKey } from '@tanstack/react-query';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { z } from 'zod';
 import * as L from '../../../shared/contracts/lessons.ts';
 import type { LessonCommandPayload, LessonCommandType, LessonState } from '../../../shared/contracts/lessons.ts';
@@ -168,4 +168,71 @@ export function awaitCommand(opId: string): Promise<unknown> {
       offStatus();
     };
   });
+}
+
+// ---------------------------------------------------------------- a start that waits (S26b, D-190)
+export type StartOutcome = { queued: true } | { queued: false; result: unknown };
+
+/**
+ * The server's result for a queued 'lesson.start', or `{ queued: true }` as soon as it cannot be sent
+ * now (this device is offline, or a try failed and waits for the next one). Rejects when the server
+ * refused it. A queued start stays in the outbox and is sent, in order, when the connection returns.
+ */
+export function awaitStartOrQueued(opId: string): Promise<StartOutcome> {
+  const box = getOutbox();
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const finish = (fn: () => void) => {
+      if (done) return;
+      done = true;
+      offStatus();
+      fn();
+    };
+    const check = () => {
+      const s = box.getStatus();
+      if (!s.online || s.failures > 0) finish(() => resolve({ queued: true }));
+    };
+    const offStatus = box.subscribe(check);
+    awaitCommand(opId).then(
+      (result) => finish(() => resolve({ queued: false, result })),
+      (err: unknown) => finish(() => reject(err instanceof Error ? err : new Error(String(err)))),
+    );
+    check();
+  });
+}
+
+export interface QueuedStart {
+  opId: string;
+  createdAt: number;
+}
+
+/** The start of a lesson in this class that waits in this account's outbox, or null. */
+export function useQueuedStart(contextId: string | null, ownerId: string | null): QueuedStart | null {
+  const [queued, setQueued] = useState<QueuedStart | null>(null);
+  // Every outbox change (a new status object), not only the count: an enqueue first counts as
+  // reserved and then as stored, with the same count.
+  const status = useSyncExternalStore(
+    (fn) => getOutbox().subscribe(fn),
+    () => getOutbox().getStatus(),
+    () => null,
+  );
+  const pending = status?.pending ?? 0;
+  useEffect(() => {
+    let live = true;
+    if (!contextId || !ownerId || pending === 0) {
+      setQueued(null);
+      return;
+    }
+    void getOutbox()
+      .all()
+      .then((ops) => {
+        const op = ops.find((o) => o.type === 'lesson.start' && o.state === 'pending' && o.ownerId === ownerId && o.contextId === contextId);
+        if (live) setQueued(op ? { opId: op.opId, createdAt: op.createdAt } : null);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [contextId, ownerId, pending, status]);
+  return queued;
 }

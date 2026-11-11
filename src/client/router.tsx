@@ -6,13 +6,14 @@
 import { createRootRouteWithContext, createRoute, createRouter, lazyRouteComponent, redirect } from '@tanstack/react-router';
 import { queryClient } from './lib/queryClient.ts';
 import { enterClassroom } from './lib/session.ts';
+import { isUnreachable, restoreOfflineClassroom } from './lib/offlineClassroom.ts';
 import { AdminHome, AdminLayout } from './routes/admin/Admin.tsx';
 import { ChangePasswordPage, LoginPage, ResetPasswordPage } from './routes/Auth.tsx';
 import { ClassroomPage } from './routes/Classroom.tsx';
 import { InvitePage, SignInLinkPage } from './routes/SignIn.tsx';
 import { OAuthConsentPage, type ConsentSearch } from './routes/OAuthConsent.tsx';
 import { AiConnectionReturnPage } from './routes/AiConnections.tsx';
-import { homeFor, requireSession, type RouterContext } from './routes/guards.ts';
+import { homeFor, requireClassroomSession, requireSession, type RouterContext } from './routes/guards.ts';
 import { NotFoundPage, RootLayout } from './routes/Root.tsx';
 import { allTeacherPages } from './modules/registry.ts';
 import type { TeacherPageSearch } from './modules/types.ts';
@@ -54,8 +55,9 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: async ({ context, location }) => {
-    const { me } = await requireSession({ context, location });
-    throw redirect({ to: homeFor(me) });
+    // Offline with this device's classroom copy (S26b, D-190): straight to the classroom.
+    const { me, offline } = await requireClassroomSession({ context, location });
+    throw redirect({ to: offline ? '/classroom' : homeFor(me) });
   },
 });
 
@@ -77,14 +79,25 @@ const signInLinkRoute = createRoute({ getParentRoute: () => rootRoute, path: '/s
 
 const changePasswordRoute = createRoute({ getParentRoute: () => rootRoute, path: '/change-password', beforeLoad: requireSession, component: ChangePasswordPage });
 
-/** Entering the classroom view (re)engages classroom mode = PIN lock on this device (PIN-6). */
+/**
+ * Entering the classroom view (re)engages classroom mode = PIN lock on this device (PIN-6). With no
+ * connection it opens from this device's last classroom data (S26b, D-190), always PIN-locked.
+ */
 const classroomRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/classroom',
   beforeLoad: async ({ context, location }) => {
-    const { me } = await requireSession({ context, location });
+    const { me, offline } = await requireClassroomSession({ context, location });
     if (me.role === 'admin') throw redirect({ to: '/admin' });
-    if (me.hasPin) await enterClassroom(context.queryClient);
+    if (offline) return { me };
+    if (me.hasPin) {
+      try {
+        await enterClassroom(context.queryClient);
+      } catch (err) {
+        // The connection dropped between the two calls: the copy is PIN-locked anyway.
+        if (!isUnreachable(err) || !(await restoreOfflineClassroom(context.queryClient))) throw err;
+      }
+    }
     return { me };
   },
   component: ClassroomPage,

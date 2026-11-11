@@ -250,6 +250,8 @@ export const assistantStartStep = startStep<StartTicks>({
   initial: () => null,
   Component: AssistantStartStep,
   useContribution: useAssistantStartContribution,
+  // Today's assistant is shown on the step: loaded before Start for an offline start (D-190).
+  useWarmup: (context, enabled) => void useToday(enabled ? context.id : null),
 });
 
 /** End Lesson step (optional): thank today's assistant. */

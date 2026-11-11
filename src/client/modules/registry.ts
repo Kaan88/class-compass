@@ -60,6 +60,17 @@ export const startStepsFor = (ctx: ClassroomContext) => allStartSteps().filter((
 export const initialStartValues = (): Record<string, unknown> => Object.fromEntries(allStartSteps().map((s) => [s.key, s.initial()]));
 
 /**
+ * Loads what the Start Lesson steps need before Start is pressed (S26b, D-190): every registered
+ * step's `useContribution` with its initial value and its `useWarmup` (stable order and count), so a
+ * lesson can be started after an offline reload of the classroom.
+ */
+export function useStartWarmup(ctx: ClassroomContext) {
+  const values = initialStartValues();
+  useStartContributions(ctx, values);
+  for (const s of allStartSteps()) s.useWarmup?.(ctx, enabled(ctx, s.module));
+}
+
+/**
  * Calls every registered start step's `useContribution` hook (stable order and count) and merges what
  * the enabled ones add to 'lesson.start'; `ready` is false while any enabled step is not ready.
  */

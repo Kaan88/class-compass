@@ -98,6 +98,14 @@ export interface StartStep<V = unknown> {
    * each other's part.
    */
   useContribution?: (context: ClassroomContext, value: V, enabled: boolean) => { input: StartLessonContribution; ready: boolean };
+  /**
+   * Optional React hook (S26b, D-190): load what the step's screen shows, while the classroom shows
+   * "no lesson" and before Start is pressed, so the step also works after an offline reload (its
+   * classroom-safe queries are kept on the device, `lib/offlineClassroom.ts`). Called for every
+   * registered step with `enabled` false when the module is off (then it loads nothing). The data the
+   * `useContribution` hook reads with the initial value is loaded anyway.
+   */
+  useWarmup?: (context: ClassroomContext, enabled: boolean) => void;
 }
 
 export interface EndStepUi<V = unknown> {

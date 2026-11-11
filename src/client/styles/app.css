@@ -5157,6 +5157,20 @@ li > .cc-admin-list {
   flex: none;
   margin-top: 0.15em;
 }
+/* Offline on the classroom screen (S26b, D-190): calm notes with an icon, no warning colour. */
+.cc-offline-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  min-width: 0;
+  color: var(--cc-text-muted);
+}
+.cc-offline-note > svg,
+.cc-queued-start h2 > svg {
+  flex: none;
+  margin-top: 0.15em;
+}
 .cc-chart {
   margin: 0;
 }

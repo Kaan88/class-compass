@@ -28,14 +28,16 @@ import { useMe } from '../lib/session.ts';
 import { LessonBoard } from '../modules/lessons/board/Board.tsx';
 import { classLabel } from '../modules/lessons/labels.ts';
 import { EndLessonFlow, LessonSummaryView, type EndDraft } from '../modules/lessons/EndLesson.tsx';
-import { serverNow, useActiveLessons, useLessonState, useServerOffset } from '../modules/lessons/lessonClient.ts';
-import { emptyStartDraft, StartLessonFlow, type StartDraft } from '../modules/lessons/StartLesson.tsx';
+import { serverNow, useActiveLessons, useLessonState, useQueuedStart, useServerOffset } from '../modules/lessons/lessonClient.ts';
+import { emptyStartDraft, QueuedStartCard, StartLessonFlow, StartWarmup, type StartDraft } from '../modules/lessons/StartLesson.tsx';
+import { useClassroomScreen } from '../lib/appWorker.ts';
+import { setClassroomOpen } from '../lib/offlineClassroom.ts';
 import { FullscreenButton } from '../modules/lessons/fullscreen.tsx';
 import { preloadTimeUp } from '../modules/lessons/timeUp.ts';
 import { BigButton, Button, buttonClass } from '../ui/Button.tsx';
 import { EmptyState, OutboxAttentionTray, OutboxSaveBadge, registerCommandDescription } from '../ui/Feedback.tsx';
 import { Toggle } from '../ui/Fields.tsx';
-import { IconCalendar, IconLock, IconPlay } from '../ui/icons.tsx';
+import { IconCalendar, IconCloudOff, IconLock, IconPlay } from '../ui/icons.tsx';
 import { ClassSwitcher } from '../ui/Layout.tsx';
 import { ClassroomTopBar } from '../ui/ClassroomTopBar.tsx';
 
@@ -178,6 +180,20 @@ function ClassroomScreen({
     if (outbox.pending === 0) void qc.invalidateQueries({ queryKey: ['classroom', 'lesson'] });
   }, [outbox.pending, qc]);
 
+  // Offline cold start (S26b, D-190): while this screen is open its classroom data is copied to this
+  // device; a start that waits in the outbox is shown as saved.
+  useEffect(() => {
+    setClassroomOpen(true);
+    return () => setClassroomOpen(false);
+  }, []);
+  const queuedStart = useQueuedStart(active?.id ?? null, me?.id ?? null);
+  // A new build of the app is loaded only at a quiet moment, never with a lesson on screen.
+  useClassroomScreen(lesson && mode.kind !== 'summary' ? 'lesson' : mode.kind === 'idle' ? 'idle' : 'flow');
+  const startedFromQueue = (contextId: string) => async () => {
+    await qc.refetchQueries({ queryKey: ['classroom', 'lesson', contextId] });
+    void qc.invalidateQueries({ queryKey: ['classroom', 'lessons'] });
+  };
+
   const switchTo = (id: string) => {
     setActiveId(id);
     try {
@@ -225,6 +241,9 @@ function ClassroomScreen({
       );
     }
     if (lesson) return <LessonBoard key={active.id} context={active} lesson={lesson} onEnd={() => setMode(active.id, { kind: 'ending', lessonId: lesson.id, draft: null })} />;
+    // The start screen waits for its own start while it can be sent; a start that waits (offline, or
+    // after a reload) is shown here.
+    if (queuedStart && mode.kind !== 'starting') return <QueuedStartCard key={queuedStart.opId} context={active} opId={queuedStart.opId} onStarted={startedFromQueue(active.id)} />;
     if (mode.kind === 'starting') {
       const contextId = active.id;
       return (
@@ -240,11 +259,13 @@ function ClassroomScreen({
             setMode(active.id, { kind: 'idle' });
             void qc.invalidateQueries({ queryKey: ['classroom', 'lessons'] });
           }}
+          onQueued={() => setMode(contextId, { kind: 'idle' })}
         />
       );
     }
     return (
       <section className="cc-card cc-stack" data-testid="no-lesson">
+        <StartWarmup key={active.id} context={active} />
         <p className="cc-h2">{t('lesson.noneRunning', { cls: classLabel(active, locale) })}</p>
         {closure ? (
           // A school holiday (D-186): a calm note; starting a (make-up) lesson stays possible.
@@ -298,6 +319,12 @@ function ClassroomScreen({
           <>
             {list.length > 1 ? <ClassSwitcher contexts={list} activeId={active.id} onSwitch={switchTo} inProgress={inProgress} /> : null}
             <OutboxAttentionTray />
+            {outbox.online ? null : (
+              <p className="cc-offline-note" role="status" data-testid="offline-note">
+                <IconCloudOff />
+                <span>{t('classroom.offlineNote')}</span>
+              </p>
+            )}
             {body()}
           </>
         ) : null}
