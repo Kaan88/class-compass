@@ -112,7 +112,7 @@ Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sü
 - Kayıt durumu.
 - **Ekran** bu ekranın ayarlarını açar:
   - **Sınıf dili**: yalnızca sınıf iki dil kullanıyorsa; ekranı iki dil arasında değiştirir.
-  - **Boyut**: **Küçük**, **Normal** ya da **Büyük**. Sınıfın arkasından okunabilen boyutu seçin; ekran ayrıca kendini görüntü alanına uydurur. Ders ekranında bu boyut öğrenci kartlarının başlangıç boyutudur: kalabalık olmayan bir sınıfın kartları boş alanı dolduracak kadar büyür (en fazla Büyük'e kadar), kalabalık bir sınıfın kartları en az iki sıra görünecek kadar küçülür ve bir ad hiçbir zaman bir kelimenin ortasından bölünmez. Seçim bu cihazda hatırlanır.
+  - **Boyut**: **Küçük**, **Normal** ya da **Büyük**. Sınıfın arkasından okunabilen boyutu seçin; ekran ayrıca kendini görüntü alanına uydurur. Ders ekranında bu boyut öğrenci kartlarının başlangıç boyutudur: kalabalık olmayan bir sınıfın kartları boş alanı dolduracak kadar büyür (en fazla Büyük'e kadar), kalabalık bir sınıfın kartları olabildiğince çoğu görünecek kadar küçülür (okunabilir bir boyutun altına inmez; görünmeyenlere "Aşağıda … öğrenci daha var" düğmesiyle inilir) ve bir ad hiçbir zaman bir kelimenin ortasından bölünmez. Seçim bu cihazda hatırlanır.
   - **Bu cihazda sesler**.
   - **Yerleşimi düzenle** (bkz. [Yerleşimi düzenlemek](#yerleşimi-düzenlemek)).
   - **Ses kontrolü** (bkz. [Sesler ve kutlamalar](#sesler-ve-kutlamalar)).

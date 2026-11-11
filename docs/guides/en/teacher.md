@@ -112,7 +112,7 @@ Press **Save and end lesson**. The summary **Lesson saved** shows the time, the 
 - The save state.
 - **Display** opens the settings of this screen:
   - **Class language**: only when the class uses two languages, to switch the screen between them.
-  - **Size**: **Compact**, **Normal** or **Large**. Pick what is readable from the back of the room; the screen also fits itself to the display. On the lesson screen the size is where the student cards start: a small class grows its cards into the free space (up to Large), a large class gets smaller cards so that at least two rows show, and a name never breaks inside a word. The choice is remembered on this device.
+  - **Size**: **Compact**, **Normal** or **Large**. Pick what is readable from the back of the room; the screen also fits itself to the display. On the lesson screen the size is where the student cards start: a small class grows its cards into the free space (up to Large), a large class gets smaller cards so that as many as possible show (never below a readable size; the rest are under the "more students below" button), and a name never breaks inside a word. The choice is remembered on this device.
   - **Sounds on this device**.
   - **Customise layout** (see [Customise layout](#customise-layout)).
   - **Sound check** (see [Sounds and celebrations](#sounds-and-celebrations)).

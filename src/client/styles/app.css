@@ -2197,8 +2197,8 @@ html:has(.cc-classroom) {
   font-size: var(--cc-card-name);
 }
 .cc-classroom .cc-student-card__add {
-  min-width: 3.25rem;
-  min-height: 3.25rem;
+  min-width: var(--cc-touch);
+  min-height: var(--cc-touch);
   padding: 0;
   font-size: 1.5rem;
 }
@@ -2859,12 +2859,13 @@ html:has(.cc-classroom) {
   --cc-card-min: 10rem;
   --cc-card-avatar: 2rem;
 }
-/* Compact cards are too narrow for a name beside both the avatar and the + button ("Şimşe / k" at
-   1280×720, S14i review): the name takes the whole first line next to the avatar, the + button sits
-   beside the count under it, so a name breaks only between words. The grid's own compact mode for a
-   class of more than 24 (CRD-3) has the same narrow cards at every display density (S20a review). */
-.cc-classroom[data-density='compact'] .cc-lesson-board .cc-student-card,
-.cc-lesson-board .cc-student-grid[data-density='compact'] .cc-student-card {
+/* Cards the fit does not size (below 64rem the page scrolls, D-177: a phone or a narrow window) can be
+   too narrow for a name beside both the avatar and the + button ("Şimşe / k" at 1280×720, S14i
+   review; "Kurg / u" on a phone, S22c review): the name takes the whole first line next to the avatar,
+   the + button sits beside the count and the marks under it, so a name breaks only between words.
+   Fitted cards choose this layout themselves (`data-fit-name="across"`) only where a name needs it, so
+   the Compact density no longer forces it there (it made Compact cards taller than Large, S22c review). */
+.cc-lesson-board .cc-student-grid:not([data-fit]) .cc-student-card {
   grid-template-areas:
     'avatar name name'
     'meta meta add';
@@ -2932,9 +2933,6 @@ html:has(.cc-classroom) {
 }
 .cc-lesson-board .cc-student-card__count {
   line-height: 1.1;
-}
-.cc-lesson-board .cc-student-card__add {
-  min-width: 2.9rem;
 }
 /* The class switcher above the board is a little lower, so the board keeps that height. */
 .cc-classroom .cc-class-switcher .cc-btn {

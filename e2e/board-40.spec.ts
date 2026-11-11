@@ -19,9 +19,12 @@
  *   is in view.
  * The 40-student class is also checked at Compact and Large display density. Then this lesson's
  * achievements and the group numbers (card marks from the achievements and grouping add-ons) are
- * given in the 28 and 40 classes: they show with their accessible names, never overlap the name, the
- * + button or the chips at any density, and disappear when the module is switched off. Axe on the
- * student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
+ * given in the 19, 28 and 40 classes: they show with their accessible names, never overlap the name,
+ * the + button or the chips at any density, and disappear when the module is switched off. With room
+ * to spare (a class of 8) a Compact card is never taller than a Large one (S22c review: Compact kept
+ * the name across the card and grew taller). On a phone (375×812, where the page scrolls and the fit
+ * does not size the cards) the classes of 8 and 19 (with marks) keep names whole and the + button a
+ * touch target (S22c review). Axe on the student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
  */
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -192,6 +195,39 @@ async function fullRowsOnScreen(page: Page) {
   }, BOX);
 }
 
+/** The tallest card on the board. */
+const cardHeight = (p: Page) => p.locator('.cc-student-card').evaluateAll((els) => Math.max(...els.map((e) => e.getBoundingClientRect().height)));
+
+const PHONE = { width: 375, height: 812, scale: 2, name: '375x812@2' } as const;
+
+/**
+ * The board on a phone: the page scrolls, the fit leaves the cards alone, and the name still takes the
+ * whole first line beside the avatar (no word broken inside), the + button is a touch target and
+ * nothing overlaps or reaches past the screen (S22c review).
+ */
+async function checkPhone(browser: Browser, cls: TestClass, label: string) {
+  const ctx = await browser.newContext({ viewport: { width: PHONE.width, height: PHONE.height }, deviceScaleFactor: PHONE.scale, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
+  const p = await ctx.newPage();
+  try {
+    await login(p, 'english');
+    await p.goto('/classroom');
+    await p.getByRole('button', { name: new RegExp(`${cls.name} · English`, 'u') }).first().click();
+    await expect(p.locator('.cc-student-card')).toHaveCount(cls.size);
+    await expect(p.locator('.cc-student-grid')).not.toHaveAttribute('data-fit', /.*/u);
+    await settle(p);
+    await p.screenshot({ path: `${SHOTS}/${label.replace(/\s+/gu, '-')}.png`, fullPage: true });
+    const se = await p.evaluate(() => document.scrollingElement!.scrollWidth > document.scrollingElement!.clientWidth + 1);
+    expect(se, `${label}: sideways page scroll`).toBe(false);
+    expect(await unreadableNames(p), `${label}: unreadable names`).toEqual([]);
+    expect(await splitWords(p), `${label}: words split over two lines`).toEqual([]);
+    expect(await smallAddButtons(p), `${label}: + buttons under a touch target`).toEqual([]);
+    expect(await overlaps(p), `${label}: overlapping card parts`).toEqual([]);
+    test.info().annotations.push({ type: 'phone card height', description: `${label}: ${Math.round(await cardHeight(p))} px` });
+  } finally {
+    await ctx.close();
+  }
+}
+
 /** The scroll position of the student box (the element "N more students below" scrolls). */
 const studentsScrollTop = (page: Page) => page.evaluate((sel) => document.querySelector(sel)!.scrollTop, BOX);
 const fitStep = (page: Page) => page.locator('.cc-student-grid').getAttribute('data-fit');
@@ -328,7 +364,7 @@ async function checkMarks(p: Page, cls: TestClass, label: string) {
  */
 for (const classSize of CLASS_SIZES) {
   test(`a class of ${classSize} on the board at 1536×703 and 1536×864 (scale 1.25), 1920×1080 and 1366×768`, async ({ page, browser }) => {
-    test.setTimeout(classSize >= 28 ? 420_000 : 240_000);
+    test.setTimeout(classSize >= 19 ? 420_000 : 240_000);
     await login(page, 'admin');
     const years = (await api(page, 'GET', '/api/admin/years')).body.years as Array<{ id: string; archived: boolean; startsOn: string }>;
     const year = years.filter((y) => !y.archived).sort((a, b) => b.startsOn.localeCompare(a.startsOn))[0]!;
@@ -360,7 +396,7 @@ for (const classSize of CLASS_SIZES) {
       const active = (await api(teacher, 'GET', '/api/classroom/lessons/active')).body.lessons as Array<{ contextId: string; lessonId: string }>;
       cls.lessonId = active.find((l) => l.contextId === cls.contextId)!.lessonId;
 
-      const withMarks = classSize >= 28;
+      const withMarks = classSize >= 19;
       for (const round of withMarks ? (['plain', 'marks'] as const) : (['plain'] as const)) {
         if (round === 'marks') await giveMarks(teacher, cls);
         for (const size of SIZES) {
@@ -376,6 +412,7 @@ for (const classSize of CLASS_SIZES) {
                 if (classSize === 40) expect(seen.rows, `${label}: full rows of cards on screen`).toBeGreaterThanOrEqual(2);
               }
               await setDensity(p, 'Normal');
+              if (classSize === 19 && size === SIZES[0]) await checkPhone(browser, cls, `${PHONE.name} 19 marks`);
               continue;
             }
             const label = `${size.name} ${classSize} Normal`;
@@ -384,6 +421,18 @@ for (const classSize of CLASS_SIZES) {
               // A small class grows into the free height: every card on screen, above the Normal size.
               expect(seen.visible, `${label}: every card on screen`).toBe(8);
               expect(stepValue(seen.step), `${label}: cards grown above Normal (step ${seen.step})`).toBeGreaterThan(2);
+              // Compact never gives taller cards than Large where every card fits (S22c review).
+              const heights: Record<string, number> = {};
+              for (const density of ['Compact', 'Large'] as const) {
+                await setDensity(p, density);
+                const l = `${size.name} 8 ${density}`;
+                const s = await checkBoard(p, cls, l);
+                expect(s.visible, `${l}: every card on screen`).toBe(8);
+                heights[density] = await cardHeight(p);
+              }
+              expect(heights.Compact!, `${label}: a Compact card is not taller than a Large one`).toBeLessThanOrEqual(heights.Large! + 1);
+              await setDensity(p, 'Normal');
+              if (size === SIZES[0]) await checkPhone(browser, cls, `${PHONE.name} 8 Normal`);
             }
             if (classSize === 40) {
               // At least two full rows of a class of 40 at every size (the S16c box).
