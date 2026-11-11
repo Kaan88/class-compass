@@ -130,7 +130,7 @@ function GoalCard({ goal, outcomes, onAddEvidence }: { goal: Goal; outcomes: rea
       <GoalSummary goal={goal} outcomes={outcomes} />
       {goal.authorType === 'student' ? <HideToggle kind="goal" id={goal.id} hidden={goal.hidden === true} /> : null}
       <div>
-        <Button size="small" onPress={onAddEvidence} aria-label={t('goals.addEvidenceFor', { goal: goal.text })} data-testid="goal-add-evidence">
+        <Button onPress={onAddEvidence} aria-label={t('goals.addEvidenceFor', { goal: goal.text })} data-testid="goal-add-evidence">
           <IconPlus />
           {t('goals.addEvidence')}
         </Button>

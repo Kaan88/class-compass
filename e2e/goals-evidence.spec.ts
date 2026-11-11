@@ -2,7 +2,9 @@
  * S20b (D-170, GOL-4): a teacher adds evidence from the Goals page. "Add evidence" on a goal card
  * opens the evidence form for that goal; a document goes up through the S9 teacher upload endpoint
  * and is listed under Evidence with its goal; the student page shows it as the teacher's. With the
- * media flags off (the demo default) the form offers no picture or voice choices. Axe on the page.
+ * media flags off (the demo default) the form offers no picture or voice choices. The upload request
+ * carries the class+subject and the student (so the Goals checks run before storing), and the
+ * "Add evidence" button is a full touch target. Axe on the page.
  * Fictional demo data only; the goal is archived and the evidence deleted afterwards.
  */
 import AxeBuilder from '@axe-core/playwright';
@@ -43,7 +45,10 @@ test('the teacher adds a document as evidence for a goal from the Goals page and
 
     // "Add evidence" on the goal card: the form is now for that goal and the focus is on Evidence.
     const card = view.getByTestId('teacher-goal').filter({ hasText: goalText });
-    await card.getByRole('button', { name: `Add evidence: ${goalText}` }).click();
+    const addEvidence = card.getByRole('button', { name: `Add evidence: ${goalText}` });
+    // The way into the flow is a full-size touch target (UX-6: at least var(--cc-touch), 56 px).
+    expect((await addEvidence.boundingBox())!.height).toBeGreaterThanOrEqual(56);
+    await addEvidence.click();
     await expect(page.locator('#goals-evidence')).toBeFocused();
     const form = view.getByTestId('evidence-form');
     await expect(form.getByLabel('For which goal?')).toHaveValue(goal.body.id);
@@ -55,7 +60,13 @@ test('the teacher adds a document as evidence for a goal from the Goals page and
     await expect(form.getByTestId('evidence-pending')).toContainText(fileName);
     await form.getByLabel('A few words about it (optional)').fill('Reading log from class');
     expect(await seriousViolations(page, '[data-testid="teacher-student-goals"]')).toEqual([]);
+    // The page names its class+subject on the upload, so the Goals checks run before the file is stored (D-170).
+    const uploadRequest = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname === '/api/files');
     await form.getByRole('button', { name: 'Add evidence', exact: true }).click();
+    const uploadParams = new URL((await uploadRequest).url()).searchParams;
+    expect(uploadParams.get('contextId')).toBe(ctx.id);
+    expect(uploadParams.get('ownerStudentId')).toBe(student.id);
+    expect(uploadParams.get('kind')).toBe('document');
 
     const item = view.locator('li.cc-evidence').filter({ hasText: fileName });
     await expect(item).toBeVisible();
