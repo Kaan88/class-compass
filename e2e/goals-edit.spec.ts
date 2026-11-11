@@ -131,6 +131,9 @@ test('a teacher renames a default goal category for their classes; students see 
   await ensurePin(page);
   const ctx = await context3A(page);
   const roster = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/roster`)).body.students as Rostered[];
+  // Turkish on as a second language, so the form shows both names (switched back in finally: shared demo data).
+  const setLanguage = async (secondLanguageEnabled: boolean) => expect((await api(page, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled })).status).toBe(200);
+  await setLanguage(true);
   try {
     await page.goto(`/teacher/goals?contextId=${ctx.id}`);
     await page.getByRole('tab', { name: 'Categories and preset goals' }).click();
@@ -142,6 +145,13 @@ test('a teacher renames a default goal category for their classes; students see 
     const en = form.getByLabel(/^Name \(English\)/u);
     await expect(en).toBeFocused();
     await en.fill('Reading club');
+    // The school's Turkish name is not kept under a new English name: the Turkish field empties and
+    // says "Needs translation" until the teacher writes one (review fix, D-176).
+    const trField = form.getByLabel(/^Name \(Turkish\)/u);
+    await expect(trField).toHaveValue('');
+    await expect(form.getByTestId('needs-translation')).toBeVisible();
+    await trField.fill('Okuma kulübü');
+    await expect(form.getByTestId('needs-translation')).toHaveCount(0);
     await card.screenshot({ path: 'test-results/s22b/category-rename.png' });
     expect(await seriousViolations(page)).toEqual([]);
     await form.getByRole('button', { name: 'Save' }).click();
@@ -170,5 +180,6 @@ test('a teacher renames a default goal category for their classes; students see 
     await expect(page.getByTestId('library-category').filter({ has: page.getByRole('heading', { name: 'Reading', exact: true }) })).toBeVisible();
   } finally {
     expect((await api(page, 'PATCH', `/api/teacher/goal-categories/${READING}`, { contextId: ctx.id, resetName: true })).status).toBe(200);
+    await setLanguage(false);
   }
 });

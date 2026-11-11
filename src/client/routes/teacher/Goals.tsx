@@ -35,6 +35,7 @@ import { Button } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextArea, TextField, Toggle } from '../../ui/Fields.tsx';
 import type { ClassLocale } from '../../../shared/classLanguage.ts';
+import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { IconArchive, IconBack, IconLock, IconPencil, IconPlus, IconTrash, IconUndo } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
@@ -390,21 +391,53 @@ function Overview({ contextId, onOpen }: { contextId: string; onOpen: (studentId
 }
 
 /**
+ * One edit in the rename form (S22b review fix, D-176). A default category arrives with the school's
+ * name in both languages. When the teacher changes one language, every language they have not typed
+ * in that still holds the school's text is cleared: a visible field then shows "Needs translation",
+ * and a language that is off for the teacher's classes does not keep a stale school translation that
+ * a class would fall back to. A language the teacher typed in themselves is never cleared.
+ */
+export function renameEdit(
+  prev: LocalizedTextValue,
+  next: LocalizedTextValue,
+  school: LocalizedTextValue | null,
+  touched: readonly ClassLocale[],
+): { value: LocalizedTextValue; touched: ClassLocale[] } {
+  const all: ClassLocale[] = ['en', 'tr'];
+  const changed = all.filter((l) => (next[l] ?? '') !== (prev[l] ?? ''));
+  const nowTouched = [...touched, ...changed.filter((l) => !touched.includes(l))];
+  if (!school) return { value: next, touched: nowTouched };
+  const differs = changed.some((l) => (next[l] ?? '').trim() !== (school[l] ?? ''));
+  let value = next;
+  if (differs) for (const o of all) if (!nowTouched.includes(o) && value[o] && value[o] === school[o]) value = { ...value, [o]: '' };
+  return { value, touched: nowTouched };
+}
+
+/**
  * Rename a category (S22b, D-176): one field per language of the teacher's classes in this subject;
  * a renamed default shows the school's name and can go back to it. Opened by the category's "Rename"
  * button, below its heading row; `onClose` puts the focus back on that button.
  */
-function CategoryRename({ contextId, category, locales, onClose }: { contextId: string; category: Category; locales: readonly ClassLocale[]; onClose: () => void }) {
+export function CategoryRename({ contextId, category, locales, onClose }: { contextId: string; category: Category; locales: readonly ClassLocale[]; onClose: () => void }) {
   const { t, locale } = useI18n();
   const run = useRun();
-  const [name, setName] = useState(category.name);
+  const [name, setName] = useState<LocalizedTextValue>(category.name);
+  const [touched, setTouched] = useState<ClassLocale[]>([]);
+  // The school's text a default inherits (its current name until the teacher renamed it).
+  const school = category.custom ? null : (category.defaultName ?? category.name);
+  const edit = (next: LocalizedTextValue) => {
+    const r = renameEdit(name, next, school, touched);
+    setName(r.value);
+    setTouched(r.touched);
+  };
   const shown = pickText(category.name, locale);
   const save = (input: { name: typeof name } | { resetName: true }) =>
     void run(() => call(G.updateCategory, { categoryId: category.id, ...(category.custom ? {} : { contextId }), ...input }), { invalidate: [ALL], success: t('goals.toast.renamed') }).then((r) => {
       if (r) onClose();
     });
   const titleId = `rename-${category.id}`;
-  const filled = Boolean(name.en?.trim() || name.tr?.trim());
+  // Only the languages shown count: a hidden language's text alone must not enable Save (review fix).
+  const filled = locales.some((l) => Boolean(name[l]?.trim()));
   return (
     <section className="cc-stack" aria-labelledby={titleId} data-testid="category-rename">
       <h4 id={titleId} className="cc-h3">
@@ -415,7 +448,7 @@ function CategoryRename({ contextId, category, locales, onClose }: { contextId: 
         {category.custom ? null : ` ${t('goals.renameDefaultHint')}`}
       </p>
       {category.defaultName ? <p className="cc-muted">{t('goals.schoolName', { name: pickText(category.defaultName, locale) })}</p> : null}
-      <LangFields label={t('goals.categoryName')} value={name} onChange={setName} locales={locales} testId="category-rename-fields" autoFocus maxLength={80} />
+      <LangFields label={t('goals.categoryName')} value={name} onChange={edit} locales={locales} testId="category-rename-fields" autoFocus maxLength={80} />
       <div className="cc-row">
         <Button variant="primary" isDisabled={!filled} onPress={() => save({ name: localized(name.en ?? '', name.tr ?? '') })}>
           {t('common.save')}
