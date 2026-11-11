@@ -5,7 +5,8 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Evidence, Feedback, Goal, GoalOutcome } from '../../../shared/contracts/goals.ts';
 import type { Db } from '../../db/client.ts';
-import { evidence, files, goalEntries, goals, skillCategories, teacherAssessments, teacherFeedback, users } from '../../db/schema.ts';
+import { evidence, files, goalCategoryNames, goalEntries, goals, skillCategories, teacherAssessments, teacherFeedback, teachingContexts, users } from '../../db/schema.ts';
+import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 
 export type GoalRow = typeof goals.$inferSelect;
 export type EntryRow = typeof goalEntries.$inferSelect;
@@ -29,10 +30,11 @@ export function goalDtos(db: Db, rows: readonly GoalRow[], opts: { forStudent?: 
       .all()
       .map((c) => [c.id, c]),
   );
+  const names = renamedDefaults(db, rows);
   return rows.map((g) => ({
     id: g.id,
     subjectId: g.subjectId,
-    category: { id: g.categoryId, name: cats.get(g.categoryId)?.name ?? g.labelSnapshot.category, nameAtCreation: g.labelSnapshot.category },
+    category: { id: g.categoryId, name: names.get(g.id) ?? cats.get(g.categoryId)?.name ?? g.labelSnapshot.category, nameAtCreation: g.labelSnapshot.category },
     authorType: g.authorType,
     presetId: g.presetId,
     presetText: g.labelSnapshot.preset ?? null,
@@ -49,6 +51,29 @@ export function goalDtos(db: Db, rows: readonly GoalRow[], opts: { forStudent?: 
     assessments: assessments.filter((a) => a.goalId === g.id).map((a) => ({ id: a.id, outcome: a.outcome as GoalOutcome, createdAt: a.createdAt })),
     ...(g.hiddenAt !== null ? { hidden: true } : {}),
   }));
+}
+
+/**
+ * A goal whose category is a default that the teacher of the goal's class+subject renamed (S22b,
+ * D-176) shows that teacher's name: goal id → name. Own categories are renamed in their own row.
+ */
+function renamedDefaults(db: Db, rows: readonly GoalRow[]): Map<string, LocalizedTextValue> {
+  const out = new Map<string, LocalizedTextValue>();
+  const contextIds = [...new Set(rows.map((g) => g.contextId).filter((x): x is string => x !== null))];
+  if (!contextIds.length) return out;
+  const teacherOf = new Map(db.select({ id: teachingContexts.id, teacherId: teachingContexts.teacherId }).from(teachingContexts).where(inArray(teachingContexts.id, contextIds)).all().map((c) => [c.id, c.teacherId]));
+  const named = db
+    .select()
+    .from(goalCategoryNames)
+    .where(and(inArray(goalCategoryNames.userId, [...new Set(teacherOf.values())]), inArray(goalCategoryNames.categoryId, [...new Set(rows.map((g) => g.categoryId))])))
+    .all();
+  if (!named.length) return out;
+  for (const g of rows) {
+    const teacherId = g.contextId ? teacherOf.get(g.contextId) : undefined;
+    const n = named.find((r) => r.userId === teacherId && r.subjectId === g.subjectId && r.categoryId === g.categoryId);
+    if (n) out.set(g.id, n.name);
+  }
+  return out;
 }
 
 export const goalDto = (db: Db, row: GoalRow, opts: { forStudent?: boolean } = {}): Goal => goalDtos(db, [row], opts)[0]!;

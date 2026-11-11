@@ -29,7 +29,7 @@ import { isModuleEnabled } from '../school/modules.ts';
 import { getYear } from '../school/policy.ts';
 import { assertNoRiskyWords, assertStudentText, limitsOf, recordBlockedAttempts, urlWords } from '../textChecks/service.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type EvidenceRow, type GoalRow } from './dto.ts';
-import { categoryUsable, getCategory, getPreset, hiddenDefaultsOf, inScope, outcomesOf, presetUsable, studentChoices } from './library.ts';
+import { categoryName, categoryNamesOf, categoryUsable, getCategory, getPreset, hiddenDefaultsOf, inScope, outcomesOf, presetUsable, studentChoices } from './library.ts';
 import { studentStarters } from './starters.ts';
 import { classLocales, studentPageLanguage } from '../../../shared/classLanguage.ts';
 
@@ -143,7 +143,8 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.studentCreate
       practiceChoicesJson: input.practiceChoices ?? [],
       reviewOn: null,
       status: 'active',
-      labelSnapshot: { category: category.name, ...(preset && !own ? { preset: preset.text } : {}) },
+      // The name the student chose from (the class's teacher may have renamed a default, D-176).
+      labelSnapshot: { category: categoryName(category, categoryNamesOf(ctx.db, sc.context.teacherId, input.subjectId)), ...(preset && !own ? { preset: preset.text } : {}) },
       createdAt: now,
       updatedAt: now,
       deletedAt: null,

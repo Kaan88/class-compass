@@ -176,6 +176,13 @@
       "when": 1794213900053,
       "tag": "0024_s14h2_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1794401143148,
+      "tag": "0025_s22b_goal_category_names",
+      "breakpoints": true
     }
   ]
 }

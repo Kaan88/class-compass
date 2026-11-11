@@ -7,7 +7,7 @@ import { weekStartsBetween } from '../../../domain/periods.ts';
 import { addDays } from '../../../domain/dates.ts';
 import type { ReportSectionData, TimelineEvent } from '../../../shared/contracts/reports.ts';
 import type { LessonTopicJson } from '../../db/schema.ts';
-import { getCategory } from '../goals/library.ts';
+import { categoryName, categoryNamesOf, getCategory } from '../goals/library.ts';
 import { lessons } from '../../db/schema.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
@@ -98,9 +98,14 @@ export function lessonTopicsSection(ctx: RequestContext, scope: ReportScope): Re
         if (l.localDate >= cur.last) Object.assign(cur, { name: t.name, last: l.localDate });
       }
     }
+  const names = categoryNamesOf(ctx.db, scope.context.teacherId, scope.context.subjectId);
+  const now = (id: string) => {
+    const c = getCategory(ctx.db, id);
+    return c ? categoryName(c, names) : null;
+  };
   const rows = [...byId.entries()]
     .sort((a, b) => b[1].lessons - a[1].lessons || (a[1].name.en ?? '').localeCompare(b[1].name.en ?? ''))
-    .map(([id, v]) => ({ key: id, cells: [lbl(text(v.name, getCategory(ctx.db, id)?.name ?? null)), n(v.lessons, scope.lessons.length), date(v.last)] }));
+    .map(([id, v]) => ({ key: id, cells: [lbl(text(v.name, now(id))), n(v.lessons, scope.lessons.length), date(v.last)] }));
   return {
     key: 'lessonTopics',
     title: key('report.section.lessonTopics'),

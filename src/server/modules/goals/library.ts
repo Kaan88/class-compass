@@ -15,7 +15,7 @@ import { DEFAULT_GOAL_OUTCOMES, OutcomeSet, type Category, type GoalLibrary, typ
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import type { TopicIcon } from '../../../shared/lessons.ts';
 import type { Db } from '../../db/client.ts';
-import { defaultItemArchives, goalPresets, skillCategories } from '../../db/schema.ts';
+import { defaultItemArchives, goalCategoryNames, goalPresets, skillCategories } from '../../db/schema.ts';
 import { moduleConfig } from '../school/modules.ts';
 import { defaultStarters, ensureStarterDefaults, starterDto, startersFor } from './starters.ts';
 
@@ -106,13 +106,33 @@ export function hiddenDefaultsOf(db: Db, teacherIds: readonly string[]): HiddenD
   return { categories: of('category'), presets: of('preset'), starters: of('starter') };
 }
 
+/** A teacher's own names for default categories in one subject (S22b, D-176): category id → name. */
+export type CategoryNames = ReadonlyMap<string, LocalizedTextValue>;
+export const NO_NAMES: CategoryNames = new Map();
+
+/**
+ * The names a teacher gave default categories in a subject (S22b, D-176). Everything a class+subject
+ * shows (the library, the student page, goals, lesson topics, reports) uses the names of the teacher
+ * of that class+subject; the default row and its id never change.
+ */
+export function categoryNamesOf(db: Db, teacherId: string | null | undefined, subjectId: string): CategoryNames {
+  if (!teacherId) return NO_NAMES;
+  const rows = db.select().from(goalCategoryNames).where(and(eq(goalCategoryNames.userId, teacherId), eq(goalCategoryNames.subjectId, subjectId))).all();
+  return new Map(rows.map((r) => [r.categoryId, r.name]));
+}
+
+/** The name shown for a category with these names: a default's own name only when the teacher renamed it. */
+export const categoryName = (c: Pick<CategoryRow, 'id' | 'name' | 'createdBy'>, names: CategoryNames = NO_NAMES): LocalizedTextValue => (c.createdBy === null ? (names.get(c.id) ?? c.name) : c.name);
+
 /**
  * `archived` = hidden from choosing for this viewer: archived by its owner, by the school (a default),
  * or a default this teacher archived for their classes. `schoolArchived`: only an administrator can restore it.
+ * `defaultName` (S22b): a renamed default's own name, so the teacher can see it and go back to it.
  */
-export const categoryDto = (c: CategoryRow, hidden: HiddenDefaults = NOTHING_HIDDEN): Category => ({
+export const categoryDto = (c: CategoryRow, hidden: HiddenDefaults = NOTHING_HIDDEN, names: CategoryNames = NO_NAMES): Category => ({
   id: c.id,
-  name: c.name,
+  name: categoryName(c, names),
+  ...(c.createdBy === null && names.has(c.id) ? { defaultName: c.name } : {}),
   icon: (c.icon as Category['icon']) ?? null,
   subjectId: c.subjectId,
   custom: c.createdBy !== null,
@@ -163,8 +183,10 @@ export function outcomesOf(db: Db, contextId: string): OutcomeDef[] {
 
 export function libraryFor(db: Db, contextId: string, subjectId: string, teacherIds: readonly string[], includeArchived: boolean): GoalLibrary {
   const hidden = hiddenDefaultsOf(db, teacherIds);
+  // The library is one teacher's (the class+subject's teacher): their names for the defaults (D-176).
+  const names = teacherIds.length === 1 ? categoryNamesOf(db, teacherIds[0], subjectId) : NO_NAMES;
   return {
-    categories: categoriesFor(db, subjectId, teacherIds, includeArchived).map((c) => categoryDto(c, hidden)),
+    categories: categoriesFor(db, subjectId, teacherIds, includeArchived).map((c) => categoryDto(c, hidden, names)),
     presets: presetsFor(db, subjectId, teacherIds, includeArchived).map((p) => presetDto(p, hidden)),
     starters: startersFor(db, subjectId, teacherIds, includeArchived).map((s) => starterDto(s, hidden)),
     outcomes: outcomesOf(db, contextId),
@@ -174,10 +196,11 @@ export function libraryFor(db: Db, contextId: string, subjectId: string, teacher
 /** What students of this class+subject may choose (D-116): usable categories and their usable presets. */
 export function studentChoices(db: Db, subjectId: string, teacherIds: readonly string[], contextTeacherId: string): { categories: Category[]; presets: Preset[] } {
   const hidden = hiddenDefaultsOf(db, [contextTeacherId]);
+  const names = categoryNamesOf(db, contextTeacherId, subjectId);
   const cats = categoriesFor(db, subjectId, teacherIds, false).filter((c) => categoryUsable(c, hidden));
   const catIds = new Set(cats.map((c) => c.id));
   return {
-    categories: cats.map((c) => categoryDto(c, hidden)),
+    categories: cats.map((c) => categoryDto(c, hidden, names)),
     presets: presetsFor(db, subjectId, teacherIds, false)
       .filter((p) => presetUsable(p, hidden) && catIds.has(p.categoryId))
       .map((p) => presetDto(p, hidden)),

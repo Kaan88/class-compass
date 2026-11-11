@@ -84,6 +84,8 @@ export const Category = z.object({
   archived: z.boolean(),
   /** A default archived school-wide by an administrator: only an administrator can restore it. */
   schoolArchived: z.boolean(),
+  /** A default this class+subject's teacher renamed (S22b, D-176): its own name; `name` is the teacher's. */
+  defaultName: LocalizedText.optional(),
 });
 export type Category = z.infer<typeof Category>;
 
@@ -303,11 +305,24 @@ export const createCategory = endpoint({
   output: Category,
   mcp: { scope: 'goals:write', tool: 'create_goal_category', readOnly: false, description: 'Adds a goal category (also a lesson topic) for the subject of one of your class+subjects, with English and/or Turkish names and an optional icon. Returns the category.' },
 });
+/**
+ * Rename, re-icon or archive a category. Own categories change in their own row. A DEFAULT category
+ * (S22b, D-176) is renamed for the teacher's classes in the subject of `contextId` only (needed for a
+ * default's `name` / `resetName`; the default keeps its id, so goals, topics and reports still group by
+ * it); `resetName` goes back to the default name. A default's icon stays the school's.
+ */
 export const updateCategory = endpoint({
   method: 'PATCH',
   path: '/api/teacher/goal-categories/:categoryId',
   access: 'teacher',
-  input: z.object({ categoryId: Id, name: RequiredLocalizedText.optional(), icon: z.enum(TOPIC_ICONS).nullable().optional(), archived: z.boolean().optional() }),
+  input: z.object({
+    categoryId: Id,
+    contextId: Id.optional(),
+    name: RequiredLocalizedText.optional(),
+    resetName: z.boolean().optional(),
+    icon: z.enum(TOPIC_ICONS).nullable().optional(),
+    archived: z.boolean().optional(),
+  }),
   output: Category,
 });
 export const createPreset = endpoint({

@@ -1269,6 +1269,30 @@ export const defaultItemArchives = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.kind, t.itemId] })],
 );
 
+/**
+ * A teacher's own name for a DEFAULT skill category in one subject (S22b, D-176). The default row and
+ * its id stay as they are (goals, lesson topics and reports keep grouping by it); the teacher's
+ * classes in that subject, their students' pages and their reports show this name instead. No row =
+ * the default name. Own (custom) categories are renamed in their own row.
+ */
+export const goalCategoryNames = sqliteTable(
+  'goal_category_names',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    subjectId: text('subject_id')
+      .notNull()
+      .references(() => subjects.id),
+    categoryId: text('category_id')
+      .notNull()
+      .references(() => skillCategories.id),
+    name: text('name', { mode: 'json' }).$type<LocalizedText>().notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.subjectId, t.categoryId] })],
+);
+
 // ---------------------------------------------------------------- achievements (S13c)
 export const ACHIEVEMENT_TIER_VALUES = ['bronze', 'silver', 'gold', 'none'] as const;
 export const ACHIEVEMENT_CATEGORY_VALUES = ['goals', 'evidence', 'reflections', 'homework', 'skills', 'roles', 'secret', 'speakers', 'teacher', 'custom'] as const;

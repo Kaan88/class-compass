@@ -17,7 +17,7 @@ import { evidence, GOAL_ENTRY_KINDS, goalEntries, goals, skillCategories, teache
 import type { RequestContext } from '../../lib/context.ts';
 import type { ReportScope } from '../manifest.ts';
 import { col, date, key, lbl, n, NA, NR, range, scopeIds, student, table, text } from '../reports/cells.ts';
-import { outcomesOf } from './library.ts';
+import { categoryName, categoryNamesOf, outcomesOf } from './library.ts';
 
 const CONFIDENCE = [1, 2, 3, 4, 5] as const;
 const GOAL_STATES = ['active', 'achieved', 'archived'] as const;
@@ -98,6 +98,8 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
   const outcomes = outcomesOf(ctx.db, scope.context.id);
   const catIds = [...new Set(gs.map((g) => g.categoryId))];
   const cats = catIds.length ? ctx.db.select().from(skillCategories).where(inArray(skillCategories.id, catIds)).all() : [];
+  // Rows stay grouped by the category id; a default the class's teacher renamed shows their name (D-176).
+  const catNames = categoryNamesOf(ctx.db, scope.context.teacherId, scope.context.subjectId);
   const inPeriod = (ms: number) => day(ms) >= scope.from && day(ms) <= scope.to;
   const teacherLatest = [...lastTeacher.values()];
   const selfLatest = [...lastSelf.values()];
@@ -135,7 +137,8 @@ export function goalsReportSection(ctx: RequestContext, scope: ReportScope): Rep
         columns: [col('category', key('report.col.category')), col('active', key('report.goals.active'), true), col('achieved', key('report.goals.achieved'), true), col('archived', key('report.goals.archived'), true)],
         rows: catIds.map((cid) => {
           const mine = gs.filter((g) => g.categoryId === cid);
-          const now = cats.find((c) => c.id === cid)?.name;
+          const cat = cats.find((c) => c.id === cid);
+          const now = cat ? categoryName(cat, catNames) : undefined;
           return { key: cid, cells: [lbl(text(mine[mine.length - 1]!.labelSnapshot.category, now)), ...GOAL_STATES.map((st) => n(mine.filter((g) => g.status === st).length, mine.length))] };
         }),
       }),

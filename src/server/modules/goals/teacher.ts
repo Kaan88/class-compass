@@ -13,7 +13,7 @@ import { checkStudentText, findRiskyWord } from '../../../shared/text/textQualit
 import { initials, normaliseName } from '../../../shared/text/turkish.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { tx } from '../../db/client.ts';
-import { defaultItemArchives, evidence, files, goalEntries, goalPresets, goals, skillCategories, students, subjects, teacherAssessments, teacherFeedback, teachingContexts, textStarters } from '../../db/schema.ts';
+import { defaultItemArchives, evidence, files, goalCategoryNames, goalEntries, goalPresets, goals, skillCategories, students, subjects, teacherAssessments, teacherFeedback, teachingContexts, textStarters } from '../../db/schema.ts';
 import { emitStudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
@@ -24,7 +24,7 @@ import { assertClassWritable, assertOwnsContext, getClass, type ClassRow, type C
 import { assertMediaAllowed, deleteFileRow } from '../files/service.ts';
 import { liveClassIdsOf, rosterRows } from '../students/service.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type GoalRow } from './dto.ts';
-import { categoryDto, defaultLibrary, getCategory, getPreset, hiddenDefaultsOf, inScope, libraryFor, NOTHING_HIDDEN, outcomesOf, presetDto, type HiddenDefaults } from './library.ts';
+import { categoryDto, categoryName, categoryNamesOf, defaultLibrary, getCategory, getPreset, hiddenDefaultsOf, inScope, libraryFor, NOTHING_HIDDEN, outcomesOf, presetDto, type CategoryRow, type HiddenDefaults } from './library.ts';
 import { getStarter, starterDto } from './starters.ts';
 import { limitsOf, wordListsFor } from '../textChecks/service.ts';
 import { addPrivateNote, deletePrivateNote, myPrivateNotes } from './private.ts';
@@ -208,7 +208,8 @@ export function createGoal(ctx: RequestContext, input: In<typeof C.teacherCreate
       practiceChoicesJson: input.practiceChoices ?? [],
       reviewOn: input.reviewOn ?? null,
       status: 'active',
-      labelSnapshot: { category: category.name, ...(preset && !input.text ? { preset: preset.text } : {}) },
+      // The name the class sees (a default the teacher renamed, D-176) is the one remembered (DAT-6).
+      labelSnapshot: { category: categoryName(category, categoryNamesOf(ctx.db, s.context.teacherId, subjectId)), ...(preset && !input.text ? { preset: preset.text } : {}) },
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -247,7 +248,7 @@ export function updateGoal(ctx: RequestContext, input: In<typeof C.teacherUpdate
       const cat = getCategory(ctx.db, input.categoryId);
       if (!cat || !inScope(cat, goal.subjectId, teacherIdsOf(s))) throw notFound('Category');
       patch.categoryId = cat.id;
-      patch.labelSnapshot = { ...(patch.labelSnapshot ?? goal.labelSnapshot), category: cat.name };
+      patch.labelSnapshot = { ...(patch.labelSnapshot ?? goal.labelSnapshot), category: categoryName(cat, categoryNamesOf(ctx.db, s.context.teacherId, goal.subjectId)) };
     }
     ctx.db.update(goals).set(patch).where(eq(goals.id, goal.id)).run();
     audit(ctx.db, ctx.actor, { action: 'goal.update', entity: 'goal', entityId: goal.id, before: { status: goal.status, reviewOn: goal.reviewOn, categoryId: goal.categoryId }, after: { status: patch.status, reviewOn: patch.reviewOn, categoryId: patch.categoryId, textChanged: input.text !== undefined } }, ctx.now());
@@ -340,11 +341,12 @@ export function createCategory(ctx: RequestContext, input: In<typeof C.createCat
 /**
  * A teacher archives or restores a DEFAULT category or preset for their own classes only (S13b2,
  * D-116): a row in `default_item_archives`; the default itself and other teachers are unaffected.
- * Defaults cannot be renamed by teachers. Returns the viewer's state of the item.
+ * Default presets (and a default category's icon) cannot be changed by teachers; a default category's
+ * name can, for their own classes (`renameDefaultCategory`, D-176). Returns the viewer's state of the item.
  */
 function setDefaultHidden(ctx: RequestContext, kind: (typeof DEFAULT_ITEM_KINDS)[number], itemId: string, archived: boolean | undefined, renamed: boolean): HiddenDefaults {
   const userId = requireUser(ctx).id;
-  if (renamed) throw new AppError('FORBIDDEN', 'Default items belong to the school and cannot be renamed', { reason: 'DEFAULT_ITEM_READ_ONLY' });
+  if (renamed) throw new AppError('FORBIDDEN', 'Default items belong to the school and cannot be changed', { reason: 'DEFAULT_ITEM_READ_ONLY' });
   if (archived !== undefined) {
     const where = and(eq(defaultItemArchives.userId, userId), eq(defaultItemArchives.kind, kind), eq(defaultItemArchives.itemId, itemId));
     const had = Boolean(ctx.db.select().from(defaultItemArchives).where(where).get());
@@ -360,15 +362,53 @@ function setDefaultHidden(ctx: RequestContext, kind: (typeof DEFAULT_ITEM_KINDS)
 /** The audit record type of each kind of default item. */
 const DEFAULT_ENTITY = { category: 'skill_category', preset: 'goal_preset', starter: 'text_starter' } as const satisfies Record<(typeof DEFAULT_ITEM_KINDS)[number], string>;
 
+const sameText = (a: LocalizedTextValue, b: LocalizedTextValue) => (a.en ?? '') === (b.en ?? '') && (a.tr ?? '') === (b.tr ?? '');
+
+/**
+ * A teacher's own name for a DEFAULT category in the subject of one of their class+subjects (S22b,
+ * D-176): a `goal_category_names` row, so the default row, its id and other teachers are unaffected
+ * and goals, lesson topics and reports keep grouping by the id. Needs a writable class and year
+ * (DAT-1); audited. A name equal to the default's, or `resetName`, removes the row.
+ */
+function renameDefaultCategory(ctx: RequestContext, c: CategoryRow, input: In<typeof C.updateCategory>): void {
+  if (!input.contextId) throw invalid('Say which class+subject the new name is for', { reason: 'CONTEXT_REQUIRED' });
+  const s = scopeOf(ctx, input.contextId);
+  assertClassWritable(ctx.db, s.cls);
+  const userId = requireUser(ctx).id;
+  const subjectId = s.context.subjectId;
+  const where = and(eq(goalCategoryNames.userId, userId), eq(goalCategoryNames.subjectId, subjectId), eq(goalCategoryNames.categoryId, c.id));
+  const before = ctx.db.select().from(goalCategoryNames).where(where).get();
+  const name = input.resetName ? null : cleanText(input.name!);
+  const next = name && !sameText(name, c.name) ? name : null;
+  if (next ? before && sameText(before.name, next) : !before) return;
+  if (next) {
+    ctx.db
+      .insert(goalCategoryNames)
+      .values({ userId, subjectId, categoryId: c.id, name: next, updatedAt: ctx.now() })
+      .onConflictDoUpdate({ target: [goalCategoryNames.userId, goalCategoryNames.subjectId, goalCategoryNames.categoryId], set: { name: next, updatedAt: ctx.now() } })
+      .run();
+  } else ctx.db.delete(goalCategoryNames).where(where).run();
+  audit(ctx.db, ctx.actor, { action: 'goal_category.rename', entity: 'skill_category', entityId: c.id, before: { name: before?.name ?? c.name }, after: { name: next ?? c.name, subjectId, scope: 'teacher', default: next === null } }, ctx.now());
+}
+
 export function updateCategory(ctx: RequestContext, input: In<typeof C.updateCategory>): Category {
   return tx(ctx.db, () => {
     const c = getCategory(ctx.db, input.categoryId);
-    if (c && c.createdBy === null) return categoryDto(c, setDefaultHidden(ctx, 'category', c.id, input.archived, Boolean(input.name) || input.icon !== undefined));
+    if (c && c.createdBy === null) {
+      const renaming = Boolean(input.name) || input.resetName === true;
+      // Checked before anything changes: a default's icon stays the school's.
+      if (input.icon !== undefined) setDefaultHidden(ctx, 'category', c.id, undefined, true);
+      if (renaming) renameDefaultCategory(ctx, c, input);
+      const hidden = setDefaultHidden(ctx, 'category', c.id, input.archived, false);
+      const subjectId = input.contextId ? scopeOf(ctx, input.contextId).context.subjectId : null;
+      return categoryDto(c, hidden, subjectId ? categoryNamesOf(ctx.db, requireUser(ctx).id, subjectId) : undefined);
+    }
     // Custom categories: teachers edit only their own.
     if (!c || c.createdBy !== requireUser(ctx).id) throw notFound('Category');
     assertLibraryWritable(ctx, c.subjectId, 'Category');
     const patch: Partial<typeof skillCategories.$inferInsert> = { updatedAt: ctx.now() };
     if (input.name) patch.name = cleanText(input.name);
+    if (input.resetName) throw invalid('Only a default category has a default name', { reason: 'NOT_A_DEFAULT' });
     if (input.icon !== undefined) patch.icon = input.icon;
     if (input.archived !== undefined) patch.archivedAt = input.archived ? ctx.now() : null;
     ctx.db.update(skillCategories).set(patch).where(eq(skillCategories.id, c.id)).run();

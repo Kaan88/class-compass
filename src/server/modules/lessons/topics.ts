@@ -18,7 +18,7 @@ import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { AppError } from '../../lib/errors.ts';
 import { tx } from '../../db/client.ts';
-import { categoriesFor, getCategory, inScope } from '../goals/library.ts';
+import { categoriesFor, categoryName, categoryNamesOf, getCategory, inScope } from '../goals/library.ts';
 import { assertClassWritable, assertOwnsContext, getClass, todayFor, type ContextRow } from '../school/policy.ts';
 import { DEFAULT_ROUTINE_ID } from '../../../shared/lessons.ts';
 
@@ -26,7 +26,9 @@ const iconOf = (v: string | null): TopicIcon | null => ((TOPIC_ICONS as readonly
 
 /** Topics a lesson of this context can have: the subject's live categories for its teacher. */
 export function topicChoices(db: Db, context: ContextRow): LessonTopic[] {
-  return categoriesFor(db, context.subjectId, [context.teacherId], false).map((c) => ({ id: c.id, name: c.name, icon: iconOf(c.icon) }));
+  // A default the teacher renamed shows (and is remembered with) the teacher's name (S22b, D-176).
+  const names = categoryNamesOf(db, context.teacherId, context.subjectId);
+  return categoriesFor(db, context.subjectId, [context.teacherId], false).map((c) => ({ id: c.id, name: categoryName(c, names), icon: iconOf(c.icon) }));
 }
 
 export function topicPlanOf(db: Db, contextId: string): TopicPlan {
@@ -40,10 +42,11 @@ export function topicPlanOf(db: Db, contextId: string): TopicPlan {
  */
 export function topicSnapshots(db: Db, context: ContextRow, ids: readonly string[]): LessonTopicJson[] {
   const out: LessonTopicJson[] = [];
+  const names = categoryNamesOf(db, context.teacherId, context.subjectId);
   for (const id of [...new Set(ids)]) {
     const c = getCategory(db, id);
     if (!c || c.archivedAt !== null || !inScope(c, context.subjectId, [context.teacherId])) throw new AppError('VALIDATION', 'Unknown topic', { reason: 'UNKNOWN_TOPIC' });
-    out.push({ id: c.id, name: c.name, icon: iconOf(c.icon) });
+    out.push({ id: c.id, name: categoryName(c, names), icon: iconOf(c.icon) });
   }
   return out;
 }
@@ -56,10 +59,11 @@ export function topicSnapshots(db: Db, context: ContextRow, ids: readonly string
 export function usableTopicSnapshots(db: Db, context: ContextRow, ids: readonly string[]): { topics: LessonTopicJson[]; dropped: string[] } {
   const topics: LessonTopicJson[] = [];
   const dropped: string[] = [];
+  const names = categoryNamesOf(db, context.teacherId, context.subjectId);
   for (const id of [...new Set(ids)]) {
     const c = getCategory(db, id);
     if (!c || c.archivedAt !== null || !inScope(c, context.subjectId, [context.teacherId])) dropped.push(id);
-    else topics.push({ id: c.id, name: c.name, icon: iconOf(c.icon) });
+    else topics.push({ id: c.id, name: categoryName(c, names), icon: iconOf(c.icon) });
   }
   return { topics, dropped };
 }
