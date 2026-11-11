@@ -117,6 +117,7 @@ export const en = {
   'themes.issue.SCHEMA': 'Something in the package is missing or not allowed: {detail}',
   'themes.issue.KEY_BUILTIN': '"{key}" is the key of a built-in theme. Give the theme another key.',
   'themes.issue.CONTRAST': 'Not enough contrast: {fg} on {bg} is {ratio}:1, it needs {min}:1.',
+  'themes.issue.CONTRAST_EITHER': 'Not enough contrast: neither {fg} nor {or} stands out on {bg} (at best {ratio}:1, one of them needs {min}:1).',
   'themes.issue.SOUND': 'Sound "{event}": {problem} ({value}, limit {limit}).',
   'themes.issue.SVG': 'A picture is not allowed: {reason} {detail}',
   'themes.issue.MASCOT_POSES_SAME': 'Every mascot pose must look different.',

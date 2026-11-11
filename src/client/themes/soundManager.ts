@@ -23,7 +23,7 @@
  */
 import type { SoundEvent, SoundSpec } from './types.ts';
 import { soundLength } from './soundPack.ts';
-import { notePartials } from '../../shared/themePackage/sound.ts';
+import { fillNoise, NOISE_BUFFER_S, NOISE_Q, notePartials } from '../../shared/themePackage/sound.ts';
 import { LOUDNESS, SOUND_LIMITS, softCeilingCurve, volumeGain } from '../../shared/themePackage/limits.ts';
 
 export const SOUND_PRIORITY: Record<SoundEvent, number> = {
@@ -337,15 +337,10 @@ export class SoundManager {
 
   private noiseBuffer(): AudioBuffer | null {
     if (this.noise || !this.ctx) return this.noise;
-    const len = Math.floor(this.ctx.sampleRate * 0.5);
+    const len = Math.floor(this.ctx.sampleRate * NOISE_BUFFER_S);
     const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    // Deterministic pseudo-random noise (no Math.random: the same sound every time).
-    let x = 12345;
-    for (let i = 0; i < len; i++) {
-      x = (x * 1103515245 + 12345) & 0x7fffffff;
-      data[i] = (x / 0x3fffffff - 1) * 0.8;
-    }
+    // Deterministic pseudo-random noise, the same samples the loudness model plays (`playedPeak`).
+    fillNoise(buf.getChannelData(0));
     this.noise = buf;
     return buf;
   }
@@ -457,9 +452,9 @@ export class SoundManager {
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
       filter.frequency.value = n.freq;
-      filter.Q.value = 1.2;
+      filter.Q.value = NOISE_Q;
       src.connect(filter).connect(gain);
-      src.start(start, 0, Math.min(0.5, n.dur / 1000 + 0.05));
+      src.start(start, 0, Math.min(NOISE_BUFFER_S, n.dur / 1000 + 0.05));
       src.stop(end + 0.05);
       return;
     }

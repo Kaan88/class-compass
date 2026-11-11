@@ -115,14 +115,15 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
 
 export interface ContrastFailure {
   pair: string;
-  /**
-   * The two tokens (`fg` is `avatar-text` for the avatar hue sweep, `bg` then names the hue; for the
-   * avatar features `fg` is "avatar-ink or avatar-white", either of which may carry the face).
-   */
+  /** The two tokens (`fg` is `avatar-text` for the avatar hue sweep, `bg` then names the hue). */
   fg: string;
   bg: string;
-  /** The colour token to change, when it is not `fg` itself (the avatar features: `avatar-ink`). */
-  token?: string;
+  /**
+   * A second foreground that would do as well (the avatar features: `fg` is `avatar-ink`, `or` is
+   * `avatar-white`, either of which may carry the face): neither reaches `min` on `bg`. Only token
+   * names, so Admin → Themes words it in the admin's language (S21a review, D-173).
+   */
+  or?: string;
   ratio: number;
   min: number;
 }
@@ -148,10 +149,10 @@ export function avatarFeatureFailures(colors: Pick<ThemeColors, ColorToken>): Co
   const own = pairContrast(ink, rim);
   if (own < AVATAR_FEATURE_MIN)
     out.push({ pair: `${AVATAR_FEATURE_INK} on ${AVATAR_FEATURE_RIM} (avatar eyes and mouths on their light rim)`, fg: AVATAR_FEATURE_INK, bg: AVATAR_FEATURE_RIM, ratio: round(own), min: AVATAR_FEATURE_MIN });
-  const fg = `${AVATAR_FEATURE_INK} or ${AVATAR_FEATURE_RIM}`;
   for (const body of AVATAR_BODY_TOKENS) {
     const best = Math.max(pairContrast(ink, colors[body]), pairContrast(rim, colors[body]));
-    if (best < AVATAR_FEATURE_MIN) out.push({ pair: `${fg} on ${body} (avatar eyes and mouths)`, fg, bg: body, token: AVATAR_FEATURE_INK, ratio: round(best), min: AVATAR_FEATURE_MIN });
+    if (best < AVATAR_FEATURE_MIN)
+      out.push({ pair: `${AVATAR_FEATURE_INK} or ${AVATAR_FEATURE_RIM} on ${body} (avatar eyes and mouths)`, fg: AVATAR_FEATURE_INK, or: AVATAR_FEATURE_RIM, bg: body, ratio: round(best), min: AVATAR_FEATURE_MIN });
   }
   return out;
 }

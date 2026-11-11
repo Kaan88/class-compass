@@ -264,10 +264,141 @@ export function makeSoundPack(opts: SoundPackOptions, overrides: Partial<ThemeSo
 /** Total length of a cue in ms. */
 export const soundLength = (s: SoundSpec) => Math.max(0, ...s.map((x) => x.at + x.dur));
 
-/** Sum of the gains of the notes sounding together at the loudest moment of a cue. */
+/**
+ * Sum of the (capped) gains of the notes whose windows overlap at the loudest moment of a cue: a
+ * worst-case bound that ignores the envelopes (every note held at its peak for its whole length). The
+ * clip check uses it, so a cue is refused when its notes could ever add up too loud. What really plays
+ * is `playedPeak` (S21a review, D-173).
+ */
 export function loudestMoment(spec: SoundSpec): number {
   const cap = (n: ToneNote) => Math.min(SOUND_LIMITS.noteGainCap, n.gain);
   return Math.max(0, ...spec.map((a) => spec.filter((b) => b.at <= a.at && b.at + b.dur > a.at).reduce((sum, n) => sum + cap(n), 0)));
+}
+
+/**
+ * The SoundManager's noise (S13b; shared since the S21a review, D-173, so the model plays the same
+ * samples): deterministic pseudo-random values in −0.8..0.8 (no Math.random: the same sound every time).
+ */
+export function fillNoise(data: Float32Array): Float32Array {
+  let x = 12345;
+  for (let i = 0; i < data.length; i++) {
+    x = (x * 1103515245 + 12345) & 0x7fffffff;
+    data[i] = (x / 0x3fffffff - 1) * 0.8;
+  }
+  return data;
+}
+/** Length of the noise buffer (s); a noise note plays from its start, at most this long. */
+export const NOISE_BUFFER_S = 0.5;
+/** Q of the band-pass every noise note goes through. */
+export const NOISE_Q = 1.2;
+/** Sample rate of the noise model (the classroom PCs and the rendered test run at 48 kHz). */
+const MODEL_RATE = 48_000;
+
+let noiseSource: Float32Array | null = null;
+const bandCache = new Map<string, Float32Array>();
+
+/**
+ * The noise of one note as it leaves the band-pass, before its envelope: the buffer from its start
+ * (for `min(0.5 s, dur + 50 ms)`, then silence) through the Web Audio band-pass biquad (Audio EQ
+ * Cookbook, constant 0 dB peak gain) at `freq` with Q 1.2, at 48 kHz, `dur` ms long.
+ */
+function bandNoise(freq: number, dur: number): Float32Array {
+  const key = `${freq}|${dur}`;
+  const hit = bandCache.get(key);
+  if (hit) return hit;
+  const src = (noiseSource ??= fillNoise(new Float32Array(Math.floor(MODEL_RATE * NOISE_BUFFER_S))));
+  const n = Math.ceil((MODEL_RATE * dur) / 1000) + 1;
+  const play = Math.min(src.length, Math.floor(MODEL_RATE * Math.min(NOISE_BUFFER_S, dur / 1000 + 0.05)));
+  const w0 = (2 * Math.PI * Math.min(freq, MODEL_RATE / 2 - 1)) / MODEL_RATE;
+  const alpha = Math.sin(w0) / (2 * NOISE_Q);
+  const a0 = 1 + alpha;
+  const [b0, b2, a1, a2] = [alpha / a0, -alpha / a0, (-2 * Math.cos(w0)) / a0, (1 - alpha) / a0];
+  const out = new Float32Array(n);
+  let [x1, x2, y1, y2] = [0, 0, 0, 0];
+  for (let i = 0; i < n; i++) {
+    const x = i < play ? src[i]! : 0;
+    const y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2;
+    [x2, x1, y2, y1] = [x1, x, y1, y];
+    out[i] = y;
+  }
+  if (bandCache.size > 500) bandCache.clear();
+  bandCache.set(key, out);
+  return out;
+}
+
+/** The envelope of a note or partial (s): from `start` it ramps to `gain` over `attack`, then falls until `end`. */
+interface EnvelopeShape {
+  start: number;
+  attack: number;
+  end: number;
+  gain: number;
+}
+
+/** Level of an envelope (as `schedule` ramps it: floor → gain over the attack → floor at the end). */
+function envelopeLevel(e: EnvelopeShape, t: number): number {
+  if (t < e.start || t >= e.end) return 0;
+  const u = t - e.start;
+  if (u <= e.attack) return e.attack <= 0 ? e.gain : ENV_FLOOR * (e.gain / ENV_FLOOR) ** (u / e.attack);
+  return e.gain * (ENV_FLOOR / e.gain) ** ((u - e.attack) / (e.end - e.start - e.attack));
+}
+
+/**
+ * The loudness model of a cue (S21a review, D-173): the peak a cue really reaches, as the sum over
+ * its notes of the level each has at that moment, with the envelopes the SoundManager schedules
+ * (exponential attack to the capped gain, exponential decay to 0.0001 by the note's end; a styled
+ * note's partials with their own envelopes, the note never over its gain). Notes in sequence whose
+ * tails overlap count with what is left of the earlier note, not with its full gain as in
+ * `loudestMoment`. For one tone note it is its capped gain.
+ * Noise is played, not estimated: the noise notes' samples (the SoundManager's buffer, band-pass and
+ * envelopes, at 48 kHz) are added up exactly, and the tone envelopes on top. Without noise, each level
+ * is exponential between the attack peaks, starts and ends, so the largest sum lies on one of those
+ * moments (checked with every millisecond between them too).
+ * Tone notes that overlap reach the sum of their levels only where their waves line up, so a chord or
+ * overlapping tails can play a little under the model, never over it (`e2e/sound-loudness.spec.ts`).
+ */
+export function playedPeak(spec: SoundSpec): number {
+  const cap = (n: ToneNote) => Math.min(SOUND_LIMITS.noteGainCap, Math.max(0, n.gain));
+  const tones = spec
+    .filter((n) => n.type !== 'noise')
+    .map((n) => {
+      const gain = cap(n);
+      const start = n.at / 1000;
+      const end = start + n.dur / 1000;
+      const scale = n.gain > 0 ? gain / n.gain : 0;
+      const parts = notePartials(n).map((p) => ({
+        start,
+        attack: Math.min(p.attackMs / 1000, n.dur / 4000),
+        end: Math.min(end, start + Math.max(0.01, (n.dur * p.decay) / 1000)),
+        gain: p.gain * scale,
+      }));
+      return { gain, start, end, parts };
+    });
+  const toneLevel = (t: number) => {
+    let sum = 0;
+    for (const n of tones) if (t >= n.start && t < n.end) sum += Math.min(n.gain, n.parts.reduce((s, p) => s + envelopeLevel(p, t), 0));
+    return sum;
+  };
+  const noise = spec.filter((n) => n.type === 'noise');
+  if (noise.length > 0) {
+    const total = Math.ceil((MODEL_RATE * soundLength(spec)) / 1000) + 1;
+    const sum = new Float64Array(total);
+    for (const n of noise) {
+      const band = bandNoise(n.freq, n.dur);
+      const env = { start: 0, attack: Math.min(0.03, n.dur / 4000), end: n.dur / 1000, gain: cap(n) };
+      const i0 = Math.round((MODEL_RATE * n.at) / 1000);
+      for (let i = 0; i < band.length && i0 + i < total; i++) sum[i0 + i] = sum[i0 + i]! + band[i]! * envelopeLevel(env, i / MODEL_RATE);
+    }
+    let peak = 0;
+    for (let i = 0; i < total; i++) peak = Math.max(peak, Math.abs(sum[i]!) + (tones.length > 0 ? toneLevel(i / MODEL_RATE) : 0));
+    return peak;
+  }
+  const times = new Set<number>();
+  for (const n of tones) for (const p of n.parts) for (const t of [p.start, p.start + p.attack]) times.add(t);
+  const lastEnd = Math.max(0, ...tones.map((n) => n.end));
+  for (let t = 0; t < lastEnd; t += 0.001) times.add(t);
+  let peak = 0;
+  for (const t of times) peak = Math.max(peak, toneLevel(t));
+  return peak;
 }
 
 export type SoundProblemKind = 'missing' | 'tooLong' | 'gain' | 'frequency' | 'tapTooQuiet' | 'tapTooLoud' | 'clips' | 'tooManyNotes';

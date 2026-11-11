@@ -713,16 +713,37 @@ closer than 50 ms merged. Never create an `AudioContext` or call `speechSynthesi
 - **Loudness.** Master (class volume, squared curve) → compressor (−24 dB, ratio 6, hard knee,
   attack 1 ms; the browser adds about +12 dB makeup) → makeup ×2.2 → soft ceiling → speakers. Notes
   stay ≤ 0.3 each. A tap at volume 80 must peak between −12 and −6 dBFS and no cue may reach 0 dBFS at
-  volume 100: `outputPeakDb(peak, volume)` models it (`compressedPeakDb` is the level before the
-  ceiling, which the clip check uses) and `tests/client/themes.test.tsx` checks every theme's pack. A
+  volume 100: `outputPeakDb(playedPeak(cue), volume)` models what a cue reaches (`playedPeak` follows
+  the note envelopes and plays the noise samples themselves); the clip check takes the worst case
+  instead, every overlapping note at its full gain (`loudestMoment`), through `compressedPeakDb`, the
+  level before the ceiling. `tests/client/themes.test.tsx` checks every theme's pack. A
   theme that makes its taps much quieter or its chords much louder fails there; change `gain` in
   `makeSoundPack`.
 - **What really plays (S21a, D-173).** `e2e/sound-loudness.spec.ts` runs the SoundManager in Chromium
   on an OfflineAudioContext for every event of every built-in theme, Snow Day and every style at
-  volume 80 and 100. A single note (every tap) peaks within 0.35 dB of `outputPeakDb`, on the first
-  sound of a page too; chords and noise (claps, drum rolls) play at or under the model, because the
-  model adds the gains of the notes that sound together and filtered noise peaks under its gain. Three
-  things in the chain explain the "7 dB under" of the S17b review and are now handled:
+  volume 80 and 100, with and without the soft ceiling, and checks both sides of the model: every cue
+  plays between 1.6 dB under (tone cues; cues with noise 0.5 dB) and 0.75 dB over
+  `outputPeakDb(playedPeak(cue), volume)`, and before the ceiling at most 0.75 dB over
+  `compressedPeakDb`. Measured: 1.4 dB under (a 44 ms square tap, whose attack shaves the peak) to
+  0.65 dB over; taps within 0.25 dB; noise cues within 0.1 dB. The model (since the S21a review) adds
+  up what each note really has left at each moment: the SoundManager's envelopes (exponential attack,
+  exponential decay to 0.0001 by the note's end) and, for noise, the same buffer and band-pass at
+  48 kHz. Adding the full gains of every note whose window overlaps (`loudestMoment`) put tonal
+  sequences 3 to 7 dB and the drum roll 12 to 19 dB over what plays. Levels at volume 80 (dBFS):
+
+  | Cue | Explorer | Classroom | Styles at gain 0.1 |
+  |---|---|---|---|
+  | tap | −8.6 | −10.4 | −9.3 to −9.6 |
+  | soft chime | −10.2 | −12.0 | −11.1 |
+  | stage change | −6.1 | −7.9 | −6.8 to −7.0 |
+  | fanfare | −3.6 | −4.6 | −3.8 to −4.3 |
+  | clapping | −10.4 | −10.8 | −11.2 |
+  | Secret Student drum roll | −20.6 | −22.3 | −21.5 |
+
+  The drum roll is low noise (260 to 340 Hz through a narrow band), so it plays about 12 dB under a
+  tap; whether it is loud enough under the reveal on the classroom speakers is the owner's hearing
+  check (S17b), not changed here. Three things in the chain explain the "7 dB under" of the S17b
+  review and are handled:
   - a **new compressor** reaches its makeup gain only after it has run for a while (its level detector
     starts at zero), so a cue started at once played up to 12 dB quieter. The SoundManager plays the
     first sound of a new chain `LOUDNESS.settleMs` (300 ms) after it built the chain; later cues start
@@ -731,10 +752,14 @@ closer than 50 ms merged. Never create an `AudioContext` or call `speechSynthesi
     128-sample block: the first block played at the default 440 Hz, every partial of a styled note in
     phase, up to 2.7 dB over the note's gain. Oscillators now start at their own frequency;
   - over the threshold the compressor needs its **attack** to pull a sudden start down, so the first
-    milliseconds pass over the settled curve: 1.7 dB with the old 3 ms attack, at most 0.75 dB (0.3 dB
-    measured for the packs above) with 1 ms. A **soft ceiling** (a WaveShaper, linear up to −3 dBFS,
-    never reaching −1 dBFS) catches what is left, so no transient, chord of notes at the cap or loud
-    clip can reach 0 dBFS. Taps (about −9 dBFS at volume 80) never reach its knee.
+    milliseconds pass over the settled curve: 1.7 dB with the old 3 ms attack; with 1 ms at most
+    0.65 dB for the class packs and 1 dB for the loudest packs the parameters allow. A **soft ceiling**
+    (a WaveShaper, linear up to −3 dBFS, never reaching −1 dBFS) follows, so no transient, chord of
+    notes at the cap or loud clip can reach 0 dBFS. Taps and every class pack at volume 80 stay under
+    its knee; at volume 100 the loudest cues (fanfare, time's up: about −3 dBFS; gain-0.2 packs up to
+    −1.4 dBFS before the ceiling) sit a little into the knee and come out at most 0.25 dB quieter, and
+    chords of 5 or 10 notes at the gain cap (up to +2.2 dBFS before it) come out under −1 dBFS. The
+    spec checks that the ceiling bends them exactly by `softCeiling` (within 0.1 dB).
 - **Status.** `useSoundStatus()` (from `themes/index.tsx`) returns `running`, `locked`, `unavailable`,
   `mutedClass`, `mutedDevice` or `volumeZero` plus a snapshot (context state, last cue). The classroom
   top bar shows "Sound is off · Turn sound on" for `locked` and `mutedDevice`, and the Display popover

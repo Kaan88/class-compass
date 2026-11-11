@@ -22,6 +22,8 @@ import {
 } from '../../src/client/themes/soundManager.ts';
 import { makeSoundPack } from '../../src/client/themes/soundPack.ts';
 import { softCeilingCurve } from '../../src/shared/themePackage/limits.ts';
+import { fillNoise, loudestMoment, playedPeak } from '../../src/shared/themePackage/sound.ts';
+import type { ToneNote } from '../../src/shared/themePackage/tokens.ts';
 
 interface Param {
   value: number;
@@ -337,5 +339,52 @@ describe('rendered loudness check (S21a, D-173)', () => {
     const oscs = log.nodes.filter((n) => n.kind === 'osc');
     expect(oscs.length).toBeGreaterThan(5);
     for (const o of oscs) expect(o.frequency.value).not.toBe(440);
+  });
+});
+
+describe('the loudness model follows the envelopes (S21a review, D-173)', () => {
+  const pack = makeSoundPack({ root: 523, wave: 'sine', gain: 0.1 });
+  const note = (at: number, dur: number, gain: number, extra: Partial<ToneNote> = {}): ToneNote => ({ freq: 523, at, dur, type: 'sine', gain, ...extra });
+
+  it('one note: its capped gain, in every style', () => {
+    expect(playedPeak([note(0, 200, 0.07)])).toBeCloseTo(0.07, 6);
+    expect(playedPeak([note(0, 200, 0.5)])).toBeCloseTo(0.3, 6);
+    for (const voice of ['bells', 'marimba', 'chimes', 'musicBox'] as const) expect(playedPeak([note(0, 300, 0.1, { voice })]), voice).toBeCloseTo(0.1, 6);
+  });
+
+  it('notes that start together add up; notes in sequence count with what is left of the earlier one', () => {
+    expect(playedPeak([note(0, 400, 0.1), note(0, 400, 0.1, { freq: 659 })])).toBeCloseTo(0.2, 6);
+    // softChime: 0.05, then 0.045 180 ms later, when the first has decayed to a fraction of its gain.
+    const chime = playedPeak(pack.softChime);
+    expect(loudestMoment(pack.softChime)).toBeCloseTo(0.095, 6);
+    expect(chime).toBeGreaterThanOrEqual(0.05);
+    expect(chime).toBeLessThan(0.06);
+  });
+
+  it('noise plays its own samples: a low drum-roll hit far under its gain, a clap higher, never over', () => {
+    const hit = (freq: number) => playedPeak([{ freq, at: 0, dur: 60, type: 'noise', gain: 0.1 }]);
+    expect(hit(300)).toBeGreaterThan(0.005);
+    expect(hit(300)).toBeLessThan(0.03);
+    expect(hit(2000)).toBeGreaterThan(hit(300));
+    for (const f of [150, 300, 1000, 2000, 5000]) expect(hit(f), String(f)).toBeLessThan(0.1);
+    // The whole drum roll plays far under a tap of the same pack (about 12 dB in Chromium).
+    expect(20 * Math.log10(playedPeak(pack.secretDrumroll) / playedPeak(pack.tap))).toBeLessThan(-6);
+  });
+
+  it('the noise buffer of the SoundManager holds the samples the model plays', () => {
+    const data = new Float32Array(48000 / 2);
+    const ctx = {
+      currentTime: 0,
+      sampleRate: 48000,
+      state: 'running',
+      createBuffer: () => ({ getChannelData: () => data }),
+      createGain: () => ({ gain: { value: 1 }, connect: () => undefined }),
+      createBufferSource: () => ({ connect: () => undefined, start: () => undefined }),
+      resume: () => Promise.resolve(),
+      destination: {},
+    };
+    new SoundManager(() => ctx as unknown as AudioContextLike, () => 0).unlock();
+    expect(data.some((x) => x !== 0)).toBe(true);
+    expect(Array.from(data)).toEqual(Array.from(fillNoise(new Float32Array(48000 / 2))));
   });
 });

@@ -205,9 +205,9 @@ export function validateThemePackage(input: unknown): { report: ThemeReport; pkg
   for (const f of contrastFailures(packageColors(pkg), pkg.avatar)) {
     errors.push({
       code: 'CONTRAST',
-      path: f.bg.includes('hue') ? 'avatar' : `colors.${f.token ?? f.fg}`,
+      path: f.bg.includes('hue') ? 'avatar' : `colors.${f.fg}`,
       message: `${f.pair}: contrast ${f.ratio}:1, needs ${f.min}:1.`,
-      params: { fg: f.fg, bg: f.bg, ratio: f.ratio, min: f.min },
+      params: { fg: f.fg, ...(f.or ? { or: f.or } : {}), bg: f.bg, ratio: f.ratio, min: f.min },
     });
   }
 

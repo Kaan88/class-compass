@@ -115,6 +115,7 @@ export const tr = {
   'themes.issue.SCHEMA': 'Pakette bir şey eksik ya da izin verilmiyor: {detail}',
   'themes.issue.KEY_BUILTIN': '"{key}" hazır bir temanın anahtarı. Temaya başka bir anahtar verin.',
   'themes.issue.CONTRAST': 'Karşıtlık yetersiz: {bg} üzerinde {fg} {ratio}:1, en az {min}:1 olmalı.',
+  'themes.issue.CONTRAST_EITHER': 'Karşıtlık yetersiz: {bg} üzerinde ne {fg} ne de {or} yeterince belirgin (en iyisi {ratio}:1; birinin en az {min}:1 olması gerekir).',
   'themes.issue.SOUND': '"{event}" sesi: {problem} ({value}, sınır {limit}).',
   'themes.issue.SVG': 'Bir resme izin verilmiyor: {reason} {detail}',
   'themes.issue.MASCOT_POSES_SAME': 'Maskotun her duruşu farklı görünmeli.',

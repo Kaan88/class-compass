@@ -183,7 +183,7 @@ describe('theme engine fields over MCP (S17a, D-166)', () => {
     expect(r.isError, r.text).toBe(false);
     expect(r.data.report.ok).toBe(false);
     expect(r.data.report.errors).toContainEqual(
-      expect.objectContaining({ code: 'CONTRAST', path: 'colors.avatar-ink', params: expect.objectContaining({ fg: 'avatar-ink or avatar-white', bg: 'avatar-navy', min: 3 }) }),
+      expect.objectContaining({ code: 'CONTRAST', path: 'colors.avatar-ink', params: expect.objectContaining({ fg: 'avatar-ink', or: 'avatar-white', bg: 'avatar-navy', min: 3 }) }),
     );
     const p = await teacher.call('preview_theme', { package: pkg });
     // A mid-grey rim also loses mid skin tones; the worst one is among the reported bodies.

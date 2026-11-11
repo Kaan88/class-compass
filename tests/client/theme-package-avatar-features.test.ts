@@ -56,7 +56,7 @@ describe('avatar features in the theme package validator (D-173)', () => {
     const err = report.errors.find((e) => e.code === 'CONTRAST' && e.params?.bg === 'avatar-navy');
     expect(err, JSON.stringify(report.errors)).toMatchObject({
       path: 'colors.avatar-ink',
-      params: { fg: 'avatar-ink or avatar-white', bg: 'avatar-navy', ratio: Math.round(navy * 100) / 100, min: 3 },
+      params: { fg: 'avatar-ink', or: 'avatar-white', bg: 'avatar-navy', ratio: Math.round(navy * 100) / 100, min: 3 },
     });
     expect(err!.message).toContain('avatar eyes and mouths');
     // Ink on its own rim is still fine here.
@@ -69,7 +69,7 @@ describe('avatar features in the theme package validator (D-173)', () => {
     pkg.colors['avatar-white'] = '#6e7380';
     pkg.colors['avatar-skin-12'] = '#5b3a2a';
     const { report } = validateThemePackage(pkg);
-    const pairs = report.errors.filter((e) => e.code === 'CONTRAST').map((e) => `${e.path} ${String(e.params?.fg)} / ${String(e.params?.bg)}`);
+    const pairs = report.errors.filter((e) => e.code === 'CONTRAST').map((e) => `${e.path} ${[e.params?.fg, e.params?.or].filter(Boolean).join(' or ')} / ${String(e.params?.bg)}`);
     expect(pairs).toContain('colors.avatar-ink avatar-ink / avatar-white');
     expect(pairs).toContain('colors.avatar-ink avatar-ink or avatar-white / avatar-skin-12');
   });

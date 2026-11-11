@@ -74,7 +74,7 @@ function useCustomThemesVersion() {
 }
 
 /** One issue of the report in words (translated by code; technical details as they are). */
-function IssueText({ issue }: { issue: Issue }) {
+export function IssueText({ issue }: { issue: Issue }) {
   const { t } = useI18n();
   const p = issue.params ?? {};
   const str = (k: string) => String(p[k] ?? '');
@@ -92,7 +92,10 @@ function IssueText({ issue }: { issue: Issue }) {
       text = t('themes.issue.SVG', { reason: t(`themes.svgReason.${str('reason')}` as MessageKey), detail: str('detail') });
       break;
     case 'CONTRAST':
-      text = t('themes.issue.CONTRAST', { fg: str('fg'), bg: str('bg'), ratio: str('ratio'), min: str('min') });
+      // Avatar faces (D-173): neither the ink nor its rim reads on a body; the tokens stay as they are.
+      text = p.or
+        ? t('themes.issue.CONTRAST_EITHER', { fg: str('fg'), or: str('or'), bg: str('bg'), ratio: str('ratio'), min: str('min') })
+        : t('themes.issue.CONTRAST', { fg: str('fg'), bg: str('bg'), ratio: str('ratio'), min: str('min') });
       break;
     case 'TOO_LARGE':
       text = t('themes.issue.TOO_LARGE', { bytes: str('bytes'), limit: str('limit') });

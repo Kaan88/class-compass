@@ -126,11 +126,17 @@ export const PACKAGE_LIMITS = {
  *   starts at zero): a cue started at once played up to 12 dB quieter (the "7 dB under" of the S17b
  *   review). The SoundManager starts nothing until `settleMs` after it built the chain;
  * - above the threshold the compressor needs its attack time to pull a sudden start down, so the first
- *   milliseconds pass over the settled curve: 1.7 dB with the old 3 ms attack, at most 0.7 dB with
- *   1 ms for packs within the limits, and up to 3 dB for chords of notes at the gain cap;
+ *   milliseconds pass over the settled curve: 1.7 dB with the old 3 ms attack, with 1 ms at most
+ *   0.65 dB for the class packs, 1 dB for the loudest packs the parameters allow (gain 0.2, volume
+ *   100) and up to 3 dB for chords of notes at the gain cap;
  * - the soft ceiling (a WaveShaper after the makeup gain) is linear up to `ceilingKneeDb` and never
  *   goes above `ceilingDb`, so no transient, chord or clip can reach 0 dBFS. Taps (about −9 dBFS at
- *   volume 80) never reach it.
+ *   volume 80) and the class packs at volume 80 stay under its knee; at volume 100 the loudest cues of
+ *   the built-in packs (fanfare, time's up, about −3 dBFS) and of gain-0.2 packs (up to −1.4 dBFS
+ *   before the ceiling) sit a little into the knee and come out bent by `softCeiling` (at most 0.25 dB
+ *   quieter), not only their transients.
+ * The model of what a cue reaches is `outputPeakDb(playedPeak(cue), volume)` (S21a review: envelopes
+ * and the noise samples themselves, not the sum of overlapping gains).
  */
 export const LOUDNESS = {
   thresholdDb: -24,
@@ -194,8 +200,9 @@ export function softCeilingCurve(points = 4097): Float32Array<ArrayBuffer> {
 /**
  * Peak level in dBFS after the compressor and its makeup gains (before the ceiling) of a cue whose
  * notes add up to `peak` at class volume `volume`, once the compressor has settled. The clip check of
- * `soundPackProblems` uses this level: a cue must stay under 0 dBFS here, so the ceiling only ever
- * catches transients, never a cue that is too loud as written.
+ * `soundPackProblems` uses this level with the worst-case `loudestMoment` (every overlapping note at
+ * its full gain): a cue must stay under 0 dBFS here, so the ceiling never excuses a cue that is too
+ * loud as written (it bends loud cues near its −3 dBFS knee a little, see LOUDNESS).
  */
 export function compressedPeakDb(peak: number, volume: number): number {
   const input = toDb(peak * volumeGain(volume));
@@ -203,11 +210,12 @@ export function compressedPeakDb(peak: number, volume: number): number {
 }
 
 /**
- * Peak level in dBFS at the speakers of a cue whose notes add up to `peak` (one note: its gain, capped
- * at the note gain cap when played) at class volume `volume` (0..100), once the compressor has settled:
- * `compressedPeakDb` through the soft ceiling. Rendered in Chromium (S21a): a single note within
- * 0.3 dB of it; chords and noise at or under it, except the first milliseconds over the threshold
- * (see LOUDNESS), which the ceiling bounds.
+ * Peak level in dBFS at the speakers of a cue whose notes add up to `peak` (`playedPeak(cue)`; one
+ * note: its gain, capped at the note gain cap when played) at class volume `volume` (0..100), once the
+ * compressor has settled: `compressedPeakDb` through the soft ceiling. Rendered in Chromium (S21a and
+ * its review), every cue of the class packs at volume 80 and 100 plays between 1.4 dB under (a 44 ms
+ * square tap; tone sequences and chords whose waves do not line up) and 0.65 dB over it (the
+ * compressor's attack); noise cues within 0.1 dB.
  */
 export function outputPeakDb(peak: number, volume: number): number {
   return toDb(softCeiling(fromDb(compressedPeakDb(peak, volume))));
