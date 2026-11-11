@@ -22,6 +22,8 @@ const EnvSchema = z.object({
     .transform((v) => v === 'true'),
   DEFAULT_TIMEZONE: z.string().default('Europe/Istanbul'),
   SMTP_HOST: z.string().optional().default(''),
+  /** Optional address to connect to when it differs from SMTP_HOST (a mail server on the same host as the container); TLS is still checked against SMTP_HOST (D-192). */
+  SMTP_CONNECT_HOST: z.string().optional().default(''),
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASS: z.string().optional().default(''),

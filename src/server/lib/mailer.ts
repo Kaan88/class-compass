@@ -17,15 +17,18 @@ export interface Mailer {
  * SMTP transport options. Port 465 uses implicit TLS; any other port must upgrade with STARTTLS
  * (`requireTLS`), so an on-path attacker cannot strip STARTTLS and read the SMTP credentials or the
  * reset links. Certificate verification stays on (nodemailer default `rejectUnauthorized: true`).
+ * With `SMTP_CONNECT_HOST` the connection goes to that address, but the certificate is still checked
+ * against `SMTP_HOST` (TLS `servername`), e.g. a mail server on the same host as the container (D-192).
  */
 export function smtpTransportOptions(config: Config) {
   const secure = config.SMTP_PORT === 465;
+  const connectHost = config.SMTP_CONNECT_HOST;
   return {
-    host: config.SMTP_HOST,
+    host: connectHost || config.SMTP_HOST,
     port: config.SMTP_PORT,
     secure,
     requireTLS: !secure,
-    tls: { rejectUnauthorized: true, minVersion: 'TLSv1.2' as const },
+    tls: { rejectUnauthorized: true, minVersion: 'TLSv1.2' as const, ...(connectHost ? { servername: config.SMTP_HOST } : {}) },
     ...(config.SMTP_USER ? { auth: { user: config.SMTP_USER, pass: config.SMTP_PASS } } : {}),
   };
 }

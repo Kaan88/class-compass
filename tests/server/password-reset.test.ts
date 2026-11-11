@@ -131,6 +131,15 @@ describe('email password reset (D-015)', () => {
     expect(smtpTransportOptions({ ...env.config, ...base, SMTP_PORT: 465 })).toMatchObject({ secure: true, tls: { rejectUnauthorized: true } });
   });
 
+  it('connects to SMTP_CONNECT_HOST but checks the certificate against SMTP_HOST (D-192)', async () => {
+    await smtpEnv();
+    const plain = smtpTransportOptions({ ...env.config, SMTP_HOST: 'mail.example.test', SMTP_CONNECT_HOST: '', SMTP_PORT: 465 });
+    expect(plain.host).toBe('mail.example.test');
+    expect(plain.tls).not.toHaveProperty('servername');
+    const viaGateway = smtpTransportOptions({ ...env.config, SMTP_HOST: 'mail.example.test', SMTP_CONNECT_HOST: 'host.docker.internal', SMTP_PORT: 465 });
+    expect(viaGateway).toMatchObject({ host: 'host.docker.internal', secure: true, tls: { rejectUnauthorized: true, servername: 'mail.example.test' } });
+  });
+
   it('does not send to deactivated accounts', async () => {
     const mailer = await smtpEnv();
     env.db.$client.prepare('update users set disabled_at = 1').run();
