@@ -7,7 +7,9 @@
  *   for Animals, falling leaves that stand still with reduced motion;
  * - frame edges keep their proportions (their SVG units are CSS pixels: no stretched path);
  * - with a scene the dock is content-width and centred on wide screens, so the scene shows beside it;
- * - on a phone the dock is one compact row (scrolling sideways inside itself) with End lesson in view;
+ * - on a phone the dock is one compact row (its buttons scroll sideways beside End lesson, which stays
+ *   in view), every button reachable and fully tappable, at least var(--cc-touch) high, axe clean;
+ * - no frame corner sits on a control or on the class name (S17b review);
  * - axe finds nothing serious on the board in any theme.
  * Screenshots go to `CC_SHOTS_DIR` (default test-results/s17b/after). With `CC_SHOTS_ONLY=1` only the
  * screenshots are taken (used once for the "before" set on the S17a code). Fictional demo data only;
@@ -84,6 +86,32 @@ async function stretchedEdges(page: Page) {
   );
 }
 
+/**
+ * Corner ornaments drawn over a control or the class name (S17b review): every visible
+ * `.cc-frame__corner` against every button, link, input and the class name on the board.
+ */
+async function cornersOnControls(page: Page) {
+  return page.evaluate(() => {
+    const visible = (el: Element) => {
+      const cs = getComputedStyle(el);
+      return el.getClientRects().length > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > 0;
+    };
+    const corners = [...document.querySelectorAll('.cc-frame__corner')].filter(visible);
+    const targets = [...document.querySelectorAll('button, a[href], input, select, textarea, [role="button"], .cc-classroom-bar__name')].filter(visible);
+    const out: string[] = [];
+    for (const c of corners) {
+      const a = c.getBoundingClientRect();
+      for (const t of targets) {
+        const b = t.getBoundingClientRect();
+        const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (w > 0.5 && h > 0.5) out.push(`${c.getAttribute('class')} on ${t.tagName.toLowerCase()} "${(t.getAttribute('aria-label') ?? t.textContent ?? '').trim().slice(0, 40)}" (${Math.round(w)}×${Math.round(h)} px)`);
+      }
+    }
+    return out;
+  });
+}
+
 test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', async ({ browser }) => {
   test.setTimeout(600_000);
   mkdirSync(SHOTS, { recursive: true });
@@ -126,6 +154,7 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
             await expect(page.locator('html')).toHaveAttribute('data-scene', '');
             await expect(page.getByTestId('theme-scene')).toBeVisible();
             expect(await stretchedEdges(page), `${theme} ${size.name}`).toEqual([]);
+            expect(await cornersOnControls(page), `${theme} ${size.name} corners on controls`).toEqual([]);
 
             const exp = (EXPECT as Record<string, (typeof EXPECT)['explorer'] | undefined>)[theme];
             if (exp && !phone) {
@@ -147,9 +176,15 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
               const d = nav.getBoundingClientRect();
               const tops = [...nav.querySelectorAll<HTMLElement>(':scope > .cc-btn, :scope > * > .cc-btn')].filter((b) => b.getClientRects().length > 0).map((b) => Math.round(b.getBoundingClientRect().top));
               const end = nav.querySelector<HTMLElement>('.cc-dock__end')!.getBoundingClientRect();
-              // Buttons keep their whole label and do not overlap (only End lesson may cover others while it sticks).
+              // Buttons keep their whole label and do not overlap (the phone row's hidden part scrolls under nothing).
               const btns = [...nav.querySelectorAll<HTMLElement>('.cc-btn')].filter((b) => b.getClientRects().length > 0 && !b.classList.contains('cc-dock__end'));
-              const squeezed = btns.filter((b) => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().height < 40).length;
+              // The app's touch minimum (var(--cc-touch)), not a fixed number of pixels.
+              const probe = document.createElement('div');
+              probe.style.height = 'var(--cc-touch)';
+              document.body.append(probe);
+              const touch = probe.getBoundingClientRect().height;
+              probe.remove();
+              const squeezed = btns.filter((b) => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().height < touch - 0.5).length;
               const xs = btns.map((b) => b.getBoundingClientRect()).sort((a, b) => a.left - b.left);
               const overlaps = xs.slice(1).filter((r, i) => r.left < xs[i]!.right - 1 && Math.abs(r.top - xs[i]!.top) < 2).length;
               return { rowL: row.left, rowR: row.right, l: d.left, r: d.right, h: d.height, rows: new Set(tops).size, endIn: end.left >= d.left - 1 && end.right <= d.right + 1, vh: innerHeight, vw: innerWidth, squeezed, overlaps };
@@ -162,6 +197,31 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
               expect(dock.endIn).toBe(true);
               expect(dock.h).toBeLessThan(dock.vh * 0.15);
               expect(dock.r).toBeLessThanOrEqual(dock.vw + 1);
+              // Every dock button can be reached (S17b review): focused (as with Tab) it is at least
+              // partly in view and End lesson is never over it (WCAG 2.4.11); scrolled to, it is fully
+              // in view beside End lesson and a tap at its centre lands on it.
+              const hidden = await page.evaluate(() => {
+                const nav = document.querySelector<HTMLElement>('.cc-dock')!;
+                const row = nav.querySelector<HTMLElement>('.cc-dock__items')!;
+                const end = nav.querySelector<HTMLElement>('.cc-dock__end')!;
+                const out: string[] = [];
+                for (const b of [...nav.querySelectorAll<HTMLElement>('.cc-btn')].filter((x) => x !== end && x.getClientRects().length > 0)) {
+                  row.scrollLeft = 0;
+                  b.focus();
+                  const d = row.getBoundingClientRect();
+                  const e = end.getBoundingClientRect();
+                  let r = b.getBoundingClientRect();
+                  if (r.right <= d.left + 8 || r.left >= Math.min(d.right, e.left) - 8) out.push(`${b.textContent?.trim()}: focused but out of view (${Math.round(r.left)}–${Math.round(r.right)})`);
+                  b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                  r = b.getBoundingClientRect();
+                  const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                  if (r.left < d.left - 1 || r.right > Math.min(d.right, e.left) + 1 || !hit || !b.contains(hit)) out.push(`${b.textContent?.trim()}: ${Math.round(r.left)}–${Math.round(r.right)} beside End at ${Math.round(e.left)}`);
+                }
+                (document.activeElement as HTMLElement | null)?.blur();
+                row.scrollLeft = 0;
+                return out;
+              });
+              expect(hidden, `${theme} phone dock buttons reachable`).toEqual([]);
             } else if (size.width >= 1536) {
               // With a scene the dock is content-width and centred: the scene shows on both sides.
               const left = dock.l - dock.rowL;
@@ -169,7 +229,8 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
               expect(left, `${theme} dock left gap`).toBeGreaterThan(40);
               expect(Math.abs(left - right), `${theme} dock centred`).toBeLessThanOrEqual(2);
             }
-            if (!reduced && size.name === '1536x703@1.25') expect(await seriousViolations(page), `${theme} axe`).toEqual([]);
+            // axe at the classroom display size and on the phone (the compact scrolling dock).
+            if (!reduced && (size.name === '1536x703@1.25' || phone)) expect(await seriousViolations(page), `${theme} ${size.name} axe`).toEqual([]);
           } finally {
             await ctx.close();
           }

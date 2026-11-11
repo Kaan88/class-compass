@@ -25,7 +25,10 @@ export interface VoicePartial {
 export interface VoiceSpec {
   /** Time to the peak (ms, at most a quarter of the note). */
   attackMs: number;
-  /** The gains add up to 1, so a styled note never peaks above the note's own gain (loudness model). */
+  /**
+   * The shares add up to 1. Inharmonic partials with their own envelopes never line up, so their sum
+   * peaks lower than that; `notePartials` scales them so the sum really peaks at the note's gain.
+   */
   partials: readonly VoicePartial[];
 }
 
@@ -80,19 +83,95 @@ export const SOUND_VOICES: Record<Exclude<SoundStyle, 'tones'>, VoiceSpec> = {
 
 export const isSoundStyle = (v: unknown): v is SoundStyle => typeof v === 'string' && (SOUND_STYLES as readonly string[]).includes(v);
 
+export interface NotePartial {
+  freq: number;
+  to?: number;
+  gain: number;
+  decay: number;
+  attackMs: number;
+}
+
+/** Sample rate of the peak simulation (the classroom PCs and iPads run at 44.1 or 48 kHz). */
+const PEAK_RATE = 48_000;
+/** The floor every envelope starts from and falls back to (an exponential ramp cannot reach 0). */
+const ENV_FLOOR = 0.0001;
+
+/**
+ * The real peak of the summed partials of a note `dur` ms long, played exactly as the SoundManager
+ * schedules them: each a sine starting at phase 0, its gain ramping exponentially from 0.0001 to its
+ * peak over `min(attack, dur / 4)` and back to 0.0001 by `min(dur, max(10 ms, dur × decay))`, its
+ * frequency gliding exponentially to `to` over the whole note. Sampled at 48 kHz; it stops once the
+ * envelopes together can no longer beat the peak found so far (they only fall after the attacks).
+ */
+export function partialsPeak(parts: readonly NotePartial[], dur: number): number {
+  const T = dur / 1000;
+  const env = parts.map((p) => {
+    const ta = Math.min(p.attackMs / 1000, T / 4);
+    const te = Math.min(T, Math.max(0.01, (dur * p.decay) / 1000));
+    return { ...p, ta, te };
+  });
+  const lastAttack = Math.max(0, ...env.map((e) => e.ta));
+  const level = (e: (typeof env)[number], t: number) => {
+    if (t <= e.ta) return e.ta <= 0 ? e.gain : ENV_FLOOR * (e.gain / ENV_FLOOR) ** (t / e.ta);
+    if (t >= e.te) return ENV_FLOOR;
+    return e.gain * (ENV_FLOOR / e.gain) ** ((t - e.ta) / (e.te - e.ta));
+  };
+  const phase = env.map(() => 0);
+  let peak = 0;
+  const steps = Math.ceil(T * PEAK_RATE);
+  for (let i = 0; i <= steps; i++) {
+    const t = i / PEAK_RATE;
+    let sum = 0;
+    let bound = 0;
+    for (let k = 0; k < env.length; k++) {
+      const e = env[k]!;
+      const g = Math.max(0, level(e, t));
+      bound += g;
+      sum += g * Math.sin(phase[k]!);
+      const f = e.to === undefined ? e.freq : e.freq * (e.to / e.freq) ** (t / T);
+      phase[k] = phase[k]! + (2 * Math.PI * f) / PEAK_RATE;
+    }
+    peak = Math.max(peak, Math.abs(sum));
+    if (t > lastAttack && bound <= peak) break;
+  }
+  return peak;
+}
+
+/** Scale factors per (style, frequency, glide, length), so a cue is simulated once. */
+const styleScale = new Map<string, number>();
+
 /**
  * The partials a note sounds with (one plain partial for `tones` and noise): frequencies and glide
- * targets in Hz, gains already multiplied by the note's peak, partials above `partialMaxHz` left out.
+ * targets in Hz, partials above `partialMaxHz` left out, gains scaled so the summed partials really
+ * peak at the note's gain (S17b review: the inharmonic partials never line up, so plain shares of the
+ * gain came out 1 to 3 dB under the loudness model). So `outputPeakDb`, the tap's lower and upper
+ * limits and the clip check stay true for every style.
  */
-export function notePartials(n: ToneNote): Array<{ freq: number; to?: number; gain: number; decay: number; attackMs: number }> {
+export function notePartials(n: ToneNote): NotePartial[] {
   const plain = { freq: n.freq, ...(n.to === undefined ? {} : { to: n.to }), gain: n.gain, decay: 1, attackMs: 30 };
   if (n.type === 'noise' || !n.voice || n.voice === 'tones') return [plain];
   const v = SOUND_VOICES[n.voice];
   if (!v) return [plain];
   const top = Math.max(n.freq, n.to ?? 0);
-  return v.partials
+  const shares = v.partials
     .filter((p) => p.ratio * top <= SOUND_LIMITS.partialMaxHz || p.ratio === 1)
     .map((p) => ({ freq: n.freq * p.ratio, ...(n.to === undefined ? {} : { to: n.to * p.ratio }), gain: n.gain * p.gain, decay: p.decay, attackMs: v.attackMs }));
+  if (!(n.gain > 0) || !(n.dur > 0)) return shares;
+  const key = `${n.voice}|${n.freq}|${n.to ?? ''}|${n.dur}|${n.gain}`;
+  let scale = styleScale.get(key);
+  if (scale === undefined) {
+    // Twice: the envelopes ramp from a fixed floor, so a louder partial's curve differs a little.
+    scale = 1;
+    for (let i = 0; i < 2; i++) {
+      const peak = partialsPeak(shares.map((p) => ({ ...p, gain: p.gain * scale! })), n.dur);
+      if (peak > 0) scale = scale * (n.gain / peak);
+    }
+    // At most ×4 (+12 dB): a guard; the styles need about ×1.1 to ×1.5.
+    scale = Math.min(4, scale);
+    if (styleScale.size > 2000) styleScale.clear();
+    styleScale.set(key, scale);
+  }
+  return shares.map((p) => ({ ...p, gain: p.gain * scale }));
 }
 
 export interface SoundPackOptions {

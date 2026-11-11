@@ -356,6 +356,10 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17b; decision D-168; after 
 - [x] Explorer, Animals and Classroom remade with scenes, frames, ambient and sets per the mockups; screenshots before/after (all four themes at 1536×703 and 1536×864 at scale 1.25, 1920×1080 and 375 px, motion on and off; `e2e/theme-builtins.spec.ts`)
 - [x] `sounds.style` (tones, bells, marimba, chimes, musicBox) in packages, the validator, docs and the MCP tools; built-ins and Snow Day choose a style
 - [x] Engine polish from the wave 1 screenshots: piled-snow drifts and frame shapes drawn in CSS pixels (no stretching), a centred content-width dock when the theme has a scene, a compact one-row dock on phones; scene and ambient only on the classroom screen
+- [x] Review fixes (S17b review, D-168): corners never on a control (top bar edge only, small box corners in the gaps, e2e check), the Admin preview's ambient kept inside its sample, styled notes really peak at their gain (rendered test of every style and of every built-in tap and Snow Day), phone dock buttons scroll beside End lesson (never under it), `--cc-touch` and axe checked at 375 px
+- [x] Usability screen crawl, classroom area (where scenes, frames and ambient show), before (c3e66f8, the commit before S17b) and after the review fixes: the same 333 screens; spot-checked the dashboards at 1280×720, 1920×1080 and the 768 px tablet and the dock views: same visible class, same cut-off cue, no overlay on a control (the crawl has no phone size; the 375 px phone is covered by `e2e/theme-builtins.spec.ts`)
+- [ ] Usability screen crawl of the other areas (teacher, admin, student, Super Speakers) before/after S17b: not run (the default theme's scene and ambient are only on the classroom screen; ordinary cards are not in the built-ins' frame surfaces)
+- [ ] The review measured plain tones about 7 dB under `outputPeakDb` through Chromium's compressor (before S17b too): check the loudness model against a rendered chain
 - [ ] Seen on the real classroom display (owner)
 - [ ] Heard on the classroom speakers (owner)
 

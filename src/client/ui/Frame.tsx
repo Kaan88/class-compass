@@ -431,10 +431,11 @@ export function FrameDocumentFlags() {
 export function FrameOverlay({ surface, boxKey, theme }: { surface: FrameSurface; boxKey?: BoxKey; theme?: ThemeKey }) {
   const f = useTheme(theme).frame;
   if (!f || !f.apply.includes(surface)) return null;
-  // Student cards are small: the edge only (mockup). Cards and dialogs: the edge only. The top bar
-  // spans the page from its top: its edge hangs from the bottom.
+  // Student cards are small: the edge only (mockup); ordinary cards too. The top bar has its own
+  // content right up to its corners (the class name, Teacher area): the edge only, so a corner never
+  // sits on a control or on text (S17b review). Its edge hangs from its bottom.
   const size: Size = surface === 'studentCards' ? 'card' : 'box';
-  const edgeOnly = surface === 'studentCards' || surface === 'cards';
+  const edgeOnly = surface === 'studentCards' || surface === 'cards' || surface === 'topBar';
   const trim = surface === 'boardBoxes' && boxKey !== undefined && f.trimOn.includes(boxKey);
   if (f.edge === 'none' && (edgeOnly || (!trim && f.corners === 'none'))) return null;
   return (

@@ -1418,10 +1418,6 @@ html:has(.cc-lesson-board) .cc-toaster {
   overflow: hidden;
   pointer-events: none;
 }
-.cc-scene--contained,
-.cc-ambient--contained {
-  position: absolute;
-}
 .cc-scene__layer {
   position: absolute;
   display: block;
@@ -1435,6 +1431,14 @@ html:has(.cc-lesson-board) .cc-toaster {
   height: 100%;
   pointer-events: none;
   transition: opacity 400ms ease-out;
+}
+/* A preview's scene and ambient (Admin → Themes) stay inside their sample (`position: relative;
+   overflow: clip`). After the page-wide rules and with the base class, so they win the cascade (S17b
+   review: the contained ambient was still `fixed` and drew leaves over the whole admin page). */
+.cc-scene.cc-scene--contained,
+.cc-ambient.cc-ambient--contained {
+  position: absolute;
+  inset: 0;
 }
 /* The ambient layer is not part of the celebration; it steps back while one is on screen. */
 body:has(.cc-celebration) .cc-ambient {
@@ -1644,38 +1648,42 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
   width: calc(100% - 36px);
   height: 18px;
 }
-/* Corners. */
+/* Corners: a small ornament on the box's corner, at most 7px out into the row and column gaps (about
+   8px) and 14px in, so it stays clear of the box's own controls (they sit at least 15px in from its
+   sides: Next stage, Reset, + Class) and of the neighbours' (a whole-box "Choose a topic" button
+   reaches the gap). S17b review; e2e checks that no corner covers a control at every display size. */
 .cc-frame__corner {
-  width: 34px;
-  height: 34px;
+  width: 21px;
+  height: 21px;
 }
 .cc-frame__corner--wide {
-  width: 46px;
-  height: 38px;
+  width: 25px;
+  height: 21px;
 }
 .cc-frame__corner--top-left {
-  left: -10px;
-  top: -12px;
+  left: -7px;
+  top: -7px;
 }
 .cc-frame__corner--top-right {
-  right: -10px;
-  top: -12px;
+  right: -7px;
+  top: -7px;
 }
 .cc-frame__corner--bottom-left {
-  left: -6px;
-  bottom: -6px;
+  left: -7px;
+  bottom: -7px;
 }
 .cc-frame__corner--bottom-right {
-  right: -6px;
-  bottom: -6px;
+  right: -7px;
+  bottom: -7px;
 }
-:is(.cc-classroom-bar, .cc-modal) > :is(.cc-frame__corner--top-left, .cc-frame__corner--top-right) {
+/* Dialogs scroll: their corners sit just inside the top (the top bar has no corners, S17b review). */
+.cc-modal > :is(.cc-frame__corner--top-left, .cc-frame__corner--top-right) {
   top: 2px;
 }
-:is(.cc-classroom-bar, .cc-modal) > .cc-frame__corner--top-left {
+.cc-modal > .cc-frame__corner--top-left {
   left: 2px;
 }
-:is(.cc-classroom-bar, .cc-modal) > .cc-frame__corner--top-right {
+.cc-modal > .cc-frame__corner--top-right {
   right: 2px;
 }
 /* Compact density and phones: the edge only (trims and corners are detail). */
@@ -2404,8 +2412,11 @@ html:has(.cc-classroom) {
   background: var(--cc-surface);
 }
 /* Buttons share one row while they fit (labels may wrap), else the dock wraps; End lesson keeps its
-   full size at the end of the last line. */
-.cc-dock > .cc-btn {
+   full size at the end of the last line. The buttons' wrapper is not a box here (S17b review). */
+.cc-dock__items {
+  display: contents;
+}
+:is(.cc-dock, .cc-dock__items) > .cc-btn {
   flex: 0 1 auto;
   min-width: 0;
   min-height: var(--cc-touch);
@@ -2446,42 +2457,47 @@ html:has(.cc-classroom) {
     flex: 0 0 0.75rem;
   }
 }
-/* S17b: a phone gets a compact dock, one row that scrolls sideways inside itself (labels on one line),
-   with End lesson kept in view at its right end; the bottom strip scene and the class stay visible. */
+/* S17b: a phone gets a compact dock: the panels' buttons are one row that scrolls sideways inside
+   itself, End lesson stays in view beside it (outside the scrolling row, so it never covers a button;
+   S17b review: a sticky End lesson hid the button beside it, also from keyboard focus). Every button
+   fits fully in the row (at most 11rem; a long label wraps at a space); the bottom strip scene and the
+   class stay visible. */
 @media (max-width: 40rem) {
   .cc-dock {
     flex-wrap: nowrap;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: thin;
     gap: 0.35rem;
     padding: 0.3rem;
   }
-  .cc-dock > *,
-  .cc-dock > .cc-btn {
+  .cc-dock__items {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 0.35rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .cc-dock__items > *,
+  :is(.cc-dock, .cc-dock__items) > .cc-btn {
     flex: none;
   }
-  /* (Stronger than the page's phone rules at the end of this file: in a row that scrolls, a button
-     keeps its whole label on one line instead of shrinking to the row.) */
+  /* (Stronger than the page's phone rules at the end of this file.) */
   .cc-dock .cc-btn,
   .cc-page .cc-dock .cc-btn {
-    max-width: none;
+    max-width: 11rem;
     overflow-wrap: normal;
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.15;
   }
-  .cc-dock > .cc-btn {
+  .cc-page :is(.cc-dock, .cc-dock__items) > .cc-btn {
     padding-inline: 0.6rem;
     font-size: 1rem;
   }
-  .cc-dock > .cc-dock__spacer {
-    display: none;
+  .cc-page .cc-dock > .cc-dock__end {
+    white-space: nowrap;
   }
-  .cc-dock > .cc-dock__end {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-    margin-left: auto;
-    box-shadow: -0.5rem 0 0.5rem -0.25rem var(--cc-shadow-color);
+  .cc-dock__items > .cc-dock__spacer {
+    display: none;
   }
 }
 /* A dock panel opened full screen: a note only when the panel has nothing to show. */

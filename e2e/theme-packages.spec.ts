@@ -232,6 +232,17 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
     await motion.getByRole('button', { name: 'Motion on' }).click();
     await expect(sample.getByTestId('theme-ambient')).toHaveAttribute('data-mode', 'full');
     await expect(sample.getByTestId('theme-ambient')).toHaveAttribute('data-running', 'true');
+    // The preview's scene and snowfall stay inside the classroom sample, never over the admin page
+    // (S17b review: the contained canvas was still position: fixed over the whole window).
+    const box = (await sample.boundingBox())!;
+    for (const id of ['theme-ambient', 'theme-scene']) {
+      const r = (await sample.getByTestId(id).boundingBox())!;
+      expect(r.x, id).toBeGreaterThanOrEqual(box.x - 1);
+      expect(r.y, id).toBeGreaterThanOrEqual(box.y - 1);
+      expect(r.x + r.width, id).toBeLessThanOrEqual(box.x + box.width + 1);
+      expect(r.y + r.height, id).toBeLessThanOrEqual(box.y + box.height + 1);
+    }
+    await expect(sample.getByTestId('theme-ambient')).toHaveCSS('position', 'absolute');
     await expect(preview.getByTestId('theme-engine-frame')).toContainText('Snow drift');
     await expect(preview.getByTestId('theme-engine-frame')).toContainText('Candy stripe (Routine, Timer)');
     await expect(preview.getByTestId('theme-engine-ambient')).toContainText('Snowfall');
@@ -269,11 +280,13 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
         await expect(page.locator('html')).toHaveAttribute('data-theme', SNOW_KEY);
         await expect(page.locator('html')).toHaveAttribute('data-scene', '');
         await expect(page.getByTestId('theme-scene')).toHaveAttribute('data-layers', '3');
-        // Frames: the snow edge on the boxes and cards, the candy stripe on the timer (trimOn), frost corners on the top bar.
+        // Frames: the snow edge on the boxes and cards, the candy stripe on the timer (trimOn); the top
+        // bar gets its edge only (S17b review: corners there sat on its buttons and the class name).
         await expect(page.locator('.cc-lesson-box[data-box="core.timer"] > .cc-frame__ring--candy')).toHaveCount(1);
         expect(await page.locator('.cc-lesson-box > .cc-frame__edge--drift').count()).toBeGreaterThan(1);
         expect(await page.locator('.cc-student-card > .cc-frame__edge--drift').count()).toBeGreaterThan(3);
-        await expect(page.locator('.cc-classroom-bar > .cc-frame__corner')).toHaveCount(2);
+        await expect(page.locator('.cc-classroom-bar > .cc-frame__edge--drift')).toHaveCount(1);
+        await expect(page.locator('.cc-classroom-bar > .cc-frame__corner')).toHaveCount(0);
         // Snowfall: running, in device pixels.
         const canvas = page.getByTestId('theme-ambient');
         await expect(canvas).toHaveAttribute('data-mode', 'full');

@@ -1,6 +1,7 @@
 /**
  * The board's dock (S14b, D-148): one big button per panel that is not shown as a box (in the
- * teacher's order), a spacer, then End lesson, always at the bottom of the board. A slot with a dock
+ * teacher's order), a spacer, then End lesson, always at the bottom of the board. On a phone the
+ * buttons are one row that scrolls sideways beside End lesson (S17b, D-168). A slot with a dock
  * spec gets a button (icon, label, optional badge) that opens its full-screen view; a slot without
  * one renders its own control here (the attendance button and dialog).
  */
@@ -47,10 +48,15 @@ export function Dock({ items, context, lesson, onEnd }: { items: readonly BoxKey
   const { t } = useI18n();
   return (
     <nav className="cc-dock" aria-label={t('board.dock')} data-testid="lesson-dock">
-      {items.map((k) => (
-        <DockItem key={k} boxKey={k} context={context} lesson={lesson} />
-      ))}
-      <span className="cc-dock__spacer" aria-hidden="true" />
+      {/* The panels' buttons: part of the dock's own row on wider screens (display: contents); on a
+          phone the row that scrolls sideways beside End lesson, so End lesson never covers one
+          (S17b review). */}
+      <div className="cc-dock__items">
+        {items.map((k) => (
+          <DockItem key={k} boxKey={k} context={context} lesson={lesson} />
+        ))}
+        <span className="cc-dock__spacer" aria-hidden="true" />
+      </div>
       <Button size="big" variant="danger" className="cc-dock__end" onPress={onEnd}>
         <IconFlag />
         {t('lesson.end')}

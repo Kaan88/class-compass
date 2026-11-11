@@ -549,11 +549,14 @@ The presets and their default colour tokens (generated from `src/shared/themePac
   never wider ones. A snow drift is a puffy 30 px cap with a soft shadow edge and drips down both
   sides on board boxes, 20 px on student cards, 20 px under the top bar.
 - With a scene, the classroom dock is content-width and centred on wide screens, so the scene shows
-  on both sides (decided by `html[data-scene]`); on a phone the dock is one row that scrolls sideways,
-  with End lesson kept at its right end.
+  on both sides (decided by `html[data-scene]`); on a phone the dock's buttons are one row that
+  scrolls sideways beside End lesson, which stays in view at the right end and never covers a button.
 - The overlays sit outside the content box: the content's padding, its hit areas and the focus
   outline are unchanged (overlays over the card fade away while keyboard focus is inside it). Student
-  cards, ordinary cards, compact density and phones get the edge only; dialogs get the edge and the
+  cards, ordinary cards, the classroom top bar (its class name and buttons reach its corners), compact
+  density and phones get the edge only; a board box's corner is a 21 px ornament on the box corner, at
+  most 7 px out into the gaps and 14 px in, so it never sits on a control (e2e checks every corner against
+  the board's buttons, links and the class name in every built-in theme and Snow Day); dialogs get the edge and the
   corners (drawn just inside their top, because dialogs scroll); the trim is only on the board boxes
   in `trimOn`.
 
@@ -674,9 +677,14 @@ of the pack sounds; the melody, timing and gains stay the same:
 
 A style is data (`SOUND_VOICES` in `src/shared/themePackage/sound.ts`): sine partials, each with a
 frequency ratio, a share of the note's gain and how long it lasts inside the note, plus an attack.
-The shares add up to 1 and every partial ends by the note's end, so every limit above (note gain,
-cue length, loudness at volume 80 and 100, the switches, the volume, the unlock path) applies
-unchanged and `soundPackProblems` checks a styled pack exactly like a plain one. Partials above
+The shares add up to 1 and every partial ends by the note's end. Partials with their own attacks,
+decays and (for bells and chimes) inharmonic ratios never line up, so their sum would peak 1 to 3 dB
+under the note's gain; `notePartials` therefore simulates the note as the SoundManager plays it
+(`partialsPeak`, 48 kHz) and scales the shares so the sum really peaks at the note's gain. So every
+limit above (note gain, cue length, loudness at volume 80 and 100, the switches, the volume, the
+unlock path) applies unchanged and `soundPackProblems` checks a styled pack exactly like a plain one;
+a test renders what the SoundManager schedules and checks the tap of every built-in theme and Snow
+Day against −12..−6 dBFS. Partials above
 8,000 Hz are left out. Noise notes (claps, drum rolls, crackle) are not styled. A package never puts
 a style inside a note; its `overrides` play in the theme's style. In Admin → Themes the preview says
 "Instrument: …" and its sound buttons play in that style; over MCP `theme_schema` lists the styles,

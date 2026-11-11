@@ -29,12 +29,16 @@ async function measure(page: Page, selector: string): Promise<{ found: number; p
     const label = (el: Element) => (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40) || el.getAttribute('aria-label') || el.tagName;
     for (const g of groups) {
       const box = g.getBoundingClientRect();
-      // A group that scrolls sideways inside itself (the phone dock, S17b) holds items beyond its edge.
-      const scrollsX = /(auto|scroll)/.test(getComputedStyle(g).overflowX);
+      // A group that scrolls sideways inside itself, or holds a row that does (the phone dock's buttons
+      // beside End lesson, S17b), holds items beyond its edge.
+      const scrolls = (el: Element) => /(auto|scroll)/.test(getComputedStyle(el).overflowX);
       const items = [...g.querySelectorAll<HTMLElement>('button, label, [role="radio"], a.cc-btn, a.cc-menu-tile')].filter((el) => el.getClientRects().length > 0);
       for (const el of items) {
         const r = el.getBoundingClientRect();
         if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1) problems.push(`"${label(el)}" content ${el.scrollWidth}px in ${el.clientWidth}px`);
+        let inside: Element | null = el;
+        while (inside && inside !== g && !scrolls(inside)) inside = inside.parentElement;
+        const scrollsX = inside !== null && scrolls(inside);
         if (!scrollsX && (r.right > box.right + 1 || r.left < box.left - 1)) problems.push(`"${label(el)}" sticks out of its group (${Math.round(r.left)}–${Math.round(r.right)} vs ${Math.round(box.left)}–${Math.round(box.right)})`);
         // Off the screen counts unless a scroll box (a wide table) holds it and is itself on screen.
         let scroller: HTMLElement | null = el.parentElement;

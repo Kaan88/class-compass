@@ -5,7 +5,8 @@
  * - their scenes are tokens only and within the package scene limits (same sanitiser);
  * - sound styles: app-defined partials whose gains add up to 1, every built-in and every style passes
  *   the existing sound limits, the SoundManager plays a styled note as sines that end with the note
- *   and never peak above it, the schema accepts the five styles and nothing else;
+ *   and, rendered from what it schedules, really peak at the note's gain (so the tap of every built-in
+ *   and of Snow Day is within −12..−6 dBFS at volume 80), the schema accepts the five styles only;
  * - frame shapes are drawn in CSS pixels: more motifs on a wider box, never wider ones (no stretching).
  * Fictional data only.
  */
@@ -19,9 +20,9 @@ import { ThemeProvider } from '../../src/client/themes/index.tsx';
 import { THEMES } from '../../src/client/themes/registry.ts';
 import { SoundManager, type AudioContextLike } from '../../src/client/themes/soundManager.ts';
 import { driftPath, FrameOverlay, scallopPath, tornPaths } from '../../src/client/ui/Frame.tsx';
-import { SOUND_LIMITS } from '../../src/shared/themePackage/limits.ts';
+import { outputPeakDb, SOUND_LIMITS } from '../../src/shared/themePackage/limits.ts';
 import { ThemePackage } from '../../src/shared/themePackage/schema.ts';
-import { makeSoundPack, notePartials, soundPackProblems, SOUND_VOICES } from '../../src/shared/themePackage/sound.ts';
+import { makeSoundPack, notePartials, partialsPeak, soundPackProblems, SOUND_VOICES } from '../../src/shared/themePackage/sound.ts';
 import { COLOR_TOKENS, SOUND_EVENTS, SOUND_STYLES, type ToneNote } from '../../src/shared/themePackage/tokens.ts';
 import { parseSceneSvg, validateThemePackage } from '../../src/shared/themePackage/validate.ts';
 
@@ -113,14 +114,18 @@ describe('sound styles (S17b, D-168)', () => {
     }
   });
 
-  it('partials sum to the note gain and leave out overtones above the partial limit', () => {
+  it('partials keep their shares, peak together at the note gain and leave out overtones above the partial limit', () => {
     const low: ToneNote = { freq: 300, at: 0, dur: 400, type: 'sine', gain: 0.2, voice: 'marimba' };
     const parts = notePartials(low);
     expect(parts.map((p) => p.freq)).toEqual([300, 1200, 3000]);
-    expect(parts.reduce((s, p) => s + p.gain, 0)).toBeCloseTo(0.2, 9);
+    // The shares stay in proportion; one scale makes up for partials that never line up (S17b review).
+    const sum = parts.reduce((s, p) => s + p.gain, 0);
+    expect(sum).toBeGreaterThanOrEqual(0.2);
+    for (const [i, p] of parts.entries()) expect(p.gain / sum).toBeCloseTo(SOUND_VOICES.marimba.partials[i]!.gain, 9);
+    expect(partialsPeak(parts, low.dur)).toBeCloseTo(0.2, 3);
     const high = notePartials({ ...low, freq: 2000 });
     expect(high.every((p) => p.freq <= SOUND_LIMITS.partialMaxHz)).toBe(true);
-    expect(high.reduce((s, p) => s + p.gain, 0)).toBeLessThan(0.2);
+    expect(partialsPeak(high, low.dur)).toBeCloseTo(0.2, 3);
     expect(notePartials({ ...low, voice: undefined })).toHaveLength(1);
     expect(notePartials({ freq: 2000, at: 0, dur: 50, type: 'noise', gain: 0.1, voice: 'bells' })).toHaveLength(1);
     // A glide moves every partial.
@@ -137,48 +142,152 @@ describe('sound styles (S17b, D-168)', () => {
     expect(ThemePackage.safeParse({ ...base, sounds: { ...base.sounds, overrides: { timeUp: [note] } } }).success).toBe(false);
   });
 
-  it('the SoundManager plays a styled note as sines that end with the note and never peak above it', () => {
-    const oscs: Array<{ type: string; freq: number; stop: number }> = [];
-    const peaks: number[] = [];
-    const param = (v = 1) => ({
-      value: v,
-      setValueAtTime: () => undefined,
-      setTargetAtTime: () => undefined,
-      cancelScheduledValues: () => undefined,
-      exponentialRampToValueAtTime: (x: number) => void peaks.push(x),
-    });
-    const node = () => ({ connect: (n: unknown) => n });
+  /*
+   * A fake AudioContext that records what the real SoundManager schedules (gain envelopes, oscillator
+   * frequencies, connections, start and stop), and an independent renderer of that schedule with the
+   * Web Audio rules (exponential ramps between events, sines from phase 0) at 48 kHz: the tests hear
+   * what the browser plays before the master chain, not what the loudness model assumes (S17b review).
+   */
+  type Ev = { kind: 'set' | 'exp'; v: number; t: number };
+  type Param = { value: number; events: Ev[] };
+  type Osc = { type: string; frequency: Param; target: unknown; start: number; stop: number };
+  function recordingContext() {
+    const gains: Array<{ gain: Param }> = [];
+    const oscs: Osc[] = [];
+    const param = (value: number) => {
+      const events: Ev[] = [];
+      return {
+        value,
+        events,
+        setValueAtTime: (v: number, t: number) => void events.push({ kind: 'set', v, t }),
+        exponentialRampToValueAtTime: (v: number, t: number) => void events.push({ kind: 'exp', v, t }),
+        setTargetAtTime: () => undefined,
+        cancelScheduledValues: () => undefined,
+      };
+    };
+    const node = () => ({ connect: (n: unknown) => n, disconnect: () => undefined });
     const ctx = {
       currentTime: 0,
-      sampleRate: 8000,
+      sampleRate: 48000,
       state: 'running',
       destination: {},
       resume: () => Promise.resolve(),
-      createGain: () => ({ ...node(), gain: param(1) }),
-      createOscillator: () => {
-        const o = { ...node(), type: 'sine', frequency: { ...param(440), setValueAtTime: (f: number) => void (o.freq = f) }, freq: 0, start: () => undefined, stop: (t: number) => void oscs.push({ type: o.type, freq: o.freq, stop: t }) };
-        return o;
+      createGain: () => {
+        const g = { ...node(), gain: param(1) };
+        gains.push(g);
+        return g;
       },
-      createBiquadFilter: () => ({ ...node(), frequency: param(), Q: param() }),
-      createBuffer: (_c: number, len: number) => ({ duration: len / 8000, getChannelData: () => new Float32Array(len) }),
+      createOscillator: () => {
+        const rec: Osc = { type: 'sine', frequency: param(440), target: null, start: 0, stop: 0 };
+        oscs.push(rec);
+        return {
+          ...node(),
+          get type() {
+            return rec.type;
+          },
+          set type(v: string) {
+            rec.type = v;
+          },
+          frequency: rec.frequency,
+          connect: (n: unknown) => ((rec.target = n), n),
+          start: (t: number) => void (rec.start = t),
+          stop: (t: number) => void (rec.stop = t),
+        };
+      },
+      createBiquadFilter: () => ({ ...node(), frequency: param(1), Q: param(1) }),
+      createDynamicsCompressor: () => ({ ...node(), threshold: param(0), knee: param(0), ratio: param(1), attack: param(0), release: param(0) }),
+      createBuffer: (_c: number, len: number) => ({ duration: len / 48000, getChannelData: () => new Float32Array(len) }),
       createBufferSource: () => ({ ...node(), buffer: null, start: () => undefined, stop: () => undefined }),
       decodeAudioData: () => Promise.resolve({ duration: 1 }),
     } as unknown as AudioContextLike;
+    return { ctx, gains, oscs };
+  }
+  /** A Web Audio parameter's value at time t from its recorded events. */
+  function valueAt(p: Param, t: number): number {
+    let v = p.value;
+    let t0 = 0;
+    for (const e of p.events) {
+      if (e.t <= t) {
+        v = e.v;
+        t0 = e.t;
+        continue;
+      }
+      if (e.kind === 'exp') return v * (e.v / v) ** ((t - t0) / (e.t - t0));
+      break;
+    }
+    return v;
+  }
+  /** The peak of the sum of every recorded sine through its own gain (before the master chain). */
+  function renderPeak(rec: ReturnType<typeof recordingContext>): number {
+    const voices = rec.oscs.map((o) => ({ o, g: (o.target as { gain: Param }).gain }));
+    const from = Math.min(...rec.oscs.map((o) => o.start));
+    const to = Math.max(...rec.oscs.map((o) => o.stop));
+    const phase = voices.map(() => 0);
+    let peak = 0;
+    for (let i = 0; from + i / 48000 <= to; i++) {
+      const t = from + i / 48000;
+      let sum = 0;
+      voices.forEach(({ o, g }, k) => {
+        if (t < o.start || t > o.stop) return;
+        sum += valueAt(g, t) * Math.sin(phase[k]!);
+        phase[k] = phase[k]! + (2 * Math.PI * valueAt(o.frequency, t)) / 48000;
+      });
+      peak = Math.max(peak, Math.abs(sum));
+    }
+    return peak;
+  }
+  function playAndRender(spec: readonly ToneNote[]) {
+    const rec = recordingContext();
     vi.useFakeTimers();
     try {
-      const m = new SoundManager(() => ctx, () => 5_000_000);
-      const note: ToneNote = { freq: 523, at: 0, dur: 500, type: 'triangle', gain: 0.12, voice: 'bells' };
-      expect(m.play([note], 2)).toBe(true);
-      const voice = SOUND_VOICES.bells;
-      expect(oscs).toHaveLength(voice.partials.length);
-      expect(oscs.every((o) => o.type === 'sine')).toBe(true);
-      expect(oscs.map((o) => Math.round(o.freq))).toEqual(voice.partials.map((p) => Math.round(523 * p.ratio)));
-      const start = 0.02;
-      for (const o of oscs) expect(o.stop).toBeLessThanOrEqual(start + 0.5 + 0.02 + 1e-9);
-      const partialPeaks = peaks.filter((p) => p > 0.001);
-      expect(partialPeaks.reduce((s, p) => s + p, 0)).toBeLessThanOrEqual(0.12 + 1e-9);
+      const m = new SoundManager(() => rec.ctx, () => 5_000_000);
+      expect(m.play([...spec], 2)).toBe(true);
     } finally {
       vi.useRealTimers();
+    }
+    return rec;
+  }
+  const dB = (x: number) => 20 * Math.log10(x);
+
+  it('the SoundManager plays a styled note as sines that end with the note and really peak at its gain', () => {
+    const note: ToneNote = { freq: 523, at: 0, dur: 500, type: 'triangle', gain: 0.12, voice: 'bells' };
+    const rec = playAndRender([note]);
+    const voice = SOUND_VOICES.bells;
+    expect(rec.oscs).toHaveLength(voice.partials.length);
+    expect(rec.oscs.every((o) => o.type === 'sine')).toBe(true);
+    expect(rec.oscs.map((o) => Math.round(o.frequency.events[0]!.v))).toEqual(voice.partials.map((p) => Math.round(523 * p.ratio)));
+    const start = Math.min(...rec.oscs.map((o) => o.start));
+    for (const o of rec.oscs) expect(o.stop).toBeLessThanOrEqual(start + 0.5 + 0.02 + 1e-9);
+    expect(Math.abs(dB(renderPeak(rec) / 0.12))).toBeLessThan(0.2);
+  });
+
+  it('every style peaks at the note gain, as the loudness model assumes (S17b review: 1 to 3 dB under before)', () => {
+    const notes: Array<[number, number, number | undefined]> = [
+      [523, 70, undefined],
+      [784, 140, undefined],
+      [659, 160, 523],
+      [392, 600, undefined],
+    ];
+    for (const style of SOUND_STYLES) {
+      for (const [freq, dur, to] of notes) {
+        const note: ToneNote = { freq, at: 0, dur, type: 'sine', gain: 0.1, voice: style, ...(to === undefined ? {} : { to }) };
+        const off = dB(renderPeak(playAndRender([note])) / 0.1);
+        // Plain tones keep their 30 ms attack (unchanged since S13b), which shaves very short notes a little.
+        expect(off, `${style} ${freq} Hz ${dur} ms`).toBeGreaterThan(style === 'tones' ? -0.6 : -0.2);
+        expect(off, `${style} ${freq} Hz ${dur} ms`).toBeLessThan(0.2);
+      }
+    }
+  });
+
+  it('the tap of every built-in theme and of Snow Day, as played, peaks between −12 and −6 dBFS at volume 80', () => {
+    const snow = example('peppermint-snow-day');
+    const { overrides, ...params } = snow.sounds;
+    const taps: Array<[string, readonly ToneNote[]]> = [...Object.values(THEMES).map((d) => [d.key, d.sounds!.tap] as [string, readonly ToneNote[]]), ['peppermint-snow-day', makeSoundPack(params, overrides ?? {}).tap]];
+    const [lo, hi] = SOUND_LIMITS.tapPeakDbAt80;
+    for (const [key, tap] of taps) {
+      const out = outputPeakDb(renderPeak(playAndRender(tap)), 80);
+      expect(out, key).toBeGreaterThanOrEqual(lo);
+      expect(out, key).toBeLessThanOrEqual(hi);
     }
   });
 });

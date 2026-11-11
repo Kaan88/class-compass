@@ -46,8 +46,9 @@ export type FrameTrim = (typeof FRAME_TRIMS)[number];
 export const FRAME_CORNERS = ['none', 'frost', 'holly', 'star', 'compass', 'leaf'] as const;
 export type FrameCorners = (typeof FRAME_CORNERS)[number];
 /**
- * Which surfaces get the edge and the corners: board boxes, the student cards of the classroom grid,
- * the classroom top bar, the dock, ordinary cards of the other pages (the edge only) and dialogs.
+ * Which surfaces get the edge and the corners: board boxes, the student cards of the classroom grid
+ * (the edge only), the classroom top bar (the edge only: its class name and buttons reach its corners,
+ * S17b review), the dock, ordinary cards of the other pages (the edge only) and dialogs.
  */
 export const FRAME_SURFACES = ['boardBoxes', 'studentCards', 'topBar', 'dock', 'cards', 'dialogs'] as const;
 export type FrameSurface = (typeof FRAME_SURFACES)[number];
