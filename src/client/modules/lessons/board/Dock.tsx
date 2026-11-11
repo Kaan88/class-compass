@@ -11,7 +11,6 @@
  * next button at End lesson's edge, D-168, which read as End lesson lying on top of it).
  */
 import { useLayoutEffect, useRef, useState } from 'react';
-import '../../../../shared/i18n/areas/classroomDock.ts';
 import type { BoxKey } from '../../../../shared/classroomLayout.ts';
 import type { LessonState } from '../../../../shared/contracts/lessons.ts';
 import { useI18n } from '../../../lib/i18n.tsx';

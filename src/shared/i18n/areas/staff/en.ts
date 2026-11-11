@@ -629,6 +629,8 @@ export const en = {
   'board.dock': 'Lesson tools',
   'board.box': 'Box',
   'board.dockViewEmpty': 'Nothing to show here right now.',
+  'board.dockMore': 'More',
+  'board.dockFewer': 'Fewer',
   'board.customise': 'Customise layout',
   'board.customiseHint': 'Move and resize the boxes of this screen. Asks for your PIN.',
   'board.customiseNarrow': 'Needs a wider screen.',

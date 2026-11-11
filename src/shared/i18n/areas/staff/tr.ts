@@ -626,6 +626,8 @@ export const tr = {
   'board.dock': 'Ders araçları',
   'board.box': 'Kutu',
   'board.dockViewEmpty': 'Şu anda burada gösterilecek bir şey yok.',
+  'board.dockMore': 'Diğer',
+  'board.dockFewer': 'Daha az',
   'board.customise': 'Yerleşimi düzenle',
   'board.customiseHint': 'Bu ekrandaki kutuları taşıyın ve boyutlarını değiştirin. PIN kodunuz sorulur.',
   'board.customiseNarrow': 'Daha geniş bir ekran gerekir.',
