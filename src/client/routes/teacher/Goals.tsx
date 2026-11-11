@@ -360,15 +360,20 @@ function Overview({ contextId, onOpen }: { contextId: string; onOpen: (studentId
   const q = useQuery({ queryKey: [...ALL, 'overview', contextId], queryFn: () => call(G.goalsOverview, { contextId }) });
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   return (
+    // S23b (D-183): below 52rem each student is a card (the name as its heading, the counts side by
+    // side under it), so on a phone a name keeps its words and every column stays in view.
     <DataTable
       caption={t('goals.overviewCaption', { className: q.data.className })}
       emptyText={t('goals.noStudents')}
       rows={q.data.students}
       rowKey={(r) => r.id}
+      stack
+      compact
       columns={[
         {
           key: 'name',
           header: t('goals.col.student'),
+          stackRole: 'title',
           render: (r) => (
             <span className="cc-row">
               <Button variant="ghost" onPress={() => onOpen(r.id)}>
