@@ -156,7 +156,7 @@ Tap a student's **name** on their card to open a small card for the class to see
 **Lesson goals** is off in every class until you switch it on for a class and subject in **Class settings** → **Modules**. Then:
 
 - **Start lesson** has a **Today's goal** step with one optional sentence.
-- The board shows **Today's goal** in its own line above the student cards, with **Change** (type a new sentence, **Save goal**, or **Remove goal**). Without a goal only a small **Set a goal** button stays. Like any box, you can move it or put it in the **Lesson tools** row with **Customise layout**.
+- The board shows **Today's goal** next to **Today's focus**, above the student cards, with a pencil button **Change** (type a new sentence, **Save goal**, or **Remove goal**). A long goal is shown a little smaller, so the student cards keep their room. Without a goal only a small **Set a goal** button stays. Like any box, you can move it or put it in the **Lesson tools** row with **Customise layout**.
 - **End lesson** asks **Did we reach our goal?** (only when the lesson had a goal).
 - **Reports** has a **Lesson goals** section: each lesson's goal with the answer, and how many goals were reached, partly reached or not yet reached out of the goals that were answered. A goal nobody answered shows "not recorded".
 

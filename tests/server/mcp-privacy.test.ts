@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { lessons, mcpPseudonyms, schoolSettings, users } from '../../src/server/db/schema.ts';
+import { lessonGoals, lessons, mcpPseudonyms, schoolSettings, users } from '../../src/server/db/schema.ts';
 import { foldSameLength, NAME_WITHHELD, NameScrubber, NUMBER_WITHHELD, unmarkedStrings } from '../../src/server/modules/mcp/privacy.ts';
 import { allTools, inputJsonSchema, type McpTool } from '../../src/server/modules/mcp/registry.ts';
 import { allResources, linkDocs } from '../../src/server/modules/mcp/resources.ts';
@@ -95,6 +95,10 @@ beforeAll(async () => {
   endedLessonId = await startLesson(s.teacherA, s.ctxA.id);
   await endLesson(s.teacherA, s.ctxA.id, endedLessonId);
   env.db.update(lessons).set({ reflectionJson: { rating: 4, note: 'Şahinzed read aloud beautifully.' } }).run();
+  // A lesson goal that names a student (S25d review, D-188): teacher text in class_report's Lesson goals section.
+  await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/lessonGoals`, { enabled: true }));
+  const at = env.db.select().from(lessons).where(eq(lessons.id, endedLessonId)).get()!.startedAt;
+  env.db.insert(lessonGoals).values({ lessonId: endedLessonId, contextId: s.ctxA.id, text: 'Kuzeyzed and the class can name the weather.', outcome: 'reached', createdAt: at, updatedAt: at, reviewedAt: at }).run();
   runningLessonId = await startLesson(s.teacherA, s.ctxA.id);
 });
 afterAll(async () => env.app.close());
@@ -247,6 +251,8 @@ describe('pseudonymous mode (D-161)', () => {
     expect(goals.evidence.every((e: Record<string, unknown>) => !('file' in e))).toBe(true);
     const summary = JSON.parse(a.texts.get('tool lesson_summary')!);
     expect(summary.reflection.note).toBe('[name] read aloud beautifully.');
+    // The lesson goal reaches AI tools in class_report as teacher text, with the name replaced (D-188).
+    expect(a.texts.get('tool class_report')).toContain('[name] and the class can name the weather.');
     // The same student keeps the same pseudonym across calls of one token.
     expect(JSON.parse(a.texts.get('tool student_summary')!).student.fullName).toBe(goals.student.fullName);
 

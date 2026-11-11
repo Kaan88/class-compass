@@ -481,9 +481,9 @@ Decision D-187; migration 0030 (`level_lists`).
 ## S25d Lesson goals per class (optional) (roadmap sweep, 2026-11-11)
 Decision D-188; migration 0031.
 - [x] Opt-in context modules: `contextDefault: 'off'` in the module catalogue, honoured by every module switch read (the teacher switches Lesson goals on per class+subject in Class settings → Modules, with a short explanation under the switch)
-- [x] Start Lesson step "Today's goal" (optional sentence), the board box "Today's goal" with Change / Remove (a quiet "Set a goal" without one; its own row above the student grid, dockable), the outbox command `lessonGoals.set`, the lesson state, audit
+- [x] Start Lesson step "Today's goal" (optional sentence), the board box "Today's goal" with Change / Remove (a quiet "Set a goal" without one; right after today's focus in its row, so the student grid loses no height (review fix); dockable), the outbox command `lessonGoals.set`, the lesson state, audit
 - [x] End Lesson "Did we reach our goal?" (Yes, we did! / Partly / Not yet, optional) only for a lesson with a goal; the report section "Lesson goals" with denominators ("not recorded" for an unanswered goal)
-- [x] Tests: `tests/server/lessonGoals.test.ts`, `tests/client/lesson-goals.test.tsx`, `tests/domain/classroom-layout.test.ts`, `e2e/lesson-goals.spec.ts` (axe), the module matrix in `e2e/classroom-layout.spec.ts`; teacher guide EN/TR
+- [x] Tests: `tests/server/lessonGoals.test.ts`, `tests/client/lesson-goals.test.tsx`, `tests/domain/classroom-layout.test.ts`, `e2e/lesson-goals.spec.ts` (axe), the module matrix and a fit test with the module on (1536×703 and 1536×864 at 1.25, no goal and a 140-character goal) in `e2e/classroom-layout.spec.ts`, `tests/server/mcp-privacy.test.ts` (the goal in `class_report` with names replaced); teacher guide EN/TR
 - [ ] Owner to confirm the reading of "per class (optional)" (D-188): opt-in per class+subject, one sentence per lesson, three answers
 - [ ] The goal on the routine's "Learning goal" stage and on the "Lesson saved" summary; a demo history generator (not built, D-188)
 - [ ] Tried in a real lesson on the classroom display (owner, Sare)

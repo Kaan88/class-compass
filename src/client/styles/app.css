@@ -4285,25 +4285,73 @@ html:has(.cc-classroom) {
   font-weight: 850;
   color: var(--cc-accent-strong);
 }
-/* Today's goal (S25d, D-188): one sentence the class reads, beside the "Today's goal" heading. */
-.cc-goal__text {
+/* Today's goal (S25d, D-188; review): one sentence the class reads. Its own class names (`cc-lesson-goal`),
+   so the student goals' `cc-goal__text` is not touched. On the board it shares the second row with
+   today's focus and the counters: the heading runs inline before the sentence, the Change button is
+   an icon, and a longer sentence gets a smaller size (`data-length`), so even 140 characters stay
+   within the row's height and the student grid loses nothing. */
+.cc-lesson-goal {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--cc-radius);
+  border: var(--cc-border-width) solid var(--cc-border);
+  background: var(--cc-surface);
+}
+.cc-lesson-goal > svg {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  color: var(--cc-accent-strong);
+}
+.cc-lesson-goal__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.cc-lesson-goal__title {
+  display: inline;
+  margin: 0 0.4em 0 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--cc-text-muted);
+}
+.cc-lesson-goal__text {
+  font-size: 1.35rem;
+  font-weight: 850;
+  color: var(--cc-accent-strong);
+}
+.cc-lesson-goal[data-length='mid'] .cc-lesson-goal__text {
+  font-size: 1.15rem;
+}
+.cc-lesson-goal[data-length='long'] .cc-lesson-goal__text {
+  font-size: 1rem;
+}
+.cc-lesson-goal > .cc-btn {
+  flex: none;
+  min-width: var(--cc-touch);
+  min-height: var(--cc-touch);
+  padding: 0;
+  justify-content: center;
+}
+/* The goal in the End Lesson review: the sentence with its target icon. */
+.cc-lesson-goal-review__goal {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  min-width: 0;
   margin: 0;
   font-size: 1.35rem;
   font-weight: 850;
   color: var(--cc-accent-strong);
   overflow-wrap: anywhere;
 }
-.cc-goal__text > svg {
+.cc-lesson-goal-review__goal > svg {
   flex: none;
   width: 1.6em;
   height: 1.6em;
-}
-.cc-goal .cc-goal__text {
-  flex: 1 1 14rem;
 }
 .cc-topic-choices {
   list-style: none;

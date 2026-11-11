@@ -9,6 +9,8 @@
  *    End lesson, Attendance, the timer's Start and the class counter fully in view at every listed
  *    display, 1280x720 included (D-139). This closes the S14a "known gap" (D-143). The same holds
  *    with Turkish as the class language (longer stage names and counter words, D-099).
+ * 2a. Lesson goals on (S25d review, D-188) at 1536x703 and 1536x864 (1.25), English and Turkish: with no
+ *    goal and with a 140-character goal, as many whole student cards as with the module off.
  * 2b. Short displays (S14i review) at 1280x720, 1366x768 and 1920x1080, English and Turkish: no name
  *    is split inside a word at Compact, Normal or Large; when the student grid cuts a row, "N more
  *    students below" is shown and scrolls to them; at 1280x720 the layout editor's handles and "Move to
@@ -339,6 +341,80 @@ async function splitNames(page: Page) {
     }),
   );
 }
+
+/** The measured classroom displays (D-177): 1536x703 and 1536x864 at device scale 1.25. */
+const DISPLAYS_125 = [
+  { name: '1536x703@1.25', width: 1536, height: 703, scale: 1.25 },
+  { name: '1536x864@1.25', width: 1536, height: 864, scale: 1.25 },
+];
+
+test('fit with Lesson goals on (S25d review, D-188): no goal and a 140-character goal cost the student grid nothing at 1536x703 and 1536x864 (1.25), in English and Turkish', async ({ page, browser }) => {
+  test.setTimeout(300_000);
+  mkdirSync('test-results/fit', { recursive: true });
+  await login(page, 'english');
+  await ensurePin(page);
+  await endActiveLessons(page);
+  const ctx = await context3A(page);
+  const original = await modulesOf(page, ctx.id);
+  const officeCtx = await browser.newContext();
+  const office = await officeCtx.newPage();
+  await login(office, 'english');
+  // About 140 characters, the longest goal there can be (MAX_LESSON_GOAL_LENGTH).
+  const LONG = {
+    en: 'We can ask and answer questions about the weather, say what we wear on a rainy day and write two short sentences about it.',
+    tr: 'Hava durumu hakkında soru sorup cevap verebilir, yağmurlu bir günde ne giydiğimizi söyleyebilir ve bunu iki kısa cümleyle yazabiliriz.',
+  };
+  try {
+    await setReminderBoxes(office, ctx.id, true);
+    await startLesson(page, ctx.id);
+    const active = (await api(page, 'GET', '/api/classroom/lessons/active')).body.lessons as Array<{ contextId: string; lessonId: string }>;
+    const lessonId = active.find((l) => l.contextId === ctx.id)!.lessonId;
+    const setGoal = async (text: string) => {
+      const r = await api(page, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'lessonGoals.set', contextId: ctx.id, lessonId, payload: { contextId: ctx.id, lessonId, text } }] });
+      expect(r.body.results[0].ok).toBe(true);
+    };
+    const measure = async (vp: (typeof DISPLAYS_125)[number], shot: string) => {
+      const { ctx: c, p } = await onDevice(browser, page, vp);
+      try {
+        await openClassroom(p);
+        await expect(p.locator('.cc-student-card')).toHaveCount(19);
+        await expect(p.locator('.cc-student-card__add').first()).toBeVisible();
+        const facts = await layoutFacts(p);
+        expect(facts.hScroll, shot).toBe(false);
+        expect(facts.overlaps, shot).toEqual([]);
+        expect(facts.overflowing, shot).toEqual([]);
+        await p.screenshot({ path: `test-results/fit/goal-${vp.name}-${shot}.png` });
+        return { cards: await cardsOnScreen(p), goal: await p.getByTestId('lesson-goal').count() };
+      } finally {
+        await c.close();
+      }
+    };
+    for (const lang of ['en', 'tr'] as const) {
+      expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
+      for (const vp of DISPLAYS_125) {
+        const run = `${vp.name} ${lang}`;
+        await setModules(office, ctx.id, DEFAULT_ON, original);
+        const off = await measure(vp, `${lang}-off`);
+        await setModules(office, ctx.id, MODULES, original);
+        await setGoal('');
+        const empty = await measure(vp, `${lang}-no-goal`);
+        await setGoal(LONG[lang]);
+        const long = await measure(vp, `${lang}-long-goal`);
+        test.info().annotations.push({ type: 'cards on screen', description: `${run}: off ${off.cards}, no goal ${empty.cards}, long goal ${long.cards}` });
+        expect(empty.goal, run).toBe(0);
+        expect(long.goal, run).toBe(1);
+        // The goal shares the second row with today's focus and the counters: no row of cards is lost.
+        expect(empty.cards, `${run}: no goal`).toBe(off.cards);
+        expect(long.cards, `${run}: a 140-character goal`).toBe(off.cards);
+      }
+    }
+  } finally {
+    await endActiveLessons(page);
+    await setModules(office, ctx.id, DEFAULT_ON, original);
+    expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false })).status).toBe(200);
+    await officeCtx.close();
+  }
+});
 
 test('short displays (S14i review): names never split inside a word at any size, a cut student row shows how many are below, editor controls in view', async ({ page, browser }) => {
   test.setTimeout(240_000);

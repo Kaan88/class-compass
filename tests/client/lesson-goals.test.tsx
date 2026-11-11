@@ -23,14 +23,15 @@ vi.mock('../../src/client/lib/outbox-client.ts', async (importOriginal) => {
 
 const { queryClient } = await import('../../src/client/lib/queryClient.ts');
 const { lessonKey } = await import('../../src/client/modules/lessons/lessonClient.ts');
-const { lessonGoalDashboardSlot, lessonGoalEndStepUi, lessonGoalStartStep } = await import('../../src/client/modules/lessonGoals/LessonGoalsPanel.tsx');
+const { endStepsWithGoal, lessonGoalDashboardSlot, lessonGoalEndStepUi, lessonGoalStartStep } = await import('../../src/client/modules/lessonGoals/LessonGoalsPanel.tsx');
 
 const context = { id: 'context-fictional-1', modules: { lessonGoals: true } } as unknown as ClassroomContext;
 const lesson = { id: 'lesson-fictional-1', contextId: context.id, endSteps: ['lessonGoal', 'reflection'] } as unknown as LessonState;
 
-function seed(goal: LessonGoalState | null) {
-  queryClient.setQueryData(lessonKey(context.id), { etag: '"fictional"', data: { lesson, lessonGoal: goal } });
+function seed(goal: LessonGoalState | null, l: LessonState = lesson) {
+  queryClient.setQueryData(lessonKey(context.id), { etag: '"fictional"', data: { lesson: l, lessonGoal: goal } });
 }
+const cachedEndSteps = () => (queryClient.getQueryData(lessonKey(context.id)) as { data: { lesson: LessonState } }).data.lesson.endSteps;
 const wrap = (node: ReactNode) => render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
 const Box = lessonGoalDashboardSlot.Component;
 
@@ -81,6 +82,28 @@ describe("Today's goal on the board (S25d, D-188)", () => {
     seed(null);
     const off = wrap(<Box context={context} lesson={lesson} presentation="box" />);
     expect(off.container.innerHTML).toBe('');
+  });
+});
+
+describe('End Lesson steps follow a goal set or removed on the board (S25d review)', () => {
+  it('adds "Our goal" before the reflection at once, so End lesson asks about it even offline', () => {
+    const noGoal = { ...lesson, endSteps: ['assistant', 'reflection'] } as LessonState;
+    seed({ text: null, outcome: null }, noGoal);
+    wrap(<Box context={context} lesson={noGoal} presentation="box" />);
+    fireEvent.click(screen.getByRole('button', { name: en['lessonGoals.set'] }));
+    fireEvent.change(screen.getByRole('textbox', { name: en['lessonGoals.field'] }), { target: { value: 'We can say three animal names.' } });
+    fireEvent.click(screen.getByRole('button', { name: en['lessonGoals.save'] }));
+    expect(cachedEndSteps()).toEqual(['assistant', 'lessonGoal', 'reflection']);
+    // Removed again: no question about a goal there is not.
+    fireEvent.click(screen.getByRole('button', { name: en['lessonGoals.change'] }));
+    fireEvent.click(screen.getByRole('button', { name: en['lessonGoals.remove'] }));
+    expect(cachedEndSteps()).toEqual(['assistant', 'reflection']);
+  });
+
+  it('endStepsWithGoal never doubles the step and works without a reflection', () => {
+    expect(endStepsWithGoal(['lessonGoal', 'reflection'], true)).toEqual(['lessonGoal', 'reflection']);
+    expect(endStepsWithGoal(['secret'], true)).toEqual(['secret', 'lessonGoal']);
+    expect(endStepsWithGoal(['lessonGoal', 'reflection'], false)).toEqual(['reflection']);
   });
 });
 

@@ -118,16 +118,32 @@ describe('layout model (D-148)', () => {
     expect(none.dock).toEqual([]);
     const all = effectiveLayout(null, availableBoxes(DEFAULT_MODULE_BOXES));
     expect(all).toEqual(DEFAULT_LAYOUT);
-    // S25d (D-188): today's goal, switched on in a class, gets its own one-line row above the student grid.
+    // S25d (D-188, review): today's goal, switched on in a class, goes right after today's focus in the
+    // second row (the counters give the width): the student grid keeps all its height.
     const withGoal = effectiveLayout(null, availableBoxes(MODULE_BOXES));
     expect(layoutIssues(withGoal)).toEqual([]);
     expect(withGoal.rows.map((r) => [r.h, r.boxes.map((b) => `${b.key}:${b.w}`)])).toEqual([
       [3, ['routine:8', 'core.timer:4']],
-      [1, ['focus:4', 'counters:8']],
-      [1, ['lessonGoal:12']],
-      [6, ['core.students:12']],
+      [1, ['focus:3', 'lessonGoal:4', 'counters:5']],
+      [7, ['core.students:12']],
       [1, ['core.dock:12']],
     ]);
+    // Also into a stored layout that has the focus box elsewhere: the goal follows it.
+    const stored = cloneLayout(DEFAULT_LAYOUT);
+    stored.rows[1] = { h: 1, boxes: [{ key: 'counters', w: 8 }, { key: 'focus', w: 4 }] };
+    expect(layoutIssues(stored)).toEqual([]);
+    const storedWithGoal = effectiveLayout(stored, availableBoxes(MODULE_BOXES));
+    expect(layoutIssues(storedWithGoal)).toEqual([]);
+    expect(storedWithGoal.rows[1]!.boxes.map((b) => b.key)).toEqual(['counters', 'focus', 'lessonGoal']);
+    expect(storedWithGoal.rows[2]!.h).toBe(7);
+    // With today's focus in the dock there is no row to share: the goal gets a row above the grid.
+    const focusDocked = cloneLayout(DEFAULT_LAYOUT);
+    focusDocked.rows[1] = { h: 1, boxes: [{ key: 'counters', w: 12 }] };
+    focusDocked.dock = ['focus', ...focusDocked.dock];
+    expect(layoutIssues(focusDocked)).toEqual([]);
+    const dockedWithGoal = effectiveLayout(focusDocked, availableBoxes(MODULE_BOXES));
+    expect(layoutIssues(dockedWithGoal)).toEqual([]);
+    expect(dockedWithGoal.rows.map((r) => r.boxes.map((b) => b.key).join('|'))).toContain('lessonGoal');
     // Counters off: today's focus takes the whole second row.
     const noCounters = effectiveLayout(DEFAULT_LAYOUT, availableBoxes(DEFAULT_MODULE_BOXES.filter((k) => k !== 'counters')));
     expect(noCounters.rows[1]!.boxes).toEqual([{ key: 'focus', w: 12 }]);

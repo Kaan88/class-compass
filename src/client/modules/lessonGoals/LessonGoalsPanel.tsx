@@ -2,7 +2,8 @@
  * Lesson goals on the classroom device (S25d, D-188), only in a class+subject where the teacher turned
  * the module on (it is off by default):
  * - Start Lesson step "Today's goal": one optional sentence (empty = no goal today);
- * - the board box: the goal for the class to read, with "Change"; without a goal only a quiet
+ * - the board box, right after today's focus in its row (BOX_CATALOGUE `nextTo`, so the student grid
+ *   loses no height): the goal for the class to read, with "Change"; without a goal only a quiet
  *   "Set a goal" action stays (like "Choose a topic");
  * - End Lesson step "Our goal" (only when the lesson has a goal): Did we reach our goal? Yes, we did! /
  *   Partly / Not yet, optional (words and icons, never colour alone).
@@ -15,10 +16,10 @@ import { LESSON_GOAL_OUTCOMES, MAX_LESSON_GOAL_LENGTH, type LessonGoalOutcome } 
 import { useI18n } from '../../lib/i18n.tsx';
 import { getOutbox, type CommandInvalidation } from '../../lib/outbox-client.ts';
 import { queryClient } from '../../lib/queryClient.ts';
-import { Button } from '../../ui/Button.tsx';
+import { Button, IconButton } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { TextField } from '../../ui/Fields.tsx';
-import { IconCheck, IconTarget, IconTrash, IconUp } from '../../ui/icons.tsx';
+import { IconCheck, IconPencil, IconTarget, IconTrash, IconUp } from '../../ui/icons.tsx';
 import { lessonKey, useLessonState, type LessonQueryData } from '../lessons/lessonClient.ts';
 import { endStepUi, startStep, type ClassroomContext, type DashboardSlot, type DashboardSlotProps, type StartStepProps } from '../types.ts';
 
@@ -28,10 +29,29 @@ export const lessonGoalInvalidation: CommandInvalidation = {
   keys: (op) => (op.contextId ? [lessonKey(op.contextId)] : [['classroom', 'lesson']]),
 };
 
+/**
+ * The End Lesson steps once the lesson has (or no longer has) a goal: the server asks "Did we reach our
+ * goal?" only for a lesson with a goal (`lessonHasGoal`), before the core reflection. Kept in step on
+ * screen so a goal set on the board offline, or just before End lesson, gets its review (S25d review).
+ */
+export function endStepsWithGoal(endSteps: readonly string[], hasGoal: boolean): string[] {
+  const rest = endSteps.filter((k) => k !== 'lessonGoal');
+  if (!hasGoal) return rest;
+  const at = rest.indexOf('reflection');
+  return at < 0 ? [...rest, 'lessonGoal'] : [...rest.slice(0, at), 'lessonGoal', ...rest.slice(at)];
+}
+
 /** Show the new goal at once and queue the command before awaiting anything (D-045). */
 function sendGoal(lesson: LessonState, text: string): void {
   const clean = text.trim();
-  queryClient.setQueryData<LessonQueryData>(lessonKey(lesson.contextId), (q) => (q ? { etag: null, data: { ...q.data, lessonGoal: { text: clean || null, outcome: null } } } : q));
+  queryClient.setQueryData<LessonQueryData>(lessonKey(lesson.contextId), (q) =>
+    q
+      ? {
+          etag: null,
+          data: { ...q.data, lesson: q.data.lesson ? { ...q.data.lesson, endSteps: endStepsWithGoal(q.data.lesson.endSteps, Boolean(clean)) } : q.data.lesson, lessonGoal: { text: clean || null, outcome: null } },
+        }
+      : q,
+  );
   getOutbox().enqueue('lessonGoals.set', { contextId: lesson.contextId, lessonId: lesson.id, text: clean }, { contextId: lesson.contextId, lessonId: lesson.id });
   void queryClient.cancelQueries({ queryKey: lessonKey(lesson.contextId) });
 }
@@ -107,18 +127,20 @@ function LessonGoalBox({ context, lesson }: DashboardSlotProps) {
         {dialog}
       </div>
     );
+  // It shares the second row with today's focus and the counters (D-188 review): the heading runs inline
+  // before the sentence, a longer sentence is set smaller, and Change is an icon with its name for
+  // screen readers, so even the longest goal stays within the row and the student grid keeps its height.
+  const length = goal.text.length > 90 ? 'long' : goal.text.length > 45 ? 'mid' : undefined;
   return (
-    <section className="cc-focus cc-goal" aria-labelledby="cc-goal-title" data-testid="lesson-goal">
-      <h2 id="cc-goal-title" className="cc-focus__title">
-        {t('lessonGoals.title')}
-      </h2>
-      <p className="cc-goal__text">
-        <IconTarget />
-        <span>{goal.text}</span>
-      </p>
-      <Button size="small" className="cc-push-right" onPress={() => setOpen(true)}>
-        {t('lessonGoals.change')}
-      </Button>
+    <section className="cc-lesson-goal" aria-labelledby="cc-goal-title" data-testid="lesson-goal" data-length={length}>
+      <IconTarget />
+      <div className="cc-lesson-goal__body">
+        <h2 id="cc-goal-title" className="cc-lesson-goal__title">
+          {t('lessonGoals.title')}
+        </h2>
+        <span className="cc-lesson-goal__text">{goal.text}</span>
+      </div>
+      <IconButton size="small" icon={<IconPencil />} label={t('lessonGoals.change')} hideLabel onPress={() => setOpen(true)} />
       {dialog}
     </section>
   );
@@ -136,7 +158,7 @@ function GoalReviewStep({ lesson, value, onChange }: { lesson: LessonState; valu
   return (
     <div className="cc-stack" data-testid="lesson-goal-review">
       {goal?.text ? (
-        <p className="cc-goal__text">
+        <p className="cc-lesson-goal-review__goal">
           <IconTarget />
           <span>{goal.text}</span>
         </p>

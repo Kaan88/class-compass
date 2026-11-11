@@ -43,6 +43,12 @@ export interface BoxSpec {
   /** Minimum width (columns) and height (rows of twelfths) as a box. */
   minW: number;
   minH: number;
+  /**
+   * For a row box that is not in DEFAULT_LAYOUT (an opt-in module's box): the box it goes right after
+   * when it becomes available, and its width there. Without it, such a box gets a new row above the
+   * student grid (which costs the grid height).
+   */
+  nextTo?: { key: BoxKey; w: number };
 }
 
 const spec = (key: BoxKey, s: Partial<Omit<BoxSpec, 'key'>>): BoxSpec => ({ key, core: false, row: true, dock: true, defaultPlace: 'row', required: false, fixed: false, minW: 3, minH: 1, ...s });
@@ -60,8 +66,11 @@ export const BOX_CATALOGUE: Readonly<Record<BoxKey, BoxSpec>> = {
   groups: spec('groups', { defaultPlace: 'dock' }),
   homework: spec('homework', { defaultPlace: 'dock' }),
   achievements: spec('achievements', { defaultPlace: 'dock' }),
-  /** S25d (D-188): today's goal, a one-line row above the student grid when the class turns it on. */
-  lessonGoal: spec('lessonGoal', { minW: 3 }),
+  /**
+   * S25d (D-188): today's goal, in the second row right after today's focus when the class turns it on
+   * (the counters give the width), so it never takes a row of height from the student grid.
+   */
+  lessonGoal: spec('lessonGoal', { minW: 3, nextTo: { key: 'focus', w: 4 } }),
 };
 
 export const isBoxKey = (k: string): k is BoxKey => (BOX_KEYS as readonly string[]).includes(k);
@@ -244,18 +253,26 @@ export function insertNewRow(l: ClassroomLayout, at: number, key: BoxKey, h: num
   return false;
 }
 
-/** Where the default layout puts a row box: its row's other boxes (partners), index and size. */
+/**
+ * Where the default layout puts a row box: its row's other boxes (partners), index and size. A box that
+ * is not in the default layout but names a `nextTo` box goes right after that box, in that box's row.
+ */
 function defaultPlacement(key: BoxKey) {
   const ri = DEFAULT_LAYOUT.rows.findIndex((r) => r.boxes.some((b) => b.key === key));
-  if (ri < 0) return null;
+  if (ri < 0) {
+    const near = BOX_CATALOGUE[key].nextTo;
+    if (!near) return null;
+    const nri = DEFAULT_LAYOUT.rows.findIndex((r) => r.boxes.some((b) => b.key === near.key));
+    return { ri: nri, index: 1, w: near.w, h: nri >= 0 ? DEFAULT_LAYOUT.rows[nri]!.h : 1, partners: [near.key], after: near.key };
+  }
   const row = DEFAULT_LAYOUT.rows[ri]!;
   const index = row.boxes.findIndex((b) => b.key === key);
-  return { ri, index, w: row.boxes[index]!.w, h: row.h, partners: row.boxes.filter((b) => b.key !== key).map((b) => b.key) };
+  return { ri, index, w: row.boxes[index]!.w, h: row.h, partners: row.boxes.filter((b) => b.key !== key).map((b) => b.key), after: null };
 }
 
 /**
- * Add a box to the rows: beside its partners from the default layout when they are there, else in a
- * new row above the student grid, else in any row with room. Returns false when it fits nowhere.
+ * Add a box to the rows: beside its partners from the default layout (or its `nextTo` box) when they
+ * are there, else in a new row above the student grid, else in any row with room. Returns false when it fits nowhere.
  */
 export function addRowBox(l: ClassroomLayout, key: BoxKey, preferredH = 1): boolean {
   const d = defaultPlacement(key);
@@ -263,9 +280,9 @@ export function addRowBox(l: ClassroomLayout, key: BoxKey, preferredH = 1): bool
     const ri = l.rows.findIndex((r) => r.boxes.some((b) => d.partners.includes(b.key)));
     if (ri >= 0) {
       const row = l.rows[ri]!;
-      // Same side of its partners as in the default layout.
+      // Same side of its partners as in the default layout (or right after its `nextTo` box).
       const firstPartner = row.boxes.findIndex((b) => d.partners.includes(b.key));
-      const index = d.index === 0 ? firstPartner : row.boxes.length;
+      const index = d.after ? row.boxes.findIndex((b) => b.key === d.after) + 1 : d.index === 0 ? firstPartner : row.boxes.length;
       if (insertIntoRow(l, ri, index, key, d.w)) return true;
     }
   }
