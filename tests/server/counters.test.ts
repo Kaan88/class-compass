@@ -530,6 +530,33 @@ describe('undo of a class reset (S22a, D-175; CNT-11, UX-9, DAT-1, ACC-10)', () 
     expect(undoAudits()).toEqual({ n: 0 });
   });
 
+  it('measures the window from when the teacher confirmed a reset queued offline, not from when it synced (review fix)', async () => {
+    const l = await start(s.teacherA, s.ctxA.id);
+    const c = await english(s.teacherA, s.ctxA.id);
+    await ok(s.teacherA.patch(`/api/teacher/counters/${c.id}`, { activeResponseId: 'class-reset' }));
+    for (let i = 0; i < 10; i += 1) await tap(s.teacherA, s.ctxA.id, l, c.id, kids[i % 4]!.id);
+    // Confirmed offline at T, synced 15 minutes later: the Undo was over at T + 10 min.
+    const madeAt = env.clock.now();
+    env.clock.advance(15 * 60_000);
+    const late = v7();
+    expect((await cmd(s.teacherA, 'counter.resetLessonBar', { contextId: s.ctxA.id, lessonId: l, counterId: c.id, resetAt: madeAt }, late)).ok).toBe(true);
+    expect(await english(s.teacherA, s.ctxA.id)).toMatchObject({ barValue: 0, resetUndo: null });
+    expect((await undo(s.teacherA, l, c.id, late)).error?.reason).toBe('RESET_UNDO_PASSED');
+    expect(undoAudits()).toEqual({ n: 0 });
+    // Synced after 4 minutes: 6 minutes are left, not 10.
+    for (let i = 0; i < 10; i += 1) await tap(s.teacherA, s.ctxA.id, l, c.id);
+    const madeAt2 = env.clock.now();
+    env.clock.advance(4 * 60_000);
+    const soon = v7();
+    expect((await cmd(s.teacherA, 'counter.resetLessonBar', { contextId: s.ctxA.id, lessonId: l, counterId: c.id, resetAt: madeAt2 }, soon)).ok).toBe(true);
+    expect((await english(s.teacherA, s.ctxA.id)).resetUndo).toEqual({ resetId: soon, until: madeAt2 + 10 * 60_000, barValue: 10 });
+    // A time from the future (a device clock ahead) is not trusted: the server time counts.
+    expect((await undo(s.teacherA, l, c.id, soon)).ok).toBe(true);
+    const ahead = v7();
+    expect((await cmd(s.teacherA, 'counter.resetLessonBar', { contextId: s.ctxA.id, lessonId: l, counterId: c.id, resetAt: env.clock.now() + 3600_000 }, ahead)).ok).toBe(true);
+    expect((await english(s.teacherA, s.ctxA.id)).resetUndo).toMatchObject({ resetId: ahead, until: env.clock.now() + 10 * 60_000 });
+  });
+
   it('is refused after a later tap or a later tap undo on that counter, and for an older reset', async () => {
     const { l, c, resetId } = await resetFullBar();
     const t = await tap(s.teacherA, s.ctxA.id, l, c.id, kids[1]!.id);

@@ -561,6 +561,9 @@ export function resetLessonBar(ctx: RequestContext, p: P<'counter.resetLessonBar
   }
   const st = barState(ctx.db, counter.id, lesson.id);
   const now = ctx.now();
+  // The Undo window runs from when the teacher confirmed the reset: a reset queued offline does not get
+  // a second window when it syncs. A missing or future time is the server's (S22a review, D-175).
+  const resetAt = p.resetAt !== undefined && p.resetAt <= now ? p.resetAt : now;
   // What the reset takes away is stored with it, so Undo can bring exactly that back (S22a, D-175).
   const open = ctx.db
     .select({ id: thresholdCrossings.id })
@@ -569,7 +572,7 @@ export function resetLessonBar(ctx: RequestContext, p: P<'counter.resetLessonBar
     .get();
   ctx.db
     .insert(counterLessonResets)
-    .values({ id: meta.opId, counterId: counter.id, lessonId: lesson.id, afterSeq: st.maxEventSeq, resetAt: now, resetBy: requireUser(ctx).id, barValueBefore: st.barValue, clearedCrossingId: open?.id ?? null })
+    .values({ id: meta.opId, counterId: counter.id, lessonId: lesson.id, afterSeq: st.maxEventSeq, resetAt, resetBy: requireUser(ctx).id, barValueBefore: st.barValue, clearedCrossingId: open?.id ?? null })
     .run();
   clearOpenCrossing(ctx, counter.id, lesson.id, 'reset');
   audit(ctx.db, ctx.actor, { action: 'counter.reset_bar', entity: 'counter', entityId: counter.id, before: { lessonId: lesson.id, barValue: st.barValue }, after: { barValue: 0 }, opId: meta.opId }, now);

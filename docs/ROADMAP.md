@@ -399,7 +399,7 @@ Decision D-174; no migration.
 
 ## S22a Counters: undo a class reset, threshold sound (roadmap sweep, 2026-11-11)
 Decision D-175; migration `s22a_counter_reset_undo` (nullable columns only). Closes the S6 box above.
-- [x] A confirmed class reset can be undone for 10 minutes and only until the next tap or tap undo on that counter: `counter.undoReset` (outbox, works offline), restores exactly the stored bar and the crossing the reset cleared, audited, idempotent; the card explains the window (tests: `tests/server/counters.test.ts`, `tests/client/counters-sound.test.ts`, `e2e/counters.spec.ts`)
+- [x] A confirmed class reset can be undone for 10 minutes and only until the next tap or tap undo on that counter: `counter.undoReset` (outbox, works offline), restores exactly the stored bar and the crossing the reset cleared, audited, idempotent; the card explains the window, which runs from the confirmation also for a reset synced late, and the reset closes the toast of the tap it cleared, so only its own Undo is left (review fixes; tests: `tests/server/counters.test.ts`, `tests/client/counters-sound.test.ts`, `e2e/counters.spec.ts`)
 - [x] Threshold sound: the existing `thresholdReached` cue through `playEvent` (class and device switches, volume), once per crossing, never on undo, replay, poll or the Undo of a reset (`tests/client/counters-sound.test.ts`); no new sound event
 - [ ] Heard on the classroom display and tried on a real tablet (owner)
 

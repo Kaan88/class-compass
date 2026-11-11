@@ -175,8 +175,10 @@ const localResets = new Map<string, { sent: Promise<string>; before: CounterLess
 
 /** A confirmed class reset (optimistic + outbox). Undo is offered on the counter card for RESET_UNDO_MS. */
 export function resetCounterBar(contextId: string, lessonId: string, counter: CounterLessonState): Promise<string> {
-  patchCounters(contextId, (c) => applyReset(c), counter.id);
-  const sent = sendCounterCommand('counter.resetLessonBar', { contextId, lessonId, counterId: counter.id });
+  // The Undo window starts when the teacher confirmed, also when the reset reaches the server later.
+  const resetAt = Math.round(serverNow());
+  patchCounters(contextId, (c) => applyReset(c, resetAt), counter.id);
+  const sent = sendCounterCommand('counter.resetLessonBar', { contextId, lessonId, counterId: counter.id, resetAt });
   localResets.set(counter.id, { sent, before: counter });
   return sent;
 }

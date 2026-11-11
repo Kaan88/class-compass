@@ -65,6 +65,8 @@ test('class reset asks first and can be undone for 10 minutes, also offline, unt
     const addClass = bar.getByRole('button', { name: 'Class: add one to Our English Time' });
     await addClass.click();
     await expect(supporting).toHaveText('10 / 10 Turkish reminders');
+    const tapToast = page.getByTestId('toast').filter({ hasText: '3-A · English: +1 Our English Time' });
+    await expect(tapToast).toBeVisible();
 
     // The response overlay offers the reset; the reset still asks first (D-061).
     const overlay = page.getByRole('dialog').filter({ has: page.getByTestId('threshold-overlay') });
@@ -75,6 +77,8 @@ test('class reset asks first and can be undone for 10 minutes, also offline, unt
     await expect(confirm).toContainText('You can undo this for 10 minutes, until the next tap.');
     await confirm.getByRole('button', { name: 'Yes, start again from 0' }).click();
     await expect(supporting).toHaveText('0 / 10 Turkish reminders');
+    // Only the reset's own Undo is left: the toast of the tap the reset cleared is gone (review fix).
+    await expect(tapToast).toHaveCount(0);
     const undoRow = bar.getByTestId('counter-reset-undo');
     await expect(undoRow).toContainText('Undo is possible for 10 minutes, until the next tap on this counter.');
     await expect.poll(async () => (await counter()).barValue, { timeout: 15_000 }).toBe(0);

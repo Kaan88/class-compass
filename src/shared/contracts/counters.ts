@@ -110,8 +110,12 @@ export const CounterCommands = {
   'counter.tap': z.object({ ...LessonRef, counterId: Id, studentId: Id.optional() }),
   /** Undo/correction: voids the event (never deletes it, CNT-4). Idempotent. */
   'counter.void': z.object({ ...LessonRef, eventId: Id }),
-  /** Only when the active threshold response is "class reset" (D-058). */
-  'counter.resetLessonBar': z.object({ ...LessonRef, counterId: Id }),
+  /**
+   * Only when the active threshold response is "class reset" (D-058). `resetAt`: when the teacher
+   * confirmed it (the classroom's server-corrected clock), so the Undo window of a reset queued offline
+   * starts then and not when it reached the server (S22a review, D-175). Omitted = server time.
+   */
+  'counter.resetLessonBar': z.object({ ...LessonRef, counterId: Id, resetAt: z.number().int().nonnegative().optional() }),
   /**
    * Undo of a class reset (S22a, D-175): restores the bar and the crossing the reset cleared.
    * Idempotent; refused after RESET_UNDO_MS or once the counter was tapped (or a tap undone) since.

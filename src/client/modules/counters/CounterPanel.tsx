@@ -29,6 +29,8 @@ import { canUndoReset, crossingKey, FRESH_CROSSING_MS, markShown, resetCounterBa
 type Translate = ReturnType<typeof useI18n>['t'];
 
 let lastUndo: number | null = null;
+/** The counter the open tap toast belongs to. */
+let lastUndoCounterId: string | null = null;
 
 /** Record one tap (optimistic + outbox) and offer undo. Returns false when the double-tap guard stopped it. */
 function recordTap(context: ClassroomContext, lesson: LessonState, counter: CounterLessonState, student: { id: string; fullName: string } | null, t: Translate, locale: 'en' | 'tr'): boolean {
@@ -38,6 +40,7 @@ function recordTap(context: ClassroomContext, lesson: LessonState, counter: Coun
   const cls = classLabel(context, locale);
   const label = pickText(student ? counter.labels.individual : counter.labels.main, locale);
   if (lastUndo !== null) dismissToast(lastUndo);
+  lastUndoCounterId = counter.id;
   lastUndo = showUndoToast(
     tapToastText(t, { cls, label, studentName: student?.fullName ?? null, crossed }),
     async () => {
@@ -49,7 +52,16 @@ function recordTap(context: ClassroomContext, lesson: LessonState, counter: Coun
   return true;
 }
 
+/**
+ * A confirmed class reset. The toast of the tap that filled the bar goes away with it: its Undo would
+ * void a tap the reset already cleared and end the reset's own Undo, so only "Undo the reset" stays.
+ */
 function resetBar(context: ClassroomContext, lesson: LessonState, counter: CounterLessonState) {
+  if (lastUndo !== null && lastUndoCounterId === counter.id) {
+    dismissToast(lastUndo);
+    lastUndo = null;
+    lastUndoCounterId = null;
+  }
   void resetCounterBar(context.id, lesson.id, counter);
 }
 
