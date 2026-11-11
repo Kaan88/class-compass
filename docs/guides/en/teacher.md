@@ -240,7 +240,7 @@ On the **Goals** page, choose the class and subject. The **Students** tab lists 
 - **Show topic** filters goals and evidence by category.
 - **Hide from student page** hides a student's goal, entry or evidence from their page (for example after a mistake). The words are kept as the student wrote them, and the change is recorded.
 
-The **Categories and preset goals** tab holds the school's default categories and goals and your own. **Archive** hides a default for your classes only (other teachers are not affected); **Restore** brings it back. Items marked "Archived by the school" were archived by the administrator. **Outcome labels** sets the four labels you use when you assess a goal.
+The **Categories and preset goals** tab holds the school's default categories and goals and your own. **Archive** hides a default for your classes only (other teachers are not affected); **Restore** brings it back. Items marked "Archived by the school" were archived by the administrator. **Rename** gives any category a new name, one box per language of your classes in that subject. For a default category the new name is yours only: your classes, their student pages, lesson topics and reports show it, goals stay in the category, and other teachers keep the school name (marked **Your name**; **Use the school name** goes back). **Outcome labels** sets the four labels you use when you assess a goal.
 
 ### Sentence starters
 

@@ -240,7 +240,7 @@ Başarıyı verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Ger
 - **Konu göster** hedefleri ve kanıtları kategoriye göre süzer.
 - **Öğrenci sayfasında gizle** bir öğrencinin hedefini, kaydını ya da kanıtını onun sayfasından gizler (örneğin bir yanlışlıktan sonra). Öğrencinin yazdıkları olduğu gibi saklanır ve değişiklik kayda geçer.
 
-**Kategoriler ve hazır hedefler** sekmesinde okulun varsayılan kategorileri ve hedefleri ile sizinkiler bulunur. **Arşivle** bir varsayılanı yalnızca sizin sınıflarınızda gizler (diğer öğretmenler etkilenmez); **Geri getir** geri getirir. "Okul tarafından arşivlendi" yazanları yönetici arşivlemiştir. **Sonuç adları**, bir hedefi değerlendirirken kullandığınız dört adı belirler.
+**Kategoriler ve hazır hedefler** sekmesinde okulun varsayılan kategorileri ve hedefleri ile sizinkiler bulunur. **Arşivle** bir varsayılanı yalnızca sizin sınıflarınızda gizler (diğer öğretmenler etkilenmez); **Geri getir** geri getirir. "Okul tarafından arşivlendi" yazanları yönetici arşivlemiştir. **Yeniden adlandır** her kategoriye yeni bir ad verir; o dersteki sınıflarınızın her dili için bir kutu vardır. Varsayılan bir kategorinin yeni adı yalnızca sizindir: sınıflarınız, öğrenci sayfaları, ders konuları ve raporlar bu adı gösterir, hedefler aynı kategoride kalır, diğer öğretmenler okulun verdiği adı görmeye devam eder (**Sizin verdiğiniz ad** etiketiyle; **Okulun adını kullan** eski ada döner). **Sonuç adları**, bir hedefi değerlendirirken kullandığınız dört adı belirler.
 
 ### Cümle başlangıçları
 

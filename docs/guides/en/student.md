@@ -86,6 +86,7 @@ You see **Saved!** and the list of **My work**. You can delete your own work the
 
 - **Tell how it is going** opens **How is it going?** for that goal.
 - When you have done it, press **I did it!** Well done!
+- **Change my words** lets you change what you wrote: your goal or what you wrote about it. Change the words and press **Save my words** (or **Cancel**). Only your own words can be changed.
 - **Delete goal** asks first, like above.
 
 ## Kind words

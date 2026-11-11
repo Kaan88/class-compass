@@ -86,6 +86,7 @@ Yalnızca cümle başı yetmez: **Cümleni bitir: ___ olan yere kendi sözcükle
 
 - **Nasıl gittiğini anlat** o hedef için **Nasıl gidiyor?** ekranını açar.
 - Hedefini başardığında **Başardım!**'a bas. Aferin!
+- **Sözlerimi değiştir** ile yazdıklarını değiştirebilirsin: hedefini ya da onun hakkında yazdıklarını. Sözlerini değiştir ve **Sözlerimi kaydet**'e bas (ya da **Vazgeç**). Yalnızca kendi yazdıklarını değiştirebilirsin.
 - **Hedefi sil** de önce sorar.
 
 ## Nazik sözler
