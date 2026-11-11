@@ -129,9 +129,17 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
           const state = i < idx ? 'done' : i === idx ? 'current' : 'next';
           return (
             <li key={s.id} data-state={state} aria-current={i === idx ? 'step' : undefined}>
-              <Button size="small" className="cc-stepper__btn" onPress={() => go(i)} aria-label={t('routine.goTo', { name: pickText(s.name, locale), n: i + 1 })}>
-                <span className="cc-stepper__num" aria-hidden="true">
-                  {state === 'done' ? <IconCheck /> : i + 1}
+              {/* Named by its visible text (number, name, "Now"), so speech input and screen readers agree (WCAG 2.5.3). */}
+              <Button size="small" className="cc-stepper__btn" onPress={() => go(i)}>
+                <span className="cc-stepper__num">
+                  {state === 'done' ? (
+                    <>
+                      <IconCheck />
+                      <span className="cc-visually-hidden">{t('routine.stageDone')}</span>
+                    </>
+                  ) : (
+                    i + 1
+                  )}
                 </span>
                 <span className="cc-stepper__name">{pickText(s.name, locale)}</span>
                 {state === 'current' ? <span className="cc-stepper__mark">{t('routine.current')}</span> : null}

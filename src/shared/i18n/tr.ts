@@ -716,7 +716,7 @@ export const tr = {
   'routine.now': 'Şimdi · aşama {n} / {total}',
   'routine.stages': 'Rutin aşamaları',
   'routine.current': 'Şimdi',
-  'routine.goTo': '{n}. aşamaya git: {name}',
+  'routine.stageDone': 'Bitti',
   'routine.prev': 'Önceki aşama',
   'routine.next': 'Sonraki aşama',
   'routine.prevShort': 'Önceki',

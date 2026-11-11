@@ -31,16 +31,8 @@ async function seriousViolations(page: Page, include?: string) {
   const r = await builder.analyze();
   return r.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-    .map((v) => ({ ...v, nodes: v.nodes.filter((n) => !(v.id === 'label-content-name-mismatch' && KNOWN_LABEL_MISMATCH.test(n.html))) }))
-    .filter((v) => v.nodes.length > 0)
     .map((v) => `${v.id}: ${v.nodes.map((n) => `${n.target.join(' ')} ${n.html.slice(0, 120)}`).slice(0, 3).join(' | ')}`);
 }
-/**
- * Known before S17a and not caused by any theme (the same with the default theme): the routine's stage
- * chips are named "Go to stage N: <name>" while they show "N <name> Now". Left to the routines module;
- * noted as a known gap of S17a.
- */
-const KNOWN_LABEL_MISMATCH = /cc-stepper__btn/u;
 
 test('import a theme package (bad contrast → fix → enable), use it in a class, delete it (D-158)', async ({ browser }) => {
   test.setTimeout(120_000);

@@ -25,8 +25,6 @@ const SNOW = readFileSync(join(import.meta.dirname, '..', 'docs', 'examples', 'p
 const SNOW_KEY = 'peppermint-snow-day';
 const SHOTS = process.env.CC_SHOTS_DIR ?? 'test-results/s17b/after';
 const SHOTS_ONLY = process.env.CC_SHOTS_ONLY === '1';
-/** Known before S17a and not caused by any theme (see e2e/theme-packages.spec.ts). */
-const KNOWN_LABEL_MISMATCH = /cc-stepper__btn/u;
 
 type Ctx = { id: string; classId: string; className: string; theme: string; subjectName: { en: string } };
 
@@ -57,8 +55,6 @@ async function seriousViolations(page: Page) {
   const r = await new AxeBuilder({ page }).analyze();
   return r.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-    .map((v) => ({ ...v, nodes: v.nodes.filter((n) => !(v.id === 'label-content-name-mismatch' && KNOWN_LABEL_MISMATCH.test(n.html))) }))
-    .filter((v) => v.nodes.length > 0)
     .map((v) => `${v.id}: ${v.nodes.map((n) => `${n.target.join(' ')} ${n.html.slice(0, 120)}`).slice(0, 3).join(' | ')}`);
 }
 

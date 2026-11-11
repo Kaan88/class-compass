@@ -718,7 +718,7 @@ export const en = {
   'routine.now': 'Now · stage {n} of {total}',
   'routine.stages': 'Routine stages',
   'routine.current': 'Now',
-  'routine.goTo': 'Go to stage {n}: {name}',
+  'routine.stageDone': 'Done',
   'routine.prev': 'Previous stage',
   'routine.next': 'Next stage',
   'routine.prevShort': 'Previous',
