@@ -217,7 +217,7 @@ A chosen student who is absent is replaced; a student who was away keeps their t
 ### Achievements: giving an achievement in class
 
 1. Open **Achievements** and press **Give an achievement**.
-2. **Who gets it?**: tick students or **Whole class**.
+2. **Who gets it?**: tick students or **Whole class**. While groups are shown in the lesson, **Or tick a group from this lesson** lists them: one tap ticks everyone in that group who is here, a second tap unticks them. Students you ticked by hand stay ticked.
 3. **Choose an achievement**. Tick **Celebrate on the display** for a short celebration with the achievement, the names and the avatars.
 4. Press **Give to N**.
 

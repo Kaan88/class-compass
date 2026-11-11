@@ -217,7 +217,7 @@ Seçilen öğrenci derste yoksa yerine başkası seçilir; gelmeyen öğrencinin
 ### Başarılar: derste başarı vermek
 
 1. **Başarılar**'ı açıp **Başarı ver**'e basın.
-2. **Kim alıyor?**: öğrencileri işaretleyin ya da **Tüm sınıf**'ı seçin.
+2. **Kim alıyor?**: öğrencileri işaretleyin ya da **Tüm sınıf**'ı seçin. Derste gruplar gösteriliyorsa **Ya da bu dersteki bir grubu işaretleyin** altında listelenir: bir dokunuş o gruptan derste olan herkesi işaretler, ikinci dokunuş işaretleri kaldırır. Elle işaretlediğiniz öğrenciler işaretli kalır.
 3. **Bir başarı seçin**. Başarı, adlar ve avatarlarla kısa bir kutlama için **Ekranda kutla**'yı işaretleyin.
 4. **N öğrenciye ver**'e basın.
 
