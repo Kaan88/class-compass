@@ -282,13 +282,74 @@ labels, the same counter levels (number + pattern + word) and the same flows.
 - [ ] `npm run docs:theme-examples` (one example package per built-in theme, served over MCP; drift-tested, D-164).
 - [ ] `npm run docs:theming` (the token table shows every built-in theme's values; drift-tested).
 
-## Add a language (notes)
+## Add a language
 
-Not scaffolded yet. English and Turkish are the supported pair, and much of the code assumes exactly
-these two.
+English and Turkish are complete. A third **interface language** (the words of the app itself) is
+scaffolded; a third language for **the labels teachers type** is not (see the end of this section).
+D-191.
 
-- `src/shared/i18n/<lang>.ts` must satisfy `Messages` and `src/shared/i18n/areas/staff/<lang>.ts` `StaffMessages` (every key, type-checked; D-182), and every other area file gets the language too. Extend the `Locale` type and `translate()` in `src/shared/i18n/index.ts`, including plural rules via `Intl.PluralRules` (`_one`/`_other` keys).
-- `tests/client/lint-rules.test.ts` compares en and tr keys and placeholders. Extend it to the new dictionary.
-- Teacher-editable labels are `{en, tr}` JSON (`pickText`). A new language needs a schema change for those labels and a migration. Record that as a decision first.
-- Names are sorted with Turkish collation (`sortByName`). Check that this is still right for the new language's users.
-- The profile language picker and the `language.*` keys list the locales.
+```
+npm run new:language -- <code> <native name>     # e.g. npm run new:language -- de Deutsch
+npm run check:language -- <code>                 # what is still untranslated
+```
+
+`<code>` is the ISO 639 code (two or three lower-case letters). The scaffold (`scripts/new-language.ts`,
+`--dry-run` lists the files, `--root <dir>` works on a copy) writes:
+
+| File | What |
+|---|---|
+| `src/shared/i18n/<code>.ts` | The main dictionary (what the student page can show, D-182), `satisfies Messages`. |
+| `src/shared/i18n/areas/staff/<code>.ts` | The staff dictionary, `satisfies StaffMessages`. |
+| `src/shared/i18n/areas/<code>/<area>.ts` | One file per other area dictionary (`areas/keys.ts`), typed by that area's English keys. |
+| `src/shared/languages.ts` | `<code>: { nativeName, ready: false }` in `LANGUAGES`. |
+| `docs/guides/<code>/*.md` | Every English guide, to translate (screenshots stay the English ones until `docs/guides/img/<code>/` exists). |
+
+Every key starts as the English text with `// TODO(<code>): translate` on its line; every guide starts
+with `<!-- TODO(<code>): translate -->`. The type checker keeps the key sets equal: a key added later
+without the new language fails `npm run check` (`npm run new:module` and `new:theme` add their keys to a
+scaffolded language too, marked the same way).
+
+**Not ready means not offered.** `Locale` (in `shared/languages.ts`, re-exported by `shared/i18n`) is
+only the languages with `ready: true`, and the contracts build their locale enums from `LOCALES`
+(`contracts/auth.ts`, `contracts/school.ts`, the account fields in `contracts/admin.ts`), so the server
+refuses a language that is not ready and no picker can offer it. `npm run check:language -- <code>` passes
+when no line or guide is still marked, every dictionary file and guide exists (an area or guide added
+after the scaffold needs its own) and every translation keeps the English `{placeholders}`;
+`tests/scripts/languages.test.ts` fails when a language is marked ready before that.
+
+Checklist, in order:
+
+- [ ] `npm run new:language -- <code> <native name>`; never commit a half-made language as ready.
+- [ ] Translate the marked lines and guides (natural wording, not word for word); delete each mark when done. Plural forms are `_one` / `_other` keys chosen by `Intl.PluralRules` for the language; add the forms the language needs to its own dictionary only if `translate()` learns them first.
+- [ ] `npm run check:language -- <code>` until it says "ready"; then set `ready: true` in `src/shared/languages.ts`.
+- [ ] `npm run check`. Now `Locale` includes the language and the type checker names every place that holds one entry per locale: `dictionaries`, the area registry and the plural rules in `shared/i18n/index.ts` (load the new main dictionary there; register the staff and area dictionaries in `areas/staff.ts` and each area file), `formatDate` and friends (`'en-GB'` / `'tr-TR'` tags), the database columns typed `{ enum: ['en', 'tr'] }` (`users.locale`, `school_settings.default_locale`, the scorer and board languages; text columns, so a type change and no migration), and every `Record<Locale, …>`.
+- [ ] Pickers that list `en` and `tr` by hand (profile, Admin → Users and School, the sign-in switch, Help, the classroom Display popover) list `LOCALES` instead, each with `LANGUAGES[code].nativeName` (a language's own name needs no translation).
+- [ ] `tests/client/lint-rules.test.ts` and `tests/scripts/i18n-split.test.ts` compare English and Turkish; add the new language to their dictionary lists.
+- [ ] Guides: Help (`client/help/`) shows `docs/guides/<lang>/` for the interface language; add the language to its switch, and take screenshots in it (`docs/guides/img/<code>/`, `npm run docs:screenshots` with the script's language list extended).
+- [ ] Names are sorted with Turkish collation (`sortByName`, `shared/text/turkish.ts`). Check that this is still right for the new language's users.
+- [ ] Record the language in DECISIONS and ROADMAP.
+
+### Labels teachers type: still `{ en, tr }`
+
+Counter names, routines, goal categories, preset goals, homework statuses, group and arrangement names,
+holiday names and the other labels teachers and administrators type are stored as `{ en?: string, tr?: string }`
+JSON (`LocalizedText`, shown with `pickText` / `pickLabel`, edited with `LangFields`), and a class's main and
+second language (`mainLanguage`, `secondLanguageEnabled`, the student page override, the card language)
+are `en` or `tr` (`BASE_LOCALES`). An interface language added above therefore changes the app's own
+words only; class-facing labels stay English or Turkish. A third class language would need, as its own
+stage with a decision first:
+
+1. **Contracts:** `LocalizedText` with an optional key per language (`shared/contracts/define.ts`), the class
+   language enums (`contracts/goals.ts`, `contracts/links.ts`, `shared/classLanguage.ts`: modes such as
+   `en+tr` become a main language plus a list), and every `{ en, tr }` literal in contracts and seeds.
+2. **A migration:** the columns typed `{ enum: ['en', 'tr'] }` for class and student-page languages, and
+   any check that a label has `en` or `tr` (`RequiredLocalizedText` and its server twins); the JSON label
+   columns themselves need no rewrite (a missing key already falls back).
+3. **Editors and fallbacks:** `LangFields` and `useEditorLocales` for any set of languages, `pickText`'s
+   fallback order (the class's languages, then English), seeded defaults per language (`inLocales`,
+   `completeDefault`, D-172), "Needs translation" across more than two languages, theme package names
+   (`name: { en, tr }`) and the Super Speakers board messages.
+4. **Text checks:** the student text checks have English and Turkish word lists only (`shared/text/`,
+   D-123); a class language needs its own lists before students write in it.
+
+ROADMAP keeps this part open.
