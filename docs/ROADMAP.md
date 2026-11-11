@@ -158,7 +158,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] First restore drill on the Oracle server (2026-11-09): the test site's latest backup restored into a scratch folder with the deployed image, verified, 76 tables and 25,566 rows equal to the live database, integrity ok; the drill command in OPERATIONS fixed (a read-only backup folder fails)
 - [ ] ENG-5 report
 - [x] e2e/axe for the Reports, Admin Reports and Maintenance pages on the classroom display and the mobile project (headings, tables, the period, a tab), and a print e2e of the teacher and admin report (navigation and filters hidden, every section open with content, a PDF with pages) (S20a, `e2e/reports-maintenance.spec.ts`; report tables can now be reached and scrolled with the keyboard on every page)
-- [ ] Not yet: a school holiday calendar (coverage counts Monday–Friday)
+- [x] School holiday calendar (S25b, D-186): named closures per school year on Admin → School holidays, "Add Turkish public holidays" (fixed-date ones; religious holidays by hand); coverage and school-day denominators leave closures out, a week of holidays reads "no school" (`tests/server/holidays.test.ts`, `tests/domain/holidays.test.ts`, `e2e/holidays.spec.ts`)
 - [ ] Production go-live only with explicit owner authorisation (installed 2026-11-09 but still behind Cloudflare Access; opening it and adding real students needs the owner's decision and the school's KVKK sign-off)
 
 ## S13a Classroom feedback round 1: fixes and classroom flow (owner/teacher feedback 2026-11-07; before S12)
@@ -489,13 +489,24 @@ Decision D-188; migration 0031.
 - [ ] Tried in a real lesson on the classroom display (owner, Sare)
 - [ ] Guide screenshots of the new step, box and review (`npm run docs:screenshots` after the next screenshot pass)
 
+## S25b School holiday calendar for coverage and week maths (wave S25, 2026-11-11)
+Decision D-186; migration 0032 (`school_closures`).
+- [x] Admin → School holidays: a year picker, add / change / delete named closures (dates inside the year, audited, read-only in an archived year), "Add Turkish public holidays for this school year" (1 Jan, 23 Apr, 1 May, 19 May, 15 Jul, 30 Aug, 29 Oct; days already covered are skipped) with the note that Ramazan and Kurban Bayramı are added by hand; EN/TR strings, admin and teacher guides EN/TR
+- [x] Week maths and coverage without closure days: `schoolDaysBetween`, the Daily Assistant's week, attendance coverage and per-student school days, the usage report's school days; a week of only closures is the report cell "no school" (attendance weeks, lessons per week, counter weeks and per-student weeks), never 0 or not recorded
+- [x] Classroom on a closure day: a calm note on the no-lesson card, a lesson can still be started (make-up lesson); no assistant on duty
+- [x] Demo history: the Turkish fixed-date holidays are added to the demo year and every closure day is skipped
+- [x] Tests: `tests/domain/holidays.test.ts`, `tests/server/holidays.test.ts`, `tests/server/seed-history.test.ts`, `e2e/holidays.spec.ts`
+- [ ] Half days (the afternoon of 28 October, the eves of the religious holidays): out of scope
+- [ ] Guide screenshot of the new page (with the next screenshot pass)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site
 - [ ] **Owner decisions:** open sareteacher.com to the school (Access, KVKK sign-off before real students); off-site backups with restic (the nightly PBS backup covers the server today); a separate Super Speakers hostname; AI tools tried with Claude Code, claude.ai, Claude Desktop and MCP Inspector on fictional data (needs the Access bypass for the AI paths); split End Lesson into a class-facing and a teacher-only part (S13a); CI again after 2026-12-01
 - [x] **Small product gap: an ordered level picker for grouping** (S25c, D-187)
 - [x] **Small product gap: lesson goals per class** (S25d, D-188)
-- [ ] **Small product gaps** (above in S5–S13): a school holiday calendar for coverage; starting a lesson offline; a larger word list for the text check; theme-supplied badge and avatar art
+- [x] **Small product gap: a school holiday calendar for coverage** (S25b, D-186)
+- [ ] **Small product gaps** (above in S5–S13): starting a lesson offline; a larger word list for the text check; theme-supplied badge and avatar art
 - [ ] **Missing automated checks:** a pixel-diff screenshot baseline (the rest done in S20a; the 40-student check found one full row of cards at 1536×703, two full rows since S22c)
 - [ ] **Future feature idea (owner, 2026-11-09): AI-assisted OCR** for the student list importer: an AI model reads hard photos and scans (handwriting, skewed or low-quality e-Okul printouts, multi-class sheets) and suggests the rows, which the teacher or admin still checks in the importer preview. Open questions before a design: which provider and where it runs, KVKK (a class list is personal data: needs the AI data switch of D-161 and the school's sign-off, or a local model), cost, and a fallback to the built-in OCR. Owner's preferred direction: a **small local model on the Oracle server** (2 ARM cores, about 9 GB RAM free with both sites running), so class lists never leave the school's server, shared with other tools later if useful (one local AI service, not one per feature). To check first: a vision model that fits on CPU-only ARM in a few GB and reads Turkish names well, its speed per photo on 2 cores, and its memory next to the app (the measured app peak is under 400 MB)
 - [x] **Boxes re-checked against S14 and the deployments** (S20d, 2026-11-11; evidence notes on each box): ticked S8 moving a student between groups on the classroom screen and late arrivals (S14c) and the S13a screenshot matrix; S0 native dependencies in Docker was already ticked (its stale tail fixed). Rewritten as precise open boxes: S13a achievements and group number on the student cards, Compact density that grows into free height, Compact / Normal / Large in the teacher area; S12 board live updates through the real tunnel (a person's check on the test site)

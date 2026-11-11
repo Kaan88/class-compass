@@ -81,6 +81,8 @@ Pages of a module that is switched off in all your classes are left out of the m
    - **Routine**: choose the routine for this lesson.
 4. Press **Begin lesson**. The board fills the whole screen (full screen), so the browser's bars do not take space from the class.
 
+On a school holiday (the administrator's holiday calendar) the classroom screen says so with a calm note. You can still start a lesson, for example a make-up lesson; reports leave holidays out of the school days.
+
 ![Start lesson: the attendance step](../img/en/start-lesson.png)
 
 ### Full screen

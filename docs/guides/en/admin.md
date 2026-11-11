@@ -19,7 +19,7 @@ Administrator accounts always sign in with a **password** (never with email link
 The very first administrator account is created on the server by the IT person (`admin:create`, see `docs/OPERATIONS.md`); there is no web registration and no default password. Then, in this order:
 
 1. **School settings**: **School name**, **School timezone** (chosen from a list; Europe/Istanbul is first), **Week starts on**, **Language for new accounts** and the weather (below).
-2. **School years and terms**: **New school year** with its dates, then **Add term** for each term. Terms are calendar settings only.
+2. **School years and terms**: **New school year** with its dates, then **Add term** for each term. Terms are calendar settings only. Then the year's holidays on **School holidays** (below).
 3. **Subjects**: **New subject** with a name in English and/or Turkish. Teachers see the name in their own language when both are given.
 4. **Classes**: **Add classroom** / **New class**: **Class name** (for example 3-A), **School year**, **Grade** (a number, for example 3), **Theme** (**Show a larger preview of the theme** opens a bigger picture), **Timezone** (empty = the school timezone), **Sounds** and **Animations**, and the class language.
 5. **Accounts**: create the teacher accounts (below).
@@ -66,6 +66,22 @@ At the end of the year use **Maintenance** → **New school year**:
 4. **Start the new year**: type the old year's name to confirm. Everything happens at once and is recorded in the audit log. History stays with the students.
 
 Single classes can also be moved with **Classes** → **Promote class**.
+
+## School holidays
+
+**School holidays** is the holiday calendar of each school year: the days without school. Choose the **School year**, then:
+
+- **Add a holiday**: a name (in English, Turkish or both, for example *Semester break* / *Yarıyıl tatili*), a **Start date** and an **End date** (the same date for one day). The dates must be inside the school year. **Edit** and **Delete** are on each row; deleting asks once more on the page.
+- **Add Turkish public holidays for this school year** adds the fixed-date national holidays that fall inside the year, one day each: 1 January, 23 April, 1 May, 19 May, 15 July, 30 August and 29 October. A day already on the calendar is skipped, so pressing it twice adds nothing.
+- **Ramazan Bayramı and Kurban Bayramı move every year**, so they are not in the built-in list: add them by hand with **Add a holiday**, with the dates the ministry announces, and the semester break too. Class Compass looks nothing up on the internet. Half days are not supported.
+
+What a holiday changes:
+
+- **Reports** leave holidays out of every school-day count: attendance coverage (days recorded / school days), the school days of a student in the class, and the school days of the school-wide usage report. A week made only of holidays says **no school**, never 0 or "not recorded".
+- The **Daily assistant** has nobody on duty on a holiday.
+- On the **classroom screen** a calm note says that today is a holiday (with its name). A teacher can still **Start lesson**, for a make-up lesson; such a lesson counts like any other.
+
+Holidays of an archived year cannot be changed. Every change is in the audit log.
 
 ## Classes and teaching assignments
 

@@ -61,7 +61,7 @@ The classroom top bar shows the current weather when Admin → School settings �
 - Administrators: **Admin → Reports**: the school-wide usage report (counts per class+subject and teacher, no student data, no notes) and every class+subject report (the teacher's lesson reflection notes are left out).
 - Every table has a CSV link (UTF-8 with BOM; cells starting with `=`, `+`, `-`, `@`, tab or CR get a leading `'` so spreadsheets never run them). Each download is audited.
 - Print: the browser's print dialog gives A4 pages with the school, class, subject, period and print time in the header; navigation and filters are hidden.
-- RPT-5: every count says what it is out of; "not recorded", "absent" and "not in the class" are words, never 0; there is no overall score. Attendance coverage counts Monday–Friday as school days (no holiday calendar yet).
+- RPT-5: every count says what it is out of; "not recorded", "absent" and "not in the class" are words, never 0; there is no overall score. Attendance coverage counts Monday–Friday as school days, without the closures of the holiday calendar (Admin → School holidays, D-186).
 
 ## Backups (S11, D-089)
 A backup is one file `DATA_DIR/backups/cc-backup-<UTC time>.tar` (folder: `BACKUP_DIR`) holding:

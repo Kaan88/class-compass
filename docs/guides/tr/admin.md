@@ -19,7 +19,7 @@ Yönetici hesapları her zaman **şifreyle** giriş yapar (hiçbir zaman e-posta
 İlk yönetici hesabını bilgi işlem sorumlusu sunucuda oluşturur (`admin:create`, bkz. `docs/OPERATIONS.md`); web üzerinden kayıt ve varsayılan bir şifre yoktur. Ardından şu sırayla ilerleyin:
 
 1. **Okul ayarları**: **Okul adı**, **Okul saat dilimi** (listeden seçilir; Europe/Istanbul en üsttedir), **Haftanın ilk günü**, **Yeni hesapların dili** ve hava durumu (aşağıda).
-2. **Eğitim yılları ve dönemler**: tarihleriyle **Yeni eğitim yılı**, ardından her dönem için **Dönem ekle**. Dönemler yalnızca takvim ayarıdır.
+2. **Eğitim yılları ve dönemler**: tarihleriyle **Yeni eğitim yılı**, ardından her dönem için **Dönem ekle**. Dönemler yalnızca takvim ayarıdır. Sonra yılın tatilleri **Okul tatilleri** sayfasında (aşağıda).
 3. **Dersler**: İngilizce ve/veya Türkçe adla **Yeni ders**. İki ad da girilirse öğretmenler adı kendi dillerinde görür.
 4. **Sınıflar**: **Sınıf ekle** / **Yeni sınıf**: **Sınıf adı** (örneğin 3-A), **Eğitim yılı**, **Sınıf düzeyi** (bir sayı, örneğin 3), **Tema** (**Temanın büyük önizlemesini göster** daha büyük bir resim açar), **Saat dilimi** (boş = okulun saat dilimi), **Sesler** ve **Animasyonlar** ile sınıf dili.
 5. **Hesaplar**: öğretmen hesaplarını açın (aşağıda).
@@ -66,6 +66,22 @@ Yıl sonunda **Bakım** → **Yeni öğretim yılı**'nı kullanın:
 4. **Yeni yılı başlat**: onaylamak için eski yılın adını yazın. Her şey tek seferde yapılır ve denetim kaydına geçer. Geçmiş öğrencilerle birlikte kalır.
 
 Tek tek sınıflar **Sınıflar** → **Sınıfı üst sınıfa taşı** ile de taşınabilir.
+
+## Okul tatilleri
+
+**Okul tatilleri**, her eğitim yılının tatil takvimidir: okulun olmadığı günler. **Eğitim yılı**'nı seçin, sonra:
+
+- **Tatil ekle**: bir ad (İngilizce, Türkçe ya da ikisi; örneğin *Yarıyıl tatili* / *Semester break*), **Başlangıç tarihi** ve **Bitiş tarihi** (tek gün için aynı tarih). Tarihler eğitim yılının içinde olmalıdır. Her satırda **Düzenle** ve **Sil** vardır; silmeden önce sayfada bir kez daha sorulur.
+- **Bu eğitim yılına resmî tatilleri ekle**, yılın içine denk gelen sabit tarihli millî tatilleri birer gün olarak ekler: 1 Ocak, 23 Nisan, 1 Mayıs, 19 Mayıs, 15 Temmuz, 30 Ağustos ve 29 Ekim. Takvimde zaten olan gün atlanır; iki kez basmak bir şey eklemez.
+- **Ramazan Bayramı ve Kurban Bayramı her yıl başka tarihe denk gelir**, bu yüzden hazır listede yoktur: bakanlığın açıkladığı tarihlerle **Tatil ekle** ile siz ekleyin, yarıyıl tatilini de. Class Compass internette hiçbir şey aramaz. Yarım günler desteklenmez.
+
+Tatil neyi değiştirir:
+
+- **Raporlar** tatilleri hiçbir okul günü sayımına katmaz: yoklama kapsamı (kaydedilen gün / okul günü), öğrencinin sınıfta olduğu okul günleri ve okul geneli kullanım raporundaki okul günleri. Yalnızca tatillerden oluşan bir hafta **okul yok** olarak görünür; asla 0 ya da "kaydedilmedi" değil.
+- **Günün Yardımcısı** tatil gününde görev almaz.
+- **Sınıf ekranında** sakin bir not bugünün tatil olduğunu (adıyla) söyler. Öğretmen yine de **Dersi başlat**'a basabilir, örneğin telafi dersi için; bu ders diğer dersler gibi sayılır.
+
+Arşivlenen bir yılın tatilleri değiştirilemez. Her değişiklik denetim kaydına geçer.
 
 ## Sınıflar ve ders görevlendirmeleri
 

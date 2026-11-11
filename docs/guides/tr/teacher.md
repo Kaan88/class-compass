@@ -81,6 +81,8 @@ Bütün sınıflarınızda kapalı olan bir modülün sayfaları menüde görün
    - **Rutin**: bu dersin rutinini seçin.
 4. **Derse başla**'ya basın. Pano tüm ekranı kaplar (tam ekran); tarayıcının çubukları sınıftan yer çalmaz.
 
+Okul tatilinde (yöneticinin tatil takvimi) sınıf ekranı bunu sakin bir notla söyler. Yine de ders başlatabilirsiniz, örneğin telafi dersi; raporlar tatilleri okul günlerine katmaz.
+
 ![Dersi başlat: yoklama adımı](../img/tr/start-lesson.png)
 
 ### Tam ekran
