@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 import { isIsoDate, isValidTimeZone } from '../dates.ts';
+import { LOCALES } from '../languages.ts';
 import { Empty, Ok, LocalizedText, endpoint, pii } from './define.ts';
 
 export const Id = z.string().min(1).max(64);
@@ -25,7 +26,8 @@ export const ModuleKeySchema = z.enum(MODULE_KEYS);
  * enabled) before writing it, for classes and the Super Speakers board.
  */
 export const Theme = z.union([z.enum(THEME_KEYS), z.string().regex(THEME_SLUG)]).meta(pii('none'));
-export const Locale = z.enum(['en', 'tr']);
+/** The ready interface languages (S26c, D-191: `shared/languages.ts`; a language that is not ready is refused). */
+export const Locale = z.enum(LOCALES);
 
 export const TimeUpSound = z.enum(TIME_UP_SOUNDS);
 export const SoundVolume = z.number().int().min(0).max(100);

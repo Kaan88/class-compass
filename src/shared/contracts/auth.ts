@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { LOCALES } from '../languages.ts';
 import { endpoint, Ok, Empty } from './define.ts';
 
-export const Locale = z.enum(['en', 'tr']);
+/** The ready interface languages (S26c, D-191: `shared/languages.ts`; a language that is not ready is refused). */
+export const Locale = z.enum(LOCALES);
 export type Locale = z.infer<typeof Locale>;
 
 /**

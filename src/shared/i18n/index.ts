@@ -3,8 +3,10 @@ import { tr } from './tr.ts';
 import type { AreaMessageKey } from './areas/keys.ts';
 import type { LocalizedTextValue as LocalizedText } from '../contracts/define.ts';
 import { dateTimeFormat } from '../intl.ts';
+import type { Locale } from '../languages.ts';
 
-export type Locale = 'en' | 'tr';
+/** The ready interface languages (S26c, D-191: the list and its `ready` flag are in `shared/languages.ts`). */
+export type { Locale };
 export const dictionaries = { en, tr } as const;
 /** Every key: the main dictionary's and the area dictionaries' (S19a, D-179: `areas/`, loaded only where used). */
 export type MessageKey = BaseMessageKey | AreaMessageKey;

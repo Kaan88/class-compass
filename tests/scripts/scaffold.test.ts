@@ -1,11 +1,13 @@
 /**
- * Scaffolding scripts (SX): `new:module` and `new:theme` run against a temporary copy of the project
- * (src, tsconfig and package.json, node_modules linked), the result must typecheck, and the copy is deleted. The
+ * Scaffolding scripts (SX; `new:language` since S26c, D-191): `new:language`, `new:module` and `new:theme`
+ * run against a temporary copy of the project (src, the English guides, tsconfig and package.json,
+ * node_modules linked), the result must typecheck, and the copy is deleted. A scaffolded language is
+ * not ready until `check:language` finds no untranslated key or guide. The
  * planners are also checked in memory: a dry run writes nothing, existing keys are refused, and
  * every registry edit lands where expected.
  */
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -67,6 +69,7 @@ describe('scaffold scripts in a temporary project copy', () => {
     tmp = mkdtempSync(join(tmpdir(), 'cc-scaffold-'));
     cpSync(join(ROOT, 'src'), join(tmp, 'src'), { recursive: true });
     for (const f of ['tsconfig.json', 'package.json']) cpSync(join(ROOT, f), join(tmp, f));
+    cpSync(join(ROOT, 'docs', 'guides', 'en'), join(tmp, 'docs', 'guides', 'en'), { recursive: true });
     symlinkSync(join(ROOT, 'node_modules'), join(tmp, 'node_modules'), 'junction');
   });
   afterAll(() => {
@@ -84,7 +87,9 @@ describe('scaffold scripts in a temporary project copy', () => {
     expect(existsSync(join(tmp, 'src', 'server', 'modules', 'demoWidget'))).toBe(false);
   });
 
-  it('generates a module and a theme that typecheck with the rest of the project', () => {
+  it('generates a language, a module and a theme that typecheck with the rest of the project', () => {
+    // S26c (D-191): the language first, so the module and theme scaffolds add their keys to it too.
+    run('new-language.ts', ['de', 'Deutsch', '--root', tmp]);
     run('new-module.ts', ['demoWidget', '--root', tmp]);
     run('new-theme.ts', ['demoTheme', '--root', tmp]);
     for (const f of [
@@ -97,10 +102,22 @@ describe('scaffold scripts in a temporary project copy', () => {
       'src/client/themes/demoTheme/tokens.ts',
       'src/client/themes/demoTheme/art.tsx',
       'tests/client/theme-demoTheme.test.ts',
+      'src/shared/i18n/de.ts',
+      'src/shared/i18n/areas/staff/de.ts',
+      'src/shared/i18n/areas/de/holidays.ts',
+      'docs/guides/de/student.md',
     ])
       expect(existsSync(join(tmp, f)), f).toBe(true);
     // Running again refuses instead of overwriting.
     expect(() => execFileSync(process.execPath, [join(ROOT, 'scripts', 'new-theme.ts'), 'demoTheme', '--root', tmp], { stdio: 'pipe' })).toThrow();
+    expect(() => execFileSync(process.execPath, [join(ROOT, 'scripts', 'new-language.ts'), 'de', 'Deutsch', '--root', tmp], { stdio: 'pipe' })).toThrow();
+    // The language is listed but not ready, and has every key in English, marked (S26c, D-191).
+    expect(readFileSync(join(tmp, 'src', 'shared', 'languages.ts'), 'utf8')).toContain("  de: { nativeName: 'Deutsch', ready: false },\n  // new:language adds");
+    const de = readFileSync(join(tmp, 'src', 'shared', 'i18n', 'de.ts'), 'utf8');
+    expect(de).toContain("  'common.cancel': 'Cancel', // TODO(de): translate\n");
+    expect(de).toContain("  'module.demoWidget': 'Demo widget', // TODO(de): translate\n"); // added later by new:module
+    expect(readFileSync(join(tmp, 'src', 'shared', 'i18n', 'areas', 'staff', 'de.ts'), 'utf8')).toContain("'demoWidget.title': ");
+    expect(readFileSync(join(tmp, 'docs', 'guides', 'de', 'student.md'), 'utf8')).toMatch(/^<!-- TODO\(de\): translate -->\n# /u);
 
     const tsc = join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
     const result = (() => {
@@ -113,4 +130,39 @@ describe('scaffold scripts in a temporary project copy', () => {
     })();
     expect(result).toBe('');
   }, 300_000);
+
+  it('the "ready" check of a scaffolded language fails while any key or guide is untranslated (S26c, D-191)', () => {
+    const check = () => {
+      try {
+        return { ok: true, out: execFileSync(process.execPath, [join(ROOT, 'scripts', 'language-check.ts'), 'de', '--root', tmp], { encoding: 'utf8', stdio: 'pipe' }) };
+      } catch (err) {
+        return { ok: false, out: String((err as { stdout?: string }).stdout ?? err) };
+      }
+    };
+    const dictFiles = ['src/shared/i18n/de.ts', 'src/shared/i18n/areas/staff/de.ts', ...readdirSync(join(tmp, 'src/shared/i18n/areas/de')).map((f) => `src/shared/i18n/areas/de/${f}`)];
+    const edit = (rel: string, fn: (s: string) => string) => writeFileSync(join(tmp, rel), fn(readFileSync(join(tmp, rel), 'utf8')));
+    const first = check();
+    expect(first.ok).toBe(false);
+    expect(first.out).toMatch(/de: not ready\nkeys still in English \(TODO\) \(\d{4,}\):/u);
+    expect(first.out).toContain('src/shared/i18n/de.ts: common.cancel');
+
+    // Translate everything except one key: still not ready, and it names that key.
+    const unmark = (line: string) => (line.startsWith("  'holidays.title':") ? line : line.replace(/ \/\/ TODO\(de\): translate$/u, ''));
+    for (const rel of dictFiles) edit(rel, (s) => s.split('\n').map(unmark).join('\n'));
+    for (const g of readdirSync(join(tmp, 'docs/guides/de'))) edit(`docs/guides/de/${g}`, (s) => s.replace('<!-- TODO(de): translate -->\n', ''));
+    const one = check();
+    expect(one.ok).toBe(false);
+    expect(one.out).toContain('keys still in English (TODO) (1):\n  src/shared/i18n/areas/de/holidays.ts: holidays.title');
+    expect(one.out).not.toContain('guides still in English');
+
+    // A translation that loses a placeholder is caught too.
+    edit('src/shared/i18n/areas/de/holidays.ts', (s) => s.replace(' // TODO(de): translate', ''));
+    edit('src/shared/i18n/de.ts', (s) => s.replace("'student.step': 'Step {n} of {total}'", "'student.step': 'Schritt {n} von {alle}'"));
+    const placeholder = check();
+    expect(placeholder.ok).toBe(false);
+    expect(placeholder.out).toContain('placeholders differ from English (1):\n  src/shared/i18n/de.ts: student.step');
+
+    edit('src/shared/i18n/de.ts', (s) => s.replace('{alle}', '{total}'));
+    expect(check()).toEqual({ ok: true, out: 'de: ready (every key and guide translated)\n' });
+  }, 120_000);
 });

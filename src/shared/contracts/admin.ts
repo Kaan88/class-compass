@@ -1,7 +1,7 @@
 /** Administrator contracts (ACC-1/2/9, DAT-3, DAT-5): accounts and the audit log. */
 import { z } from 'zod';
 import { Empty, Ok, endpoint } from './define.ts';
-import { Id } from './school.ts';
+import { Id, Locale } from './school.ts';
 
 export const AdminUser = z.object({
   id: z.string(),
@@ -13,7 +13,7 @@ export const AdminUser = z.object({
   hasPin: z.boolean(),
   mustChangePassword: z.boolean(),
   /** Interface language of the account (S13a, D-099): first sign-in, password change and PIN setup use it. */
-  locale: z.enum(['en', 'tr']),
+  locale: Locale,
   /** S13b (D-108): how the account signs in, whether the address was proven, and a pending invite. */
   signInMethod: z.enum(['password', 'email_link']),
   emailVerified: z.boolean(),
@@ -44,7 +44,7 @@ export const createUserByAdmin = endpoint({
     email: Email.nullable().optional(),
     role: z.enum(['admin', 'teacher']),
     /** Required in the form (default English); the API falls back to English when it is left out. */
-    locale: z.enum(['en', 'tr']).default('en'),
+    locale: Locale.default('en'),
     setup: z.enum(['invite', 'temporary_password']).default('invite'),
   }),
   output: z.object({ user: AdminUser, temporaryPassword: z.string().nullable(), invite: InviteOut.nullable() }),
@@ -58,7 +58,7 @@ export const updateUserByAdmin = endpoint({
   method: 'PATCH',
   path: '/api/admin/users/:userId',
   access: 'admin',
-  input: z.object({ userId: Id, displayName: z.string().trim().min(1).max(120).optional(), email: Email.nullable().optional(), locale: z.enum(['en', 'tr']).optional() }),
+  input: z.object({ userId: Id, displayName: z.string().trim().min(1).max(120).optional(), email: Email.nullable().optional(), locale: Locale.optional() }),
   output: AdminUser,
 });
 

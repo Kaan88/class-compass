@@ -121,6 +121,17 @@ export function addMessages(ws: Workspace, entries: ReadonlyArray<readonly [key:
     for (const d of Object.values(DICTIONARIES)) if (ws.read(d.en).includes(`${lit(k)}:`)) throw new Error(`i18n key ${k} already exists`);
   ws.insertBefore(en, '} as const;', entries.map(([k, v]) => `  ${lit(k)}: ${lit(v)},\n`).join(''));
   ws.insertBefore(tr, trEnd, entries.map(([k, v]) => `  ${lit(k)}: ${lit(v)}, // TODO(tr): translate\n`).join(''));
+  // Languages added with `npm run new:language` (S26c, D-191) get the English text, marked the same way.
+  for (const code of scaffoldedLanguages(ws)) {
+    const file = dict === 'main' ? `src/shared/i18n/${code}.ts` : `src/shared/i18n/areas/staff/${code}.ts`;
+    ws.insertBefore(file, trEnd, entries.map(([k, v]) => `  ${lit(k)}: ${lit(v)}, // TODO(${code}): translate\n`).join(''));
+  }
+}
+
+/** The languages of `src/shared/languages.ts` besides English and Turkish (S26c, D-191). */
+export function scaffoldedLanguages(ws: Workspace): string[] {
+  if (!ws.exists('src/shared/languages.ts')) return [];
+  return [...ws.read('src/shared/languages.ts').matchAll(/^ {2}([a-z]{2,3}): \{ nativeName:/gmu)].map((m) => m[1]!).filter((c) => c !== 'en' && c !== 'tr');
 }
 
 /** Runs a scaffold CLI: parse, plan, print, write. */

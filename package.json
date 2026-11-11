@@ -31,6 +31,8 @@
     "check": "node --run typecheck && node --run lint && node --run test",
     "new:module": "node scripts/new-module.ts",
     "new:theme": "node scripts/new-theme.ts",
+    "new:language": "node scripts/new-language.ts",
+    "check:language": "node scripts/language-check.ts",
     "docs:theming": "node scripts/theme-docs.ts",
     "docs:theme-examples": "node scripts/theme-examples.ts"
   },
