@@ -549,8 +549,9 @@ The presets and their default colour tokens (generated from `src/shared/themePac
   never wider ones. A snow drift is a puffy 30 px cap with a soft shadow edge and drips down both
   sides on board boxes, 20 px on student cards, 20 px under the top bar.
 - With a scene, the classroom dock is content-width and centred on wide screens, so the scene shows
-  on both sides (decided by `html[data-scene]`); on a phone the dock's buttons are one row that
-  scrolls sideways beside End lesson, which stays in view at the right end and never covers a button.
+  on both sides (decided by `html[data-scene]`); on a phone the dock is one line of whole buttons,
+  "More" and End lesson, and "More" opens every button over a few lines (S23b, D-183): no dock button
+  is ever cut off or drawn under another, in any theme.
 - The overlays sit outside the content box: the content's padding, its hit areas and the focus
   outline are unchanged (overlays over the card fade away while keyboard focus is inside it). Student
   cards, ordinary cards, the classroom top bar (its class name and buttons reach its corners), compact
