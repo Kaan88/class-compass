@@ -54,6 +54,10 @@ export async function testConnection(ctx: RequestContext, row: ConnectionRow, mo
   const done = (r: Omit<z.infer<typeof AiTestResult>, 'ms'>) => ({ ...r, ms: Math.round(performance.now() - started) });
   if (status === 'notAvailable') return done({ ok: false, text: false, tools: false, failure: 'NOT_AVAILABLE', httpStatus: null });
   if (status === 'needsKey') return done({ ok: false, text: false, tools: false, failure: 'NEEDS_KEY', httpStatus: null });
+  // A paused connection (perhaps a key suspected to have leaked) and a used-up budget send nothing,
+  // like a chat message (`connectionForUse`); security review of D-179.
+  if (status === 'paused') return done({ ok: false, text: false, tools: false, failure: 'PAUSED', httpStatus: null });
+  if (status === 'overBudget') return done({ ok: false, text: false, tools: false, failure: 'OVER_BUDGET', httpStatus: null });
   let text = false;
   let tools = false;
   let failure: AiFailure | null = null;

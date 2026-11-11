@@ -182,6 +182,21 @@ describe('OpenAI-compatible addresses', () => {
     expect(sent.headers.authorization).toBe(`Bearer ${FAKE_KEYS.openai}`);
     expect(sent.body.max_completion_tokens).toBeGreaterThan(0);
   });
+
+  it('Test connection sends nothing while the connection is paused or its monthly budget is used up (security review)', async () => {
+    const v = await okBody(create(s.admin, { type: 'anthropic', name: 'Paused test', apiKey: FAKE_KEYS.anthropic, monthlyTokenBudget: 1000 }));
+    const before = fake.requests.length;
+    await okBody(s.admin.patch(`/api/admin/ai-connections/${v.id}`, { enabled: false }));
+    expect(await okBody(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'fake-model' }))).toMatchObject({ ok: false, text: false, tools: false, failure: 'PAUSED', httpStatus: null });
+    await okBody(s.admin.patch(`/api/admin/ai-connections/${v.id}`, { enabled: true }));
+    recordTokens(env.deps, v.id, s.ayse.id, { inputTokens: 600, outputTokens: 400 });
+    expect(await okBody(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'fake-model' }))).toMatchObject({ ok: false, text: false, tools: false, failure: 'OVER_BUDGET', httpStatus: null });
+    expect(fake.requests.length).toBe(before);
+    // No test ran, so the stored result is unchanged.
+    const after = (await okBody(s.admin.get('/api/admin/ai-connections'))).connections.find((c: any) => c.id === v.id);
+    expect(after.models[0]).toMatchObject({ testedAt: null, text: null, tools: null });
+    await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
+  });
 });
 
 describe('school default and edits', () => {

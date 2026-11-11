@@ -17,7 +17,7 @@ import { AddressRefused, addressAllowed, policyLookup, type NetPolicy } from './
 /** Time until the response headers arrive, and the longest quiet gap while a reply streams. */
 export const AI_CONNECT_TIMEOUT_MS = 30_000;
 export const AI_IDLE_TIMEOUT_MS = 60_000;
-/** The longest one streamed reply may take in total. */
+/** The longest one request may take in total, from sending it to the end of the streamed reply. */
 export const AI_TOTAL_TIMEOUT_MS = 5 * 60_000;
 /** The most a provider may send in one reply. */
 export const AI_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
@@ -49,6 +49,8 @@ export interface AiHttpRequest {
   body?: string;
   policy: NetPolicy;
   signal?: AbortSignal | undefined;
+  /** The total limit for this request (default `AI_TOTAL_TIMEOUT_MS`); tests set a short one. */
+  totalTimeoutMs?: number;
 }
 
 export interface AiHttpResponse {
@@ -77,6 +79,7 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
     const lib = u.protocol === 'https:' ? https : http;
     let settled = false;
     const fail = (e: unknown) => {
+      clearTimeout(total);
       if (settled) return;
       settled = true;
       reject(e instanceof AiCallError ? e : (e as Error)?.name === 'AddressRefused' || e instanceof AddressRefused ? new AiCallError('URL_NOT_ALLOWED') : new AiCallError('UNREACHABLE'));
@@ -97,7 +100,6 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
         }
         settled = true;
         r.setTimeout(AI_IDLE_TIMEOUT_MS);
-        const total = setTimeout(() => r.destroy(new AiCallError('TIMEOUT')), AI_TOTAL_TIMEOUT_MS);
         res.on('close', () => clearTimeout(total));
         let size = 0;
         const body = (async function* () {
@@ -117,6 +119,11 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
         resolve({ status: res.statusCode ?? 0, contentType: String(res.headers['content-type'] ?? ''), body, cancel: () => r.destroy() });
       },
     );
+    // The total limit runs from the start, not from the headers: a server that never finishes its
+    // headers (a slow trickle, or a `100 Continue` every few seconds) keeps the socket busy, so the
+    // idle timeout alone would never end it (security review of D-179). Only callbacks that run
+    // after this line read `total`.
+    const total = setTimeout(() => r.destroy(new AiCallError('TIMEOUT')), req.totalTimeoutMs ?? AI_TOTAL_TIMEOUT_MS);
     r.on('timeout', () => r.destroy(new AiCallError('TIMEOUT')));
     r.on('error', fail);
     req.signal?.addEventListener('abort', () => r.destroy(new AiCallError('TIMEOUT')), { once: true });

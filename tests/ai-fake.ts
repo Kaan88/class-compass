@@ -6,7 +6,7 @@
  */
 import crypto from 'node:crypto';
 import http from 'node:http';
-import type { AddressInfo } from 'node:net';
+import net, { type AddressInfo } from 'node:net';
 
 export const FAKE_KEYS = {
   anthropic: 'sk-ant-fake-0123456789-S19A',
@@ -165,4 +165,32 @@ export class FakeProvider {
   close() {
     return new Promise<void>((resolve) => this.server.close(() => resolve()));
   }
+}
+
+/**
+ * A broken or hostile endpoint that never finishes its response headers: it sends
+ * `HTTP/1.1 100 Continue` every `everyMs`, so the socket is never quiet (security review of D-179).
+ * `open()` is the number of connections still open.
+ */
+export async function startStallingServer(everyMs = 50): Promise<{ base: string; open: () => number; close: () => Promise<void> }> {
+  const sockets = new Set<net.Socket>();
+  const server = net.createServer((sock) => {
+    sockets.add(sock);
+    const t = setInterval(() => sock.write('HTTP/1.1 100 Continue\r\n\r\n'), everyMs);
+    sock.on('error', () => {});
+    sock.on('close', () => {
+      clearInterval(t);
+      sockets.delete(sock);
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  return {
+    base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    open: () => sockets.size,
+    close: () =>
+      new Promise<void>((resolve) => {
+        for (const s of sockets) s.destroy();
+        server.close(() => resolve());
+      }),
+  };
 }

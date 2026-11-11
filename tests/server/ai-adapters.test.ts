@@ -10,10 +10,10 @@ import { anthropicAdapter, anthropicMessages } from '../../src/server/modules/ai
 import { geminiAdapter, geminiContents, geminiSchema } from '../../src/server/modules/aiConnections/adapters/gemini.ts';
 import { openAiAdapter, openAiMessages } from '../../src/server/modules/aiConnections/adapters/openai.ts';
 import type { Adapter, ChatEvent, ChatMessage, ProviderTarget, ToolDefinition } from '../../src/server/modules/aiConnections/adapters/types.ts';
-import { AiCallError, sseEvents } from '../../src/server/modules/aiConnections/http.ts';
+import { AiCallError, aiRequest, sseEvents } from '../../src/server/modules/aiConnections/http.ts';
 import { toolDefinitions } from '../../src/server/modules/aiConnections/tools.ts';
 import { allTools } from '../../src/server/modules/mcp/registry.ts';
-import { FAKE_KEYS, FakeProvider, openAiStream } from '../ai-fake.ts';
+import { FAKE_KEYS, FakeProvider, openAiStream, startStallingServer } from '../ai-fake.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 
 let fake: FakeProvider;
@@ -300,5 +300,19 @@ describe('outgoing request rules', () => {
     await expect(run(openAiAdapter, { baseUrl: 'http://169.254.169.254/latest', policy: 'local', secret: 'x' })).rejects.toMatchObject({ failure: 'URL_NOT_ALLOWED' });
     expect(hits).toBe(0);
     await new Promise<void>((resolve) => s.close(() => resolve()));
+  });
+
+  it('the total time limit holds before the headers arrive: a server that never finishes them is cut off (security review)', async () => {
+    const stall = await startStallingServer(50);
+    try {
+      const started = Date.now();
+      // The socket is never quiet (a 100 Continue every 50 ms), so only the total limit can end it.
+      await expect(aiRequest({ url: `${stall.base}/v1/chat/completions`, headers: {}, body: '{}', policy: 'local', totalTimeoutMs: 400 })).rejects.toMatchObject({ failure: 'TIMEOUT' });
+      expect(Date.now() - started).toBeLessThan(3000);
+      await new Promise((r) => setTimeout(r, 100));
+      expect(stall.open()).toBe(0);
+    } finally {
+      await stall.close();
+    }
   });
 });
