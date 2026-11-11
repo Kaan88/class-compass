@@ -93,6 +93,16 @@ Bunu istemiyorsanız **Profil ve PIN** → **Dersler** bölümünde **Derslerde 
 
 Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sürer. Dersi süren sınıf **Ders sürüyor** olarak işaretlenir. Kablosuz ağ koparsa dokunuşlarınız cihazda saklanır ve sonra gönderilir; kayıt göstergesinde **Çevrimdışı – N değişiklik bekliyor** yazar. Sunucunun kaydedemediği her şey **Kontrol gerekiyor** altında **Yeniden dene** ve **Kapat** düğmeleriyle görünür.
 
+### Bağlantı yokken
+
+Sınıf ekranını bir bilgisayarda daha önce (son 7 gün içinde) açtıysanız, bağlantı yokken de orada açılır: sayfayı yenilediğinizde ya da tarayıcıyı kapatıp yeniden açtığınızda. Sınıflarınızı, öğrencilerin adlarını ve avatarlarını ve dersi, bu bilgisayarın en son kaydettiği hâliyle gösterir; üstte şu not yer alır: **Bağlantı yok. Bu ekran, bu cihazın en son kaydettiklerini gösteriyor; değişiklikler burada bekler ve bağlantı gelince gönderilir.**
+
+- **Bağlantı yokken ders başlatma.** **Dersi başlat** düğmesine basın ve adımları her zamanki gibi geçin. Başlatma henüz sunucuya ulaşamadığı için sınıfınızın adıyla **Ders başlatma kaydedildi** yazısını görürsünüz: başlatma bu bilgisayarda saklanır, bağlantı gelir gelmez gönderilir ve ders o zaman başlar. O zamana kadar pano bekler: yoklama, puanlar ve zamanlayıcı ders başladıktan sonra kullanılabilir. Bağlantı hâlâ yokken **Başlatmaktan vazgeç** ile başlatmayı geri alabilirsiniz.
+- **Ders sırasında** kablosuz ağ koparsa dokunuşlar, yoklama ve zamanlayıcı çalışmaya devam eder (yukarıya bakın); bağlantı gelince her şey sırasıyla gönderilir.
+- **Bağlantı gerektirenler:** öğretmen alanı (raporlar, ayarlar, notlar, Profil ve PIN), giriş yapmak, öğrenci sayfası ve bu bilgisayarda daha önce görmediğiniz resimler. PIN bağlantı olmadan kontrol edilemez; bu yüzden öğretmen alanı kilitli kalır.
+- **Gizlilik.** Yalnızca sınıf ekranının gösterdikleri saklanır, o da yalnızca bu bilgisayarda. **Çıkış yap** bunları siler; bu bilgisayarda başka bir öğretmenin giriş yapması da. 7 gün boyunca bağlantı olmazsa artık kullanılmaz.
+- **Güncellemeler.** Sınıf Pusulası'nın yeni bir sürümü kurulduğunda bu bilgisayar ona sakin bir anda (ekranda ders yokken) geçer, asla bir dersin ortasında değil.
+
 ### Dersi bitirin
 
 **Dersi bitir**'e basın. Modüllere göre şu adımlardan geçersiniz:

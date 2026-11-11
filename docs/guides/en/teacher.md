@@ -93,6 +93,16 @@ If you do not want this, switch off **Full screen during lessons** in **Profile 
 
 A lesson keeps running when you refresh the page or switch to another class and back. A class with a running lesson is marked **Lesson in progress**. If the Wi-Fi drops, your taps are kept on the device and sent later; the save status shows **Offline – N changes waiting**. Anything the server could not save appears under **Needs attention** with **Try again** and **Dismiss**.
 
+### Without a connection
+
+If you have opened the classroom on a computer before (in the last 7 days), it also opens there with no connection, after a reload or after closing and reopening the browser. It shows your classes, the students' names and avatars and the lesson as this computer saved them last, with the note **No connection. This screen shows what this device saved last; changes wait here and are sent when the connection returns.**
+
+- **Start a lesson offline.** Press **Start lesson** and go through the steps as usual. The start cannot reach the server yet, so you see **Lesson start saved** with your class: the start is kept on this computer and sent as soon as the connection returns, and the lesson begins then. Until then the board waits: attendance, points and the timer can be used once the lesson has begun. While you are still offline, **Do not start** takes the start back.
+- **During a lesson** taps, attendance and the timer keep working when the Wi-Fi drops (see above); everything is sent in order when the connection returns.
+- **What needs a connection:** the teacher area (reports, setup, notes, Profile and PIN), signing in, the student page, and pictures you have not seen on this computer before. The PIN cannot be checked offline, so the teacher area stays locked.
+- **Privacy.** Only what the classroom screen shows is kept, and only on this computer. **Sign out** deletes it, and so does another teacher signing in on this computer; after 7 days without a connection it is not used any more.
+- **Updates.** When a new version of Class Compass is installed, this computer switches to it at a quiet moment (no lesson on screen), never in the middle of a lesson.
+
 ### End a lesson
 
 Press **End lesson**. Depending on the modules, you go through:
