@@ -126,7 +126,9 @@ The full technical description (every colour, the limits, the drawing rules, a w
 3. Check the preview exactly as a teacher does (Teacher guide, "Importing a student list"): the columns, the flagged rows and the students who may already exist. Then confirm.
 4. The class count goes up. Do the next class.
 
-One file is read into one class. If your e-Okul export holds several classes, export one list per class or read the same file once for each class: when the file has a class column, rows of other classes are marked **Listed in another class** and skipped.
+**A list with several classes** (for example one e-Okul export of the whole school with a class column): turn on **This list has several classes** before you read it. **Classes in this list** then shows every class of the file in one preview: how it is written in the list (3/A, 3-A, 3 A and "3. Sınıf / A Şubesi" count as the same class), how many rows it has, and which class it was recognised as. A class the school does not have is marked **Not one of your classes**: choose a class for it under **Import into**, or leave **Skip these rows**. Press **Make previews for N classes**; then **Check each class** lists one preview per class. Check and confirm each class as above; each one has its own report, its own line in the history and its own **Undo import**. With the switch off, a file is read into one class as before and rows of other classes are marked **Listed in another class** and skipped.
+
+**Web-page .xls files**: some school systems save a list as a web page with a .xls name. It is read like a workbook (only the text of its table; nothing in the page is opened or run), and the preview says so. Other files that are not real workbooks are still refused.
 
 The history below lists **All imports in the school** with who made each one. **Undo import** removes what an import added, as for teachers. Teachers do not see the imports an administrator made and cannot undo them; they simply find the students in their class. Every import and undo is in the audit log under your name.
 

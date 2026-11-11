@@ -371,6 +371,10 @@ Sayfanın adresi sınıfı, öğrenciyi, görünümü ve süreyi her zaman içer
 4. **Listeyi kontrol edin**: **Sütunlar** altında hangi sütunun ad, numara ya da sınıf olduğunu kontrol edin. Dikkat isteyen satırlar işaretlenir (örneğin "Mevcut bir öğrenci olabilir"). Her biri için **Yeni öğrenci olarak ekle**, **Mevcut öğrenci** ya da **Atla**'yı seçin.
 5. **Onayla: N ekle, M eşleştir**'e ya da **Sonra devam et**'e basın.
 
+**Birden fazla sınıflı liste** (sınıf sütunu olan bir okul listesi): önce **Bu listede birden fazla sınıf var** seçeneğini açın. **Bu listedeki sınıflar** dosyadaki her sınıfı satır sayısıyla gösterir. Kendi sınıflarınız nasıl yazılmış olursa olsun tanınır (3/A, 3-A, 3 A, "3. Sınıf / A Şubesi"); diğer sınıflar **Sınıflarınızdan biri değil** diye işaretlenip atlanır, çünkü yalnızca derse girdiğiniz sınıflara aktarabilirsiniz. **N sınıfın önizlemesini hazırla**'ya basın, sonra her sınıfı **kontrol edip** yukarıdaki gibi onaylayın. Her sınıfın kendi raporu ve kendi **Aktarmayı geri al** düğmesi vardır.
+
+Aslında bir web sayfası olan .xls dosyası da (bazı okul sistemleri listeleri böyle kaydeder) okunur: yalnızca tablosundaki yazılar.
+
 Dosyalar yalnızca okulun kendi sunucusunda okunur. Fotoğraflar metin tanıma ile okunur ve hata olabilir: her satırı kontrol edin. Adlar tam yazıldığı gibi saklanır. **Önceki aktarmalar** aktarmalarınızı listeler; **Aktarmayı geri al** (sınıfın adını yazarak) bir aktarmanın eklediği öğrencileri siler ya da o zamandan beri onlar için bir şey kaydedildiyse pasifleştirir.
 
 ## Öğretmen alanının diğer sayfaları

@@ -371,6 +371,10 @@ On the **Students** page you can add a student to your class, add a photo (only 
 4. **Check the list**: under **Columns**, check which column holds the name, number or class. Rows that need attention are marked (for example "Possibly an existing student"). For each such row choose **Add as new student**, **Existing student** or **Skip**.
 5. Press **Confirm: add N, link M**, or **Continue later**.
 
+**A list with several classes** (a school list with a class column): turn on **This list has several classes** first. **Classes in this list** shows each class of the file with its number of rows. Your own classes are recognised however they are written (3/A, 3-A, 3 A, "3. Sınıf / A Şubesi"); other classes are marked **Not one of your classes** and skipped, because you can only import into the classes you teach. Press **Make previews for N classes**, then **Check** each class and confirm it as above. Each class has its own report and its own **Undo import**.
+
+A .xls file that is really a web page (some school systems save lists like that) is read too: only the text of its table.
+
 Files are read on the school's own server only. Photos are read with text recognition, which can make mistakes: check every row. Names are kept exactly as written. **Earlier imports** lists your imports; **Undo import** (type the class name) removes the students an import added, or deactivates them if something has been recorded for them since.
 
 ## Other teacher pages
