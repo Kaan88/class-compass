@@ -3,6 +3,7 @@
  * - A badge given in class through the outbox shows the "Celebrate" moment on the display, then the
  *   student's phone shows the badge with a one-time celebration.
  * - A student picks an avatar on the phone; it appears on their classroom card. axe on the creator at 375×812.
+ * - S25a (D-185): a group shown in the lesson ticks its members in the award dialog in one tap.
  */
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
@@ -128,6 +129,78 @@ test('a student chooses an avatar on the phone and it appears on their classroom
     await page.getByRole('button', { name: /3-A · English/ }).click();
     const card = page.locator('article.cc-student-card', { hasText: student.fullName }).first();
     await expect(card.locator('.cc-avatar--art[data-avatar="person"]')).toBeVisible();
+  } finally {
+    await endActiveLessons(page);
+  }
+});
+
+test('a group of this lesson ticks its members in the award dialog in one tap (S25a, D-185, UX-8, GRP-7)', async ({ page }) => {
+  test.skip(test.info().project.name === 'mobile', 'checked once, on the display project');
+  test.setTimeout(120_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  await endActiveLessons(page);
+  const ctx = await context3A(page);
+  const started = await api(page, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'lesson.start', contextId: ctx.id, payload: { contextId: ctx.id, othersPresent: true } }] });
+  expect(started.body.results[0].ok).toBe(true);
+  try {
+    const lessonId = ((await api(page, 'GET', '/api/classroom/lessons/active')).body.lessons as Array<{ contextId: string; lessonId: string }>).find((l) => l.contextId === ctx.id)!.lessonId;
+    const arrangements = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/grouping/arrangements`)).body.arrangements as Array<{ id: string }>;
+    expect(arrangements.length, 'a saved grouping option').toBeGreaterThan(0);
+    const applied = await api(page, 'POST', '/api/commands', {
+      commands: [{ opId: randomUUID(), type: 'grouping.apply', contextId: ctx.id, lessonId, payload: { contextId: ctx.id, lessonId, templateId: arrangements[0]!.id } }],
+    });
+    expect(applied.body.results[0].ok, JSON.stringify(applied.body.results[0])).toBe(true);
+    type Group = { name: { en?: string }; members: Array<{ fullName: string }> };
+    const state = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/lesson`)).body as { grouping: { groups: Group[] } };
+    const shown = state.grouping.groups.filter((g) => g.members.length > 0);
+    const group = shown[0]!;
+    const members = group.members.map((m) => m.fullName);
+
+    await page.goto('/classroom');
+    await page.getByRole('button', { name: /3-A · English/ }).click();
+    const view = await openDock(page, 'achievements');
+    await view.getByTestId('achievements-give').click();
+    const dialog = page.getByTestId('achievements-dialog');
+    await expect(dialog.getByTestId('achievements-groups')).toBeVisible();
+    await expect(dialog.getByTestId('achievements-group')).toHaveCount(shown.length);
+    const button = dialog.getByTestId('achievements-group').filter({ hasText: group.name.en! }).first();
+    await expect(button).toHaveAttribute('aria-pressed', 'false');
+    await expect(button).toContainText(members.length === 1 ? '1 student' : `${members.length} students`);
+    const checked = () => dialog.getByTestId('achievements-student').evaluateAll((els) => els.filter((e) => (e as HTMLInputElement).checked).map((e) => e.closest('label')!.textContent!.trim()));
+    // One tap ticks every member of the group, and nobody else ...
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect((await checked()).sort()).toEqual([...members].sort());
+    await expect(dialog.getByTestId('achievements-confirm')).toHaveText(`Give to ${members.length}`);
+    // ... a second tap unticks them; a student ticked by hand stays ticked.
+    const other = dialog
+      .locator('.cc-achievements-students label')
+      .filter({ hasNotText: new RegExp(members.map((m) => m.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')).join('|'), 'u') })
+      .first();
+    await other.getByTestId('achievements-student').check();
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(await checked()).toHaveLength(1);
+    await button.click();
+    expect(await checked()).toHaveLength(members.length + 1);
+    const axe = await new AxeBuilder({ page }).include('[data-testid="achievements-groups"]').analyze();
+    expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
+    // Given quietly to the group and the other student: one award command for exactly those students
+    // (the server skips anyone who already had the achievement from an earlier spec).
+    const roster = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/roster`)).body.students as Array<{ id: string; fullName: string }>;
+    const otherName = (await other.innerText()).trim();
+    const expected = roster.filter((s) => members.includes(s.fullName) || s.fullName === otherName).map((s) => s.id).sort();
+    expect(expected).toHaveLength(members.length + 1);
+    const sent = page.waitForRequest((r) => r.url().endsWith('/api/commands') && r.method() === 'POST' && (r.postData() ?? '').includes('achievements.award'));
+    await dialog.getByTestId('achievements-celebrate').uncheck();
+    await dialog.getByTestId('achievements-badge').first().click();
+    await dialog.getByTestId('achievements-confirm').click();
+    await expect(dialog).toHaveCount(0);
+    const body = (await sent).postDataJSON() as { commands: Array<{ type: string; payload: { studentIds: string[] } }> };
+    expect(body.commands.find((c) => c.type === 'achievements.award')!.payload.studentIds.sort()).toEqual(expected);
+    await expect(view.getByTestId('achievements-note')).not.toBeEmpty();
+    await closeDock(page, 'achievements');
   } finally {
     await endActiveLessons(page);
   }

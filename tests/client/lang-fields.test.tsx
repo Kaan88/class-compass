@@ -6,6 +6,8 @@
  * languages of the class being edited (all of the teacher's classes for a routine "for all classes").
  * Fictional data only.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -199,5 +201,21 @@ describe('Goals library: labels stored per subject and teacher (S20d review fix,
     cleanup();
     wrap(qc, <Show id="m-tr" />);
     expect(screen.getByTestId('locales').textContent).toBe('tr');
+  });
+});
+
+describe('a readable width (S25a, D-185)', () => {
+  it('the group names its number of fields, and app.css caps each field and the group at about 40 characters', () => {
+    wrap(client(), <Harness locales={['tr']} initial={{ en: 'Not yet', tr: '' }} />);
+    expect(screen.getByTestId('lf').getAttribute('data-count')).toBe('1');
+    cleanup();
+    wrap(client(), <Harness locales={['en', 'tr']} initial={{ en: 'Not yet', tr: 'Henüz değil' }} />);
+    expect(screen.getByTestId('lf').getAttribute('data-count')).toBe('2');
+    // jsdom has no layout: check the rules themselves (the width is measured at 1920 px in e2e/lang-fields-width.spec.ts).
+    const css = readFileSync(resolve('src/client/styles/app.css'), 'utf8');
+    const maxWidth = (sel: string) => new RegExp(`${sel.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\s*\\{[^}]*?max-width:\\s*([^;]+);`, 'u').exec(css)?.[1]?.trim();
+    expect(maxWidth(".cc-langfields[data-count='1']")).toBe('40ch');
+    expect(maxWidth(".cc-langfields:not([data-count='1'])")).toBe('calc(80ch + 0.75rem)');
+    expect(maxWidth('.cc-langfields__one')).toBe('40ch');
   });
 });

@@ -8,7 +8,7 @@
  * Covered: the student page's home tiles, subject switch, New goal categories, evidence kinds and
  * How is it going? faces (S14d), the avatar family buttons (S17c), the teacher menu grid and the attendance status segments (teacher
  * area), the topic choices (Start Lesson), the group options (group screen, opened from the board's
- * dock), the board's dock itself (S14b) and the lesson reflection (End Lesson). S14e3: no page of the
+ * dock), the board's dock itself (S14b), the lesson's groups in the award dialog (S25a) and the lesson reflection (End Lesson). S14e3: no page of the
  * teacher menu scrolls sideways at 375 px with 200 % text (second test). Fictional demo data only; the
  * class language and profile language are put back.
  */
@@ -200,6 +200,21 @@ test('choice buttons fit at 375/768/1280 px, in English and Turkish, at 100 % an
       await checkAll(d, '[data-testid="group-options"]', `${lang} group options`);
       await d.keyboard.press('Escape');
       await expect(d.getByTestId('dock-view-groups')).toHaveCount(0);
+
+      // S25a (D-185): the lesson's groups as a shortcut in the award dialog.
+      const lessonId = ((await api(d, 'GET', '/api/classroom/lessons/active')).body.lessons as Array<{ contextId: string; lessonId: string }>).find((l) => l.contextId === c3a.id)!.lessonId;
+      const options = (await api(d, 'GET', `/api/classroom/contexts/${c3a.id}/grouping/arrangements`)).body.arrangements as Array<{ id: string }>;
+      expect(
+        (await api(d, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type: 'grouping.apply', contextId: c3a.id, lessonId, payload: { contextId: c3a.id, lessonId, templateId: options[0]!.id } }] })).body.results[0].ok,
+      ).toBe(true);
+      const awards = await openDock(d, 'achievements');
+      await awards.getByTestId('achievements-give').click();
+      await expect(d.getByTestId('achievements-groups')).toBeVisible();
+      await checkAll(d, '.cc-achievements-groups__list', `${lang} award dialog groups`);
+      await d.keyboard.press('Escape');
+      await expect(d.getByTestId('achievements-dialog')).toHaveCount(0);
+      await d.keyboard.press('Escape');
+      await expect(d.getByTestId('dock-view-achievements')).toHaveCount(0);
 
       await d.getByRole('button', { name: T('lesson.end'), exact: true }).first().click();
       await expect(d.getByTestId('end-lesson').locator('.cc-reflect')).toBeVisible();

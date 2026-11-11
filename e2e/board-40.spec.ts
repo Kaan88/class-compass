@@ -26,7 +26,9 @@
  * does not size the cards) the classes of 8 and 19 (with marks) keep names whole and the + button a
  * touch target (S22c review); S23b (D-183): with the small mark pills a phone card stays under 120 px
  * (before: about 164 px) and the short displays (1536×703@1.25, 1366×768) show at least 16 whole
- * cards with marks (before: 14). Axe on the student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
+ * cards with marks (before: 14). S25a (D-185): in the narrowest layout (`tight`, checked at
+ * 1536×703@1.25 with 40 students) every mark sits on the count's line (icon and number only), and a
+ * class of 40 with marks passes the phone checks at 375 px. Axe on the student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
  */
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -178,6 +180,26 @@ async function overlaps(page: Page) {
           if (x > 1 && y > 1) out.push(`${name}: ${a} overlaps ${b}`);
         }
       return out;
+    }),
+  );
+}
+
+/**
+ * S25a (D-185): marks that are not on the count's line (their middle outside the count's box) on the
+ * cards that show a count.
+ */
+async function marksOffCountLine(page: Page) {
+  return page.locator('.cc-student-card').evaluateAll((cards) =>
+    cards.flatMap((card) => {
+      const count = card.querySelector('.cc-student-card__count')?.getBoundingClientRect();
+      if (!count) return [];
+      return [...card.querySelectorAll<HTMLElement>('.cc-student-card__mark')]
+        .filter((m) => {
+          const r = m.getBoundingClientRect();
+          const mid = (r.top + r.bottom) / 2;
+          return mid < count.top || mid > count.bottom;
+        })
+        .map((m) => `${card.getAttribute('aria-label')}: mark ${m.dataset.mark} on its own line`);
     }),
   );
 }
@@ -361,7 +383,9 @@ async function checkMarks(p: Page, cls: TestClass, label: string) {
   await expect(card(0).locator('[data-mark="group"]')).toHaveAttribute('aria-label', /^In group \d+$/u);
   await expect(p.locator('[data-mark="group"]')).toHaveCount(cls.size);
   await settle(p);
-  return checkBoard(p, cls, label);
+  const seen = await checkBoard(p, cls, label);
+  if (seen.step === 'tight') expect(await marksOffCountLine(p), `${label}: marks on the count's line in tight`).toEqual([]);
+  return seen;
 }
 
 /**
@@ -419,9 +443,11 @@ for (const classSize of CLASS_SIZES) {
                 // S23b (D-183): the small pills join the count's line, so the marks cost no row on the
                 // short displays (16 whole cards as without marks; 14 before).
                 if (size.name === '1536x703@1.25' || size.name === '1366x768') expect(seen.visible, `${label}: whole cards with marks`).toBeGreaterThanOrEqual(16);
+                // S25a (D-185): the measured classroom display shows a class of 40 in `tight`, where the marks share the count's line.
+                if (classSize === 40 && size.name === '1536x703@1.25') expect(seen.step, `${label}: the narrowest layout`).toBe('tight');
               }
               await setDensity(p, 'Normal');
-              if (classSize === 19 && size === SIZES[0]) await checkPhone(browser, cls, `${PHONE.name} 19 marks`);
+              if ((classSize === 19 || classSize === 40) && size === SIZES[0]) await checkPhone(browser, cls, `${PHONE.name} ${classSize} marks`);
               continue;
             }
             const label = `${size.name} ${classSize} Normal`;

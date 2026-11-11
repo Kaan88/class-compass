@@ -2984,6 +2984,19 @@ html:has(.cc-classroom) {
 }
 .cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta {
   align-self: center;
+  gap: 0.2rem;
+}
+/* S25a (D-185): in `tight` the marks are their icon and number only (no pill edge or padding; the
+   accessible name is unchanged) and come right after the count, so they share its line; the level chip
+   (or a notice) takes the next line when the line is full. The DOM order, and so the reading order,
+   stays count, level, marks. */
+.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__mark {
+  gap: 0.05em;
+  padding: 0;
+  border: none;
+}
+.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta > :is(.cc-level, .cc-student-card__notice) {
+  order: 1;
 }
 .cc-lesson-board .cc-student-card__name {
   line-height: 1.12;
@@ -4333,6 +4346,15 @@ html:has(.cc-classroom) {
   gap: 0.3rem;
   min-width: min(18rem, 100%);
   flex: 1;
+  max-width: 40ch;
+}
+/* S25a (D-185): a readable maximum width. The group is never wider than its fields (one field, or two
+   side by side with the gap), so in a row it stops taking the free width and its neighbour stays close. */
+.cc-langfields[data-count='1'] {
+  max-width: 40ch;
+}
+.cc-langfields:not([data-count='1']) {
+  max-width: calc(80ch + 0.75rem);
 }
 /* Language fields in a row of other controls (routine stages, homework statuses, S20d) take the free width. */
 .cc-row > .cc-langfields {
@@ -5863,6 +5885,31 @@ li > .cc-admin-list {
 .cc-badge-choice:focus-visible {
   outline: 3px solid var(--cc-focus);
   outline-offset: 2px;
+}
+/* S25a (D-185): the lesson's groups as a shortcut in the award dialog (a tap ticks the group's members). */
+.cc-achievements-groups {
+  gap: 0.3rem;
+}
+.cc-achievements-groups__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.4rem;
+}
+.cc-achievements-groups__list .cc-btn {
+  min-width: 0;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  white-space: normal;
+  text-align: start;
+}
+.cc-achievements-groups__list .cc-btn[aria-pressed='true'] {
+  background: var(--cc-accent-soft);
+  border-color: var(--cc-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.cc-achievements-groups__list .cc-btn[aria-pressed='true'] .cc-muted {
+  color: inherit;
 }
 .cc-achievements-students {
   display: grid;

@@ -1,6 +1,7 @@
 /**
  * Achievements on the classroom screen (S13c items 5 and 7, D-122):
- * - "Give a badge": choose students (or the whole class), choose a badge the teacher gives by hand,
+ * - "Give a badge": choose students (or the whole class, or S25a (D-185) one of the groups shown in
+ *   this lesson: one tap ticks its members), choose a badge the teacher gives by hand,
  *   and it is saved through the outbox ('achievements.award', no PIN, works offline). When the teacher
  *   leaves "Celebrate on the display" ticked, a full-screen moment then shows the badge and the names
  *   of the students who were awarded (not those who already had it); unticked, it is given quietly.
@@ -24,11 +25,12 @@ import { showToast, showUndoToast } from '../../lib/toast.ts';
 import { celebrate } from '../../themes/Celebration.tsx';
 import { playEvent } from '../../themes/index.tsx';
 import { BigButton, Button } from '../../ui/Button.tsx';
-import { IconStar, IconTrophy } from '../../ui/icons.tsx';
+import { IconCheck, IconStar, IconTrophy } from '../../ui/icons.tsx';
+import { GroupPicto } from '../../ui/pictos.tsx';
 import { PanelHead } from '../../ui/Layout.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Avatar } from '../../ui/Students.tsx';
-import { awaitCommand, useLessonRoster } from '../lessons/lessonClient.ts';
+import { awaitCommand, useLessonRoster, useLessonState } from '../lessons/lessonClient.ts';
 import { endStepUi, type ClassroomContext, type DashboardSlot, type DashboardSlotProps, type StudentCardAddon } from '../types.ts';
 import '../../../shared/i18n/areas/classroomCards.ts';
 
@@ -71,6 +73,7 @@ function AchievementsSlot({ context, lesson, presentation }: DashboardSlotProps)
   };
   const q = useClassroomAchievements(context.id, lesson.id);
   const roster = useLessonRoster(context.id, lesson.id).data?.students ?? [];
+  const groups = useLessonGroups(context.id, roster);
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [badgeId, setBadgeId] = useState<string | null>(null);
@@ -81,6 +84,9 @@ function AchievementsSlot({ context, lesson, presentation }: DashboardSlotProps)
   const badgeOf = (id: string) => data.badges.find((b) => b.id === id);
   const nameOf = (id: string) => roster.find((s) => s.id === id)?.fullName ?? '';
   const allPicked = roster.length > 0 && picked.length === roster.length;
+  /** A group is ticked when every member is; a tap ticks them all, or unticks them when all were. */
+  const groupPicked = (ids: readonly string[]) => ids.every((id) => picked.includes(id));
+  const toggleGroup = (ids: readonly string[]) => setPicked((p) => (groupPicked(ids) ? p.filter((x) => !ids.includes(x)) : [...p, ...ids.filter((x) => !p.includes(x))]));
 
   const give = async () => {
     if (!badgeId || !picked.length) return;
@@ -191,6 +197,23 @@ function AchievementsSlot({ context, lesson, presentation }: DashboardSlotProps)
             <input type="checkbox" checked={allPicked} onChange={(e) => setPicked(e.target.checked ? roster.map((s) => s.id) : [])} data-testid="achievements-whole-class" />
             <span>{t('achievements.wholeClass')}</span>
           </label>
+          {groups.length ? (
+            <div className="cc-stack cc-achievements-groups" role="group" aria-labelledby="cc-achievements-groups-title" data-testid="achievements-groups">
+              <span id="cc-achievements-groups-title" className="cc-muted">
+                {t('achievements.groupsTitle')}
+              </span>
+              <div className="cc-achievements-groups__list">
+                {groups.map((g) => (
+                  <Button key={g.id} aria-pressed={groupPicked(g.memberIds)} onPress={() => toggleGroup(g.memberIds)} data-testid="achievements-group">
+                    {groupPicked(g.memberIds) ? <IconCheck /> : null}
+                    <GroupPicto icon={g.icon} size="1.4em" />
+                    <span>{pickText(g.name, locale)}</span>
+                    <span className="cc-muted">{t('achievements.groupMembers', { count: g.memberIds.length })}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="cc-achievements-students">
             {roster.map((s) => (
               <label key={s.id} className="cc-tick cc-tick--choice">
@@ -254,6 +277,20 @@ function AchievementsSlot({ context, lesson, presentation }: DashboardSlotProps)
       </Modal>
     </section>
   );
+}
+
+/**
+ * S25a (D-185): the groups shown in this lesson (the grouping module's lesson groups in the polled lesson
+ * state: a saved option the teacher applied, shuffled or changed by hand), as a shortcut in the award
+ * dialog. Only members on the lesson roster count; a group with none is left out. Nothing while no
+ * groups are shown or the grouping module is off (the lesson state then has no groups). Classroom-safe:
+ * group names, icons and members only, as on the group screen (GRP-7).
+ */
+function useLessonGroups(contextId: string, roster: readonly { id: string }[]) {
+  const st = useLessonState(contextId).data?.data.grouping ?? null;
+  if (!st?.applied) return [];
+  const here = new Set(roster.map((s) => s.id));
+  return st.groups.map((g) => ({ id: g.id, name: g.name, icon: g.icon, memberIds: g.members.map((m) => m.id).filter((id) => here.has(id)) })).filter((g) => g.memberIds.length > 0);
 }
 
 export const achievementsDashboardSlot: DashboardSlot = { key: 'achievements', module: 'achievements', order: 130, dock: { Icon: IconTrophy, label: 'achievements.title' }, Component: AchievementsSlot };

@@ -9,6 +9,9 @@
  * goal categories, ready-made goals, own sentence starters and outcomes, arrangement, group and role
  * names). Field labels
  * name the language in the teacher's interface language ("Stage 1 (Turkish)").
+ * S25a (D-185): each field has a readable maximum width (about 40 characters), and the group is at
+ * most as wide as its fields, so a one-language field in a row (homework statuses, goal outcomes) no
+ * longer takes the whole free width on a wide screen and keeps its neighbour ("Counts as") beside it.
  */
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -68,7 +71,7 @@ export function LangFields({
   const { t } = useI18n();
   const missing = needsTranslation(value, { mainLanguage: locales[0] ?? 'en', secondLanguageEnabled: locales.length > 1 });
   return (
-    <div className="cc-langfields" data-testid={testId}>
+    <div className="cc-langfields" data-count={locales.length} data-testid={testId}>
       {locales.map((l, i) => (
         <div key={l} className="cc-langfields__one" data-lang={l}>
           <TextField
