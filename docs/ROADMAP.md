@@ -458,14 +458,14 @@ Decision D-184; migration 0029.
 - [x] Tests: `tests/server/avatar-pictures.test.ts`, `tests/client/picture-editor.test.tsx`, `tests/scripts/docker.test.ts`, `e2e/avatar-uploads.spec.ts` (axe at 375 px and 1536×703)
 - [x] Review fixes: approved pictures kept out of the goals clean-up of loose uploads (stored as uploaded by the system; dead rows swept), nothing shown while the school switch is off (admin list without images), students without a class in the admin list, Mirror after a quarter turn, the HEIC message, the saved-for-later note, no entry for a class that does not take pictures, slider touch size, Turkish "Net görünmüyor"
 - [ ] The editor and the teacher check tried on real phones and tablets, with real camera-roll pictures (owner)
-- [ ] Guide screenshots of the new screens (`npm run docs:screenshots` after the next screenshot pass)
+- [x] Guide screenshots of the new screens (S25-verify, 2026-11-11, `npm run docs:screenshots`): student "Use my own picture", the editor and the waiting status (a picture drawn by the script), teacher Avatar pictures, Admin → Modules and media → Photos and media, Super Speakers "Show students' own pictures"; the Avatars picture retaken; student, teacher, admin and Super Speakers guides EN/TR
 
 ## S25a Polish: readable language fields, card marks in `tight`, a group shortcut in the award dialog (2026-11-11)
 
 - [x] Language fields with a readable maximum width (about 40 characters each, the group no wider than its fields), one and two languages, phones unchanged (closes the S22d "Found by the crawl" box; `e2e/lang-fields-width.spec.ts`, `tests/client/lang-fields.test.tsx`)
 - [x] Card marks on the count's line in the `tight` layout: icon and number only, the level chip (and an attendance chip such as Late) on the next line beside the + button; checked at 1536×703@1.25 with 40 students (also with Late students) and at 375 px (closes the S23b box; `e2e/board-40.spec.ts`)
 - [x] The award dialog ticks a group of this lesson in one tap (closes the saved-group half of the S13c themes/badges box; `e2e/achievements-avatars.spec.ts`, `e2e/button-groups.spec.ts`); teacher guide EN/TR
-- [ ] Guide screenshots of the award dialog with its group buttons (`npm run docs:screenshots` in the next screenshot pass)
+- [x] Guide screenshots of the award dialog with its group buttons (S25-verify, 2026-11-11: `award-dialog.png`, a group of the lesson ticked; teacher guide EN/TR)
 
 Decision D-185; no migration.
 
@@ -476,7 +476,7 @@ Decision D-187; migration 0030 (`level_lists`).
 - [x] Server and solver: `PUT /api/teacher/contexts/:contextId/grouping/level-list` (teacher, owner, writable class, grouping on, audited, duplicates refused), `levelList` in the grouping overview, `levelRanks(levels, list)` / `levelOrder`; the list is in the GRP-7 classroom scan
 - [x] Tests: `tests/domain/grouping.test.ts`, `tests/server/grouping.test.ts`, `tests/client/level-list.test.tsx`, `e2e/level-list.spec.ts` (axe); teacher guide EN/TR
 - [x] Review fixes: the own level outside the list can be picked again after a slip; case / accent variants of a level are one row and one list entry; "make a list" says when levels beyond 20 were left out; an archived class refuses the list (tested)
-- [ ] Guide screenshot of the Levels tab with a list (`npm run docs:screenshots` after the next screenshot pass)
+- [x] Guide screenshot of the Levels tab with a list (S25-verify, 2026-11-11: `grouping-levels.png`, the guide's example list set only inside the script; teacher guide EN/TR)
 
 ## S25d Lesson goals per class (optional) (roadmap sweep, 2026-11-11)
 Decision D-188; migration 0031.
@@ -487,7 +487,7 @@ Decision D-188; migration 0031.
 - [ ] Owner to confirm the reading of "per class (optional)" (D-188): opt-in per class+subject, one sentence per lesson, three answers
 - [ ] The goal on the routine's "Learning goal" stage and on the "Lesson saved" summary; a demo history generator (not built, D-188)
 - [ ] Tried in a real lesson on the classroom display (owner, Sare)
-- [ ] Guide screenshots of the new step, box and review (`npm run docs:screenshots` after the next screenshot pass)
+- [x] Guide screenshots of the new step, box and review (S25-verify, 2026-11-11: `start-lesson-goal.png`, `classroom-goal.png`, `end-lesson-goal.png`, Lesson goals on only inside the script; the classroom, card, Customise layout and Start lesson pictures retaken with the goal; teacher guide EN/TR)
 
 ## S25b School holiday calendar for coverage and week maths (wave S25, 2026-11-11)
 Decision D-186; migration 0032 (`school_closures`).
@@ -498,7 +498,7 @@ Decision D-186; migration 0032 (`school_closures`).
 - [x] Tests: `tests/domain/holidays.test.ts`, `tests/server/holidays.test.ts`, `tests/server/seed-history.test.ts`, `e2e/holidays.spec.ts`
 - [x] Review fixes: a period or current week of only closures reads "no school" in every count (attendance, goals confidence history, usage); attendance recorded on a closure day stays out of every attendance table; an assistant planned before the day became a closure is not shown, thanked or counted; the public-holiday message in singular and plural
 - [ ] Half days (the afternoon of 28 October, the eves of the religious holidays): out of scope
-- [ ] Guide screenshot of the new page (with the next screenshot pass)
+- [x] Guide screenshot of the new page (S25-verify, 2026-11-11: `admin-holidays.png` with the demo year's public holidays; admin home and accounts retaken with the new menu entry; admin guide EN/TR)
 
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
@@ -519,10 +519,10 @@ Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in t
 - [x] Super Speakers (EN, TR): administrator guide, one-page scorer guide (Android and iPhone install, pairing code, undo, offline), one-page board-screen setup guide
 - [x] Student and parent guide (EN, TR): child-level page guide and a KVKK-aware privacy part for parents, only what the app does
 - [x] Index (`docs/guides/README.md`) and a one-page quick start per role (teacher, administrator, student; the scorer guide is the scorer's quick start)
-- [x] Screenshots from the fictional demo school with demo history, EN and TR (44 each since S14i, palette PNG), made by a separate Playwright script: `npm run docs:screenshots` (not part of `npx playwright test`)
+- [x] Screenshots from the fictional demo school with demo history, EN and TR (44 each since S14i, 58 since S25-verify, palette PNG), made by a separate Playwright script: `npm run docs:screenshots` (not part of `npx playwright test`)
 - [x] In-app Help: Help link in the teacher menu and nav, the admin top bar, the student page and the scorer app; opens the guide in the interface language with an EN/TR switch; rendered by a small Markdown subset renderer without HTML (no innerHTML, no remote images or links), bundled at build time
 - [x] Tests: every guide in both languages, every guide link, anchor and image exists, every screenshot used and small (`tests/docs`); Help renders EN and TR for teacher, admin and student and passes axe (`e2e/help.spec.ts`)
 - [ ] Read through by the owner and a Turkish-speaking teacher (wording, anything unclear for colleagues)
 - [x] Administrators set their Maintenance PIN in Profile (asked by "Back up now" and "Verify the latest backup"); the admin guide is updated (D-138)
 - [x] The sign-in pages have an English | Türkçe switch, remembered per device; without a choice they follow a Turkish browser, then the school's language for new accounts; the Turkish teacher guide quotes the Turkish labels (D-142)
-- [ ] Re-run `npm run docs:screenshots` after visible UI changes (standing rule, no automatic check that the pictures are current; last full run S21, 2026-11-11 on main after S17–S21: 34 of 44 pictures per language changed and were committed)
+- [ ] Re-run `npm run docs:screenshots` after visible UI changes (standing rule, no automatic check that the pictures are current; last full run S25-verify, 2026-11-11 on main after S22–S25: 12 new pictures per language (58 each); of the 46 existing, 7 per language had real UI changes and were committed, the rest differed only by run data or a 1 px shift and were put back)
