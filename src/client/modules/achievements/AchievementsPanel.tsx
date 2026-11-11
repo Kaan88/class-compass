@@ -29,7 +29,7 @@ import { PanelHead } from '../../ui/Layout.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { awaitCommand, useLessonRoster } from '../lessons/lessonClient.ts';
-import { endStepUi, type DashboardSlot, type DashboardSlotProps } from '../types.ts';
+import { endStepUi, type ClassroomContext, type DashboardSlot, type DashboardSlotProps, type StudentCardAddon } from '../types.ts';
 
 export const achievementsKey = (contextId: string, lessonId?: string) => ['classroom', 'achievements', contextId, lessonId ?? null] as const;
 
@@ -46,8 +46,8 @@ const TIER_KEY: Record<AchievementTier, 'achievements.tier.bronze' | 'achievemen
   none: 'achievements.tier.none',
 };
 
-function useClassroomAchievements(contextId: string, lessonId?: string) {
-  return useQuery({ queryKey: achievementsKey(contextId, lessonId), queryFn: () => call(classroomAchievements, { contextId, ...(lessonId ? { lessonId } : {}) }), refetchInterval: 30_000 });
+function useClassroomAchievements(contextId: string, lessonId?: string, enabled = true) {
+  return useQuery({ queryKey: achievementsKey(contextId, lessonId), queryFn: () => call(classroomAchievements, { contextId, ...(lessonId ? { lessonId } : {}) }), refetchInterval: 30_000, enabled });
 }
 
 type Moment = { badgeId: string; studentIds: string[]; names: string[]; awardIds: string[] };
@@ -279,3 +279,27 @@ function WellDoneStep({ lesson }: { lesson: LessonState }) {
 }
 
 export const achievementsEndStepUi = endStepUi<Record<string, never>>({ key: 'achievementsWellDone', title: 'achievements.wellDoneTitle', initial: () => ({}), Component: WellDoneStep });
+
+/**
+ * S22c (D-177): this lesson's achievements on each classroom student card: a trophy and the number of
+ * achievements the student was given in this lesson ("2 achievements this lesson"). Only what was
+ * given in class (the lesson's manual awards, the list the panel's Undo uses); automatic achievements
+ * are kept for the End Lesson "Well done!" moment or come quietly, so they are not counted here.
+ * Nothing on a card without one (never a zero) and nothing while the module is off.
+ */
+function useAchievementCards(context: ClassroomContext, lesson: LessonState, enabled: boolean) {
+  const { t } = useI18n();
+  const q = useClassroomAchievements(context.id, lesson.id, enabled);
+  if (!enabled || !q.data?.enabled) return null;
+  const counts = new Map<string, number>();
+  for (const a of q.data.lessonAwards) counts.set(a.studentId, (counts.get(a.studentId) ?? 0) + 1);
+  if (counts.size === 0) return null;
+  return {
+    cardProps: (studentId: string) => {
+      const n = counts.get(studentId);
+      return n ? { marks: [{ key: 'achievements', Icon: IconTrophy, value: String(n), label: t('achievements.cardCount', { count: n }) }] } : {};
+    },
+  };
+}
+
+export const achievementsCardAddon: StudentCardAddon = { key: 'achievements', module: 'achievements', useAddon: useAchievementCards };

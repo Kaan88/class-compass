@@ -3,7 +3,7 @@
  * CounterBar, MetricCell. Designed for 18–20 cards on one 1920×1080 classroom screen; a compact
  * density kicks in automatically for larger classes (34+).
  */
-import { useState, type CSSProperties } from 'react';
+import { useState, type ComponentType, type CSSProperties } from 'react';
 import { Button as RACButton } from 'react-aria-components';
 import { isAway, type EffectiveAttendance } from '../../domain/attendance.ts';
 import { generatedAvatar, type AvatarSpecValue } from '../../shared/avatars.ts';
@@ -77,6 +77,20 @@ export function LevelChip({ level }: { level: CountLevel }) {
   );
 }
 
+/**
+ * S22c (D-177): a small positive mark a module puts on a classroom card (this lesson's achievements,
+ * the group number): an icon and a short value, read out as `label` (never colour alone). Modules
+ * add marks through their card add-on (`StudentCardExtras.marks`), so the card never names a module.
+ */
+export interface StudentCardMark {
+  key: string;
+  Icon: ComponentType;
+  /** Short visible value, e.g. "2" or "3". */
+  value: string;
+  /** Accessible name, e.g. "2 achievements this lesson". */
+  label: string;
+}
+
 export interface StudentCardData {
   id: string;
   fullName: string;
@@ -116,6 +130,7 @@ export function StudentCard({
   periodLabel,
   addLabel,
   notice,
+  marks,
   onOpen,
 }: {
   student: StudentCardData;
@@ -131,6 +146,8 @@ export function StudentCard({
   /** Short message shown on the card, e.g. the double-tap guard (announced politely). */
   notice?: string | null;
   absent?: boolean;
+  /** S22c (D-177): the modules' marks (icon + value), shown with the count under the name. */
+  marks?: readonly StudentCardMark[];
   /** Effective attendance for the lesson; absent/excused render the card as away. */
   attendance?: EffectiveAttendance;
   onAdd?: () => void;
@@ -175,6 +192,12 @@ export function StudentCard({
             {level !== undefined ? <LevelChip level={level} /> : null}
           </>
         ) : null}
+        {marks?.map(({ key, Icon, value, label }) => (
+          <span key={key} className="cc-student-card__mark" role="img" aria-label={label} data-mark={key}>
+            <Icon />
+            {value}
+          </span>
+        ))}
         {notice ? (
           <span className="cc-student-card__notice" role="status">
             {notice}

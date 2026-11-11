@@ -1245,6 +1245,7 @@ export const tr = {
   'grouping.leftClass': 'Sınıftan ayrılan öğrenci',
   'grouping.levelChip': 'Seviye {level}',
   'grouping.groupN': 'Grup {n}',
+  'grouping.cardGroup': '{n}. grupta',
   'grouping.groupName': 'Grup adı',
   'grouping.roleOf': '{name} için görev',
   'grouping.roleHint': 'Görevler isteğe bağlıdır, örneğin Lider, Yazıcı, Sözcü veya Zaman tutucu.',
@@ -2610,6 +2611,9 @@ export const tr = {
   // S13c: achievements, avatars, kind words check
   'module.achievements': 'Başarılar',
   'achievements.title': 'Başarılar',
+  'achievements.cardCount': 'Bu derste {count} başarı',
+  'achievements.cardCount_one': 'Bu derste {count} başarı',
+  'achievements.cardCount_other': 'Bu derste {count} başarı',
   'teacher.achievements': 'Başarılar',
   'teacher.avatars': 'Avatarlar',
   'teacher.textChecks': 'Nazik sözcük denetimi',

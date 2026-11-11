@@ -15,6 +15,7 @@ import { StudentCard, StudentGrid } from '../../../ui/Students.tsx';
 import { slotForBox, useStudentCardAddons, type ClassroomContext, type StudentCardExtras } from '../../registry.ts';
 import { LessonTimer } from '../LessonTimer.tsx';
 import { useLessonRoster } from '../lessonClient.ts';
+import { CARD_FIT_EVENT, useCardFit } from './cardFit.ts';
 import { Dock } from './Dock.tsx';
 import { StudentCardDialog } from './StudentCardDialog.tsx';
 
@@ -48,11 +49,13 @@ export function useCardsBelow(sectionRef: RefObject<HTMLElement | null>, deps: r
     };
     measure();
     scroller.addEventListener('scroll', measure, { passive: true });
+    section.addEventListener(CARD_FIT_EVENT, measure);
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
     ro?.observe(scroller);
     ro?.observe(section);
     return () => {
       scroller.removeEventListener('scroll', measure);
+      section.removeEventListener(CARD_FIT_EVENT, measure);
       ro?.disconnect();
     };
   }, [sectionRef, ...deps]);
@@ -71,8 +74,20 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
   const students = roster.data?.students ?? [];
   const cardStudent = cardFor ? students.find((s) => s.id === cardFor) : undefined;
   const addons = useStudentCardAddons(context, lesson);
-  const extrasFor = (id: string, name: string): StudentCardExtras => Object.assign({}, ...addons.map((a) => a.cardProps(id, name))) as StudentCardExtras;
+  // Later add-ons replace a field of an earlier one, except the marks, which add up (S22c, D-177).
+  const extrasFor = (id: string, name: string): StudentCardExtras => {
+    const parts = addons.map((a) => a.cardProps(id, name));
+    const marks = parts.flatMap((p) => p.marks ?? []);
+    return { ...(Object.assign({}, ...parts) as StudentCardExtras), marks: marks.length ? marks : undefined };
+  };
+  const extras = new Map(students.map((s) => [s.id, extrasFor(s.id, s.fullName)]));
   const below = useCardsBelow(sectionRef, [gridOpen, students.length]);
+  // What changes a card's height (not a passing notice): the fit measures again when it changes.
+  const cardShape = students.map((s) => {
+    const e = extras.get(s.id)!;
+    return `${e.marks?.length ?? 0}${e.attendance ?? ''}${e.weeklyCount === undefined ? '' : 'c'}${e.onAdd ? '+' : ''}`;
+  });
+  useCardFit(sectionRef, [gridOpen, students.length, cardShape.join('|'), addons.some((a) => a.header)]);
   const showMore = () => {
     const scroller = sectionRef.current?.parentElement;
     scroller?.scrollBy({ top: Math.max(80, scroller.clientHeight * 0.8), behavior: motionAllowed(display) ? 'smooth' : 'auto' });
@@ -111,7 +126,7 @@ function StudentsBox({ context, lesson }: { context: ClassroomContext; lesson: L
         <div id="cc-student-grid" className="cc-students-box__grid">
           <StudentGrid count={students.length} label={t('lesson.studentCards')}>
             {students.map((s) => (
-              <StudentCard key={s.id} student={s} {...extrasFor(s.id, s.fullName)} onOpen={() => setCardFor(s.id)} />
+              <StudentCard key={s.id} student={s} {...extras.get(s.id)} onOpen={() => setCardFor(s.id)} />
             ))}
           </StudentGrid>
         </div>

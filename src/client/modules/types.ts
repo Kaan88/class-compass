@@ -16,6 +16,7 @@ import type { LessonCommandPayload, LessonState } from '../../shared/contracts/l
 import type { ContextModule, PolicyKey } from '../../shared/modules.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import type { CommandInvalidation } from '../lib/outbox-client.ts';
+import type { StudentCardMark } from '../ui/Students.tsx';
 
 export interface ClassroomContext {
   id: string;
@@ -118,6 +119,12 @@ export interface StudentCardExtras {
   notice?: string | null;
   /** Effective attendance for the lesson (attendance module). */
   attendance?: EffectiveAttendance;
+  /**
+   * S22c (D-177): positive marks (icon + short value + accessible name), e.g. this lesson's
+   * achievements or the group number. Unlike the other fields, the marks of every add-on are kept
+   * (concatenated in registry order), not replaced. Return none rather than a zero.
+   */
+  marks?: readonly StudentCardMark[];
 }
 
 /**

@@ -901,6 +901,25 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
 .cc-student-card__meta:empty {
   display: none;
 }
+/* S22c (D-177): a module's mark on the card (this lesson's achievements, the group number): icon and
+   number in an outlined pill, read out by its accessible name, so it never relies on colour. */
+.cc-student-card__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+  padding: 0 0.35em;
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+  border-radius: 999px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.cc-student-card__mark svg {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
 .cc-student-card__count {
   font-size: 1.35rem;
   font-weight: 850;
@@ -2482,6 +2501,9 @@ html:has(.cc-classroom) {
 .cc-lesson-box[data-box='core.students'] > .cc-lesson-box__body {
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* The card fit (D-177) measures with and without a scroll bar: the bar's room is kept either way,
+     so the columns never change when the bar comes or goes. */
+  scrollbar-gutter: stable;
 }
 /* A panel that usually lives in the dock (assistant, groups, homework …) shown as a box takes its
    row's share and scrolls inside, so a long list never pushes the student grid off the screen. */
@@ -2523,6 +2545,12 @@ html:has(.cc-classroom) {
 .cc-students-box__more.cc-btn {
   min-height: var(--cc-touch);
   border-color: var(--cc-accent-strong);
+}
+/* Every button of the heading line is a touch target, so the line keeps its height whether the cue is
+   there or not: the cards' fit (D-177) measures the room under it, and a line that grew with the cue
+   would change the fit, and the fit the cue. */
+.cc-students-box__head > .cc-btn {
+  min-height: var(--cc-touch);
 }
 /* The dock: big buttons for the panels in the dock, a spacer, End lesson at the end. */
 .cc-dock {
@@ -2846,12 +2874,55 @@ html:has(.cc-classroom) {
   --cc-card-avatar: 3rem;
 }
 .cc-lesson-board .cc-student-grid {
-  gap: 0.45rem;
+  gap: var(--cc-card-gap, 0.45rem);
 }
 .cc-lesson-board .cc-student-card {
-  padding: 0.35rem 0.5rem;
+  padding: var(--cc-card-pad-y, 0.35rem) var(--cc-card-pad-x, 0.5rem);
   column-gap: 0.45rem;
-  row-gap: 0.15rem;
+  row-gap: var(--cc-card-row-gap, 0.15rem);
+}
+/* Cards that fit the Students box (S22c, D-177): `board/cardFit.ts` measures the box and writes the
+   size step's --cc-card-* variables and `data-fit` on the grid. The + button is a touch target at
+   every step. The readable minimum (`tight`) puts the name on its own line across the whole card, so
+   it breaks only between words, and the avatar, the count and the marks beside the + button under it. */
+/* While the fit measures (synchronously, never painted) the SVG inside the avatars and the frames is
+   left out of the layout: the avatar boxes keep their size, frames take no room anyway. */
+.cc-lesson-board .cc-student-grid[data-fit-measuring] :is(.cc-avatar > *, .cc-student-card > .cc-frame) {
+  display: none;
+}
+/* Measured sizes are the sizes themselves, never a step of a transition (the reduced-motion rule gives
+   every property a tiny one, and a size read in the middle of it is the old size). */
+.cc-lesson-board .cc-student-grid[data-fit-measuring],
+.cc-lesson-board .cc-student-grid[data-fit-measuring] * {
+  transition: none !important;
+}
+.cc-lesson-board .cc-student-grid[data-fit] {
+  grid-template-columns: repeat(var(--cc-card-cols, 1), minmax(0, 1fr));
+}
+/* A fitted grid follows the step, also over the grid's own compact mode for a large class. */
+.cc-lesson-board .cc-student-grid[data-fit] .cc-student-card {
+  min-height: var(--cc-card-h);
+  padding: var(--cc-card-pad-y) var(--cc-card-pad-x);
+}
+.cc-lesson-board .cc-student-grid[data-fit] .cc-student-card .cc-avatar {
+  --cc-avatar-size: var(--cc-card-avatar);
+}
+.cc-lesson-board .cc-student-grid[data-fit] .cc-student-card__add {
+  min-width: var(--cc-card-add);
+  min-height: var(--cc-card-add);
+}
+.cc-lesson-board .cc-student-grid[data-fit-name='across'] .cc-student-card {
+  grid-template-areas:
+    'avatar name name'
+    'meta meta add';
+}
+.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card {
+  grid-template-areas:
+    'name name name'
+    'avatar meta add';
+}
+.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta {
+  align-self: center;
 }
 .cc-lesson-board .cc-student-card__name {
   line-height: 1.12;

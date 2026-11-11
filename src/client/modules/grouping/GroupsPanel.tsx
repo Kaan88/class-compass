@@ -33,7 +33,7 @@ import { Avatar } from '../../ui/Students.tsx';
 import { StudentDnd, StudentDropList } from '../../ui/StudentDnd.tsx';
 import { LessonTimer } from '../lessons/LessonTimer.tsx';
 import { lessonKey, useLessonState, type LessonQueryData } from '../lessons/lessonClient.ts';
-import type { ClassroomContext, DashboardSlot, DashboardSlotProps } from '../types.ts';
+import type { ClassroomContext, DashboardSlot, DashboardSlotProps, StudentCardAddon } from '../types.ts';
 import { playEvent } from '../../themes/index.tsx';
 
 const arrangementsKey = (contextId: string) => ['classroom', 'grouping', 'arrangements', contextId] as const;
@@ -318,3 +318,29 @@ export const groupsDashboardSlot: DashboardSlot = {
   dock: { Icon: IconGroups, label: 'grouping.title', useBadge: useGroupsBadge },
   Component: GroupsSlot,
 };
+
+/** The number of a group in the lesson: the "Group N" icon's number, else its place on the group screen. */
+export const groupNumberOf = (group: DisplayGroup, index: number): number => Number(/^g(\d+)$/u.exec(group.icon)?.[1] ?? index + 1);
+
+/**
+ * S22c (D-177): the student's group number on each classroom student card while groups are shown in
+ * this lesson (an icon and the number, read out as "In group 3"), so the class finds its group without
+ * opening the group screen. Students in no group show nothing; nothing while the module is off.
+ */
+function useGroupCards(context: ClassroomContext, _lesson: LessonState, enabled: boolean) {
+  const { t } = useI18n();
+  const st = useLessonState(enabled ? context.id : null).data?.data.grouping ?? null;
+  if (!enabled || !st?.applied || st.groups.length === 0) return null;
+  const numbers = new Map<string, number>();
+  st.groups.forEach((g, i) => {
+    for (const m of g.members) numbers.set(m.id, groupNumberOf(g, i));
+  });
+  return {
+    cardProps: (studentId: string) => {
+      const n = numbers.get(studentId);
+      return n === undefined ? {} : { marks: [{ key: 'group', Icon: IconGroups, value: String(n), label: t('grouping.cardGroup', { n }) }] };
+    },
+  };
+}
+
+export const groupsCardAddon: StudentCardAddon = { key: 'groups', module: 'grouping', useAddon: useGroupCards };
