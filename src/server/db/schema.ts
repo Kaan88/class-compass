@@ -927,7 +927,21 @@ export const files = sqliteTable(
 
 // ---------------------------------------------------------------- student list importer (S9)
 export type ImportParsedJson = { fullName: string; givenNames: string | null; familyName: string | null; studentNumber: string | null; className: string | null };
-export type ImportMappingJson = { headerRow: number | null; fullName: number | null; givenNames: number | null; familyName: number | null; studentNumber: number | null; className: number | null };
+export type ImportMappingJson = {
+  headerRow: number | null;
+  fullName: number | null;
+  givenNames: number | null;
+  familyName: number | null;
+  studentNumber: number | null;
+  className: number | null;
+  /**
+   * A batch made from a file with several classes (S20c, D-171): the split it belongs to and the
+   * class labels of the file read into this class (rows with these labels are not "another class").
+   * Kept by the server when the mapping changes; absent for one-class imports. No migration: JSON.
+   */
+  splitId?: string;
+  classLabels?: string[];
+};
 export type ImportCandidateJson = { id: string; fullName: string; className: string | null; studentNumber: string | null; active: boolean; score: number };
 export type ImportCountsJson = Record<string, number>;
 

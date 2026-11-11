@@ -101,6 +101,11 @@ export const ImportBatchSummary = z.object({
   createdByName: z.string(),
   committedAt: z.number().nullable(),
   revertedAt: z.number().nullable(),
+  /**
+   * Made from a file with several classes (S20c, D-171): the split's id (shared by the batches made
+   * from the same file) and the class labels of the file that were read into this class.
+   */
+  split: z.object({ id: z.string(), labels: z.array(z.string()) }).nullable(),
 });
 export type ImportBatchSummary = z.infer<typeof ImportBatchSummary>;
 
@@ -141,11 +146,73 @@ export const createImportBatch = endpoint({
   output: ImportBatch,
 });
 
+// ---------------------------------------------------------------- several classes in one file (S20c, D-171)
+const ImportSource = z.object({ text: z.string().max(200_000).optional(), fileId: Id.optional(), sheets: z.array(z.string().max(200)).min(1).max(20).optional() });
+const oneSource = (v: { text?: string | undefined; fileId?: string | undefined }) => (v.text !== undefined) !== (v.fileId !== undefined);
+
+/**
+ * One class of the file: `matched` = exactly one of the caller's classes has this name (Turkish-aware:
+ * "3-A", "3/A", "3 A", "3. Sınıf / A Şubesi"); `unknown` = none of the caller's classes (for a
+ * teacher: none they teach); `ambiguous` = several of them (`candidateIds`); `none` = rows without a class.
+ */
+export const IMPORT_GROUP_STATUSES = ['matched', 'unknown', 'ambiguous', 'none'] as const;
+export const ImportClassGroup = z.object({
+  /** Stable key of the class label ('' for rows without a class); `createImportSplit` assigns by it. */
+  key: z.string(),
+  /** The label(s) as written in the file. */
+  labels: z.array(z.string()),
+  rows: z.number().int(),
+  status: z.enum(IMPORT_GROUP_STATUSES),
+  classId: z.string().nullable(),
+  className: z.string().nullable(),
+  candidateIds: z.array(z.string()),
+});
+export type ImportClassGroup = z.infer<typeof ImportClassGroup>;
+
+export const ImportSplit = z.object({
+  sourceType: z.enum(IMPORT_SOURCE_TYPES),
+  fileName: z.string().nullable(),
+  notices: z.array(z.string()),
+  sheets: z.array(z.string()).nullable(),
+  /** The label of the class column the rows were split by. */
+  classColumn: z.string(),
+  groups: z.array(ImportClassGroup),
+});
+export type ImportSplit = z.infer<typeof ImportSplit>;
+
+/**
+ * Read a file (or pasted text) with a class column and group its rows by class, without saving
+ * anything: the per-class counts and how each class name matches the caller's classes. Refused with
+ * IMPORT_NO_CLASS_COLUMN when no class column is found.
+ */
+export const previewImportSplit = endpoint({
+  method: 'POST',
+  path: '/api/import/split/preview',
+  access: 'account',
+  input: ImportSource.refine(oneSource, 'Paste text or choose a file'),
+  output: ImportSplit,
+});
+
+/**
+ * Create one draft batch per chosen class from the same source: `assign` gives the class for a
+ * group key (null = skip those rows); a group not named keeps its match (unmatched groups are
+ * skipped). Every class must be one the caller may import into. Each batch then has its own preview,
+ * confirm, report, history entry, audit and undo, exactly like a one-class import.
+ */
+export const createImportSplit = endpoint({
+  method: 'POST',
+  path: '/api/import/split',
+  access: 'account',
+  input: ImportSource.extend({ assign: z.array(z.object({ key: z.string().max(200), classId: Id.nullable() })).max(200) }).refine(oneSource, 'Paste text or choose a file'),
+  output: z.object({ splitId: z.string(), batches: z.array(ImportBatchSummary), skippedRows: z.number().int() }),
+});
+
 export const listImportBatches = endpoint({
   method: 'GET',
   path: '/api/import/batches',
   access: 'account',
-  input: z.object({ classId: Id.optional() }),
+  /** `splitId`: only the batches made from one file with several classes (S20c). */
+  input: z.object({ classId: Id.optional(), splitId: Id.optional() }),
   output: z.object({ batches: z.array(ImportBatchSummary) }),
 });
 

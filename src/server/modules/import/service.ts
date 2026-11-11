@@ -10,15 +10,22 @@
  *   student number, and only when the teacher ticked it for that row. No duplicates are created.
  * - Revert (IMP-5, DAT-5): what the batch created is removed when nothing refers to it since;
  *   otherwise the student is deactivated / the enrolment closed and the row reports it. Audited.
+ * - Several classes in one file (S20c, D-171): `previewSplit` groups the rows by the class column
+ *   and matches each class name to the caller's writable classes; `createSplit` makes one ordinary
+ *   draft batch per chosen class (same preview, confirm, report, audit and undo per class), linked by
+ *   a split id kept in the batch's mapping JSON with the file's class labels for that class.
  */
 import { and, eq, gte, inArray, or } from 'drizzle-orm';
 import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/import.ts';
-import type { ImportBatch, ImportFlag, ImportMapping, ImportRow } from '../../../shared/contracts/import.ts';
+import type { ImportBatch, ImportClassGroup, ImportFlag, ImportMapping, ImportRow, ImportSplit } from '../../../shared/contracts/import.ts';
 import { foldForSearch } from '../../../shared/text/turkish.ts';
 import {
   classKey,
+  classLabelKey,
   classifyRows,
+  splitByClass,
+  type ClassGroup,
   columnLabels,
   inferMapping,
   LOW_CONFIDENCE,
@@ -40,7 +47,7 @@ import { newId } from '../../lib/crypto.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { assertCanReadFile } from '../files/service.ts';
 import { storagePath } from '../files/storage.ts';
-import { assertClassWritable, assertTeachesClass, defaultEnrolmentDate, getClass, todayFor, type ClassRow } from '../school/policy.ts';
+import { assertClassWritable, assertTeachesClass, defaultEnrolmentDate, getClass, isClassWritable, todayFor, type ClassRow } from '../school/policy.ts';
 import { taughtClassIds } from '../school/service.ts';
 import { GOALS_HISTORY_TABLES, goalsHistorySince } from '../goals/history.ts';
 import { SELECTIONS_TABLE_NAME, studentInContextSelections } from '../secret/service.ts';
@@ -50,6 +57,17 @@ import { extractFile, extractPaste, listSheets as listWorkbookSheets, type Extra
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 type BatchRow = typeof importBatches.$inferSelect;
+/** The mapping as stored: the field columns plus, for a split batch (D-171), its split id and class labels. */
+type StoredMapping = Mapping & { splitId?: string; classLabels?: string[] };
+const fieldMapping = (m: StoredMapping): ImportMapping => ({
+  headerRow: m.headerRow,
+  fullName: m.fullName,
+  givenNames: m.givenNames,
+  familyName: m.familyName,
+  studentNumber: m.studentNumber,
+  className: m.className,
+});
+const splitPart = (m: StoredMapping): Pick<StoredMapping, 'splitId' | 'classLabels'> => (m.splitId ? { splitId: m.splitId, classLabels: m.classLabels ?? [] } : {});
 type RowRow = typeof importRows.$inferSelect;
 type StudentRow = typeof students.$inferSelect;
 
@@ -148,8 +166,10 @@ interface RowState {
  * Flags, candidates and suggested decisions for every row (IMP-2, IMP-4). A decision the teacher
  * chose is kept as long as it still makes sense (a matched student must still be a candidate).
  */
-function evaluate(ctx: RequestContext, cls: ClassRow, mapping: Mapping, rows: RowState[], pool: Pool): void {
+function evaluate(ctx: RequestContext, cls: ClassRow, mapping: StoredMapping, rows: RowState[], pool: Pool): void {
   const target = classKey(cls.name);
+  // A split batch (D-171): the file's labels chosen for this class are not "another class".
+  const chosen = new Set((mapping.classLabels ?? []).map((l) => classLabelKey(l)).filter((k): k is string => k !== null));
   for (const r of rows) {
     const f: ImportFlag[] = [];
     if (r.heading) f.push('heading_ignored');
@@ -159,7 +179,7 @@ function evaluate(ctx: RequestContext, cls: ClassRow, mapping: Mapping, rows: Ro
       if (mapping.studentNumber !== null && !r.parsed.studentNumber) f.push('missing_number');
       if (r.confidence !== null && r.confidence < LOW_CONFIDENCE) f.push('low_confidence');
       const k = r.parsed.className ? classKey(r.parsed.className) : null;
-      if (target && k && k !== target) f.push('class_mismatch');
+      if (target && k && k !== target && !chosen.has(classLabelKey(r.parsed.className) ?? '')) f.push('class_mismatch');
     }
     r.flags = f;
   }
@@ -342,12 +362,13 @@ function summaryOf(db: Db, b: BatchRow) {
     createdByName: by?.name ?? '',
     committedAt: b.committedAt,
     revertedAt: b.revertedAt,
+    split: b.mappingJson.splitId ? { id: b.mappingJson.splitId, labels: b.mappingJson.classLabels ?? [] } : null,
   };
 }
 
 function batchDto(db: Db, batchId: string): ImportBatch {
   const b = db.select().from(importBatches).where(eq(importBatches.id, batchId)).get()!;
-  return { ...summaryOf(db, b), columns: b.columnsJson, mapping: b.mappingJson, notices: b.noticesJson, sheets: b.sheetsJson ?? null, rows: rowsOf(db, b.id).map(rowDto) };
+  return { ...summaryOf(db, b), columns: b.columnsJson, mapping: fieldMapping(b.mappingJson), notices: b.noticesJson, sheets: b.sheetsJson ?? null, rows: rowsOf(db, b.id).map(rowDto) };
 }
 
 function touch(ctx: RequestContext, batchId: string, states: RowState[]) {
@@ -361,12 +382,32 @@ function assertDraft(b: BatchRow) {
 // ---------------------------------------------------------------- create
 export async function createBatch(ctx: RequestContext, input: In<typeof C.createImportBatch>): Promise<ImportBatch> {
   const cls = assertCanImportInto(ctx, input.classId);
+  const read = await readSource(ctx, input);
+  const mapping = inferMapping(read.source);
+  return tx(ctx.db, () => {
+    assertClassWritable(ctx.db, cls);
+    return batchDto(ctx.db, insertDraft(ctx, cls, read, read.source, mapping, buildPool(ctx)));
+  });
+}
+
+interface ReadSource {
+  extracted: Extracted;
+  fileId: string | null;
+  fileName: string | null;
+  /** The extracted rows without blank rows, in file order. */
+  source: SourceRow[];
+}
+
+/** Extract the rows of pasted text or an uploaded `import_source` file the caller may read. */
+async function readSource(ctx: RequestContext, input: { text?: string | undefined; fileId?: string | undefined; sheets?: string[] | undefined }): Promise<ReadSource> {
   let extracted: Extracted;
   let fileId: string | null = null;
+  let fileName: string | null = null;
   if (input.fileId) {
     const f = assertCanReadFile(ctx, input.fileId);
     if (f.kind !== 'import_source') throw invalid('This file is not a student list upload', { reason: 'NOT_AN_IMPORT_FILE' });
     fileId = f.id;
+    fileName = f.originalName;
     extracted = await extractFile(ctx.config, { path: storagePath(ctx.config, f.storageKey), mime: f.sniffedMime, name: f.originalName }, { sheets: input.sheets });
   } else {
     if (!input.text?.trim()) throw invalid('Paste a list first', { reason: 'IMPORT_EMPTY' });
@@ -375,13 +416,17 @@ export async function createBatch(ctx: RequestContext, input: In<typeof C.create
   // Blank rows are dropped here; the remaining rows keep their order (idx).
   const source: SourceRow[] = extracted.rows.filter((r) => r.cells.some((c) => c.trim()));
   if (!source.some((r) => r.cells.some((c) => /\p{L}/u.test(c)))) throw invalid('No names were found', { reason: 'IMPORT_NO_ROWS' });
-  const mapping = inferMapping(source);
+  return { extracted, fileId, fileName, source };
+}
+
+/** Insert a draft batch for `cls` from `source` under `mapping` (inside the caller's transaction); returns its id. */
+function insertDraft(ctx: RequestContext, cls: ClassRow, read: Pick<ReadSource, 'extracted' | 'fileId'>, source: SourceRow[], mapping: StoredMapping, pool: Pool): string {
+  const { extracted, fileId } = read;
   const classified = classifyRows(source, mapping, { targetClassName: cls.name });
   const now = ctx.now();
   const user = requireUser(ctx);
   const batchId = newId();
-  return tx(ctx.db, () => {
-    assertClassWritable(ctx.db, cls);
+  {
     const states: RowState[] = classified.map((c, i) => ({
       id: newId(),
       idx: i,
@@ -400,7 +445,7 @@ export async function createBatch(ctx: RequestContext, input: In<typeof C.create
       candidates: [],
       repeat: false,
     }));
-    evaluate(ctx, cls, mapping, states, buildPool(ctx));
+    evaluate(ctx, cls, mapping, states, pool);
     ctx.db
       .insert(importBatches)
       .values({
@@ -451,8 +496,97 @@ export async function createBatch(ctx: RequestContext, input: In<typeof C.create
         })
         .run();
     }
-    audit(ctx.db, ctx.actor, { action: 'import.create', entity: 'import_batch', entityId: batchId, after: { classId: cls.id, sourceType: extracted.sourceType, fileId, rows: states.length } }, now);
-    return batchDto(ctx.db, batchId);
+    audit(
+      ctx.db,
+      ctx.actor,
+      { action: 'import.create', entity: 'import_batch', entityId: batchId, after: { classId: cls.id, sourceType: extracted.sourceType, fileId, rows: states.length, ...(mapping.splitId ? { splitId: mapping.splitId } : {}) } },
+      now,
+    );
+  }
+  return batchId;
+}
+
+// ---------------------------------------------------------------- several classes in one file (S20c, D-171)
+/** The classes the caller may import into: admins every writable class, teachers the writable classes they teach. */
+function importableClasses(ctx: RequestContext): ClassRow[] {
+  const vis = visibleClasses(ctx);
+  return ctx.db
+    .select()
+    .from(classes)
+    .all()
+    .filter((c) => (vis === 'all' || vis.includes(c.id)) && isClassWritable(ctx.db, c));
+}
+
+type PlannedGroup = ClassGroup & Omit<ImportClassGroup, 'rows' | 'key' | 'labels'>;
+
+async function planSplit(ctx: RequestContext, input: In<typeof C.previewImportSplit>): Promise<ReadSource & { mapping: Mapping; groups: PlannedGroup[] }> {
+  const read = await readSource(ctx, input);
+  const mapping = inferMapping(read.source);
+  if (mapping.className === null) throw invalid('No class column was found in this list', { reason: 'IMPORT_NO_CLASS_COLUMN' });
+  const options = importableClasses(ctx);
+  const groups = splitByClass(read.source, mapping).map((g): PlannedGroup => {
+    if (!g.key) return { ...g, status: 'none', classId: null, className: null, candidateIds: [] };
+    const found = options.filter((c) => classLabelKey(c.name) === g.key);
+    if (found.length === 1) return { ...g, status: 'matched', classId: found[0]!.id, className: found[0]!.name, candidateIds: [] };
+    return { ...g, status: found.length ? 'ambiguous' : 'unknown', classId: null, className: null, candidateIds: found.map((c) => c.id) };
+  });
+  return { ...read, mapping, groups };
+}
+
+/** Group the rows of a source by its class column, matched to the caller's classes; nothing is saved. */
+export async function previewSplit(ctx: RequestContext, input: In<typeof C.previewImportSplit>): Promise<ImportSplit> {
+  const plan = await planSplit(ctx, input);
+  return {
+    sourceType: plan.extracted.sourceType,
+    fileName: plan.fileName,
+    notices: plan.extracted.notices,
+    sheets: plan.extracted.sheets,
+    classColumn: columnLabels(plan.source, plan.mapping)[plan.mapping.className!] ?? '',
+    groups: plan.groups.map((g) => ({ key: g.key, labels: g.labels, rows: g.rows.length, status: g.status, classId: g.classId, className: g.className, candidateIds: g.candidateIds })),
+  };
+}
+
+/**
+ * One draft batch per chosen class, all in one transaction (all or none). Each keeps the rows above
+ * the header (so the header row stays where the mapping says) and its own classes' rows in file
+ * order. Audited per batch (`import.create` with the split id) and once for the split.
+ */
+export async function createSplit(ctx: RequestContext, input: In<typeof C.createImportSplit>) {
+  const plan = await planSplit(ctx, input);
+  const keys = new Set(plan.groups.map((g) => g.key));
+  const assign = new Map<string, string | null>();
+  for (const a of input.assign) {
+    if (!keys.has(a.key)) throw invalid('The classes in this list changed; read it again', { reason: 'IMPORT_SPLIT_CHANGED' });
+    assign.set(a.key, a.classId);
+  }
+  const byClass = new Map<string, { cls: ClassRow; rows: number[]; labels: string[] }>();
+  let skippedRows = 0;
+  for (const g of plan.groups) {
+    const classId = assign.has(g.key) ? assign.get(g.key)! : g.classId;
+    if (!classId) {
+      skippedRows += g.rows.length;
+      continue;
+    }
+    const cls = assertCanImportInto(ctx, classId);
+    const entry = byClass.get(cls.id) ?? { cls, rows: [], labels: [] };
+    entry.rows.push(...g.rows);
+    entry.labels.push(...g.labels.filter((l) => !entry.labels.includes(l)));
+    byClass.set(cls.id, entry);
+  }
+  if (!byClass.size) throw invalid('Choose a class for at least one group of rows', { reason: 'IMPORT_SPLIT_NOTHING' });
+  const header = plan.mapping.headerRow === null ? [] : plan.source.slice(0, plan.mapping.headerRow + 1);
+  const splitId = newId();
+  return tx(ctx.db, () => {
+    const pool = buildPool(ctx);
+    const ids: string[] = [];
+    for (const { cls, rows, labels } of byClass.values()) {
+      assertClassWritable(ctx.db, cls);
+      const source = [...header, ...[...rows].sort((a, b) => a - b).map((i) => plan.source[i]!)];
+      ids.push(insertDraft(ctx, cls, plan, source, { ...plan.mapping, splitId, classLabels: labels }, pool));
+    }
+    audit(ctx.db, ctx.actor, { action: 'import.split', entity: 'import_split', entityId: splitId, after: { fileId: plan.fileId, sourceType: plan.extracted.sourceType, batchIds: ids, classIds: [...byClass.keys()], skippedRows } }, ctx.now());
+    const batches = ids.map((id) => summaryOf(ctx.db, ctx.db.select().from(importBatches).where(eq(importBatches.id, id)).get()!));
+    return { splitId, batches, skippedRows };
   });
 }
 
@@ -479,6 +613,7 @@ export function listBatches(ctx: RequestContext, input: In<typeof C.listImportBa
     const taught = taughtClassIds(ctx.db, requireUser(ctx).id);
     rows = rows.filter((b) => taught.includes(b.targetClassId));
   }
+  if (input.splitId) rows = rows.filter((b) => b.mappingJson.splitId === input.splitId);
   rows.sort((a, b) => b.createdAt - a.createdAt);
   return { batches: rows.slice(0, 100).map((b) => summaryOf(ctx.db, b)) };
 }
@@ -495,7 +630,8 @@ export function setMapping(ctx: RequestContext, input: In<typeof C.setImportMapp
     assertDraft(batch);
     assertClassWritable(ctx.db, cls);
     const rows = rowsOf(ctx.db, batch.id);
-    const mapping: ImportMapping = input.mapping;
+    // The split id and class labels (D-171) are the server's, never the client's: kept from the batch.
+    const mapping: StoredMapping = { ...fieldMapping(input.mapping), ...splitPart(batch.mappingJson) };
     const width = Math.max(0, ...rows.map((r) => r.rawJson.length));
     for (const k of ['fullName', 'givenNames', 'familyName', 'studentNumber', 'className'] as const) {
       const v = mapping[k];

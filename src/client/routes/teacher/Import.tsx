@@ -3,8 +3,13 @@
  * CSV, Word, PDF, a photo of a typed list) → preview with the field mapping and flags → fix rows and
  * decide → confirm → report. Earlier imports can be undone (IMP-5, DAT-5). Everything is read on
  * this server; photos go through local OCR (IMP-7, D-011), so the notice is always visible.
+ *
+ * Several classes in one file (S20c, D-171): with "This list has several classes" on, the list is
+ * split by its class column into one preview of all its classes (rows per class, how each class name
+ * matched, a choice for unknown ones); confirming that makes one draft per class, and each class is
+ * then checked, confirmed, reported and undone on its own like a one-class import.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import { ACCEPT_HINT, uploadFile } from '../../../shared/contracts/files.ts';
@@ -409,8 +414,23 @@ function SheetPicker({ sheets, busy, onRead, onCancel }: { sheets: Imp.ImportShe
 /** A class the importer can fill: `label` replaces the name in the class picker (admin: name and count). */
 export type ImporterClass = { id: string; name: string; label?: string };
 
-function Start({ classes, onCreated, classId: chosen, onClassChange }: { classes: ImporterClass[]; onCreated: (b: Batch) => void; classId?: string; onClassChange?: (id: string) => void }) {
+type SplitSource = { text: string } | { fileId: string; sheets?: string[] };
+
+function Start({
+  classes,
+  onCreated,
+  onSplit,
+  classId: chosen,
+  onClassChange,
+}: {
+  classes: ImporterClass[];
+  onCreated: (b: Batch) => void;
+  onSplit: (split: Imp.ImportSplit, source: SplitSource) => void;
+  classId?: string;
+  onClassChange?: (id: string) => void;
+}) {
   const { t } = useI18n();
+  const [several, setSeveral] = useState(false);
   const [own, setOwn] = useState('');
   const classId = chosen ?? own;
   const setClassId = onClassChange ?? setOwn;
@@ -431,7 +451,8 @@ function Start({ classes, onCreated, classId: chosen, onClassChange }: { classes
     setBusy(true);
     setError(null);
     try {
-      onCreated(await call(Imp.createImportBatch, { classId: cid, fileId, sheets }));
+      if (several) onSplit(await call(Imp.previewImportSplit, { fileId, sheets }), { fileId, sheets });
+      else onCreated(await call(Imp.createImportBatch, { classId: cid, fileId, sheets }));
       reset();
     } catch (err) {
       setError(errorText(t, err));
@@ -443,8 +464,10 @@ function Start({ classes, onCreated, classId: chosen, onClassChange }: { classes
     setBusy(true);
     setError(null);
     try {
-      if (source === 'text') onCreated(await call(Imp.createImportBatch, { classId: cid, text }));
-      else if (file) {
+      if (source === 'text') {
+        if (several) onSplit(await call(Imp.previewImportSplit, { text }), { text });
+        else onCreated(await call(Imp.createImportBatch, { classId: cid, text }));
+      } else if (file) {
         const meta = await upload(uploadFile, { kind: 'import_source' }, file);
         // Workbooks with several sheets: the teacher chooses which to read (S13b).
         const { sheets } = await call(Imp.listImportSheets, { fileId: meta.id });
@@ -452,7 +475,8 @@ function Start({ classes, onCreated, classId: chosen, onClassChange }: { classes
           setPicking({ fileId: meta.id, sheets });
           return;
         }
-        onCreated(await call(Imp.createImportBatch, { classId: cid, fileId: meta.id }));
+        if (several) onSplit(await call(Imp.previewImportSplit, { fileId: meta.id }), { fileId: meta.id });
+        else onCreated(await call(Imp.createImportBatch, { classId: cid, fileId: meta.id }));
       }
       reset();
     } catch (err) {
@@ -471,7 +495,8 @@ function Start({ classes, onCreated, classId: chosen, onClassChange }: { classes
   }
   return (
     <div className="cc-stack">
-      <Select label={t('import.intoClass')} value={cid} onChange={setClassId} items={classes.map((c) => ({ id: c.id, label: c.label ?? c.name }))} />
+      <Toggle label={t('import.split.toggle')} description={t('import.split.toggleHint')} isSelected={several} onChange={setSeveral} />
+      {several ? null : <Select label={t('import.intoClass')} value={cid} onChange={setClassId} items={classes.map((c) => ({ id: c.id, label: c.label ?? c.name }))} />}
       <section className="cc-card cc-stack" aria-labelledby="imp-file">
         <h2 id="imp-file" className="cc-h2">
           {t('import.fileTitle')}
@@ -482,7 +507,7 @@ function Start({ classes, onCreated, classId: chosen, onClassChange }: { classes
           <input ref={fileRef} type="file" className="cc-file-input" accept={ACCEPT_HINT.import_source} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </label>
         <div className="cc-row">
-          <Button variant="primary" isDisabled={!file || !cid || busy} onPress={() => void go('file')}>
+          <Button variant="primary" isDisabled={!file || (!several && !cid) || busy} onPress={() => void go('file')}>
             {busy ? t('import.reading') : t('import.readFile')}
           </Button>
         </div>
@@ -493,13 +518,148 @@ function Start({ classes, onCreated, classId: chosen, onClassChange }: { classes
         </h2>
         <TextArea label={t('import.pasteLabel')} description={t('import.pasteHint')} value={text} onChange={setText} rows={10} />
         <div className="cc-row">
-          <Button variant="primary" isDisabled={!text.trim() || !cid || busy} onPress={() => void go('text')}>
+          <Button variant="primary" isDisabled={!text.trim() || (!several && !cid) || busy} onPress={() => void go('text')}>
             {t('import.preview')}
           </Button>
         </div>
       </section>
       {error ? <Alert>{error}</Alert> : null}
     </div>
+  );
+}
+
+const GROUP_CHIP: Record<Imp.ImportClassGroup['status'], { cls: string; Icon: typeof IconCheck }> = {
+  matched: { cls: 'cc-chip--success', Icon: IconCheck },
+  unknown: { cls: 'cc-chip--warning', Icon: IconAlert },
+  ambiguous: { cls: 'cc-chip--warning', Icon: IconAlert },
+  none: { cls: '', Icon: IconMinus },
+};
+
+/**
+ * One preview of all the classes in a list (S20c, D-171): rows per class as written in the file, how
+ * each name matched the classes the user may import into, and where each group goes (unknown and
+ * unmatched groups are skipped until a class is chosen). Nothing is saved until "Make previews".
+ */
+function SplitPreview({ split, source, classes, onMade, onCancel }: { split: Imp.ImportSplit; source: SplitSource; classes: ImporterClass[]; onMade: (splitId: string) => void; onCancel: () => void }) {
+  const { t } = useI18n();
+  const [choice, setChoice] = useState<Record<string, string>>(() => Object.fromEntries(split.groups.map((g) => [g.key, g.classId ?? ''])));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const chosenClasses = new Set(split.groups.map((g) => choice[g.key]).filter(Boolean));
+  const skipped = split.groups.filter((g) => !choice[g.key]).reduce((n, g) => n + g.rows, 0);
+  const total = split.groups.reduce((n, g) => n + g.rows, 0);
+  const options = [{ id: '', label: t('import.split.skip') }, ...classes.map((c) => ({ id: c.id, label: c.label ?? c.name }))];
+  const nameOf = (g: Imp.ImportClassGroup) => (g.labels.length ? g.labels.join(', ') : t('import.split.noClass'));
+  const make = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await call(Imp.createImportSplit, { ...source, assign: split.groups.map((g) => ({ key: g.key, classId: choice[g.key] || null })) });
+      onMade(res.splitId);
+    } catch (err) {
+      setError(errorText(t, err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="cc-stack" aria-labelledby="imp-split" data-testid="import-split-preview">
+      <h2 id="imp-split" className="cc-h2">
+        {t('import.split.title')}
+      </h2>
+      <p className="cc-muted">
+        {t(`import.source.${split.sourceType}`)}
+        {split.fileName ? ` · ${split.fileName}` : ''} · {t('import.split.column', { column: split.classColumn })}
+      </p>
+      {split.notices.map((code) =>
+        has(`import.notice.${code}`) ? (
+          <Alert key={code} kind="warning">
+            {t(`import.notice.${code}` as MessageKey)}
+          </Alert>
+        ) : null,
+      )}
+      <p className="cc-muted">{t('import.split.hint')}</p>
+      <DataTable
+        caption={t('import.split.caption', { count: split.groups.length })}
+        rows={split.groups}
+        rowKey={(g) => g.key || '-'}
+        stack
+        emptyText={t('import.noRows')}
+        columns={[
+          { key: 'class', header: t('import.split.col.inFile'), stackRole: 'title', render: (g) => <strong>{nameOf(g)}</strong> },
+          { key: 'rows', header: t('import.split.col.rows'), sortValue: (g) => g.rows, render: (g) => t('import.split.rows', { count: g.rows }) },
+          {
+            key: 'match',
+            header: t('import.split.col.match'),
+            render: (g) => {
+              const chip = GROUP_CHIP[g.status];
+              return (
+                <span className={`cc-chip ${chip.cls}`}>
+                  <chip.Icon />
+                  {g.status === 'matched' ? t('import.split.status.matched', { name: g.className ?? '' }) : t(`import.split.status.${g.status}`)}
+                </span>
+              );
+            },
+          },
+          {
+            key: 'into',
+            header: t('import.split.col.into'),
+            render: (g) => (
+              <Select label={t('import.split.intoFor', { name: nameOf(g) })} hideLabel value={choice[g.key] ?? ''} onChange={(v) => setChoice((c) => ({ ...c, [g.key]: v }))} items={options} />
+            ),
+          },
+        ]}
+      />
+      <p role="status">{t('import.split.summary', { rows: total - skipped, classes: chosenClasses.size, skipped })}</p>
+      {error ? <Alert>{error}</Alert> : null}
+      <div className="cc-row">
+        <Button variant="primary" isDisabled={chosenClasses.size === 0 || busy} onPress={() => void make()}>
+          {busy ? t('import.reading') : t('import.split.make', { count: chosenClasses.size })}
+        </Button>
+        <Button onPress={onCancel}>{t('common.cancel')}</Button>
+      </div>
+    </section>
+  );
+}
+
+/** The drafts made from one list with several classes: each class is checked and confirmed on its own. */
+function SplitBatches({ splitId, onOpen, onDone }: { splitId: string; onOpen: (id: string) => void; onDone: () => void }) {
+  const { t } = useI18n();
+  const list = useQuery({ queryKey: [...KEY, 'split', splitId], queryFn: () => call(Imp.listImportBatches, { splitId }) });
+  const batches = sortByName(list.data?.batches ?? [], (b) => b.className);
+  const open = batches.filter((b) => b.status === 'draft').length;
+  return (
+    <section className="cc-stack" aria-labelledby="imp-split-batches" data-testid="import-split-batches">
+      <h2 id="imp-split-batches" className="cc-h2">
+        {t('import.split.batchesTitle')}
+      </h2>
+      <p role="status">{open ? t('import.split.batchesOpen', { count: open }) : t('import.split.batchesDone')}</p>
+      <DataTable
+        caption={t('import.split.batchesCaption')}
+        rows={batches}
+        rowKey={(b) => b.id}
+        stack
+        emptyText={t('import.noHistory')}
+        columns={[
+          { key: 'class', header: t('import.col.class'), stackRole: 'title', render: (b) => <strong>{b.className}</strong> },
+          { key: 'labels', header: t('import.split.col.inFile'), render: (b) => b.split?.labels.join(', ') || t('import.split.noClass') },
+          { key: 'status', header: t('import.col.status'), render: (b) => t(`import.status.${b.status}`) },
+          { key: 'counts', header: t('import.col.result'), render: (b) => (b.status === 'draft' ? '—' : t('import.countsShort', { added: b.counts.added ?? 0, matched: b.counts.matched ?? 0 })) },
+          {
+            key: 'actions',
+            header: t('common.actions'),
+            render: (b) => (
+              <Button size="small" variant={b.status === 'draft' ? 'primary' : 'secondary'} onPress={() => onOpen(b.id)}>
+                {b.status === 'draft' ? t('import.split.check', { name: b.className }) : t('import.split.openClass', { name: b.className })}
+              </Button>
+            ),
+          },
+        ]}
+      />
+      <div className="cc-row">
+        <Button onPress={onDone}>{t('import.split.done')}</Button>
+      </div>
+    </section>
   );
 }
 
@@ -523,7 +683,16 @@ function History({ tz, onOpen, showCreator }: { tz: string; onOpen: (id: string)
           { key: 'at', header: t('audit.when'), sortValue: (b) => b.createdAt, render: (b) => formatDate(b.createdAt, locale, tz, { dateStyle: 'medium', timeStyle: 'short' }) },
           { key: 'class', header: t('import.col.class'), sortValue: (b) => b.className, render: (b) => b.className },
           ...(showCreator ? [{ key: 'by', header: t('import.col.by'), sortValue: (b: Imp.ImportBatchSummary) => b.createdByName, render: (b: Imp.ImportBatchSummary) => b.createdByName }] : []),
-          { key: 'source', header: t('import.col.source'), render: (b) => b.fileName ?? t(`import.source.${b.sourceType}`) },
+          {
+            key: 'source',
+            header: t('import.col.source'),
+            render: (b) => (
+              <span className="cc-stack" style={{ gap: '0.2rem' }}>
+                <span>{b.fileName ?? t(`import.source.${b.sourceType}`)}</span>
+                {b.split ? <span className="cc-muted">{t('import.split.fromList', { labels: b.split.labels.join(', ') || t('import.split.noClass') })}</span> : null}
+              </span>
+            ),
+          },
           { key: 'status', header: t('import.col.status'), render: (b) => t(`import.status.${b.status}`) },
           { key: 'counts', header: t('import.col.result'), render: (b) => (b.status === 'draft' ? '—' : t('import.countsShort', { added: b.counts.added ?? 0, matched: b.counts.matched ?? 0 })) },
           {
@@ -591,17 +760,24 @@ export function Importer({
   const { t } = useI18n();
   const qc = useQueryClient();
   const [batchId, setBatchId] = useState<string | null>(null);
+  // Several classes in one file (S20c, D-171): the split preview, then the drafts it made.
+  const [split, setSplit] = useState<{ data: Imp.ImportSplit; source: SplitSource } | null>(null);
+  const [splitId, setSplitId] = useState<string | null>(null);
   const batch = useQuery({ queryKey: [...KEY, 'batch', batchId], queryFn: () => call(Imp.getImportBatch, { batchId: batchId! }), enabled: Boolean(batchId) });
+  const busy = Boolean(batchId || split || splitId);
+  useEffect(() => onBatchOpenChange?.(busy), [busy, onBatchOpenChange]);
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: [...KEY, 'list'] });
+    void qc.invalidateQueries({ queryKey: [...KEY, 'split'] });
+  };
   const show = (b: Batch) => {
     qc.setQueryData([...KEY, 'batch', b.id], b);
     setBatchId(b.id);
-    onBatchOpenChange?.(true);
-    void qc.invalidateQueries({ queryKey: [...KEY, 'list'] });
+    refresh();
   };
   const close = () => {
     setBatchId(null);
-    onBatchOpenChange?.(false);
-    void qc.invalidateQueries({ queryKey: [...KEY, 'list'] });
+    refresh();
   };
   return (
     <>
@@ -614,17 +790,24 @@ export function Importer({
         ) : (
           <Report batch={batch.data} onClose={close} />
         )
+      ) : split ? (
+        <SplitPreview
+          split={split.data}
+          source={split.source}
+          classes={classes}
+          onCancel={() => setSplit(null)}
+          onMade={(id) => {
+            setSplit(null);
+            setSplitId(id);
+            refresh();
+          }}
+        />
+      ) : splitId ? (
+        <SplitBatches splitId={splitId} onOpen={setBatchId} onDone={() => setSplitId(null)} />
       ) : (
-        <Start classes={classes} onCreated={show} {...(classId !== undefined ? { classId } : {})} {...(onClassChange ? { onClassChange } : {})} />
+        <Start classes={classes} onCreated={show} onSplit={(data, source) => setSplit({ data, source })} {...(classId !== undefined ? { classId } : {})} {...(onClassChange ? { onClassChange } : {})} />
       )}
-      <History
-        tz={tz}
-        onOpen={(id) => {
-          setBatchId(id);
-          onBatchOpenChange?.(true);
-        }}
-        showCreator={showCreator}
-      />
+      <History tz={tz} onOpen={setBatchId} showCreator={showCreator} />
       <p className="cc-muted">
         <IconUsers /> {t('import.namesRule')}
       </p>

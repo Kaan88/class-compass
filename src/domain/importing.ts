@@ -12,7 +12,7 @@
  * name are filled ONLY when the source has explicit columns for them (Adı / Soyadı); a surname is
  * never guessed from a multi-word name.
  */
-import { foldForSearch, normaliseName, smartTitleCase } from '../shared/text/turkish.ts';
+import { foldForSearch, lowerTr, normaliseName, smartTitleCase } from '../shared/text/turkish.ts';
 
 export interface SourceRow {
   cells: string[];
@@ -526,3 +526,63 @@ export function nameSimilarity(a: string, b: string): number {
 
 /** Names at least this similar are offered as possible matches (never merged without a choice). */
 export const POSSIBLE_MATCH = 0.85;
+
+// ---------------------------------------------------------------- several classes in one file (S20c, D-171)
+/**
+ * The key a class label is compared by (Turkish-aware): "3-A", "3/A", "3 A", "3A", "03-a", "3. Sınıf
+ * / A Şubesi" and "3. SINIF / A ŞUBESİ" are all `3a`. Letters are lower-cased with Turkish rules and
+ * keep their identity (Ç is not C, I is not İ: both can be şube letters). Any other label
+ * ("Hazırlık", "Anasınıfı B") is its letters and digits without "sınıf/şube" words. Null when empty.
+ */
+export function classLabelKey(label: string | null | undefined): string | null {
+  const c = clean(label);
+  if (!c) return null;
+  const words = lowerTr(c)
+    .normalize('NFC')
+    .replace(/s[ıi]n[ıi]f[ıi]?/gu, ' ')
+    .replace(/[şs]ubes[ıi]?/gu, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+  const m = /^0*(\d{1,2})\s*(\p{L})$/u.exec(words);
+  if (m) return `${m[1]}${m[2]}`;
+  return words.replace(/\s+/gu, '') || null;
+}
+
+/** The classes (of `classes`) whose name means the same class as `label`. */
+export function classesMatching<T extends { name: string }>(label: string, classes: readonly T[]): T[] {
+  const k = classLabelKey(label);
+  if (!k) return [];
+  return classes.filter((c) => classLabelKey(c.name) === k);
+}
+
+export interface ClassGroup {
+  /** `classLabelKey` of the class label; '' for rows without a class. */
+  key: string;
+  /** The labels as written in the file (the first five distinct ones). */
+  labels: string[];
+  /** Source row indices of the group's rows, in file order. */
+  rows: number[];
+}
+
+/**
+ * Splits the rows of a file by its class column (S20c, D-171): headings (titles, the header row,
+ * repeated page headers, page numbers) belong to no class; every other row goes to the group of its
+ * class label's key, rows without a class to the group with key ''. Groups keep the order in which
+ * the classes first appear in the file.
+ */
+export function splitByClass(rows: readonly SourceRow[], mapping: Mapping): ClassGroup[] {
+  const groups = new Map<string, ClassGroup>();
+  for (const r of classifyRows(rows, mapping)) {
+    if (r.heading) continue;
+    const label = r.parsed.className ? clean(r.parsed.className) : '';
+    const key = classLabelKey(label) ?? '';
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, labels: [], rows: [] };
+      groups.set(key, g);
+    }
+    if (label && g.labels.length < 5 && !g.labels.includes(label)) g.labels.push(label);
+    g.rows.push(r.source);
+  }
+  return [...groups.values()];
+}
