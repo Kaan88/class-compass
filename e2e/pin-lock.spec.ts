@@ -118,6 +118,69 @@ test('Lock button and a 423 swap straight to the lock screen', async ({ page }) 
   await expectLockedAndClean(page);
 });
 
+/** In classroom mode on this device: unlock from the teacher area and open the profile (sensitive). */
+async function unlockToProfile(page: import('@playwright/test').Page) {
+  await page.goto('/teacher');
+  await page.getByLabel('Enter your PIN').fill(PIN);
+  await page.getByRole('button', { name: 'Unlock' }).click();
+  await expect(page.getByTestId('teacher-menu')).toBeVisible();
+  await page.getByRole('link', { name: 'Profile and PIN' }).first().click();
+  await expect(page.getByTestId('profile-page')).toBeVisible();
+}
+
+test('PIN-8 back/forward cache (S20a): a page restored after the lock shows the lock screen, never the teacher data', async ({ page }) => {
+  await login(page, 'english');
+  await ensurePin(page);
+  await page.goto('/classroom');
+  await expect(page.getByTestId('classroom-shell')).toBeVisible();
+  await unlockToProfile(page);
+
+  // Leave the app for another document, lock meanwhile (another tab, the server window), come back.
+  await page.evaluate(() => ((window as unknown as { __s20aMark: boolean }).__s20aMark = true));
+  await page.goto('/healthz');
+  expect((await api(page, 'POST', '/api/auth/lock', {})).status).toBe(200);
+  await page.goBack();
+  const restored = await page.evaluate(() => (window as unknown as { __s20aMark?: boolean }).__s20aMark === true);
+  test.info().annotations.push({ type: 'bfcache', description: restored ? 'the page came back from the back/forward cache' : 'the browser loaded the page again (not kept in the cache)' });
+  await expectLockedAndClean(page);
+
+  // The restore handler itself (main.tsx `pageshow` with `persisted`), whatever the browser decided
+  // above: the page still shows the profile while the server has locked; a restore must not trust it.
+  await unlockToProfile(page);
+  expect((await api(page, 'POST', '/api/auth/lock', {})).status).toBe(200);
+  await expect(page.getByTestId('profile-page')).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await expectLockedAndClean(page);
+  expect((await api(page, 'GET', '/api/auth/me')).body.pinUnlocked).toBe(false);
+});
+
+test('PIN-7 inactivity relock (S20a): the teacher area locks itself after 3 minutes without input, input restarts the wait', async ({ page }) => {
+  // The browser clock is controlled, so the client's 3-minute timer (CLIENT_IDLE_LOCK_MS) runs in
+  // moments; no test-only server setting is needed. The server's own 5-minute window is not reached.
+  await page.clock.install();
+  await login(page, 'english');
+  await ensurePin(page);
+  await page.goto('/classroom');
+  await expect(page.getByTestId('classroom-shell')).toBeVisible();
+  await unlockToProfile(page);
+
+  // Two minutes without input: still open.
+  await page.clock.fastForward(2 * 60_000);
+  await expect(page.getByTestId('profile-page')).toBeVisible();
+  // Input restarts the wait: two more minutes (four since the unlock) and still open.
+  await page.mouse.move(10, 10);
+  await page.keyboard.press('Shift');
+  await page.clock.fastForward(2 * 60_000);
+  await expect(page.getByTestId('profile-page')).toBeVisible();
+  expect((await api(page, 'GET', '/api/auth/me')).body.pinUnlocked).toBe(true);
+
+  // Three minutes without input: the screen locks and the server session is locked too.
+  await page.clock.fastForward(60_000 + 5_000);
+  await expectLockedAndClean(page);
+  await expect.poll(async () => (await api(page, 'GET', '/api/auth/me')).body.pinUnlocked).toBe(false);
+  expect((await api(page, 'GET', '/api/admin/users')).status).toBe(423);
+});
+
 test('PIN-4 in every tab: a second tab waiting on a deep link shows the teacher menu first after unlock', async ({ page, context }) => {
   await login(page, 'english');
   await ensurePin(page);
