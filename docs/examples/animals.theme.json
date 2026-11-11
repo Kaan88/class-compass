@@ -170,6 +170,7 @@
   "sounds": {
     "root": 587,
     "wave": "sine",
+    "style": "musicBox",
     "scale": "pentatonic",
     "gain": 0.11,
     "tempo": 1.2
@@ -181,6 +182,43 @@
       "deco-2",
       "deco-3",
       "warning"
+    ]
+  },
+  "frame": {
+    "edge": "none",
+    "trim": "garland",
+    "corners": "leaf",
+    "apply": [
+      "boardBoxes",
+      "studentCards",
+      "topBar"
+    ],
+    "trimOn": [
+      "routine",
+      "core.timer"
+    ],
+    "snowColor": "surface",
+    "trimColors": [
+      "deco-1",
+      "deco-2",
+      "deco-3"
+    ],
+    "cornerColors": [
+      "deco-1",
+      "icon-accent"
+    ]
+  },
+  "ambient": {
+    "preset": "leaves",
+    "density": 22,
+    "speed": "slow",
+    "size": "large"
+  },
+  "sets": {
+    "achievementFrame": "classic",
+    "avatarFamiliesFirst": [
+      "animals",
+      "sea"
     ]
   }
 }

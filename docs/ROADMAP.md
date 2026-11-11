@@ -337,7 +337,7 @@ Brief: `docs/design/2026-11-11-theme-engine.md`; decision D-166; no migration.
 - [x] Tests at the real display sizes (1536×703 and 1536×864 at scale 1.25, 1920×1080), axe, focus, tap targets, ambient performance
 - [x] Review fixes: frames take no room on the board (same students box height and whole cards as the plain package at 1536×703 and 1536×864), scene visible below the grid, phone strip above the dock, ambient stops on a live reduced-motion change and caps its pixel ratio, badge frames keep the tier's size, scene sizes in the admin report, dialog frame docs
 - [ ] Seen on the real classroom display (owner)
-- [ ] Found by the S17a review, not caused by themes: on a phone the classroom dock wraps into many rows and covers more than half of the screen (before S17a too); the scene strip now stands on it, but the dock itself needs a compact phone layout
+- [x] Found by the S17a review, not caused by themes: on a phone the classroom dock wraps into many rows and covers more than half of the screen (before S17a too); the scene strip now stands on it, but the dock itself needs a compact phone layout (done in S17b, D-168: one row that scrolls sideways, End lesson in view)
 - [ ] Found by S17a's axe run of the whole lesson board, not caused by themes: the routine's stage chips are named "Go to stage N: …" while they show "N … Now" (axe `label-content-name-mismatch`); the routines module should name them by their visible text (the e2e check lists it as known)
 
 ## S18 Full screen during lessons (owner 2026-11-11)
@@ -349,8 +349,10 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S18; decision D-167; no migr
 
 ## S17b Built-in themes remade, sound styles (owner 2026-11-11)
 Brief: `docs/design/2026-11-11-theme-engine.md` → S17b; decision D-168; after S17a.
-- [ ] Explorer, Animals and Classroom remade with scenes, frames, ambient and sets per the mockups; screenshots before/after
-- [ ] `sounds.style` (tones, bells, marimba, chimes, musicBox) in packages, the validator, docs and the MCP tools; built-ins and Snow Day choose a style
+- [x] Explorer, Animals and Classroom remade with scenes, frames, ambient and sets per the mockups; screenshots before/after (all four themes at 1536×703 and 1536×864 at scale 1.25, 1920×1080 and 375 px, motion on and off; `e2e/theme-builtins.spec.ts`)
+- [x] `sounds.style` (tones, bells, marimba, chimes, musicBox) in packages, the validator, docs and the MCP tools; built-ins and Snow Day choose a style
+- [x] Engine polish from the wave 1 screenshots: piled-snow drifts and frame shapes drawn in CSS pixels (no stretching), a centred content-width dock when the theme has a scene, a compact one-row dock on phones; scene and ambient only on the classroom screen
+- [ ] Seen on the real classroom display (owner)
 - [ ] Heard on the classroom speakers (owner)
 
 ## S17c Avatars: frozen defaults, readability, picture picker (owner 2026-11-11)

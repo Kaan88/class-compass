@@ -170,6 +170,7 @@
   "sounds": {
     "root": 440,
     "wave": "sine",
+    "style": "chimes",
     "scale": "major",
     "gain": 0.09,
     "tempo": 0.85,
@@ -198,6 +199,37 @@
       "success",
       "deco-1",
       "deco-2"
+    ]
+  },
+  "frame": {
+    "edge": "scallop",
+    "trim": "pencil",
+    "corners": "star",
+    "apply": [
+      "boardBoxes",
+      "studentCards",
+      "topBar"
+    ],
+    "trimOn": [
+      "routine",
+      "core.timer"
+    ],
+    "snowColor": "surface",
+    "trimColors": [
+      "deco-2",
+      "mascot-cheek",
+      "text-muted"
+    ],
+    "cornerColors": [
+      "deco-2",
+      "text-muted"
+    ]
+  },
+  "sets": {
+    "achievementFrame": "star",
+    "avatarFamiliesFirst": [
+      "robots",
+      "space"
     ]
   }
 }

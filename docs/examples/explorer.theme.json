@@ -170,6 +170,7 @@
   "sounds": {
     "root": 523,
     "wave": "triangle",
+    "style": "marimba",
     "scale": "major",
     "gain": 0.11,
     "tempo": 1,
@@ -206,6 +207,36 @@
       "deco-2",
       "deco-3",
       "success"
+    ]
+  },
+  "frame": {
+    "edge": "torn",
+    "trim": "stitched",
+    "corners": "compass",
+    "apply": [
+      "boardBoxes",
+      "studentCards",
+      "topBar"
+    ],
+    "trimOn": [
+      "routine",
+      "core.timer"
+    ],
+    "snowColor": "surface",
+    "trimColors": [
+      "deco-2",
+      "surface"
+    ],
+    "cornerColors": [
+      "deco-2",
+      "text-muted"
+    ]
+  },
+  "sets": {
+    "achievementFrame": "shield",
+    "avatarFamiliesFirst": [
+      "space",
+      "animals"
     ]
   }
 }

@@ -29,11 +29,13 @@ async function measure(page: Page, selector: string): Promise<{ found: number; p
     const label = (el: Element) => (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40) || el.getAttribute('aria-label') || el.tagName;
     for (const g of groups) {
       const box = g.getBoundingClientRect();
+      // A group that scrolls sideways inside itself (the phone dock, S17b) holds items beyond its edge.
+      const scrollsX = /(auto|scroll)/.test(getComputedStyle(g).overflowX);
       const items = [...g.querySelectorAll<HTMLElement>('button, label, [role="radio"], a.cc-btn, a.cc-menu-tile')].filter((el) => el.getClientRects().length > 0);
       for (const el of items) {
         const r = el.getBoundingClientRect();
         if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1) problems.push(`"${label(el)}" content ${el.scrollWidth}px in ${el.clientWidth}px`);
-        if (r.right > box.right + 1 || r.left < box.left - 1) problems.push(`"${label(el)}" sticks out of its group (${Math.round(r.left)}–${Math.round(r.right)} vs ${Math.round(box.left)}–${Math.round(box.right)})`);
+        if (!scrollsX && (r.right > box.right + 1 || r.left < box.left - 1)) problems.push(`"${label(el)}" sticks out of its group (${Math.round(r.left)}–${Math.round(r.right)} vs ${Math.round(box.left)}–${Math.round(box.right)})`);
         // Off the screen counts unless a scroll box (a wide table) holds it and is itself on screen.
         let scroller: HTMLElement | null = el.parentElement;
         while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowX)) scroller = scroller.parentElement;
@@ -181,7 +183,8 @@ test('choice buttons fit at 375/768/1280 px, in English and Turkish, at 100 % an
       await d.getByRole('button', { name: /3-A · (English|İngilizce)/ }).first().click();
       await expect(d.getByTestId('lesson-dashboard')).toBeVisible();
 
-      // The board's dock (S14b, D-148): its buttons and End lesson fit, wrapping on narrow screens.
+      // The board's dock (S14b, D-148): its buttons and End lesson fit, wrapping on narrow screens; on a
+      // phone it is one row that scrolls sideways inside itself (S17b, D-168).
       await expect(d.getByTestId('lesson-dock')).toBeVisible();
       await checkAll(d, '.cc-dock', `${lang} lesson dock`);
 

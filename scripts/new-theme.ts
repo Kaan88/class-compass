@@ -1,7 +1,7 @@
 /**
  * `npm run new:theme -- <key> [--dry-run] [--root <dir>]` (SX, D-070): scaffolds a theme.
  *
- * Copies the default theme folder (`src/client/themes/<default>/`: tokens, art, motion, sounds) to
+ * Copies the default theme folder (`src/client/themes/<default>/`: tokens, art, scene, motion, sounds) to
  * `src/client/themes/<key>/` with renamed identifiers, adds the key to the shared THEME_KEYS (so
  * `classes.theme` accepts it) and to the client registry, adds its names to en + tr (Turkish marked
  * TODO) and a test stub. The copy fills every slot and passes the contrast and theme tests, so the
@@ -10,7 +10,7 @@
 import { addMessages, humanize, lit, pascal, runCli, type Workspace } from './scaffold.ts';
 
 const USAGE = 'Usage: npm run new:theme -- <camelCaseKey> [--dry-run] [--root <dir>]';
-const FILES = ['tokens.ts', 'art.tsx', 'index.ts'] as const;
+const FILES = ['tokens.ts', 'art.tsx', 'scene.tsx', 'index.ts'] as const;
 
 export function planTheme(ws: Workspace, key: string): void {
   const shared = 'src/shared/themes.ts';
@@ -30,12 +30,12 @@ export function planTheme(ws: Workspace, key: string): void {
   // 2. The theme folder, copied from the default theme with identifiers renamed.
   const P = pascal(key);
   const D = pascal(def);
-  const note = `/* Scaffolded from the "${def}" theme by \`npm run new:theme\`: replace colours, typography, shape, art, motion and sounds (docs/EXTENDING.md). */\n`;
+  const note = `/* Scaffolded from the "${def}" theme by \`npm run new:theme\`: replace colours, typography, shape, art, scene, frame, motion and sounds (docs/EXTENDING.md). */\n`;
   for (const f of FILES) {
     const src = ws.read(`src/client/themes/${def}/${f}`);
     const renamed = src
       .replace(new RegExp(`\\b${D}(?=[A-Z])`, 'g'), P)
-      .replace(new RegExp(`\\b${def}(?=Theme\\b|Illustrations\\b)`, 'g'), key)
+      .replace(new RegExp(`\\b${def}(?=Theme\\b|Illustrations\\b|Scene\\b)`, 'g'), key)
       .replace(new RegExp(`'theme\\.${def}(\\.|')`, 'g'), `'theme.${key}$1`)
       .replace(new RegExp(`key: '${def}'`), `key: ${lit(key)}`);
     ws.create(`${dir}/${f}`, note + renamed);
@@ -79,7 +79,7 @@ if (import.meta.main) {
   runCli(USAGE, planTheme, (key) =>
     [
       `Theme "${key}" scaffolded. Next, see docs/EXTENDING.md "Add a theme":`,
-      `  - edit src/client/themes/${key}/tokens.ts (colours), art.tsx (mascot, illustrations), index.ts (motion, sounds)`,
+      `  - edit src/client/themes/${key}/tokens.ts (colours), art.tsx (mascot, illustrations), scene.tsx (the scene behind the classroom screen), index.ts (motion, sounds, frame, ambient, sets)`,
       '  - translate the TODO(tr) strings in src/shared/i18n/tr.ts',
       '  - npm run check (contrast, slot and theme-lint tests), then look at /dev/catalog',
     ].join('\n'),

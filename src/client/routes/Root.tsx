@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as Auth from '../../shared/contracts/auth.ts';
 import { call } from '../lib/api.ts';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
-import { setDisplay } from '../lib/display.ts';
+import { setDisplay, useDisplay } from '../lib/display.ts';
 import { useMe } from '../lib/session.ts';
 import { signedOutLocale, useStoredSignedOutLocale } from '../lib/signedOutLocale.ts';
 import { buttonClass } from '../ui/Button.tsx';
@@ -29,15 +29,17 @@ export function RootLayout() {
   const signInInfo = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000, enabled: !me && !stored });
   const locale = me?.locale ?? stored ?? signedOutLocale(signInInfo.data?.defaultLocale);
   const textScale = me?.textScale ?? 100;
+  const classScreen = useDisplay().classScreen;
   useEffect(() => {
     setDisplay({ locale, textScale });
   }, [locale, textScale]);
   return (
     <I18nProvider locale={locale}>
-      {/* Theme layers, back to front (S17a, D-166): scene, tile pattern, ambient; then the page. */}
-      <ThemeScene documentFlag />
+      {/* Theme layers, back to front (S17a, D-166): scene, tile pattern, ambient; then the page. The scene
+          and the ambient layer belong to the classroom screen only (S17b, D-168). */}
+      {classScreen ? <ThemeScene documentFlag /> : null}
       <ThemeBackdrop />
-      <ThemeAmbient />
+      {classScreen ? <ThemeAmbient /> : null}
       <FrameDocumentFlags />
       <AvatarDirectoryProvider enabled={me?.role === 'teacher'}>
         <Outlet />

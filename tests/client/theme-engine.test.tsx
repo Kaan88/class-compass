@@ -233,12 +233,11 @@ describe('definitions: a package with the new fields (S17a)', () => {
     expect(validateThemePackage({ ...exported, art: snow().art }).report.errors).toEqual([]);
   });
 
-  it('every built-in theme stays as it was in S17a (no scene, frame, ambient or sets yet)', () => {
+  it('every built-in theme uses the engine since S17b (details in tests/client/theme-builtins.test.tsx)', () => {
     for (const def of Object.values(THEMES)) {
-      expect(def.scene, def.key).toBeUndefined();
-      expect(def.frame, def.key).toBeUndefined();
-      expect(def.ambient, def.key).toBeUndefined();
-      expect(def.sets, def.key).toBeUndefined();
+      expect(def.scene, def.key).toBeDefined();
+      expect(def.frame, def.key).toBeDefined();
+      expect(def.sets, def.key).toBeDefined();
     }
   });
 
@@ -286,7 +285,8 @@ describe('frames (FrameOverlay)', () => {
     renderToStaticMarkup(inTheme(theme, createElement('article', null, createElement(FrameOverlay, props))));
 
   it('draws nothing for a theme without a frame', () => {
-    expect(overlay('classroom', { surface: 'boardBoxes', boxKey: 'routine' })).not.toContain('cc-frame');
+    registerThemePackage(ocean(), 'enabled');
+    expect(overlay('ocean', { surface: 'boardBoxes', boxKey: 'routine' })).not.toContain('cc-frame');
   });
 
   it('student cards get the edge only; boxes in trimOn get the trim; corners on boxes; everything aria-hidden', () => {
@@ -369,7 +369,9 @@ describe('scene (ThemeScene)', () => {
     setDisplay({ theme: 'peppermint-snow-day' });
     const { unmount } = render(createElement(ThemeScene, { documentFlag: true }));
     expect(document.documentElement.hasAttribute('data-scene')).toBe(true);
-    act(() => setDisplay({ theme: 'classroom' }));
+    // A theme without a scene (the built-in themes all have one since S17b).
+    registerThemePackage(ocean(), 'enabled');
+    act(() => setDisplay({ theme: 'ocean' }));
     expect(document.documentElement.hasAttribute('data-scene')).toBe(false);
     unmount();
   });
@@ -542,7 +544,8 @@ describe('sets: avatar order and achievement frames', () => {
 
   it('the achievement frame surrounds the tier shape; the tier keeps its shape and token', () => {
     registerThemePackage(snow(), 'enabled');
-    const plain = renderToStaticMarkup(inTheme('classroom', createElement(BadgeArt, { icon: 'star', tier: 'gold' })));
+    registerThemePackage(ocean(), 'enabled'); // no sets: the classic frame
+    const plain = renderToStaticMarkup(inTheme('ocean', createElement(BadgeArt, { icon: 'star', tier: 'gold' })));
     expect(plain).toContain('viewBox="0 0 48 48"');
     expect(plain).toContain('data-frame="classic"');
     const framed = renderToStaticMarkup(inTheme('peppermint-snow-day', createElement(BadgeArt, { icon: 'star', tier: 'gold' })));

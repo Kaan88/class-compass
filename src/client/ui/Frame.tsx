@@ -12,8 +12,14 @@
  * Shapes and proportions follow the approved mockups (docs/design/mockups/2026-11-11-theme-engine/,
  * `Frames.dc.html` and `ThemedBoard.dc.html`). Components never branch on a theme: they place
  * `<FrameOverlay surface=… />` and the theme decides whether anything is drawn.
+ *
+ * S17b (D-168): edges and long trims are drawn in CSS pixels, never stretched. Each one measures its
+ * own box (one shared ResizeObserver) and repeats its motif (a snow bump, a scallop, a torn tooth, a
+ * leaf, a bulb) a whole number of times across it, so a 1,800 px box gets more bumps, not wider ones;
+ * the ends (a rounded snow end, a pencil's eraser and tip) keep their size. A snow drift is a puffy
+ * cap with a soft shadow edge and drips down both sides.
  */
-import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { BoxKey } from '../../shared/classroomLayout.ts';
 import type { FrameSurface, ResolvedFrame } from '../../shared/themePackage/engine.ts';
 import type { ColorToken } from '../../shared/themePackage/tokens.ts';
@@ -21,30 +27,102 @@ import type { ThemeKey } from '../../shared/themes.ts';
 import { useTheme } from '../themes/index.tsx';
 
 const tok = (t: ColorToken) => `var(--cc-${t})`;
+const r1 = (n: number) => Math.round(n * 10) / 10;
 
-// ---------------------------------------------------------------- shapes (mockup paths)
-const DRIFT =
-  'M0 42 V24 C10 22 14 12 30 13 C44 4 62 8 72 14 C86 6 104 4 116 13 C132 5 150 7 160 15 C176 6 194 6 206 14 C220 5 240 6 250 14 C266 4 286 7 296 15 C310 6 330 6 342 13 C356 5 378 8 388 15 C396 16 400 20 400 26 V42 C392 38 386 44 378 40 C360 44 350 38 330 41 C300 36 280 44 250 40 C220 44 200 37 170 41 C140 44 120 38 90 41 C60 44 40 38 20 41 C10 44 4 40 0 42Z';
-const DRIFT_SM = 'M0 30 V18 C8 14 14 8 26 10 C38 3 52 6 60 11 C72 4 88 4 96 11 C108 4 124 5 132 11 C142 8 150 12 150 18 V30 C140 26 132 30 120 27 C100 30 90 25 70 28 C50 30 36 25 20 28 C10 30 4 27 0 30Z';
+// ---------------------------------------------------------------- measuring (one shared observer)
+type Size2 = { w: number; h: number };
+const watched = new Map<Element, (s: Size2) => void>();
+let observer: ResizeObserver | null = null;
+function watch(el: Element, fn: (s: Size2) => void): () => void {
+  if (typeof ResizeObserver === 'undefined') return () => undefined;
+  observer ??= new ResizeObserver((entries) => {
+    for (const e of entries) watched.get(e.target)?.({ w: e.contentRect.width, h: e.contentRect.height });
+  });
+  watched.set(el, fn);
+  observer.observe(el);
+  return () => {
+    watched.delete(el);
+    observer?.unobserve(el);
+  };
+}
+
+/**
+ * The CSS-pixel size of an overlay (rounded), measured before the first paint and on every resize.
+ * Until it is known (server rendering, jsdom) the fallback is used, so something sensible is drawn.
+ */
+const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+function useBoxSize<T extends Element>(fallback: Size2): [RefObject<T | null>, Size2] {
+  const ref = useRef<T>(null);
+  const [size, setSize] = useState(fallback);
+  useBeforePaint(() => {
+    const el = ref.current;
+    if (!el) return;
+    const set = (s: Size2) => {
+      const w = Math.round(s.w);
+      const h = Math.round(s.h);
+      if (w > 0 && h > 0) setSize((old) => (old.w === w && old.h === h ? old : { w, h }));
+    };
+    const r = el.getBoundingClientRect();
+    set({ w: r.width, h: r.height });
+    return watch(el, set);
+  }, []);
+  return [ref, size];
+}
+
+// ---------------------------------------------------------------- shapes in CSS pixels (S17b)
+/** n whole motifs of about `step` px across `span` px (at least `min`). */
+const tiles = (span: number, step: number, min = 1) => {
+  const n = Math.max(min, Math.round(span / step));
+  return { n, size: span / n };
+};
+
+/**
+ * A snow drift `w`×`h`: rounded ends that hang a little lower, a row of puffy bumps of about `bump` px
+ * (heights vary in a fixed pattern) and a gently wavy underside.
+ */
+export function driftPath(w: number, h: number, bump: number): string {
+  const end = Math.min(h * 0.55, w / 5);
+  const base = h * 0.42;
+  const { n, size } = tiles(w - 2 * end, bump);
+  const peaks = [0.04, 0.12, 0, 0.09, 0.03, 0.14];
+  let d = `M0 ${r1(h * 0.88)} C0 ${r1(h * 0.55)} ${r1(end * 0.3)} ${r1(base)} ${r1(end)} ${r1(base)}`;
+  for (let i = 0; i < n; i++) {
+    const x0 = end + i * size;
+    const x1 = x0 + size;
+    // A cubic with both controls at c peaks at base + 0.75 × (c − base).
+    const top = h * peaks[i % peaks.length]! + 0.5;
+    const c = base - (base - top) / 0.75;
+    d += ` C${r1(x0 + size * 0.08)} ${r1(c)} ${r1(x1 - size * 0.08)} ${r1(c)} ${r1(x1)} ${r1(base)}`;
+  }
+  d += ` C${r1(w - end * 0.3)} ${r1(base)} ${w} ${r1(h * 0.55)} ${w} ${r1(h * 0.88)}`;
+  // The underside: small waves back to the left (about 28 px each).
+  const under = tiles(w, 28, 2);
+  for (let j = under.n - 1; j >= 0; j--) {
+    const x = j * under.size;
+    const y = j % 2 === 0 ? h * 0.8 : h * 0.92;
+    d += ` Q${r1(x + under.size / 2)} ${r1(y)} ${r1(x)} ${r1(j === 0 ? h * 0.88 : (y + h * 0.86) / 2)}`;
+  }
+  return `${d}Z`;
+}
+
+/** Scallops (gingerbread icing) of about `step` px along the bottom of a `w`×`h` box. */
+export function scallopPath(w: number, h: number, step = 20): string {
+  const { n, size } = tiles(w, step);
+  const ry = Math.min(h - 1, size * 0.5);
+  return `M0 ${h}${` a${r1(size / 2)} ${r1(ry)} 0 0 1 ${r1(size)} 0`.repeat(n)}`;
+}
+
+/** A torn paper edge: teeth of about 14 px; the line and the filled shape. */
+export function tornPaths(w: number, h: number): { line: string; fill: string } {
+  const { n, size } = tiles(w, 14);
+  const ys = [0.2, 0.45, 0.15, 0.4, 0.1, 0.35];
+  let line = `M0 ${r1(h * 0.4)}`;
+  for (let i = 1; i <= n; i++) line += ` L${r1(i * size)} ${r1(h * ys[(i - 1) % ys.length]!)}`;
+  return { line, fill: `${line} L${w} ${h} L0 ${h}Z` };
+}
+
 const DRIP = 'M6 0 C12 6 11 20 8 30 C7 36 3 38 3 32 C2 22 0 8 6 0Z';
-const SCALLOP = `M0 16${' a10 10 0 0 1 20 0'.repeat(10)}`;
-const TORN_LINE = (() => {
-  let d = 'M0 8';
-  for (let x = 12, i = 0; x <= 400; x += 14, i++) d += ` L${x} ${[4, 9, 3, 8, 2, 7][i % 6]}`;
-  return d;
-})();
-const TORN_FILL = `${TORN_LINE} L400 20 L0 20Z`;
-const GARLAND = 'M4 8 Q56 34 110 10 Q164 34 216 8';
-const LIGHTS_WIRE = 'M4 6 Q60 22 110 8 Q160 22 216 6';
-const BULBS: ReadonlyArray<readonly [number, number]> = [
-  [24, 15],
-  [52, 19],
-  [80, 17],
-  [110, 13],
-  [140, 17],
-  [168, 19],
-  [196, 15],
-];
 const FROST_CORNER = 'M4 36 L20 20 M4 36 L30 34 M4 36 L6 10 M12 28 l-4 -6 M12 28 l6 2 M20 34 l-2 -6';
 const FROST_CORNER_FINE = 'M4 36 L20 20 M4 36 L30 34 M4 36 L6 10';
 const STAR = 'M20 2 l5 12 13 1 -10 8 3 13 -11 -7 -11 7 3 -13 -10 -8 13 -1z';
@@ -70,48 +148,179 @@ function Svg({ className, viewBox, children, over = true, flip }: { className: s
   );
 }
 
+/**
+ * An overlay drawn in its own CSS pixels: it measures itself and `draw` builds the shapes for that
+ * size, so its viewBox always equals its box (nothing stretched).
+ */
+function MeasuredSvg({ className, flip, fallback, draw }: { className: string; flip?: 'x' | 'y'; fallback: Size2; draw: (s: Size2) => ReactNode }) {
+  const [ref, s] = useBoxSize<SVGSVGElement>(fallback);
+  return (
+    <svg ref={ref} className={`cc-frame cc-frame--over ${className}`} viewBox={`0 0 ${s.w} ${s.h}`} preserveAspectRatio="none" aria-hidden="true" focusable="false" data-flip={flip}>
+      {draw(s)}
+    </svg>
+  );
+}
+
 function Edge({ f, size, bottom }: { f: ResolvedFrame; size: Size; bottom: boolean }) {
   const fill = tok(f.snowColor);
   const line = tok('border');
   const flip = bottom ? 'y' : undefined;
   const where = bottom ? 'bottom' : 'top';
   switch (f.edge) {
-    case 'snowDrift':
+    case 'snowDrift': {
+      const bump = size === 'box' ? 46 : 30;
       return (
         <>
-          <Svg className={`cc-frame__edge cc-frame__edge--drift cc-frame__edge--${where}`} viewBox={size === 'box' ? '0 0 400 46' : '0 0 150 30'} flip={flip}>
-            <path d={size === 'box' ? DRIFT : DRIFT_SM} fill={fill} stroke={line} strokeWidth={size === 'box' ? 1.5 : 1.2} vectorEffect="non-scaling-stroke" />
-          </Svg>
+          <MeasuredSvg
+            className={`cc-frame__edge cc-frame__edge--drift cc-frame__edge--${where}`}
+            flip={flip}
+            fallback={size === 'box' ? { w: 400, h: 30 } : { w: 150, h: 18 }}
+            draw={({ w, h }) => {
+              const d = driftPath(w, h - 2, bump);
+              return (
+                <>
+                  {/* The soft shadow edge under the snow (mockup Main.dc.html). */}
+                  <path d={d} transform="translate(0 2)" fill={line} opacity="0.45" />
+                  <path d={d} fill={fill} stroke={line} strokeWidth={size === 'box' ? 1.5 : 1.2} strokeLinejoin="round" />
+                </>
+              );
+            }}
+          />
           {size === 'box' && !bottom ? (
-            <Svg className="cc-frame__drip cc-frame--detail" viewBox="0 0 12 40">
-              <path d={DRIP} fill={fill} stroke={line} strokeWidth="1" vectorEffect="non-scaling-stroke" />
-            </Svg>
+            <>
+              <Svg className="cc-frame__drip cc-frame__drip--left cc-frame--detail" viewBox="0 0 12 40">
+                <path d={DRIP} fill={fill} stroke={line} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+              </Svg>
+              <Svg className="cc-frame__drip cc-frame__drip--right cc-frame--detail" viewBox="0 0 12 40" flip="x">
+                <path d={DRIP} fill={fill} stroke={line} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+              </Svg>
+            </>
           ) : null}
         </>
       );
-    case 'scallop':
+    }
+    case 'scallop': {
+      const scallop = (cls: string, fl?: 'y') => (
+        <MeasuredSvg
+          className={`cc-frame__edge cc-frame__edge--scallop ${cls}`}
+          flip={fl}
+          fallback={{ w: 200, h: 12 }}
+          draw={({ w, h }) => <path d={scallopPath(w - 2, h - 1, size === 'box' ? 20 : 16)} transform="translate(1 0)" fill={fill} stroke={line} strokeWidth="2" />}
+        />
+      );
       return (
         <>
-          <Svg className={`cc-frame__edge cc-frame__edge--scallop cc-frame__edge--${where}`} viewBox="0 0 200 16" flip={flip}>
-            <path d={SCALLOP} fill={fill} stroke={line} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-          </Svg>
-          {size === 'box' && !bottom ? (
-            <Svg className="cc-frame__edge cc-frame__edge--scallop cc-frame__edge--bottom" viewBox="0 0 200 16" flip="y">
-              <path d={SCALLOP} fill={fill} stroke={line} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-            </Svg>
-          ) : null}
+          {scallop(`cc-frame__edge--${where}`, flip)}
+          {size === 'box' && !bottom ? scallop('cc-frame__edge--bottom', 'y') : null}
         </>
       );
+    }
     case 'torn':
       return (
-        <Svg className={`cc-frame__edge cc-frame__edge--torn cc-frame__edge--${where}`} viewBox="0 0 400 20" flip={flip}>
-          <path d={TORN_FILL} fill={fill} />
-          <path d={TORN_LINE} fill="none" stroke={line} strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        </Svg>
+        <MeasuredSvg
+          className={`cc-frame__edge cc-frame__edge--torn cc-frame__edge--${where}`}
+          flip={flip}
+          fallback={{ w: 400, h: 12 }}
+          draw={({ w, h }) => {
+            const p = tornPaths(w, h);
+            return (
+              <>
+                <path d={p.fill} fill={fill} />
+                <path d={p.line} fill="none" stroke={line} strokeWidth="2" strokeLinejoin="round" />
+              </>
+            );
+          }}
+        />
       );
     default:
       return null;
   }
+}
+
+/** A leaf vine with flowers across `w`×`h` (the garland trim, Animals mockup): leaves about every 45 px. */
+function Garland({ w, h, c }: { w: number; h: number; c: readonly ColorToken[] }) {
+  const { n, size } = tiles(w - 8, 45, 2);
+  const mid = h * 0.45;
+  const amp = h * 0.18;
+  const yAt = (x: number) => mid + amp * Math.sin((x / 110) * Math.PI * 2);
+  let vine = `M4 ${r1(yAt(4))}`;
+  for (let x = 14; x <= w - 4; x += 10) vine += ` L${r1(x)} ${r1(yAt(x))}`;
+  const leaves: ReactNode[] = [];
+  const flowers: ReactNode[] = [];
+  for (let i = 0; i < n; i++) {
+    const x = 4 + (i + 0.5) * size;
+    const y = yAt(x);
+    const up = i % 2 === 0;
+    leaves.push(<path key={`l${i}`} d={`M${r1(x)} ${r1(y)} q${up ? '7 -11 15 -3' : '7 11 15 3'} q${up ? '-8 8 -15 3' : '-8 -8 -15 -3'}z`} />);
+    if (i % 2 === 1) {
+      const fx = x + size / 2;
+      const fy = yAt(fx);
+      flowers.push(
+        <g key={`f${i}`}>
+          <circle cx={r1(fx)} cy={r1(fy)} r="4.6" fill={tok(pick(c, i % 4 === 1 ? 1 : 2))} />
+          <circle cx={r1(fx)} cy={r1(fy)} r="1.8" fill={tok('art-light')} />
+        </g>,
+      );
+    }
+  }
+  return (
+    <>
+      <path d={vine} fill="none" stroke={tok(pick(c, 0))} strokeWidth="3" strokeLinecap="round" />
+      <path d={vine} fill="none" stroke={tok('text')} strokeOpacity="0.2" strokeWidth="3" strokeLinecap="round" />
+      <g fill={tok(pick(c, 0))}>{leaves}</g>
+      {flowers}
+    </>
+  );
+}
+
+/** String lights: a sagging wire between hooks about every 110 px, a bulb about every 28 px. */
+function Lights({ w, h, c }: { w: number; h: number; c: readonly ColorToken[] }) {
+  const sag = tiles(w - 8, 110);
+  let wire = `M4 ${r1(h * 0.2)}`;
+  for (let i = 0; i < sag.n; i++) wire += ` Q${r1(4 + (i + 0.5) * sag.size)} ${r1(h * 0.75)} ${r1(4 + (i + 1) * sag.size)} ${r1(h * 0.2)}`;
+  const bulbs = tiles(w - 8, 28, 2);
+  // On a quadratic sag the wire is at y0 + 2t(1 − t)(yc − y0), t the share of the way along the sag.
+  const yOn = (x: number) => {
+    const t = (((x - 4) % sag.size) + sag.size) % sag.size / sag.size;
+    return h * 0.2 + 2 * t * (1 - t) * (h * 0.75 - h * 0.2);
+  };
+  return (
+    <>
+      <path d={wire} fill="none" stroke={tok('text-muted')} strokeWidth="1.6" />
+      {Array.from({ length: bulbs.n }, (_, i) => {
+        const x = 4 + (i + 0.5) * bulbs.size;
+        return <ellipse key={i} cx={r1(x)} cy={r1(yOn(x) + 6)} rx="4.5" ry="6" fill={tok(pick(c, i % c.length))} />;
+      })}
+    </>
+  );
+}
+
+/** A pencil `w`×`h`: an eraser and a metal band, a long body with two grooves, a wooden tip and lead. */
+function Pencil({ w, h, c }: { w: number; h: number; c: readonly ColorToken[] }) {
+  const eraser = Math.min(18, w / 8);
+  const band = 6;
+  const tip = Math.min(34, w / 6);
+  const bodyEnd = w - tip;
+  const t = 1;
+  const b = h - 1;
+  const m = h / 2;
+  const outline = `M${eraser} ${t} H${r1(bodyEnd)} L${w - 1} ${r1(m)} L${r1(bodyEnd)} ${b} H${eraser} Z`;
+  return (
+    <>
+      <path d={`M2 ${t} H${eraser} V${b} H2 Q0 ${r1(m)} 2 ${t}Z`} fill={tok(pick(c, 1))} />
+      <path d={outline} fill={tok(pick(c, 0))} />
+      <path d={`M${r1(bodyEnd)} ${t} L${w - 1} ${r1(m)} L${r1(bodyEnd)} ${b}Z`} fill={tok('art-light')} />
+      <path d={`M${r1(w - tip * 0.3)} ${r1(m - h * 0.15)} L${w - 1} ${r1(m)} L${r1(w - tip * 0.3)} ${r1(m + h * 0.15)}Z`} fill={tok(pick(c, 2))} />
+      <rect x={eraser} y={t} width={band} height={b - t} fill={tok('border')} />
+      <path
+        d={`${outline} M${eraser + band} ${r1(h / 3)} H${r1(bodyEnd)} M${eraser + band} ${r1((2 * h) / 3)} H${r1(bodyEnd)} M2 ${t} H${eraser} V${b} H2`}
+        fill="none"
+        stroke={tok(pick(c, 2))}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </>
+  );
 }
 
 function Trim({ f }: { f: ResolvedFrame }) {
@@ -125,34 +334,11 @@ function Trim({ f }: { f: ResolvedFrame }) {
     case 'stitched':
       return <span className="cc-frame cc-frame--over cc-frame--detail cc-frame__stitch" style={vars(1)} aria-hidden="true" />;
     case 'garland':
-      return (
-        <Svg className="cc-frame__swag cc-frame--detail" viewBox="0 0 220 34">
-          <path d={GARLAND} fill="none" stroke={tok(pick(c, 0))} strokeWidth="9" strokeLinecap="round" />
-          <path d={GARLAND} fill="none" stroke={tok('text')} strokeOpacity="0.25" strokeWidth="3" strokeDasharray="2 6" strokeLinecap="round" />
-          <circle cx="34" cy="18" r="4" fill={tok(pick(c, 1))} />
-          <circle cx="74" cy="21" r="4" fill={tok(pick(c, 2))} />
-          <circle cx="146" cy="21" r="4" fill={tok(pick(c, 1))} />
-          <circle cx="186" cy="18" r="4" fill={tok(pick(c, 2))} />
-          <circle cx="110" cy="10" r="6" fill={tok(pick(c, 1))} />
-        </Svg>
-      );
+      return <MeasuredSvg className="cc-frame__swag cc-frame--detail" fallback={{ w: 220, h: 28 }} draw={({ w, h }) => <Garland w={w} h={h} c={c} />} />;
     case 'lights':
-      return (
-        <Svg className="cc-frame__swag cc-frame__swag--lights cc-frame--detail" viewBox="0 0 220 30">
-          <path d={LIGHTS_WIRE} fill="none" stroke={tok('text-muted')} strokeWidth="1.6" />
-          {BULBS.map(([x, y], i) => (
-            <ellipse key={x} cx={x} cy={y} rx="4.5" ry="6" fill={tok(pick(c, i % c.length))} />
-          ))}
-        </Svg>
-      );
+      return <MeasuredSvg className="cc-frame__swag cc-frame__swag--lights cc-frame--detail" fallback={{ w: 220, h: 22 }} draw={({ w, h }) => <Lights w={w} h={h} c={c} />} />;
     case 'pencil':
-      return (
-        <Svg className="cc-frame__pencil cc-frame--detail" viewBox="0 0 400 30">
-          <path d="M20 6 H360 L398 15 L360 24 H20Z" fill={tok(pick(c, 0))} />
-          <path d="M2 6 H20 V24 H2Z" fill={tok(pick(c, 1))} />
-          <path d="M20 6 H360 L398 15 L360 24 H20Z M360 6 V24 M20 15 H360 M386 12 L398 15 L386 18 M2 6 H20 V24 H2Z" fill="none" stroke={tok(pick(c, 2))} strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        </Svg>
-      );
+      return <MeasuredSvg className="cc-frame__pencil cc-frame--detail" fallback={{ w: 400, h: 18 }} draw={({ w, h }) => <Pencil w={w} h={h} c={c} />} />;
     default:
       return null;
   }

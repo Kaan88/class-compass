@@ -227,9 +227,9 @@ registry line, the names in en and tr (Turkish marked TODO) and `tests/client/th
 | `art.tsx` | `Decoration`, `Pattern` (+ `patternSize`) | Corner decoration and background tile. Kept subtle by `decoOpacity` ≤ 0.6 and `patternOpacity` ≤ 0.15. |
 | `art.tsx` | `illustrations` | `lockScreen`, `emptyState`, `threshold`, `startLesson`, `endLesson`, `celebration`, each in a 200×140 box and decorative (`aria-hidden`). The lock screen art must not hint at the page behind it. |
 | `index.ts` | `motion` | `celebrate` and `threshold`. Each has `full` and `reduced` variants, plays once and lasts 150–1500 ms. `reduced` is opacity only (`FADE_IN`). No flashing: opacity changes direction at most once. |
-| `index.ts` | `sounds` | A sound pack with one cue per classroom event (`SOUND_EVENTS`), usually `makeSoundPack({ root, wave, scale, gain, tempo }, overrides)`; `null` means silent. Synthesized only, gain ≤ 0.3, short cues ≤ 1.2 s, celebration cues ≤ 2.5 s (THEMING.md). |
+| `index.ts` | `sounds` | A sound pack with one cue per classroom event (`SOUND_EVENTS`), usually `themeSounds({ root, wave, style, scale, gain, tempo }, overrides)` (`style`: an instrument style, S17b); `null` means silent. Synthesized only, gain ≤ 0.3, short cues ≤ 1.2 s, celebration cues ≤ 2.5 s (THEMING.md). |
 | `index.ts` | `celebration` | `colors`: 2+ colour tokens for the celebration fireworks. |
-| `index.ts` (optional, S17a) | `scene`, `frame`, `ambient`, `sets` | The theme engine (THEMING.md → "Scenes, frames, ambient and sets"): scene layers as React SVG components with `viewBox`, `fit`, `anchor`; a frame from presets (`resolveFrame`); an ambient preset; sets. |
+| `scene.tsx` + `index.ts` (optional, S17a; every built-in since S17b) | `scene`, `frame`, `ambient`, `sets` | The theme engine (THEMING.md → "Scenes, frames, ambient and sets"): scene layers as React SVG components in `scene.tsx` with `viewBox`, `fit`, `anchor` (tokens only, within the package scene limits; the last layer is the phone strip); a frame from presets (`resolveFrame`); an ambient preset; sets. |
 
 All art is coloured with `tok('name')` (that is, `var(--cc-name)`), never literals. Shared building
 blocks (`Face`, `Arms`, `Scene`, `Sparkles`, `Confetti`, …) are in `src/client/themes/art.tsx`.
@@ -266,7 +266,7 @@ labels, the same counter levels (number + pattern + word) and the same flows.
 
 ### Checklist
 
-- [ ] `npm run new:theme -- <key>`, then edit `tokens.ts`, `art.tsx` and `index.ts`.
+- [ ] `npm run new:theme -- <key>`, then edit `tokens.ts`, `art.tsx`, `scene.tsx` and `index.ts`.
 - [ ] `npm run check`, which runs:
   - `tests/client/themes.test.tsx`: every slot, WCAG pairs (AA body text, AAA classroom text on page and cards, 3:1 UI and focus), avatar hue sweep, motion and sound limits;
   - `tests/client/lint-rules.test.ts`: no literals outside token sheets, identical token sets, no theme branching.

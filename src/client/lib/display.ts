@@ -24,6 +24,12 @@ export interface DisplayState {
   timeUpClip: boolean;
   textScale: number;
   locale: 'en' | 'tr';
+  /**
+   * The classroom screen is showing (S17b, D-168): only there does the root layout draw the theme's
+   * scene and ambient layer. Teacher, admin and sign-in pages use the default theme's colours, mascot
+   * and pattern, without a scene behind tables and forms.
+   */
+  classScreen: boolean;
 }
 
 const SOUND_KEY = 'cc.deviceSounds';
@@ -35,7 +41,7 @@ function readDeviceSounds(): boolean {
   }
 }
 
-let state: DisplayState = { theme: DEFAULT_THEME, classAnimations: true, classSounds: true, deviceSounds: true, soundVolume: 80, timeUpSound: 'voice', timeUpClip: false, textScale: 100, locale: 'en' };
+let state: DisplayState = { theme: DEFAULT_THEME, classAnimations: true, classSounds: true, deviceSounds: true, soundVolume: 80, timeUpSound: 'voice', timeUpClip: false, textScale: 100, locale: 'en', classScreen: false };
 let initialised = false;
 const listeners = new Set<() => void>();
 

@@ -417,9 +417,10 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
       const { ctx, page } = await display(browser, sizes[0]!);
       try {
         await expect(page.locator('html')).toHaveAttribute('data-theme', DEFAULT_THEME);
-        await expect(page.getByTestId('theme-scene')).toHaveCount(0);
+        // No snow left: the default theme's own scene since S17b (D-168), with no ambient layer.
+        await expect(page.locator('.cc-frame__edge--drift')).toHaveCount(0);
+        await expect(page.getByTestId('theme-scene')).toHaveAttribute('data-layers', '2');
         await expect(page.getByTestId('theme-ambient')).toHaveCount(0);
-        await expect(page.locator('html')).not.toHaveAttribute('data-scene', /.*/u);
       } finally {
         await ctx.close();
       }

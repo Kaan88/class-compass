@@ -1,8 +1,10 @@
 /** Explorer / adventure theme (THM-2): maps, compass, warm paper. One definition fills every slot. */
+import { resolveFrame } from '../../../shared/themePackage/engine.ts';
 import { presetMotion } from '../motion.ts';
 import { themeSounds } from '../soundPack.ts';
 import type { ThemeDefinition } from '../types.ts';
 import { ExplorerDecoration, explorerIllustrations, ExplorerMascot, ExplorerPattern } from './art.tsx';
+import { explorerScene } from './scene.tsx';
 import { avatar, colors, icons, shape, typography } from './tokens.ts';
 
 export const explorerTheme: ThemeDefinition = {
@@ -28,8 +30,8 @@ export const explorerTheme: ThemeDefinition = {
     // Slides in from the side like a map being unrolled.
     threshold: presetMotion('threshold', { preset: 'slideIn', durationMs: 600, easing: 'ease-out' }),
   },
-  // Brass-like triangle fanfares in C major, like reaching a summit.
-  ...themeSounds({ root: 523, wave: 'triangle', scale: 'major', gain: 0.11 }, {
+  // Wooden marimba fanfares in C major, like a camp-fire song at the summit (S17b style).
+  ...themeSounds({ root: 523, wave: 'triangle', style: 'marimba', scale: 'major', gain: 0.11 }, {
     timeUp: [
       { freq: 523, at: 0, dur: 450, type: 'triangle', gain: 0.12 },
       { freq: 659, at: 380, dur: 600, type: 'triangle', gain: 0.1 },
@@ -37,4 +39,9 @@ export const explorerTheme: ThemeDefinition = {
     ],
   }),
   celebration: { colors: ['accent', 'deco-1', 'deco-2', 'deco-3', 'success'] },
+  // S17b (D-168): a map table under rolling hills; torn paper edges, a stitched band on the routine and
+  // the timer, compass corners; no ambient; shield achievement frames; space and animal avatars first.
+  scene: explorerScene,
+  frame: resolveFrame({ edge: 'torn', trim: 'stitched', corners: 'compass' }),
+  sets: { achievementFrame: 'shield', avatarFamiliesFirst: ['space', 'animals'] },
 };

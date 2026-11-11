@@ -16,7 +16,7 @@ Agents: start with [AGENTS.md](../AGENTS.md).
 | Who adds it | A developer, with a release | An administrator on **Admin → Themes**, no release |
 | Art | React SVG components (`art.tsx`) | Strict SVG fragments, drawn as a sanitised tree; missing art comes from a base theme |
 | Motion, fonts, shadows | Keyframes and CSS values from the shared presets | Preset **names** only |
-| Sounds | `themeSounds(params, overrides)` | The same parameters and overrides as data |
+| Sounds | `themeSounds(params, overrides)` | The same parameters, instrument style and overrides as data |
 | Checked by | `npm run check` (tests) | The shared validator, on import and before it is enabled |
 
 Both end up as the same `ThemeDefinition` at run time, use the same tokens and pass the same limits.
@@ -92,6 +92,7 @@ numbers; loosening one is a decision in DECISIONS.md):
 | Sound note | gain ≤ 0.3; tones 150–2500 Hz (a glide may end at ≤ 3000 Hz); noise band ≤ 5000 Hz |
 | Loudness | a tap at class volume 80 peaks between -12 and -6 dBFS; no cue reaches 0 dBFS at volume 100 |
 | Sound parameters | root 150–1000 Hz, gain 0.05–0.2, tempo 0.5–2 |
+| Sound style (S17b) | `tones`, `bells`, `marimba`, `chimes`, `musicBox` (default `tones`); app-defined partials whose gains add up to the note gain, inside the note; partials above 8000 Hz are left out |
 | Typography | weights 400–900; letter-spacing -0.05–0.1 em; system font presets only |
 | Shape | radius 0–2 rem (small 0–1.5 rem); borders 1–4 px (strong 1–6 px); shadow presets only |
 | Icons and avatars | icon stroke 1.5–3; avatar saturation 0–100 %, lightness 10–90 % |
@@ -329,7 +330,7 @@ preview, the MCP tools of S14h and the tests use it).
 | `avatar`, `icons` | Avatar saturation and lightness (big and small initials); icon stroke width, linecap, linejoin |
 | `decoOpacity`, `patternOpacity` | ≤ 0.6, ≤ 0.15 |
 | `motion` | `celebrate` (`hop`, `squash`, `pop`, `sway`, `grow`) and `threshold` (`slideIn`, `rise`, `settle`, `grow`, `fade`), each with `durationMs` and `easing` |
-| `sounds` | `null` (silent) or `{ root, wave, scale, gain, tempo, overrides? }` (`overrides`: hand-made cues per event, as `ToneNote` lists) |
+| `sounds` | `null` (silent) or `{ root, wave, style?, scale, gain, tempo, overrides? }` (`style`: the instrument style, S17b, see [Instrument styles](#instrument-styles-s17b-d-168); `overrides`: hand-made cues per event, as `ToneNote` lists) |
 | `celebration.colors` | Colour tokens of the fireworks |
 | `art` (optional) | `mascot` (all five poses), `illustrations` (any of the six), `decoration`, `pattern`, `patternSize` |
 | `scene`, `frame`, `ambient`, `sets` (optional, S17a) | The theme engine: art behind the app, app-drawn frames, a silent background animation, built-in sets. See [Scenes, frames, ambient and sets](#scenes-frames-ambient-and-sets-s17a-d-166) |
@@ -389,8 +390,8 @@ theme's colours, typography, shape, motion or sounds.
 [peppermint-snow-day](examples/peppermint-snow-day.theme.json) (S17a, D-166) is the example of the
 theme engine: a reindeer mascot and snowy pictures, a three-layer village scene (far hills, fir trees,
 cottages with lit windows and string lights; `cover`, `bottom`, `bottomStrip`), snow-drift frames with
-a candy stripe on the routine and timer and frost corners, slow snowfall and snowflake achievement
-frames. `tests/client/theme-engine.test.tsx` keeps it valid. It is an example: it is not enabled
+a candy stripe on the routine and timer and frost corners, slow snowfall, snowflake achievement
+frames and sounds in the `bells` style (S17b). `tests/client/theme-engine.test.tsx` keeps it valid. It is an example: it is not enabled
 anywhere.
 
 - **Palette.** `bg` `#eef6f8` (sea foam) and white `surface` with `text` `#0f2430` (deep sea): 7:1+
@@ -527,6 +528,9 @@ The presets and their default colour tokens (generated from `src/shared/themePac
   the package's own `surface` (a note in the report).
 - A scene is never inherited from the base theme, and Export of a built-in theme leaves its scene
   out (it is code, like the rest of its art).
+- **Only on the classroom screen** (S17b, D-168). The scene and the ambient layer are drawn while the
+  classroom screen shows (and inside previews). The teacher area, the admin pages and the sign-in pages
+  use the default theme's colours, mascot and pattern without its scene, so tables and forms stay calm.
 
 ### Frame
 
@@ -539,6 +543,14 @@ The presets and their default colour tokens (generated from `src/shared/themePac
   board box keys (`BOX_KEYS` in `src/shared/classroomLayout.ts`; default the routine and the timer).
 - Colours are **token names**: `snowColor` (the edge), `trimColors` (2–3) and `cornerColors` (1–3).
   Each preset has defaults (the table above). Nothing in a frame is CSS or SVG from the package.
+- **Drawn in CSS pixels** (S17b, D-168): an edge or a long trim measures its own box and repeats its
+  motif (a snow bump, a scallop, a torn tooth, a leaf, a bulb) a whole number of times; ends (a
+  pencil's eraser and tip, the rounded ends of a drift) keep their size. A wide box gets more bumps,
+  never wider ones. A snow drift is a puffy 30 px cap with a soft shadow edge and drips down both
+  sides on board boxes, 20 px on student cards, 20 px under the top bar.
+- With a scene, the classroom dock is content-width and centred on wide screens, so the scene shows
+  on both sides (decided by `html[data-scene]`); on a phone the dock is one row that scrolls sideways,
+  with End lesson kept at its right end.
 - The overlays sit outside the content box: the content's padding, its hit areas and the focus
   outline are unchanged (overlays over the card fade away while keyboard focus is inside it). Student
   cards, ordinary cards, compact density and phones get the edge only; dialogs get the edge and the
@@ -572,6 +584,21 @@ The presets and their default colour tokens (generated from `src/shared/themePac
   base theme's).
 - **One mascot everywhere:** built-in illustrations draw the active theme's mascot (a mascot context
   in `themes/art.tsx`), so a package that keeps base illustrations shows its own mascot in them.
+
+### The built-in themes (S17b, D-168)
+
+Every built-in theme uses the engine (mockup `docs/design/mockups/2026-11-11-theme-engine/ThemedBoard.dc.html`):
+
+| Theme | Scene | Frame (edge / trim on routine and timer / corners) | Ambient | Sets | Sound style |
+|---|---|---|---|---|---|
+| Explorer (Compy) | map table, rolling hills, dotted trail, flags, tents, round trees, faint compass rose | `torn` / `stitched` / `compass` | none | `shield`; space, animals | `marimba` |
+| Animals (Fındık) | meadow, sun, clouds, round trees, flowers, a burrow | `none` / `garland` (leaf vine with flowers) / `leaf` | `leaves`, slow | `classic`; animals, sea | `musicBox` |
+| Classroom (Yıldız) | sunny classroom wall, windows, bunting, bookshelves, a plant, a star | `scallop` / `pencil` / `star` | none | `star`; robots, space | `chimes` |
+
+Their scenes are React SVG in `src/client/themes/<key>/scene.tsx`: tokens only and within the package
+scene limits (`tests/client/theme-builtins.test.tsx` runs them through the same sanitiser); the last
+layer is the phone strip, so it carries the ground and the props. Export (and the generated
+`docs/examples/<key>.theme.json`) includes the frame, ambient, sets and sound style, not the scene.
 
 ### Recipe for agents: a scene, frames and snow
 
@@ -628,8 +655,32 @@ celebration: { colors: ['accent', 'deco-1', 'deco-2', 'deco-3', 'success'] },
   (`sine` soft, `triangle` warm, `square` buzzy — use sparingly); `tempo` > 1 is snappier; `gain` 0.05–0.2.
 - A `ToneNote` is `{ freq, to?, at, dur, type, gain }`: `to` glides the pitch; `type: 'noise'` is
   band-passed white noise centred on `freq` (claps ~1.4–2.3 kHz, drums ~250–350 Hz, crackle ~3 kHz).
+- `style` (S17b) picks the instrument; see below.
 - Everything is synthesized. **Never add audio files** to a theme; if a recorded sound is ever
   needed it must be CC0 and listed in [ASSETS.md](ASSETS.md) with its source and licence.
+
+### Instrument styles (S17b, D-168)
+
+`sounds.style` (packages) or `style` in `themeSounds` (built-in themes) chooses how every tone note
+of the pack sounds; the melody, timing and gains stay the same:
+
+| Style | Character | Used by |
+|---|---|---|
+| `tones` | the plain `wave` oscillator of S13b (the default when `style` is absent) | Ocean |
+| `bells` | bright, slightly inharmonic overtones that ring out | Snow Day |
+| `marimba` | a warm wooden note with the 4th harmonic, quick to fade | Explorer |
+| `chimes` | airy, a soft attack and a slow shimmer | Classroom |
+| `musicBox` | a plucked comb tine: very fast attack, short bright overtones | Animals |
+
+A style is data (`SOUND_VOICES` in `src/shared/themePackage/sound.ts`): sine partials, each with a
+frequency ratio, a share of the note's gain and how long it lasts inside the note, plus an attack.
+The shares add up to 1 and every partial ends by the note's end, so every limit above (note gain,
+cue length, loudness at volume 80 and 100, the switches, the volume, the unlock path) applies
+unchanged and `soundPackProblems` checks a styled pack exactly like a plain one. Partials above
+8,000 Hz are left out. Noise notes (claps, drum rolls, crackle) are not styled. A package never puts
+a style inside a note; its `overrides` play in the theme's style. In Admin → Themes the preview says
+"Instrument: …" and its sound buttons play in that style; over MCP `theme_schema` lists the styles,
+`validate_theme` refuses an unknown one and `preview_theme` reports `soundStyle`.
 
 ### Playing
 

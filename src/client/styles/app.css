@@ -1480,7 +1480,11 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
 }
 .cc-lesson-box[data-box='core.students'] > .cc-frame__edge--drift {
   top: -9px;
-  height: 15px;
+  height: 16px;
+}
+/* The students box has no card under its heading line: no drips down its sides. */
+.cc-lesson-box[data-box='core.students'] > .cc-frame__drip {
+  display: none;
 }
 
 /* Frames: overlays placed around a card (FrameOverlay). Over the card they fade away while keyboard
@@ -1526,25 +1530,32 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
   margin: -0.75rem -0.9rem 0;
   padding: 0.75rem 0.9rem 0;
 }
-/* A snow drift sits over the top of its box: the box's card moves a little of its bottom padding to
-   the top (the same total), so the snow covers padding, never content. */
-.cc-lesson-box:has(> .cc-frame__edge--drift) > .cc-lesson-box__body > :is(.cc-card, .cc-counter-panel > .cc-card) {
+/* A snow drift (and a garland or a pencil, S17b) sits over the top of its box: the box's card moves a
+   little of its bottom padding to the top (the same total), so the overlay covers padding, never
+   content. */
+.cc-lesson-box:has(> :is(.cc-frame__edge--drift, .cc-frame__swag, .cc-frame__pencil)) > .cc-lesson-box__body > :is(.cc-card, .cc-counter-panel > .cc-card) {
   padding-top: 1rem;
   padding-bottom: 0.2rem;
 }
-/* Edges (silhouettes). A box's drift: about 10px above the box (inside the 0.5rem row gap) and the
-   rest over its top padding (mockup ThemedBoard: a puffy cap, not a line). */
+/* Edges (silhouettes), drawn in CSS pixels (S17b: measured and tiled, never stretched). A box's drift
+   is a 30px puffy cap (mockup ThemedBoard): its bumps rise up to 8px above the box (the 0.5rem row
+   gap), the rest lies over the box's top padding; drips run down both sides. */
 .cc-frame__edge--drift {
-  left: -8px;
-  top: -12px;
-  width: calc(100% + 16px);
+  left: -6px;
+  top: -9px;
+  width: calc(100% + 12px);
   height: 30px;
 }
 .cc-frame__drip {
-  left: -6px;
-  top: 6px;
+  top: 12px;
   width: 10px;
   height: 30px;
+}
+.cc-frame__drip--left {
+  left: -6px;
+}
+.cc-frame__drip--right {
+  right: -6px;
 }
 .cc-frame__edge--scallop,
 .cc-frame__edge--torn {
@@ -1564,12 +1575,13 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
 .cc-frame__edge--torn.cc-frame__edge--bottom {
   bottom: -8px;
 }
-/* A card's drift: about 6px above the card (the grid's row gap) and the rest over its top padding. */
+/* A card's drift: a 20px cap, 10px above the card (the grid's 0.75rem row gap) and 10px over its top
+   padding; exactly as wide as the card, so it never widens the scrolling student grid. */
 .cc-student-card > .cc-frame__edge--drift {
-  left: -3px;
-  top: -7px;
-  width: calc(100% + 6px);
-  height: 14px;
+  left: 0;
+  top: -10px;
+  width: 100%;
+  height: 20px;
 }
 .cc-student-card > :is(.cc-frame__edge--scallop, .cc-frame__edge--torn) {
   left: 10px;
@@ -1580,10 +1592,10 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
 /* The top bar spans the page from its top: its edge hangs from the bottom border. */
 .cc-classroom-bar > .cc-frame__edge--drift {
   top: auto;
-  bottom: -12px;
+  bottom: -13px;
   left: 0;
   width: 100%;
-  height: 16px;
+  height: 20px;
 }
 /* Dialogs scroll: their edge and corners are drawn just inside the top. */
 .cc-modal > .cc-frame__edge--top {
@@ -1616,7 +1628,7 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
 }
 .cc-frame__swag {
   left: -6px;
-  top: -12px;
+  top: -14px;
   width: calc(100% + 12px);
   height: 28px;
 }
@@ -2418,6 +2430,59 @@ html:has(.cc-classroom) {
 }
 .cc-dock__spacer {
   flex: 1 1 0;
+}
+/* S17b (D-168): with a theme scene the dock is content-width and centred on wide screens, so the scene
+   shows on both sides (mockups); End lesson stays at its right end. Decided by the scene, never by a
+   theme key (not while the layout is edited). The dock box drops its inline-size containment so it can take its content's width. */
+@media (min-width: 64.01rem) {
+  html[data-scene] .cc-lesson-board:not([data-editing]) .cc-lesson-row[data-dock-row] {
+    justify-content: center;
+  }
+  html[data-scene] .cc-lesson-board:not([data-editing]) .cc-lesson-box[data-box='core.dock'] {
+    flex: 0 1 auto;
+    container-type: normal;
+  }
+  html[data-scene] .cc-lesson-board:not([data-editing]) .cc-lesson-box[data-box='core.dock'] .cc-dock__spacer {
+    flex: 0 0 0.75rem;
+  }
+}
+/* S17b: a phone gets a compact dock, one row that scrolls sideways inside itself (labels on one line),
+   with End lesson kept in view at its right end; the bottom strip scene and the class stay visible. */
+@media (max-width: 40rem) {
+  .cc-dock {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    gap: 0.35rem;
+    padding: 0.3rem;
+  }
+  .cc-dock > *,
+  .cc-dock > .cc-btn {
+    flex: none;
+  }
+  /* (Stronger than the page's phone rules at the end of this file: in a row that scrolls, a button
+     keeps its whole label on one line instead of shrinking to the row.) */
+  .cc-dock .cc-btn,
+  .cc-page .cc-dock .cc-btn {
+    max-width: none;
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+  .cc-dock > .cc-btn {
+    padding-inline: 0.6rem;
+    font-size: 1rem;
+  }
+  .cc-dock > .cc-dock__spacer {
+    display: none;
+  }
+  .cc-dock > .cc-dock__end {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    margin-left: auto;
+    box-shadow: -0.5rem 0 0.5rem -0.25rem var(--cc-shadow-color);
+  }
 }
 /* A dock panel opened full screen: a note only when the panel has nothing to show. */
 .cc-dock-view {

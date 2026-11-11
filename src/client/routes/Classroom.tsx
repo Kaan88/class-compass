@@ -156,7 +156,11 @@ function ClassroomScreen({
     setDisplay({ theme: active.theme, classAnimations: active.animationsEnabled, classSounds: active.soundsEnabled, soundVolume: active.soundVolume, timeUpSound: active.timeUpSound, timeUpClip: hasClip });
     preloadTimeUp(active.timeUpSound, hasClip);
   }, [active, contexts.data?.timeUpClip]);
-  useEffect(() => () => setDisplay({ theme: DEFAULT_THEME, classAnimations: true, classSounds: true, soundVolume: 80 }), []);
+  // The theme's scene and ambient layer are drawn only while the classroom screen shows (S17b, D-168).
+  useEffect(() => {
+    setDisplay({ classScreen: true });
+    return () => setDisplay({ theme: DEFAULT_THEME, classAnimations: true, classSounds: true, soundVolume: 80, classScreen: false });
+  }, []);
 
   // The needs-attention tray names the class of every refused command (LES-4).
   useEffect(() => {

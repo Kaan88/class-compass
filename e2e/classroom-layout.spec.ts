@@ -108,7 +108,11 @@ async function layoutFacts(page: Page) {
         if (w > 1 && h > 1) overlaps.push(`${rects[i]!.key} / ${rects[j]!.key}`);
       }
     const empty = boxes.filter((b) => b.getBoundingClientRect().height < 4 || !b.innerText.trim()).map((b) => b.dataset.box);
-    const overflowing = boxes.filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => b.dataset.box);
+    // The content (the box body) must fit; a theme's frame overlays may reach past the box itself (S17b).
+    const overflowing = boxes.filter((b) => {
+      const body = b.querySelector<HTMLElement>(':scope > .cc-lesson-box__body') ?? b;
+      return body.scrollWidth > body.clientWidth + 1;
+    }).map((b) => b.dataset.box);
     const offScreen = rects.filter(({ r }) => r.left < -1 || r.right > window.innerWidth + 1).map(({ key }) => key);
     return { hScroll: se.scrollWidth > se.clientWidth + 1, overlaps, empty, overflowing, offScreen };
   });
