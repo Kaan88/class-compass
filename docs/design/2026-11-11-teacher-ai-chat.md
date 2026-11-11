@@ -1,6 +1,14 @@
 # AI assistant chat in the teacher area: proposal
 
-Status: proposal, nothing built (2026-11-11). Owner's wishes: a chat "similar to this" (Claude Code) inside the teacher area; **chats kept on the server so they are not lost**; **connect whatever AI the school has**: accounts where the provider allows it, API keys, other providers.
+Status: approved for building (owner decisions 2026-11-11, below); stages S19a–S19c. Owner's wishes: a chat "similar to this" (Claude Code) inside the teacher area; **chats kept on the server so they are not lost**; **connect whatever AI the school has**: accounts where the provider allows it, API keys, other providers.
+
+## Owner decisions (2026-11-11)
+
+- **Connections: all of them.** Anthropic API key, OpenAI API key, Google Gemini API key, OpenRouter ("Connect OpenRouter" with OAuth PKCE, or a pasted key) and any OpenAI-compatible base URL, all in the first build; the admin picks the school default. **"Sign in with ChatGPT"** (a teacher's ChatGPT plan): build the adapter slot and the flow behind a setting that stays off until OpenAI grants Class Compass access; the admin page says so plainly and links how to apply. Claude subscriptions stay impossible (Anthropic allows only API keys for third-party apps).
+- **Easier connector setup (the other direction).** Besides the in-app chat, a guided "Connect an AI app" page so a teacher can add Class Compass to ChatGPT, Claude (claude.ai, Desktop, Code) and other MCP clients with step-by-step instructions, the exact URL, copy buttons, a connection test and the admin checklist (AI tools switch, OAuth return hosts, the Cloudflare Access bypass note) — replacing today's bare token list as the first thing teachers see.
+- **Teachers' own connections:** an admin setting, off by default; when on, a teacher may add a personal connection only they use.
+- **Chat retention:** keep for the school year, delete one year after the last message (admin can change it).
+- **Parent drafts:** yes, drafts only; nothing is ever sent from the chat; the teacher copies the text.
 
 ## What already exists
 

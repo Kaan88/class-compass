@@ -376,11 +376,12 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17c; decision D-169; after 
 - [ ] Avatars named and chosen by children on the real devices (owner, Sare)
 - [ ] Later, owner to choose: new families (arctic, forest, farm, bugs), seasonal hats and accessories, theme avatar style, more expressions
 
-## S19 AI assistant chat in the teacher area (proposal, owner 2026-11-11)
-Proposal: `docs/design/2026-11-11-teacher-ai-chat.md`; not started; after S17/S18. Decision and migration numbers assigned when it is planned.
-- [ ] S19a: chat page with streaming on the existing AI tool layer, confirmation before any change, real names on screen with pseudonyms to the provider, chats kept on the server with retention, Anthropic and OpenAI-compatible (any base URL) connections with sealed keys and limits, guides EN/TR
-- [ ] S19b: Gemini, "Connect OpenRouter" (OAuth PKCE), per-teacher connections, model test matrix; "Sign in with ChatGPT" only if OpenAI grants access
-- [ ] Owner decisions: default model and connection, teachers' own connections, chat retention
+## S19 AI assistant chat in the teacher area (owner 2026-11-11, decisions taken)
+Proposal and owner decisions: `docs/design/2026-11-11-teacher-ai-chat.md`. Decisions D-179 (connections), D-180 (chat), D-181 (connector setup).
+- [ ] S19a: AI connections: Anthropic, OpenAI, Gemini, OpenRouter (key and OAuth PKCE), any OpenAI-compatible base URL; sealed secrets, limits and usage, URL safety, "Test connection", school default, teachers' own connections behind an admin setting (off by default); "Sign in with ChatGPT" slot off until OpenAI grants access
+- [ ] S19b: chat page in the teacher area with streaming, the server agent loop on the existing tool layer, confirmation before any change, real names on screen and pseudonyms to the provider, chats on the server (retention: school year + 1 year), parent drafts (copy only), guides EN/TR
+- [ ] S19c: "Connect an AI app" guided setup for ChatGPT, Claude and other MCP clients (URL, copy, test, admin checklist)
+- [x] Owner decisions: all connections with an admin-chosen default, teachers' own connections an admin setting, retention school year + 1 year, parent drafts as copy-only drafts (2026-11-11)
 
 ## S20 Roadmap sweep (owner 2026-11-11: "finish roadmap items as you go")
 Brief: `docs/design/2026-11-11-roadmap-sweep.md`; decisions D-170 to D-172. The boxes of each item stay in their own stages above and are ticked there.
