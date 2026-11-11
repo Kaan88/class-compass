@@ -113,6 +113,29 @@ Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bi
 
 **Yapay zekâ araçları** (yönetim menüsü) öğretmenlerin Claude gibi bir yapay zekâ asistanını Sınıf Pusulası'na bağlamasını sağlar. Varsayılan olarak kapalıdır; öğrenci adları da siz okulun KVKK sorumlusuyla birlikte aksine karar verene kadar okulda kalır. Ayrıntıların hepsi [Yapay zekâ araçları kılavuzu](ai-tools.md)'ndadır.
 
+## Asistan bağlantıları
+
+**Yapay zekâ araçları** → **Asistan bağlantıları**, Sınıf Pusulası içindeki asistan için okulun bir yapay zekâ sağlayıcısındaki kendi hesabını bağladığınız yerdir. Siz bir bağlantı eklemeden hiçbir şey bağlanmaz.
+
+**Bağlantı ekle** şunları sorar:
+
+- **Bağlantı türü**: Anthropic (Claude), OpenAI, Google Gemini, OpenRouter ya da bir **OpenAI uyumlu sunucu** (örneğin Mistral, Groq ya da okulun kendi sunucusunda çalışan Ollama gibi bir model). OpenAI uyumlu sunucu için **Adres (temel URL)** alanına adresini yazarsınız; **Bu adres bu sunucuda ya da okulun ağında** kutusunu yalnızca adres gerçekten yerelse işaretleyin (kutu işaretli değilse yerel adres ya da düz http reddedilir; bulut meta veri adresleri her zaman reddedilir).
+- **Ad**: öğretmenlerin gördüğü ad.
+- **API anahtarı**: bir kez yapıştırılır ve mühürlü saklanır. Yöneticiler de dahil kimse onu bir daha göremez. Değiştirmek için bağlantıyı düzenleyip yenisini yapıştırın. OpenRouter için boş bırakıp kaydettikten sonra **OpenRouter’ı bağla** düğmesini kullanabilirsiniz: OpenRouter'da oturum açar, Sınıf Pusulası'na dönersiniz ve aldığı anahtarı Sınıf Pusulası saklar.
+- **Modeller, her satıra bir tane**: sağlayıcının kullandığı model adlarının tam hâli.
+- Herkes için **Aylık bütçe (token)** ve **Öğretmen başına günlük mesaj**. Boş bırakmak sınır yok demektir.
+- **Veri işleyen onayı** (KVKK): yalnızca okul bu sağlayıcıyı kullanmayı kabul ettiyse işaretleyin. Asistana yazılan mesajlar sağlayıcıya gider; **Öğrenci verisi yapay zekâ araçlarına** kapalıyken sağlayıcı yalnızca takma adları görür.
+
+Bir modelin yanındaki **… modelini dene** düğmesi okul verisi içermeyen iki küçük istek gönderir: biri bir kelime ister, öteki modelden bir deneme aracını kullanmasını ister. Sonuç metnin ve araçların çalışıp çalışmadığını yazıyla söyler; asistanın ikisine de ihtiyacı vardır. Liste her modeli "araçlarla denendi", "yalnızca metin, araçlar çalışmadı" ya da "denenmedi" olarak, bu ayki kullanımı (mesaj ve token sayısı, yazılanlar asla) ve durumu gösterir.
+
+**Okulun varsayılanı** asistanın kullandığı bağlantıyı ve modeli seçer. **Öğretmenler kendi bağlantılarını ekleyebilir** (varsayılan olarak kapalı) açıkken öğretmenler Profil sayfalarında yalnızca kendilerinin kullandığı bir Anthropic, OpenAI, Gemini ya da OpenRouter bağlantısı ekleyebilir; sunucu adresi ekleyemezler. Ayarı yeniden kapatmak bu bağlantıların kullanımını durdurur.
+
+**Düzenle** adı, modelleri, sınırları, anahtarı ya da **Bağlantı kullanımda** ayarını değiştirir; **Sil** anahtarı hemen siler (kullanım sayıları kalır). Her değişiklik denetim kaydına geçer, anahtar asla geçmez.
+
+### ChatGPT ile giriş
+
+Bir ChatGPT hesabı henüz bağlanamaz: önce OpenAI'ın Sınıf Pusulası'nı "Sign in with ChatGPT" için onaylaması gerekir. O zamana kadar bu seçenek **Henüz kullanılamıyor** olarak görünür. Başvurmak için okul (ya da sunucuyu işleten kişi) OpenAI geliştirici platformu (platform.openai.com, yardım ve iletişim sayfaları) üzerinden, öğretmenlerin ChatGPT hesaplarını kullanmasını sağlayan bir okul uygulamasını anlatarak erişim ister. OpenAI bir istemci kimliği ve oturum açma adreslerini verince sunucuyu işleten kişi sunucu ayarlarında `AI_CHATGPT_SIGNIN=true` ve öteki `AI_CHATGPT_*` değerlerini girip sunucuyu yeniden başlatır; bundan sonra **ChatGPT ile giriş** öteki türler gibi eklenebilir. O zamana kadar bir OpenAI API anahtarı **OpenAI** türüyle çalışır.
+
 ## Hava durumu
 
 **Okul ayarları** → **Sınıf ekranında hava durumu**: **Hava durumunu göster**, bir **Yer adı** (sizin için) ile **Enlem** ve **Boylam**. Ücretsiz Open-Meteo hizmetine yalnızca bu koordinatlar gönderilir (anahtar yok, okul ya da öğrenci verisi yok). Sunucunun api.open-meteo.com adresine internet erişimi olmalıdır; yoksa hava durumu yalnızca görünmez.

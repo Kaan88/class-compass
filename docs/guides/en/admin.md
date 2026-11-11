@@ -113,6 +113,29 @@ The full technical description (every colour, the limits, the drawing rules, a w
 
 **AI tools** (administration menu) lets teachers connect an AI assistant such as Claude to Class Compass. It is off by default, and student names stay inside the school until you, with the school's KVKK contact, decide otherwise. Everything about it is in the [AI tools guide](ai-tools.md).
 
+## Assistant connections
+
+**AI tools** → **Assistant connections** is where you connect the school's own account with an AI provider, for the assistant inside Class Compass. Nothing is connected until you add a connection.
+
+**Add connection** asks for:
+
+- **Kind of connection**: Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, or an **OpenAI-compatible server** (for example Mistral, Groq, or a model running on the school's own server such as Ollama). For an OpenAI-compatible server you give its **Address (base URL)**; tick **This address is on this server or the school's network** only when it really is local (a local address or plain http is refused without the tick; cloud metadata addresses are always refused).
+- **Name**: what teachers see.
+- **API key**: pasted once and stored sealed. Nobody can see it again, administrators included. To change it, edit the connection and paste a new one. For OpenRouter you can leave it empty and use **Connect OpenRouter** after saving: you sign in at OpenRouter and come back to Class Compass, which then stores the key it receives.
+- **Models, one per line**: the exact model names of the provider.
+- **Monthly budget (tokens)** for everyone together and **Messages a day per teacher**. Empty means no limit.
+- The **data processor confirmation** (KVKK): tick it only when the school has agreed to use this provider. Messages sent to the assistant go to the provider; while **Student data to AI tools** is off it only ever sees pseudonyms.
+
+**Test** (the button named after a model) sends two tiny requests with no school data: one asks for a word, the other asks the model to use a test tool. The result says in words whether text works and whether tools work; the assistant needs both. The list shows each model as "tested with tools", "text only, tools did not work" or "not tested", the usage this month (messages and tokens, never what was written) and the status.
+
+**School default** → **Connection and model the assistant uses** chooses the connection and model the assistant uses. **Teachers may add their own connection** (off by default) lets teachers add a personal Anthropic, OpenAI, Gemini or OpenRouter connection on their Profile, used only by them; they cannot add server addresses. Switching it off again stops their use.
+
+**Edit** changes the name, models, limits, key or **Connection in use**; **Delete** erases the key at once (usage numbers stay). Every change is in the audit log, never with the key.
+
+### Sign in with ChatGPT
+
+A ChatGPT account cannot be connected yet: OpenAI must first approve Class Compass for "Sign in with ChatGPT". Until then the option is shown as **Not available yet**. To apply, the school (or whoever runs the server) asks OpenAI for access through the OpenAI developer platform (platform.openai.com, the help and contact pages), describing a school app that lets teachers use their ChatGPT account. When OpenAI gives a client id and the sign-in addresses, the server's operator sets `AI_CHATGPT_SIGNIN=true` and the other `AI_CHATGPT_*` values in the server settings and restarts it; after that **Sign in with ChatGPT** can be added like the other kinds. Until then, an OpenAI API key works with **OpenAI**.
+
 ## Weather
 
 **School settings** → **Weather on the classroom screen**: **Show the weather**, a **Place name** (for you) and the **Latitude** and **Longitude**. Only these coordinates are sent to the free Open-Meteo service (no key, no school or student data). The server needs internet access to api.open-meteo.com; without it, the weather simply does not appear.

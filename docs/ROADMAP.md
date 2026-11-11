@@ -378,7 +378,9 @@ Brief: `docs/design/2026-11-11-theme-engine.md` → S17c; decision D-169; after 
 
 ## S19 AI assistant chat in the teacher area (owner 2026-11-11, decisions taken)
 Proposal and owner decisions: `docs/design/2026-11-11-teacher-ai-chat.md`. Decisions D-179 (connections), D-180 (chat), D-181 (connector setup).
-- [ ] S19a: AI connections: Anthropic, OpenAI, Gemini, OpenRouter (key and OAuth PKCE), any OpenAI-compatible base URL; sealed secrets, limits and usage, URL safety, "Test connection", school default, teachers' own connections behind an admin setting (off by default); "Sign in with ChatGPT" slot off until OpenAI grants access
+- [x] S19a: AI connections: Anthropic, OpenAI, Gemini, OpenRouter (key and OAuth PKCE), any OpenAI-compatible base URL; sealed secrets, limits and usage, URL safety, "Test connection", school default, teachers' own connections behind an admin setting (off by default); "Sign in with ChatGPT" slot off until OpenAI grants access (D-179; tested against a local fake provider)
+- [ ] S19a check with real providers: test a connection to each cloud provider with a real school key, and "Connect OpenRouter" with a real account (a person does it)
+- [ ] S19a "Sign in with ChatGPT": fill in the `AI_CHATGPT_*` settings and check the flow once OpenAI approves the school
 - [ ] S19b: chat page in the teacher area with streaming, the server agent loop on the existing tool layer, confirmation before any change, real names on screen and pseudonyms to the provider, chats on the server (retention: school year + 1 year), parent drafts (copy only), guides EN/TR
 - [ ] S19c: "Connect an AI app" guided setup for ChatGPT, Claude and other MCP clients (URL, copy, test, admin checklist)
 - [x] Owner decisions: all connections with an admin-chosen default, teachers' own connections an admin setting, retention school year + 1 year, parent drafts as copy-only drafts (2026-11-11)
