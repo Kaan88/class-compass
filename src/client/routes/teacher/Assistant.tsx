@@ -120,12 +120,13 @@ function WeekTab({ contextId }: { contextId: string }) {
           {t('assistant.weekTitle')}
         </h2>
         <DataTable
+          stack
           caption={t('assistant.weekOf', { from: dayLabel(ws, locale, { day: 'numeric', month: 'long' }), to: dayLabel(lastDay, locale, { day: 'numeric', month: 'long', year: 'numeric' }) })}
           rows={p.days}
           rowKey={(d) => d.date}
           emptyText={t('assistant.noDays')}
           columns={[
-            { key: 'day', header: t('assistant.col.day'), render: (d) => <span>{dayLabel(d.date, locale)}{d.today ? ` · ${t('assistant.today')}` : ''}</span> },
+            { key: 'day', header: t('assistant.col.day'), stackRole: 'title', render: (d) => <span>{dayLabel(d.date, locale)}{d.today ? ` · ${t('assistant.today')}` : ''}</span> },
             { key: 'who', header: t('assistant.col.assistant'), render: (d) => <Who contextId={contextId} s={d.assistant} /> },
             { key: 'planned', header: t('assistant.col.planned'), render: (d) => (d.actual ? <Who contextId={contextId} s={d.planned} /> : <span className="cc-muted">{t('assistant.asPlanned')}</span>) },
             { key: 'status', header: t('assistant.col.status'), render: (d) => (d.status ? <span>{t(statusKey(d.status))}{d.reason ? ` – ${reasonText(t, d.reason)}` : ''}</span> : '') },
@@ -275,12 +276,13 @@ function HistoryTab({ contextId }: { contextId: string }) {
   return (
     <div className="cc-stack">
       <DataTable
+        stack
         caption={t('assistant.historyStudents')}
         rows={q.data.students}
         rowKey={(r) => r.student.id}
         emptyText={t('assistant.historyEmpty')}
         columns={[
-          { key: 'name', header: t('common.name'), render: (r) => <Who contextId={contextId} s={r.student} />, sortValue: (r) => r.student.fullName },
+          { key: 'name', header: t('common.name'), stackRole: 'title', render: (r) => <Who contextId={contextId} s={r.student} />, sortValue: (r) => r.student.fullName },
           { key: 'turns', header: t('assistant.col.turns'), render: (r) => r.turns, sortValue: (r) => r.turns },
           { key: 'missed', header: t('assistant.col.missed'), render: (r) => r.missed, sortValue: (r) => r.missed },
           { key: 'last', header: t('assistant.col.last'), render: (r) => d(r.lastDate), sortValue: (r) => r.lastDate ?? '' },
@@ -288,12 +290,13 @@ function HistoryTab({ contextId }: { contextId: string }) {
         ]}
       />
       <DataTable
+        stack
         caption={t('assistant.historyDays')}
         rows={q.data.days}
         rowKey={(r) => r.date}
         emptyText={t('assistant.historyEmpty')}
         columns={[
-          { key: 'day', header: t('assistant.col.day'), render: (r) => dayLabel(r.date, locale) },
+          { key: 'day', header: t('assistant.col.day'), stackRole: 'title', render: (r) => dayLabel(r.date, locale) },
           { key: 'planned', header: t('assistant.col.planned'), render: (r) => <Who contextId={contextId} s={r.planned} /> },
           { key: 'actual', header: t('assistant.col.actual'), render: (r) => (r.actual ? <Who contextId={contextId} s={r.actual} /> : <span className="cc-muted">{t('assistant.asPlanned')}</span>) },
           { key: 'status', header: t('assistant.col.status'), render: (r) => `${t(statusKey(r.status))}${r.reason ? ` – ${reasonText(t, r.reason)}` : ''}${r.absent.length ? ` (${t('assistant.absentNames', { names: r.absent.map((a) => a.fullName).join(', ') })})` : ''}` },

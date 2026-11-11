@@ -81,12 +81,13 @@ function History({ contextId }: { contextId: string }) {
   return (
     <div className="cc-stack">
       <DataTable
+        stack
         caption={t('secret.historyStudents')}
         rows={q.data.students}
         rowKey={(r) => r.student.id}
         emptyText={t('secret.historyEmpty')}
         columns={[
-          { key: 'name', header: t('common.name'), render: (r) => <Name contextId={contextId} s={r.student} />, sortValue: (r) => r.student.fullName },
+          { key: 'name', header: t('common.name'), stackRole: 'title', render: (r) => <Name contextId={contextId} s={r.student} />, sortValue: (r) => r.student.fullName },
           { key: 'revealed', header: t('secret.col.revealed'), render: (r) => r.revealed, sortValue: (r) => r.revealed },
           { key: 'met', header: t('secret.outcome.goal_met'), render: (r) => r.goalMet, sortValue: (r) => r.goalMet },
           { key: 'practising', header: t('secret.outcome.still_practising'), render: (r) => r.stillPractising, sortValue: (r) => r.stillPractising },

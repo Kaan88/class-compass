@@ -265,8 +265,9 @@ export function TableView({ table, csvHref, compact = false }: { table: ReportTa
       </div>
       {table.note ? <p className="cc-muted">{label(table.note)}</p> : null}
       {table.chart && !compact ? <ChartView table={table} chart={table.chart} /> : null}
-      {/* In the narrow drawer a table may scroll sideways: the keyboard can reach and scroll it (S14e2). */}
-      <div className="cc-table-wrap" {...(compact ? { tabIndex: 0, role: 'region', 'aria-label': label(table.title) } : {})}>
+      {/* A table may scroll sideways (the drawer, a phone): the keyboard can reach and scroll it (S14e2;
+          on report pages too since S20a, axe scrollable-region-focusable at 412 px). */}
+      <div className="cc-table-wrap" tabIndex={0} role="region" aria-label={label(table.title)}>
         <table className="cc-table">
           <caption className="cc-visually-hidden">{label(table.title)}</caption>
           <thead>
