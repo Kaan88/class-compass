@@ -24,6 +24,7 @@ Yönetim menüsünden **Süper Konuşmacılar**'ı açın. **Aç ya da kapat** b
 - **Puanlayıcı başına sınır**: **Süre (dakika)** içinde **En çok (puan)**; altındaki satır bunu bir cümle olarak okur. Art arda kontrolsüz dokunmaları durdurur (varsayılan: 10 dakikada 60 puan).
 - **Pano başlığı (İngilizce)** ve **Pano başlığı (Türkçe)** ile henüz kimsenin puanı yokken ve podyumda boş bir yer varken gösterilen **Pano mesajları**. Hazır mesaj için alanı boş bırakın.
 - **Pano dili** ve **Pano teması**.
+- **Öğrencilerin kendi resimlerini panoda ve puanlama uygulamasında göster**: yalnızca bir öğretmenin onayladığı resimler; varsayılan olarak kapalıdır, kapalıyken pano ve puanlama uygulaması avatarı gösterir.
 - **Pano sesi ve kutlama**: ilk üç değiştiğinde temanın kutlamasını oynatır. Varsayılan olarak kapalıdır. Tarayıcılar ses çalmak için birinin panoya bir kez tıklamasını bekleyebilir.
 - **Başarılar bu derse verilir**: puanlar bu derste Süper Konuşmacılar başarılarını kazandırır (ilk puan, 5, 10 ve 25 puan). Varsayılan (**Otomatik: İngilizce dersi**), İngilizce adı "English" olan derstir. Böyle bir ders bulunamazsa siz bir ders seçene kadar Süper Konuşmacılar başarısı verilmez.
 

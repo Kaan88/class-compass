@@ -299,7 +299,15 @@ Başarılar çabayı ödüllendirir: hiçbiri devama, hıza ya da öğrencileri 
 
 - **Bu sınıfta avatar değişikliklerini durdur** (öğrenciler avatarlarını korur ama değiştiremez);
 - **Öğrenci seçene kadar göster**: **otomatik oluşturulan sevimli bir avatar** ya da **baş harfler**;
-- bir öğrenci için **Avatarı sıfırla** (yazarak onaylarsınız; öğrenci yeniden seçene kadar otomatik avatarı görür).
+- bir öğrenci için **Avatarı sıfırla** (yazarak onaylarsınız; öğrenci yeniden seçene kadar otomatik avatarı görür);
+- **Öğrenciler kendi resimlerini gönderebilir** seçeneğini açabilirsiniz (varsayılan olarak kapalı; yalnızca yönetici kendi resimlerini okul genelinde açtıysa). Avatar değişikliklerine ara verirseniz yeni resim de gönderilemez.
+
+**Avatar resimleri** (öğretmen menüsünde, bakılacak sayısıyla): öğrencilerinizin avatar olarak gönderdiği resimler. Siz evet diyene kadar resmi başka kimse görmez.
+
+- **Bakılacak**: en eskisi önce, silinmesine ne kadar kaldığıyla (kimsenin bakmadığı resim 14 gün sonra silinir). **Evet, kullansın**'dan önce **Öğrencinin ya da tanıdığı birinin fotoğrafı değil. Ünlüler, karakterler ve çizimler olur.** kutusunu işaretleyin. **Bu olmaz** nedenini sorar (**Tanıdığı gerçek biri**, **Kırıcı ya da uygun değil**, **Bir isim ya da yer gösteriyor**, **Zor görünüyor**): öğrenci nedeni görür, resim hemen silinir.
+- **Kullanımda**: öğrencilerin şu an kullandığı resimler. **Kaldır** resmi hemen siler; öğrencinin avatarı geri gelir.
+
+Onaylanan resimler diğer yüklemeler gibi okulun yedeklerinde tutulur; eski yedeklerdeki kopyalar o yedeklerin süresi dolunca gider. Bildirimleriniz bekleyen bir resmi haber verebilir (**Bakılacak kendi resimleri**, kapatılabilir).
 
 ### Nazik sözcük denetimi
 

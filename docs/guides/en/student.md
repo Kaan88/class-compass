@@ -119,6 +119,19 @@ Your avatar is the little picture of you that your class sees on the classroom s
 
 Some parts say **earn "…" to unlock**: earn that achievement first. If you see **Your teacher has paused avatar changes for now**, you can change it later.
 
+### Use my own picture
+
+If your school and your teacher allow it, **My avatar** has a button **Use my own picture**. You can use a picture instead of your avatar, and your teacher checks it first.
+
+- **Fine**: a drawing you made, a cartoon or game character, a famous person (like a footballer), an animal or a thing.
+- **Not allowed**: a photo of you, a photo of a classmate, a friend or your family, names, your school or your address, anything unkind.
+
+1. Press **Choose a picture** and pick one (JPG, PNG or WebP).
+2. Make it fit: drag it, or use the arrow keys, to move it inside the circle. Use **Zoom** and **Brightness**, **Turn left**, **Turn right**, **Mirror** or **Start again**. **How it will look** shows the large and the small card.
+3. Press **Send to my teacher**.
+
+Until your teacher says yes, your class sees your avatar (**Waiting for your teacher**). You can **Take my picture back**. A picture nobody checks is deleted after 14 days. If your teacher says **Not this one**, the picture is deleted at once and you see why; press **Choose another picture** to try again. **Stop using my picture** deletes it and brings your avatar back.
+
 ## What your teacher can see
 
 Your teachers of that subject can see everything on your page for that subject: your goals, what you wrote about them, your work and how it is going. They can add goals, work and feedback. They can also **hide** something from your page (for example if it was added by mistake). Your teacher may also keep short private notes for themselves; those are never shown on your page. When you add something, your teacher may get a notification about it in their teacher area.

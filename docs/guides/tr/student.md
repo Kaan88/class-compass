@@ -119,6 +119,19 @@ Avatarın, sınıfının sınıf ekranında gördüğü küçük resmindir. Bir 
 
 Bazı parçalarda **açmak için "…" başarısını kazan** yazar: önce o başarıyı kazanman gerekir. **Öğretmenin avatar değişikliklerini şimdilik durdurdu.** yazıyorsa avatarını daha sonra değiştirebilirsin.
 
+### Kendi resmimi kullan
+
+Okulun ve öğretmenin izin veriyorsa **Avatarım**'da **Kendi resmimi kullan** düğmesi olur. Avatarının yerine bir resim kullanabilirsin; önce öğretmenin bakar.
+
+- **Olur**: kendi yaptığın bir çizim, bir çizgi film ya da oyun karakteri, ünlü biri (örneğin bir futbolcu), bir hayvan ya da bir eşya.
+- **Olmaz**: senin fotoğrafın, bir sınıf arkadaşının, arkadaşının ya da ailenden birinin fotoğrafı, isimler, okulun ya da adresin, kırıcı olan her şey.
+
+1. **Bir resim seç**'e bas ve bir resim seç (JPG, PNG ya da WebP).
+2. Yerleştir: resmi sürükleyerek ya da ok tuşlarıyla dairenin içinde kaydır. **Yakınlaştır** ve **Parlaklık**'ı, **Sola çevir**, **Sağa çevir**, **Ayna** ya da **Baştan başla**'yı kullan. **Nasıl görünecek** büyük ve küçük kartı gösterir.
+3. **Öğretmenime gönder**'e bas.
+
+Öğretmenin evet diyene kadar sınıfın avatarını görür (**Öğretmenin bakacak**). **Resmimi geri al** diyebilirsin. Kimsenin bakmadığı resim 14 gün sonra silinir. Öğretmenin **Bu olmaz** derse resim hemen silinir ve nedenini görürsün; yeniden denemek için **Başka bir resim seç**'e bas. **Resmimi artık kullanma** resmi siler, avatarın geri gelir.
+
 ## Öğretmenin neleri görür
 
 O dersteki öğretmenlerin, sayfanda o dersle ilgili her şeyi görebilir: hedeflerini, onlar hakkında yazdıklarını, çalışmalarını ve nasıl gittiğini. Hedef, çalışma ve geri bildirim ekleyebilirler. Sayfandan bir şeyi **gizleyebilirler** de (örneğin yanlışlıkla eklendiyse). Öğretmenin kendisi için kısa özel notlar da tutabilir; bunlar sayfanda asla görünmez. Bir şey eklediğinde öğretmenin kendi alanında bununla ilgili bir bildirim görebilir.

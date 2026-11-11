@@ -299,7 +299,15 @@ Achievements reward effort: none depends on attendance, speed or comparing stude
 
 - **Pause avatar changes for this class** (students keep their avatar but cannot change it);
 - choose what to show **Before a student chooses**: **a friendly generated avatar** or **the initials**;
-- **Reset avatar** for one student (you confirm by typing; the student sees the generated avatar until they choose again).
+- **Reset avatar** for one student (you confirm by typing; the student sees the generated avatar until they choose again);
+- turn on **Students may send their own picture** (off by default; only while the administrator has turned own pictures on for the school). Pausing avatar changes also stops new pictures.
+
+**Avatar pictures** (on the teacher menu, with the number to check): pictures your students sent as their avatar. Nobody else sees a picture until you say yes.
+
+- **To check**: oldest first, with how long until it is deleted (a picture nobody checks is deleted after 14 days). Before **Yes, use it**, tick **Not a photo of the student or anyone they know. Famous people, characters and drawings are fine.** **Not this one** asks why (**A real person you know**, **Not kind or not suitable**, **Shows a name or place**, **Hard to see**): the student sees the reason and the picture is deleted at once.
+- **In use**: the pictures students use now. **Remove** deletes one at once; the student gets their avatar back.
+
+Approved pictures are kept in the school's backups like other uploads; copies in earlier backups go when those backups expire. Your notifications can tell you when a picture waits (**Own pictures to check**, can be turned off).
 
 ### Kind words check
 

@@ -3,8 +3,9 @@
  * development machine); these tests lint what can be checked without it.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { join, posix, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { loadConfig } from '../../src/server/config.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const read = (f: string) => readFileSync(join(ROOT, f), 'utf8');
@@ -29,6 +30,13 @@ describe('Dockerfile', () => {
     expect(df).toMatch(/DATA_DIR=\/data/u);
     expect(df).toMatch(/HEALTHCHECK [^\n]*\\\n[^\n]*\/healthz/u);
     expect(df).toContain('VOLUME ["/data"]');
+  });
+
+  it('keeps avatar pictures waiting for a teacher on the /data volume but outside the uploads that backups copy (S24, D-184)', () => {
+    const c = loadConfig({ NODE_ENV: 'production', SECRET_PEPPER: 'docker-test-pepper-0123456789', PUBLIC_ORIGIN: 'https://school.example.org', DATA_DIR: '/data' });
+    expect(relative(resolve('/data'), c.avatarQuarantineDir)).toBe('avatar-quarantine');
+    expect(relative(c.uploadsDir, c.avatarQuarantineDir).startsWith('..')).toBe(true);
+    expect(relative(c.backupsDir, c.avatarQuarantineDir).startsWith('..')).toBe(true);
   });
 
   it('bakes the OCR language data in at build time', () => {

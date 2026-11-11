@@ -45,6 +45,7 @@ Safety rules (D-024):
 The classroom top bar shows the current weather when Admin → School settings → Weather is on (default: Ankara, Kızılay). The server calls Open-Meteo (`WEATHER_API_URL`, default `https://api.open-meteo.com/v1/forecast`, no key) with the coordinates only, caches the answer 30 minutes (a failure 5 minutes) and gives up after 5 seconds; without internet the widget simply does not appear. The firewall must allow outbound HTTPS to `api.open-meteo.com` for it to work.
 
 ## Uploads and OCR (S9)
+- Students' own avatar pictures (S24, D-184) waiting for a teacher live in `DATA_DIR/avatar-quarantine` (the Docker volume `/data`, so they survive a restart), outside `uploads/`: backups and exports never contain them, and the server deletes them after 14 days (at start-up and hourly). Do not copy this folder anywhere. An approved picture moves into `uploads/` and is backed up like any upload; a removed picture is deleted at once, and copies in earlier backups go when those backups expire. "Delete all uploaded pictures" (Admin → Modules → Photos and media) empties both.
 - Uploaded files live in `DATA_DIR/uploads` (random `xx/yy/<uuid>` keys; never serve this folder directly, files are served only by the app after a permission check). Temporary parts go to `DATA_DIR/uploads/tmp` and are removed after each request.
 - Quotas: `UPLOAD_STUDENT_QUOTA_MB` (default 100) per student and `UPLOAD_GLOBAL_QUOTA_MB` (default 10240) for the server.
 - OCR runs locally (D-080). The Turkish/English models come from npm packages and are copied to `DATA_DIR/ocr-cache/tessdata` on first use (SHA-256 checked); no network access is needed. `OCR_TIMEOUT_MS` (default 90000) stops a stuck recognition. Back up `uploads/`; `ocr-cache/` can be deleted at any time.
@@ -65,7 +66,7 @@ The classroom top bar shows the current weather when Admin → School settings �
 ## Backups (S11, D-089)
 A backup is one file `DATA_DIR/backups/cc-backup-<UTC time>.tar` (folder: `BACKUP_DIR`) holding:
 - `class-compass.db`: an online copy made with SQLite's backup API (safe while the app runs);
-- `uploads/…`: every uploaded file;
+- `uploads/…`: every uploaded file (approved own avatar pictures included, S24);
 - `manifest.json`: format version, app version, migration level, row counts per table and the size + SHA-256 of every entry.
 
 Commands (in the container prefix them with `docker compose exec -T app`; in development use `npm run cli --`):

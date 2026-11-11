@@ -448,6 +448,16 @@ Decision D-183; no migration.
 - [ ] In the narrowest fitted card layout (`tight`, the name across the card) the pills can still take a second line beside the + button (D-183)
 - [ ] The folded dock and the Goals cards seen on a real phone (owner)
 
+## S24 Students' own avatar pictures: upload, editor, teacher check, purge (owner 2026-11-11)
+Decision D-184; migration 0029.
+- [x] Student: "Use my own picture" from My avatar (Fine / Not allowed lists, FilePick, the 14-day note), the editor (drag or arrow keys inside a circle, Zoom, Brightness, Turn left / right, Mirror, Start again, large and small previews, one 512 px upload), waiting with "Take my picture back", refused with the reason and "Choose another picture", in use with "Stop using my picture", paused and class-off messages; one waiting picture per student
+- [x] Server: re-encoded 512 px WebP without metadata, 8 MB, animated and huge pictures refused, hourly limit per student; waiting pictures in `DATA_DIR/avatar-quarantine` (never in a backup or export), approved ones as the student's uploaded file (backed up); audit of every decision and removal; the 14-day sweep at start-up and hourly; erasure; AI tools never see pictures
+- [x] Teacher page "Avatar pictures" (Today, count badge): To check with the expiry, the confirmation tick, "Yes, use it", "Not this one" with four reasons; In use with Remove; a notification category; the per-class switch on the Avatars page
+- [x] Administrator: the media flag `media.avatarPictures` (off by default), the same check for every student, "Delete all uploaded pictures" with a typed confirmation; Super Speakers "Show students' own pictures on the board and the scorer" (off by default)
+- [x] Tests: `tests/server/avatar-pictures.test.ts`, `tests/client/picture-editor.test.tsx`, `tests/scripts/docker.test.ts`, `e2e/avatar-uploads.spec.ts` (axe at 375 px and 1536×703)
+- [ ] The editor and the teacher check tried on real phones and tablets, with real camera-roll pictures (owner)
+- [ ] Guide screenshots of the new screens (`npm run docs:screenshots` after the next screenshot pass)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site
