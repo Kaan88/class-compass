@@ -31,8 +31,9 @@ export default defineConfig({
   testDir: './e2e',
   testMatch: /.*\.spec\.ts/,
   // The guide screenshots and the usability crawler are not tests: they run only with
-  // playwright.docs.config.ts and playwright.usability.config.ts.
-  testIgnore: /(docs-screenshots|usability-screens)\.spec\.ts/,
+  // playwright.docs.config.ts and playwright.usability.config.ts. The visual baseline (S26a, D-189)
+  // needs its fixed clock and ids: it runs only with playwright.visual.config.ts.
+  testIgnore: /(docs-screenshots|usability-screens|visual)\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

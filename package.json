@@ -26,6 +26,8 @@
     "test:e2e": "playwright test",
     "docs:screenshots": "playwright test -c playwright.docs.config.ts",
     "usability:screens": "playwright test -c playwright.usability.config.ts",
+    "test:visual": "playwright test -c playwright.visual.config.ts",
+    "test:visual:update": "playwright test -c playwright.visual.config.ts --update-snapshots=changed",
     "check": "node --run typecheck && node --run lint && node --run test",
     "new:module": "node scripts/new-module.ts",
     "new:theme": "node scripts/new-theme.ts",

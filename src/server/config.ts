@@ -79,6 +79,13 @@ const EnvSchema = z.object({
    */
   CC_TEST_CLOCK_FILE: z.string().optional(),
   /**
+   * Test-only fixed ids for the demo seed (S26a, D-189): when set and NODE_ENV=test, `seed:demo`
+   * makes its ids from this number instead of at random, so every run of the visual baseline gets
+   * the same student ids and with them the same generated avatars. Ignored in development and
+   * production (see `testIdSeed`).
+   */
+  CC_TEST_ID_SEED: z.coerce.number().int().min(1).max(2_147_483_647).optional(),
+  /**
    * "Sign in with ChatGPT" for the assistant's connections (S19a, D-179): off, and stays off until
    * OpenAI grants Class Compass access. Only with `true` AND the client id and the three addresses
    * OpenAI gives the app can an administrator or teacher start this sign-in (`chatgptAvailable`).
@@ -100,6 +107,9 @@ export const chatgptAvailable = (c: Pick<Config, 'AI_CHATGPT_SIGNIN' | 'AI_CHATG
 
 /** The e2e clock offset file, honoured only under NODE_ENV=test. */
 export const testClockFile = (e: { NODE_ENV: string; CC_TEST_CLOCK_FILE?: string | undefined }): string | null => (e.NODE_ENV === 'test' && e.CC_TEST_CLOCK_FILE ? e.CC_TEST_CLOCK_FILE : null);
+
+/** The demo seed's fixed-id seed (S26a, D-189), honoured only under NODE_ENV=test. */
+export const testIdSeed = (e: { NODE_ENV: string; CC_TEST_ID_SEED?: number | undefined }): number | null => (e.NODE_ENV === 'test' && e.CC_TEST_ID_SEED !== undefined ? e.CC_TEST_ID_SEED : null);
 
 /** Sign-in attempts per minute per address (production value). */
 export const LOGIN_RATE_LIMIT_MAX = 20;

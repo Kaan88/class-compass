@@ -9,6 +9,7 @@ build
 .next
 coverage
 playwright-report
+playwright-report-visual
 test-results
 blob-report
 # Usability screenshot sets (npm run usability:screens): git-ignored output, often over a gigabyte.

@@ -2,7 +2,37 @@ import crypto from 'node:crypto';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import { v7 as uuidv7 } from 'uuid';
 
-export const newId = (): string => uuidv7();
+let makeId: () => string = () => uuidv7();
+
+export const newId = (): string => makeId();
+
+/**
+ * Test-only (S26a, D-189): from now on this process makes its ids from `seed` instead of at random,
+ * as UUIDv7 whose time part counts up from `startMs`, one millisecond per id (so ids still sort in
+ * the order they were made). Called only by `seed:demo` under NODE_ENV=test with CC_TEST_ID_SEED
+ * (`testIdSeed` in config.ts), so the visual baseline sees the same students and avatars every run.
+ * Returns a function that puts random ids back (for unit tests).
+ */
+export function useSeededIds(seed: number, startMs: number): () => void {
+  const before = makeId;
+  let a = seed >>> 0;
+  const byte = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) & 0xff;
+  };
+  let n = 0;
+  makeId = () => {
+    const random = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) random[i] = byte();
+    return uuidv7({ msecs: startMs + n++, seq: 0, random });
+  };
+  return () => {
+    makeId = before;
+  };
+}
 
 /** 256-bit URL-safe random token (sessions, student links, reset tokens). */
 export const randomToken = (bytes = 32): string => crypto.randomBytes(bytes).toString('base64url');

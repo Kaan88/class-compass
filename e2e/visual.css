@@ -1,0 +1,7 @@
+/*
+ * Applied only while the visual baseline takes a picture (playwright.visual.config.ts, S26a, D-189).
+ * Short-lived messages would cover the screen in a still picture.
+ */
+.cc-toast {
+  visibility: hidden !important;
+}

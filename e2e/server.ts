@@ -5,6 +5,9 @@
  *   node e2e/server.ts            (PORT and E2E_PASSWORD come from playwright.config.ts)
  * With E2E_DEMO_HISTORY=1 (the guide screenshots, playwright.docs.config.ts) it also runs
  * `seed:demo-history` (D-136), so the screens show weeks of fictional lessons, goals and points.
+ * The visual baseline (playwright.visual.config.ts, S26a, D-189) also sets E2E_FIXED_NOW (the
+ * server's clock starts there) and CC_TEST_ID_SEED (the demo seed's ids, and so its avatars, are
+ * the same every run); both are honoured only under NODE_ENV=test.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -19,7 +22,10 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-e2e-'));
 const mailDir = path.join(os.tmpdir(), `cc-e2e-mail-${port}`);
 // Test clock (S12): milliseconds added to the server clock, read from this file (NODE_ENV=test only).
 const clockFile = process.env.CC_TEST_CLOCK_FILE ?? path.join(os.tmpdir(), `cc-e2e-clock-${port}`);
-fs.writeFileSync(clockFile, '0');
+// The visual baseline (S26a, D-189) starts the server, and seeds the school, at a fixed moment:
+// E2E_FIXED_NOW (an ISO date) becomes the clock's offset; its tests pin it again before each screen.
+const fixedNow = process.env.E2E_FIXED_NOW ? Date.parse(process.env.E2E_FIXED_NOW) : Number.NaN;
+fs.writeFileSync(clockFile, Number.isFinite(fixedNow) ? String(fixedNow - Date.now()) : '0');
 fs.rmSync(mailDir, { recursive: true, force: true });
 
 Object.assign(process.env, {

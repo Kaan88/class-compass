@@ -18,11 +18,12 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { eq } from 'drizzle-orm';
-import { loadConfig } from './config.ts';
+import { loadConfig, testClockFile, testIdSeed } from './config.ts';
 import { openDatabase, type Db } from './db/client.ts';
 import { users } from './db/schema.ts';
 import { audit } from './lib/audit.ts';
-import { hashPassword } from './lib/crypto.ts';
+import { hashPassword, useSeededIds } from './lib/crypto.ts';
+import { offsetClock } from './lib/testClock.ts';
 import { createUser, normaliseLogin, revokeAllUserMcpTokens, revokeAllUserSessions } from './modules/auth/service.ts';
 import { backupNow, errorSummary, listBackups, migrateWithSnapshot, recordRun, resolveBackupFile, restoreBackup, RestoreRefused, verifyBackup, type RunRecord } from './ops/backup.ts';
 import { offsiteBackup, offsiteCheck, offsiteInit, offsiteProblems, offsiteSnapshots, tail } from './ops/restic.ts';
@@ -102,7 +103,14 @@ switch (cmd) {
     await migrate();
     try {
       const fixed = process.env.CC_DEMO_PASSWORD;
-      const r = await seedDemo({ db: db(), config, now: Date.now }, { force: values['force-demo'] === true, ...(fixed ? { fixedPassword: fixed } : {}) });
+      // Test only (NODE_ENV=test, S26a, D-189): the e2e clock and fixed ids, so a visual baseline run
+      // seeds the same school year, students and avatars every time.
+      const clockFile = testClockFile(config);
+      const seedNow = clockFile ? offsetClock(clockFile) : Date.now;
+      const idSeed = testIdSeed(config);
+      // A fixed start (2026-01-01 UTC), never the clock: the id text decides each generated avatar.
+      if (idSeed !== null) useSeededIds(idSeed, Date.UTC(2026, 0, 1));
+      const r = await seedDemo({ db: db(), config, now: seedNow },{ force: values['force-demo'] === true, ...(fixed ? { fixedPassword: fixed } : {}) });
       console.log(`Demo school created (fictional data). School year ${r.schoolYear}.`);
       for (const c of r.classes) console.log(`  class ${c.name}: ${c.students} students`);
       console.log('');

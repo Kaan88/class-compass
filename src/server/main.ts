@@ -1,8 +1,8 @@
-import fs from 'node:fs';
 import { buildApp } from './app.ts';
 import { loadConfig, testClockFile } from './config.ts';
 import { openDatabase } from './db/client.ts';
 import { mailerFor } from './lib/mailer.ts';
+import { offsetClock } from './lib/testClock.ts';
 import { purgeOldChats, RETENTION_TICK_MS } from './modules/assistantChat/retention.ts';
 import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
 import { PICTURE_SWEEP_MS, sweepAvatarPictures } from './modules/avatars/pictures.ts';
@@ -15,22 +15,7 @@ const config = loadConfig();
  * milliseconds, re-read at most every 200 ms), e.g. to see the Super Speakers board after the weekly reset.
  */
 const clockFile = testClockFile(config);
-let offset = 0;
-let offsetReadAt = 0;
-const now = clockFile
-  ? () => {
-      const t = Date.now();
-      if (t - offsetReadAt > 200) {
-        offsetReadAt = t;
-        try {
-          offset = Number(fs.readFileSync(clockFile, 'utf8').trim()) || 0;
-        } catch {
-          offset = 0;
-        }
-      }
-      return t + offset;
-    }
-  : Date.now;
+const now = clockFile ? offsetClock(clockFile) : Date.now;
 const db = openDatabase(config.dbPath);
 // Pending migrations: a database snapshot is taken first (DAT-4, D-089); a failed snapshot stops the start.
 const snapshot = await migrateWithSnapshot(db, config, Date.now, 'startup');

@@ -5,6 +5,8 @@ build/
 .next/
 coverage/
 playwright-report/
+# Visual baseline report (npm run test:visual, S26a); the baselines themselves are in e2e/visual-baselines/
+playwright-report-visual/
 test-results/
 # Usability screenshot sets (npm run usability:screens) — never committed
 usability-shots/
