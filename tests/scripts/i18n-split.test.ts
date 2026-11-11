@@ -59,10 +59,17 @@ describe('main and staff dictionaries (S23a, D-182)', () => {
     // the entry registers first, or in an area dictionary the same entry imports.
     const areaFiles = readdirSync(p('src', 'shared', 'i18n', 'areas')).filter((f) => f.endsWith('.ts') && f !== 'keys.ts' && f !== 'staff.ts');
     const areas = areaFiles.map((f) => ({ file: p('src', 'shared', 'i18n', 'areas', f), keys: new Set(Object.keys(readAreaKeys(f))) }));
+    // Each source file is read once (S25b: reading it again for every key of every area outgrew the timeout).
+    const sources = new Map<string, string>();
+    const source = (f: string) => {
+      let s = sources.get(f);
+      if (s === undefined) sources.set(f, (s = readFileSync(f, 'utf8')));
+      return s;
+    };
     for (const entry of OTHER_ENTRIES) {
       const files = reachableFiles(entry);
       for (const area of areas) {
-        const used = files.filter((f) => f !== area.file && [...area.keys].some((k) => readFileSync(f, 'utf8').includes(`'${k}'`)));
+        const used = files.filter((f) => f !== area.file && [...area.keys].some((k) => source(f).includes(`'${k}'`)));
         if (used.length) expect(files, `${rel(entry)} uses keys of ${rel(area.file)} (in ${used.map(rel).join(', ')}) but never imports it`).toContain(area.file);
       }
     }
