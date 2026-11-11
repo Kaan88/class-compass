@@ -7,6 +7,9 @@
  * - Library: the default categories and presets plus this teacher's own; own items are archived for
  *   everyone, defaults only for this teacher's classes (S13b2, D-116). S14d (D-152): sentence starters.
  * - Settings: outcome labels (also the module's panel on the class settings page).
+ * S22b (D-176): every category can be renamed here; a default is renamed for this teacher's classes in
+ *   the subject only (its id stays, so goals, topics and reports still group by it), with the class
+ *   languages (`LangFields`) and a way back to the school name.
  * S13a: goal categories are also the lesson topics (D-101); a student's goals and evidence can be
  * filtered by topic.
  * S20b (D-170): "Add evidence" on each goal card opens the evidence form (the shared `EvidenceAdder`,
@@ -16,7 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as Files from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
-import type { Goal, GoalLibrary, OutcomeDef, TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
+import type { Category, Goal, GoalLibrary, OutcomeDef, TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
 import * as School from '../../../shared/contracts/school.ts';
 import { hideStudentText } from '../../../shared/contracts/textChecks.ts';
 import { pickText, type MessageKey } from '../../../shared/i18n/index.ts';
@@ -31,7 +34,8 @@ import { ConfidenceChip, EntryLine, EvidenceView, FeedbackLine, GoalSummary, whe
 import { Button } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextArea, TextField, Toggle } from '../../ui/Fields.tsx';
-import { IconArchive, IconBack, IconLock, IconPlus, IconTrash, IconUndo } from '../../ui/icons.tsx';
+import type { ClassLocale } from '../../../shared/classLanguage.ts';
+import { IconArchive, IconBack, IconLock, IconPencil, IconPlus, IconTrash, IconUndo } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
 import { Avatar } from '../../ui/Students.tsx';
 import { StudentStatsButton } from '../../ui/StudentName.tsx';
@@ -385,6 +389,51 @@ function Overview({ contextId, onOpen }: { contextId: string; onOpen: (studentId
   );
 }
 
+/**
+ * Rename a category (S22b, D-176): one field per language of the teacher's classes in this subject;
+ * a renamed default shows the school's name and can go back to it. Opened by the category's "Rename"
+ * button, below its heading row; `onClose` puts the focus back on that button.
+ */
+function CategoryRename({ contextId, category, locales, onClose }: { contextId: string; category: Category; locales: readonly ClassLocale[]; onClose: () => void }) {
+  const { t, locale } = useI18n();
+  const run = useRun();
+  const [name, setName] = useState(category.name);
+  const shown = pickText(category.name, locale);
+  const save = (input: { name: typeof name } | { resetName: true }) =>
+    void run(() => call(G.updateCategory, { categoryId: category.id, ...(category.custom ? {} : { contextId }), ...input }), { invalidate: [ALL], success: t('goals.toast.renamed') }).then((r) => {
+      if (r) onClose();
+    });
+  const titleId = `rename-${category.id}`;
+  const filled = Boolean(name.en?.trim() || name.tr?.trim());
+  return (
+    <section className="cc-stack" aria-labelledby={titleId} data-testid="category-rename">
+      <h4 id={titleId} className="cc-h3">
+        {t('goals.renameTitle', { name: shown })}
+      </h4>
+      <p className="cc-muted">
+        {t('goals.renameHint')}
+        {category.custom ? null : ` ${t('goals.renameDefaultHint')}`}
+      </p>
+      {category.defaultName ? <p className="cc-muted">{t('goals.schoolName', { name: pickText(category.defaultName, locale) })}</p> : null}
+      <LangFields label={t('goals.categoryName')} value={name} onChange={setName} locales={locales} testId="category-rename-fields" autoFocus maxLength={80} />
+      <div className="cc-row">
+        <Button variant="primary" isDisabled={!filled} onPress={() => save({ name: localized(name.en ?? '', name.tr ?? '') })}>
+          {t('common.save')}
+        </Button>
+        {category.defaultName ? (
+          <Button variant="ghost" onPress={() => save({ resetName: true })}>
+            <IconUndo />
+            {t('goals.useSchoolName')}
+          </Button>
+        ) : null}
+        <Button variant="ghost" onPress={onClose}>
+          {t('common.cancel')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export function LibraryTab({ contextId }: { contextId: string }) {
   const { t, locale } = useI18n();
   const run = useRun();
@@ -398,6 +447,8 @@ export function LibraryTab({ contextId }: { contextId: string }) {
   const [presetEn, setPresetEn] = useState('');
   const [presetTr, setPresetTr] = useState('');
   const [showArchived, setShowArchived] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const list = useRef<HTMLUListElement>(null);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const lib = q.data;
   const opts = { invalidate: [ALL] };
@@ -416,11 +467,15 @@ export function LibraryTab({ contextId }: { contextId: string }) {
         {item.archived ? t('goals.restore') : t('goals.archive')}
       </Button>
     );
+  const closeRename = (id: string) => {
+    setRenaming(null);
+    requestAnimationFrame(() => list.current?.querySelector<HTMLButtonElement>(`[data-rename-for="${id}"]`)?.focus());
+  };
   return (
     <div className="cc-stack" data-testid="goals-library">
       <p className="cc-muted">{t('goals.libraryHint')}</p>
       <Toggle label={t('goals.showArchived', { count: archivedCount })} isSelected={showArchived} onChange={setShowArchived} />
-      <ul className="cc-stack">
+      <ul className="cc-stack" ref={list}>
         {cats.map((c) => {
           const name = pickText(c.name, locale);
           return (
@@ -428,9 +483,19 @@ export function LibraryTab({ contextId }: { contextId: string }) {
               <div className="cc-row">
                 <h3 className="cc-h2">{name}</h3>
                 {c.custom ? <span className="cc-chip">{t('goals.custom')}</span> : <span className="cc-chip">{t('goals.default')}</span>}
+                {c.defaultName ? <span className="cc-chip">{t('goals.renamedChip')}</span> : null}
                 {c.archived && !c.schoolArchived ? <span className="cc-chip">{t('goals.archived')}</span> : null}
-                <span className="cc-push-right">{archiveButton(c, name, () => call(G.updateCategory, { categoryId: c.id, archived: !c.archived }))}</span>
+                <span className="cc-push-right cc-row">
+                  {renaming === c.id ? null : (
+                    <Button size="small" variant="ghost" aria-label={`${t('goals.rename')}: ${name}`} data-rename-for={c.id} onPress={() => setRenaming(c.id)}>
+                      <IconPencil />
+                      {t('goals.rename')}
+                    </Button>
+                  )}
+                  {archiveButton(c, name, () => call(G.updateCategory, { categoryId: c.id, archived: !c.archived }))}
+                </span>
               </div>
+              {renaming === c.id ? <CategoryRename contextId={contextId} category={c} locales={locales} onClose={() => closeRename(c.id)} /> : null}
               <ul className="cc-stack">
                 {lib.presets
                   .filter((p) => p.categoryId === c.id && (showArchived || !p.archived))
