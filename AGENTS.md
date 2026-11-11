@@ -70,6 +70,7 @@ disagree, the doc in `docs/` wins (and fix this file).
 | `npm run docs:theming` | Regenerate the token table and limits in `docs/THEMING.md` and `docs/theme-package.schema.json` (drift-tested). |
 | `npm run docs:theme-examples` | Regenerate `docs/examples/<key>.theme.json` from the built-in themes (served to AI tools; drift-tested). |
 | `npm run docs:screenshots`, `npm run usability:screens` | Guide screenshots and the usability screen crawl (separate Playwright configs). |
+| `npm run test:visual` / `npm run test:visual:update` | Pixel-diff visual baseline of 17 screens against `e2e/visual-baselines/win32/` (D-189); update only after looking at the diff (OPERATIONS → "Visual baseline"). |
 
 ## Stage workflow
 
