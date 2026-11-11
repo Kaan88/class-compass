@@ -46,13 +46,13 @@ export function planTheme(ws: Workspace, key: string): void {
   ws.insertBefore(registry, "import type { ThemeDefinition } from './types.ts';", `import { ${key}Theme } from './${key}/index.ts';\n`);
   ws.insertBefore(registry, '};', `  ${key}: ${key}Theme,\n`, 'export const THEMES');
 
-  // 4. Names in both languages.
+  // 4. Names in both languages (the student page shows theme names: the main dictionary, D-182).
   const title = humanize(key);
   addMessages(ws, [
     [`theme.${key}`, title],
     [`theme.${key}.description`, `${title}: describe the look in one line.`],
     [`theme.${key}.mascot`, `${title} mascot`],
-  ]);
+  ], 'main');
 
   // 5. Test stub (the registry-wide theme tests already cover every slot of the new theme).
   ws.create(

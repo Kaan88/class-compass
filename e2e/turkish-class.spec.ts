@@ -12,8 +12,7 @@
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { en } from '../src/shared/i18n/en.ts';
-import { tr } from '../src/shared/i18n/tr.ts';
+import { en, tr } from '../tests/messages.ts';
 import { api, bodyText, ensurePin, login, openDock, studentLinkUrl } from './helpers.ts';
 
 type Ctx = { id: string; classId: string; className: string; subjectName: { en: string } };

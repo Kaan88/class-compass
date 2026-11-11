@@ -18,9 +18,8 @@ import { DataTable } from '../../src/client/ui/Layout.tsx';
 import { AttendanceChip } from '../../src/client/ui/Students.tsx';
 import { BADGE_ICONS } from '../../src/shared/achievements.ts';
 import type { ReportTable } from '../../src/shared/contracts/reports.ts';
-import { en } from '../../src/shared/i18n/en.ts';
+import { en, tr } from '../messages.ts';
 import { formatWeekRange } from '../../src/shared/i18n/index.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
 
 const withLocale = (locale: 'en' | 'tr', node: ReactNode) => render(<I18nProvider locale={locale}>{node}</I18nProvider>);
 

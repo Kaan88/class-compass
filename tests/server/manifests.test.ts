@@ -6,8 +6,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { en } from '../../src/shared/i18n/en.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { en, tr } from '../messages.ts';
 import { MODULE_KEYS, POLICY_KEYS, moduleLabelKey, type ContextModule } from '../../src/shared/modules.ts';
 import { registeredCommandTypes } from '../../src/server/lib/commands.ts';
 import { contextModules } from '../../src/server/db/schema.ts';

@@ -17,7 +17,7 @@
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import { localDate } from '../../../domain/dates.ts';
 import { categoryOn, NOTIFICATION_CATEGORIES, type NotificationCategory } from '../../../shared/notifications.ts';
-import { translate, type Locale } from '../../../shared/i18n/index.ts';
+import { translate, type Locale } from '../../lib/i18n.ts';
 import { dateTimeFormat } from '../../../shared/intl.ts';
 import { sortByName } from '../../../shared/text/turkish.ts';
 import { notificationDigests, notifications, users } from '../../db/schema.ts';

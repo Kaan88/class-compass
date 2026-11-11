@@ -9,7 +9,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Category, Starter } from '../../src/shared/contracts/goals.ts';
-import { en } from '../../src/shared/i18n/en.ts';
+import { en } from '../messages.ts';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
 import { AdminStarters, TeacherStarters } from '../../src/client/modules/goals/StartersLibrary.tsx';
 

@@ -9,8 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminImportPage } from '../../src/client/routes/admin/ImportAdmin.tsx';
 import { ADMIN } from '../../src/client/routes/admin/Admin.tsx';
 import { SENSITIVE } from '../../src/client/lib/queryClient.ts';
-import { en } from '../../src/shared/i18n/en.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { en, tr } from '../messages.ts';
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),

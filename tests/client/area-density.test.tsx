@@ -11,8 +11,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AREA_DENSITIES, type Me } from '../../src/shared/contracts/auth.ts';
-import { en } from '../../src/shared/i18n/en.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { en, tr } from '../messages.ts';
 
 const calls: Array<{ path: string; input: unknown }> = [];
 vi.mock('../../src/client/lib/api.ts', async (importOriginal) => ({

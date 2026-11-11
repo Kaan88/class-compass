@@ -105,13 +105,22 @@ export function apply(root: string, changes: readonly Change[], dryRun: boolean)
   return lines.join('\n');
 }
 
-/** Adds keys to both dictionaries (en.ts, tr.ts). Turkish gets the English text marked for translation. */
-export function addMessages(ws: Workspace, entries: ReadonlyArray<readonly [key: string, en: string]>) {
-  const en = 'src/shared/i18n/en.ts';
-  const tr = 'src/shared/i18n/tr.ts';
-  for (const [k] of entries) if (ws.read(en).includes(`${lit(k)}:`)) throw new Error(`i18n key ${k} already exists`);
+/** The main dictionary (what the student page loads) and the staff dictionary (everything else), S23a / D-182. */
+const DICTIONARIES = {
+  main: { en: 'src/shared/i18n/en.ts', tr: 'src/shared/i18n/tr.ts', trEnd: '} as const satisfies Messages;' },
+  staff: { en: 'src/shared/i18n/areas/staff/en.ts', tr: 'src/shared/i18n/areas/staff/tr.ts', trEnd: '} as const satisfies StaffMessages;' },
+} as const;
+
+/**
+ * Adds keys in English and Turkish. Turkish gets the English text marked for translation. `dict` is
+ * `main` only for strings the student page shows (`module.<key>`, `theme.<key>`; D-182), else `staff`.
+ */
+export function addMessages(ws: Workspace, entries: ReadonlyArray<readonly [key: string, en: string]>, dict: keyof typeof DICTIONARIES = 'staff') {
+  const { en, tr, trEnd } = DICTIONARIES[dict];
+  for (const [k] of entries)
+    for (const d of Object.values(DICTIONARIES)) if (ws.read(d.en).includes(`${lit(k)}:`)) throw new Error(`i18n key ${k} already exists`);
   ws.insertBefore(en, '} as const;', entries.map(([k, v]) => `  ${lit(k)}: ${lit(v)},\n`).join(''));
-  ws.insertBefore(tr, '} as const satisfies Messages;', entries.map(([k, v]) => `  ${lit(k)}: ${lit(v)}, // TODO(tr): translate\n`).join(''));
+  ws.insertBefore(tr, trEnd, entries.map(([k, v]) => `  ${lit(k)}: ${lit(v)}, // TODO(tr): translate\n`).join(''));
 }
 
 /** Runs a scaffold CLI: parse, plan, print, write. */

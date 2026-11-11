@@ -1,3 +1,5 @@
+// First: the strings the student page never shows (S23a, D-182).
+import '../shared/i18n/areas/staff.ts';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';

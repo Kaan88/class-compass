@@ -13,8 +13,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import jsQRImport from 'jsqr';
 import sharp from 'sharp';
-import { en } from '../src/shared/i18n/en.ts';
-import { tr } from '../src/shared/i18n/tr.ts';
+import { en, tr } from '../tests/messages.ts';
 import { api, ensurePin, login, PASSWORD, studentLinkUrl } from './helpers.ts';
 
 // jsqr is a CommonJS bundle: its default export is the decoder at runtime, typed as a namespace under NodeNext.

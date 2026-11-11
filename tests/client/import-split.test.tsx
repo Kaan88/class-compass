@@ -9,8 +9,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { en } from '../../src/shared/i18n/en.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { en, tr } from '../messages.ts';
 
 let scope: 'school' | 'taught' = 'school';
 const never = new Promise<never>(() => undefined);

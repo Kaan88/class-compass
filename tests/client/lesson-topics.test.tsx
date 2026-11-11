@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_ROUTINE_STAGES } from '../../src/domain/routines.ts';
 import type { LessonState } from '../../src/shared/contracts/lessons.ts';
-import { en } from '../../src/shared/i18n/en.ts';
+import { en } from '../messages.ts';
 import { focusDashboardSlot } from '../../src/client/modules/lessons/TopicsClassroom.tsx';
 import { routineDashboardSlot } from '../../src/client/modules/routines/RoutineClassroom.tsx';
 import type { ClassroomContext } from '../../src/client/modules/types.ts';

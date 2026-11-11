@@ -13,6 +13,8 @@ export type MessageKey = BaseMessageKey | AreaMessageKey;
  * Area dictionaries (S19a, D-179). Strings that only one part of the teacher or admin app shows live
  * in `areas/<area>.ts` instead of en.ts/tr.ts: the area file registers itself when a screen imports
  * it, so the student page (which loads the whole main dictionary, D-151 budget) never downloads them.
+ * The largest area is the staff dictionary (S23a, D-182, `areas/staff.ts`): every string the student page
+ * never shows, registered first by every other entry and by the server (`server/lib/i18n.ts`).
  */
 const areaDicts: Record<Locale, Record<string, string>> = { en: {}, tr: {} };
 export function registerMessages(area: { en: Record<string, string>; tr: Record<string, string> }): void {

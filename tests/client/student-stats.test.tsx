@@ -13,7 +13,7 @@ import { preferredContext } from '../../src/client/reports/StudentStatsDrawer.ts
 import { StudentName, StudentStatsButton, StudentStatsProvider } from '../../src/client/ui/StudentName.tsx';
 import { StudentCard } from '../../src/client/ui/Students.tsx';
 import type { ReportContextInfo } from '../../src/shared/contracts/reports.ts';
-import { en } from '../../src/shared/i18n/en.ts';
+import { en } from '../messages.ts';
 
 afterEach(cleanup);
 const ada = { id: 'fictional-ada', fullName: 'Ada Yıldız' };

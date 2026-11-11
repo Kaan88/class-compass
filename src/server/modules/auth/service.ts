@@ -5,7 +5,7 @@ import type { Db } from '../../db/client.ts';
 import { authAttempts, mcpTokens, oneTimeTokens, sessions, users } from '../../db/schema.ts';
 import { revokeOAuthForUser } from '../mcp/oauth/store.ts';
 import { tx } from '../../db/client.ts';
-import { translate } from '../../../shared/i18n/index.ts';
+import { translate } from '../../lib/i18n.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
 import { audit } from '../../lib/audit.ts';
 import type { AppDeps, Actor, SessionRow, UserRow } from '../../lib/context.ts';

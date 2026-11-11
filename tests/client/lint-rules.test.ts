@@ -141,7 +141,9 @@ describe('area dictionaries (S19a, D-179)', () => {
       for (const k of Object.keys(a.en)) {
         expect(JSON.stringify(ph(a.tr[k]!)), `${path} ${k}`).toBe(JSON.stringify(ph(a.en[k]!)));
         expect(a.en[k]!.trim() && a.tr[k]!.trim(), `${path} ${k}`).toBeTruthy();
-        expect(/\bbadges?\b/i.test(a.en[k]!) || /rozet/i.test(a.tr[k]!), `${path} ${k}`).toBe(false);
+        // Placeholders such as {badge} are code, not words the user reads (as for the main dictionary).
+        const words = (s: string) => s.replace(/\{\w+\}/g, '');
+        expect(/\bbadges?\b/i.test(words(a.en[k]!)) || /rozet/i.test(words(a.tr[k]!)), `${path} ${k}`).toBe(false);
       }
     }
   });

@@ -18,8 +18,7 @@ import { ART_LIMITS, MOTION_LIMITS, SOUND_LIMITS, STYLE_LIMITS } from '../../src
 import { opacityTurns } from '../../src/shared/themePackage/motion.ts';
 import { soundPackProblems } from '../../src/shared/themePackage/sound.ts';
 import { ILLUSTRATIONS, MASCOT_POSES, MOTIONS, SOUND_EVENTS } from '../../src/client/themes/types.ts';
-import { en } from '../../src/shared/i18n/en.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { en, tr } from '../messages.ts';
 import { DEFAULT_THEME, THEME_KEYS, isThemeKey } from '../../src/shared/themes.ts';
 import { Theme } from '../../src/shared/contracts/school.ts';
 

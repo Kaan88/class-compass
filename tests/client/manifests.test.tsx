@@ -32,8 +32,7 @@ import {
   useStartContributions,
 } from '../../src/client/modules/registry.ts';
 import { SERVER_MODULES } from '../../src/server/modules/index.ts';
-import { en } from '../../src/shared/i18n/en.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { en, tr } from '../messages.ts';
 import { CONTEXT_MODULES, POLICY_KEYS } from '../../src/shared/modules.ts';
 
 const MODULES_DIR = join(import.meta.dirname, '..', '..', 'src', 'client', 'modules');

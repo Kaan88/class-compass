@@ -22,7 +22,7 @@
  */
 import crypto from 'node:crypto';
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
-import { translate } from '../../../shared/i18n/index.ts';
+import { translate } from '../../lib/i18n.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { authAttempts, oneTimeTokens, sessions, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';

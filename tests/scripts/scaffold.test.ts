@@ -41,10 +41,16 @@ describe('scaffold planning (in memory)', () => {
     expect(byPath.get('src/server/modules/index.ts')?.content).toMatch(/demoWidgetManifest,\n\];/);
     expect(byPath.get('src/client/modules/index.ts')?.content).toMatch(/demoWidgetClientManifest,\n\];/);
     expect(byPath.get('src/client/themes/registry.ts')?.content).toContain('  demoTheme: demoThemeTheme,\n};');
+    // The student page names modules and themes (main dictionary); the rest is staff only (S23a, D-182).
     const tr = byPath.get('src/shared/i18n/tr.ts')!.content;
-    for (const k of ['module.demoWidget', 'demoWidget.title', 'theme.demoTheme', 'theme.demoTheme.description', 'theme.demoTheme.mascot']) {
+    for (const k of ['module.demoWidget', 'theme.demoTheme', 'theme.demoTheme.description', 'theme.demoTheme.mascot']) {
       expect(byPath.get('src/shared/i18n/en.ts')!.content).toContain(`'${k}':`);
       expect(tr).toContain(`'${k}':`);
+    }
+    for (const k of ['demoWidget.title', 'demoWidget.placeholder']) {
+      expect(byPath.get('src/shared/i18n/areas/staff/en.ts')!.content).toContain(`'${k}':`);
+      expect(byPath.get('src/shared/i18n/areas/staff/tr.ts')!.content).toContain(`'${k}':`);
+      expect(byPath.get('src/shared/i18n/en.ts')!.content).not.toContain(`'${k}':`);
     }
     const index = byPath.get('src/client/themes/demoTheme/index.ts')!.content;
     expect(index).toContain("key: 'demoTheme'");

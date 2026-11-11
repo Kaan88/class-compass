@@ -59,6 +59,9 @@ export default defineConfig({
             { name: 'vendor-tanstack', test: /node_modules[\\/]@tanstack[\\/]/ },
             // Area dictionaries (S19a, D-179) stay with the screens that import them.
             { name: 'i18n', test: /src[\\/]shared[\\/]i18n[\\/](?!areas[\\/])/ },
+            // S23a (D-182): the staff dictionary, every string the student page never shows, in its own
+            // long-cached chunk for the entries that register it (never loaded by the student page).
+            { name: 'i18n-staff', test: /src[\\/]shared[\\/]i18n[\\/]areas[\\/]staff/ },
           ],
         },
       },

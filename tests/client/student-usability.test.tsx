@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { StudentAchievementsSection } from '../../src/shared/contracts/achievements.ts';
 import type { StudentHomeworkSection } from '../../src/shared/contracts/goals.ts';
 import type { Locale } from '../../src/shared/i18n/index.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { tr } from '../messages.ts';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
 import { FilePick } from '../../src/client/modules/goals/FilePick.tsx';
 import { chosenGoalHint } from '../../src/client/modules/goals/shared.tsx';

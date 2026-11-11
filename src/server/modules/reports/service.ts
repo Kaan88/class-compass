@@ -6,7 +6,7 @@
 import { and, eq } from 'drizzle-orm';
 import { safeFileName, toCsv, type CsvDelimiter, type CsvValue } from '../../../domain/csv.ts';
 import type { Report, ReportSection, ReportTable, TimelineEvent } from '../../../shared/contracts/reports.ts';
-import { pickText, translate, type Locale } from '../../../shared/i18n/index.ts';
+import { pickText, translate, type Locale } from '../../lib/i18n.ts';
 import { parseSectionsParam, tableMatches, type SectionFilter } from '../../../shared/reportViews.ts';
 import { reportCellText, reportLabelText } from '../../../shared/reportText.ts';
 import { enrolments } from '../../db/schema.ts';

@@ -9,7 +9,7 @@ import { userSettings } from '../../src/server/db/schema.ts';
 import { getUserSetting, setUserSetting, USER_SETTINGS } from '../../src/server/lib/userSettings.ts';
 import { allReportContributions } from '../../src/server/modules/index.ts';
 import type { Report, ReportSection } from '../../src/shared/contracts/reports.ts';
-import { en } from '../../src/shared/i18n/en.ts';
+import { en } from '../messages.ts';
 import { BUILTIN_VIEWS, BUILTIN_VIEW_IDS, MAX_REPORT_VIEWS, parseSectionsParam, sectionsParam, tableMatches } from '../../src/shared/reportViews.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 import { cmd, endLesson, startLesson } from '../lesson-helpers.ts';

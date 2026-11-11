@@ -7,6 +7,8 @@
  * by a strict HttpOnly scorer cookie. The installed iPhone app has its own cookie store, so it pairs
  * with a 6-digit code instead (D-129). The service worker keeps only the app shell (D-134).
  */
+// First: the strings the student page never shows (S23a, D-182).
+import '../../shared/i18n/areas/staff.ts';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

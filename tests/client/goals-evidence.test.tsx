@@ -9,7 +9,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Evidence } from '../../src/shared/contracts/goals.ts';
-import { en } from '../../src/shared/i18n/en.ts';
+import { en } from '../messages.ts';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
 import { EvidenceAdder, type NewEvidence, type UploadKind } from '../../src/client/modules/goals/EvidenceAdder.tsx';
 import { EvidenceView } from '../../src/client/modules/goals/shared.tsx';

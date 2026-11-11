@@ -36,9 +36,10 @@ export function planModule(ws: Workspace, key: string): void {
   // 1. Shared catalogue: one line; new modules start disabled until an admin enables them (CFG-1).
   ws.insertBefore(catalog, '] as const satisfies readonly CatalogEntry[];', `  { key: ${lit(key)}, defaultAvailability: 'disabled' },\n`);
 
-  // 2. i18n: the module name and the namespace the client manifest declares.
+  // 2. i18n: the module name (the student page names modules, so the main dictionary) and the namespace
+  // the client manifest declares (teacher screens only: the staff dictionary, D-182).
+  addMessages(ws, [[`module.${key}`, title]], 'main');
   addMessages(ws, [
-    [`module.${key}`, title],
     [`${key}.title`, title],
     [`${key}.placeholder`, `${title}: coming soon.`],
   ]);
@@ -146,7 +147,7 @@ if (import.meta.main) {
   runCli(USAGE, planModule, (key) =>
     [
       `Module "${key}" scaffolded (disabled by default). Next, see docs/EXTENDING.md "Add a module":`,
-      '  - translate the TODO(tr) strings in src/shared/i18n/tr.ts',
+      '  - translate the TODO(tr) strings in src/shared/i18n/tr.ts and src/shared/i18n/areas/staff/tr.ts',
       '  - contracts + routes + commands, then real tests; add a ROADMAP box',
       '  - npm run check',
     ].join('\n'),

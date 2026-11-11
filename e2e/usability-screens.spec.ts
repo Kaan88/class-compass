@@ -19,7 +19,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
-import { dictionaries, type Locale } from '../src/shared/i18n/index.ts';
+import type { Locale } from '../src/shared/i18n/index.ts';
+import { en as allEn, tr as allTr } from '../tests/messages.ts';
 import { DEFAULT_THEME, THEME_KEYS } from '../src/shared/themes.ts';
 import { api, ensurePin, login, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
 
@@ -73,8 +74,8 @@ async function newPage(browser: Browser, dev: Device, lang: Locale, extra: Param
 
 // ---------------------------------------------------------------- texts in either language
 
-const EN = dictionaries.en as Record<string, string>;
-const TR = dictionaries.tr as Record<string, string>;
+const EN = allEn as Record<string, string>;
+const TR = allTr as Record<string, string>;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 /** Exact accessible name in English or Turkish (every key whose English text is `en`). */
 function nm(en: string, exact = true): RegExp {

@@ -14,7 +14,7 @@ import { STYLE_ELEMENT_ID, installThemeStyles, themeTokens } from '../../src/cli
 import { THEMES, ThemeProvider, useTheme } from '../../src/client/themes/index.tsx';
 import { StudentCard } from '../../src/client/ui/Students.tsx';
 import { SensitiveGate } from '../../src/client/routes/Lock.tsx';
-import { en } from '../../src/shared/i18n/en.ts';
+import { en } from '../messages.ts';
 import { THEME_KEYS } from '../../src/shared/themes.ts';
 
 const path = { current: '/teacher/students' };

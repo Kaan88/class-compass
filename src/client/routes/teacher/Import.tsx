@@ -15,8 +15,7 @@ import type { z } from 'zod';
 import { ACCEPT_HINT, uploadFile } from '../../../shared/contracts/files.ts';
 import * as Imp from '../../../shared/contracts/import.ts';
 import * as School from '../../../shared/contracts/school.ts';
-import { en } from '../../../shared/i18n/en.ts';
-import { formatDate, type MessageKey } from '../../../shared/i18n/index.ts';
+import { formatDate, hasMessage, type MessageKey } from '../../../shared/i18n/index.ts';
 import { sortByName } from '../../../shared/text/turkish.ts';
 import { call, upload } from '../../lib/api.ts';
 import { errorText } from '../../lib/errors.ts';
@@ -37,7 +36,7 @@ type Row = Imp.ImportRow;
 type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 const KEY = [SENSITIVE, 'teacher', 'import'] as const;
-const has = (k: string): k is MessageKey => k in en;
+const has = (k: string): k is MessageKey => hasMessage(k);
 const FIELD_KEYS: Record<Imp.ImportField, MessageKey> = {
   fullName: 'import.field.fullName',
   givenNames: 'import.field.givenNames',

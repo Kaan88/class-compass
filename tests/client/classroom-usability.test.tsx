@@ -17,8 +17,7 @@ import { AttendanceCountsLine } from '../../src/client/modules/attendance/Attend
 import { longDay } from '../../src/client/modules/homework/CheckGrid.tsx';
 import { ClassroomTopBar } from '../../src/client/ui/ClassroomTopBar.tsx';
 import { PanelHead } from '../../src/client/ui/Layout.tsx';
-import { en } from '../../src/shared/i18n/en.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { en, tr } from '../messages.ts';
 
 afterEach(cleanup);
 

@@ -16,8 +16,7 @@ import { suggestNextYear } from '../../src/client/routes/admin/rollover.ts';
 import { ME_KEY, type Me } from '../../src/client/lib/session.ts';
 import { ProfilePage } from '../../src/client/routes/teacher/Teacher.tsx';
 import type { ReportTable } from '../../src/shared/contracts/reports.ts';
-import { en } from '../../src/shared/i18n/en.ts';
-import { tr } from '../../src/shared/i18n/tr.ts';
+import { en, tr } from '../messages.ts';
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),

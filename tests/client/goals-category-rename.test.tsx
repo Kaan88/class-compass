@@ -10,7 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Category } from '../../src/shared/contracts/goals.ts';
-import { en } from '../../src/shared/i18n/en.ts';
+import { en } from '../messages.ts';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
 import { CategoryRename, renameEdit } from '../../src/client/routes/teacher/Goals.tsx';
 
