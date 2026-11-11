@@ -10,7 +10,8 @@
  *   The order of the finished groups is then shuffled with the seed, so a group's position (and so
  *   its default name and icon) never tells the class which group is the lowest or highest (GRP-7).
  * - Levels are free text: numbers, codes (A1, B2) and the usual EN/TR word scales (Beginner …
- *   Advanced, Başlangıç … İleri) are ranked in their real order (`levelRanks`).
+ *   Advanced, Başlangıç … İleri) are ranked in their real order (`levelRanks`). A class+subject may
+ *   have an ordered level list (D-187): its labels are ranked in the teacher's order, other labels after it.
  * - Mixed mode balances levels across groups with a serpentine draft (highest levels first), with
  *   the unassessed bucket drafted last so it is also spread evenly.
  * - Pair constraints: 'apart' is a hard rule where possible, 'together' a soft one. A swap search
@@ -133,19 +134,45 @@ export function orderedLevels(labels: Iterable<string | null | undefined>): stri
   });
 }
 
-/** Ranks of teacher-entered level labels (`orderedLevels`), lowest = 0. Empty / missing labels are unassessed. */
-export function levelRanks(levels: ReadonlyMap<string, string | null>): Map<string, number | null> {
-  const distinct = orderedLevels(levels.values());
+/**
+ * Key that matches a level label with an entry of the class's level list (D-187): Turkish-aware lower
+ * case without diacritics, spaces collapsed, so "starter", "Starter " and "STARTER" are one level.
+ */
+export const levelKey = (label: string): string => foldForSearch(label.trim()).replace(/\s+/gu, ' ');
+
+/** A level list in use: at least one label after trimming. */
+const activeList = (list: readonly string[] | null | undefined): string[] => (list ?? []).map((l) => l.trim()).filter(Boolean);
+
+/**
+ * The order the solver uses (D-187). Without a level list: `orderedLevels`, with every label in
+ * `others`. With a list: the list's labels in the teacher's order (`listed`, all of them, used or not),
+ * then the labels in use that are not in the list (`others`, ranked as without a list).
+ */
+export function levelOrder(labels: Iterable<string | null | undefined>, list?: readonly string[] | null): { listed: string[]; others: string[] } {
+  const listed = activeList(list);
+  const keys = new Set(listed.map(levelKey));
+  return { listed, others: orderedLevels([...labels].filter((l) => l?.trim() && !keys.has(levelKey(l)))) };
+}
+
+/**
+ * Ranks of teacher-entered level labels, lowest = 0. Empty / missing labels are unassessed. Without a
+ * level list the labels are ranked by `orderedLevels`; with one (D-187) a label in the list takes its
+ * position in the list, and every other label is ranked after the whole list, in `orderedLevels` order.
+ */
+export function levelRanks(levels: ReadonlyMap<string, string | null>, list?: readonly string[] | null): Map<string, number | null> {
+  const { listed, others } = levelOrder(levels.values(), list);
+  const listRank = new Map(listed.map((l, i) => [levelKey(l), i] as const));
   const rank = new Map<string, number>();
   // Labels on the same step of a word scale ("Orta" / "Intermediate") share a rank.
-  let r = -1;
-  distinct.forEach((l, i) => {
-    const prev = i > 0 ? distinct[i - 1]! : null;
+  let r = listed.length - 1;
+  others.forEach((l, i) => {
+    const prev = i > 0 ? others[i - 1]! : null;
     const same = prev !== null && levelWordStep(l) !== null && levelWordStep(l) === levelWordStep(prev);
     if (!same) r++;
     rank.set(l, r);
   });
-  return new Map([...levels].map(([id, l]) => [id, l?.trim() ? (rank.get(l.trim()) ?? null) : null]));
+  const rankOf = (l: string) => listRank.get(levelKey(l)) ?? rank.get(l) ?? null;
+  return new Map([...levels].map(([id, l]) => [id, l?.trim() ? rankOf(l.trim()) : null]));
 }
 
 // ---------------------------------------------------------------- cost

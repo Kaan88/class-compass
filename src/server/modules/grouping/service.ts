@@ -15,7 +15,7 @@
 import { and, asc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import type { z } from 'zod';
 import { effectiveAttendance, isAway } from '../../../domain/attendance.ts';
-import { evaluateRules, fitToPresent, levelRanks, solveGroups, type PairRule as DomainRule } from '../../../domain/grouping.ts';
+import { evaluateRules, fitToPresent, levelKey, levelRanks, solveGroups, type PairRule as DomainRule } from '../../../domain/grouping.ts';
 import type * as C from '../../../shared/contracts/grouping.ts';
 import {
   DEFAULT_ARRANGEMENTS,
@@ -33,10 +33,10 @@ import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { completeDefault, inLocales, seedLocales, type ClassLocale } from '../../../shared/classLanguage.ts';
 import { initials, normaliseName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { groupTemplates, lessonGroupings, lessons, pairConstraints, studentSubjectLevels, students, teachingContexts, type GroupJson, type UnsatisfiedJson } from '../../db/schema.ts';
+import { groupTemplates, lessonGroupings, lessons, levelLists, pairConstraints, studentSubjectLevels, students, teachingContexts, type GroupJson, type UnsatisfiedJson } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
-import { requireUser, type RequestContext } from '../../lib/context.ts';
+import { actorUserId, requireUser, type RequestContext } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { dailyFor, exceptionsFor } from '../attendance/service.ts';
@@ -66,6 +66,11 @@ function levelsOf(db: Db, subjectId: string, ids: readonly string[]): Map<string
   return new Map(ids.map((id) => [id, by.get(id) ?? null]));
 }
 
+/** The class+subject's ordered level list, lowest first (D-187); empty when there is none. */
+export function levelListOf(db: Db, classId: string, subjectId: string): string[] {
+  return db.select().from(levelLists).where(and(eq(levelLists.classId, classId), eq(levelLists.subjectId, subjectId))).get()?.labelsJson ?? [];
+}
+
 function ruleRows(db: Db, contextId: string): RuleRow[] {
   return db.select().from(pairConstraints).where(and(eq(pairConstraints.contextId, contextId), isNull(pairConstraints.archivedAt))).orderBy(asc(pairConstraints.createdAt)).all();
 }
@@ -86,7 +91,7 @@ function generateGroups(ctx: RequestContext, context: ContextRow, mode: Exclude<
 }
 
 function generateFor(db: Db, context: ContextRow, roster: readonly StudentRow[], mode: Exclude<GroupingMode, 'custom'>, sizing: Sizing, seed: string, previous: readonly GroupJson[]) {
-  const ranks = levelRanks(levelsOf(db, context.subjectId, roster.map((s) => s.id)));
+  const ranks = levelRanks(levelsOf(db, context.subjectId, roster.map((s) => s.id)), levelListOf(db, context.classId, context.subjectId));
   const result = solveGroups({ students: roster.map((s) => ({ id: s.id, levelRank: ranks.get(s.id) ?? null })), mode, sizing, rules: domainRules(ruleRows(db, context.id)), seed });
   const locales = localesOf(db, context);
   const groups: GroupJson[] = result.groups.map((memberIds, i) => {
@@ -260,7 +265,37 @@ export function overview(ctx: RequestContext, contextId: string, includeArchived
     templates: templateRows(ctx.db, context.id, includeArchived).map(toTemplate),
     students: roster.map((s) => ({ id: s.id, fullName: s.fullName, initials: initials(s.fullName), avatarHue: s.avatarHue, level: levels.get(s.id) ?? null })),
     rules: ruleRows(ctx.db, context.id).map(toRule),
+    levelList: levelListOf(ctx.db, context.classId, context.subjectId),
   };
+}
+
+/**
+ * Set the ordered level list of the class+subject (S25c, D-187); an empty list removes it. Writable
+ * class, grouping on, audited. Students' levels are not touched (a level outside the list is kept).
+ */
+export function setLevelList(ctx: RequestContext, input: In<typeof C.setLevelList>): { labels: string[] } {
+  return tx(ctx.db, () => {
+    const context = assertOwnsContext(ctx, input.contextId);
+    assertClassWritable(ctx.db, getClass(ctx.db, context.classId));
+    assertModuleEnabled(ctx.db, context.id, 'grouping');
+    const labels = input.labels.map((l) => l.replace(/\s+/gu, ' '));
+    if (new Set(labels.map(levelKey)).size !== labels.length) throw new AppError('VALIDATION', 'A level is in the list twice', { reason: 'DUPLICATE_LEVEL' });
+    const before = levelListOf(ctx.db, context.classId, context.subjectId);
+    if (before.length === labels.length && before.every((l, i) => l === labels[i])) return { labels };
+    const key = and(eq(levelLists.classId, context.classId), eq(levelLists.subjectId, context.subjectId));
+    const now = ctx.now();
+    const uid = actorUserId(ctx.actor);
+    if (!labels.length) ctx.db.delete(levelLists).where(key).run();
+    else
+      ctx.db
+        .insert(levelLists)
+        .values({ classId: context.classId, subjectId: context.subjectId, labelsJson: labels, updatedAt: now, updatedBy: uid })
+        .onConflictDoUpdate({ target: [levelLists.classId, levelLists.subjectId], set: { labelsJson: labels, updatedAt: now, updatedBy: uid } })
+        .run();
+    const where = { classId: context.classId, subjectId: context.subjectId };
+    audit(ctx.db, ctx.actor, { action: 'grouping.level_list_set', entity: 'teaching_context', entityId: context.id, before: { ...where, labels: before }, after: { ...where, labels } }, now);
+    return { labels };
+  });
 }
 
 /** The context of an arrangement the teacher owns (ACC-10), writable class, module on. */

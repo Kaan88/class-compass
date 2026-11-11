@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { apartPlacement, evaluateRules, fitToPresent, groupSizes, levelRanks, orderedLevels, solveGroups, type GroupStudent, type PairRule, type Sizing } from '../../src/domain/grouping.ts';
+import { apartPlacement, evaluateRules, fitToPresent, groupSizes, levelOrder, levelRanks, orderedLevels, solveGroups, type GroupStudent, type PairRule, type Sizing } from '../../src/domain/grouping.ts';
 
 /**
  * Fixed fast-check seed (S10 housekeeping): runs are reproducible, and fast-check prints the seed and
@@ -304,6 +304,64 @@ describe('levelRanks (GRP-3)', () => {
     // Other words follow the known ones, alphabetically; numbers and codes stay natural.
     expect(orderedLevels(['Zebra', 'Beginner', 'Apple'])).toEqual(['Beginner', 'Apple', 'Zebra']);
     expect(orderedLevels(['B1', 'A2', 'A1', 'C1'])).toEqual(['A1', 'A2', 'B1', 'C1']);
+  });
+});
+
+describe('levelRanks with a class level list (S25c, D-187, GRP-3)', () => {
+  const LIST = ['Starter', 'Growing', 'Strong', 'Star'];
+  it('ranks the list labels in the teacher’s order, not alphabetically or by the word scale', () => {
+    // Alphabetically "Growing" < "Star" < "Starter" < "Strong"; "Starter" is also a known word (lowest step).
+    const r = levelRanks(new Map([['a', 'Star'], ['b', 'Strong'], ['c', 'Growing'], ['d', 'Starter']]), LIST);
+    expect([r.get('d'), r.get('c'), r.get('b'), r.get('a')]).toEqual([0, 1, 2, 3]);
+    // Even a reversed word scale follows the list.
+    const rev = levelRanks(new Map([['a', 'Advanced'], ['b', 'Beginner']]), ['Advanced', 'Beginner']);
+    expect(rev.get('a')).toBe(0);
+    expect(rev.get('b')).toBe(1);
+  });
+  it('matches list labels ignoring case, accents and spaces; keeps missing levels unassessed', () => {
+    const r = levelRanks(new Map([['a', ' starter '], ['b', 'STRONG'], ['c', null], ['d', '']]), LIST);
+    expect(r.get('a')).toBe(0);
+    expect(r.get('b')).toBe(2);
+    expect(r.get('c')).toBeNull();
+    expect(r.get('d')).toBeNull();
+    const tr = levelRanks(new Map([['a', 'ILERI'], ['b', 'başlıyor']]), ['Başlıyor', 'İleri']);
+    expect(tr.get('b')).toBe(0);
+    expect(tr.get('a')).toBe(1);
+  });
+  it('ranks labels that are not in the list after the whole list, in today’s order', () => {
+    const r = levelRanks(new Map([['a', 'Zebra'], ['b', 'Starter'], ['c', 'Advanced'], ['d', '2'], ['e', 'Growing'], ['f', 'Ileri']]), LIST);
+    expect(r.get('b')).toBe(0);
+    expect(r.get('e')).toBe(1);
+    // Not in the list, as without one: Advanced = Ileri (one step of the word scale), then "2", then Zebra.
+    expect(r.get('c')).toBe(4);
+    expect(r.get('f')).toBe(4);
+    expect(r.get('d')).toBe(5);
+    expect(r.get('a')).toBe(6);
+    expect(levelOrder(['Zebra', 'Starter', 'Advanced', '2', 'starter', null], LIST)).toEqual({ listed: LIST, others: ['Advanced', '2', 'Zebra'] });
+    // Without the list the same labels follow the known words, then alphabetical order.
+    expect(orderedLevels(LIST)).toEqual(['Starter', 'Growing', 'Star', 'Strong']);
+  });
+  it('without a list (null or empty) everything is ranked as before', () => {
+    const levels = new Map<string, string | null>([['a', '10'], ['b', 'Advanced'], ['c', 'B1'], ['d', null], ['e', 'Beginner']]);
+    expect(levelRanks(levels, [])).toEqual(levelRanks(levels));
+    expect(levelRanks(levels, null)).toEqual(levelRanks(levels));
+    expect(levelRanks(levels, ['  '])).toEqual(levelRanks(levels));
+    expect(levelOrder(['B1', 'A1'], [])).toEqual({ listed: [], others: ['A1', 'B1'] });
+  });
+  it('level groups follow the list order (the solver gets the ranks)', () => {
+    const levels = new Map<string, string | null>();
+    // 8 students, two per level; with the list, Starter+Growing and Strong+Star end up together in 2 groups.
+    LIST.forEach((l, i) => {
+      levels.set(`s${i}a`, l);
+      levels.set(`s${i}b`, l);
+    });
+    const ranks = levelRanks(levels, LIST);
+    const { groups } = solveGroups({ students: [...levels.keys()].map((id) => ({ id, levelRank: ranks.get(id) ?? null })), mode: 'level', sizing: { groupCount: 2 }, rules: [], seed: 'list' });
+    const bands = groups.map((g) => new Set(g.map((id) => levels.get(id))));
+    expect(bands.map((b) => [...b].sort()).sort()).toEqual([
+      ['Growing', 'Starter'],
+      ['Star', 'Strong'],
+    ]);
   });
 });
 

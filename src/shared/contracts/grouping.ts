@@ -148,6 +148,8 @@ export const GroupingOverview = z.object({
   templates: z.array(GroupTemplate),
   students: z.array(TeacherGroupingStudent),
   rules: z.array(PairRule),
+  /** The class+subject's ordered level list, lowest first (D-187); empty = no list. Teacher-only (GRP-7). */
+  levelList: z.array(z.string()),
 });
 export type GroupingOverview = z.infer<typeof GroupingOverview>;
 
@@ -157,6 +159,23 @@ export const getGrouping = endpoint({
   access: 'teacher',
   input: z.object({ contextId: Id, includeArchived: z.enum(['0', '1']).optional() }),
   output: GroupingOverview,
+});
+
+/** Ordered level list (S25c, D-187): at most this many labels, each like a level (1–40 characters). */
+export const MAX_LEVEL_LIST = 20;
+export const LevelLabel = z.string().trim().min(1).max(40);
+/**
+ * Set the class+subject's ordered level list, lowest first (D-187). An empty list removes it, and the
+ * levels are ranked as before. Labels that differ only in case, accents or spaces are refused
+ * (`DUPLICATE_LEVEL`). Students' levels are not changed: a level that is not in the list is kept and
+ * ranked after it. Takes effect the next time groups are made.
+ */
+export const setLevelList = endpoint({
+  method: 'PUT',
+  path: '/api/teacher/contexts/:contextId/grouping/level-list',
+  access: 'teacher',
+  input: z.object({ contextId: Id, labels: z.array(LevelLabel).max(MAX_LEVEL_LIST) }),
+  output: z.object({ labels: z.array(z.string()) }),
 });
 
 export const GroupInput = z.object({

@@ -166,6 +166,61 @@ describe('roster changes (GRP-1, GRP-3, review fixes)', () => {
   });
 });
 
+describe('ordered level list per class+subject (S25c, D-187, GRP-3)', () => {
+  const listUrl = () => `/api/teacher/contexts/${ctx()}/grouping/level-list`;
+  // 19 students: 7 Bronze, 6 Silver, 6 Gold. Without a list the order is alphabetical (Bronze < Gold < Silver).
+  const METAL = (i: number) => ['Bronze', 'Silver', 'Gold'][i % 3]!;
+  const setMetals = () => ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/levels`, { levels: kids.map((k, i) => ({ studentId: k.id, level: METAL(i) })) }));
+  const levelGroups = async () => {
+    const t = await ok(s.teacherA.post(`/api/teacher/contexts/${ctx()}/grouping/templates`, { name: { en: 'Two by level' }, mode: 'level', sizing: { groupCount: 2 } }));
+    const levelOf = new Map(kids.map((k, i) => [k.id, METAL(i)]));
+    return t.groups.map((g: any) => new Set(g.memberIds.map((id: string) => levelOf.get(id))));
+  };
+
+  it('sets, returns, changes and removes the list (audited, levels untouched); refuses duplicates and too many', async () => {
+    await setMetals();
+    expect((await overview()).levelList).toEqual([]);
+    expect(await ok(s.teacherA.put(listUrl(), { labels: [' Bronze ', 'Silver', 'Gold'] }))).toEqual({ labels: ['Bronze', 'Silver', 'Gold'] });
+    expect((await overview()).levelList).toEqual(['Bronze', 'Silver', 'Gold']);
+    await ok(s.teacherA.put(listUrl(), { labels: ['Bronze', 'Silver', 'Gold'] })); // no change, no audit row
+    expect(count("select count(*) n from audit_events where action = 'grouping.level_list_set'")).toBe(1);
+    const dup = await s.teacherA.put(listUrl(), { labels: ['Gold', 'gold '] });
+    expect(dup.status).toBe(400);
+    expect(dup.body.error.details.reason).toBe('DUPLICATE_LEVEL');
+    expect((await s.teacherA.put(listUrl(), { labels: Array.from({ length: 21 }, (_, i) => `L${i}`) })).status).toBe(400);
+    expect((await s.teacherA.put(listUrl(), { labels: ['x'.repeat(41)] })).status).toBe(400);
+    expect((await s.teacherA.put(listUrl(), { labels: [''] })).status).toBe(400);
+    await ok(s.teacherA.put(listUrl(), { labels: [] }));
+    expect((await overview()).levelList).toEqual([]);
+    expect(count('select count(*) n from level_lists')).toBe(0);
+    expect(count("select count(*) n from audit_events where action = 'grouping.level_list_set'")).toBe(2);
+    // Students' levels are never changed by the list.
+    expect((await overview()).students.map((st: any) => st.level)).toEqual(kids.map((_, i) => METAL(i)));
+  });
+
+  it('only the teacher of the class+subject, in a writable class with grouping on (ACC-10, CFG-1)', async () => {
+    expect((await s.teacherB.put(listUrl(), { labels: ['A'] })).status).toBe(403);
+    await ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/modules/grouping`, { enabled: false }));
+    expect((await s.teacherA.put(listUrl(), { labels: ['A'] })).body.error.code).toBe('FEATURE_DISABLED');
+    await ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/modules/grouping`, { enabled: true }));
+    expect(count('select count(*) n from level_lists')).toBe(0);
+  });
+
+  it('level groups follow the list order; without a list they follow the order used before', async () => {
+    await setMetals();
+    // Without a list: Bronze < Gold < Silver, so Bronze and Silver are never in one group.
+    expect((await levelGroups()).some((g: Set<string>) => g.has('Bronze') && g.has('Silver'))).toBe(false);
+    // With the list Bronze < Silver < Gold, Bronze and Gold are never in one group.
+    await ok(s.teacherA.put(listUrl(), { labels: ['Bronze', 'Silver', 'Gold'] }));
+    const withList = await levelGroups();
+    expect(withList.some((g: Set<string>) => g.has('Bronze') && g.has('Gold'))).toBe(false);
+    expect(withList.some((g: Set<string>) => g.has('Bronze') && g.has('Silver'))).toBe(true);
+    // A level that is not in the list is kept and ranked after the list.
+    await ok(s.teacherA.put(listUrl(), { labels: ['Bronze', 'Silver'] }));
+    expect((await levelGroups()).some((g: Set<string>) => g.has('Bronze') && g.has('Gold'))).toBe(false);
+  });
+});
+
 describe('pair rules (GRP-4, GRP-8)', () => {
   it("keeps 'apart' students apart, and reports rules that cannot be met with a reason", async () => {
     const [a, b, c] = kids;
@@ -235,6 +290,8 @@ describe('groups in a lesson (GRP-5, GRP-7, DSH-8)', () => {
 
   it('no level, arrangement type, rule or note in any classroom-access response (GRP-7 scan)', async () => {
     await setLevels();
+    // The class's level list (S25c, D-187) is teacher-only too.
+    await ok(s.teacherA.put(`/api/teacher/contexts/${ctx()}/grouping/level-list`, { labels: ['LVLSECRET-3', 'LISTSECRET-x', 'LVLSECRET-1', 'LVLSECRET-2'] }));
     await ok(s.teacherA.post(`/api/teacher/contexts/${ctx()}/grouping/rules`, { studentA: kids[0]!.id, studentB: kids[1]!.id, kind: 'apart', note: NOTE }));
     const lessonId = await startLesson(s.teacherA, ctx(), { othersPresent: true });
     const arr = await ok(s.teacherA.get(`/api/classroom/contexts/${ctx()}/grouping/arrangements`));
@@ -253,6 +310,7 @@ describe('groups in a lesson (GRP-5, GRP-7, DSH-8)', () => {
     const all = bodies.join('\n');
     expect(all).toContain(kids[2]!.fullName); // the scan does see the groups
     expect(all).not.toContain('LVLSECRET');
+    expect(all).not.toContain('LISTSECRET');
     expect(all).not.toContain(NOTE);
     // (Counter card levels are numbers 0–3, CNT-6; a subject level would be a string.)
     // Arrangement names must not say "level" either (default names are neutral; review fix).

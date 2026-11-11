@@ -816,6 +816,24 @@ export const pairConstraints = sqliteTable(
 );
 
 /**
+ * Ordered level list per class+subject (S25c, D-187): the level labels the teacher picks from, lowest
+ * first; the grouping solver ranks levels in this order. Levels stay free text in
+ * `student_subject_levels`; no row = no list (levels ranked as before). PRIVATE like the levels: teacher
+ * area only (GRP-7). Shared by every teacher of the class+subject, as the levels are.
+ */
+export const levelLists = sqliteTable(
+  'level_lists',
+  {
+    classId: text('class_id').notNull().references(() => classes.id),
+    subjectId: text('subject_id').notNull().references(() => subjects.id),
+    labelsJson: text('labels_json', { mode: 'json' }).$type<string[]>().notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    updatedBy: text('updated_by').references(() => users.id),
+  },
+  (t) => [primaryKey({ columns: [t.classId, t.subjectId] })],
+);
+
+/**
  * The groups used in a lesson (GRP-5): a copy of the arrangement fitted to the students present,
  * so absences never change the saved arrangement. id = opId of 'grouping.apply'. At most one live
  * grouping per lesson; applying another or clearing marks the previous one `clearedAt`.
