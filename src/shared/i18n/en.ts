@@ -621,6 +621,7 @@ export const en = {
   'error.CONFIRM_REQUIRED': 'Tick the box first.',
   'error.REASON_REQUIRED': 'Choose a reason first.',
   'error.PICTURE_NOT_PENDING': 'This picture is no longer waiting. Someone else may have checked it.',
+  'module.lessonGoals': 'Lesson goals',
 } as const;
 
 export type MessageKey = keyof typeof en;

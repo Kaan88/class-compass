@@ -50,10 +50,10 @@ describe('server manifests', () => {
     expect(registered.filter((t) => !declared.includes(t) && !t.startsWith('test.'))).toEqual([]);
   });
 
-  it('End Lesson steps run in a deterministic order: Secret Students → assistant thank-you → achievements "Well done!" → reflection (LES-3)', () => {
+  it('End Lesson steps run in a deterministic order: Secret Students → assistant thank-you → achievements "Well done!" → lesson goal → reflection (LES-3, D-188)', () => {
     installModules();
     const steps = allEndSteps();
-    expect(steps.map((s) => s.key)).toEqual(['secretStudents', 'assistantThanks', 'achievementsWellDone', 'reflection']);
+    expect(steps.map((s) => s.key)).toEqual(['secretStudents', 'assistantThanks', 'achievementsWellDone', 'lessonGoal', 'reflection']);
     const orders = steps.map((s) => s.order);
     expect(new Set(orders).size).toBe(orders.length); // no ties left to key order
     for (const m of SERVER_MODULES) for (const s of m.endSteps ?? []) expect(s.module === null || s.module === m.policyKey).toBe(true);

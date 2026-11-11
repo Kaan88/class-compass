@@ -15,6 +15,7 @@ import { IMPORT_SOURCE_TYPES, type ImportFlag } from '../../shared/contracts/imp
 import { STARTER_KINDS } from '../../shared/text/starters.ts';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_ENTITIES } from '../../shared/notifications.ts';
 import { REFUSAL_REASONS } from '../../shared/avatarPictures.ts';
+import { LESSON_GOAL_OUTCOMES } from '../../shared/lessonGoals.ts';
 
 export type LocalizedText = { en?: string; tr?: string };
 
@@ -2132,4 +2133,29 @@ export const avatarPictures = sqliteTable(
     refusalReason: text('refusal_reason', { enum: REFUSAL_REASONS }),
   },
   (t) => [index('avatar_pictures_student_idx').on(t.studentId), index('avatar_pictures_status_idx').on(t.status, t.expiresAt)],
+);
+
+// ---------------------------------------------------------------- lesson goals (S25d, D-188)
+/**
+ * The optional goal of one lesson (module `lessonGoals`, opt-in per class+subject): the sentence the
+ * teacher set at Start Lesson or during the lesson, and the class's review at End Lesson (`outcome`
+ * null = not reviewed). No row = the lesson had no goal; clearing the goal deletes the row (audited).
+ * Kept when the module is switched off (CFG-2). Only `server/modules/lessonGoals/` writes it.
+ */
+export const lessonGoals = sqliteTable(
+  'lesson_goals',
+  {
+    lessonId: text('lesson_id')
+      .primaryKey()
+      .references(() => lessons.id),
+    contextId: text('context_id')
+      .notNull()
+      .references(() => teachingContexts.id),
+    text: text('text').notNull(),
+    outcome: text('outcome', { enum: LESSON_GOAL_OUTCOMES }),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    reviewedAt: integer('reviewed_at'),
+  },
+  (t) => [index('lesson_goals_context_idx').on(t.contextId)],
 );

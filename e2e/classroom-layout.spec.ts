@@ -25,11 +25,13 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { api, closeDock, ensurePin, login, openDock, PIN, type DockPanel } from './helpers.ts';
 
-const MODULES = ['routines', 'attendance', 'counters', 'secretStudents', 'assistant', 'grouping', 'homework', 'goals', 'achievements'] as const;
+const MODULES = ['routines', 'attendance', 'counters', 'secretStudents', 'assistant', 'grouping', 'homework', 'goals', 'achievements', 'lessonGoals'] as const;
 type Module = (typeof MODULES)[number];
+/** The modules that are on in a class+subject nobody changed: Lesson goals is opt-in (S25d, D-188). */
+const DEFAULT_ON = MODULES.filter((m) => m !== 'lessonGoals');
 const THEMES = ['explorer', 'animals', 'classroom'] as const;
 /** The board box (dashboard slot key) of each module that has one. */
-const BOX_OF: Partial<Record<Module, string>> = { routines: 'routine', attendance: 'attendance', counters: 'counters', secretStudents: 'secret', assistant: 'assistant', grouping: 'groups', homework: 'homework', achievements: 'achievements' };
+const BOX_OF: Partial<Record<Module, string>> = { routines: 'routine', attendance: 'attendance', counters: 'counters', secretStudents: 'secret', assistant: 'assistant', grouping: 'groups', homework: 'homework', achievements: 'achievements', lessonGoals: 'lessonGoal' };
 
 async function endActiveLessons(page: Page) {
   const active = await api(page, 'GET', '/api/classroom/lessons/active');
@@ -168,7 +170,7 @@ test('module combinations x themes: the board holds (no overlap, no empty box, n
     ['groups-homework-assistant', ['grouping', 'homework', 'assistant']],
     ...MODULES.map((m): [string, readonly Module[]] => [`without-${m}`, MODULES.filter((x) => x !== m)]),
   ];
-  expect(combos).toHaveLength(13);
+  expect(combos).toHaveLength(14);
   try {
     for (const theme of THEMES) {
       expect((await api(admin, 'PATCH', `/api/admin/classes/${ctx.classId}`, { theme })).status).toBe(200);
@@ -226,7 +228,7 @@ test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Nor
   const office = await officeCtx.newPage();
   await login(office, 'english');
   try {
-    await setModules(office, ctx.id, MODULES, original);
+    await setModules(office, ctx.id, DEFAULT_ON, original);
     await setReminderBoxes(office, ctx.id, true);
     await startLesson(page, ctx.id);
     // Below 1440 the grid scrolls inside its box; these floors keep it from getting worse (measured
@@ -525,7 +527,7 @@ test('Customise layout: PIN, keyboard and mouse edits, save per class (relocks: 
   const { ctx: displayCtx, p: d } = await displayPage(browser, { width: 1440, height: 900 });
   const layoutOf = async (contextId: string) => (await api(d, 'GET', `/api/classroom/layout?contextId=${contextId}`)).body as { source: string; layout: unknown };
   try {
-    await setModules(page, ctxA.id, MODULES, original);
+    await setModules(page, ctxA.id, DEFAULT_ON, original);
     await startLesson(page, ctxA.id);
     await startLesson(page, ctxB.id);
     await openClassroom(d);

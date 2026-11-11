@@ -88,6 +88,7 @@ const COMMAND_TEXT: Record<string, MessageKey> = {
   'lesson.setTopics': 'command.lesson.setTopics',
   'lesson.setDisplay': 'command.lesson.setDisplay',
   'assistant.checkDuty': 'command.assistant.checkDuty',
+  'lessonGoals.set': 'command.lessonGoals.set',
 };
 
 /**

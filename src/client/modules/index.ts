@@ -20,6 +20,7 @@ import { superSpeakersClientManifest } from './superSpeakers/manifest.tsx';
 import { notificationsClientManifest } from './notifications/manifest.tsx';
 import { assistantChatClientManifest } from './assistantChat/manifest.tsx';
 import { displayInfoClientManifest } from './displayInfo/manifest.tsx';
+import { lessonGoalsClientManifest } from './lessonGoals/manifest.tsx';
 import type { ClientModuleManifest } from './types.ts';
 
 export const CLIENT_MODULES: readonly ClientModuleManifest[] = [
@@ -41,4 +42,5 @@ export const CLIENT_MODULES: readonly ClientModuleManifest[] = [
   notificationsClientManifest,
   assistantChatClientManifest,
   displayInfoClientManifest,
+  lessonGoalsClientManifest,
 ];

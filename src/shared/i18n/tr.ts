@@ -614,4 +614,5 @@ export const tr = {
   'error.CONFIRM_REQUIRED': 'Önce kutuyu işaretleyin.',
   'error.REASON_REQUIRED': 'Önce bir neden seçin.',
   'error.PICTURE_NOT_PENDING': 'Bu resim artık beklemiyor. Başka biri bakmış olabilir.',
+  'module.lessonGoals': 'Ders hedefleri',
 } as const satisfies Messages;

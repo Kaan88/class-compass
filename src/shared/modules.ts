@@ -17,6 +17,11 @@ type Availability = 'enabled' | 'disabled';
 interface CatalogEntry {
   readonly key: string;
   readonly defaultAvailability: Availability;
+  /**
+   * S25d (D-188): the teacher's switch in a class+subject that has never set it (no row). Absent =
+   * 'on', as for every module before S25d. 'off' = an opt-in module the teacher turns on per class.
+   */
+  readonly contextDefault?: 'on' | 'off';
 }
 
 export const CONTEXT_MODULE_CATALOG = [
@@ -29,6 +34,8 @@ export const CONTEXT_MODULE_CATALOG = [
   { key: 'homework', defaultAvailability: 'enabled' },
   { key: 'goals', defaultAvailability: 'enabled' },
   { key: 'achievements', defaultAvailability: 'enabled' },
+  /** S25d (D-188): opt-in per class+subject (the teacher turns it on in Class settings). */
+  { key: 'lessonGoals', defaultAvailability: 'enabled', contextDefault: 'off' },
 ] as const satisfies readonly CatalogEntry[];
 
 /** Photos and audio stay off until consent is confirmed (D-014, D-026). */
@@ -65,6 +72,13 @@ export const DEFAULT_AVAILABILITY = Object.fromEntries([...CONTEXT_MODULE_CATALO
   ModuleKey,
   Availability
 >;
+
+/**
+ * S25d (D-188): is the teacher's switch of a context module on when the class+subject has no row for
+ * it? Read only through `school/modules.ts` (`isModuleEnabled` and friends) on the server.
+ */
+export const contextDefaultOn = (module: string): boolean =>
+  (CONTEXT_MODULE_CATALOG as readonly CatalogEntry[]).find((m) => m.key === module)?.contextDefault !== 'off';
 
 /** i18n key of a module's name. */
 export const moduleLabelKey = (key: ModuleKey) => `module.${key}` as const;

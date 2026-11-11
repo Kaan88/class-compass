@@ -21,6 +21,8 @@ import {
 } from '../../src/shared/classroomLayout.ts';
 
 const MODULE_BOXES = BOX_KEYS.filter((k) => !BOX_CATALOGUE[k].core);
+/** The module boxes of the default board: an opt-in module's box (Lesson goals, D-188) is not one of them. */
+const DEFAULT_MODULE_BOXES = MODULE_BOXES.filter((k) => placedKeys(DEFAULT_LAYOUT).includes(k));
 const sorted = (xs: readonly string[]) => [...xs].sort();
 
 type Op =
@@ -114,13 +116,23 @@ describe('layout model (D-148)', () => {
       [1, ['core.dock:12']],
     ]);
     expect(none.dock).toEqual([]);
-    const all = effectiveLayout(null, availableBoxes(MODULE_BOXES));
+    const all = effectiveLayout(null, availableBoxes(DEFAULT_MODULE_BOXES));
     expect(all).toEqual(DEFAULT_LAYOUT);
+    // S25d (D-188): today's goal, switched on in a class, gets its own one-line row above the student grid.
+    const withGoal = effectiveLayout(null, availableBoxes(MODULE_BOXES));
+    expect(layoutIssues(withGoal)).toEqual([]);
+    expect(withGoal.rows.map((r) => [r.h, r.boxes.map((b) => `${b.key}:${b.w}`)])).toEqual([
+      [3, ['routine:8', 'core.timer:4']],
+      [1, ['focus:4', 'counters:8']],
+      [1, ['lessonGoal:12']],
+      [6, ['core.students:12']],
+      [1, ['core.dock:12']],
+    ]);
     // Counters off: today's focus takes the whole second row.
-    const noCounters = effectiveLayout(DEFAULT_LAYOUT, availableBoxes(MODULE_BOXES.filter((k) => k !== 'counters')));
+    const noCounters = effectiveLayout(DEFAULT_LAYOUT, availableBoxes(DEFAULT_MODULE_BOXES.filter((k) => k !== 'counters')));
     expect(noCounters.rows[1]!.boxes).toEqual([{ key: 'focus', w: 12 }]);
     // A stored layout that is not valid is not used: the default is.
-    expect(effectiveLayout({ version: 1, rows: [], dock: [] }, availableBoxes(MODULE_BOXES))).toEqual(DEFAULT_LAYOUT);
+    expect(effectiveLayout({ version: 1, rows: [], dock: [] }, availableBoxes(DEFAULT_MODULE_BOXES))).toEqual(DEFAULT_LAYOUT);
   });
 
   it('effectiveLayout always returns a valid layout with exactly the available boxes, and is idempotent (property)', () => {

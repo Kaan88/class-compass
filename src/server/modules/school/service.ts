@@ -6,7 +6,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/school.ts';
 import { CONTEXT_MODULES, MEDIA_MODULES, type ContextModule, type ModuleKey } from '../../../shared/contracts/school.ts';
-import { isSchoolModule } from '../../../shared/modules.ts';
+import { contextDefaultOn, isSchoolModule } from '../../../shared/modules.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
 import { compareNames, foldForSearch, normaliseName } from '../../../shared/text/turkish.ts';
 import { DEFAULT_SOUND_VOLUME } from '../../../shared/classDisplay.ts';
@@ -651,7 +651,7 @@ export function setContextModule(ctx: RequestContext, input: In<typeof C.setCont
     audit(
       ctx.db,
       ctx.actor,
-      { action: 'context_module.set', entity: 'teaching_context', entityId: t.id, before: existing ? { module: input.module, enabled: existing.enabled } : { module: input.module, enabled: true }, after: { module: input.module, enabled: input.enabled, configChanged: input.config !== undefined } },
+      { action: 'context_module.set', entity: 'teaching_context', entityId: t.id, before: existing ? { module: input.module, enabled: existing.enabled } : { module: input.module, enabled: contextDefaultOn(input.module) }, after: { module: input.module, enabled: input.enabled, configChanged: input.config !== undefined } },
       now,
     );
     return contextModuleStates(ctx.db, t.id).find((s) => s.module === input.module)!;

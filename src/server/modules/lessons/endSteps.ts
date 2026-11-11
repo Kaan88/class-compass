@@ -28,8 +28,11 @@ export interface EndLessonStep<S extends z.ZodType = z.ZodType> {
   /** Lower runs (and is shown) first. Core reflection is 100. */
   order: number;
   input: S;
-  /** Optional: the step applies only when this returns true (e.g. a class setting, S13c "Well done!"). */
-  when?: (db: Db, contextId: string) => boolean;
+  /**
+   * Optional: the step applies only when this returns true (e.g. a class setting, S13c "Well done!").
+   * `lesson` is the lesson being ended (S25d, D-188: the goal review only when the lesson has a goal).
+   */
+  when?: (db: Db, contextId: string, lesson: LessonRow) => boolean;
   apply: (ctx: RequestContext, lesson: LessonRow, data: z.infer<S>) => void;
 }
 
@@ -41,9 +44,9 @@ export function registerEndLessonStep<S extends z.ZodType>(step: EndLessonStep<S
   steps.sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
 }
 
-/** Steps that apply to a context right now (core + enabled modules), in order. */
-export function endStepsFor(db: Db, contextId: string): EndLessonStep[] {
-  return steps.filter((s) => (s.module === null || isModuleEnabled(db, contextId, s.module)) && (!s.when || s.when(db, contextId)));
+/** Steps that apply to this lesson of a context right now (core + enabled modules), in order. */
+export function endStepsFor(db: Db, contextId: string, lesson: LessonRow): EndLessonStep[] {
+  return steps.filter((s) => (s.module === null || isModuleEnabled(db, contextId, s.module)) && (!s.when || s.when(db, contextId, lesson)));
 }
 
 /** Declare a step for a manifest's `endSteps` (typed input, stored untyped). */

@@ -1,6 +1,7 @@
 /**
  * Module availability (CFG-1/2, ACC-5/12, D-014). Effective = admin global availability AND the
- * teacher's per-context switch (default on). Disabling only flips flags: no data is ever deleted.
+ * teacher's per-context switch (default on, or off for an opt-in module such as Lesson goals: the
+ * catalogue's `contextDefault`, S25d, D-188). Disabling only flips flags: no data is ever deleted.
  * Later stages call `isModuleEnabled` before serving or accepting module data.
  */
 import { and, eq, inArray } from 'drizzle-orm';
@@ -14,6 +15,7 @@ import {
   type MediaModule,
   type ModuleKey,
 } from '../../../shared/contracts/school.ts';
+import { contextDefaultOn } from '../../../shared/modules.ts';
 import type { Db } from '../../db/client.ts';
 import { contextModules, modulePolicies } from '../../db/schema.ts';
 import { AppError } from '../../lib/errors.ts';
@@ -36,7 +38,8 @@ export function isModuleAvailable(db: Db, module: ModuleKey): boolean {
 
 /**
  * Is `module` usable in teaching context `contextId`? Media flags are global (admin only); context
- * modules additionally need the teacher's switch (no row = enabled).
+ * modules additionally need the teacher's switch (no row = the catalogue's `contextDefault`, on unless
+ * the module is opt-in, D-188).
  */
 export function isModuleEnabled(db: Db, contextId: string, module: ModuleKey): boolean {
   if (!isModuleAvailable(db, module)) return false;
@@ -46,7 +49,7 @@ export function isModuleEnabled(db: Db, contextId: string, module: ModuleKey): b
     .from(contextModules)
     .where(and(eq(contextModules.contextId, contextId), eq(contextModules.module, module)))
     .get();
-  return row?.enabled ?? true;
+  return row?.enabled ?? contextDefaultOn(module);
 }
 
 /**
@@ -65,7 +68,7 @@ export function moduleEnabledLookup(db: Db, contextIds: readonly string[]): (con
   return (contextId, module) => {
     if (!available[module]) return false;
     if (!isContextModule(module)) return true;
-    return switches.get(`${contextId}:${module}`) ?? true;
+    return switches.get(`${contextId}:${module}`) ?? contextDefaultOn(module);
   };
 }
 
@@ -107,7 +110,7 @@ export function contextModuleStates(db: Db, contextId: string): ContextModuleSta
   const byKey = new Map(rows.map((r) => [r.module, r]));
   return CONTEXT_MODULES.map((m) => {
     const row = byKey.get(m);
-    const enabled = row?.enabled ?? true;
+    const enabled = row?.enabled ?? contextDefaultOn(m);
     return {
       module: m,
       available: avail[m],
@@ -145,7 +148,7 @@ export function mergeModuleConfig(db: Db, contextId: string, module: ContextModu
   const next = { ...(getModuleConfig(db, contextId, module) ?? {}), ...valid };
   const configJson = JSON.stringify(next);
   db.insert(contextModules)
-    .values({ contextId, module, enabled: row?.enabled ?? true, configJson, updatedAt: now, updatedBy: userId })
+    .values({ contextId, module, enabled: row?.enabled ?? contextDefaultOn(module), configJson, updatedAt: now, updatedBy: userId })
     .onConflictDoUpdate({ target: [contextModules.contextId, contextModules.module], set: { configJson, updatedAt: now, updatedBy: userId } })
     .run();
   return next;

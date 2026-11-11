@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getMediaPolicy, isModuleEnabled } from '../../src/server/modules/school/modules.ts';
+import { contextDefaultOn } from '../../src/shared/modules.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 
@@ -128,7 +129,9 @@ describe('subjects, classes, teaching contexts', () => {
     const mine = await ok(s.teacherA.get('/api/teacher/contexts'));
     expect(mine.contexts).toHaveLength(1);
     expect(mine.contexts[0]).toMatchObject({ id: s.ctxA.id, className: '3-A', subjectName: { en: 'English', tr: 'İngilizce' } });
-    expect(Object.values(mine.contexts[0].modules).every((v) => v === true)).toBe(true);
+    // Every module is on by default except the opt-in ones (S25d, D-188: Lesson goals).
+    expect(Object.entries(mine.contexts[0].modules).every(([k, v]) => v === contextDefaultOn(k))).toBe(true);
+    expect(mine.contexts[0].modules.lessonGoals).toBe(false);
     expect(Object.keys(mine.contexts[0])).not.toContain('teacherId');
   });
 });

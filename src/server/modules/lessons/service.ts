@@ -14,6 +14,7 @@ import { idleTimer, type TimerState } from '../../../domain/timer.ts';
 import type { AssistantToday } from '../../../shared/contracts/assistant.ts';
 import type { CountersLessonState } from '../../../shared/contracts/counters.ts';
 import type { GroupingLessonState } from '../../../shared/contracts/grouping.ts';
+import type { LessonGoalState } from '../../../shared/contracts/lessonGoals.ts';
 import type { SecretLessonState } from '../../../shared/contracts/secret.ts';
 import type { LessonCommands, LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
 import { lessons, subjects, teachingContexts } from '../../db/schema.ts';
@@ -59,7 +60,7 @@ export function lessonDto(db: Db, l: LessonRow): LessonState {
     timer: l.timerJson,
     topics: l.topicsJson.map((t) => ({ id: t.id, name: t.name, icon: (t.icon as LessonState['topics'][number]['icon']) ?? null })),
     display: { assistantVisible: l.displayJson.assistantVisible ?? null },
-    endSteps: endStepsFor(db, l.contextId).map((s) => s.key),
+    endSteps: endStepsFor(db, l.contextId, l).map((s) => s.key),
   };
 }
 
@@ -108,7 +109,7 @@ export function updateLesson(ctx: RequestContext, lesson: LessonRow, patch: Part
  * changes made by lesson commands bump the version through `updateLesson` already.
  */
 export interface LessonStateContributor {
-  key: 'counters' | 'secret' | 'assistant' | 'grouping';
+  key: 'counters' | 'secret' | 'assistant' | 'grouping' | 'lessonGoal';
   stamp: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => string;
   body: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => unknown;
 }
@@ -154,6 +155,7 @@ export function lessonState(ctx: RequestContext, contextId: string) {
       secret: (bodies.secret ?? null) as SecretLessonState | null,
       assistant: (bodies.assistant ?? null) as AssistantToday | null,
       grouping: (bodies.grouping ?? null) as GroupingLessonState | null,
+      lessonGoal: (bodies.lessonGoal ?? null) as LessonGoalState | null,
     },
   };
 }
@@ -352,7 +354,7 @@ export function changeTimer(ctx: RequestContext, p: { contextId: string; lessonI
 export function endLesson(ctx: RequestContext, p: P<'lesson.end'>, meta: CommandMeta) {
   const { lesson } = lessonForCommand(ctx, p, meta);
   // Module steps first (S7: Secret Student reveal/outcomes, assistant thanks), then the core reflection (LES-3).
-  for (const step of endStepsFor(ctx.db, lesson.contextId)) {
+  for (const step of endStepsFor(ctx.db, lesson.contextId, lesson)) {
     const parsed = step.input.safeParse(p.steps[step.key] ?? {});
     if (!parsed.success) throw new AppError('VALIDATION', `Invalid input for step ${step.key}`, { reason: 'END_STEP_INVALID', step: step.key });
     step.apply(ctx, lesson, parsed.data);

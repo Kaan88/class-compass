@@ -9,6 +9,7 @@ import { LocalizedText, Ok, endpoint, pii } from './define.ts';
 import { AssistantToday } from './assistant.ts';
 import { CountersLessonState } from './counters.ts';
 import { GroupingLessonState } from './grouping.ts';
+import { LessonGoalState } from './lessonGoals.ts';
 import { SecretLessonState } from './secret.ts';
 import { Id, IsoDate, RequiredLocalizedText } from './school.ts';
 
@@ -73,6 +74,8 @@ export const getLessonState = endpoint({
     assistant: AssistantToday.nullable(),
     /** The groups in use in the running lesson (DSH-8): names, members, roles; never levels or rules (GRP-7). Null when off or no lesson. */
     grouping: GroupingLessonState.nullable(),
+    /** The running lesson's goal (S25d, D-188); null when the Lesson goals module is off or no lesson runs. */
+    lessonGoal: LessonGoalState.nullable(),
   }),
 });
 

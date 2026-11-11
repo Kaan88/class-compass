@@ -24,7 +24,7 @@ export const MAX_BOXES_PER_ROW = 4;
 /** A stored layout is at most this many bytes of JSON. */
 export const MAX_LAYOUT_BYTES = 8192;
 
-export const BOX_KEYS = ['core.timer', 'core.students', 'core.dock', 'routine', 'focus', 'counters', 'attendance', 'assistant', 'secret', 'groups', 'homework', 'achievements'] as const;
+export const BOX_KEYS = ['core.timer', 'core.students', 'core.dock', 'routine', 'focus', 'counters', 'attendance', 'assistant', 'secret', 'groups', 'homework', 'achievements', 'lessonGoal'] as const;
 export type BoxKey = (typeof BOX_KEYS)[number];
 
 export interface BoxSpec {
@@ -60,6 +60,8 @@ export const BOX_CATALOGUE: Readonly<Record<BoxKey, BoxSpec>> = {
   groups: spec('groups', { defaultPlace: 'dock' }),
   homework: spec('homework', { defaultPlace: 'dock' }),
   achievements: spec('achievements', { defaultPlace: 'dock' }),
+  /** S25d (D-188): today's goal, a one-line row above the student grid when the class turns it on. */
+  lessonGoal: spec('lessonGoal', { minW: 3 }),
 };
 
 export const isBoxKey = (k: string): k is BoxKey => (BOX_KEYS as readonly string[]).includes(k);

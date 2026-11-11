@@ -1452,7 +1452,7 @@
         },
         "trimOn": {
           "description": "Board boxes that get the trim (box keys of the classroom board; default routine and core.timer).",
-          "maxItems": 12,
+          "maxItems": 13,
           "type": "array",
           "items": {
             "type": "string",
@@ -1468,7 +1468,8 @@
               "secret",
               "groups",
               "homework",
-              "achievements"
+              "achievements",
+              "lessonGoal"
             ]
           }
         },
