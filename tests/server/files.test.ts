@@ -53,14 +53,14 @@ describe('uploads (STU-8, D-014)', () => {
 
   it('refuses photo and audio uploads while the media flags are off (default), documents allowed (D-014)', async () => {
     const img = await jpeg();
-    const r1 = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, img, 'a.jpg', 'image/jpeg');
+    const r1 = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, img, 'a.jpg', 'image/jpeg');
     expect(r1.status).toBe(403);
     expect(r1.body.error).toMatchObject({ code: 'FEATURE_DISABLED', details: { reason: 'MEDIA_DISABLED', module: 'media.evidencePhotos' } });
-    const r2 = await upload(s.teacherA, `/api/files?kind=audio&ownerStudentId=${ada.id}`, Buffer.alloc(100), 'a.mp3', 'audio/mpeg');
+    const r2 = await upload(s.teacherA, `/api/files?kind=audio&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, Buffer.alloc(100), 'a.mp3', 'audio/mpeg');
     expect(r2.body.error).toMatchObject({ code: 'FEATURE_DISABLED', details: { module: 'media.evidenceAudio' } });
     const r3 = await upload(s.teacherA, `/api/students/${ada.id}/photo?consent=true`, img, 'p.jpg', 'image/jpeg');
     expect(r3.body.error).toMatchObject({ code: 'FEATURE_DISABLED', details: { module: 'media.studentPhotos' } });
-    const r4 = await upload(s.teacherA, `/api/files?kind=document&ownerStudentId=${ada.id}`, Buffer.from('My reading log\nPage 4\n'), 'log.txt', 'text/plain');
+    const r4 = await upload(s.teacherA, `/api/files?kind=document&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, Buffer.from('My reading log\nPage 4\n'), 'log.txt', 'text/plain');
     expect(r4.status).toBe(200);
     expect(r4.body).toMatchObject({ kind: 'document', mime: 'text/plain', ownerStudentId: ada.id });
   });
@@ -75,7 +75,7 @@ describe('uploads (STU-8, D-014)', () => {
       [html, 'list.csv', 'text/csv', 'import_source'],
       [html, 'notes.txt', 'text/plain', 'document'],
     ] as const) {
-      const owner = kind === 'import_source' ? '' : `&ownerStudentId=${ada.id}`;
+      const owner = kind === 'import_source' ? '' : `&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`;
       const r = await upload(s.teacherA, `/api/files?kind=${kind}${owner}`, data, name, type);
       expect(r.status, `${name} as ${kind}`).toBe(400);
       expect(r.body.error.details.reason).toBe('FILE_TYPE_NOT_ALLOWED');
@@ -83,17 +83,17 @@ describe('uploads (STU-8, D-014)', () => {
     // A real PDF sent as an image upload with an image type: refused (kind allow-list by content).
     const { PDFDocument } = await import('pdf-lib');
     const pdf = Buffer.from(await (await PDFDocument.create()).save());
-    const spoof = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, pdf, 'cat.jpg', 'image/jpeg');
+    const spoof = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, pdf, 'cat.jpg', 'image/jpeg');
     expect(spoof.body.error.details.reason).toBe('FILE_TYPE_NOT_ALLOWED');
     // A JPEG sent with a PDF type and name is stored as what it is.
-    const real = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, await jpeg(), 'doc.pdf', 'application/pdf');
+    const real = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, await jpeg(), 'doc.pdf', 'application/pdf');
     expect(real.status).toBe(200);
     expect(real.body.mime).toBe('image/jpeg');
   });
 
   it('re-encodes a polyglot JPEG with HTML appended: the stored file has no markup and is served sandboxed', async () => {
     const poly = Buffer.concat([await jpeg(), Buffer.from('<html><script>alert(document.cookie)</script></html>')]);
-    const r = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, poly, 'x.jpg', 'image/jpeg');
+    const r = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, poly, 'x.jpg', 'image/jpeg');
     expect(r.status).toBe(200);
     const got = await raw(env, s.teacherA, `/api/files/${r.body.id}`);
     expect(got.statusCode).toBe(200);
@@ -113,7 +113,7 @@ describe('uploads (STU-8, D-014)', () => {
       .jpeg()
       .toBuffer();
     expect((await sharp(big).metadata()).exif).toBeDefined();
-    const r = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, big, 'trip.jpg', 'image/jpeg');
+    const r = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, big, 'trip.jpg', 'image/jpeg');
     expect(r.status).toBe(200);
     const got = await raw(env, s.teacherA, `/api/files/${r.body.id}`);
     const meta = await sharp(got.rawPayload).metadata();
@@ -127,7 +127,7 @@ describe('uploads (STU-8, D-014)', () => {
 
   it('refuses files over the kind limit', async () => {
     const huge = Buffer.concat([await jpeg(), Buffer.alloc(10 * 1024 * 1024 + 10)]);
-    const r = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, huge, 'big.jpg', 'image/jpeg');
+    const r = await upload(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, huge, 'big.jpg', 'image/jpeg');
     expect(r.status).toBe(400);
     expect(r.body.error.details.reason).toBe('FILE_TOO_LARGE');
     const leftovers = await fsp.readdir(path.join(dirs.uploadsDir, 'tmp')).catch(() => []);
@@ -135,7 +135,7 @@ describe('uploads (STU-8, D-014)', () => {
   });
 
   it('serves files only to the owner scope: other teachers, students, signed-out callers get nothing', async () => {
-    const doc = await upload(s.teacherA, `/api/files?kind=document&ownerStudentId=${ada.id}`, Buffer.from('Story draft'), 'story.txt', 'text/plain');
+    const doc = await upload(s.teacherA, `/api/files?kind=document&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, Buffer.from('Story draft'), 'story.txt', 'text/plain');
     const list = await upload(s.teacherA, '/api/files?kind=import_source', Buffer.from('Ada Kurgu\nBora Kurgu\n'), 'list.txt', 'text/plain');
     expect((await raw(env, s.teacherA, `/api/files/${doc.body.id}`)).statusCode).toBe(200);
     const att = await raw(env, s.teacherA, `/api/files/${doc.body.id}`);
@@ -146,7 +146,7 @@ describe('uploads (STU-8, D-014)', () => {
     expect((await raw(env, s.teacherB, `/api/files/${list.body.id}`)).statusCode).toBe(404);
     expect((await s.teacherB.get(`/api/files/${doc.body.id}/meta`)).status).toBe(404);
     // Teacher B cannot upload for a student outside their classes either.
-    const foreign = await upload(s.teacherB, `/api/files?kind=document&ownerStudentId=${ada.id}`, Buffer.from('x'), 'x.txt', 'text/plain');
+    const foreign = await upload(s.teacherB, `/api/files?kind=document&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, Buffer.from('x'), 'x.txt', 'text/plain');
     expect(foreign.status).toBe(403);
     // Signed out.
     expect((await raw(env, new Client(env), `/api/files/${doc.body.id}`)).statusCode).toBe(401);
@@ -169,7 +169,7 @@ describe('uploads (STU-8, D-014)', () => {
     await setMedia(s, 'media.evidenceAudio', true);
     const frame = Buffer.from([0xff, 0xfb, 0x90, 0x64]);
     const mp3 = Buffer.concat([...Array.from({ length: 50 }, () => Buffer.concat([frame, Buffer.alloc(413)]))]);
-    const r = await upload(s.teacherA, `/api/files?kind=audio&ownerStudentId=${ada.id}`, mp3, 'reading.mp3', 'audio/mpeg');
+    const r = await upload(s.teacherA, `/api/files?kind=audio&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, mp3, 'reading.mp3', 'audio/mpeg');
     expect(r.status).toBe(200);
     expect(r.body.mime).toBe('audio/mpeg');
     const part = await raw(env, s.teacherA, `/api/files/${r.body.id}`, { range: 'bytes=0-99' });
@@ -232,7 +232,7 @@ describe('upload quotas (STU-8)', () => {
       const a = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Cem Kurgu' });
       const b = await addStudent(s.teacherA, s.c3a.id, { fullName: 'Deniz Kurgu' });
       const doc = Buffer.from('a'.repeat(700 * 1024));
-      const send = (owner: string) => upload(s.teacherA, `/api/files?kind=document&ownerStudentId=${owner}`, doc, 'log.txt', 'text/plain');
+      const send = (owner: string) => upload(s.teacherA, `/api/files?kind=document&ownerStudentId=${owner}&contextId=${s.ctxA.id}`, doc, 'log.txt', 'text/plain');
       expect((await send(a.id)).status).toBe(200);
       const second = await send(a.id);
       expect(second.status).toBe(409);

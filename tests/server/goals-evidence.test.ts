@@ -152,6 +152,55 @@ describe('evidence from the teacher Goals page (S20b, D-170)', () => {
   });
 });
 
+describe('every evidence upload names its class+subject (S21b, D-174)', () => {
+  beforeEach(() => setup());
+  afterEach(teardown);
+
+  it('ENG-3, STU-8: an evidence upload without contextId (or without the student) is a 400 and stores nothing', async () => {
+    const before = fileCount();
+    try {
+      await setMedia('media.evidencePhotos', true);
+      await setMedia('media.evidenceAudio', true);
+      for (const [kind, data, name, type] of [
+        ['document', PDF, 'log.pdf', 'application/pdf'],
+        ['image', await jpeg(), 'work.jpg', 'image/jpeg'],
+        ['audio', mp3(), 'read.mp3', 'audio/mpeg'],
+      ] as const) {
+        const noContext = await send(s.teacherA, `kind=${kind}&ownerStudentId=${ada.id}`, data, name, type);
+        expect(noContext.status, `${kind} without contextId`).toBe(400);
+        expect(noContext.body.error.code).toBe('VALIDATION');
+        const noOwner = await send(s.teacherA, `kind=${kind}&contextId=${s.ctxA.id}`, data, name, type);
+        expect(noOwner.status, `${kind} without ownerStudentId`).toBe(400);
+      }
+    } finally {
+      await setMedia('media.evidencePhotos', false);
+      await setMedia('media.evidenceAudio', false);
+    }
+    expect(fileCount()).toBe(before);
+    expect(env.db.select().from(auditEvents).where(eq(auditEvents.action, 'file.upload')).all()).toHaveLength(0);
+  });
+
+  it('ACC-10: a contextId of another class is refused (403) even for a student the teacher teaches; an admin needs a class+subject of their own', async () => {
+    const before = fileCount();
+    // Ayşe teaches Ada in 3-A, but 3-B English is Mehmet's class+subject.
+    const other = await pageUpload(s.teacherA, 'document', s.ctxB.id, ada.id, PDF, 'x.pdf', 'application/pdf');
+    expect(other.status).toBe(403);
+    expect(other.body.error.code).toBe('FORBIDDEN');
+    // An administrator teaches no class+subject: no evidence upload, with or without one named.
+    expect((await pageUpload(s.admin, 'document', s.ctxA.id, ada.id, PDF, 'x.pdf', 'application/pdf')).status).toBe(403);
+    expect((await send(s.admin, `kind=document&ownerStudentId=${ada.id}`, PDF, 'x.pdf', 'application/pdf')).status).toBe(400);
+    expect(fileCount()).toBe(before);
+  });
+
+  it('IMP-1: a student list still uploads without a class+subject; the time’s-up clip is still sent to its own endpoint', async () => {
+    const csv = multipart(Buffer.from('Öğrenci No;Adı Soyadı\n9001;Cem Kurgu\n', 'utf8'), 'list.csv', 'text/csv');
+    expect((await ok(s.teacherA.req('POST', '/api/files?kind=import_source', csv.body, csv.headers))).kind).toBe('import_source');
+    const owned = await send(s.teacherA, `kind=import_source&ownerStudentId=${ada.id}`, Buffer.from('Öğrenci No;Adı Soyadı\n'), 'list.csv', 'text/csv');
+    expect(owned.body.error.details.reason).toBe('OWNER_NOT_ALLOWED');
+    expect((await send(s.teacherA, 'kind=teacher_sound', mp3(), 'x.mp3', 'audio/mpeg')).body.error.details.reason).toBe('WRONG_UPLOAD_KIND');
+  });
+});
+
 describe('quotas for evidence from the Goals page (S20b, STU-8)', () => {
   beforeEach(() => setup({ UPLOAD_STUDENT_QUOTA_MB: 1 }));
   afterEach(teardown);

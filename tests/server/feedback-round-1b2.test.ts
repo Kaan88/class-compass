@@ -429,7 +429,7 @@ describe('evidence kinds and teacher evidence (items 13, 14c, D-119)', () => {
     await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/evidence`, { kind: 'link', url: 'https://example.org/story' }));
     expect((await s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/evidence`, { kind: 'link', url: 'javascript:alert(1)' })).status).toBe(400);
     const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
-    const file = await ok(send(s.teacherA, `/api/files?kind=document&ownerStudentId=${ada.id}`, pdf, 'worksheet.pdf', 'application/pdf'));
+    const file = await ok(send(s.teacherA, `/api/files?kind=document&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, pdf, 'worksheet.pdf', 'application/pdf'));
     const doc = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/evidence`, { kind: 'file', fileId: file.id }));
     // The student opens the teacher's file on their own evidence.
     const page = goalsOf(await ok(adaPhone.get('/api/student/page')));
@@ -450,7 +450,7 @@ describe('evidence kinds and teacher evidence (items 13, 14c, D-119)', () => {
     // Photo evidence by the teacher needs the photo flag too.
     await setMedia('media.evidencePhotos', false);
     const jpg = await sharp({ create: { width: 20, height: 20, channels: 3, background: '#ffffff' } }).jpeg().toBuffer();
-    expect((await send(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, jpg, 'p.jpg', 'image/jpeg')).body.error.details.reason).toBe('MEDIA_DISABLED');
+    expect((await send(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, jpg, 'p.jpg', 'image/jpeg')).body.error.details.reason).toBe('MEDIA_DISABLED');
   });
 
   it('a student’s consent-gated profile photo can never be attached as evidence, so evidence actions cannot expose or delete it (STU-8)', async () => {
@@ -463,7 +463,7 @@ describe('evidence kinds and teacher evidence (items 13, 14c, D-119)', () => {
     expect((await s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/evidence`, { kind: 'file', fileId: photoFileId })).status).toBe(404);
     expect((await adaPhone.get(`/api/student/files/${photoFileId}`)).status).toBe(404);
     // A normal evidence picture by the same teacher still works; deleting it leaves the photo alone.
-    const pic = await ok(send(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}`, jpg, 'work.jpg', 'image/jpeg'));
+    const pic = await ok(send(s.teacherA, `/api/files?kind=image&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, jpg, 'work.jpg', 'image/jpeg'));
     const ev = await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/evidence`, { kind: 'file', fileId: pic.id }));
     await ok(s.teacherA.del(`/api/teacher/evidence/${ev.id}`));
     expect(photoOf(ada.id)).toBe(photoFileId);

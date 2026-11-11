@@ -379,7 +379,7 @@ describe('deleting students (S13b item 7, D-109)', () => {
     const goal = await ok(phone.post('/api/student/goals', { subjectId: s.english.id, categoryId: READING, text: 'I will read one book every week.' }));
     await ok(phone.post('/api/student/evidence', { subjectId: s.english.id, goalId: goal.id, kind: 'text', body: 'Ada read Pip and the Moon' }));
     const m = multipart(Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n'), 'ada-story.pdf', 'application/pdf');
-    const file = await ok(s.teacherA.req('POST', `/api/files?kind=document&ownerStudentId=${ada.id}`, m.body, m.headers));
+    const file = await ok(s.teacherA.req('POST', `/api/files?kind=document&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`, m.body, m.headers));
     const before = (await fsp.readdir(uploadsDir, { recursive: true })).length;
     expect(before).toBeGreaterThan(0);
 

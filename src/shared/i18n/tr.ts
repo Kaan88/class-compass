@@ -1338,7 +1338,6 @@ export const tr = {
   'error.NOT_MULTIPART': 'Dosya gönderilmedi. Bir dosya seçip tekrar deneyin.',
   'error.NO_FILE': 'Dosya gönderilmedi. Bir dosya seçip tekrar deneyin.',
   'error.OWNER_NOT_ALLOWED': 'Öğrenci listesi bir öğrenciye ait olamaz.',
-  'error.OWNER_REQUIRED': 'Dosyanın ait olduğu öğrenciyi seçin.',
   'error.NOT_AN_IMPORT_FILE': 'Bu dosya öğrenci listesi olarak yüklenmedi.',
   'error.SCANNED_PDF': 'Bu PDF yalnızca taranmış bir görüntü içeriyor. Bunun yerine sayfanın fotoğrafını yükleyin.',
   'error.OCR_NO_TEXT': 'Bu görüntüden yazı okunamadı. İyi ışıkta, düz ve net bir fotoğraf deneyin.',

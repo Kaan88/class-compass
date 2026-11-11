@@ -65,7 +65,7 @@ async function upload(c: any, studentId: string, body: Buffer, name: string, typ
     body,
     Buffer.from(`\r\n--${boundary}--\r\n`),
   ]);
-  return c.req('POST', `/api/files?kind=document&ownerStudentId=${studentId}`, payload, { 'content-type': `multipart/form-data; boundary=${boundary}` });
+  return c.req('POST', `/api/files?kind=document&ownerStudentId=${studentId}&contextId=${s.ctxA.id}`, payload, { 'content-type': `multipart/form-data; boundary=${boundary}` });
 }
 
 beforeEach(async () => {

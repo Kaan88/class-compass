@@ -81,20 +81,30 @@ export const FileMeta = z.object({
 });
 export type FileMeta = z.infer<typeof FileMeta>;
 
+/** Evidence file kinds a teacher uploads for a student: they need the student and the class+subject (D-174). */
+export const EVIDENCE_FILE_KINDS = ['image', 'document', 'audio'] as const satisfies readonly FileKind[];
+
 /**
  * Upload one file (multipart field `file`). Kinds image/document/audio are evidence files and need
  * `ownerStudentId` plus the matching media flag (D-014: photos and audio OFF by default →
  * 403 FEATURE_DISABLED); `import_source` is a student list for the importer (IMP-1).
- * `contextId` (S20b, D-170): the teacher Goals page names the class+subject the evidence is for, so
- * the upload is refused before any bytes are stored when the teacher does not teach the student
- * there, the Goals module is off or the class is read-only (the same checks as attaching it).
+ * `contextId` (S20b, D-170; required since S21b, D-174): the class+subject the evidence is for, so
+ * the upload is refused before any bytes are stored when the teacher does not own that class+subject
+ * (403), does not teach the student there, the Goals module is off or the class is read-only (the
+ * same checks as attaching it). The teacher Goals page is the only caller of an evidence upload and
+ * always has the class+subject, so an evidence upload without `ownerStudentId` or `contextId` is a
+ * 400. Student lists and the time's-up clip (refused here, it has its own endpoint) carry no class.
  * Query-string input (the body is the multipart stream).
  */
 export const uploadFile = endpoint({
   method: 'POST',
   path: '/api/files',
   access: 'account',
-  input: z.object({ kind: FileKindSchema, ownerStudentId: Id.optional(), contextId: Id.optional() }),
+  input: z.discriminatedUnion('kind', [
+    z.object({ kind: z.enum(EVIDENCE_FILE_KINDS), ownerStudentId: Id, contextId: Id }),
+    z.object({ kind: z.literal('import_source'), ownerStudentId: Id.optional() }),
+    z.object({ kind: z.literal('teacher_sound') }),
+  ]),
   output: FileMeta,
 });
 

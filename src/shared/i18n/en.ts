@@ -1340,7 +1340,6 @@ export const en = {
   'error.NOT_MULTIPART': 'No file was sent. Choose a file and try again.',
   'error.NO_FILE': 'No file was sent. Choose a file and try again.',
   'error.OWNER_NOT_ALLOWED': 'A student list cannot belong to a student.',
-  'error.OWNER_REQUIRED': 'Choose the student this file belongs to.',
   'error.NOT_AN_IMPORT_FILE': 'This file was not uploaded as a student list.',
   'error.SCANNED_PDF': 'This PDF contains only a scanned image. Upload a photo of the page instead.',
   'error.OCR_NO_TEXT': 'No text could be read from this image. Try a sharper, straight photo in good light.',
