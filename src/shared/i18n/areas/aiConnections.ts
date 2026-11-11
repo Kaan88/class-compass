@@ -8,7 +8,7 @@ import { registerMessages } from '../index.ts';
 export const en = {
   'aiConn.title': 'Assistant connections',
   'aiConn.intro': 'A connection will let the in-app assistant use an AI model through your school’s own account with a provider. Keys are stored sealed on this server, are never shown again and never reach a model or an AI app.',
-  'aiConn.notYet': 'The assistant chat itself is not in Class Compass yet: it comes in a later update. Connections you set up and test now will be ready for it.',
+  'aiConn.notYet': 'Teachers chat with these connections on their Assistant page, once an administrator switches the assistant chat on (Admin → AI tools → Assistant chat).',
   'aiConn.noneYet': 'No connections yet.',
   'aiConn.add': 'Add connection',
   'aiConn.addTitle': 'Add an assistant connection',
@@ -162,7 +162,7 @@ export const en = {
 export const tr: Record<keyof typeof en, string> = {
   'aiConn.title': 'Asistan bağlantıları',
   'aiConn.intro': 'Bağlantı, uygulamadaki asistanın okulunuzun bir sağlayıcıdaki hesabı üzerinden bir yapay zekâ modelini kullanmasını sağlayacak. Anahtarlar bu sunucuda şifreli saklanır, bir daha gösterilmez; hiçbir modele ya da yapay zekâ uygulamasına gitmez.',
-  'aiConn.notYet': 'Asistan sohbeti henüz Sınıf Pusulası’nda yok; sonraki bir güncellemeyle gelecek. Şimdi kurup denediğiniz bağlantılar o zaman kullanıma hazır olur.',
+  'aiConn.notYet': 'Bir yönetici asistan sohbetini açtığında (Yönetim → Yapay zekâ araçları → Asistan sohbeti) öğretmenler bu bağlantılarla Asistan sayfalarında sohbet eder.',
   'aiConn.noneYet': 'Henüz bağlantı yok.',
   'aiConn.add': 'Bağlantı ekle',
   'aiConn.addTitle': 'Asistan bağlantısı ekle',

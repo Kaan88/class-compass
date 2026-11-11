@@ -86,8 +86,8 @@ describe('client module manifests', () => {
     expect(pages.slice(0, 3).map((p) => p.key)).toEqual(['profile', 'setup', 'classes']);
   });
 
-  it('teacher menu (S14e3, D-156): Today holds Attendance, Homework, Goals, Reports and Notifications; every other menu page is in a Class setup tab', () => {
-    expect(todayPages().map((p) => p.key)).toEqual(['attendance', 'homework', 'goals', 'reports', 'notifications']);
+  it('teacher menu (S14e3, D-156): Today holds Attendance, Homework, Goals, Reports, Notifications and the Assistant (S19b); every other menu page is in a Class setup tab', () => {
+    expect(todayPages().map((p) => p.key)).toEqual(['attendance', 'homework', 'goals', 'reports', 'notifications', 'assistantChat']);
     for (const p of menuTeacherPages()) {
       expect(['today', 'setup'], p.key).toContain(p.group);
       if (p.group === 'setup') expect(SETUP_TABS, p.key).toContain(p.setupTab);
@@ -110,7 +110,7 @@ describe('client module manifests', () => {
     expect(keys([{ modules: off }, { modules: on }])).toContain('homework');
     const hidden = keys([{ modules: off }, { modules: off }]);
     for (const k of ['homework', 'goals', 'attendance', 'counters', 'routines', 'secret', 'assistant', 'grouping', 'achievements']) expect(hidden, k).not.toContain(k);
-    for (const k of ['reports', 'notifications', 'classes', 'students', 'topics', 'avatars', 'textChecks']) expect(hidden, k).toContain(k);
+    for (const k of ['reports', 'notifications', 'assistantChat', 'classes', 'students', 'topics', 'avatars', 'textChecks']) expect(hidden, k).toContain(k);
     expect(pageAvailable({ module: 'homework' }, [{ modules: off }])).toBe(false);
     expect(pageAvailable({ module: null }, [{ modules: off }])).toBe(true);
   });

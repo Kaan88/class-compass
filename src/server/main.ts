@@ -3,6 +3,7 @@ import { buildApp } from './app.ts';
 import { loadConfig, testClockFile } from './config.ts';
 import { openDatabase } from './db/client.ts';
 import { mailerFor } from './lib/mailer.ts';
+import { purgeOldChats, RETENTION_TICK_MS } from './modules/assistantChat/retention.ts';
 import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
 import { runNotificationTick, TICK_MS as NOTIFICATION_TICK_MS } from './modules/notifications/digest.ts';
 import { migrateWithSnapshot, writeServerLock } from './ops/backup.ts';
@@ -54,10 +55,16 @@ const notificationTick = () => {
 };
 const notificationTimer = setInterval(notificationTick, NOTIFICATION_TICK_MS);
 notificationTimer.unref();
+// Assistant chats (S19b, D-180): deleted a school year (the administrator's setting) after their last message.
+const chatRetention = () => void purgeOldChats({ db, now }).catch((err: unknown) => app.log.warn({ err }, 'assistant chat retention failed'));
+chatRetention();
+const chatRetentionTimer = setInterval(chatRetention, RETENTION_TICK_MS);
+chatRetentionTimer.unref();
 
 const shutdown = async () => {
   clearInterval(exportSweep);
   clearInterval(notificationTimer);
+  clearInterval(chatRetentionTimer);
   await app.close();
   db.$client.close();
   releaseLock();

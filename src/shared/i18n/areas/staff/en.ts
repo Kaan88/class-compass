@@ -3094,6 +3094,13 @@ export const en = {
   'audit.action.ai_connection.settings': 'Assistant connection settings changed',
   'audit.entity.ai_connection': 'Assistant connection',
   'audit.entity.ai_connection_settings': 'Assistant connection settings',
+  'audit.action.assistant_chat.settings': 'Assistant chat settings changed',
+  'audit.action.assistant_chat.delete': 'Assistant chat deleted',
+  'audit.action.assistant_chat.retention': 'Old assistant chats deleted',
+  'audit.entity.assistant_chat': 'Assistant chat',
+  'audit.entity.assistant_settings': 'Assistant chat settings',
+  // The assistant chat's menu label (S19b, D-180); the page's own strings are the area areas/assistantChat.ts.
+  'assistantChat.title': 'Assistant',
   // ---------------------------------------------------------------- OAuth for AI apps (S14h2, D-160)
   'audit.action.oauth.connect': 'AI app connected',
   'audit.action.oauth.deny': 'AI app connection refused',

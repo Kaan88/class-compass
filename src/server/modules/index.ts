@@ -31,6 +31,7 @@ import type { ClassroomCardContribution, ReportContribution, ServerModuleManifes
 import { maintenanceManifest } from './maintenance/manifest.ts';
 import { mcpManifest } from './mcp/manifest.ts';
 import { aiConnectionsManifest } from './aiConnections/manifest.ts';
+import { assistantChatManifest } from './assistantChat/manifest.ts';
 import { notificationsManifest } from './notifications/manifest.ts';
 import { reportsManifest } from './reports/manifest.ts';
 import { routinesManifest } from './routines/manifest.ts';
@@ -76,6 +77,7 @@ export const SERVER_MODULES: readonly ServerModuleManifest[] = [
   notificationsManifest,
   mcpManifest,
   aiConnectionsManifest,
+  assistantChatManifest,
   displayInfoManifest,
 ];
 

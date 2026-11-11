@@ -31,6 +31,7 @@ import { conflict, invalid, notFound } from '../../lib/errors.ts';
 import { removeKey } from '../files/storage.ts';
 import { erasePrivateNotesOf, privateNotesCount, PRIVATE_NOTES_TABLE } from '../goals/history.ts';
 import { eraseStudentSelections, SELECTIONS_TABLE_NAME } from '../secret/service.ts';
+import { scrubStudentFromChats } from '../assistantChat/store.ts';
 
 type Row = Record<string, unknown>;
 const STUDENT_COLUMNS = new Set(['student_id', 'owner_student_id', 'student_a', 'student_b', 'planned_student_id', 'actual_student_id', 'matched_student_id', 'created_student_id']);
@@ -196,6 +197,9 @@ export async function eraseStudent(ctx: RequestContext, studentId: string, confi
     };
     // Owning modules first (boundaries): Secret Student selections, private notes.
     eraseStudentSelections(db, sid);
+    // Assistant chats (S19b, D-180): the name and the pseudonyms become [name], before the pseudonyms go.
+    const chats = scrubStudentFromChats(db, st);
+    if (chats) tables.assistant_messages = chats;
     const notes = erasePrivateNotesOf(db, sid);
     if (notes) tables.private_notes = notes;
     // Children of the student's goals, then evidence, then the other tables, then goals/links/enrolments.

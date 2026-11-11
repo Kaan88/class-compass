@@ -422,3 +422,10 @@ export const IconFullscreenExit = () => (
     <path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" />
   </Icon>
 );
+/** The assistant chat (S19b, D-180): a speech bubble. */
+export const IconChat = () => (
+  <Icon>
+    <path d="M4 5h16v11H9l-5 4z" />
+    <path d="M8 9h8M8 12h5" />
+  </Icon>
+);

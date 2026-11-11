@@ -6,4 +6,5 @@ export type AreaMessageKey =
   | keyof typeof import('./staff.ts').en
   | keyof typeof import('./aiConnections.ts').en
   | keyof typeof import('./aiConnect.ts').en
+  | keyof typeof import('./assistantChat.ts').en
   | keyof typeof import('./classroomCards.ts').en;

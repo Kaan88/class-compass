@@ -1986,3 +1986,97 @@ export const aiOauthStates = sqliteTable(
   },
   (t) => [index('ai_oauth_states_user_idx').on(t.userId)],
 );
+
+// ---------------------------------------------------------------- assistant chat (S19b, D-180)
+/** A tool call the model made, as stored with its assistant message (S19b, D-180). */
+export type AssistantToolCallJson = {
+  /** The provider's id, or `cc_call_…` made by the adapter (`generatedId`, never sent back). */
+  id: string;
+  generatedId?: true;
+  name: string;
+  /** Exactly what the model sent (pseudonyms and `student-N` aliases while the student-data switch is off). */
+  arguments: Record<string, unknown>;
+  invalidArguments?: true;
+  signature?: string;
+  /**
+   * `auto`: a read-only tool, run at once; `pending`: a change waiting for the teacher's Yes/No card;
+   * `approved` / `declined`: the teacher's answer (single use); `refused`: not a tool this teacher may
+   * use, or invalid arguments; `expired`: a newer message was sent while it was still waiting.
+   */
+  state: 'auto' | 'pending' | 'approved' | 'declined' | 'refused' | 'expired';
+  decidedAt?: number;
+};
+
+/**
+ * A teacher's assistant chat (S19b, D-180). Private to its owner (another user's chat is a 404 and no AI
+ * tool exposes chats); deleted with the account (cascade) and by the retention job a school year after
+ * the last message (`assistant_settings.retention_days`). `summary` is the compacted earlier part of the
+ * chat as it was sent to the provider (pseudonyms while the student-data switch was off), covering the
+ * messages up to `summary_seq`.
+ */
+export const assistantChats = sqliteTable(
+  'assistant_chats',
+  {
+    id: text('id').primaryKey(),
+    ownerUserId: text('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    /** The teacher typed the title (otherwise it follows the first message). */
+    titleSet: integer('title_set', { mode: 'boolean' }).notNull().default(false),
+    connectionId: text('connection_id'),
+    model: text('model'),
+    summary: text('summary'),
+    summarySeq: integer('summary_seq').notNull().default(0),
+    nextSeq: integer('next_seq').notNull().default(1),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    lastMessageAt: integer('last_message_at').notNull(),
+    archivedAt: integer('archived_at'),
+  },
+  (t) => [index('assistant_chats_owner_idx').on(t.ownerUserId, t.lastMessageAt), index('assistant_chats_last_idx').on(t.lastMessageAt)],
+);
+
+/**
+ * One message of an assistant chat, stored as it was sent to (or came from) the provider: with the
+ * student-data switch off that means pseudonyms ("Student 4", `student-4`), mapped back to real names
+ * only on the way to the browser (`privacy` records the mode the message was made in). `role` 'tool'
+ * rows hold a tool result as the model saw it (after the privacy gate); `untrusted` marks a result that
+ * carried children's text.
+ */
+export const assistantMessages = sqliteTable(
+  'assistant_messages',
+  {
+    id: text('id').primaryKey(),
+    chatId: text('chat_id')
+      .notNull()
+      .references(() => assistantChats.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    role: text('role', { enum: ['user', 'assistant', 'tool'] }).notNull(),
+    content: text('content').notNull(),
+    toolCallsJson: text('tool_calls_json', { mode: 'json' }).$type<AssistantToolCallJson[]>(),
+    toolCallId: text('tool_call_id'),
+    toolName: text('tool_name'),
+    isError: integer('is_error', { mode: 'boolean' }).notNull().default(false),
+    untrusted: integer('untrusted', { mode: 'boolean' }).notNull().default(false),
+    privacy: text('privacy', { enum: ['pseudonymous', 'named'] }).notNull(),
+    /** `cancelled`: stopped by the teacher; `error`: the provider failed (`error_code` from AI_FAILURES or an app reason). */
+    status: text('status', { enum: ['complete', 'cancelled', 'error'] }).notNull().default('complete'),
+    errorCode: text('error_code'),
+    connectionId: text('connection_id'),
+    model: text('model'),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [uniqueIndex('assistant_messages_seq_uq').on(t.chatId, t.seq)],
+);
+
+/** Administrator settings of the assistant chat (one row, id 1, made on first write): switched on, and how long chats are kept. */
+export const assistantSettings = sqliteTable('assistant_settings', {
+  id: integer('id').primaryKey(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  /** Days after a chat's last message before it is deleted (owner decision: a school year after it, so 365). */
+  retentionDays: integer('retention_days').notNull().default(365),
+  updatedAt: integer('updated_at').notNull(),
+});

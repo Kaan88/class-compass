@@ -102,7 +102,7 @@ test('teacher menu: Today tiles, one Class setup hub, and pages of modules that 
   await ensurePin(page);
   await page.goto('/teacher');
   const today = page.getByTestId('menu-today');
-  await expect(today.locator('a.cc-menu-tile')).toHaveText(['Attendance', 'Homework', 'Goals', 'Reports', /^Notifications/u]);
+  await expect(today.locator('a.cc-menu-tile')).toHaveText(['Attendance', 'Homework', 'Goals', 'Reports', /^Notifications/u, 'Assistant']);
   await expect(page.getByTestId('teacher-menu').getByRole('link', { name: 'Profile and PIN' })).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);
 
@@ -126,7 +126,7 @@ test('teacher menu: Today tiles, one Class setup hub, and pages of modules that 
   try {
     for (const c of before) expect((await api(page, 'PUT', `/api/teacher/contexts/${c.id}/modules/homework`, { enabled: false })).status).toBe(200);
     await page.goto('/teacher');
-    await expect(today.locator('a.cc-menu-tile')).toHaveText(['Attendance', 'Goals', 'Reports', /^Notifications/u]);
+    await expect(today.locator('a.cc-menu-tile')).toHaveText(['Attendance', 'Goals', 'Reports', /^Notifications/u, 'Assistant']);
     await page.goto('/teacher/homework');
     await expect(page.getByTestId('module-off-page')).toBeVisible();
     await expect(page.getByText('Homework is switched off in all your classes')).toBeVisible();
@@ -138,7 +138,7 @@ test('teacher menu: Today tiles, one Class setup hub, and pages of modules that 
     for (const c of before) await api(page, 'PUT', `/api/teacher/contexts/${c.id}/modules/homework`, { enabled: c.modules.homework !== false });
   }
   await page.goto('/teacher');
-  await expect(today.locator('a.cc-menu-tile')).toHaveText(['Attendance', 'Homework', 'Goals', 'Reports', /^Notifications/u]);
+  await expect(today.locator('a.cc-menu-tile')).toHaveText(['Attendance', 'Homework', 'Goals', 'Reports', /^Notifications/u, 'Assistant']);
 
   // Homework made unavailable school-wide by the administrator: the page says so and offers no Class
   // settings switch the teacher could not use (S14e3 review).

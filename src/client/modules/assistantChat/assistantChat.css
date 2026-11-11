@@ -1,0 +1,157 @@
+/*
+ * The Assistant page (S19b, D-180). Its own stylesheet, loaded with the lazy page chunk, so the student
+ * page (which loads app.css, D-151 budget) never downloads it. Semantic tokens only; touch targets at
+ * least var(--cc-touch); no motion.
+ */
+.cc-assistant {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+  align-items: start;
+}
+.cc-assistant__list {
+  min-width: 0;
+}
+.cc-assistant__main {
+  min-width: 0;
+}
+.cc-assistant__back {
+  display: none;
+  align-self: flex-start;
+}
+.cc-assistant__privacy {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--cc-radius-sm);
+  border: var(--cc-border-width) solid var(--cc-border);
+  background: var(--cc-surface-2);
+  color: var(--cc-text);
+}
+.cc-assistant__chats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cc-assistant__chat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  min-height: var(--cc-touch);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--cc-radius-sm);
+  border: var(--cc-border-width) solid var(--cc-border);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.cc-assistant__chat--current {
+  border: var(--cc-border-width-strong) solid var(--cc-accent-strong);
+  background: var(--cc-accent-soft);
+}
+.cc-assistant__chat:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-assistant__chat-title {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.cc-assistant__chat-date {
+  font-size: 0.9em;
+}
+.cc-assistant__messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.cc-assistant__message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 48rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--cc-radius);
+  border: var(--cc-border-width) solid var(--cc-border);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+}
+.cc-assistant__message--user {
+  align-self: flex-end;
+  background: var(--cc-accent-soft);
+  border-color: var(--cc-accent);
+}
+.cc-assistant__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.cc-assistant__activity,
+.cc-assistant__note {
+  margin: 0;
+  font-size: 0.95em;
+}
+.cc-assistant__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--cc-radius-sm);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+  background: var(--cc-surface-2);
+}
+/* A card waiting for the teacher: a thicker border and the question (never colour alone). */
+.cc-assistant__card--pending {
+  border: var(--cc-border-width-strong) solid var(--cc-warning);
+  background: var(--cc-warning-soft);
+}
+.cc-assistant__changes-title {
+  margin: 0;
+  font-size: 1em;
+}
+.cc-assistant__changes {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cc-assistant__changes > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+.cc-assistant__changes dt {
+  font-weight: 650;
+}
+.cc-assistant__changes dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.cc-assistant__decided {
+  margin: 0;
+  font-weight: 650;
+}
+.cc-assistant__composer {
+  max-width: 48rem;
+}
+@media (max-width: 52rem) {
+  .cc-assistant {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* On a narrow screen an open chat takes the whole width; "All chats" goes back to the list. */
+  .cc-assistant--open .cc-assistant__list {
+    display: none;
+  }
+  .cc-assistant--open .cc-assistant__back {
+    display: inline-flex;
+  }
+}

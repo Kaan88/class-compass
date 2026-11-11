@@ -150,7 +150,7 @@ describe('Profile → My assistant connections', () => {
     wrap(<OwnAiConnectionsSection />);
     expect(await screen.findByText('Chosen by your school for the assistant: School server (local-small).')).toBeTruthy();
     // The chat is not built yet: the card says so instead of implying an assistant is in use.
-    expect(screen.getByTestId('ai-conn-not-yet').textContent).toContain('not in Class Compass yet');
+    expect(screen.getByTestId('ai-conn-not-yet').textContent).toContain('on their Assistant page');
     expect(screen.getByText('Your school has not allowed teachers’ own connections.')).toBeTruthy();
     expect(screen.queryByTestId('ai-conn-add')).toBeNull();
   });

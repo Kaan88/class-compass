@@ -21,6 +21,7 @@ import { DataTable } from '../../ui/Layout.tsx';
 import { AI_SETUP_KEY } from '../AiConnect.tsx';
 import { AI_ACCOUNT_KEY, AI_ADMIN_KEY, ConnectionsTable, DAY_CHOICES, statusText, useDateFormat } from '../AiTools.tsx';
 import { AiConnectionsAdminSection } from '../AiConnections.tsx';
+import { ASSISTANT_ADMIN_KEY, AssistantChatAdminSection } from './AssistantChatAdmin.tsx';
 
 /**
  * OAuth (S14h2, D-160): the hosts an AI app's https redirect address may use (loopback is always
@@ -205,13 +206,14 @@ export function AiToolsAdminPage() {
   const [confirming, setConfirming] = useState(false);
   const data = q.data;
   const save = (patch: z.input<typeof M.setAiToolsSettings.input>) =>
-    run(() => call(M.setAiToolsSettings, patch), { success: t('aiTools.admin.saved'), invalidate: [AI_ADMIN_KEY, AI_ACCOUNT_KEY, AI_SETUP_KEY] });
+    run(() => call(M.setAiToolsSettings, patch), { success: t('aiTools.admin.saved'), invalidate: [AI_ADMIN_KEY, AI_ACCOUNT_KEY, AI_SETUP_KEY, ASSISTANT_ADMIN_KEY] });
   return (
     <main className="cc-page cc-stack" data-testid="admin-ai-tools">
       <h1 className="cc-h1">{t('aiTools.admin.title')}</h1>
       <p className="cc-muted">{t('aiTools.admin.intro')}</p>
       {/* The in-app assistant's connections to model providers (S19a, D-179): first, so they are found. */}
       <AiConnectionsAdminSection />
+      <AssistantChatAdminSection />
       {q.error ? <Alert>{errorText(t, q.error)}</Alert> : null}
       {data ? (
         <>

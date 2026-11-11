@@ -3091,6 +3091,12 @@ export const tr = {
   'audit.action.ai_connection.settings': 'Asistan bağlantısı ayarları değiştirildi',
   'audit.entity.ai_connection': 'Asistan bağlantısı',
   'audit.entity.ai_connection_settings': 'Asistan bağlantısı ayarları',
+  'audit.action.assistant_chat.settings': 'Asistan sohbeti ayarları değiştirildi',
+  'audit.action.assistant_chat.delete': 'Asistan sohbeti silindi',
+  'audit.action.assistant_chat.retention': 'Eski asistan sohbetleri silindi',
+  'audit.entity.assistant_chat': 'Asistan sohbeti',
+  'audit.entity.assistant_settings': 'Asistan sohbeti ayarları',
+  'assistantChat.title': 'Asistan',
   // ---------------------------------------------------------------- OAuth for AI apps (S14h2, D-160)
   'audit.action.oauth.connect': 'Yapay zekâ uygulaması bağlandı',
   'audit.action.oauth.deny': 'Yapay zekâ uygulamasının bağlanmasına izin verilmedi',
