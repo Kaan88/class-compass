@@ -115,9 +115,15 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
 
 export interface ContrastFailure {
   pair: string;
-  /** The two tokens (`fg` is `avatar-text` for the avatar hue sweep, `bg` then names the hue). */
+  /**
+   * The two tokens. For the avatar initials sweep `fg` is `avatar-text` and `bg` an identifier made of
+   * token-like words only (`avatar-hue-120`, `avatar-small-hue-120`, `avatar-circles`); `avatar` then
+   * carries the size and hue so Admin → Themes words it in the admin's language (S21 verification).
+   */
   fg: string;
   bg: string;
+  /** The avatar initials sweep: which circles (`big`, `small`, or `all` when avatar-text is translucent) and the hue. */
+  avatar?: { size: 'big' | 'small' | 'all'; hue?: number };
   /**
    * A second foreground that would do as well (the avatar features: `fg` is `avatar-ink`, `or` is
    * `avatar-white`, either of which may carry the face): neither reaches `min` on `bg`. Only token
@@ -173,14 +179,14 @@ export function contrastFailures(colors: ThemeColors, avatar: AvatarTone): Contr
   out.push(...avatarFeatureFailures(colors));
   // Avatars: initials on every hue. Big avatars carry large bold initials (3:1), small ones 4.5:1.
   if (!isOpaqueHex(colors['avatar-text'])) {
-    out.push({ pair: 'avatar-text on avatar circles (translucent)', fg: 'avatar-text', bg: 'avatar circles', ratio: 1, min: AA });
+    out.push({ pair: 'avatar-text on avatar circles (translucent)', fg: 'avatar-text', bg: 'avatar-circles', avatar: { size: 'all' }, ratio: 1, min: AA });
     return out;
   }
   for (let hue = 0; hue < 360; hue += 5) {
     const big = contrast(colors['avatar-text'], hslToRgb(hue, avatar.saturation, avatar.lightness));
-    if (big < AA_LARGE) out.push({ pair: `avatar-text on avatar hue ${hue}`, fg: 'avatar-text', bg: `avatar hue ${hue}`, ratio: Math.round(big * 100) / 100, min: AA_LARGE });
+    if (big < AA_LARGE) out.push({ pair: `avatar-text on avatar hue ${hue}`, fg: 'avatar-text', bg: `avatar-hue-${hue}`, avatar: { size: 'big', hue }, ratio: Math.round(big * 100) / 100, min: AA_LARGE });
     const small = contrast(colors['avatar-text'], hslToRgb(hue, avatar.saturation, avatar.lightnessSmall));
-    if (small < AA) out.push({ pair: `avatar-text on small avatar hue ${hue}`, fg: 'avatar-text', bg: `small avatar hue ${hue}`, ratio: Math.round(small * 100) / 100, min: AA });
+    if (small < AA) out.push({ pair: `avatar-text on small avatar hue ${hue}`, fg: 'avatar-text', bg: `avatar-small-hue-${hue}`, avatar: { size: 'small', hue }, ratio: Math.round(small * 100) / 100, min: AA });
   }
   return out;
 }

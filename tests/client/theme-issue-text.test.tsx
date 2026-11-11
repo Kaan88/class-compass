@@ -50,3 +50,46 @@ describe('avatar face contrast in Admin → Themes (D-173)', () => {
     expect(tr).toContain('surface üzerinde text 2.1:1, en az 4.5:1 olmalı');
   });
 });
+
+/** The ocean example with grey initials: some big and some small avatar circles lose them. */
+function greyInitials() {
+  const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'docs', 'examples', 'ocean.theme.json'), 'utf8')) as Record<string, any>;
+  pkg.colors['avatar-text'] = '#8a8a8a';
+  return validateThemePackage(pkg).report.errors.filter((e) => e.code === 'CONTRAST' && e.params?.fg === 'avatar-text');
+}
+
+describe('avatar initials contrast in Admin → Themes (S21 verification)', () => {
+  it('the report names the circles with size and hue, no English words in its parameters', () => {
+    const issues = greyInitials();
+    const big = issues.find((e) => e.params?.avatarSize === 'big');
+    const small = issues.find((e) => e.params?.avatarSize === 'small');
+    expect(big).toBeDefined();
+    expect(small).toBeDefined();
+    for (const issue of [big!, small!]) {
+      expect(issue.path).toBe('avatar');
+      expect(typeof issue.params?.hue).toBe('number');
+      for (const v of Object.values(issue.params ?? {})) expect(String(v)).not.toMatch(/\s/u);
+    }
+  });
+
+  it('reads in English and in Turkish, with no English word in the Turkish one', () => {
+    const issues = greyInitials();
+    const big = issues.find((e) => e.params?.avatarSize === 'big')!;
+    const small = issues.find((e) => e.params?.avatarSize === 'small')!;
+    expect(text('en', big)).toContain(`avatar-text on avatar circles of hue ${big.params!.hue} is`);
+    cleanup();
+    expect(text('en', small)).toContain(`avatar-text on small avatar circles of hue ${small.params!.hue} is`);
+    cleanup();
+    const trBig = text('tr', big);
+    expect(trBig).toContain(`renk tonu ${big.params!.hue} olan avatar daireleri üzerinde avatar-text`);
+    cleanup();
+    const trSmall = text('tr', small);
+    expect(trSmall).toContain(`renk tonu ${small.params!.hue} olan küçük avatar daireleri üzerinde avatar-text`);
+    for (const tr of [trBig, trSmall]) expect(tr.replace(/avatar-[a-z0-9-]+/gu, '')).not.toMatch(/\b(on|of|hue|small|circles|needs)\b/u);
+  });
+
+  it('translucent initials name all avatar circles in the admin language', () => {
+    const issue = { code: 'CONTRAST', path: 'colors.avatar-text', message: 'x', params: { fg: 'avatar-text', bg: 'avatar-circles', avatarSize: 'all', ratio: 1, min: 4.5 } } as ReturnType<typeof lostFace>;
+    expect(text('tr', issue)).toContain('avatar daireleri üzerinde avatar-text 1:1');
+  });
+});

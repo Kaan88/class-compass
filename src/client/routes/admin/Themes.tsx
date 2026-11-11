@@ -91,12 +91,21 @@ export function IssueText({ issue }: { issue: Issue }) {
     case 'SVG':
       text = t('themes.issue.SVG', { reason: t(`themes.svgReason.${str('reason')}` as MessageKey), detail: str('detail') });
       break;
-    case 'CONTRAST':
+    case 'CONTRAST': {
       // Avatar faces (D-173): neither the ink nor its rim reads on a body; the tokens stay as they are.
+      // Avatar initials: the circles are named in the admin's language (big or small, and the hue).
+      const size = str('avatarSize');
+      const bg =
+        size === 'big' || size === 'small'
+          ? t(size === 'big' ? 'themes.avatarBg.big' : 'themes.avatarBg.small', { hue: str('hue') })
+          : size === 'all'
+            ? t('themes.avatarBg.all')
+            : str('bg');
       text = p.or
-        ? t('themes.issue.CONTRAST_EITHER', { fg: str('fg'), or: str('or'), bg: str('bg'), ratio: str('ratio'), min: str('min') })
-        : t('themes.issue.CONTRAST', { fg: str('fg'), bg: str('bg'), ratio: str('ratio'), min: str('min') });
+        ? t('themes.issue.CONTRAST_EITHER', { fg: str('fg'), or: str('or'), bg, ratio: str('ratio'), min: str('min') })
+        : t('themes.issue.CONTRAST', { fg: str('fg'), bg, ratio: str('ratio'), min: str('min') });
       break;
+    }
     case 'TOO_LARGE':
       text = t('themes.issue.TOO_LARGE', { bytes: str('bytes'), limit: str('limit') });
       break;
