@@ -15,6 +15,8 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { translate, type Locale, type MessageKey } from '../src/shared/i18n/index.ts';
+// Every dictionary registered, staff strings included (S23a, D-182).
+import '../tests/messages.ts';
 import { api, ensurePin, login, openDock, studentLinkUrl } from './helpers.ts';
 
 const WIDTHS = [375, 768, 1280] as const;

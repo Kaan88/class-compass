@@ -17,6 +17,8 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { translate, type Locale, type MessageKey } from '../src/shared/i18n/index.ts';
+// Every dictionary registered, staff strings included (S23a, D-182).
+import '../tests/messages.ts';
 import { api, ensurePin, login, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
 
 const IMG_ROOT = path.resolve(import.meta.dirname, '../docs/guides/img');
