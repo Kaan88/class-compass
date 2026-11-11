@@ -478,13 +478,19 @@ export function ThemePackagePreview({ themeKey, onClose }: { themeKey: string; o
         ))}
         {section('sounds', t('themes.preview.sounds'), (
           def.sounds ? (
-            <div className="cc-row">
-              {SOUND_EVENTS.map((e) => (
-                <Button key={e} size="small" onPress={() => playThemeSound(getDisplay(), def, e)}>
-                  {t(`sound.${e}`)}
-                </Button>
-              ))}
-            </div>
+            <>
+              {/* S17b (D-168): the instrument style; every button below plays in it. */}
+              <p className="cc-muted" data-testid="theme-sound-style">
+                {t('themes.preview.soundStyle', { style: t(`themes.soundStyle.${def.soundParams?.style ?? 'tones'}`) })}
+              </p>
+              <div className="cc-row">
+                {SOUND_EVENTS.map((e) => (
+                  <Button key={e} size="small" onPress={() => playThemeSound(getDisplay(), def, e)}>
+                    {t(`sound.${e}`)}
+                  </Button>
+                ))}
+              </div>
+            </>
           ) : (
             <p className="cc-muted">{t('themes.issue.SILENT')}</p>
           )

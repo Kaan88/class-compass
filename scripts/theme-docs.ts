@@ -31,7 +31,7 @@ import {
 } from '../src/shared/themePackage/engine.ts';
 import { AMBIENT_LIMITS, ART_LIMITS, FRAME_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS, SCENE_LIMITS, SETS_LIMITS, SOUND_LIMITS, SOUND_PARAM_LIMITS, STYLE_LIMITS } from '../src/shared/themePackage/limits.ts';
 import { themePackageJsonSchema } from '../src/shared/themePackage/schema.ts';
-import { COLOR_TOKENS, FIXED_COLOR_TOKENS, TOKEN_DOCS, TOKEN_GROUPS, type ColorToken, type TokenGroup } from '../src/shared/themePackage/tokens.ts';
+import { COLOR_TOKENS, FIXED_COLOR_TOKENS, SOUND_STYLES, TOKEN_DOCS, TOKEN_GROUPS, type ColorToken, type TokenGroup } from '../src/shared/themePackage/tokens.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 export const THEMING_MD = join(ROOT, 'docs', 'THEMING.md');
@@ -85,6 +85,10 @@ export function renderLimits(): string {
     ['Sound note', `gain ≤ ${S.noteGainCap}; tones ${S.toneMinHz}–${S.toneMaxHz} Hz (a glide may end at ≤ ${S.glideMaxHz} Hz); noise band ≤ ${S.noiseMaxHz} Hz`],
     ['Loudness', `a tap at class volume 80 peaks between ${S.tapPeakDbAt80[0]} and ${S.tapPeakDbAt80[1]} dBFS; no cue reaches ${S.clipDbAt100} dBFS at volume 100`],
     ['Sound parameters', `root ${r(SOUND_PARAM_LIMITS.rootHz, ' Hz')}, gain ${r(SOUND_PARAM_LIMITS.gain)}, tempo ${r(SOUND_PARAM_LIMITS.tempo)}`],
+    [
+      'Sound style (S17b)',
+      `${SOUND_STYLES.map((x) => `\`${x}\``).join(', ')} (default \`tones\`); app-defined partials whose gains add up to the note gain, inside the note; partials above ${S.partialMaxHz} Hz are left out`,
+    ],
     ['Typography', `weights ${r(STYLE_LIMITS.weight)}; letter-spacing ${r(STYLE_LIMITS.trackingEm, ' em')}; system font presets only`],
     ['Shape', `radius ${r(STYLE_LIMITS.radiusRem, ' rem')} (small ${r(STYLE_LIMITS.radiusSmRem, ' rem')}); borders ${r(STYLE_LIMITS.borderPx, ' px')} (strong ${r(STYLE_LIMITS.borderStrongPx, ' px')}); shadow presets only`],
     ['Icons and avatars', `icon stroke ${r(STYLE_LIMITS.iconStroke)}; avatar saturation ${r(STYLE_LIMITS.avatarSaturation, ' %')}, lightness ${r(STYLE_LIMITS.avatarLightness, ' %')}`],

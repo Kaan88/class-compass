@@ -201,6 +201,36 @@ describe('theme engine fields over MCP (S17a, D-166)', () => {
     expect(plain.data.engine).toEqual({ scene: null, frame: null, ambient: null, sets: null });
   });
 
+  // S17b (D-168): sound styles over MCP.
+  it('theme_schema lists the sound styles; validate_theme accepts each and rejects an unknown one', async () => {
+    const r = await teacher.call('theme_schema', {});
+    const sounds = (r.data.schema.properties as Record<string, any>).sounds;
+    const style = (sounds.anyOf?.find((x: { type?: string }) => x.type === 'object') ?? sounds).properties.style;
+    expect(style.enum).toEqual(['tones', 'bells', 'marimba', 'chimes', 'musicBox']);
+    expect(String(style.description)).toContain('musicBox');
+    for (const s of ['tones', 'bells', 'marimba', 'chimes', 'musicBox']) {
+      const pkg = example('ocean');
+      pkg.sounds.style = s;
+      const ok = await teacher.call('validate_theme', { package: pkg });
+      expect(ok.data.report.ok, s).toBe(true);
+    }
+    const pkg = example('ocean');
+    pkg.sounds.style = 'kazoo';
+    const bad = await teacher.call('validate_theme', { package: pkg });
+    expect(bad.data.report.ok).toBe(false);
+    expect(bad.data.report.errors.map((e: { path: string }) => e.path)).toContain('sounds.style');
+  });
+
+  it('preview_theme names the sound style; the Snow Day example rings bells, the built-ins their own styles', async () => {
+    expect((await teacher.call('preview_theme', { package: example('peppermint-snow-day') })).data.soundStyle).toBe('bells');
+    expect((await teacher.call('preview_theme', { package: example('ocean') })).data.soundStyle).toBe('tones');
+    const expected = { explorer: 'marimba', animals: 'musicBox', classroom: 'chimes' } as const;
+    for (const key of THEME_KEYS) {
+      const back = await teacher.call('export_theme', { key });
+      expect(back.data.package.sounds.style, key).toBe(expected[key]);
+    }
+  });
+
   it('import_theme_draft keeps the new fields (administrators)', async () => {
     const pkg = example('peppermint-snow-day');
     pkg.key = 'mcp-snow-draft';

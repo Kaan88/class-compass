@@ -193,6 +193,14 @@ export const SOUND_EVENTS = [
 ] as const;
 export type SoundEvent = (typeof SOUND_EVENTS)[number];
 
+/**
+ * Instrument styles (S17b, D-168): how a theme's tone notes are voiced. `tones` is the plain
+ * oscillator of S13b (the default); the others are app-defined partials and envelopes
+ * (`SOUND_VOICES` in sound.ts). Synthesized only, no audio files.
+ */
+export const SOUND_STYLES = ['tones', 'bells', 'marimba', 'chimes', 'musicBox'] as const;
+export type SoundStyle = (typeof SOUND_STYLES)[number];
+
 /** A short synthesized note (WebAudio): no audio files are shipped. */
 export interface ToneNote {
   /** Frequency in Hz (for 'noise': the centre of the band-pass filter). */
@@ -207,6 +215,11 @@ export interface ToneNote {
   type: 'sine' | 'triangle' | 'square' | 'noise';
   /** Peak gain 0..0.3 (gentle); scaled by the class volume. */
   gain: number;
+  /**
+   * Instrument style of a tone note (S17b): set by `makeSoundPack` from the theme's `style`, never
+   * written in a package (its overrides take the theme's style). Absent = `tones`.
+   */
+  voice?: SoundStyle;
 }
 export type SoundSpec = readonly ToneNote[];
 export type ThemeSoundPack = Record<SoundEvent, SoundSpec>;

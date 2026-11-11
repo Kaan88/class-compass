@@ -34,7 +34,7 @@ import {
   SCENE_SMALL_SCREENS,
 } from '../../../shared/themePackage/engine.ts';
 import { CREATURE_FAMILY_KEYS, type CreatureFamily } from '../../../shared/avatars.ts';
-import { COLOR_TOKENS, DERIVED_PACKAGE_TOKENS, ILLUSTRATIONS, isDerivedPackageToken, MASCOT_POSES } from '../../../shared/themePackage/tokens.ts';
+import { COLOR_TOKENS, DERIVED_PACKAGE_TOKENS, ILLUSTRATIONS, isDerivedPackageToken, MASCOT_POSES, SOUND_STYLES } from '../../../shared/themePackage/tokens.ts';
 import { FIXED_COLORS, packageArt, parseSceneSvg, validateThemePackage } from '../../../shared/themePackage/validate.ts';
 import { executeCommand } from '../../lib/commands.ts';
 import { newId } from '../../lib/crypto.ts';
@@ -206,7 +206,7 @@ const THEME_GUIDE =
 const themeSchema = handTool({
   name: 'theme_schema',
   description:
-    'The JSON Schema of a Class Compass theme package (format, key slug, names in English and Turkish, base theme, every colour token, typography and shape presets, motion presets, sound parameters, optional SVG art, and the optional theme engine fields: scene (up to 3 SVG layers behind the app), frame (edge, trim and corner presets with colour token names), ambient (snowfall or leaves) and sets (achievement frame, avatar families first, mascotFrom)). Read the theming guide resource (classcompass://docs/theming) for palette design, contrast rules and the SVG allow-list. Holds no school data. ' + THEME_GUIDE,
+    'The JSON Schema of a Class Compass theme package (format, key slug, names in English and Turkish, base theme, every colour token, typography and shape presets, motion presets, sound parameters with an optional instrument style (sounds.style: tones, the default, bells, marimba, chimes or musicBox), optional SVG art, and the optional theme engine fields: scene (up to 3 SVG layers behind the app), frame (edge, trim and corner presets with colour token names), ambient (snowfall or leaves) and sets (achievement frame, avatar families first, mascotFrom)). Read the theming guide resource (classcompass://docs/theming) for palette design, contrast rules and the SVG allow-list. Holds no school data. ' + THEME_GUIDE,
   scope: null,
   role: 'any',
   readOnly: true,
@@ -264,6 +264,7 @@ const exportTheme = handTool({
   },
 });
 
+const soundStyleOf = (v: unknown) => (v === undefined ? 'tones' : (SOUND_STYLES as readonly unknown[]).includes(v) ? (v as (typeof SOUND_STYLES)[number]) : undefined);
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const Source = z.enum(['package', 'base', 'fixed', 'derived']);
 
@@ -389,6 +390,8 @@ export function previewPackage(source: string) {
       pattern: parsed.pattern ? ('package' as const) : ('base' as const),
     },
     sounds: obj.sounds === null ? ('silent' as const) : isRecord(obj.sounds) ? ('package' as const) : ('base' as const),
+    // S17b (D-168): the instrument style the sounds play in (null for a silent theme or an unknown style).
+    soundStyle: obj.sounds === null ? null : isRecord(obj.sounds) ? (soundStyleOf(obj.sounds.style) ?? null) : null,
     engine: engineSummary(obj),
   };
 }
@@ -396,7 +399,7 @@ export function previewPackage(source: string) {
 const previewTheme = handTool({
   name: 'preview_theme',
   description:
-    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, derived from another package colour such as scene-scrim from surface, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, the worst avatar hue for big and small avatar initials (the validator checks every hue), and which mascot poses, illustrations, decoration and pattern come from the base theme, and the theme engine fields with every default filled in (scene layers with size and element count, frame, ambient, sets). No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
+    'A text preview of a theme package (JSON object or text) without a browser, like the catalogue a developer looks at: the validation report, the base theme, every colour token with its value and where it comes from (package, derived from another package colour such as scene-scrim from surface, base theme or fixed print colour), every contrast pair with its ratio, the minimum and pass/fail, the worst avatar hue for big and small avatar initials (the validator checks every hue), and which mascot poses, illustrations, decoration and pattern come from the base theme, the instrument style of the sounds, and the theme engine fields with every default filled in (scene layers with size and element count, frame, ambient, sets). No images are drawn and nothing is saved; looking at the real preview and enabling the theme stay human actions on Admin → Themes. ' +
     THEME_GUIDE,
   scope: null,
   role: 'any',
@@ -420,6 +423,7 @@ const previewTheme = handTool({
       pattern: Source,
     }),
     sounds: z.enum(['package', 'silent', 'base']),
+    soundStyle: z.enum(SOUND_STYLES).nullable(),
     engine: EngineOut,
   }),
   run: (_env, input) => previewPackage(packageText(input.package)),

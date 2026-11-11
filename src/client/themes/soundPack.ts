@@ -13,7 +13,9 @@ export { degree, makeSoundPack, soundLength, soundPackProblems, type SoundPackOp
  * a package (S14g). Spread it into a ThemeDefinition: `...themeSounds({ root: 523, wave: 'sine' })`.
  */
 export function themeSounds(opts: SoundPackOptions, overrides: Partial<ThemeSoundPack> = {}): { sounds: ThemeSoundPack; soundParams: ThemePackageSounds } {
-  const params = { root: opts.root, wave: opts.wave, scale: opts.scale ?? 'major', gain: opts.gain ?? 0.1, tempo: opts.tempo ?? 1 };
+  // S17b (D-168): the instrument style travels with the parameters (left out for plain tones).
+  const style = opts.style && opts.style !== 'tones' ? { style: opts.style } : {};
+  const params = { root: opts.root, wave: opts.wave, ...style, scale: opts.scale ?? 'major', gain: opts.gain ?? 0.1, tempo: opts.tempo ?? 1 };
   const own = Object.entries(overrides).filter(([, v]) => v !== undefined);
   const ov = own.length ? { overrides: Object.fromEntries(own.map(([k, v]) => [k, v!.map((n) => ({ ...n }))])) } : {};
   return { sounds: makeSoundPack(opts, overrides), soundParams: { ...params, ...ov } };

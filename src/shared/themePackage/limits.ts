@@ -24,6 +24,11 @@ export const SOUND_LIMITS = {
   glideMaxHz: 3000,
   /** Most notes in one cue (a package override). */
   maxNotesPerCue: 64,
+  /**
+   * Instrument styles (S17b, D-168): the highest partial a styled note may sound (Hz). Partials above
+   * it are left out, so a high note simply has fewer overtones.
+   */
+  partialMaxHz: 8000,
   /** A tap at class volume 80 must peak between these levels (dBFS) at the speakers. */
   tapPeakDbAt80: [-12, -6] as const,
   /** No cue may reach this level (dBFS) at class volume 100 (notes that overlap add up). */

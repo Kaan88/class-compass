@@ -30,7 +30,7 @@ import { AMBIENT_LIMITS, ART_LIMITS, FRAME_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS
 import { EASINGS, MOTION_PRESETS } from './motion.ts';
 import { FONT_PRESETS, SHADOW_PRESETS } from './presets.ts';
 import { SOUND_SCALES, SOUND_WAVES } from './sound.ts';
-import { COLOR_TOKENS, ILLUSTRATIONS, isDerivedPackageToken, isTranslucentToken, MASCOT_POSES, PACKAGE_COLOR_TOKENS, SOUND_EVENTS, type PackageColorToken } from './tokens.ts';
+import { COLOR_TOKENS, ILLUSTRATIONS, isDerivedPackageToken, isTranslucentToken, MASCOT_POSES, PACKAGE_COLOR_TOKENS, SOUND_EVENTS, SOUND_STYLES, type PackageColorToken } from './tokens.ts';
 
 export const THEME_PACKAGE_FORMAT = 'class-compass-theme';
 export const THEME_PACKAGE_VERSION = 1;
@@ -118,7 +118,11 @@ export const ToneNoteSchema = z.strictObject({
 export const Sounds = z
   .strictObject({
     root: range(...SOUND_PARAM_LIMITS.rootHz).describe('Root note in Hz (523 = C5).'),
-    wave: z.enum(SOUND_WAVES),
+    wave: z.enum(SOUND_WAVES).describe('Oscillator of the plain tones style (sine soft, triangle warm, square buzzy).'),
+    style: z
+      .enum(SOUND_STYLES)
+      .optional()
+      .describe('Instrument style of every tone note (S17b): tones (the plain wave, the default when absent), bells, marimba, chimes or musicBox. App-defined synthesis; every limit still applies.'),
     scale: z.enum(SOUND_SCALES),
     gain: range(...SOUND_PARAM_LIMITS.gain).describe('Peak gain of the main voice; the tap must still peak between -12 and -6 dBFS at volume 80.'),
     tempo: range(...SOUND_PARAM_LIMITS.tempo).describe('Speed: above 1 is snappier, below 1 calmer.'),

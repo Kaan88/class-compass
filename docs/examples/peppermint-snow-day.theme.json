@@ -170,6 +170,7 @@
   "sounds": {
     "root": 523,
     "wave": "sine",
+    "style": "bells",
     "scale": "major",
     "gain": 0.1,
     "tempo": 1.08

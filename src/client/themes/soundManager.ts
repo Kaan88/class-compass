@@ -22,6 +22,7 @@
  */
 import type { SoundEvent, SoundSpec } from './types.ts';
 import { soundLength } from './soundPack.ts';
+import { notePartials } from '../../shared/themePackage/sound.ts';
 import { LOUDNESS, SOUND_LIMITS, volumeGain } from '../../shared/themePackage/limits.ts';
 
 export const SOUND_PRIORITY: Record<SoundEvent, number> = {
@@ -390,8 +391,30 @@ export class SoundManager {
   private schedule(ctx: AudioContextLike, out: GainNode, n: SoundSpec[number], t0: number) {
     const start = t0 + n.at / 1000;
     const end = start + n.dur / 1000;
-    const gain = ctx.createGain();
     const peak = Math.min(NOTE_GAIN_CAP, Math.max(0.0002, n.gain));
+    if (n.type !== 'noise' && n.voice && n.voice !== 'tones') {
+      // An instrument style (S17b, D-168): one sine per partial, each with its own attack and decay,
+      // all inside the note. The partials' gains add up to the note's peak, so the loudness model and
+      // every limit hold (nothing sounds after the note's end).
+      for (const p of notePartials(n)) {
+        const pg = ctx.createGain();
+        const ppeak = Math.max(0.0002, p.gain * (peak / Math.max(n.gain, 0.0002)));
+        const pend = Math.min(end, start + Math.max(0.01, (n.dur * p.decay) / 1000));
+        pg.gain.setValueAtTime(0.0001, start);
+        pg.gain.exponentialRampToValueAtTime(ppeak, start + Math.min(p.attackMs / 1000, n.dur / 4000));
+        pg.gain.exponentialRampToValueAtTime(0.0001, pend);
+        pg.connect(out);
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(p.freq, start);
+        if (p.to) osc.frequency.exponentialRampToValueAtTime(p.to, end);
+        osc.connect(pg);
+        osc.start(start);
+        osc.stop(pend + 0.02);
+      }
+      return;
+    }
+    const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(peak, start + Math.min(0.03, n.dur / 4000));
     gain.gain.exponentialRampToValueAtTime(0.0001, end);

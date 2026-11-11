@@ -942,6 +942,18 @@
                 "sine",
                 "triangle",
                 "square"
+              ],
+              "description": "Oscillator of the plain tones style (sine soft, triangle warm, square buzzy)."
+            },
+            "style": {
+              "description": "Instrument style of every tone note (S17b): tones (the plain wave, the default when absent), bells, marimba, chimes or musicBox. App-defined synthesis; every limit still applies.",
+              "type": "string",
+              "enum": [
+                "tones",
+                "bells",
+                "marimba",
+                "chimes",
+                "musicBox"
               ]
             },
             "scale": {

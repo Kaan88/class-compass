@@ -7,16 +7,101 @@
  * validator use the same function).
  */
 import { outputPeakDb, SOUND_LIMITS } from './limits.ts';
-import { SOUND_EVENTS, type SoundEvent, type SoundSpec, type ThemeSoundPack, type ToneNote } from './tokens.ts';
+import { SOUND_EVENTS, SOUND_STYLES, type SoundEvent, type SoundSpec, type SoundStyle, type ThemeSoundPack, type ToneNote } from './tokens.ts';
 
 export const SOUND_WAVES = ['sine', 'triangle', 'square'] as const;
 export const SOUND_SCALES = ['major', 'pentatonic'] as const;
 
+// ---------------------------------------------------------------- instrument styles (S17b, D-168)
+/**
+ * One partial of a styled voice: a sine at `ratio` × the note's frequency, `gain` its share of the
+ * note's peak, `decay` how much of the note it lasts (0..1; it fades out exponentially by then).
+ */
+export interface VoicePartial {
+  ratio: number;
+  gain: number;
+  decay: number;
+}
+export interface VoiceSpec {
+  /** Time to the peak (ms, at most a quarter of the note). */
+  attackMs: number;
+  /** The gains add up to 1, so a styled note never peaks above the note's own gain (loudness model). */
+  partials: readonly VoicePartial[];
+}
+
+/**
+ * The app-defined instrument styles. Only data: the SoundManager plays each partial as a sine with its
+ * own envelope inside the note's length, so every cue length, note gain and loudness limit is unchanged.
+ * - bells: bright, slightly inharmonic overtones (2.76, 4.07, 5.4) that ring out;
+ * - marimba: a warm wooden fundamental with the 4th harmonic of a tuned bar, quick to fade;
+ * - chimes: airy, a soft attack and a slow shimmer (a fundamental and a slightly detuned twin);
+ * - musicBox: a plucked comb tine, very fast attack, short bright overtones.
+ */
+export const SOUND_VOICES: Record<Exclude<SoundStyle, 'tones'>, VoiceSpec> = {
+  bells: {
+    attackMs: 2,
+    partials: [
+      { ratio: 1, gain: 0.45, decay: 1 },
+      { ratio: 2, gain: 0.2, decay: 0.85 },
+      { ratio: 2.76, gain: 0.17, decay: 0.6 },
+      { ratio: 4.07, gain: 0.1, decay: 0.45 },
+      { ratio: 5.4, gain: 0.08, decay: 0.3 },
+    ],
+  },
+  marimba: {
+    attackMs: 3,
+    partials: [
+      { ratio: 1, gain: 0.72, decay: 0.85 },
+      { ratio: 4, gain: 0.2, decay: 0.25 },
+      { ratio: 10, gain: 0.08, decay: 0.06 },
+    ],
+  },
+  chimes: {
+    attackMs: 6,
+    partials: [
+      { ratio: 1, gain: 0.4, decay: 1 },
+      { ratio: 1.0045, gain: 0.12, decay: 1 },
+      { ratio: 2.76, gain: 0.22, decay: 0.7 },
+      { ratio: 5.4, gain: 0.16, decay: 0.45 },
+      { ratio: 8.93, gain: 0.1, decay: 0.3 },
+    ],
+  },
+  musicBox: {
+    attackMs: 1,
+    partials: [
+      { ratio: 1, gain: 0.6, decay: 0.7 },
+      { ratio: 2, gain: 0.12, decay: 0.45 },
+      { ratio: 3, gain: 0.1, decay: 0.3 },
+      { ratio: 6, gain: 0.1, decay: 0.12 },
+      { ratio: 7.2, gain: 0.08, decay: 0.04 },
+    ],
+  },
+};
+
+export const isSoundStyle = (v: unknown): v is SoundStyle => typeof v === 'string' && (SOUND_STYLES as readonly string[]).includes(v);
+
+/**
+ * The partials a note sounds with (one plain partial for `tones` and noise): frequencies and glide
+ * targets in Hz, gains already multiplied by the note's peak, partials above `partialMaxHz` left out.
+ */
+export function notePartials(n: ToneNote): Array<{ freq: number; to?: number; gain: number; decay: number; attackMs: number }> {
+  const plain = { freq: n.freq, ...(n.to === undefined ? {} : { to: n.to }), gain: n.gain, decay: 1, attackMs: 30 };
+  if (n.type === 'noise' || !n.voice || n.voice === 'tones') return [plain];
+  const v = SOUND_VOICES[n.voice];
+  if (!v) return [plain];
+  const top = Math.max(n.freq, n.to ?? 0);
+  return v.partials
+    .filter((p) => p.ratio * top <= SOUND_LIMITS.partialMaxHz || p.ratio === 1)
+    .map((p) => ({ freq: n.freq * p.ratio, ...(n.to === undefined ? {} : { to: n.to * p.ratio }), gain: n.gain * p.gain, decay: p.decay, attackMs: v.attackMs }));
+}
+
 export interface SoundPackOptions {
   /** Root note in Hz (e.g. 523 = C5). */
   root: number;
-  /** Main voice. */
+  /** Main voice of the plain `tones` style. */
   wave: (typeof SOUND_WAVES)[number];
+  /** Instrument style of every tone note (S17b): `tones` (default), bells, marimba, chimes, musicBox. */
+  style?: SoundStyle;
   /** Peak gain of the main voice (0.05..0.2); everything else is scaled from it. */
   gain?: number;
   /** 'major' (bright) or 'pentatonic' (playful, no clashes). */
@@ -83,7 +168,12 @@ export function makeSoundPack(opts: SoundPackOptions, overrides: Partial<ThemeSo
     // "Test sound" in the Display popover and class settings: three clear notes at tap loudness.
     soundTest: arpeggio([0, 4, 7], 160, 240, g),
   };
-  return { ...pack, ...overrides };
+  const all: ThemeSoundPack = { ...pack, ...overrides };
+  // S17b (D-168): every tone note (the theme's own overrides too) is played in the theme's style.
+  const style = opts.style ?? 'tones';
+  if (style === 'tones') return all;
+  const voiced = (spec: SoundSpec): SoundSpec => spec.map((x) => (x.type === 'noise' ? x : { ...x, voice: style }));
+  return Object.fromEntries(SOUND_EVENTS.map((e) => [e, voiced(all[e])])) as Record<SoundEvent, SoundSpec>;
 }
 
 /** Total length of a cue in ms. */
