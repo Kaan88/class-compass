@@ -197,6 +197,13 @@
       "when": 1794404415286,
       "tag": "0027_s19a_ai_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1794409462885,
+      "tag": "0028_s19b_assistant_chat",
+      "breakpoints": true
     }
   ]
 }
