@@ -27,8 +27,9 @@
  * touch target (S22c review); S23b (D-183): with the small mark pills a phone card stays under 120 px
  * (before: about 164 px) and the short displays (1536×703@1.25, 1366×768) show at least 16 whole
  * cards with marks (before: 14). S25a (D-185): in the narrowest layout (`tight`, checked at
- * 1536×703@1.25 with 40 students) every mark sits on the count's line (icon and number only), and a
- * class of 40 with marks passes the phone checks at 375 px. Axe on the student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
+ * 1536×703@1.25 with 40 students) every mark sits on the count's line (icon and number only), also
+ * on the cards of Late students (whose Late chip goes after the marks; such a card is no taller than
+ * the others), and a class of 40 with marks passes the phone checks at 375 px. Axe on the student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
  */
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -389,6 +390,43 @@ async function checkMarks(p: Page, cls: TestClass, label: string) {
 }
 
 /**
+ * S25a review (D-185): a Late student still shows the count, and the Late chip comes before it in the
+ * DOM. In `tight` the marks must still share the count's line (the chip goes after them) and such a
+ * card is no taller than the others. Students 0, 3 and 6 (two achievements, one, none; all with a
+ * group) are marked Late for this lesson and put back in `finally`.
+ */
+async function checkLate(p: Page, teacher: Page, cls: TestClass, label: string) {
+  const late = [0, 3, 6].map((i) => cls.students[i]!);
+  const contextId = cls.contextId!;
+  const lessonId = cls.lessonId!;
+  const setLate = async (status: 'late' | null) => {
+    const r = await api(teacher, 'POST', '/api/commands', {
+      commands: late.map((s) => ({ opId: randomUUID(), type: 'attendance.setLessonException', contextId, lessonId, payload: { contextId, lessonId, studentId: s.id, status } })),
+    });
+    for (const res of r.body.results as Array<{ ok: boolean }>) expect(res.ok, JSON.stringify(res)).toBe(true);
+  };
+  try {
+    await setLate('late');
+    await p.reload();
+    await showClass(p, cls);
+    const lateCards = p.locator('.cc-student-card').filter({ has: p.locator('.cc-att-chip[data-status="late"]') });
+    await expect(lateCards).toHaveCount(late.length);
+    await expect(lateCards.locator('.cc-student-card__count')).toHaveCount(late.length);
+    const seen = await checkMarks(p, cls, label);
+    expect(seen.step, `${label}: the narrowest layout`).toBe('tight');
+    const heights = await p.locator('.cc-student-card').evaluateAll((cards) => {
+      const h = (late: boolean) => Math.max(...cards.filter((c) => !!c.querySelector('.cc-att-chip[data-status="late"]') === late).map((c) => c.getBoundingClientRect().height));
+      return { late: h(true), others: h(false) };
+    });
+    expect(heights.late, `${label}: a Late card is no taller than the others (${JSON.stringify(heights)})`).toBeLessThanOrEqual(heights.others + 1);
+  } finally {
+    await setLate(null);
+    await p.reload();
+    await showClass(p, cls);
+  }
+}
+
+/**
  * One test per class size, so the teacher's class tabs above the board are the demo classes plus one,
  * as on a real teacher's board (four extra tabs would wrap and take height from the board).
  */
@@ -447,6 +485,7 @@ for (const classSize of CLASS_SIZES) {
                 if (classSize === 40 && size.name === '1536x703@1.25') expect(seen.step, `${label}: the narrowest layout`).toBe('tight');
               }
               await setDensity(p, 'Normal');
+              if (classSize === 40 && size === SIZES[0]) await checkLate(p, teacher, cls, `${size.name} 40 Normal marks late`);
               if ((classSize === 19 || classSize === 40) && size === SIZES[0]) await checkPhone(browser, cls, `${PHONE.name} ${classSize} marks`);
               continue;
             }

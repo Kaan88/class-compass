@@ -463,7 +463,7 @@ Decision D-184; migration 0029.
 ## S25a Polish: readable language fields, card marks in `tight`, a group shortcut in the award dialog (2026-11-11)
 
 - [x] Language fields with a readable maximum width (about 40 characters each, the group no wider than its fields), one and two languages, phones unchanged (closes the S22d "Found by the crawl" box; `e2e/lang-fields-width.spec.ts`, `tests/client/lang-fields.test.tsx`)
-- [x] Card marks on the count's line in the `tight` layout: icon and number only, the level chip on the next line beside the + button; checked at 1536×703@1.25 with 40 students and at 375 px (closes the S23b box; `e2e/board-40.spec.ts`)
+- [x] Card marks on the count's line in the `tight` layout: icon and number only, the level chip (and an attendance chip such as Late) on the next line beside the + button; checked at 1536×703@1.25 with 40 students (also with Late students) and at 375 px (closes the S23b box; `e2e/board-40.spec.ts`)
 - [x] The award dialog ticks a group of this lesson in one tap (closes the saved-group half of the S13c themes/badges box; `e2e/achievements-avatars.spec.ts`, `e2e/button-groups.spec.ts`); teacher guide EN/TR
 - [ ] Guide screenshots of the award dialog with its group buttons (`npm run docs:screenshots` in the next screenshot pass)
 

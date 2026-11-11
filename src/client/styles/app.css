@@ -2989,13 +2989,17 @@ html:has(.cc-classroom) {
 /* S25a (D-185): in `tight` the marks are their icon and number only (no pill edge or padding; the
    accessible name is unchanged) and come right after the count, so they share its line; the level chip
    (or a notice) takes the next line when the line is full. The DOM order, and so the reading order,
-   stays count, level, marks. */
+   stays count, level, marks. On a card with a count, every other chip (the level, a notice, and an
+   attendance chip such as Late, which comes before the count in the DOM) goes after the marks, so
+   the count and the marks lead the first line (S25a review). A card without a count (away) keeps its
+   order: its attendance chip leads. */
 .cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__mark {
   gap: 0.05em;
   padding: 0;
   border: none;
 }
-.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta > :is(.cc-level, .cc-student-card__notice) {
+.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta > :is(.cc-level, .cc-student-card__notice),
+.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta:has(> .cc-student-card__count) > :not(.cc-student-card__count, .cc-student-card__mark) {
   order: 1;
 }
 .cc-lesson-board .cc-student-card__name {
