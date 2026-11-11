@@ -177,6 +177,15 @@ Press **Groups** in the lesson tools row (when Groups is a box on your board: **
 
 Levels, pair rules ("should / should not work together") and their notes are **never** shown on the classroom screen. You manage them on the **Grouping** page (tabs **Arrangements**, **Levels**, **Pair rules**). In Class settings you can show student names in capital letters on the group screen.
 
+**Levels** tab: type each student's level and press **Save**. Numbers, codes such as A1 and B1, and the usual words (Beginner … Advanced, Başlangıç … İleri) are put in their real order; other words come after them in alphabetical order. **Order used** shows the order level groups will use.
+
+**Level list** (optional) lets you choose your own words and their order, for example Starter, Growing, Strong, Star:
+
+- **Make a list from the levels used now** starts with the levels your students already have, in the order used now. **Start an empty list** starts from nothing.
+- Write one level per line, lowest first. Use the up and down arrows to change the order, **Add a level** for another line, and the cross to remove one. Press **Save the list**.
+- While the list exists, each student's level is chosen from it (or **No level**). A level that is not in the list stays and is shown as "(not in the list)"; level groups put such levels after the list. Under **Levels not in the list** you can change all students with that level to a level from the list.
+- The list belongs to the class and subject, so every teacher of that class and subject sees the same list. Changing the list does not change the groups you already have: press **Make new groups** (or **Shuffle** on the group screen) to use it. **Remove the list** goes back to typing levels; no student's level changes.
+
 **Edit groups** (Arrangements tab) shows the groups side by side. Drag a name onto another group or onto **Not in a group**, or tap a name and then **Move here** on the group. Nothing is saved until you press **Save**. **Group name and roles** under each group holds its English and Turkish name and the optional roles.
 
 ### Daily assistant

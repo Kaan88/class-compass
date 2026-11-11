@@ -10,9 +10,9 @@
  * S14c (D-150): the editor moves names with `ui/StudentDnd.tsx` like the classroom group screen (drag
  * onto a group or "Not in a group", tap then "Move here", keyboard); the sticky move bar is gone.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { orderedLevels } from '../../../domain/grouping.ts';
+import { levelKey, levelOrder } from '../../../domain/grouping.ts';
 import * as G from '../../../shared/contracts/grouping.ts';
 import type { GroupTemplate, GroupingOverview, PairRule, Sizing } from '../../../shared/contracts/grouping.ts';
 import * as School from '../../../shared/contracts/school.ts';
@@ -25,8 +25,8 @@ import { useRun } from '../../lib/useRun.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert, EmptyState } from '../../ui/Feedback.tsx';
 import { Select, TextField, Toggle } from '../../ui/Fields.tsx';
-import { IconArchive, IconPlus, IconSync, IconUndo, IconX } from '../../ui/icons.tsx';
-import { UNPLACED } from '../../../shared/contracts/grouping.ts';
+import { IconArchive, IconChevronDown, IconChevronUp, IconList, IconPencil, IconPlus, IconSync, IconUndo, IconX } from '../../ui/icons.tsx';
+import { MAX_LEVEL_LIST, UNPLACED } from '../../../shared/contracts/grouping.ts';
 import { Tabs } from '../../ui/Tabs.tsx';
 import { GroupPicto, OptionPicto } from '../../ui/pictos.tsx';
 import { StudentDnd, StudentDropList } from '../../ui/StudentDnd.tsx';
@@ -401,32 +401,222 @@ function ArrangementsTab({ contextId }: { contextId: string }) {
   );
 }
 
-function LevelsTab({ contextId }: { contextId: string }) {
+/** A draft row of the level list editor: a stable key, so moving a row keeps its field and focus. */
+type ListRow = { key: number; label: string };
+let listRowSeq = 0;
+const toRows = (labels: readonly string[]): ListRow[] => labels.map((label) => ({ key: listRowSeq++, label }));
+
+/**
+ * The class+subject's ordered level list (S25c, D-187): made from the levels used now (in the order
+ * used today) or from scratch, reordered with up / down buttons (keyboard: Tab to a button, Enter),
+ * removed again. Teacher-only like the levels (GRP-7).
+ */
+function LevelListEditor({ contextId, list, used }: { contextId: string; list: readonly string[]; used: ReadonlyArray<string | null> }) {
+  const { t } = useI18n();
+  const run = useRun();
+  const [rows, setRows] = useState<ListRow[] | null>(null);
+  const focusAfterMove = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusAfterMove.current) return;
+    document.getElementById(focusAfterMove.current)?.focus();
+    focusAfterMove.current = null;
+  });
+  const save = (labels: string[], success: string) => void run(() => call(G.setLevelList, { contextId, labels }), { success, invalidate: [ALL] }).then((r) => r && setRows(null));
+  if (!rows) {
+    const fromUsed = levelOrder(used).others;
+    return (
+      <section className="cc-card cc-stack" aria-labelledby="cc-level-list" data-testid="level-list">
+        <h2 id="cc-level-list" className="cc-h2">
+          {t('grouping.levelList.title')}
+        </h2>
+        <p className="cc-muted">{t('grouping.levelList.intro')}</p>
+        {list.length ? (
+          <ol data-testid="level-list-saved">
+            {list.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ol>
+        ) : (
+          <p className="cc-muted">{t('grouping.levelList.none')}</p>
+        )}
+        <div className="cc-row">
+          {list.length ? (
+            <>
+              <Button onPress={() => setRows(toRows(list))}>
+                <IconPencil />
+                {t('grouping.levelList.edit')}
+              </Button>
+              <Button onPress={() => save([], t('grouping.levelList.removed'))}>
+                <IconX />
+                {t('grouping.levelList.remove')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button isDisabled={!fromUsed.length} onPress={() => setRows(toRows(fromUsed.slice(0, MAX_LEVEL_LIST)))}>
+                <IconList />
+                {t('grouping.levelList.fromUsed')}
+              </Button>
+              <Button onPress={() => setRows(toRows(['']))}>
+                <IconPlus />
+                {t('grouping.levelList.startEmpty')}
+              </Button>
+            </>
+          )}
+        </div>
+        {list.length ? <p className="cc-field__hint">{t('grouping.levelList.removeHint')}</p> : null}
+      </section>
+    );
+  }
+  const keys = rows.map((r) => levelKey(r.label));
+  const valid = rows.length > 0 && keys.every((k) => k !== '') && new Set(keys).size === keys.length;
+  const move = (i: number, by: -1 | 1) => {
+    const next = [...rows];
+    const [row] = next.splice(i, 1);
+    const j = i + by;
+    next.splice(j, 0, row!);
+    // Keep the focus on the moved level: the same button, or the other one when it reached an end.
+    const side = by < 0 ? (j > 0 ? 'up' : 'down') : j < next.length - 1 ? 'down' : 'up';
+    focusAfterMove.current = `level-list-${side}-${row!.key}`;
+    setRows(next);
+  };
+  return (
+    <section className="cc-card cc-stack" aria-labelledby="cc-level-list" data-testid="level-list">
+      <h2 id="cc-level-list" className="cc-h2">
+        {t('grouping.levelList.title')}
+      </h2>
+      <p className="cc-muted">{t('grouping.levelList.lowestFirst')}</p>
+      <ol className="cc-stack">
+        {rows.map((r, i) => (
+          <li key={r.key} className="cc-row" data-testid="level-list-row">
+            <TextField label={t('grouping.levelList.item', { n: i + 1 })} value={r.label} maxLength={40} onChange={(v) => setRows(rows.map((x) => (x.key === r.key ? { ...x, label: v } : x)))} />
+            <Button size="small" id={`level-list-up-${r.key}`} aria-label={t('grouping.levelList.moveUp', { n: i + 1 })} isDisabled={i === 0} onPress={() => move(i, -1)}>
+              <IconChevronUp />
+            </Button>
+            <Button size="small" id={`level-list-down-${r.key}`} aria-label={t('grouping.levelList.moveDown', { n: i + 1 })} isDisabled={i === rows.length - 1} onPress={() => move(i, 1)}>
+              <IconChevronDown />
+            </Button>
+            <Button size="small" aria-label={t('grouping.levelList.removeItem', { n: i + 1 })} onPress={() => setRows(rows.filter((x) => x.key !== r.key))}>
+              <IconX />
+            </Button>
+          </li>
+        ))}
+      </ol>
+      <div>
+        <Button isDisabled={rows.length >= MAX_LEVEL_LIST} onPress={() => setRows([...rows, ...toRows([''])])}>
+          <IconPlus />
+          {t('grouping.levelList.add')}
+        </Button>
+      </div>
+      {!valid ? <p className="cc-field__hint">{t('grouping.levelList.needNames')}</p> : null}
+      <div className="cc-row">
+        <Button onPress={() => setRows(null)}>{t('common.cancel')}</Button>
+        <Button variant="primary" isDisabled={!valid} onPress={() => save(rows.map((r) => r.label.trim()), t('grouping.levelList.saved'))}>
+          {t('grouping.levelList.saveList')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/** Levels in use that are not in the list (D-187): kept and ranked after it, or changed to a level from the list. */
+function NotInList({ contextId, list, students }: { contextId: string; list: readonly string[]; students: readonly Student[] }) {
+  const { t } = useI18n();
+  const run = useRun();
+  const [target, setTarget] = useState<Record<string, string>>({});
+  const others = levelOrder(
+    students.map((s) => s.level),
+    list,
+  ).others;
+  if (!list.length || !others.length) return null;
+  const holders = (level: string) => students.filter((s) => s.level?.trim() && levelKey(s.level) === levelKey(level));
+  return (
+    <section className="cc-card cc-stack" aria-labelledby="cc-not-in-list" data-testid="levels-not-in-list">
+      <h2 id="cc-not-in-list" className="cc-h2">
+        {t('grouping.notInList.title')}
+      </h2>
+      <p className="cc-muted">{t('grouping.notInList.intro')}</p>
+      <ul className="cc-stack">
+        {others.map((level) => (
+          <li key={level} className="cc-row" style={{ alignItems: 'flex-end' }}>
+            <span>{t('grouping.notInList.students', { level, count: holders(level).length })}</span>
+            <Select
+              label={t('grouping.notInList.changeTo', { level })}
+              items={[{ id: '', label: t('grouping.notInList.keep') }, ...list.map((l) => ({ id: l, label: l }))]}
+              value={target[level] ?? ''}
+              onChange={(v) => setTarget({ ...target, [level]: v })}
+            />
+            <Button
+              isDisabled={!target[level]}
+              onPress={() =>
+                void run(() => call(St.setContextLevels, { contextId, levels: holders(level).map((s) => ({ studentId: s.id, level: target[level]! })) }), { success: t('grouping.notInList.changed'), invalidate: [ALL] }).then(
+                  (r) => r && setTarget({ ...target, [level]: '' }),
+                )
+              }
+            >
+              {t('grouping.notInList.change', { level })}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function LevelsTab({ contextId }: { contextId: string }) {
   const { t } = useI18n();
   const run = useRun();
   const q = useQuery({ queryKey: overviewKey(contextId, false), queryFn: () => call(G.getGrouping, { contextId }) });
   const [draft, setDraft] = useState<Record<string, string>>({});
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
+  const list = q.data.levelList;
   const changed = q.data.students.filter((s) => draft[s.id] !== undefined && draft[s.id]!.trim() !== (s.level ?? ''));
-  // The order the solver will use for the levels as typed now (GRP-3), so it is never a surprise.
-  const order = orderedLevels(q.data.students.map((s) => draft[s.id] ?? s.level));
+  // The order the solver will use for the levels as typed or picked now (GRP-3, D-187), so it is never a surprise.
+  const order = levelOrder(
+    q.data.students.map((s) => draft[s.id] ?? s.level),
+    list,
+  );
+  // With a list, a level that matches an entry (case and accents ignored) shows as that entry.
+  const inList = (level: string) => list.find((l) => levelKey(l) === levelKey(level));
   return (
     <div className="cc-stack">
       <p className="cc-muted">{t('grouping.levelsIntro')}</p>
-      <p className="cc-muted">{t('grouping.levelsFormat')}</p>
-      {order.length ? (
-        <p data-testid="level-order">
-          {t('grouping.levelOrder', { order: order.join(' < ') })}
-        </p>
+      {list.length ? null : <p className="cc-muted">{t('grouping.levelsFormat')}</p>}
+      {list.length ? (
+        <div data-testid="level-order">
+          <p>{t('grouping.levelOrderList', { order: order.listed.join(' < ') })}</p>
+          {order.others.length ? <p>{t('grouping.levelOrderOthers', { order: order.others.join(' < ') })}</p> : null}
+        </div>
+      ) : order.others.length ? (
+        <p data-testid="level-order">{t('grouping.levelOrder', { order: order.others.join(' < ') })}</p>
       ) : null}
+      <LevelListEditor key={list.join('\n')} contextId={contextId} list={list} used={q.data.students.map((s) => s.level)} />
+      <NotInList contextId={contextId} list={list} students={q.data.students} />
       <ul className="cc-stack">
-        {q.data.students.map((s) => (
-          <li key={s.id} className="cc-row">
-            <TextField label={t('grouping.levelFor', { name: s.fullName })} value={draft[s.id] ?? s.level ?? ''} onChange={(v) => setDraft({ ...draft, [s.id]: v })} />
-            {/* The name is the field's label here, so statistics have their own button (D-154). */}
-            <StudentStatsButton id={s.id} name={s.fullName} contextId={contextId} />
-          </li>
-        ))}
+        {q.data.students.map((s) => {
+          const value = draft[s.id] ?? s.level ?? '';
+          const picked = value.trim() ? (inList(value) ?? value) : '';
+          return (
+            <li key={s.id} className="cc-row">
+              {list.length ? (
+                <Select
+                  label={t('grouping.levelFor', { name: s.fullName })}
+                  items={[
+                    { id: '', label: t('grouping.noLevel') },
+                    ...list.map((l) => ({ id: l, label: l })),
+                    ...(picked && !inList(picked) ? [{ id: picked, label: t('grouping.levelNotInList', { level: picked }) }] : []),
+                  ]}
+                  value={picked}
+                  onChange={(v) => setDraft({ ...draft, [s.id]: v })}
+                />
+              ) : (
+                <TextField label={t('grouping.levelFor', { name: s.fullName })} value={value} onChange={(v) => setDraft({ ...draft, [s.id]: v })} />
+              )}
+              {/* The name is the field's label here, so statistics have their own button (D-154). */}
+              <StudentStatsButton id={s.id} name={s.fullName} contextId={contextId} />
+            </li>
+          );
+        })}
       </ul>
       <div>
         <Button

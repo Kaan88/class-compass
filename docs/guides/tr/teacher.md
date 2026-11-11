@@ -177,6 +177,15 @@ Ders araçları satırındaki **Gruplar**'a basın (Gruplar panonuzda bir kutuys
 
 Seviyeler, eşleşme kuralları ("birlikte çalışmalı / çalışmamalı") ve notları sınıf ekranında **hiçbir zaman** gösterilmez. Bunları **Gruplar** sayfasında (**Düzenler**, **Seviyeler**, **Eşleşme kuralları** sekmeleri) yönetirsiniz. Sınıf ayarlarında grup ekranında öğrenci adlarının büyük harfle gösterilmesini seçebilirsiniz.
 
+**Seviyeler** sekmesi: her öğrencinin seviyesini yazın ve **Kaydet**'e basın. Sayılar, A1 ve B1 gibi kodlar ve alışılmış sözcükler (Başlangıç … İleri, Beginner … Advanced) gerçek sıralarına konur; diğer sözcükler bunlardan sonra alfabetik sırayla gelir. **Kullanılan sıra** satırı seviye gruplarının kullanacağı sırayı gösterir.
+
+**Seviye listesi** (isteğe bağlı) kendi sözcüklerinizi ve sıralarını seçmenizi sağlar, örneğin Başlıyor, Gelişiyor, Güçlü, Yıldız:
+
+- **Şu an kullanılan seviyelerden liste yap**, öğrencilerinizin şu anki seviyeleriyle, bugün kullanılan sırayla başlar. **Boş bir liste başlat** sıfırdan başlar.
+- Her satıra bir seviye yazın, en düşük en üstte. Sırayı yukarı ve aşağı oklarla değiştirin; **Seviye ekle** yeni bir satır ekler, çarpı işareti bir satırı kaldırır. Sonra **Listeyi kaydet**'e basın.
+- Liste varken her öğrencinin seviyesi listeden seçilir (ya da **Seviye yok**). Listede olmayan bir seviye silinmez, "(listede yok)" diye gösterilir; seviye grupları bu seviyeleri listeden sonraya koyar. **Listede olmayan seviyeler** bölümünde o seviyedeki bütün öğrencileri listedeki bir seviyeye çevirebilirsiniz.
+- Liste sınıfa ve derse aittir; o sınıfın o dersine giren her öğretmen aynı listeyi görür. Listeyi değiştirmek var olan grupları değiştirmez: listeyi kullanmak için **Yeni gruplar oluştur**'a (ya da grup ekranında **Karıştır**'a) basın. **Listeyi kaldır** seviyeleri yeniden yazılır hâle getirir; hiçbir öğrencinin seviyesi değişmez.
+
 **Grupları düzenle** (Düzenler sekmesi) grupları yan yana gösterir. Bir adı başka bir gruba ya da **Grupta değil** bölümüne sürükleyin veya bir ada, sonra gruptaki **Buraya taşı** düğmesine dokunun. **Kaydet**'e basana kadar hiçbir şey kaydedilmez. Her grubun altındaki **Grup adı ve görevler** grubun İngilizce ve Türkçe adını ve isteğe bağlı görevleri içerir.
 
 ### Günün Yardımcısı

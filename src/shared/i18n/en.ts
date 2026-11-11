@@ -154,6 +154,7 @@ export const en = {
   'error.NOT_WEEK_START': 'Choose the first day of a week.',
   'error.VERSION_CONFLICT': 'Someone changed this in the meantime. Reload and try again.',
   'error.STUDENT_IN_TWO_GROUPS': 'A student can be in only one group.',
+  'error.DUPLICATE_LEVEL': 'A level is in the list twice.',
   'error.GROUPS_REQUIRED': 'Add at least one group.',
   'error.SAME_STUDENT': 'Choose two different students.',
   'error.RULE_EXISTS': 'There is already a rule for these two students.',

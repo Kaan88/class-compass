@@ -147,6 +147,7 @@ export const tr = {
   'error.NOT_WEEK_START': 'Haftanın ilk gününü seçin.',
   'error.VERSION_CONFLICT': 'Bu öğe bu arada değiştirildi. Yenileyip tekrar deneyin.',
   'error.STUDENT_IN_TWO_GROUPS': 'Bir öğrenci yalnızca bir grupta olabilir.',
+  'error.DUPLICATE_LEVEL': 'Bir seviye listede iki kez geçiyor.',
   'error.GROUPS_REQUIRED': 'En az bir grup ekleyin.',
   'error.SAME_STUDENT': 'İki farklı öğrenci seçin.',
   'error.RULE_EXISTS': 'Bu iki öğrenci için zaten bir kural var.',
