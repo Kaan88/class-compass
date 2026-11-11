@@ -189,6 +189,26 @@ describe('the classroom on a closure day (LES-1, AST-1, D-186)', () => {
     for (const row of asst.tables.find((t) => t.key === 'students')!.rows) expect(row.cells[1]).not.toEqual({ t: 'n', v: 1, d: 1 });
   });
 
+  it('closures on the first and the last school day of an announced week hide both planned assistants alike (AST-1, D-186, review fix)', async () => {
+    await lessonState(s.teacherA, s.ctxA.id); // makes this week's plan
+    await ok(s.teacherA.post(`/api/teacher/contexts/${s.ctxA.id}/assistant/plan/announce`, { weekStart: '2026-11-09' }));
+    const planned = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/assistant/plan?weekStart=2026-11-09`));
+    expect(planned.days.map((d: { date: string }) => d.date)).toEqual(['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13']);
+    expect(planned.days.find((d: { date: string }) => d.date === '2026-11-13').planned).not.toBeNull();
+    await ok(addClosure({ name: { en: 'Teacher training day' }, startsOn: '2026-11-09', endsOn: '2026-11-09' }));
+    await ok(addClosure({ name: { en: 'Snow day' }, startsOn: '2026-11-13', endsOn: '2026-11-13' }));
+    const week = await ok(s.teacherA.get(`/api/classroom/contexts/${s.ctxA.id}/assistant/week?weekStart=2026-11-09`));
+    expect(week.announced).toBe(true);
+    expect(week.days.map((d: { date: string }) => d.date)).toEqual(['2026-11-10', '2026-11-11', '2026-11-12']);
+    const plan = await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/assistant/plan?weekStart=2026-11-09`));
+    expect(plan.days.map((d: { date: string }) => d.date)).toEqual(['2026-11-10', '2026-11-11', '2026-11-12']);
+    expect((await lessonState(s.teacherA, s.ctxA.id)).assistant).toMatchObject({ schoolDay: false, assistant: null });
+    // A week of only closures shows nobody, not even on its first day.
+    await ok(addClosure({ name: { en: 'Autumn break' }, startsOn: '2026-11-10', endsOn: '2026-11-12' }));
+    expect((await ok(s.teacherA.get(`/api/classroom/contexts/${s.ctxA.id}/assistant/week?weekStart=2026-11-09`))).days).toEqual([]);
+    expect((await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/assistant/plan?weekStart=2026-11-09`))).days).toEqual([]);
+  });
+
   it('a closure added for today changes the polled ETag', async () => {
     const first = await s.teacherA.get(`/api/classroom/contexts/${s.ctxA.id}/lesson`);
     expect(first.body.today.closure).toBeNull();

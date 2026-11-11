@@ -495,14 +495,18 @@ function weekOf(ctx: RequestContext, context: ContextRow, cls: ClassRow, weekSta
   if (weekStart && ws !== weekStart) throw invalid('Not the first day of a week', { reason: 'NOT_WEEK_START' });
   const year = getYear(ctx.db, cls.schoolYearId);
   const schoolDays = schoolDaysOf(ctx.db, context.id);
-  const dates = weekDates(ws, schoolDays, year.startsOn, year.endsOn, closedDatesOfYear(ctx.db, year.id));
+  const closed = closedDatesOfYear(ctx.db, year.id);
+  const dates = weekDates(ws, schoolDays, year.startsOn, year.endsOn, closed);
+  // The whole calendar week, so a closure at its start and one at its end are treated the same (S25 review
+  // fix, D-186): an assignment planned before its day became a closure stays in the table but is never shown.
   const rows = ctx.db
     .select()
     .from(assistantAssignments)
-    .where(and(eq(assistantAssignments.contextId, context.id), gte(assistantAssignments.localDate, ws), lte(assistantAssignments.localDate, dates[dates.length - 1] ?? ws)))
-    .all();
+    .where(and(eq(assistantAssignments.contextId, context.id), gte(assistantAssignments.localDate, ws), lte(assistantAssignments.localDate, addDays(ws, 6))))
+    .all()
+    .filter((r) => !closed.has(r.localDate));
   const byDate = new Map(rows.map((r) => [r.localDate, r]));
-  // A day that stopped being a school day but already has an assignment stays visible.
+  // A day that stopped being a school day (not a closure) but already has an assignment stays visible.
   const all = [...new Set([...dates, ...rows.map((r) => r.localDate)])].sort();
   return { today, weekStart: ws, schoolDays, dates: all, byDate, plan: getPlan(ctx.db, context.id, ws) ?? null };
 }
