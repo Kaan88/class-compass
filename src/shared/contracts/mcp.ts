@@ -5,7 +5,7 @@
  * revoke every token (never a secret) and set the switches on Admin → AI tools (audited).
  */
 import { z } from 'zod';
-import { AI_PRIVACY_MODES, MCP_SCOPES, MCP_TOKEN_MAX_DAYS, MCP_TOKEN_NAME_MAX } from '../mcp.ts';
+import { AI_APPS, AI_PRIVACY_MODES, MCP_SCOPES, MCP_TOKEN_MAX_DAYS, MCP_TOKEN_NAME_MAX } from '../mcp.ts';
 import { endpoint, Empty, Ok } from './define.ts';
 import { Id } from './school.ts';
 
@@ -101,6 +101,45 @@ export const createAiToken = endpoint({
 });
 export const revokeAiToken = endpoint({ method: 'POST', path: '/api/account/ai-tools/tokens/:tokenId/revoke', access: 'account', input: z.object({ tokenId: Id }), output: Ok });
 
+// ---------------------------------------------------------------- "Connect an AI app" (S19c, D-181)
+/**
+ * The last successful call of one app for this account, from the call log (`mcp_calls`: method, time,
+ * outcome; never arguments or results) joined with the token or connection that made it. `name` is the
+ * connection's app name (the app's own, untrusted text) or the personal token's name.
+ */
+export const AiAppCall = z.object({
+  at: z.number(),
+  /** The tool's name (`list_my_classes`), our own vocabulary. */
+  tool: z.string(),
+  via: z.enum(['connection', 'token']),
+  name: z.string(),
+  /** The connection or token still works (not ended, expired or revoked). */
+  live: z.boolean(),
+});
+export type AiAppCall = z.infer<typeof AiAppCall>;
+export const AiAppStatus = z.object({
+  app: z.enum(AI_APPS),
+  /** The return host this app's sign-in needs (null: none). */
+  returnHost: z.string().nullable(),
+  /** The administrator has allowed that host (true when none is needed). */
+  returnHostAllowed: z.boolean(),
+  /** The last successful tool call from this app (null: none in the call log, which is kept 180 days). */
+  lastToolCall: AiAppCall.nullable(),
+  /** The last successful request of any kind (connecting, listing tools), to tell "connected, no tool used yet". */
+  lastSeenAt: z.number().nullable(),
+});
+export type AiAppStatus = z.infer<typeof AiAppStatus>;
+export const AiToolsSetup = z.object({
+  enabled: z.boolean(),
+  studentDataAllowed: z.boolean(),
+  /** `<PUBLIC_ORIGIN>/mcp`, from the server's configuration. */
+  url: z.string(),
+  apps: z.array(AiAppStatus),
+});
+export type AiToolsSetup = z.infer<typeof AiToolsSetup>;
+/** Profile → AI tools → "Connect an AI app" and its "Check connection" (`account`: PIN-gated in classroom mode). */
+export const aiToolsSetup = endpoint({ method: 'GET', path: '/api/account/ai-tools/setup', access: 'account', input: Empty, output: AiToolsSetup });
+
 // ---------------------------------------------------------------- administrators
 /** Typed to switch on "student data to AI tools" (D-161). */
 export const AI_STUDENT_DATA_CONFIRM = 'STUDENT DATA';
@@ -121,6 +160,8 @@ export const AiToolsAdmin = z.object({
   redirectHosts: z.array(z.string()),
   /** Calls in the last 7 days (counts only; arguments are never logged). */
   calls: z.object({ total: z.number().int(), errors: z.number().int(), denied: z.number().int() }),
+  /** The last successful tool call by anyone at the school (S19c setup checklist: "a first call worked"). */
+  lastToolCallAt: z.number().nullable(),
 });
 export type AiToolsAdmin = z.infer<typeof AiToolsAdmin>;
 

@@ -27,6 +27,7 @@ import { newId, randomToken, tokenHash } from '../../lib/crypto.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { assertReauth } from '../auth/service.ts';
 import { getSchoolSettings } from '../school/policy.ts';
+import { lastSchoolToolCall } from './calls.ts';
 import { accountConnections, adminConnections, clampGrants, clientViews, grantLive, redirectHosts, revokeAllOAuth } from './oauth/store.ts';
 
 type TokenRow = typeof mcpTokens.$inferSelect;
@@ -177,6 +178,7 @@ export function adminView(ctx: RequestContext): z.infer<typeof C.AiToolsAdmin> {
     connections: adminConnections(ctx.db, now, cap),
     clients: clientViews(ctx.db, now),
     redirectHosts: redirectHosts(ctx.db),
+    lastToolCallAt: lastSchoolToolCall(ctx.db),
   };
 }
 

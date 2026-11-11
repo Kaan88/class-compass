@@ -151,3 +151,27 @@ export const OAUTH_HOST_PATTERN = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a
 export const MCP_RATE_PER_MINUTE = 120;
 /** Largest tool result (serialised); longer results are cut with a note. */
 export const MCP_RESULT_MAX_BYTES = 256 * 1024;
+
+/**
+ * "Connect an AI app" (S19c, D-181): the guided setup on Profile → AI tools. The apps a teacher can
+ * choose; `other` is any MCP client (Cursor, MCP Inspector, …).
+ */
+export const AI_APPS = ['chatgpt', 'claude', 'claude-code', 'other'] as const;
+export type AiApp = (typeof AI_APPS)[number];
+/**
+ * The OAuth return host each app's documentation names (checked 2026-11-11, D-181): ChatGPT returns to
+ * `https://chatgpt.com/connector_platform_oauth_redirect` (or `/connector/oauth/{callback_id}` on the
+ * same host); claude.ai, Claude Desktop and Claude Code's published client identity use `claude.ai`
+ * (`https://claude.ai/api/mcp/auth_callback`, `https://claude.ai/oauth/claude-code-client-metadata`).
+ * The admin checklist adds them in one click; adding stays the administrator's decision.
+ */
+export const AI_APP_RETURN_HOSTS = { chatgpt: 'chatgpt.com', claude: 'claude.ai' } as const;
+export type AiReturnHostApp = keyof typeof AI_APP_RETURN_HOSTS;
+/** The return host an app's sign-in needs on the allow-list (Claude Code signs in with Claude's published identity on claude.ai), or null. */
+export function returnHostFor(app: AiApp): string | null {
+  if (app === 'chatgpt') return AI_APP_RETURN_HOSTS.chatgpt;
+  if (app === 'claude' || app === 'claude-code') return AI_APP_RETURN_HOSTS.claude;
+  return null;
+}
+/** The name Claude Code commands use for the server (`claude mcp add … class-compass <url>`). */
+export const MCP_SERVER_NAME = 'class-compass';

@@ -3,15 +3,17 @@
  * personal tokens for the `/mcp` endpoint, and the administrator's Admin → AI tools page (the two
  * switches, the longest token lifetime, every token, call counts). Both are behind the PIN gate; making
  * a token also asks for the password (or a fresh email sign-in). The secret is shown once.
+ *
+ * S19c (D-181): the Profile section opens with "Connect an AI app" (`AiConnect.tsx`); tokens and
+ * connected apps are under "Advanced", open from the start while the account has a working one.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as M from '../../shared/contracts/mcp.ts';
 import * as O from '../../shared/contracts/oauth.ts';
 import { READ_SCOPES, type AiPrivacyMode, type McpScope } from '../../shared/mcp.ts';
 import { call } from '../lib/api.ts';
-import { copyText, showManualCopy } from '../lib/clipboard.ts';
 import { errorText } from '../lib/errors.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import type { Me } from '../lib/session.ts';
@@ -21,8 +23,9 @@ import { DialogActions, Modal } from '../ui/Dialog.tsx';
 import { Alert } from '../ui/Feedback.tsx';
 import { Select, TextField } from '../ui/Fields.tsx';
 import { InlineConfirmButton } from '../ui/InlineConfirm.tsx';
-import { IconCheck, IconCopy, IconPlus } from '../ui/icons.tsx';
+import { IconPlus } from '../ui/icons.tsx';
 import { DataTable } from '../ui/Layout.tsx';
+import { AI_SETUP_KEY, AiToolsOff, claudeCodeCommands, ConnectAiApp, CopyButton } from './AiConnect.tsx';
 
 export const AI_ACCOUNT_KEY = ['sensitive', 'ai-tools', 'account'] as const;
 export const AI_ADMIN_KEY = ['sensitive', 'ai-tools', 'admin'] as const;
@@ -33,28 +36,10 @@ export function useDateFormat() {
   return new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { dateStyle: 'medium' });
 }
 
-/** A copy button that falls back to showing the text for copying by hand (D-140). */
-function CopyButton({ text, label, testId }: { text: string; label: string; testId?: string }) {
-  const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      data-testid={testId}
-      onPress={async () => {
-        if (await copyText(text)) setCopied(true);
-        else showManualCopy({ title: label, label, text });
-      }}
-    >
-      {copied ? <IconCheck /> : <IconCopy />}
-      {copied ? t('users.copied') : label}
-    </Button>
-  );
-}
-
 /** The secret of a new token, shown exactly once. */
 function SecretDialog({ value, url, onClose }: { value: { secret: string; name: string } | null; url: string; onClose: () => void }) {
   const { t } = useI18n();
-  const command = value ? `claude mcp add --transport http class-compass ${url} --header "Authorization: Bearer ${value.secret}"` : '';
+  const command = value ? `${claudeCodeCommands(url).signIn} --header "Authorization: Bearer ${value.secret}"` : '';
   return (
     <Modal isOpen={value !== null} onOpenChange={(open) => !open && onClose()} title={t('aiTools.secretTitle')} dismissable={false} testId="ai-secret-dialog">
       <Alert kind="warning">{t('aiTools.secretOnce', { name: value?.name ?? '' })}</Alert>
@@ -216,7 +201,17 @@ export function AiToolsSection({ me }: { me: Me }) {
   const q = useQuery({ queryKey: AI_ACCOUNT_KEY, queryFn: () => call(M.aiToolsAccount, {}) });
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState<{ secret: string; name: string } | null>(null);
+  // "Advanced" (S19c): open from the start while the account has a working token or connected app; then the person decides.
+  const advancedRef = useRef<HTMLDetailsElement>(null);
+  const advancedOpened = useRef(false);
   const data = q.data;
+  const hasLive = !!data && (data.tokens.some((x) => x.status === 'active') || data.connections.some((x) => x.status === 'active'));
+  // Opened once, the first time the data says so; the fold is never closed or reopened by the app afterwards.
+  useEffect(() => {
+    if (!hasLive || advancedOpened.current || !advancedRef.current) return;
+    advancedOpened.current = true;
+    advancedRef.current.open = true;
+  }, [hasLive]);
   return (
     <section className="cc-card cc-stack" aria-labelledby="ai-tools-title" data-testid="ai-tools">
       <h2 id="ai-tools-title" className="cc-h2">
@@ -224,11 +219,13 @@ export function AiToolsSection({ me }: { me: Me }) {
       </h2>
       {q.error ? <Alert>{errorText(t, q.error)}</Alert> : null}
       {!data ? null : !data.enabled ? (
-        <p className="cc-muted">{t('aiTools.off')}</p>
+        <AiToolsOff admin={me.role === 'admin'} />
       ) : (
         <>
+          <ConnectAiApp me={me} onMakeToken={() => setCreating(true)} />
+          <details className="cc-disclosure cc-stack cc-ai-advanced" ref={advancedRef} data-testid="ai-advanced">
+            <summary>{t('aiConnect.advanced')}</summary>
           <p className="cc-muted">{t('aiTools.intro')}</p>
-          <Alert kind="warning">{data.studentDataAllowed ? t('aiTools.schoolAllowsNames') : t('aiTools.schoolPseudonymous')}</Alert>
           <div className="cc-stack">
             <span className="cc-field__label">{t('aiTools.address')}</span>
             <code className="cc-ai-url" data-testid="ai-url">
@@ -268,7 +265,7 @@ export function AiToolsSection({ me }: { me: Me }) {
                       message={t('aiTools.revokeConfirm', { name: r.name })}
                       confirmLabel={t('aiTools.revoke')}
                       cancelLabel={t('common.cancel')}
-                      onConfirm={() => void run(() => call(M.revokeAiToken, { tokenId: r.id }), { success: t('aiTools.revoked'), invalidate: [AI_ACCOUNT_KEY] })}
+                      onConfirm={() => void run(() => call(M.revokeAiToken, { tokenId: r.id }), { success: t('aiTools.revoked'), invalidate: [AI_ACCOUNT_KEY, AI_SETUP_KEY] })}
                     >
                       {t('aiTools.revoke')}
                     </InlineConfirmButton>
@@ -282,7 +279,8 @@ export function AiToolsSection({ me }: { me: Me }) {
           <p className="cc-muted" style={{ margin: 0 }}>
             {t('aiTools.connectionsIntro')}
           </p>
-          <ConnectionsTable rows={data.connections} onDisconnect={(r) => void run(() => call(O.revokeAiConnection, { connectionId: r.id }), { success: t('aiTools.disconnected'), invalidate: [AI_ACCOUNT_KEY] })} />
+          <ConnectionsTable rows={data.connections} onDisconnect={(r) => void run(() => call(O.revokeAiConnection, { connectionId: r.id }), { success: t('aiTools.disconnected'), invalidate: [AI_ACCOUNT_KEY, AI_SETUP_KEY] })} />
+          </details>
           <CreateTokenDialog isOpen={creating} onClose={() => setCreating(false)} me={me} data={data} onCreated={setSecret} />
           <SecretDialog value={secret} url={data.url} onClose={() => setSecret(null)} />
         </>

@@ -73,7 +73,11 @@ test('Profile → AI tools: PIN lock, password again, secret shown once, revoke'
     await expect(page.getByTestId('teacher-menu')).toBeVisible();
     await page.getByRole('link', { name: 'Profile and PIN' }).first().click();
     const section = page.getByTestId('ai-tools');
-    await expect(section.getByRole('heading', { name: 'AI tools' })).toBeVisible();
+    await expect(section.getByRole('heading', { name: 'AI tools', exact: true })).toBeVisible();
+    // S19c (D-181): "Connect an AI app" comes first; tokens are under Advanced.
+    await expect(section.getByRole('heading', { name: 'Connect an AI app' })).toBeVisible();
+    const advanced = section.getByTestId('ai-advanced');
+    if (!(await advanced.evaluate((d) => (d as HTMLDetailsElement).open))) await advanced.locator('summary').click();
     await expect(section.getByTestId('ai-url')).toContainText('/mcp');
 
     await section.getByRole('button', { name: 'New token' }).click();

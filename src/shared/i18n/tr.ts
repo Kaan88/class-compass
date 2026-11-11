@@ -3533,7 +3533,6 @@ export const tr = {
   'error.STUDENT_DATA_OFF': 'Okul, yapay zekâ araçlarına öğrenci adlarının gitmesine izin vermiyor. "Takma adlar"ı seçin.',
   'error.TOO_MANY_TOKENS': 'İzin verilen en fazla sayıda anahtarınız var. Önce artık kullanmadığınız birini iptal edin.',
   'aiTools.title': 'Yapay zekâ araçları',
-  'aiTools.off': 'Yöneticiniz bu okul için yapay zekâ araçlarını açmadı.',
   'aiTools.intro': 'Kişisel bir anahtar, bir yapay zekâ asistanının (örneğin Claude Code) Sınıf Pusulası’nı sizin adınıza kullanmasını sağlar: yalnızca sizin yetkilerinizle ve yalnızca seçtiğiniz bölümlerde. Her çağrı kaydedilir, her değişiklik denetim kaydında görünür. Anahtarı bir parola gibi saklayın.',
   'aiTools.schoolPseudonymous': 'Bu okulda yapay zekâ araçları öğrencileri yalnızca "Student 1", "Student 2" gibi takma adlarla görür; öğrencilerin yazdıklarını hiç görmez. Öğretmen metinlerinde uygulamanın tanıdığı adlar da değiştirilir, yine de yapay zekâ araçlarıyla kullanacağınız metinlere lütfen öğrenci adı yazmayın.',
   'aiTools.schoolAllowsNames': 'Yöneticiniz yapay zekâ araçlarına öğrenci adlarının gitmesine izin veriyor. Her anahtar için seçin: takma adlar (güvenli varsayılan) ya da adlar.',

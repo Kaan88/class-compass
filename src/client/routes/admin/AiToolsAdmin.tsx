@@ -1,11 +1,11 @@
 /** Admin → AI tools (S14h1, D-160, D-161): the two switches, the longest token lifetime, every token, call counts. */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import type { z } from 'zod';
 import * as M from '../../../shared/contracts/mcp.ts';
 import * as O from '../../../shared/contracts/oauth.ts';
-import { AI_NEVER_SHARED, AI_STUDENT_DATA_CATEGORIES, MCP_TOKEN_MAX_DAYS } from '../../../shared/mcp.ts';
+import { AI_APP_RETURN_HOSTS, AI_NEVER_SHARED, AI_STUDENT_DATA_CATEGORIES, MCP_TOKEN_MAX_DAYS, type AiReturnHostApp } from '../../../shared/mcp.ts';
 import { call } from '../../lib/api.ts';
 import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
@@ -16,7 +16,9 @@ import { Alert } from '../../ui/Feedback.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { Select, TextArea, Toggle } from '../../ui/Fields.tsx';
 import { InlineConfirmButton } from '../../ui/InlineConfirm.tsx';
+import { IconAlert, IconCheck, IconDot, IconPlus } from '../../ui/icons.tsx';
 import { DataTable } from '../../ui/Layout.tsx';
+import { AI_SETUP_KEY } from '../AiConnect.tsx';
 import { AI_ACCOUNT_KEY, AI_ADMIN_KEY, ConnectionsTable, DAY_CHOICES, statusText, useDateFormat } from '../AiTools.tsx';
 import { AiConnectionsAdminSection } from '../AiConnections.tsx';
 
@@ -45,7 +47,7 @@ function RedirectHosts({ hosts }: { hosts: string[] }) {
         className="cc-stack"
         onSubmit={(e) => {
           e.preventDefault();
-          void run(() => call(O.setOAuthRedirectHosts, { hosts: list }), { success: t('aiTools.admin.saved'), invalidate: [AI_ADMIN_KEY] });
+          void run(() => call(O.setOAuthRedirectHosts, { hosts: list }), { success: t('aiTools.admin.saved'), invalidate: [AI_ADMIN_KEY, AI_SETUP_KEY] });
         }}
       >
         <TextArea label={t('aiTools.admin.redirectHostsLabel')} description={t('aiTools.admin.redirectHostsHint')} value={text} onChange={setText} rows={4} />
@@ -55,6 +57,99 @@ function RedirectHosts({ hosts }: { hosts: string[] }) {
           </Button>
         </div>
       </form>
+    </section>
+  );
+}
+
+type CheckStatus = 'done' | 'todo' | 'info' | 'manual';
+
+/** A status shown as an icon and a word, never by colour alone. */
+function CheckBadge({ status }: { status: CheckStatus }) {
+  const { t } = useI18n();
+  return (
+    <span className={`cc-ai-badge cc-ai-badge--${status}`}>
+      {status === 'done' ? <IconCheck /> : status === 'todo' ? <IconDot /> : <IconAlert />}
+      {t(`aiTools.admin.check.status.${status}` as const)}
+    </span>
+  );
+}
+
+function CheckItem({ id, status, title, children }: { id: string; status: CheckStatus; title: string; children?: ReactNode }) {
+  return (
+    <li className="cc-ai-checklist__item" data-testid={`ai-check-${id}`} data-status={status}>
+      <div className="cc-ai-checklist__head">
+        <CheckBadge status={status} />
+        <span className="cc-ai-checklist__title">{title}</span>
+      </div>
+      {children ? <div className="cc-stack cc-ai-checklist__body">{children}</div> : null}
+    </li>
+  );
+}
+
+/**
+ * The setup checklist (S19c, D-181): AI tools on, the student data switch explained, the documented
+ * return hosts of Claude and ChatGPT with one-click add, the Cloudflare Access note and whether a first
+ * tool call has worked. Adding a host is the administrator's click; it is audited like any host change.
+ */
+function SetupChecklist({ data, onSwitchOn }: { data: M.AiToolsAdmin; onSwitchOn: () => void }) {
+  const { t, locale } = useI18n();
+  const run = useRun();
+  const fmt = new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+  const addHost = (host: string) =>
+    void run(() => call(O.setOAuthRedirectHosts, { hosts: [...data.redirectHosts.filter((h) => h !== host), host] }), { success: t('aiTools.admin.check.hostAdded', { host }), invalidate: [AI_ADMIN_KEY, AI_SETUP_KEY] });
+  const hostItem = (app: AiReturnHostApp) => {
+    const host = AI_APP_RETURN_HOSTS[app];
+    const ok = data.redirectHosts.includes(host);
+    return (
+      <CheckItem id={`host-${app}`} status={ok ? 'done' : 'todo'} title={t(`aiTools.admin.check.host.${app}` as const, { host })}>
+        <p style={{ margin: 0 }}>{t(`aiTools.admin.check.hostHint.${app}` as const, { host })}</p>
+        {ok ? null : (
+          <div>
+            <Button onPress={() => addHost(host)} data-testid={`ai-add-host-${app}`}>
+              <IconPlus />
+              {t('aiTools.admin.check.addHost', { host })}
+            </Button>
+          </div>
+        )}
+      </CheckItem>
+    );
+  };
+  return (
+    <section className="cc-card cc-stack" aria-labelledby="ai-checklist-title" data-testid="ai-checklist">
+      <h2 id="ai-checklist-title" className="cc-h2">
+        {t('aiTools.admin.check.title')}
+      </h2>
+      <p className="cc-muted" style={{ margin: 0 }}>
+        {t('aiTools.admin.check.intro')}
+      </p>
+      <ol className="cc-ai-checklist">
+        <CheckItem id="enabled" status={data.settings.mcpEnabled ? 'done' : 'todo'} title={t('aiTools.admin.check.enabled')}>
+          <p style={{ margin: 0 }}>{data.settings.mcpEnabled ? t('aiTools.admin.check.enabledOn') : t('aiTools.admin.check.enabledOff')}</p>
+          {data.settings.mcpEnabled ? null : (
+            <div>
+              <Button variant="primary" onPress={onSwitchOn} data-testid="ai-switch-on">
+                {t('aiTools.admin.check.switchOn')}
+              </Button>
+            </div>
+          )}
+        </CheckItem>
+        <CheckItem id="student-data" status="info" title={t('aiTools.admin.check.studentData')}>
+          <p style={{ margin: 0 }}>{data.settings.aiStudentDataAllowed ? t('aiTools.admin.check.studentDataOn') : t('aiTools.admin.check.studentDataOff')}</p>
+        </CheckItem>
+        {hostItem('claude')}
+        {hostItem('chatgpt')}
+        <CheckItem id="access" status="manual" title={t('aiTools.admin.check.access')}>
+          <p style={{ margin: 0 }}>{t('aiTools.admin.check.accessHint')}</p>
+          <div>
+            <Link to="/help" search={{ guide: 'ai-tools', lang: locale }} hash="cloudflare-access">
+              {t('aiTools.admin.check.accessLink')}
+            </Link>
+          </div>
+        </CheckItem>
+        <CheckItem id="first-call" status={data.lastToolCallAt ? 'done' : 'todo'} title={t('aiTools.admin.check.firstCall')}>
+          <p style={{ margin: 0 }}>{data.lastToolCallAt ? t('aiTools.admin.check.firstCallDone', { when: fmt.format(data.lastToolCallAt) }) : t('aiTools.admin.check.firstCallTodo')}</p>
+        </CheckItem>
+      </ol>
     </section>
   );
 }
@@ -109,7 +204,7 @@ export function AiToolsAdminPage() {
   const [confirming, setConfirming] = useState(false);
   const data = q.data;
   const save = (patch: z.input<typeof M.setAiToolsSettings.input>) =>
-    run(() => call(M.setAiToolsSettings, patch), { success: t('aiTools.admin.saved'), invalidate: [AI_ADMIN_KEY, AI_ACCOUNT_KEY] });
+    run(() => call(M.setAiToolsSettings, patch), { success: t('aiTools.admin.saved'), invalidate: [AI_ADMIN_KEY, AI_ACCOUNT_KEY, AI_SETUP_KEY] });
   return (
     <main className="cc-page cc-stack" data-testid="admin-ai-tools">
       <h1 className="cc-h1">{t('aiTools.admin.title')}</h1>
@@ -117,6 +212,7 @@ export function AiToolsAdminPage() {
       {q.error ? <Alert>{errorText(t, q.error)}</Alert> : null}
       {data ? (
         <>
+          <SetupChecklist data={data} onSwitchOn={() => void save({ mcpEnabled: true })} />
           <section className="cc-card cc-stack" aria-labelledby="ai-switches">
             <h2 id="ai-switches" className="cc-h2">
               {t('aiTools.admin.switches')}

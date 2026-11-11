@@ -3,7 +3,7 @@
  * token, account, outcome, duration, response size) and never the arguments or the result. The rate
  * limit is a one-minute budget per token: every request costs 1, a tool its declared cost.
  */
-import { lt } from 'drizzle-orm';
+import { and, desc, eq, like, lt } from 'drizzle-orm';
 import { MCP_RATE_PER_MINUTE } from '../../../shared/mcp.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { mcpCalls } from '../../db/schema.ts';
@@ -76,4 +76,19 @@ export class RateLimiter {
     w.used += cost;
     return true;
   }
+}
+
+/** How the transport names a tool call in the log (`tools/call:<tool>`). */
+export const TOOL_CALL_PREFIX = 'tools/call:';
+
+/** The newest successful tool call at the school (S19c, D-181: the admin checklist's "a first call worked"). */
+export function lastSchoolToolCall(db: Db): number | null {
+  const row = db
+    .select({ at: mcpCalls.at })
+    .from(mcpCalls)
+    .where(and(eq(mcpCalls.status, 'ok'), like(mcpCalls.method, `${TOOL_CALL_PREFIX}%`)))
+    .orderBy(desc(mcpCalls.at))
+    .limit(1)
+    .get();
+  return row?.at ?? null;
 }

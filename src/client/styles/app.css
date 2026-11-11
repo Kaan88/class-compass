@@ -6739,6 +6739,201 @@ html[data-cursor='off'] * {
 .cc-ai-return {
   max-width: 40rem;
 }
+/* "Connect an AI app" (S19c, D-181): app picker, numbered steps, copyable values, a small flow diagram,
+   the connection check; the admin setup checklist with status badges (icon + word, never colour alone). */
+.cc-ai-apps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.cc-ai-apps > legend {
+  margin-bottom: 0.4rem;
+  padding: 0;
+}
+.cc-ai-app {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-height: var(--cc-touch);
+  min-width: 0;
+  padding: 0.6rem 0.8rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  cursor: pointer;
+}
+.cc-ai-app:has(input:checked) {
+  border: var(--cc-border-width-strong) solid var(--cc-accent-strong);
+  background: var(--cc-accent-soft);
+}
+.cc-ai-app input {
+  margin-top: 0.3rem;
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.cc-ai-app__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-ai-app__name {
+  font-weight: 700;
+}
+.cc-ai-app input:checked + .cc-ai-app__text .cc-ai-app__name {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.cc-ai-app__hint {
+  color: var(--cc-text-muted);
+  font-size: 0.9rem;
+}
+.cc-ai-panel {
+  border-top: var(--cc-border-width) solid var(--cc-border);
+  padding-top: 0.75rem;
+  min-width: 0;
+}
+.cc-ai-subhead {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.cc-ai-steps {
+  margin: 0;
+  padding-inline-start: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow-wrap: anywhere;
+}
+.cc-ai-steps > li {
+  min-width: 0;
+}
+.cc-ai-copyable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.cc-ai-copyable .cc-ai-url {
+  display: block;
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--cc-radius-sm);
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+  background: var(--cc-surface-2);
+  color: var(--cc-text);
+}
+.cc-ai-flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem 1.6rem;
+}
+.cc-ai-flow__node {
+  position: relative;
+  flex: 1 1 9rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.7rem;
+  border: var(--cc-border-width) dashed var(--cc-border-strong);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface-2);
+  overflow-wrap: anywhere;
+}
+/* An arrow between the boxes (drawn, not a character, so screen readers read only the list). */
+.cc-ai-flow__node + .cc-ai-flow__node::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -1.15rem;
+  top: 50%;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-top: 0.18em solid var(--cc-text-muted);
+  border-inline-end: 0.18em solid var(--cc-text-muted);
+  transform: translateY(-50%) rotate(45deg);
+}
+[dir='rtl'] .cc-ai-flow__node + .cc-ai-flow__node::before {
+  transform: translateY(-50%) rotate(-135deg);
+}
+.cc-ai-flow__title {
+  font-weight: 700;
+}
+.cc-ai-flow__hint {
+  color: var(--cc-text-muted);
+  font-size: 0.9rem;
+}
+.cc-ai-check__result {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.cc-ai-advanced > summary {
+  font-size: 1.05rem;
+}
+.cc-ai-advanced[open] > summary {
+  margin-bottom: 0.5rem;
+}
+.cc-ai-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.cc-ai-checklist__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0.8rem;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-ai-checklist__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+}
+.cc-ai-checklist__title {
+  font-weight: 700;
+  min-width: 0;
+}
+.cc-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+  background: var(--cc-surface-2);
+  color: var(--cc-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cc-ai-badge--done {
+  background: var(--cc-success-soft);
+  border-color: var(--cc-success);
+}
+.cc-ai-badge--todo {
+  background: var(--cc-warning-soft);
+  border-color: var(--cc-warning);
+}
 /* OAuth consent page (S14h2, D-160): the app's own name as plain text, the return host prominent. */
 .cc-oauth {
   max-width: 40rem;

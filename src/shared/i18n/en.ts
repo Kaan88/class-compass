@@ -3535,7 +3535,6 @@ export const en = {
   'error.STUDENT_DATA_OFF': 'The school does not allow student names for AI tools. Choose "Pseudonyms".',
   'error.TOO_MANY_TOKENS': 'You already have the most tokens allowed. Revoke one you no longer use first.',
   'aiTools.title': 'AI tools',
-  'aiTools.off': 'Your administrator has not switched on AI tools for this school.',
   'aiTools.intro': 'A personal token lets an AI assistant (for example Claude Code) use Class Compass for you, with exactly your own permissions and only the parts you choose. Every call is logged and every change is in the audit log. Treat a token like a password.',
   'aiTools.schoolPseudonymous': 'At this school AI tools see students only as "Student 1", "Student 2" and so on, and nothing students wrote. Names the app recognises in teachers’ text are replaced too, but please do not write students’ names into text you use with AI tools.',
   'aiTools.schoolAllowsNames': 'Your administrator allows student names for AI tools. Choose per token: pseudonyms (the safe default) or names.',

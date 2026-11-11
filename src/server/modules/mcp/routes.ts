@@ -4,6 +4,7 @@ import * as O from '../../../shared/contracts/oauth.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route, setMcpResolver } from '../../lib/http.ts';
 import { accountView, adminRevoke, adminView, createToken, resolveBearer, revokeOwn, setSettings } from './tokens.ts';
+import { setupView } from './setup.ts';
 import { registerMcpTransport } from './transport.ts';
 import { adminDisconnect, adminRevokeClient, decide, disconnectOwn, requestView, setRedirectHosts } from './oauth/consent.ts';
 import { registerOAuthProtocol } from './oauth/protocol.ts';
@@ -12,6 +13,8 @@ export function registerMcpRoutes(app: FastifyInstance, deps: AppDeps) {
   setMcpResolver(resolveBearer);
   // Profile → AI tools: `account` access, so a locked classroom device answers 423 (the PIN cannot be bypassed).
   route(app, deps, C.aiToolsAccount, (ctx) => accountView(ctx));
+  // "Connect an AI app" (S19c, D-181): per app its return host and last successful call (from the call log, no new tracking).
+  route(app, deps, C.aiToolsSetup, (ctx) => setupView(ctx));
   // Rate-limited like the other password checks (re-authentication); at most MCP_TOKENS_PER_USER live tokens per account.
   route(app, deps, C.createAiToken, (ctx, input) => createToken(ctx, input), { rateLimit: { max: 30, timeWindow: '15 minutes' } });
   route(app, deps, C.revokeAiToken, (ctx, input) => revokeOwn(ctx, input.tokenId));
