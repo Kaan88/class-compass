@@ -2659,12 +2659,26 @@ html:has(.cc-classroom) {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .cc-dock__items[data-empty] {
-    display: none !important;
+  /* Marks the fit puts on the dock. Empty: no button fits beside "More" and End lesson, which share
+     the line. Compact: "More" draws only its count (its word stays in its
+     accessible name), so the first button fits beside it on a 360 px phone. */
+  .cc-dock[data-dock-empty]:not([data-expanded]) > .cc-dock__items {
+    display: none;
   }
-  .cc-dock__items[data-empty] ~ .cc-btn,
+  .cc-dock[data-dock-empty]:not([data-expanded]) > .cc-btn,
   .cc-page .cc-dock[data-expanded] > .cc-dock__end {
     flex: 1 1 auto;
+  }
+  .cc-dock[data-dock-compact]:not([data-expanded]) > .cc-dock__more > .cc-dock__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .cc-dock[data-dock-compact]:not([data-expanded]) > .cc-dock__more {
+    min-width: var(--cc-touch);
   }
   .cc-page .cc-dock > .cc-dock__end {
     white-space: nowrap;
@@ -2690,6 +2704,13 @@ html:has(.cc-classroom) {
   .cc-dock__spacer {
     display: none;
   }
+}
+/* While the dock folds (Dock.tsx, synchronously, never painted) its sizes are the sizes themselves,
+   never a step of a transition: the reduced-motion rule gives every property a tiny one, and a size
+   read in the middle of it is the old size (as for the card fit; S23b review). */
+.cc-dock[data-dock-measuring],
+.cc-dock[data-dock-measuring] * {
+  transition: none !important;
 }
 /* A dock panel opened full screen: a note only when the panel has nothing to show. */
 .cc-dock-view {

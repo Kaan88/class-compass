@@ -62,10 +62,32 @@ function itemBox(item: HTMLElement): DOMRect | null {
  * of the wrapping row, and hides the rest (`data-dock-overflow`: not drawn, inert). "More" is shown
  * only when something is hidden, and the fit is measured again with it in place. Plain DOM attributes
  * (React does not render them), so a fit never re-renders the dock's panels; only the count changes.
+ *
+ * When no button fits beside "More" and End lesson, "More" is measured once more in its compact form
+ * (`data-dock-compact` on the dock: only the count is drawn, its word stays in its accessible name),
+ * which keeps the first button in view on a 360 px phone (S23b review). When not even then, the empty
+ * line gives its width to those two (`data-dock-empty`). The fit measures with transitions off
+ * (`data-dock-measuring`): with reduced motion every property has a tiny transition, so End lesson
+ * read as still stretched right after the empty mark was removed, and a dock folded once at 320 px
+ * stayed fully folded at every wider width (S23b review).
  */
-function foldDock(row: HTMLElement, more: HTMLElement, phone: boolean, expanded: boolean): number {
+function foldDock(nav: HTMLElement, row: HTMLElement, more: HTMLElement, phone: boolean, expanded: boolean): number {
+  // Sizes read while a transition runs are its first step (the reduced-motion rule gives every
+  // property a tiny one): the fit measures with none (app.css) and its marks take effect at once.
+  nav.setAttribute('data-dock-measuring', '');
+  try {
+    return measureFold(nav, row, more, phone, expanded);
+  } finally {
+    // Laid out once more with the marks in place, so they are not transitioned to afterwards.
+    void nav.offsetWidth;
+    nav.removeAttribute('data-dock-measuring');
+  }
+}
+
+function measureFold(nav: HTMLElement, row: HTMLElement, more: HTMLElement, phone: boolean, expanded: boolean): number {
   const items = [...row.querySelectorAll<HTMLElement>(':scope > .cc-dock__item')];
-  row.removeAttribute('data-empty');
+  nav.removeAttribute('data-dock-empty');
+  nav.removeAttribute('data-dock-compact');
   for (const it of items) {
     it.removeAttribute('data-dock-overflow');
     it.inert = false;
@@ -95,13 +117,20 @@ function foldDock(row: HTMLElement, more: HTMLElement, phone: boolean, expanded:
     more.hidden = false;
     over = overflowing();
   }
+  if (over.length > 0 && over.length === drawn) {
+    nav.setAttribute('data-dock-compact', '');
+    over = overflowing();
+    if (over.length === drawn) {
+      // Not even the first button fits beside the compact "More" and End lesson (large text, a narrow
+      // phone): "More" keeps its word, and the empty line gives its width to those two.
+      nav.removeAttribute('data-dock-compact');
+      nav.setAttribute('data-dock-empty', '');
+    }
+  }
   for (const it of over) {
     it.setAttribute('data-dock-overflow', '');
     it.inert = true;
   }
-  // Not even the first button fits beside "More" and End lesson (large text on a narrow phone): the
-  // empty line gives its width to those two.
-  if (over.length > 0 && over.length === drawn) row.setAttribute('data-empty', '');
   return over.length;
 }
 
@@ -120,7 +149,7 @@ export function Dock({ items, context, lesson, onEnd }: { items: readonly BoxKey
     const end = nav?.querySelector<HTMLElement>('.cc-dock__end');
     if (!nav || !row || !more) return;
     const mq = typeof window.matchMedia === 'function' ? window.matchMedia(PHONE) : null;
-    const fit = () => setHidden(foldDock(row, more, mq?.matches ?? false, expanded));
+    const fit = () => setHidden(foldDock(nav, row, more, mq?.matches ?? false, expanded));
     fit();
     // Measured again when the dock's width or the size of its text changes (End lesson is always drawn,
     // so its size follows the text size), and when a panel's button appears or its label or badge

@@ -10,7 +10,7 @@
  * - on a phone the dock is one compact line (S23b, D-183: the buttons that fit whole, "More" with the
  *   count of the others, End lesson); no dock button is cut off, covered or drawn on another (every
  *   pair of drawn buttons checked by their boxes), each is at least var(--cc-touch) and a tap at its
- *   centre lands on it, folded or opened with "More", at 320, 375 and 414 px in English and Turkish
+ *   centre lands on it, folded or opened with "More", at 320, 360, 375 and 414 px in English and Turkish
  *   and at 375 px with 200 % text (the second test); axe clean;
  * - no frame corner sits on a control or on the class name (S17b review);
  * - the class tabs never break a word that fits on a line of the tab, and the "N more students
@@ -371,11 +371,13 @@ test('built-in themes remade: scenes, frames, ambient, dock (S17b, D-168)', asyn
 });
 
 /**
- * S23b (D-183): the phone dock in every theme (the three built-ins and Snow Day) at 320, 375 and 414 px
- * (812 px high), in English and Turkish (3-A switched to one language), and at 375 px with 200 % text:
- * folded it is one line ("More" counts the buttons it holds) and opened it shows every button; in
- * both, no pair of dock buttons intersects, each is whole and a tap at its centre lands on it
- * (`dockProblems`). Before the fix End lesson's box lay on Daily Assistant's at every width (the
+ * S23b (D-183): the phone dock in every theme (the three built-ins and Snow Day) at 320, 360, 375 and
+ * 414 px (812 px high), in English and Turkish (3-A switched to one language; Turkish with reduced
+ * motion), and at 375 px with 200 % text: folded it is one line ("More" counts the buttons it holds,
+ * and from 360 px with 100 % text at least the first panel button is in it) and opened it shows every
+ * button; in both, no pair of dock buttons intersects, each is whole and a tap at its centre lands on
+ * it (`dockProblems`). The widths are visited in turn on one page, so the fold must follow the width,
+ * not the widths before it (S23b review: with reduced motion a dock folded at 320 px stayed folded). Before the fix End lesson's box lay on Daily Assistant's at every width (the
  * scrolling row clipped Daily Assistant under it). The class's language and theme and the package are
  * put back in `finally`.
  */
@@ -407,6 +409,7 @@ test('phone dock: every button whole and on no other, folded and opened (S23b, D
 
     const cases = [
       { width: 320, scale: 1 },
+      { width: 360, scale: 1 },
       { width: 375, scale: 1 },
       { width: 414, scale: 1 },
       { width: 375, scale: 2 },
@@ -415,7 +418,7 @@ test('phone dock: every button whole and on no other, folded and opened (S23b, D
       expect((await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
       for (const theme of [...THEME_KEYS, SNOW_KEY]) {
         expect((await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { theme })).status).toBe(200);
-        const ctx = await browser.newContext({ viewport: { width: 320, height: 812 }, deviceScaleFactor: 2, hasTouch: true });
+        const ctx = await browser.newContext({ viewport: { width: 320, height: 812 }, deviceScaleFactor: 2, hasTouch: true, reducedMotion: lang === 'tr' ? 'reduce' : 'no-preference' });
         const page = await ctx.newPage();
         try {
           await login(page, 'english');
@@ -439,6 +442,14 @@ test('phone dock: every button whole and on no other, folded and opened (S23b, D
               expect(tops, `${what} folded lines`).toBe(1);
               expect((await dock.boundingBox())!.height, `${what} folded height`).toBeLessThan(812 * 0.15);
             }
+            // From 360 px (the most common Android width) the first panel button stays in the line
+            // (S23b review); "More" may then draw only its count, and keeps its word in its name.
+            if (c.scale === 1 && c.width >= 360) {
+              const inLine = await dock.locator('.cc-dock__item .cc-btn').evaluateAll((els) => els.filter((e) => e.getClientRects().length > 0).length);
+              expect(inLine, `${what} panel buttons in the folded line`).toBeGreaterThan(0);
+              await expect(dock.locator('.cc-dock__item').first().locator('.cc-btn').first(), `${what} first panel button`).toBeVisible();
+            }
+            if (await more.isVisible()) await expect(more, `${what} "More" name`).toHaveAccessibleName(lang === 'en' ? /^More \+\d+$/u : /^Diğer \+\d+$/u);
             await dock.screenshot({ path: `${shots}/dock-${lang}-${theme}-${c.width}-${c.scale}x.png` });
             if (!(await more.isVisible())) continue;
             await expect(more).toHaveAttribute('aria-expanded', 'false');
@@ -477,5 +488,70 @@ test('phone dock: every button whole and on no other, folded and opened (S23b, D
     if (ctx3a) await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { mainLanguage: ctx3a.mainLanguage, secondLanguageEnabled: ctx3a.secondLanguageEnabled, theme: ctx3a.theme });
     if ((await api(admin, 'GET', `/api/admin/themes/${SNOW_KEY}`)).status === 200) await api(admin, 'DELETE', `/api/admin/themes/${SNOW_KEY}`, { confirm: SNOW_KEY });
     await adminCtx.close();
+  }
+});
+
+/**
+ * S23b review (D-183): the folded phone dock follows its width, not its history. With reduced motion
+ * every property has a tiny transition, and the fit once read End lesson as still stretched: a dock
+ * folded fully at 320 px stayed fully folded at 360, 375 and 414 px. On one page with reduced motion
+ * the widths are visited 414 -> 320 -> 360 -> 414 -> 320 -> 375, and each fold must equal the fold of a
+ * fresh page at that width (and from 360 px keep a panel button in the line).
+ */
+test('phone dock: the fold follows the width with reduced motion (S23b review, D-183)', async ({ browser }) => {
+  test.setTimeout(180_000);
+  const teacherCtx = await browser.newContext();
+  const teacher = await teacherCtx.newPage();
+  try {
+    await login(teacher, 'english');
+    await ensurePin(teacher);
+    const ctx3a = ((await api(teacher, 'GET', '/api/teacher/contexts')).body.contexts as Ctx[]).find((c) => c.className === '3-A' && c.subjectName.en === 'English')!;
+    await endActiveLessons(teacher);
+    const started = await api(teacher, 'POST', '/api/commands', {
+      commands: [{ opId: randomUUID(), type: 'lesson.start', contextId: ctx3a.id, payload: { contextId: ctx3a.id, othersPresent: true, attendance: [] } }],
+    });
+    expect(started.body.results[0].ok).toBe(true);
+
+    const open = async (width: number) => {
+      const ctx = await browser.newContext({ viewport: { width, height: 812 }, deviceScaleFactor: 2, hasTouch: true, reducedMotion: 'reduce' });
+      const page = await ctx.newPage();
+      await login(page, 'english');
+      await page.goto('/classroom');
+      await page.getByRole('button', { name: /^3-A · /u }).first().click();
+      await expect(page.locator('.cc-student-card').first()).toBeVisible();
+      await expect(page.getByTestId('lesson-dock')).toBeVisible();
+      return { ctx, page };
+    };
+    const settle = (page: Page) =>
+      page.evaluate(() => document.fonts.ready.then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 300))))));
+    const folded = (page: Page) => page.locator('.cc-dock__item[data-dock-overflow]').count();
+    const inLine = (page: Page) => page.locator('.cc-dock__item .cc-btn').evaluateAll((els) => els.filter((e) => e.getClientRects().length > 0).length);
+
+    const widths = [414, 320, 360, 414, 320, 375];
+    const fresh = new Map<number, number>();
+    for (const w of new Set(widths)) {
+      const { ctx, page } = await open(w);
+      try {
+        await settle(page);
+        fresh.set(w, await folded(page));
+      } finally {
+        await ctx.close();
+      }
+    }
+    const { ctx, page } = await open(widths[0]!);
+    try {
+      for (const w of widths) {
+        await page.setViewportSize({ width: w, height: 812 });
+        await settle(page);
+        expect(await folded(page), `folded at ${w} px after resizing`).toBe(fresh.get(w));
+        if (w >= 360) expect(await inLine(page), `panel buttons in the line at ${w} px`).toBeGreaterThan(0);
+        expect(await dockProblems(page), `dock at ${w} px after resizing`).toEqual([]);
+      }
+    } finally {
+      await ctx.close();
+    }
+  } finally {
+    await endActiveLessons(teacher).catch(() => undefined);
+    await teacherCtx.close();
   }
 });
