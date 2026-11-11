@@ -9,7 +9,7 @@ import { sessionGate, type AgentEnv } from './agent.ts';
 import { RunRegistry } from './runs.ts';
 import { answerCall, cancelRun, checkChoice, sendMessage, statusView } from './service.ts';
 import { adminView, setAdmin } from './settings.ts';
-import { contextLabels, createChat, deleteChat, exportChats, listChats, loadChat, messageViews, messagesOf, summaryOf, updateChat } from './store.ts';
+import { CardLookup, createChat, deleteChat, exportChats, listChats, loadChat, messageViews, messagesOf, summaryOf, updateChat } from './store.ts';
 
 /** A message reaches the provider (and costs tokens): at most 30 a minute per address, besides the daily limit per teacher. */
 const SEND_LIMIT = { rateLimit: { max: 30, timeWindow: '1 minute' } };
@@ -39,7 +39,7 @@ export function registerAssistantChatRoutes(app: FastifyInstance, deps: AppDeps)
     const user = requireUser(ctx);
     const chat = loadChat(ctx, input.chatId);
     const p = assistantPrivacy(ctx.db, user, ctx.now());
-    return { chat: summaryOf(p, chat), messages: messageViews(p, contextLabels(ctx.db, user), messagesOf(ctx.db, chat.id)), runId: registry.activeFor(chat.id)?.id ?? null, compacted: chat.summarySeq > 0 };
+    return { chat: summaryOf(p, chat), messages: messageViews(p, new CardLookup(ctx.db, user, p), messagesOf(ctx.db, chat.id)), runId: registry.activeFor(chat.id)?.id ?? null, compacted: chat.summarySeq > 0 };
   });
   route(app, deps, C.updateAssistantChat, (ctx, input) => {
     const user = requireUser(ctx);

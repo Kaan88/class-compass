@@ -86,7 +86,7 @@ test('Assistant: a streamed answer with a read tool, one change confirmed, one r
     await page.getByTestId('assistant-send').click();
     const messages = page.getByTestId('assistant-messages');
     await expect(messages.getByText(/^You teach \d+ classes\. Nothing is due this week\.$/u)).toBeVisible();
-    await expect(messages.getByTestId('assistant-activity').first()).toHaveText('Looked at: list_my_classes');
+    await expect(messages.getByTestId('assistant-activity').first()).toHaveText('Looked at: Your classes');
     expect(seen[0]!.body.tools.map((t: { function: { name: string } }) => t.function.name)).toContain('create_homework');
     expect(await seriousViolations(page)).toEqual([]);
 
@@ -96,7 +96,10 @@ test('Assistant: a streamed answer with a read tool, one change confirmed, one r
     await page.getByTestId('assistant-send').click();
     const card = page.getByTestId('assistant-change-card').last();
     await expect(card).toHaveAttribute('data-state', 'pending');
-    await expect(card).toContainText('Change: create_homework');
+    await expect(card).toContainText('Change: New homework');
+    await expect(card).toContainText('Due on');
+    // The waiting card is brought into view (on a phone it would be screens below the header).
+    await expect(card).toBeInViewport();
     await expect(card).toContainText(SET_TITLE);
     expect(await seriousViolations(page)).toEqual([]);
     await card.getByTestId('assistant-card-yes').click();
@@ -135,6 +138,9 @@ test('Assistant: a streamed answer with a read tool, one change confirmed, one r
     await expect(page.getByTestId('assistant-chat-list')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(await seriousViolations(page)).toEqual([]);
+    // Continuing the chat on a phone brings its newest message into view, below the header.
+    await page.getByTestId('assistant-chat-list').locator('.cc-assistant__chat').first().click();
+    await expect(page.getByTestId('assistant-message-assistant').last()).toBeInViewport();
   } finally {
     // Leave nothing behind for later specs (one shared server and database).
     for (const id of madeHomework) await api(page, 'POST', `/api/teacher/homework/${id}/archive`, { archived: true });

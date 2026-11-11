@@ -20,6 +20,8 @@ export const ASSISTANT_MAX_CALLS_PER_ROUND = 10;
 export const ASSISTANT_RETENTION_DEFAULT_DAYS = 365;
 export const ASSISTANT_RETENTION_MIN_DAYS = 30;
 export const ASSISTANT_RETENTION_MAX_DAYS = 3650;
+/** A deactivated teacher's chats are deleted this many days after the deactivation (accounts are never deleted, D-180). */
+export const ASSISTANT_DEACTIVATED_GRACE_DAYS = 30;
 
 /** Why the chat cannot be used right now (the page explains each one). */
 export const ASSISTANT_UNAVAILABLE = ['OFF', 'AI_TOOLS_OFF', 'NO_CONNECTION'] as const;

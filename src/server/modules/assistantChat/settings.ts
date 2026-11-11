@@ -33,6 +33,26 @@ export function usableConnections(deps: Pick<AppDeps, 'db' | 'now' | 'config'>, 
     .sort((a, b) => Number(a.ownerUserId !== null) - Number(b.ownerUserId !== null) || a.createdAt - b.createdAt);
 }
 
+/**
+ * The connection and model a chat without its own choice uses: the school default while it can be used,
+ * else the first usable connection with its first model (the same answer the status gives the page, so
+ * what the picker shows is what a message uses). Null when nothing can be used.
+ */
+export function defaultChoice(deps: Pick<AppDeps, 'db' | 'now' | 'config'>, user: UserRow): { connectionId: string; model: string } | null {
+  const conns = usableConnections(deps, user);
+  const s = connectionSettings(deps.db);
+  const def = conns.find((c) => c.id === s.defaultConnectionId);
+  if (def) {
+    const model = s.defaultModel && def.modelsJson.some((m) => m.name === s.defaultModel) ? s.defaultModel : def.modelsJson[0]?.name;
+    if (model) return { connectionId: def.id, model };
+  }
+  for (const c of conns) {
+    const model = c.modelsJson[0]?.name;
+    if (model) return { connectionId: c.id, model };
+  }
+  return null;
+}
+
 /** Why the chat cannot be used now, or null. */
 export function unavailableReason(deps: Pick<AppDeps, 'db' | 'now' | 'config'>, user: UserRow): AssistantUnavailable | null {
   if (!assistantSettingsOf(deps.db).enabled) return 'OFF';

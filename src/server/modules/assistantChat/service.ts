@@ -9,37 +9,45 @@ import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/assistantChat.ts';
 import { tx } from '../../db/client.ts';
 import { assistantChats, assistantMessages, type AssistantToolCallJson } from '../../db/schema.ts';
-import { beginAssistantMessage, connectionForUse, connectionSettings } from '../aiConnections/service.ts';
-import { requireUser, type RequestContext } from '../../lib/context.ts';
+import { beginAssistantMessage, connectionForUse } from '../aiConnections/service.ts';
+import { requireUser, type RequestContext, type UserRow } from '../../lib/context.ts';
 import { AppError, conflict, notFound } from '../../lib/errors.ts';
 import { ASSISTANT_VIA, assistantPrivacy, assistantToolByName, runAssistantTool, type AssistantPrivacy } from '../mcp/assistant.ts';
 import { expirePending, runAgent, type AgentEnv } from './agent.ts';
 import type { Run } from './runs.ts';
-import { assertAvailable, assistantSettingsOf, unavailableReason, usableConnections } from './settings.ts';
+import { assertAvailable, assistantSettingsOf, defaultChoice, unavailableReason, usableConnections } from './settings.ts';
 import { appendMessage, loadChat, type ChatRow } from './store.ts';
 
 export function statusView(ctx: RequestContext): z.infer<typeof C.AssistantStatus> {
   const user = requireUser(ctx);
   const why = unavailableReason(ctx, user);
-  const s = connectionSettings(ctx.db);
   const conns = why === 'OFF' || why === 'AI_TOOLS_OFF' ? [] : usableConnections(ctx, user);
-  const def = conns.find((c) => c.id === s.defaultConnectionId);
+  // The same choice a message without its own uses (`choiceOf`), so the picker never shows one that fails.
+  const def = conns.length ? defaultChoice(ctx, user) : null;
   return {
     available: why === null,
     unavailable: why,
     studentNames: assistantPrivacy(ctx.db, user, ctx.now()).mode === 'named',
     connections: conns.map((c) => ({ id: c.id, name: c.name, type: c.type, scope: c.ownerUserId ? ('personal' as const) : ('school' as const), models: c.modelsJson.map((m) => ({ name: m.name, tools: m.tools })) })),
-    defaultConnectionId: def?.id ?? conns[0]?.id ?? null,
-    defaultModel: def ? s.defaultModel : (conns[0]?.modelsJson[0]?.name ?? null),
+    defaultConnectionId: def?.connectionId ?? null,
+    defaultModel: def?.model ?? null,
     retentionDays: assistantSettingsOf(ctx.db).retentionDays,
   };
 }
 
-/** The connection and model a chat uses: the request's choice, else the chat's, else the school default (checked by `connectionForUse`). */
-const choiceOf = (chat: ChatRow, input: { connectionId?: string | null | undefined; model?: string | null | undefined }) => ({
-  connectionId: input.connectionId !== undefined ? input.connectionId : chat.connectionId,
-  model: input.model !== undefined ? input.model : chat.model,
-});
+/**
+ * The connection and model a chat uses: the request's choice, else the chat's, else `defaultChoice` (the
+ * school default while it can be used, else the first usable connection: what the status shows). The
+ * result is checked again by `connectionForUse`.
+ */
+function choiceOf(ctx: RequestContext, user: UserRow, chat: ChatRow, input: { connectionId?: string | null | undefined; model?: string | null | undefined }) {
+  const connectionId = input.connectionId !== undefined ? input.connectionId : chat.connectionId;
+  const model = input.model !== undefined ? input.model : chat.model;
+  if (connectionId !== null) return { connectionId, model };
+  const def = defaultChoice(ctx, user);
+  if (!def) throw new AppError('FEATURE_DISABLED', 'No connection is set up', { reason: 'AI_NO_CONNECTION' });
+  return { connectionId: def.connectionId, model: model ?? def.model };
+}
 
 /** Checks a choice before it is stored on a chat (a connection the teacher may not use is a 404, a model not on it a 400). */
 export function checkChoice(ctx: RequestContext, connectionId: string | null, model: string | null) {
@@ -52,7 +60,7 @@ export function sendMessage(a: AgentEnv, ctx: RequestContext, input: z.infer<typ
   const chat = loadChat(ctx, input.chatId);
   assertAvailable(ctx, user);
   if (a.registry.activeFor(chat.id)) throw conflict('An answer is still being written', { reason: 'ASSISTANT_BUSY' });
-  const choice = choiceOf(chat, input);
+  const choice = choiceOf(ctx, user, chat, input);
   // Checks the connection and the model, the monthly budget and the daily message limit, and counts the message.
   const used = beginAssistantMessage(ctx, choice.connectionId, choice.model);
   const p = assistantPrivacy(ctx.db, user, ctx.now());
@@ -93,8 +101,11 @@ export async function answerCall(a: AgentEnv, ctx: RequestContext, input: z.infe
     const m = ctx.db.select().from(assistantMessages).where(eq(assistantMessages.id, input.messageId)).get();
     if (!m || m.chatId !== chat.id || m.role !== 'assistant') throw notFound('Message');
     const calls = m.toolCallsJson ?? [];
-    const c = calls.find((x) => x.id === input.callId);
+    const matches = calls.filter((x) => x.id === input.callId);
+    const c = matches[0];
     if (!c) throw notFound('Call');
+    // Ids are made unique when a reply is stored (runAgent); two calls with one id are never answered.
+    if (matches.length > 1) throw conflict('This card cannot be answered', { reason: 'ASSISTANT_ALREADY_ANSWERED' });
     if (c.state !== 'pending') throw conflict('This change was already answered', { reason: 'ASSISTANT_ALREADY_ANSWERED' });
     const next: AssistantToolCallJson[] = calls.map((x) => (x.id === c.id ? { ...x, state: input.approve ? 'approved' : 'declined', decidedAt: now } : x));
     ctx.db.update(assistantMessages).set({ toolCallsJson: next }).where(eq(assistantMessages.id, m.id)).run();
@@ -116,7 +127,8 @@ export async function answerCall(a: AgentEnv, ctx: RequestContext, input: z.infe
   // The model hears the outcome and goes on (no new message is counted; the budget is checked again).
   if (unavailableReason(ctx, user)) return { runId: null };
   const fresh = ctx.db.select().from(assistantChats).where(eq(assistantChats.id, chat.id)).get()!;
-  const used = connectionForUse(ctx, call.message.connectionId ?? fresh.connectionId, call.message.model ?? fresh.model);
+  const choice = choiceOf(ctx, user, fresh, { connectionId: call.message.connectionId ?? fresh.connectionId, model: call.message.model ?? fresh.model });
+  const used = connectionForUse(ctx, choice.connectionId, choice.model);
   const run = a.registry.start(chat.id, user.id, ctx.now());
   start(a, ctx, chat.id, run, used, p);
   return { runId: run.id };

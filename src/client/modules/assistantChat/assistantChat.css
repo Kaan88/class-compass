@@ -135,6 +135,17 @@
 .cc-assistant__changes dd {
   margin: 0;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+/* A list on a card (homework marks, a week's plan): every item, one per line, never cut. */
+.cc-assistant__items {
+  margin: 0.25rem 0 0;
+  padding-inline-start: 1.25rem;
+  white-space: normal;
+}
+/* An id that is not the teacher's own: said in words, marked with weight, not colour alone. */
+.cc-assistant__missing {
+  font-weight: 650;
 }
 .cc-assistant__decided {
   margin: 0;

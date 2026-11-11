@@ -15,11 +15,11 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { and, eq, isNull } from 'drizzle-orm';
-import { ASSISTANT_MAX_CALLS_PER_ROUND, ASSISTANT_MAX_ROUNDS } from '../../../shared/assistantChat.ts';
+import { ASSISTANT_MAX_CALLS_PER_ROUND, ASSISTANT_MAX_ROUNDS, PSEUDONYM_TEXT } from '../../../shared/assistantChat.ts';
 import { localDate } from '../../../domain/dates.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { assistantChats, assistantMessages, sessions, users, type AssistantToolCallJson } from '../../db/schema.ts';
-import type { ChatMessage, ToolCall } from '../aiConnections/adapters/types.ts';
+import { newCallId, type ChatMessage, type ToolCall } from '../aiConnections/adapters/types.ts';
 import { AiCallError } from '../aiConnections/http.ts';
 import { streamChat, type ConnectionRow } from '../aiConnections/provider.ts';
 import { connectionForUse, recordTokens } from '../aiConnections/service.ts';
@@ -27,11 +27,13 @@ import type { AppDeps, RequestContext, UserRow } from '../../lib/context.ts';
 import { AppError } from '../../lib/errors.ts';
 import { isPinUnlocked, SESSION_IDLE_MS } from '../../lib/http.ts';
 import { newId } from '../../lib/crypto.ts';
-import { ASSISTANT_VIA, assistantToolByName, assistantTools, runAssistantTool, toBrowser, toolSchema, type AssistantPrivacy } from '../mcp/assistant.ts';
+import { ASSISTANT_VIA, assistantMode, assistantToolByName, assistantTools, parseAssistantArgs, runAssistantTool, toBrowser, toolSchema, type AssistantPrivacy } from '../mcp/assistant.ts';
+import type { McpTool } from '../mcp/registry.ts';
 import type { ToolEnv } from '../mcp/toolkit.ts';
 import { getSchoolSettings } from '../school/policy.ts';
 import type { Run, RunRegistry } from './runs.ts';
-import { appendMessage, callView, contextLabels, historyFor, messagesOf, type ChatRow, type MessageRow } from './store.ts';
+import { unavailableReason } from './settings.ts';
+import { appendMessage, callView, CardLookup, historyFor, messagesOf, type ChatRow, type MessageRow } from './store.ts';
 
 /** When to summarise the earlier part of a chat (estimated tokens of the messages) and how much to keep as it is. Tests lower them. */
 export const ASSISTANT_TUNING = { compactAtTokens: 40_000, keepRecentTokens: 12_000 };
@@ -176,16 +178,73 @@ export function providerTextOf(p: AssistantPrivacy): (r: MessageRow) => string {
   };
 }
 
+/** What a tool call made with names carries once student data is switched off: its arguments are withheld. */
+export const WITHHELD_ARGUMENTS = { withheld: 'These arguments were written while the school shared student data, which is now switched off.' } as const;
+
+/**
+ * A stored message as the provider may get it now (`providerTextOf` for its text). The tool-call
+ * arguments of a message made with names (they can hold names in free text and student ids) are
+ * replaced by `WITHHELD_ARGUMENTS` once the school has switched student data off (D-161, D-180); the
+ * provider's signature of such a call is dropped with them.
+ */
+export function providerRowOf(p: AssistantPrivacy): (r: MessageRow) => MessageRow {
+  const text = providerTextOf(p);
+  return (r) => {
+    const content = text(r);
+    if (p.mode === 'named' || r.privacy === 'pseudonymous' || !r.toolCallsJson?.length) return { ...r, content };
+    return { ...r, content, toolCallsJson: r.toolCallsJson.map((c) => ({ id: c.id, ...(c.generatedId ? { generatedId: true as const } : {}), name: c.name, arguments: { ...WITHHELD_ARGUMENTS }, state: c.state })) };
+  };
+}
+
+/** "Student 4" or `student-4` anywhere in a text argument (not an id field) of a change. */
+const PSEUDONYM_ANYWHERE = new RegExp(PSEUDONYM_TEXT.source, 'u');
+const ID_KEY = /(?:^id|Id|Ids)$/u;
+/**
+ * Does a change call carry a pseudonym inside its free text (a homework title, feedback for a child)?
+ * Such a call is refused: the card shows text exactly as it would be written, and a stand-in name must
+ * never land on a child's page (whole-value aliases in id fields are resolved as usual).
+ */
+export function pseudonymInText(v: unknown, key = ''): boolean {
+  if (typeof v === 'string') return !ID_KEY.test(key) && PSEUDONYM_ANYWHERE.test(v);
+  if (Array.isArray(v)) return v.some((x) => pseudonymInText(x, key));
+  if (typeof v === 'object' && v !== null) return Object.entries(v).some(([k, x]) => pseudonymInText(x, k));
+  return false;
+}
+
+/**
+ * Why a call the model made is not run and gets no card (the model is told), or null. A change is
+ * checked against its tool's schema here, so a card only shows arguments that can run.
+ */
+function refusalOf(tool: McpTool | undefined, c: ToolCall, index: number, p: AssistantPrivacy): string | null {
+  if (!tool) return 'Not done: there is no such tool for this teacher.';
+  if (c.invalidArguments) return 'Not done: the arguments were not a JSON object.';
+  if (index >= ASSISTANT_MAX_CALLS_PER_ROUND) return 'Not done: too many tool calls in one reply.';
+  if (tool.readOnly) return null;
+  if (pseudonymInText(c.arguments)) return 'Not done: the text contains a stand-in name ("Student N" or student-N). Write it without student names or stand-ins; the teacher can add a name afterwards.';
+  const parsed = parseAssistantArgs(tool, c.arguments, p);
+  return parsed.ok ? null : parsed.content;
+}
+
+const UNAVAILABLE_REASON = { OFF: 'ASSISTANT_OFF', AI_TOOLS_OFF: 'MCP_DISABLED', NO_CONNECTION: 'AI_NO_CONNECTION' } as const;
+/** Why a running answer must stop before anything more goes to the provider (or a tool runs), or null. */
+export function stopReason(ctx: RequestContext, user: UserRow, p: AssistantPrivacy): string | null {
+  const why = unavailableReason(ctx, user);
+  if (why) return UNAVAILABLE_REASON[why];
+  if (assistantMode(ctx.db) !== p.mode) return 'ASSISTANT_PRIVACY_CHANGED';
+  return null;
+}
+
 export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
   const { ctx, run, privacy: p } = s;
   const user = ctx.user!;
   const db: Db = ctx.db;
-  const labels = contextLabels(db, user);
+  const look = new CardLookup(db, user, p);
   // Tools act as the teacher; their audit rows say "through an AI tool" with via_token_id assistant:<chat>.
   const toolCtx: RequestContext = { ...ctx, actor: { type: 'mcp', id: user.id, role: user.role, tokenId: `${ASSISTANT_VIA}${s.chatId}` }, mcp: null };
   const env: ToolEnv = { app: a.app, ctx: toolCtx };
   const defs = assistantTools().map(toolSchema);
   const scrub = providerTextOf(p);
+  const forProvider = providerRowOf(p);
   const finish = (end: Parameters<RunRegistry['finish']>[1], reason: string | null = null) => a.registry.finish(run, end, reason, ctx.now());
   let connection = s.connection;
   const model = s.model;
@@ -195,13 +254,16 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
       const gate = sessionGate(ctx, ctx.session?.id ?? null, user.id);
       if (gate !== 'ok') return finish(gate === 'locked' ? 'locked' : 'error', gate === 'locked' ? 'PIN_REQUIRED' : 'SESSION_ENDED');
       if (round >= ASSISTANT_MAX_ROUNDS) return finish('complete', 'ASSISTANT_MAX_ROUNDS');
+      // An administrator switched the assistant, AI tools or student data off (or on) since: stop here.
+      const stop = stopReason(ctx, user, p);
+      if (stop) return finish('error', stop);
       // Paused, over budget or removed since the message was sent: stop before the next request.
       connection = connectionForUse(ctx, connection.id, model).row;
       let chat = db.select().from(assistantChats).where(eq(assistantChats.id, s.chatId)).get();
       if (!chat) return finish('error', 'NOT_FOUND');
       chat = await maybeCompact(ctx, chat, messagesOf(db, chat.id), { connection, model }, user, run.abort.signal, scrub);
       const rows = messagesOf(db, chat.id);
-      const history = historyFor(chat, rows.map((r) => ({ ...r, content: scrub(r) })));
+      const history = historyFor(chat, rows.map(forProvider));
       const summary = chat.summary && p.mode === 'pseudonymous' && rows.some((r) => r.seq <= chat!.summarySeq && r.privacy === 'named') ? p.toProvider(chat.summary) : chat.summary;
       const messageId = newId();
       const text = new TextStream(p, (t) => a.registry.emit(run, { type: 'text', messageId, text: t }));
@@ -238,17 +300,25 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
       }
       text.end();
       recordTokens(ctx, connection.id, user.id, usage);
+      // Call ids come from the provider: one that repeats an id of this chat gets a new one, so a card's
+      // Yes is bound to exactly one call (the provider gets the new id back with the call).
+      const seen = new Set(rows.flatMap((r) => (r.toolCallsJson ?? []).map((c) => c.id)));
+      const refusals = new Map<string, string>();
       const stored: AssistantToolCallJson[] = calls.map((c, i) => {
         const tool = assistantToolByName(c.name);
-        const state: AssistantToolCallJson['state'] = !tool || c.invalidArguments || i >= ASSISTANT_MAX_CALLS_PER_ROUND ? 'refused' : tool.readOnly ? 'auto' : 'pending';
+        const refusal = refusalOf(tool, c, i, p);
+        const repeated = seen.has(c.id);
+        const id = repeated ? newCallId() : c.id;
+        seen.add(id);
+        if (refusal) refusals.set(id, refusal);
         return {
-          id: c.id,
-          ...(c.generatedId ? { generatedId: true as const } : {}),
+          id,
+          ...(c.generatedId || repeated ? { generatedId: true as const } : {}),
           name: c.name,
           arguments: c.arguments,
           ...(c.invalidArguments ? { invalidArguments: true as const } : {}),
           ...(c.signature ? { signature: c.signature } : {}),
-          state,
+          state: refusal || !tool ? 'refused' : tool.readOnly ? 'auto' : 'pending',
         };
       });
       tx(db, () =>
@@ -268,21 +338,22 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
       for (const c of stored) {
         const tool = assistantToolByName(c.name);
         if (c.state === 'refused' || !tool) {
-          const why = !tool ? 'There is no such tool for this teacher.' : c.invalidArguments ? 'The arguments were not a JSON object.' : 'Too many tool calls in one reply.';
-          const row = tx(db, () => appendMessage(db, s.chatId, ctx.now(), { role: 'tool', toolCallId: c.id, toolName: c.name, content: `Not done: ${why}`, isError: true, privacy: p.mode }));
-          a.registry.emit(run, { type: 'tool', messageId, call: callView(p, labels, c, row) });
+          const content = refusals.get(c.id) ?? 'Not done.';
+          const row = tx(db, () => appendMessage(db, s.chatId, ctx.now(), { role: 'tool', toolCallId: c.id, toolName: c.name, content, isError: true, privacy: p.mode }));
+          a.registry.emit(run, { type: 'tool', messageId, call: callView(p, look, c, row) });
           continue;
         }
         if (c.state === 'pending') {
-          a.registry.emit(run, { type: 'tool', messageId, call: callView(p, labels, c, undefined) });
+          a.registry.emit(run, { type: 'tool', messageId, call: callView(p, look, c, undefined) });
           continue;
         }
         if (run.abort.signal.aborted) break;
         if (sessionGate(ctx, ctx.session?.id ?? null, user.id) !== 'ok') break;
-        a.registry.emit(run, { type: 'tool', messageId, call: callView(p, labels, c, undefined) });
+        if (stopReason(ctx, user, p)) break;
+        a.registry.emit(run, { type: 'tool', messageId, call: callView(p, look, c, undefined) });
         const r = await runAssistantTool(env, tool, c.arguments, p);
         const row = tx(db, () => appendMessage(db, s.chatId, ctx.now(), { role: 'tool', toolCallId: c.id, toolName: c.name, content: r.content, isError: r.isError, untrusted: r.untrusted, privacy: p.mode }));
-        a.registry.emit(run, { type: 'tool', messageId, call: callView(p, labels, c, row) });
+        a.registry.emit(run, { type: 'tool', messageId, call: callView(p, look, c, row) });
       }
       if (stored.some((c) => c.state === 'pending')) return finish('awaiting');
     }

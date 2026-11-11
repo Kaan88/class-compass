@@ -7,15 +7,32 @@ import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { ASSISTANT_CHATS_MAX } from '../../../shared/assistantChat.ts';
 import type * as C from '../../../shared/contracts/assistantChat.ts';
+import type { AssistantChangeLine } from '../../../shared/contracts/assistantChat.ts';
 import { pickText } from '../../lib/i18n.ts';
+import type { LocalizedTextValue as LocalizedText } from '../../../shared/contracts/define.ts';
+import { DEFAULT_GOAL_OUTCOMES } from '../../../shared/contracts/goals.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { assistantChats, assistantMessages, classes, subjects, teachingContexts, type AssistantToolCallJson } from '../../db/schema.ts';
+import {
+  assistantChats,
+  assistantMessages,
+  assistantResponsibilities,
+  classes,
+  goalPresets,
+  goals,
+  homeworkAssignments,
+  lessons,
+  skillCategories,
+  subjects,
+  teachingContexts,
+  type AssistantToolCallJson,
+  type HomeworkStatusJson,
+} from '../../db/schema.ts';
 import type { ChatMessage, ToolCall } from '../aiConnections/adapters/types.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext, type UserRow } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { conflict, notFound } from '../../lib/errors.ts';
-import { assistantPseudonymsOf, assistantToolByName, studentNameFor, toBrowser, type AssistantPrivacy } from '../mcp/assistant.ts';
+import { assistantPseudonymsOf, assistantToolByName, parseAssistantArgs, studentNameFor, toBrowser, type AssistantPrivacy } from '../mcp/assistant.ts';
 import { foldSameLength, NameScrubber } from '../mcp/privacy.ts';
 
 export type ChatRow = typeof assistantChats.$inferSelect;
@@ -36,63 +53,263 @@ export function summaryOf(p: AssistantPrivacy, row: ChatRow): z.infer<typeof C.A
   return { id: row.id, title: toBrowser(p, row.title), createdAt: row.createdAt, lastMessageAt: row.lastMessageAt, archived: row.archivedAt !== null, connectionId: row.connectionId, model: row.model };
 }
 
-// ---------------------------------------------------------------- labels for the activity lines and cards
-/** "3-A English" for each class+subject the teacher has (or had) — ids are not personal, so this is only for the browser. */
-export function contextLabels(db: Db, user: UserRow): Map<string, string> {
-  const rows = db
-    .select({ id: teachingContexts.id, className: classes.name, subject: subjects.name })
-    .from(teachingContexts)
-    .innerJoin(classes, eq(classes.id, teachingContexts.classId))
-    .innerJoin(subjects, eq(subjects.id, teachingContexts.subjectId))
-    .where(eq(teachingContexts.teacherId, user.id))
-    .all();
-  return new Map(rows.map((r) => [r.id, `${r.className} ${pickText(r.subject, user.locale)}`.trim()]));
+// ---------------------------------------------------------------- what a card and an activity line say
+/**
+ * Looks up, for the browser only, what a call's ids stand for among the teacher's own things: a
+ * class+subject ("3-A English"), a homework (title and status labels), a goal (the student and its
+ * text), a lesson, a category, a preset, a responsibility. Anything that is not the teacher's own stays
+ * unresolved (the card says so and the endpoint refuses the change). Results are cached per id.
+ */
+export class CardLookup {
+  private db: Db;
+  private user: UserRow;
+  private p: AssistantPrivacy;
+  private ctxs: Map<string, string> | null = null;
+  private cache = new Map<string, unknown>();
+  constructor(db: Db, user: UserRow, p: AssistantPrivacy) {
+    this.db = db;
+    this.user = user;
+    this.p = p;
+  }
+  private once<T>(key: string, f: () => T): T {
+    if (!this.cache.has(key)) this.cache.set(key, f());
+    return this.cache.get(key) as T;
+  }
+  private text(t: LocalizedText | null | undefined) {
+    return pickText(t, this.user.locale);
+  }
+  /** "3-A English" for a class+subject of this teacher (or one they had). */
+  context(id: unknown): string | null {
+    if (typeof id !== 'string') return null;
+    if (!this.ctxs) {
+      const rows = this.db
+        .select({ id: teachingContexts.id, className: classes.name, subject: subjects.name })
+        .from(teachingContexts)
+        .innerJoin(classes, eq(classes.id, teachingContexts.classId))
+        .innerJoin(subjects, eq(subjects.id, teachingContexts.subjectId))
+        .where(eq(teachingContexts.teacherId, this.user.id))
+        .all();
+      this.ctxs = new Map(rows.map((r) => [r.id, `${r.className} ${this.text(r.subject)}`.trim()]));
+    }
+    return this.ctxs.get(id) ?? null;
+  }
+  student(id: unknown): string | null {
+    return studentNameFor(this.p, id);
+  }
+  assignment(id: unknown): { title: string; context: string; statuses: HomeworkStatusJson[] } | null {
+    if (typeof id !== 'string') return null;
+    return this.once(`a:${id}`, () => {
+      const r = this.db.select({ title: homeworkAssignments.title, contextId: homeworkAssignments.contextId, statuses: homeworkAssignments.statusSetJson }).from(homeworkAssignments).where(eq(homeworkAssignments.id, id)).get();
+      const context = r ? this.context(r.contextId) : null;
+      return r && context ? { title: r.title, context, statuses: r.statuses } : null;
+    });
+  }
+  goal(id: unknown): { student: string; text: string; context: string | null } | null {
+    if (typeof id !== 'string') return null;
+    return this.once(`g:${id}`, () => {
+      const r = this.db.select({ studentId: goals.studentId, text: goals.text, contextId: goals.contextId }).from(goals).where(eq(goals.id, id)).get();
+      const student = r ? this.student(r.studentId) : null;
+      return r && student ? { student, text: r.text, context: r.contextId ? this.context(r.contextId) : null } : null;
+    });
+  }
+  lesson(id: unknown): string | null {
+    if (typeof id !== 'string') return null;
+    return this.once(`l:${id}`, () => {
+      const r = this.db.select({ contextId: lessons.contextId, teacherId: lessons.teacherId, localDate: lessons.localDate }).from(lessons).where(eq(lessons.id, id)).get();
+      const context = r && r.teacherId === this.user.id ? this.context(r.contextId) : null;
+      return context ? `${context} · ${r!.localDate}` : null;
+    });
+  }
+  classOf(id: unknown): string | null {
+    if (typeof id !== 'string') return null;
+    return this.once(`c:${id}`, () => {
+      const owns = this.db.select({ name: classes.name }).from(teachingContexts).innerJoin(classes, eq(classes.id, teachingContexts.classId)).where(and(eq(teachingContexts.classId, id), eq(teachingContexts.teacherId, this.user.id))).get();
+      return owns?.name ?? null;
+    });
+  }
+  category(id: unknown): string | null {
+    if (typeof id !== 'string') return null;
+    return this.once(`k:${id}`, () => {
+      const r = this.db.select({ name: skillCategories.name }).from(skillCategories).where(eq(skillCategories.id, id)).get();
+      return r ? this.text(r.name) || null : null;
+    });
+  }
+  preset(id: unknown): string | null {
+    if (typeof id !== 'string') return null;
+    return this.once(`p:${id}`, () => {
+      const r = this.db.select({ text: goalPresets.text }).from(goalPresets).where(eq(goalPresets.id, id)).get();
+      return r ? this.text(r.text) || null : null;
+    });
+  }
+  responsibility(id: unknown): string | null {
+    if (typeof id !== 'string') return null;
+    return this.once(`r:${id}`, () => {
+      const r = this.db.select({ label: assistantResponsibilities.labelJson, contextId: assistantResponsibilities.contextId }).from(assistantResponsibilities).where(eq(assistantResponsibilities.id, id)).get();
+      return r && this.context(r.contextId) ? this.text(r.label) || null : null;
+    });
+  }
+  weekday(day: string): string {
+    // ISO weekday 1 (Monday) … 7: 2024-01-01 was a Monday.
+    const n = Number(day);
+    if (!Number.isInteger(n) || n < 1 || n > 7) return day;
+    return new Intl.DateTimeFormat(this.user.locale === 'tr' ? 'tr-TR' : 'en-GB', { weekday: 'long', timeZone: 'UTC' }).format(Date.UTC(2024, 0, n));
+  }
+  get locale() {
+    return this.user.locale;
+  }
 }
 
+/** Arguments a card never shows (retry keys). */
 const SKIP_KEYS = new Set(['opId', 'batchId']);
+/** Ids the card shows as its "about" line; one that is not the teacher's own becomes a `missing` line. */
+const TARGET_KEYS = ['contextId', 'classId', 'lessonId', 'assignmentId', 'studentId', 'goalId'] as const;
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isLocalized = (v: unknown): boolean => isRecord(v) && Object.keys(v).length > 0 && Object.entries(v).every(([k, x]) => (k === 'en' || k === 'tr') && (typeof x === 'string' || x === undefined || x === null));
 
-/** One argument value as the teacher reads it: student ids and aliases as names, class+subject ids as their names, pseudonyms in text as names. */
-function display(p: AssistantPrivacy, labels: Map<string, string>, v: unknown, depth = 0): string {
-  if (typeof v === 'string') return studentNameFor(p, v) ?? labels.get(v) ?? toBrowser(p, v);
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  if (v === null || v === undefined) return '—';
-  if (depth > 2) return '…';
-  if (Array.isArray(v)) return v.map((x) => display(p, labels, x, depth + 1)).join('; ');
-  if (isRecord(v))
-    return Object.entries(v)
-      .filter(([k]) => !SKIP_KEYS.has(k))
-      .map(([k, x]) => `${k}: ${display(p, labels, x, depth + 1)}`)
-      .join(', ');
-  return String(v);
+/** The page's own words for a fixed choice of a tool (`optionKey`): i18n keys the page already has, or the chat's own. */
+function optionKeyOf(tool: string, key: string, value: string): string | null {
+  if (key === 'module') return `module.${value}`;
+  if (key === 'kind' && tool === 'create_sentence_starter') return `goals.starters.kind.${value}`;
+  if (key === 'status' && tool === 'update_student_goal') return `goals.status.${value}`;
+  if (key === 'status' && tool === 'classroom_command') return `attendance.status.${value}`;
+  if (key === 'command') return `assistantChat.value.command.${value}`;
+  return null;
 }
-const clip = (s: string, n = 400) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** What a call is about, for its activity line: the class+subject and/or the student. */
-export function targetOf(p: AssistantPrivacy, labels: Map<string, string>, args: Record<string, unknown>): string | null {
+const line = (key: string, kind: AssistantChangeLine['kind'], value = '', items: string[] = [], optionKey: string | null = null): AssistantChangeLine => ({ key, kind, value, optionKey, items });
+const NONE = (key: string) => line(key, 'option', 'none', [], 'assistantChat.value.none');
+
+/** A nested value as one plain line (a fallback for shapes no tool uses today). */
+function plain(v: unknown): string {
+  if (typeof v === 'string') return v;
+  if (v === null || v === undefined) return '—';
+  if (typeof v !== 'object') return String(v);
+  return JSON.stringify(v);
+}
+
+/**
+ * The lines of a change card: every argument the change will use, free text exactly as it will be
+ * written (never with names put in: a call whose text holds a pseudonym is refused before it gets a
+ * card), ids as the names of the teacher's own things, lists in full (one line per item, never cut).
+ */
+export function changeLines(look: CardLookup, tool: string, args: Record<string, unknown>): AssistantChangeLine[] {
+  const out: AssistantChangeLine[] = [];
+  for (const [key, v] of Object.entries(args)) {
+    if (SKIP_KEYS.has(key)) continue;
+    if ((TARGET_KEYS as readonly string[]).includes(key)) {
+      const found = key === 'contextId' ? look.context(v) : key === 'classId' ? look.classOf(v) : key === 'lessonId' ? look.lesson(v) : key === 'assignmentId' ? look.assignment(v) : key === 'studentId' ? look.student(v) : look.goal(v);
+      if (!found && v !== null && v !== undefined) out.push(line(key, 'missing'));
+      continue;
+    }
+    if (v === null || v === undefined) {
+      out.push(NONE(key));
+      continue;
+    }
+    if (key === 'categoryId') {
+      const name = look.category(v);
+      out.push(name ? line(key, 'name', name) : line(key, 'missing'));
+      continue;
+    }
+    if (key === 'presetId') {
+      const text = look.preset(v);
+      out.push(text ? line(key, 'name', text) : line(key, 'missing'));
+      continue;
+    }
+    if (key === 'responsibilityId') {
+      const label = look.responsibility(v);
+      out.push(label ? line(key, 'name', label) : line(key, 'missing'));
+      continue;
+    }
+    if (key === 'topicIds' && Array.isArray(v)) {
+      out.push(line(key, 'list', '', v.map((x) => look.category(x) ?? plain(x))));
+      continue;
+    }
+    if (key === 'outcome' && typeof v === 'string') {
+      const def = DEFAULT_GOAL_OUTCOMES.find((o) => o.key === v);
+      out.push(def ? line(key, 'name', pickText(def.label, look.locale)) : line(key, 'text', v));
+      continue;
+    }
+    if (key === 'changes' && tool === 'set_homework_marks' && Array.isArray(v)) {
+      const a = look.assignment(args.assignmentId);
+      const label = (status: unknown) => {
+        const def = a?.statuses.find((x) => x.key === status);
+        return def ? pickText(def.label, look.locale) || String(status) : plain(status);
+      };
+      out.push(
+        line(
+          key,
+          'list',
+          '',
+          v.map((c) => {
+            const m = isRecord(c) ? c : {};
+            const note = typeof m.note === 'string' && m.note.trim() ? ` (${m.note})` : '';
+            return `${look.student(m.studentId) ?? '—'}: ${label(m.status)}${note}`;
+          }),
+        ),
+      );
+      continue;
+    }
+    if (key === 'plan' && tool === 'set_topic_plan' && isRecord(v)) {
+      out.push(line(key, 'list', '', Object.entries(v).map(([day, ids]) => `${look.weekday(day)}: ${Array.isArray(ids) && ids.length ? ids.map((x) => look.category(x) ?? plain(x)).join(', ') : '—'}`)));
+      continue;
+    }
+    if (typeof v === 'boolean') {
+      out.push(line(key, 'flag', String(v)));
+      continue;
+    }
+    if (typeof v === 'number') {
+      out.push(line(key, 'text', String(v)));
+      continue;
+    }
+    if (typeof v === 'string') {
+      const optionKey = optionKeyOf(tool, key, v);
+      out.push(optionKey ? line(key, 'option', v, [], optionKey) : line(key, 'text', v));
+      continue;
+    }
+    if (isLocalized(v)) {
+      const t = v as LocalizedText;
+      out.push(line(key, 'list', '', (['en', 'tr'] as const).flatMap((l) => (t[l]?.trim() ? [`${l.toUpperCase()}: ${t[l]}`] : []))));
+      continue;
+    }
+    if (Array.isArray(v)) {
+      out.push(line(key, 'list', '', v.map(plain)));
+      continue;
+    }
+    out.push(line(key, 'list', '', Object.entries(v as Record<string, unknown>).map(([k, x]) => `${k}: ${plain(x)}`)));
+  }
+  return out;
+}
+
+/** What a call is about, for its activity line and card: the class+subject, the homework, the student, the goal. */
+export function targetOf(look: CardLookup, args: Record<string, unknown>): string | null {
   const parts: string[] = [];
-  const ctxLabel = typeof args.contextId === 'string' ? labels.get(args.contextId) : undefined;
-  if (ctxLabel) parts.push(ctxLabel);
-  const student = studentNameFor(p, args.studentId);
-  if (student) parts.push(student);
-  if (!parts.length && typeof args.guide === 'string') parts.push(args.guide);
+  const add = (s: string | null | undefined) => {
+    if (s && !parts.includes(s)) parts.push(s);
+  };
+  const assignment = look.assignment(args.assignmentId);
+  const goal = look.goal(args.goalId);
+  const lesson = look.lesson(args.lessonId);
+  if (lesson) add(lesson);
+  else add(look.context(args.contextId) ?? assignment?.context ?? goal?.context ?? look.classOf(args.classId));
+  if (assignment) add(`“${assignment.title}”`);
+  add(look.student(args.studentId) ?? goal?.student);
+  if (goal) add(`“${goal.text}”`);
+  if (!parts.length && typeof args.guide === 'string') add(args.guide);
   return parts.length ? parts.join(' · ') : null;
 }
 
 /** A stored call as the browser sees it (`result`: its tool row, when it ran). */
-export function callView(p: AssistantPrivacy, labels: Map<string, string>, call: AssistantToolCallJson, result: MessageRow | undefined): CallView {
+export function callView(p: AssistantPrivacy, look: CardLookup, call: AssistantToolCallJson, result: MessageRow | undefined): CallView {
   const tool = assistantToolByName(call.name);
   const readOnly = tool?.readOnly ?? true;
-  const changes = readOnly
-    ? []
-    : Object.entries(call.arguments)
-        .filter(([k]) => !SKIP_KEYS.has(k))
-        .slice(0, 20)
-        .map(([key, value]) => ({ key, value: clip(display(p, labels, value)) }));
-  return { id: call.id, tool: tool ? call.name : 'unknown', readOnly, state: call.state, target: targetOf(p, labels, call.arguments), changes, failed: result ? result.isError : null };
+  // The arguments as the tool will get them (parsed: trimmed, defaults), so the card shows what is written.
+  const parsed = tool && !readOnly ? parseAssistantArgs(tool, call.arguments, p) : null;
+  const args = parsed?.ok && isRecord(parsed.data) ? parsed.data : call.arguments;
+  const changes = readOnly || call.state === 'refused' ? [] : changeLines(look, call.name, args);
+  return { id: call.id, tool: tool ? call.name : 'unknown', readOnly, state: call.state, target: targetOf(look, args), changes, failed: result ? result.isError : null };
 }
 
-export function messageViews(p: AssistantPrivacy, labels: Map<string, string>, rows: MessageRow[]): Array<z.infer<typeof C.AssistantMessageView>> {
+export function messageViews(p: AssistantPrivacy, look: CardLookup, rows: MessageRow[]): Array<z.infer<typeof C.AssistantMessageView>> {
   const results = new Map(rows.filter((r) => r.role === 'tool' && r.toolCallId).map((r) => [r.toolCallId!, r]));
   return rows
     .filter((r) => r.role !== 'tool')
@@ -103,7 +320,7 @@ export function messageViews(p: AssistantPrivacy, labels: Map<string, string>, r
       createdAt: r.createdAt,
       status: r.status,
       errorCode: r.errorCode,
-      calls: (r.toolCallsJson ?? []).map((c) => callView(p, labels, c, results.get(c.id))),
+      calls: (r.toolCallsJson ?? []).map((c) => callView(p, look, c, results.get(c.id))),
     }));
 }
 
@@ -226,7 +443,7 @@ export function listChats(ctx: RequestContext, p: AssistantPrivacy, q: string | 
 /** The teacher's own data export of their chats (as they see them, with names). A GET without side effects: their own data, not audited. */
 export function exportChats(ctx: RequestContext, p: AssistantPrivacy) {
   const user = requireUser(ctx);
-  const labels = contextLabels(ctx.db, user);
+  const look = new CardLookup(ctx.db, user, p);
   const chats = ctx.db.select().from(assistantChats).where(eq(assistantChats.ownerUserId, user.id)).orderBy(asc(assistantChats.createdAt)).all();
   const out = {
     format: 'class-compass-assistant-chats',
@@ -239,7 +456,7 @@ export function exportChats(ctx: RequestContext, p: AssistantPrivacy) {
       lastMessageAt: new Date(c.lastMessageAt).toISOString(),
       archived: c.archivedAt !== null,
       model: c.model,
-      messages: messageViews(p, labels, messagesOf(ctx.db, c.id)).map((m) => ({
+      messages: messageViews(p, look, messagesOf(ctx.db, c.id)).map((m) => ({
         role: m.role,
         at: new Date(m.createdAt).toISOString(),
         text: m.text,

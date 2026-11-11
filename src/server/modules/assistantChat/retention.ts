@@ -3,9 +3,14 @@
  * year after its last message (`assistant_settings.retention_days`, 365 by default, changeable by an
  * administrator). Runs hourly from the server (`main.ts`) in small pieces; deletions are counted in one
  * system audit row, never with content.
+ *
+ * Accounts are deactivated, never deleted: "deleted with the account" means a deactivated teacher's
+ * chats go `ASSISTANT_DEACTIVATED_GRACE_DAYS` after the deactivation (an account switched off by mistake
+ * and switched on again within that time keeps them).
  */
-import { inArray, lt } from 'drizzle-orm';
-import { assistantChats, assistantMessages } from '../../db/schema.ts';
+import { and, inArray, isNotNull, lt, or } from 'drizzle-orm';
+import { ASSISTANT_DEACTIVATED_GRACE_DAYS } from '../../../shared/assistantChat.ts';
+import { assistantChats, assistantMessages, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { tx } from '../../db/client.ts';
@@ -19,9 +24,19 @@ export const RETENTION_TICK_MS = 60 * 60_000;
 
 export async function purgeOldChats(deps: Pick<AppDeps, 'db' | 'now'>): Promise<number> {
   const cutoff = deps.now() - assistantSettingsOf(deps.db).retentionDays * DAY_MS;
+  const deactivated = deps.db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(isNotNull(users.disabledAt), lt(users.disabledAt, deps.now() - ASSISTANT_DEACTIVATED_GRACE_DAYS * DAY_MS)));
   let total = 0;
   for (;;) {
-    const ids = deps.db.select({ id: assistantChats.id }).from(assistantChats).where(lt(assistantChats.lastMessageAt, cutoff)).limit(PIECE).all().map((r) => r.id);
+    const ids = deps.db
+      .select({ id: assistantChats.id })
+      .from(assistantChats)
+      .where(or(lt(assistantChats.lastMessageAt, cutoff), inArray(assistantChats.ownerUserId, deactivated)))
+      .limit(PIECE)
+      .all()
+      .map((r) => r.id);
     if (!ids.length) break;
     tx(deps.db, () => {
       deps.db.delete(assistantMessages).where(inArray(assistantMessages.chatId, ids)).run();

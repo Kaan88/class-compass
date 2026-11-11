@@ -238,7 +238,7 @@ describe('answers, tools and pseudonyms', () => {
         expect(toolRow).toMatchObject({ untrusted: true, privacy: 'named' });
         // The model obeyed the child's text: the change waits for the teacher, nothing was written.
         expect(endOf(evs)).toMatchObject({ end: 'awaiting' });
-        expect(evs.filter((e) => e.type === 'tool').at(-1).call).toMatchObject({ tool: 'create_homework', state: 'pending', changes: expect.arrayContaining([{ key: 'title', value: 'Everyone homework' }, { key: 'contextId', value: '3-A English' }]) });
+        expect(evs.filter((e) => e.type === 'tool').at(-1).call).toMatchObject({ tool: 'create_homework', state: 'pending', target: '3-A English', changes: expect.arrayContaining([expect.objectContaining({ key: 'title', kind: 'text', value: 'Everyone homework' })]) });
         expect(env.db.select().from(homeworkAssignments).where(eq(homeworkAssignments.title, 'Everyone homework')).all()).toEqual([]);
         expect((await ok(s.teacherA.get(API))).studentNames).toBe(true);
       },
@@ -529,3 +529,4 @@ describe('long chats, retention, export, erasure and the list', () => {
     });
   });
 });
+

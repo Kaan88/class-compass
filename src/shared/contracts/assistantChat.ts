@@ -63,8 +63,22 @@ export const AssistantChatSummary = z.object({
 });
 export type AssistantChatSummary = z.infer<typeof AssistantChatSummary>;
 
-/** One line of "what will change" on a confirmation card: an argument the model sent, with real names. */
-export const AssistantChangeLine = z.object({ key: z.string(), value: z.string() });
+/**
+ * How one line of a confirmation card is shown: `text` exactly as it will be written; `name` a name or
+ * title the server looked up (a student, a category, a status label); `option` a fixed choice the page
+ * translates through `optionKey`; `flag` 'true' or 'false'; `missing` an id that is not one of the
+ * teacher's own things (the change will be refused); `list` every item in `items`, one per line, never cut.
+ */
+export const ASSISTANT_CHANGE_KINDS = ['text', 'name', 'option', 'flag', 'missing', 'list'] as const;
+/** One line of "what will change" on a confirmation card: one argument of the change (the page shows `assistantChat.arg.<key>`). */
+export const AssistantChangeLine = z.object({
+  key: z.string(),
+  kind: z.enum(ASSISTANT_CHANGE_KINDS),
+  value: z.string(),
+  optionKey: z.string().nullable(),
+  items: z.array(z.string()),
+});
+export type AssistantChangeLine = z.infer<typeof AssistantChangeLine>;
 
 export const ASSISTANT_CALL_STATES = ['auto', 'pending', 'approved', 'declined', 'refused', 'expired'] as const;
 export const AssistantCallView = z.object({

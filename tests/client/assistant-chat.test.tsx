@@ -55,7 +55,12 @@ const status = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const summary = { id: CHAT, title: 'Homework for 3-A', createdAt: 1, lastMessageAt: 1_700_000_000_000, archived: false, connectionId: 'conn-1', model: 'fake-chat' };
-const pendingCall = { id: 'call_hw', tool: 'create_homework', readOnly: false, state: 'pending', target: '3-A English', changes: [{ key: 'title', value: 'Read chapter 3' }], failed: null };
+const pendingCall = { id: 'call_hw', tool: 'create_homework', readOnly: false, state: 'pending', target: '3-A English', changes: [
+    { key: 'title', kind: 'text', value: 'Read chapter 3', optionKey: null, items: [] },
+    { key: 'dueOn', kind: 'text', value: '2026-11-13', optionKey: null, items: [] },
+  ],
+  failed: null,
+};
 const detail = (over: Record<string, unknown> = {}) => ({
   chat: summary,
   messages: [
@@ -151,9 +156,13 @@ describe('assistant page (S19b, D-180)', () => {
     vi.stubGlobal('fetch', fetch);
     answers['POST /api/teacher/assistant-chat/chats/:chatId/messages/:messageId/calls/:callId'] = { runId: RUN };
     wrap(<AssistantChatPage search={{ chat: CHAT }} />);
-    expect((await screen.findByTestId('assistant-activity')).textContent).toBe('Looked at: class_roster (3-A English)');
+    expect((await screen.findByTestId('assistant-activity')).textContent).toBe('Looked at: Class list (3-A English)');
     const card = await screen.findByTestId('assistant-change-card');
-    expect(card.textContent).toContain('Change: create_homework');
+    // Words, never the tool's or the argument's identifier.
+    expect(card.textContent).toContain('Change: New homework');
+    expect(card.textContent).not.toContain('create_homework');
+    expect(within(card).getByText('Title')).toBeTruthy();
+    expect(within(card).getByText('Due on')).toBeTruthy();
     expect(card.textContent).toContain('Read chapter 3');
     expect(within(card).getByText('Should Class Compass make this change?')).toBeTruthy();
     // Delivery to parents is never from the app.
@@ -250,6 +259,44 @@ describe('assistant page (S19b, D-180)', () => {
       { type: 'text', seq: 1, messageId: BOT_MSG, text: 'a' },
       { type: 'end', seq: 2, end: 'awaiting', reason: null },
     ]);
+  });
+
+  it('a card in Turkish: tool, arguments, choices and lists in words, every item shown; the messages list has its own name', async () => {
+    const marks = Array.from({ length: 15 }, (_, i) => `Öğrenci ${i + 1}: Yapıldı`);
+    const card = {
+      id: 'call_m',
+      tool: 'set_homework_marks',
+      readOnly: false,
+      state: 'pending',
+      target: '3-A İngilizce · “Okuma günlüğü”',
+      changes: [
+        { key: 'changes', kind: 'list', value: '', optionKey: null, items: marks },
+        { key: 'module', kind: 'option', value: 'homework', optionKey: 'module.homework', items: [] },
+        { key: 'enabled', kind: 'flag', value: 'false', optionKey: null, items: [] },
+        { key: 'goalId', kind: 'missing', value: '', optionKey: null, items: [] },
+      ],
+      failed: null,
+    };
+    answers['GET /api/teacher/assistant-chat/chats/:chatId'] = detail({
+      messages: [
+        { id: BOT_MSG, role: 'assistant', text: '', createdAt: 2, status: 'complete', errorCode: null, calls: [{ id: 'r', tool: 'homework_check', readOnly: true, state: 'auto', target: '3-A İngilizce', changes: [], failed: false }, card] },
+      ],
+    });
+    wrap(<AssistantChatPage search={{ chat: CHAT }} />, 'tr');
+    const c = await screen.findByTestId('assistant-change-card');
+    expect(c.textContent).toContain('Değişiklik: Ödev işaretleri');
+    expect(c.textContent).toContain('İlgili: 3-A İngilizce · “Okuma günlüğü”');
+    expect(c.textContent).not.toMatch(/set_homework_marks|assignmentId|changes|goalId/u);
+    expect(within(c).getByText('İşaretler')).toBeTruthy();
+    expect(within(c).getByText('15 öğe')).toBeTruthy();
+    // Every item, the last one too (nothing is cut).
+    expect(within(c).getAllByRole('listitem')).toHaveLength(15);
+    expect(within(c).getByText('Öğrenci 15: Yapıldı')).toBeTruthy();
+    expect(within(c).getByText('Ödevler')).toBeTruthy();
+    expect(c.querySelector('[data-key="enabled"] dd')?.textContent).toBe('Hayır');
+    expect(c.textContent).toContain('değişiklik reddedilir');
+    expect(screen.getByTestId('assistant-activity').textContent).toBe('Bakıldı: Ödev kontrolü (3-A İngilizce)');
+    expect(screen.getByTestId('assistant-messages').getAttribute('aria-label')).toBe('Mesajlar');
   });
 
   it('Turkish', async () => {

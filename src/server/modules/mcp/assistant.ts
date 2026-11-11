@@ -151,11 +151,20 @@ const errorContent = (code: string, message: string, extra: Record<string, unkno
  * Runs one tool for the assistant exactly as `/mcp` would for this teacher (the caller has decided it
  * may run: read-only, or approved by the teacher). Returns the text the model gets.
  */
-export async function runAssistantTool(env: ToolEnv, tool: McpTool, args: Record<string, unknown>, p: AssistantPrivacy): Promise<{ content: string; isError: boolean; untrusted: boolean }> {
+/**
+ * A call's arguments as the tool will get them (aliases resolved to the caller's own students, parsed by
+ * the tool's schema), or the error the model is told. The chat checks a change with it before showing its
+ * card, so a card only ever shows arguments that can run, within the schema's limits.
+ */
+export function parseAssistantArgs(tool: McpTool, args: Record<string, unknown>, p: AssistantPrivacy): { ok: true; data: unknown } | { ok: false; content: string } {
   const parsed = tool.input.safeParse(resolveAliases(p.env, p.own, args));
-  if (!parsed.success) {
-    return { content: RESULT_PREFIX + errorContent('VALIDATION', 'Invalid arguments', { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message })) }), isError: true, untrusted: false };
-  }
+  if (parsed.success) return { ok: true, data: parsed.data };
+  return { ok: false, content: RESULT_PREFIX + errorContent('VALIDATION', 'Invalid arguments', { issues: parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message })) }) };
+}
+
+export async function runAssistantTool(env: ToolEnv, tool: McpTool, args: Record<string, unknown>, p: AssistantPrivacy): Promise<{ content: string; isError: boolean; untrusted: boolean }> {
+  const parsed = parseAssistantArgs(tool, args, p);
+  if (!parsed.ok) return { content: parsed.content, isError: true, untrusted: false };
   try {
     const value = await tool.run(env, parsed.data);
     const safe = privateResult(p.env, tool.output, value);
