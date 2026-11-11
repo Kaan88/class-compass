@@ -102,3 +102,50 @@ test('the teacher adds a document as evidence for a goal from the Goals page and
     expect((await api(page, 'PATCH', `/api/teacher/goals/${goal.body.id}`, { status: 'archived' })).status).toBe(200);
   }
 });
+
+test('the Add evidence form shows one focus ring and the chosen goal once on a wide screen (S21 review)', async ({ page }) => {
+  test.skip(test.info().project.name === 'mobile', 'the widths are set here, on the display project');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await login(page, 'english');
+  await ensurePin(page);
+  const contexts = (await api(page, 'GET', '/api/teacher/contexts')).body.contexts as Ctx[];
+  const ctx = contexts.find((c) => c.className === '3-B' && c.subjectName.en === 'English')!;
+  const roster = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/roster`)).body.students as Rostered[];
+  const student = roster[9]!;
+  const library = (await api(page, 'GET', `/api/teacher/contexts/${ctx.id}/goal-library`)).body as { categories: Array<{ id: string; archived: boolean }> };
+  const goalText = 'I will read one short fictional story every week and tell my partner about it.';
+  const goal = await api(page, 'POST', `/api/teacher/contexts/${ctx.id}/students/${student.id}/goals`, { categoryId: library.categories.find((c) => !c.archived)!.id, text: goalText });
+  expect(goal.status).toBe(200);
+  try {
+    await page.goto(`/teacher/goals?contextId=${ctx.id}&studentId=${student.id}`);
+    const view = page.getByTestId('teacher-student-goals');
+    // By keyboard: "Add evidence" (Enter), then into the words box.
+    await view.getByTestId('teacher-goal').filter({ hasText: goalText }).getByRole('button', { name: `Add evidence: ${goalText}` }).focus();
+    await page.keyboard.press('Enter');
+    const form = view.getByTestId('evidence-form');
+    await form.getByRole('textbox').last().focus();
+    await page.keyboard.type('Fictional words');
+    // Only the focused field has a ring: the tabbed section around it (RAC Tabs marks its root
+    // data-focus-visible while focus is anywhere inside) drew a second one down the page's edges.
+    const ringed = await page.evaluate(() =>
+      [...document.querySelectorAll('*')]
+        .filter((e) => {
+          const c = getComputedStyle(e);
+          return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0;
+        })
+        .map((e) => (e === document.activeElement ? `focused ${e.tagName}` : `${e.tagName}.${e.className}`)),
+    );
+    expect(ringed).toEqual(['focused TEXTAREA']);
+    // The select shows the whole goal at 1280 px: no copy of it below.
+    const select = form.getByLabel('For which goal?');
+    await expect(select).toHaveValue(goal.body.id);
+    await expect(form.locator('.cc-field__hint').filter({ hasText: goalText })).toHaveCount(0);
+    // On a phone width the closed select cuts the sentence, so the full text is shown under it.
+    await page.setViewportSize({ width: 360, height: 800 });
+    await expect(form.locator('.cc-field__hint').filter({ hasText: goalText })).toBeVisible();
+    expect(await select.getAttribute('aria-describedby')).toBeTruthy();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  } finally {
+    expect((await api(page, 'PATCH', `/api/teacher/goals/${goal.body.id}`, { status: 'archived' })).status).toBe(200);
+  }
+});

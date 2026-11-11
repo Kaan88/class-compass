@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type Ref } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
 import { FieldError, Input, Label, Switch, Text, TextArea as RACTextArea, TextField as RACTextField, type TextFieldProps as RACTextFieldProps } from 'react-aria-components';
 import { useI18n } from '../lib/i18n.tsx';
 
@@ -67,6 +67,7 @@ export function Select({
   placeholder,
   className = '',
   hideLabel = false,
+  descriptionWhenCut = false,
 }: {
   label: string;
   items: SelectItem[];
@@ -79,14 +80,25 @@ export function Select({
   className?: string;
   /** Keep the label for screen readers only (e.g. one select per table row under a column header). */
   hideLabel?: boolean;
+  /**
+   * The description repeats the chosen option in full (S13 usability: a phone cuts a long goal inside
+   * the closed select). Show it only while the closed select actually cuts the chosen text; on a wide
+   * screen it was a visible duplicate of the select (S21 review).
+   */
+  descriptionWhenCut?: boolean;
 }) {
   const id = useId();
+  const ref = useRef<HTMLSelectElement>(null);
+  const chosen = items.find((i) => i.id === value)?.label ?? '';
+  const cut = useSelectCut(ref, chosen, descriptionWhenCut && Boolean(description));
+  if (descriptionWhenCut && !cut) description = undefined;
   return (
     <div className={`cc-field ${className}`}>
       <label htmlFor={id} className={hideLabel ? 'cc-visually-hidden' : 'cc-field__label'}>
         {label}
       </label>
       <select
+        ref={ref}
         id={id}
         name={name}
         className="cc-select"
@@ -113,6 +125,45 @@ export function Select({
       ) : null}
     </div>
   );
+}
+
+/**
+ * Whether the closed select cuts `text`: its width in the select's font (an invisible span outside the
+ * select) against the room left of the arrow (the native arrow is about 1.5em wide). Re-measured when
+ * the select changes size. Without layout (jsdom) or before the first measurement it says "cut", so
+ * the full text is never lost.
+ */
+function useSelectCut(ref: RefObject<HTMLSelectElement | null>, text: string, active: boolean): boolean {
+  const [cut, setCut] = useState(true);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!active || !el) return;
+    // A zero-size clipped box outside React's tree, so a long text never widens the page.
+    const box = document.createElement('div');
+    box.setAttribute('aria-hidden', 'true');
+    box.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none';
+    const probe = document.createElement('span');
+    probe.textContent = text;
+    probe.style.whiteSpace = 'pre';
+    box.appendChild(probe);
+    document.body.appendChild(box);
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      probe.style.font = cs.font;
+      probe.style.letterSpacing = cs.letterSpacing;
+      const width = probe.getBoundingClientRect().width;
+      const room = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 1.5 * parseFloat(cs.fontSize);
+      setCut(!(width > 0 && room > 0) || width > room);
+    };
+    measure();
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+      box.remove();
+    };
+  }, [ref, text, active]);
+  return cut;
 }
 
 /** On/off switch with a visible "On"/"Off" state label (not colour only). */

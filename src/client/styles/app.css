@@ -619,6 +619,11 @@ a {
 }
 
 /* ------------------------------------------------------------------ tabs */
+/* S21: the Tabs root is data-focus-visible whenever focus is anywhere inside it (focus within); only
+   the focused tab, field or button shows the ring, not the whole tabbed section. */
+.cc-tabs[data-focus-visible] {
+  outline: none;
+}
 .cc-tablist {
   display: flex;
   flex-wrap: wrap;
@@ -1956,9 +1961,14 @@ html[data-frame-cards='torn'] .cc-card:not(.cc-lesson-box .cc-card)::before {
   gap: 0.5rem;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
 }
+/* S21: a miniature tile at the menu's 1.15rem split "Achievements" mid-word (158 px tile at 1280 px):
+   the sample text is a size smaller so each label's longest word fits whole. A word still breaks
+   (the tile's overflow-wrap) only when it cannot fit on a line of its own, e.g. at 200 % text. */
 .cc-theme-sample__tiles .cc-menu-tile {
   min-height: 3.5rem;
   padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  hyphens: manual;
 }
 .cc-theme-podium {
   list-style: none;

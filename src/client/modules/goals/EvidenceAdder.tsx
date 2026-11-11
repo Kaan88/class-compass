@@ -343,7 +343,7 @@ export function EvidenceAdder({
       ) : (
         <>
           {modeButtons(t('student.evidenceKind'))}
-          <Select label={t('student.evidenceGoal')} items={[{ id: '', label: t('student.noGoalLink') }, ...goals]} value={goalId} onChange={setGoalId} description={chosenGoalHint(goals, goalId)} />
+          <Select label={t('student.evidenceGoal')} items={[{ id: '', label: t('student.noGoalLink') }, ...goals]} value={goalId} onChange={setGoalId} description={chosenGoalHint(goals, goalId)} descriptionWhenCut />
         </>
       )}
       {current === 'link' ? (

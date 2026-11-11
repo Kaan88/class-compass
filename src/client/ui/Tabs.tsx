@@ -20,7 +20,10 @@ export function Tabs({
   onSelectionChange?: (k: string) => void;
 }) {
   return (
-    <RACTabs selectedKey={selectedKey} onSelectionChange={onSelectionChange ? (k) => onSelectionChange(String(k)) : undefined}>
+    // `cc-tabs`: RAC marks the Tabs root data-focus-visible while ANY element inside it has keyboard
+    // focus (a focus-within ring); the global [data-focus-visible] outline then drew a second ring
+    // around the whole page section (S21 review). The ring belongs to the focused element only.
+    <RACTabs className="cc-tabs" selectedKey={selectedKey} onSelectionChange={onSelectionChange ? (k) => onSelectionChange(String(k)) : undefined}>
       <TabList aria-label={label} className="cc-tablist">
         {items.map((i) => (
           <Tab key={i.id} id={i.id} className="cc-tab">

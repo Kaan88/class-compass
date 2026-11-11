@@ -12,7 +12,7 @@
  * on framed cards, tap targets keep their size, axe passes, the snowfall makes no long tasks (> 50 ms),
  * and deleting the theme falls back to the default. Screenshots go to test-results/theme-engine/.
  */
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
@@ -436,5 +436,48 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
     if (ctx3a) await api(admin, 'PATCH', `/api/admin/classes/${ctx3a.classId}`, { theme: ctx3a.theme });
     await adminCtx.close();
     await teacherCtx.close();
+  }
+});
+
+test('the student page sample in the package preview never splits a tile word that fits (S21 review)', async ({ browser }) => {
+  test.skip(test.info().project.name === 'mobile', 'the widths are set here, on the display project');
+  test.setTimeout(180_000);
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await ctx.newPage();
+  await login(page, 'admin');
+  const examples = readdirSync(join(import.meta.dirname, '..', 'docs', 'examples')).filter((f) => f.endsWith('.theme.json'));
+  const split: string[] = [];
+  try {
+    for (const lang of ['en', 'tr'] as const) {
+      expect((await api(page, 'PATCH', '/api/auth/preferences', { locale: lang })).status).toBe(200);
+      for (const file of examples) {
+        // 1280 px is where the review saw "Achievemen / ts"; 900 px gives the tiles the same width.
+        for (const width of [1280, 900]) {
+          await page.setViewportSize({ width, height: 900 });
+          await page.goto('/admin/themes');
+          await page.getByTestId('theme-file').setInputFiles({ name: file, mimeType: 'application/json', buffer: readFileSync(join(import.meta.dirname, '..', 'docs', 'examples', file)) });
+          await page.getByRole('button', { name: lang === 'en' ? 'Check package' : 'Paketi denetle', exact: true }).click();
+          await expect(page.getByTestId('theme-sample-student')).toBeVisible();
+          await page.evaluate(() => document.fonts.ready);
+          // A word whose own boxes sit on more than one line was split inside the word.
+          const words = await page.getByTestId('theme-sample-student').evaluate((sample) =>
+            [...sample.querySelectorAll('.cc-menu-tile')].flatMap((tile) => {
+              const text = tile.firstChild!;
+              return [...(text.textContent ?? '').matchAll(/\S+/gu)].flatMap((m) => {
+                const r = document.createRange();
+                r.setStart(text, m.index!);
+                r.setEnd(text, m.index! + m[0].length);
+                return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size > 1 ? [m[0]] : [];
+              });
+            }),
+          );
+          split.push(...words.map((w) => `${lang} ${file} ${width}px: "${w}"`));
+        }
+      }
+    }
+    expect(split).toEqual([]);
+  } finally {
+    await api(page, 'PATCH', '/api/auth/preferences', { locale: 'en' });
+    await ctx.close();
   }
 });
