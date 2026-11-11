@@ -2,7 +2,7 @@
  * Feedback components: Toaster/UndoToast (UX-9), SaveStateBadge (UX-10), NeedsAttentionTray (UX-11),
  * EmptyState.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import type { OutboxOp } from '../lib/outbox.ts';
 import { isRetryable, saveStateOf, type SaveState } from '../lib/outbox.ts';
@@ -49,11 +49,64 @@ function ToastView({ toast }: { toast: Toast }) {
   );
 }
 
+/** Space kept between a note and the top of the classroom board's dock (CSS pixels). */
+const DOCK_GAP_PX = 8;
+
+/**
+ * S21b (D-174): on the classroom board the notes stand just above the dock, measured, so they never
+ * cover a dock button or End lesson whatever the dock's height (it wraps into several rows on a
+ * tablet, the text size and the screen-sized root font change it). Only while a note is shown: the
+ * dock row is found again when the board mounts or changes (mutations), and followed on resize and
+ * scroll. The clearance is written straight on the toaster (a CSS variable, no React render), so the
+ * note moves before the next paint. Without a dock in view the CSS placement applies unchanged.
+ */
+function useAboveDock(ref: RefObject<HTMLDivElement | null>, active: boolean) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!active || !el) return;
+    let observed: Element | null = null;
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => measure());
+    const clear = () => {
+      el.removeAttribute('data-above-dock');
+      el.style.removeProperty('--cc-dock-clear');
+    };
+    const measure = () => {
+      const dock = document.querySelector('.cc-dock');
+      const target = dock?.closest('[data-dock-row]') ?? dock;
+      if (target !== observed) {
+        if (observed) ro?.unobserve(observed);
+        if (target) ro?.observe(target);
+        observed = target ?? null;
+      }
+      const r = target?.getBoundingClientRect();
+      const vh = window.innerHeight;
+      // Only a dock in the lower part of the screen: a note is never pushed off the top.
+      if (!r || r.height === 0 || r.top >= vh || r.bottom <= 0 || r.top < vh * 0.3) return clear();
+      el.setAttribute('data-above-dock', '');
+      el.style.setProperty('--cc-dock-clear', `${Math.ceil(vh - r.top + DOCK_GAP_PX)}px`);
+    };
+    measure();
+    const mo = new MutationObserver(measure);
+    mo.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, { passive: true, capture: true });
+    return () => {
+      mo.disconnect();
+      ro?.disconnect();
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, { capture: true });
+      clear();
+    };
+  }, [ref, active]);
+}
+
 /** Mount once at the root. Polite live region so screen readers hear confirmations. */
 export function Toaster() {
   const toasts = useToasts();
+  const ref = useRef<HTMLDivElement>(null);
+  useAboveDock(ref, toasts.length > 0);
   return (
-    <div className="cc-toaster" role="status" aria-live="polite">
+    <div ref={ref} className="cc-toaster" role="status" aria-live="polite">
       {toasts.map((t) => (
         <ToastView key={t.id} toast={t} />
       ))}

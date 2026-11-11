@@ -17,7 +17,7 @@
  * "Customise layout"; it asks for the PIN (`PinDialog`) and then opens the board's layout editor.
  * Below 64rem the board is one column and the button explains that a wider screen is needed.
  */
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import { pickText } from '../../shared/i18n/index.ts';
 import { classLocales } from '../../shared/classLanguage.ts';
@@ -203,7 +203,13 @@ export function ClassroomTopBar({
         {context ? (
           <>
             <span className="cc-classroom-bar__name" data-testid="class-banner-class">
-              {context.className}
+              {/* S21b (D-174): a class name breaks only between its words, never at "3-A"'s hyphen. */}
+              {context.className.split(' ').map((word, i) => (
+                <Fragment key={i}>
+                  {i ? ' ' : null}
+                  <span className="cc-nowrap">{word}</span>
+                </Fragment>
+              ))}
             </span>
             <span className="cc-classroom-bar__subject" data-testid="class-banner-subject">
               {pickText(context.subjectName, locale)}
