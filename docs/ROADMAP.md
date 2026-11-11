@@ -416,9 +416,10 @@ Decision D-176; migration `goal_category_names` (additive table).
 
 ## S22d Teacher area density and the crawl of the other areas (roadmap sweep, 2026-11-11)
 Decision D-178; no migration.
-- [x] Compact / Normal / Large in the teacher and admin areas (closes the S13 box above): Profile → Spacing beside the text size, per account, Normal by default (today's look, pixel-checked with the admin crawl), touch targets unchanged; server, client and e2e tests with axe
+- [x] Compact / Normal / Large in the teacher and admin areas (closes the S13 box above): Profile → Spacing beside the text size, per account, Normal by default (today's look: the Normal values are the old numbers, tested; the admin crawl of the branch against main differs on Profile and, in 69 of 222 pictures, by run data such as PIN state, audit rows and invite names, so it is no pixel proof), touch targets unchanged; the hint under the row is the select's accessible description (review fix); server, client and e2e tests with axe
 - [x] Usability crawl of the teacher, admin, student and Super Speakers areas before/after S17b, compared pixel by pixel and reviewed (closes the S17b box above, numbers there)
 - [ ] Found by the crawl (S20d, minor, not a S22d file): a language field of a one-language class takes the whole free width on a wide screen (homework statuses and goal outcomes: a "Not yet" field about 1,500 px wide at 1920 px, with "Counts as" pushed to the far edge); give `ui/LangFields.tsx` fields a readable maximum width
+- [ ] Found in the S22d review (goals module, major, not a S22d file; same before S17b, at every Spacing): on a 375 px phone the teacher Goals → Students table squeezes the Student column so names break one letter per line (rows about 330 px tall) and the Evidence column is cut off at the card edge; below 52rem make it a stacked table (`cc-table--stack`) or give the Student column a minimum width, and add a 375 px e2e check that a student name keeps its words
 - [ ] Spacing seen on the real displays (Sare's MacBook, the classroom PC) by a person
 
 ## Open points noted with the owner (2026-11-09)

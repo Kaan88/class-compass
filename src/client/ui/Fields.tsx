@@ -68,6 +68,7 @@ export function Select({
   className = '',
   hideLabel = false,
   descriptionWhenCut = false,
+  describedBy,
 }: {
   label: string;
   items: SelectItem[];
@@ -86,6 +87,11 @@ export function Select({
    * screen it was a visible duplicate of the select (S21 review).
    */
   descriptionWhenCut?: boolean;
+  /**
+   * Id of a hint shown elsewhere (e.g. a line under a row of selects, where it would stretch the select
+   * as its own description, S22d review): the select is still described by it (WCAG 1.3.1).
+   */
+  describedBy?: string;
 }) {
   const id = useId();
   const ref = useRef<HTMLSelectElement>(null);
@@ -105,7 +111,7 @@ export function Select({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        aria-describedby={description ? `${id}-d` : undefined}
+        aria-describedby={[description ? `${id}-d` : '', describedBy ?? ''].filter(Boolean).join(' ') || undefined}
       >
         {placeholder !== undefined ? (
           <option value="" disabled>

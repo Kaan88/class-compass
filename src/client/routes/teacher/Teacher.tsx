@@ -1,5 +1,5 @@
 /** Teacher area (PIN-gated in classroom mode): menu first (PIN-4), profile, class settings, roster. */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Auth from '../../../shared/contracts/auth.ts';
@@ -267,6 +267,7 @@ export function ProfilePage() {
   const me = useMe();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const densityHintId = useId();
   const signInInfo = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000 });
   if (!me) return null;
   const update = async (patch: { locale?: 'en' | 'tr'; textScale?: number; density?: Auth.AreaDensity }) => {
@@ -312,10 +313,12 @@ export function ProfilePage() {
               if (density) void update({ density });
             }}
             items={Auth.AREA_DENSITIES.map((d) => ({ id: d, label: t(`profile.density.${d}`) }))}
+            describedBy={densityHintId}
           />
         </div>
-        {/* A line of its own: as the select's description it stretched the select to its width. */}
-        <p className="cc-muted" style={{ margin: 0 }}>
+        {/* A line of its own (as the select's description it stretched the select to its width), still
+            tied to the Spacing select through aria-describedby for screen readers (S22d review). */}
+        <p id={densityHintId} className="cc-muted" style={{ margin: 0 }}>
           {t('profile.densityHint')}
         </p>
         {error ? <Alert>{error}</Alert> : null}

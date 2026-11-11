@@ -71,7 +71,12 @@ describe('Profile → Spacing (S22d, D-178)', () => {
     expect([...select.options].map((o) => o.textContent)).toEqual([en['profile.density.compact'], en['profile.density.normal'], en['profile.density.large']]);
     // Beside the text size, in the same section.
     expect(select.closest('section')?.contains(screen.getByLabelText(en['profile.textSize']))).toBe(true);
-    expect(screen.getByText(en['profile.densityHint'])).toBeTruthy();
+    // The hint is a line of its own under the row, but still the select's accessible description
+    // (S22d review: WCAG 1.3.1 / 3.3.2).
+    const hint = screen.getByText(en['profile.densityHint']);
+    expect(hint.id).toBeTruthy();
+    expect(select.getAttribute('aria-describedby')?.split(' ')).toContain(hint.id);
+    expect(screen.getByRole('combobox', { name: en['profile.density'], description: en['profile.densityHint'] })).toBe(select);
     fireEvent.change(select, { target: { value: 'compact' } });
     await waitFor(() => expect(qc.getQueryData<Me>(ME_KEY)?.density).toBe('compact'));
     expect(calls).toEqual([{ path: '/api/auth/preferences', input: { density: 'compact' } }]);
