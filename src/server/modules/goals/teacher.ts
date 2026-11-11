@@ -485,6 +485,17 @@ export function setSettings(ctx: RequestContext, input: In<typeof C.setGoalSetti
  * uploaded for this student (`uploadFile` with the student as owner). The media flags are checked
  * again here (an admin may have switched photos or audio off since the upload, D-014).
  */
+/**
+ * S20b (D-170): an evidence upload from the teacher Goals page names its class+subject; the same
+ * checks as `addEvidence` run before the file is stored (owns the context, Goals module on, class
+ * and year writable, the student in the class today).
+ */
+export function assertEvidenceUploadScope(ctx: RequestContext, contextId: string, studentId: string): void {
+  const s = scopeOf(ctx, contextId);
+  assertWritable(ctx, s);
+  assertStudentInClass(ctx, s, studentId);
+}
+
 /** True when the file is some student's current profile photo (never attachable or deletable as evidence). */
 function isStudentPhotoFile(ctx: RequestContext, fileId: string): boolean {
   return ctx.db.select({ id: students.id }).from(students).where(eq(students.photoFileId, fileId)).get() !== undefined;

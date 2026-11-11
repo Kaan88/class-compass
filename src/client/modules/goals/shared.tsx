@@ -102,7 +102,8 @@ export function GoalSummary({ goal, outcomes }: { goal: Goal; outcomes: readonly
  * Evidence item (S13b2, D-119): text, a safe external link, a picture (thumbnail; tap to see it
  * large), a document (icon, name and size; opens as a download) or a voice recording (player).
  */
-export function EvidenceView({ item, fileUrl, actions }: { item: Evidence; fileUrl: (fileId: string, thumb?: boolean) => string; actions?: ReactNode }) {
+/** `goalLabel` (teacher Goals page, S20b): the goal this evidence is for, shown under the kind. */
+export function EvidenceView({ item, fileUrl, actions, goalLabel }: { item: Evidence; fileUrl: (fileId: string, thumb?: boolean) => string; actions?: ReactNode; goalLabel?: string }) {
   const { t, locale } = useI18n();
   const [large, setLarge] = useState(false);
   const f = item.file;
@@ -116,6 +117,7 @@ export function EvidenceView({ item, fileUrl, actions }: { item: Evidence; fileU
         <span className="cc-muted">{whenText(item.createdAt, locale)}</span>
         {item.authorType === 'teacher' ? <span className="cc-chip">{t('goals.byTeacher')}</span> : null}
       </div>
+      {goalLabel ? <p className="cc-muted cc-evidence__goal">{t('student.forGoal', { goal: goalLabel })}</p> : null}
       {item.body ? <p className="cc-entry__body">{item.body}</p> : null}
       {item.url ? (
         <a href={item.url} target="_blank" rel="noopener noreferrer" className="cc-evidence__link">

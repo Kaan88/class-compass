@@ -1594,6 +1594,8 @@ export const en = {
   'goals.deleteFeedback': 'Delete feedback',
   'goals.feedbackFrom': 'From {name}',
   'goals.evidence': 'Evidence',
+  'goals.addEvidence': 'Add evidence',
+  'goals.addEvidenceFor': 'Add evidence: {goal}',
   'goals.noEvidence': 'No evidence yet.',
   'goals.privateNotes': 'Private notes',
   'goals.privateHint': 'Private: these notes are never shown to the student, on the classroom screen or to other teachers. The school’s full data export (made by administrators) includes them.',

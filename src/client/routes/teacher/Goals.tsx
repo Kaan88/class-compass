@@ -9,8 +9,10 @@
  * - Settings: outcome labels (also the module's panel on the class settings page).
  * S13a: goal categories are also the lesson topics (D-101); a student's goals and evidence can be
  * filtered by topic.
+ * S20b (D-170): "Add evidence" on each goal card opens the evidence form (the shared `EvidenceAdder`,
+ * S9 upload pipeline) for that goal; uploads name the class+subject so the server checks it first.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as Files from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
@@ -117,7 +119,7 @@ function HideToggle({ kind, id, hidden }: { kind: 'goal' | 'entry' | 'evidence';
   );
 }
 
-function GoalCard({ goal, outcomes }: { goal: Goal; outcomes: readonly OutcomeDef[] }) {
+function GoalCard({ goal, outcomes, onAddEvidence }: { goal: Goal; outcomes: readonly OutcomeDef[]; onAddEvidence: () => void }) {
   const { t, locale } = useI18n();
   const run = useRun();
   const [progress, setProgress] = useState('');
@@ -127,6 +129,12 @@ function GoalCard({ goal, outcomes }: { goal: Goal; outcomes: readonly OutcomeDe
     <li className="cc-card cc-stack cc-goal" data-testid="teacher-goal">
       <GoalSummary goal={goal} outcomes={outcomes} />
       {goal.authorType === 'student' ? <HideToggle kind="goal" id={goal.id} hidden={goal.hidden === true} /> : null}
+      <div>
+        <Button size="small" onPress={onAddEvidence} aria-label={t('goals.addEvidenceFor', { goal: goal.text })} data-testid="goal-add-evidence">
+          <IconPlus />
+          {t('goals.addEvidence')}
+        </Button>
+      </div>
       {goal.entries.length ? (
         <ul className="cc-stack">
           {goal.entries.map((e) => (
@@ -212,6 +220,13 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
   const q = useQuery({ queryKey: [...ALL, 'student', contextId, studentId], queryFn: () => call(G.teacherStudentGoals, { contextId, studentId }) });
   const [feedback, setFeedback] = useState('');
   const [feedbackGoal, setFeedbackGoal] = useState('');
+  // S20b: the goal the evidence form is for; "Add evidence" on a goal card sets it and moves focus to the form.
+  const [evidenceGoal, setEvidenceGoal] = useState('');
+  const [focusEvidence, setFocusEvidence] = useState(0);
+  const evidenceHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focusEvidence) evidenceHeading.current?.focus();
+  }, [focusEvidence]);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const d = q.data;
   // Topic filter (S13a): goals by their category; evidence by the goal it belongs to.
@@ -243,7 +258,15 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
         {goals.length === 0 ? <p className="cc-muted">{t('goals.noGoals')}</p> : null}
         <ul className="cc-stack">
           {goals.map((g) => (
-            <GoalCard key={g.id} goal={g} outcomes={d.library.outcomes} />
+            <GoalCard
+              key={g.id}
+              goal={g}
+              outcomes={d.library.outcomes}
+              onAddEvidence={() => {
+                setEvidenceGoal(g.id);
+                setFocusEvidence((n) => n + 1);
+              }}
+            />
           ))}
         </ul>
       </section>
@@ -283,7 +306,7 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
         </ul>
       </section>
       <section className="cc-stack" aria-labelledby="goals-evidence">
-        <h3 id="goals-evidence" className="cc-h2">
+        <h3 id="goals-evidence" className="cc-h2" tabIndex={-1} ref={evidenceHeading}>
           {t('goals.evidence')}
         </h3>
         <p className="cc-muted">{t('goals.teacherEvidenceHint')}</p>
@@ -291,7 +314,9 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
           idPrefix={`teacher-evidence-${studentId}`}
           goals={d.goals.map((g) => ({ id: g.id, label: g.text }))}
           media={d.media}
-          upload={(kind, file, name) => upload(Files.uploadFile, { kind, ownerStudentId: studentId }, file, name)}
+          goalId={evidenceGoal}
+          onGoalChange={setEvidenceGoal}
+          upload={(kind, file, name) => upload(Files.uploadFile, { kind, ownerStudentId: studentId, contextId }, file, name)}
           add={(input) => call(G.teacherAddEvidence, { contextId, studentId, ...input })}
           run={(fn, success) => run(fn, { success, invalidate: [ALL] })}
         />
@@ -302,6 +327,7 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
               key={e.id}
               item={e}
               fileUrl={G.teacherFileUrl}
+              goalLabel={e.goalId ? d.goals.find((g) => g.id === e.goalId)?.text : undefined}
               actions={
                 e.authorType === 'teacher' ? (
                   <div>

@@ -1592,6 +1592,8 @@ export const tr = {
   'goals.deleteFeedback': 'Geri bildirimi sil',
   'goals.feedbackFrom': '{name} yazdı',
   'goals.evidence': 'Kanıtlar',
+  'goals.addEvidence': 'Kanıt ekle',
+  'goals.addEvidenceFor': 'Kanıt ekle: {goal}',
   'goals.noEvidence': 'Henüz kanıt yok.',
   'goals.privateNotes': 'Özel notlar',
   'goals.privateHint': 'Özel: bu notlar öğrenciye, sınıf ekranında ya da başka öğretmenlere asla gösterilmez. Okulun tam veri dışa aktarımı (yöneticiler tarafından alınır) bunları içerir.',

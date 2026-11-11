@@ -3,6 +3,7 @@ import * as C from '../../../shared/contracts/files.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { AppError, invalid } from '../../lib/errors.ts';
 import { rawRoute, route } from '../../lib/http.ts';
+import { assertEvidenceUploadScope } from '../goals/teacher.ts';
 import { teacherSeesStudent } from '../students/service.ts';
 import { removeStudentPhoto, serveClassroomPhoto, uploadStudentPhoto } from './photos.ts';
 import { deleteTimeUpClip, serveTimeUpClip, uploadTimeUpClip } from './teacherSound.ts';
@@ -27,6 +28,8 @@ export function registerFileRoutes(app: FastifyInstance, deps: AppDeps) {
       assertMediaAllowed(ctx.db, input.kind, 'evidence');
       if (!input.ownerStudentId) throw invalid('Choose the student this file belongs to', { reason: 'OWNER_REQUIRED' });
       if (ctx.user?.role !== 'admin' && !teacherSeesStudent(ctx, input.ownerStudentId)) throw new AppError('FORBIDDEN', 'This student is not in a class you teach');
+      // From the teacher Goals page (S20b, D-170): the class+subject it is for, checked before the bytes are read.
+      if (input.contextId) assertEvidenceUploadScope(ctx, input.contextId, input.ownerStudentId);
       return fileMeta(await ingestUpload(ctx, req, { kind: input.kind, ownerStudentId: input.ownerStudentId }));
     },
     { rateLimit: UPLOAD_RATE },

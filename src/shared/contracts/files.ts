@@ -83,13 +83,16 @@ export type FileMeta = z.infer<typeof FileMeta>;
  * Upload one file (multipart field `file`). Kinds image/document/audio are evidence files and need
  * `ownerStudentId` plus the matching media flag (D-014: photos and audio OFF by default →
  * 403 FEATURE_DISABLED); `import_source` is a student list for the importer (IMP-1).
+ * `contextId` (S20b, D-170): the teacher Goals page names the class+subject the evidence is for, so
+ * the upload is refused before any bytes are stored when the teacher does not teach the student
+ * there, the Goals module is off or the class is read-only (the same checks as attaching it).
  * Query-string input (the body is the multipart stream).
  */
 export const uploadFile = endpoint({
   method: 'POST',
   path: '/api/files',
   access: 'account',
-  input: z.object({ kind: FileKindSchema, ownerStudentId: Id.optional() }),
+  input: z.object({ kind: FileKindSchema, ownerStudentId: Id.optional(), contextId: Id.optional() }),
   output: FileMeta,
 });
 

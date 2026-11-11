@@ -13,6 +13,9 @@
  * 3 the work and a few words, with sentence starters). The steps can follow the page address (`step`,
  * `onStep`); a step whose earlier choice was lost (a reload) goes back to the first step. Both use
  * the same upload pipeline. Text hints are shown when Save is pressed (`check`), never while typing.
+ *
+ * S20b (D-170): the teacher Goals page can control the chosen goal (`goalId`, `onGoalChange`), so
+ * "Add evidence" on a goal card opens this form for that goal.
  */
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ACCEPT_HINT } from '../../../shared/contracts/files.ts';
@@ -80,6 +83,8 @@ export function EvidenceAdder({
   onStep,
   onDone,
   starters,
+  goalId: goalIdProp,
+  onGoalChange,
 }: {
   goals: Array<{ id: string; label: string }>;
   media: EvidenceMedia;
@@ -97,11 +102,16 @@ export function EvidenceAdder({
   /** `steps` only: after a save, instead of going back to step 1 (the page leaves the step entries behind). */
   onDone?: () => void;
   starters?: EvidenceStarters;
+  /** `form` only: the chosen goal ('' = none) when the page controls it, and how to change it. */
+  goalId?: string;
+  onGoalChange?: (goalId: string) => void;
 }) {
   const { t, locale } = useI18n();
   const modes = evidenceModes(media);
   const [mode, setMode] = useState<EvidenceMode>('text');
-  const [goalId, setGoalId] = useState('');
+  const [localGoalId, setLocalGoalId] = useState('');
+  const goalId = goalIdProp ?? localGoalId;
+  const setGoalId = (id: string) => (onGoalChange ? onGoalChange(id) : setLocalGoalId(id));
   const [body, setBody] = useState('');
   const [url, setUrl] = useState('');
   const [pending, setPending] = useState<Pending[]>([]);
