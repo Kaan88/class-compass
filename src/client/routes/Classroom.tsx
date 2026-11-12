@@ -27,8 +27,8 @@ import { useOutboxStatus } from '../lib/outbox-client.ts';
 import { useMe } from '../lib/session.ts';
 import { LessonBoard } from '../modules/lessons/board/Board.tsx';
 import { classLabel } from '../modules/lessons/labels.ts';
-import { EndLessonFlow, LessonSummaryView, type EndDraft } from '../modules/lessons/EndLesson.tsx';
-import { serverNow, useActiveLessons, useLessonState, useQueuedStart, useServerOffset } from '../modules/lessons/lessonClient.ts';
+import { EndLessonFlow, LessonSummaryView, QueuedEndCard, type EndDraft } from '../modules/lessons/EndLesson.tsx';
+import { serverNow, useActiveLessons, useLessonState, useQueuedEnd, useQueuedStart, useServerOffset } from '../modules/lessons/lessonClient.ts';
 import { emptyStartDraft, QueuedStartCard, StartLessonFlow, StartWarmup, type StartDraft } from '../modules/lessons/StartLesson.tsx';
 import { useClassroomScreen } from '../lib/appWorker.ts';
 import { setClassroomOpen } from '../lib/offlineClassroom.ts';
@@ -187,6 +187,7 @@ function ClassroomScreen({
     return () => setClassroomOpen(false);
   }, []);
   const queuedStart = useQueuedStart(active?.id ?? null, me?.id ?? null);
+  const queuedEnd = useQueuedEnd(active?.id ?? null, me?.id ?? null);
   // A new build of the app is loaded only at a quiet moment, never with a lesson on screen.
   useClassroomScreen(lesson && mode.kind !== 'summary' ? 'lesson' : mode.kind === 'idle' ? 'idle' : 'flow');
   const startedFromQueue = (contextId: string) => async () => {
@@ -237,6 +238,23 @@ function ClassroomScreen({
           onDraft={(fn) => updateMode(contextId, (m) => (m.kind === 'ending' && m.lessonId === lesson.id ? { ...m, draft: fn(m.draft) } : m))}
           onCancel={() => setMode(active.id, { kind: 'idle' })}
           onEnded={(summary) => setMode(active.id, { kind: 'summary', lessonId: lesson.id, summary })}
+          onQueued={() => setMode(contextId, { kind: 'idle' })}
+        />
+      );
+    }
+    // An end that waits (offline, or after a reload offline): never the board of the ended lesson.
+    if (lesson && queuedEnd && queuedEnd.lessonId === lesson.id) {
+      const contextId = active.id;
+      const lessonId = lesson.id;
+      return (
+        <QueuedEndCard
+          key={queuedEnd.opId}
+          context={active}
+          opId={queuedEnd.opId}
+          onEnded={(summary) => {
+            setMode(contextId, { kind: 'summary', lessonId, summary });
+            void qc.invalidateQueries({ queryKey: ['classroom', 'lessons'] });
+          }}
         />
       );
     }
@@ -287,7 +305,8 @@ function ClassroomScreen({
 
   // Full screen while a lesson runs; Leave full screen whenever the page is in full screen, in any mode
   // (S18, D-167); hidden where the browser has none.
-  const lessonRunning = Boolean(lesson && active) && mode.kind !== 'summary';
+  const endQueued = Boolean(lesson && queuedEnd && queuedEnd.lessonId === lesson.id);
+  const lessonRunning = Boolean(lesson && active) && mode.kind !== 'summary' && !endQueued;
   const tools = (
     <>
       <OutboxSaveBadge />
@@ -309,7 +328,7 @@ function ClassroomScreen({
         onLocale={onLocale}
         settings={<Toggle label={t('classroom.sounds')} isSelected={display.deviceSounds} onChange={(v) => setDisplay({ deviceSounds: v })} />}
         // Customise layout (S14b, D-148): only while the board of a running lesson is on screen.
-        canCustomise={Boolean(lesson && active) && mode.kind !== 'ending' && mode.kind !== 'summary'}
+        canCustomise={Boolean(lesson && active) && mode.kind !== 'ending' && mode.kind !== 'summary' && !endQueued}
         tools={tools}
       />
       <main className="cc-page cc-page--wide cc-stack cc-classroom__main">

@@ -7,12 +7,14 @@
  *
  * What it does, and only this:
  * - pages of the main app (sign-in, classroom, teacher, admin, help): network first; when the network
- *   fails (or takes longer than NAV_TIMEOUT_MS) the cached page of this build. The personal student page
- *   (`/s`), the Super Speakers pages (`/p`, `/p/app`, `/board`), the API, AI tools and OAuth are never
- *   answered here: the browser fetches them as if there were no worker;
+ *   fails (or takes longer than NAV_TIMEOUT_MS) the cached page of this build, stored as the server
+ *   sent it (with its security headers). The personal student page (`/s`), the Super Speakers pages
+ *   (`/p`, `/p/app`, `/board`), the API, AI tools and OAuth are never answered here: the browser
+ *   fetches them as if there were no worker;
  * - built files under `/assets/` (content-hashed, so a name never changes its content): cache first.
  *   The worker installs with every script and style of the main app of its build (CC_PRECACHE);
- *   pictures are added when first shown;
+ *   pictures are added when first shown. The files of a page left alone (the student page, the hall
+ *   board: the scope `/` still covers them) are fetched from the network and never stored;
  * - nothing under `/api/` is ever cached or answered: lesson state, rosters and avatars that the board
  *   needs offline are kept by the page itself (`lib/offlineClassroom.ts`), cleared on sign-out.
  *
@@ -91,6 +93,8 @@ interface WorkerEvent {
 }
 interface FetchEventLike extends WorkerEvent {
   request: Request;
+  /** The page that made the request (empty for navigations and worker requests). */
+  clientId?: string;
   respondWith(r: Response | Promise<Response>): void;
 }
 interface MessageEventLike extends WorkerEvent {
@@ -100,7 +104,7 @@ interface MessageEventLike extends WorkerEvent {
 interface WorkerScope {
   location: { origin: string };
   skipWaiting(): Promise<void>;
-  clients: { claim(): Promise<void> };
+  clients: { claim(): Promise<void>; get(id: string): Promise<{ url: string } | undefined> };
   addEventListener(type: 'install' | 'activate', fn: (e: WorkerEvent) => void): void;
   addEventListener(type: 'fetch', fn: (e: FetchEventLike) => void): void;
   addEventListener(type: 'message', fn: (e: MessageEventLike) => void): void;
@@ -124,6 +128,17 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 
 export function installWorker(scope: WorkerScope, build: string, precache: readonly string[]): void {
   const CACHE = cacheNameOf(build);
+
+  /** The path of the page that made a request, or null when unknown (no page, or it is gone). */
+  const clientPath = async (id: string | undefined): Promise<string | null> => {
+    if (!id) return null;
+    try {
+      const client = await scope.clients.get(id);
+      return client ? new URL(client.url).pathname : null;
+    } catch {
+      return null;
+    }
+  };
 
   scope.addEventListener('install', (event) => {
     // Every script and style of this build, and the page. `reload` skips the HTTP cache. No
@@ -163,11 +178,14 @@ export function installWorker(scope: WorkerScope, build: string, precache: reado
           .then((res) => {
             // Keep the newest page of THIS build as the offline shell (a newer build's page would ask
             // for files this build's cache does not hold).
+            // The server's answer itself is stored, with its security headers (Content-Security-Policy,
+            // frame-ancestors): the page served offline runs under the same policy as online.
             const copy = res.clone();
+            const keep = res.clone();
             event.waitUntil(
               copy
                 .text()
-                .then((html) => (isShellOfBuild(copy, html, build) ? caches.open(CACHE).then((c) => c.put(SHELL_KEY, new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } }))) : undefined))
+                .then((html) => (isShellOfBuild(copy, html, build) ? caches.open(CACHE).then((c) => c.put(SHELL_KEY, keep)) : undefined))
                 .catch(() => undefined),
             );
             return res;
@@ -176,21 +194,27 @@ export function installWorker(scope: WorkerScope, build: string, precache: reado
       );
       return;
     }
+    // A file asked for by a page this worker leaves alone (the student page, the hall board): the
+    // network, as with no worker, and never stored in this app's cache.
     event.respondWith(
-      caches
-        .open(CACHE)
-        .then((c) => c.match(req))
-        .then(
-          (hit) =>
-            hit ??
-            fetch(req).then((res) => {
-              if (res.ok && res.status === 200) {
-                const copy = res.clone();
-                event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)));
-              }
-              return res;
-            }),
-        ),
+      clientPath(event.clientId).then((path) =>
+        path !== null && isPassThroughPath(path)
+          ? fetch(req)
+          : caches
+              .open(CACHE)
+              .then((c) => c.match(req))
+              .then(
+                (hit) =>
+                  hit ??
+                  fetch(req).then((res) => {
+                    if (res.ok && res.status === 200) {
+                      const copy = res.clone();
+                      event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy)));
+                    }
+                    return res;
+                  }),
+              ),
+      ),
     );
   });
 }

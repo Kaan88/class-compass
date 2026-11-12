@@ -4,22 +4,23 @@
  * every optional module switched off (only the reflection remains). Save and end leaves full screen
  * when the teacher's "Full screen during lessons" is on (S18, D-167).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as L from '../../../shared/contracts/lessons.ts';
 import type { LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
 import { formatDate, pickText } from '../../../shared/i18n/index.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
+import { getOutbox, useOutboxStatus } from '../../lib/outbox-client.ts';
 import { showToast } from '../../lib/toast.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
-import { IconFace, IconFlag, IconPrev } from '../../ui/icons.tsx';
+import { IconCloudOff, IconFace, IconFlag, IconPrev, IconSync } from '../../ui/icons.tsx';
 import { MetricCell } from '../../ui/Students.tsx';
 import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { playEvent } from '../../themes/index.tsx';
-import { awaitCommand, sendLessonCommand } from './lessonClient.ts';
+import { awaitCommand, awaitOrQueued, sendLessonCommand } from './lessonClient.ts';
 import { exitLessonFullscreen, useLessonPrefs } from './fullscreen.tsx';
 import { endStepUis, type ClassroomContext } from '../registry.ts';
 import type { ReflectionValue } from './ReflectionStep.tsx';
@@ -35,6 +36,7 @@ export function EndLessonFlow({
   onDraft,
   onCancel,
   onEnded,
+  onQueued,
 }: {
   context: ClassroomContext;
   lesson: LessonState;
@@ -43,6 +45,8 @@ export function EndLessonFlow({
   onDraft: (update: (d: EndDraft | null) => EndDraft) => void;
   onCancel: () => void;
   onEnded: (summary: LessonSummary | null) => void;
+  /** The end could not be sent now and waits in the outbox (S26b, D-190). */
+  onQueued: () => void;
 }) {
   const { t, locale } = useI18n();
   const uis = endStepUis(lesson.endSteps);
@@ -65,9 +69,14 @@ export function EndLessonFlow({
     if (r) steps.reflection = { rating: r.rating, note: r.note.trim() ? r.note.trim() : null };
     try {
       const opId = await sendLessonCommand('lesson.end', { contextId: context.id, lessonId: lesson.id, steps });
-      const summary = (await awaitCommand(opId)) as LessonSummary | null;
+      // Offline (D-190): the end waits in the outbox and the classroom shows it as saved.
+      const outcome = await awaitOrQueued(opId);
+      if (outcome.queued) {
+        onQueued();
+        return;
+      }
       showToast({ message: t('lesson.toast.ended', { cls: label }), kind: 'success', scope: 'classroom' });
-      onEnded(summary);
+      onEnded(outcome.result as LessonSummary | null);
     } catch {
       setError(t('lesson.endFailed'));
       setBusy(false);
@@ -105,6 +114,63 @@ export function EndLessonFlow({
           {t('lesson.saveAndEnd')}
         </Button>
       </div>
+    </section>
+  );
+}
+
+/**
+ * A lesson end that waits in the outbox (S26b, D-190): this device is offline, so the end is saved
+ * here and sent when the connection returns; then the summary appears. Shown instead of the board,
+ * also after a reload offline (the device copy still shows the lesson running, and anything done on
+ * that board would be refused once the end is sent). While offline the teacher can take it back.
+ */
+export function QueuedEndCard({ context, opId, onEnded }: { context: ClassroomContext; opId: string; onEnded: (summary: LessonSummary | null) => void }) {
+  const { t, locale } = useI18n();
+  const label = classLabel(context, locale);
+  const status = useOutboxStatus();
+  const [cancelling, setCancelling] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    awaitCommand(opId).then(
+      (summary) => {
+        if (!live) return;
+        showToast({ message: t('lesson.toast.ended', { cls: label }), kind: 'success', scope: 'classroom' });
+        onEnded(summary as LessonSummary | null);
+      },
+      // A refused end is listed in "Needs attention" (with the class), like any refused command.
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+    // The end is followed once per queued command (the label and handler of the first render).
+  }, [opId]);
+
+  const canCancel = !status.online && !status.sending;
+  return (
+    <section className="cc-card cc-stack cc-queued-start" data-testid="queued-end" aria-labelledby="cc-queued-end-title">
+      <h2 id="cc-queued-end-title" className="cc-h2 cc-row">
+        {status.online ? <IconSync /> : <IconCloudOff />}
+        {t('lesson.queuedEnd.title', { cls: label })}
+      </h2>
+      <p role="status">{status.online ? t('lesson.queuedEnd.sending') : t('lesson.queuedEnd.offline')}</p>
+      {canCancel ? (
+        <div>
+          <Button
+            isDisabled={cancelling}
+            onPress={() => {
+              setCancelling(true);
+              void getOutbox()
+                .dismiss(opId)
+                .finally(() => setCancelling(false));
+            }}
+          >
+            <IconPrev />
+            {t('lesson.queuedEnd.cancel')}
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }

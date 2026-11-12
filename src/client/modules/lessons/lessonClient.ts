@@ -170,15 +170,16 @@ export function awaitCommand(opId: string): Promise<unknown> {
   });
 }
 
-// ---------------------------------------------------------------- a start that waits (S26b, D-190)
-export type StartOutcome = { queued: true } | { queued: false; result: unknown };
+// ---------------------------------------------------------------- a start or end that waits (S26b, D-190)
+export type QueuedOutcome = { queued: true } | { queued: false; result: unknown };
 
 /**
- * The server's result for a queued 'lesson.start', or `{ queued: true }` as soon as it cannot be sent
- * now (this device is offline, or a try failed and waits for the next one). Rejects when the server
- * refused it. A queued start stays in the outbox and is sent, in order, when the connection returns.
+ * The server's result for a queued 'lesson.start' or 'lesson.end', or `{ queued: true }` as soon as it
+ * cannot be sent now (this device is offline, or a try failed and waits for the next one). Rejects
+ * when the server refused it. A queued command stays in the outbox and is sent, in order, when the
+ * connection returns.
  */
-export function awaitStartOrQueued(opId: string): Promise<StartOutcome> {
+export function awaitOrQueued(opId: string): Promise<QueuedOutcome> {
   const box = getOutbox();
   return new Promise((resolve, reject) => {
     let done = false;
@@ -201,14 +202,25 @@ export function awaitStartOrQueued(opId: string): Promise<StartOutcome> {
   });
 }
 
-export interface QueuedStart {
+export interface QueuedLessonOp {
   opId: string;
   createdAt: number;
+  /** The lesson an end is for (null for a start). */
+  lessonId: string | null;
 }
 
 /** The start of a lesson in this class that waits in this account's outbox, or null. */
-export function useQueuedStart(contextId: string | null, ownerId: string | null): QueuedStart | null {
-  const [queued, setQueued] = useState<QueuedStart | null>(null);
+export const useQueuedStart = (contextId: string | null, ownerId: string | null) => useQueuedLessonOp('lesson.start', contextId, ownerId);
+
+/**
+ * The end of a lesson in this class that waits in this account's outbox, or null. After a reload
+ * offline the device copy still shows that lesson running: the classroom shows the saved end instead
+ * of its board (anything done on the board would be refused once the end is sent).
+ */
+export const useQueuedEnd = (contextId: string | null, ownerId: string | null) => useQueuedLessonOp('lesson.end', contextId, ownerId);
+
+function useQueuedLessonOp(type: 'lesson.start' | 'lesson.end', contextId: string | null, ownerId: string | null): QueuedLessonOp | null {
+  const [queued, setQueued] = useState<QueuedLessonOp | null>(null);
   // Every outbox change (a new status object), not only the count: an enqueue first counts as
   // reserved and then as stored, with the same count.
   const status = useSyncExternalStore(
@@ -226,13 +238,13 @@ export function useQueuedStart(contextId: string | null, ownerId: string | null)
     void getOutbox()
       .all()
       .then((ops) => {
-        const op = ops.find((o) => o.type === 'lesson.start' && o.state === 'pending' && o.ownerId === ownerId && o.contextId === contextId);
-        if (live) setQueued(op ? { opId: op.opId, createdAt: op.createdAt } : null);
+        const op = ops.find((o) => o.type === type && o.state === 'pending' && o.ownerId === ownerId && o.contextId === contextId);
+        if (live) setQueued((prev) => (op ? (prev?.opId === op.opId ? prev : { opId: op.opId, createdAt: op.createdAt, lessonId: op.lessonId ?? null }) : null));
       })
       .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, [contextId, ownerId, pending, status]);
+  }, [type, contextId, ownerId, pending, status]);
   return queued;
 }

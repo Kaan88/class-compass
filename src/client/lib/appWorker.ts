@@ -8,8 +8,9 @@
  * - A new deploy installs a new worker that waits. When this page already runs the new build (it was
  *   loaded from the network after the deploy), the new worker takes over at once. Otherwise it takes
  *   over at the next quiet moment, followed by one reload: the classroom screen with no lesson and
- *   no Start or End Lesson flow on screen, or a hidden page with no lesson on screen, and never while
- *   commands are still waiting to be sent. A running lesson is never reloaded.
+ *   no Start or End Lesson flow on screen, and never while commands are still waiting to be sent. A
+ *   running lesson is never reloaded, and neither is any other page (a teacher form may hold typed
+ *   text, even in a hidden tab): those move to the new build on their next full load.
  */
 import { useEffect } from 'react';
 
@@ -37,8 +38,10 @@ export function useClassroomScreen(state: QuietReason | null) {
 /** Whether a reload now would interrupt nothing (pure, exported for tests). */
 export function isQuietMoment(s: { screen: QuietReason | null; hidden: boolean; pending: number; online: boolean }): boolean {
   if (s.pending > 0 || !s.online) return false;
-  if (s.screen === 'idle') return true;
-  return s.hidden && s.screen !== 'lesson' && s.screen !== 'flow';
+  // Only the classroom screen with no lesson and no flow. Any other page (teacher, admin, help) may
+  // hold typed text, hidden or not: it moves to the new build on its next full load instead (the
+  // page then runs the new build and the waiting worker takes over at once).
+  return s.screen === 'idle';
 }
 
 /** The build this page was loaded from (`<meta name="cc-build">`, written by the build). */

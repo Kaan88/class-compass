@@ -18,7 +18,7 @@ import { IconCheck, IconCloudOff, IconNext, IconPlay, IconPrev, IconSync } from 
 import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { playEvent } from '../../themes/index.tsx';
-import { awaitCommand, awaitStartOrQueued, sendLessonCommand } from './lessonClient.ts';
+import { awaitCommand, awaitOrQueued, sendLessonCommand } from './lessonClient.ts';
 import { enterLessonFullscreen, useLessonPrefs } from './fullscreen.tsx';
 import { initialStartValues, startStepsFor, useStartContributions, useStartWarmup, type ClassroomContext } from '../registry.ts';
 
@@ -146,7 +146,7 @@ export function StartLessonFlow({
     try {
       const opId = await sendLessonCommand('lesson.start', { ...contribution.input, contextId: context.id });
       // Offline (D-190): the start waits in the outbox and the classroom shows it as saved.
-      const outcome = await awaitStartOrQueued(opId);
+      const outcome = await awaitOrQueued(opId);
       if (outcome.queued) {
         onQueued();
         return;

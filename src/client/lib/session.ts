@@ -7,10 +7,54 @@ import { clearAllToasts, clearSensitiveToasts } from './toast.ts';
 export type Me = Auth.Me;
 export const ME_KEY = ['me'] as const;
 
+/**
+ * The classroom was opened from this device's copy with no connection (S26b, D-190), so the server
+ * was never told to engage classroom mode (PIN-6): its session may still be PIN-unlocked, or out of
+ * classroom mode. Until the server has been told, every `me` asks it to relock first, and an answer
+ * read before that is not trusted.
+ */
+let relockPending = false;
+
+let onlineHooked = false;
+
+/**
+ * Set by `restoreOfflineClassroom`: the next server `me` relocks the session first (PIN-6). When the
+ * connection returns, `me` is asked for at once, so the server is relocked without waiting for a tap.
+ */
+export function requireRelock() {
+  relockPending = true;
+  if (onlineHooked || typeof window === 'undefined') return;
+  onlineHooked = true;
+  window.addEventListener('online', () => {
+    if (relockPending) void queryClient.invalidateQueries({ queryKey: ME_KEY });
+  });
+}
+
+/** Whether the next `me` relocks the server session first (tests). */
+export const relockIsPending = () => relockPending;
+
+async function relock() {
+  try {
+    await call(Auth.enterClassroom, {});
+  } catch (err) {
+    // A 401 is answered by `fetchMe` (signed out) and no connection keeps the relock pending. Any other
+    // answer (no PIN any more, not a teacher) means classroom mode cannot be engaged: nothing to relock.
+    if (!(err instanceof ApiError) || err.status === 401) throw err;
+  }
+  relockPending = false;
+  purgeSensitive(queryClient);
+  clearSensitiveToasts();
+}
+
 /** The signed-in account, or null when signed out. */
 export async function fetchMe(): Promise<Me | null> {
   try {
-    return await call(Auth.me, {});
+    for (;;) {
+      if (relockPending) await relock();
+      const me = await call(Auth.me, {});
+      // The copy was restored while this answer was on its way: relock and ask again.
+      if (!relockPending) return me;
+    }
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) return null;
     throw err;
@@ -50,6 +94,7 @@ export async function enterClassroom(qc: QueryClient = queryClient) {
   purgeSensitive(qc);
   clearSensitiveToasts();
   await call(Auth.enterClassroom, {});
+  relockPending = false;
   return freshMe(qc);
 }
 

@@ -52,8 +52,9 @@ vi.mock('../../src/client/lib/session.ts', async (importOriginal) => ({
   freshMe: vi.fn(),
 }));
 
-const { awaitStartOrQueued } = await import('../../src/client/modules/lessons/lessonClient.ts');
+const { awaitOrQueued, useQueuedEnd, useQueuedStart } = await import('../../src/client/modules/lessons/lessonClient.ts');
 const { QueuedStartCard } = await import('../../src/client/modules/lessons/StartLesson.tsx');
+const { QueuedEndCard } = await import('../../src/client/modules/lessons/EndLesson.tsx');
 const { clearAllToasts, useToasts } = await import('../../src/client/lib/toast.ts');
 const session = await import('../../src/client/lib/session.ts');
 const { requireClassroomSession } = await import('../../src/client/routes/guards.ts');
@@ -89,17 +90,17 @@ afterEach(() => {
 describe('a start that cannot be sent now waits in the outbox (D-190)', () => {
   it('is reported as queued at once while the device is offline', async () => {
     resetStatus({ online: false, pending: 1 });
-    await expect(awaitStartOrQueued('op-start')).resolves.toEqual({ queued: true });
+    await expect(awaitOrQueued('op-start')).resolves.toEqual({ queued: true });
   });
 
   it('is reported as queued when a try fails (the server cannot be reached)', async () => {
-    const p = awaitStartOrQueued('op-start');
+    const p = awaitOrQueued('op-start');
     resetStatus({ pending: 1, failures: 1 });
     await expect(p).resolves.toEqual({ queued: true });
   });
 
   it('gives the server’s result when it is sent at once', async () => {
-    const p = awaitStartOrQueued('op-start');
+    const p = awaitOrQueued('op-start');
     succeed('op-start', { started: true, lessonId: 'op-start' });
     await expect(p).resolves.toEqual({ queued: false, result: { started: true, lessonId: 'op-start' } });
   });
@@ -132,6 +133,53 @@ describe('the queued start on the classroom screen (D-190, UX-10)', () => {
     await act(async () => succeed('op-start', { started: true, lessonId: 'op-start', attendanceKept: 0 }));
     expect(onStarted).toHaveBeenCalledOnce();
     expect(screen.getByTestId('toasts').textContent).toContain('3-A');
+  });
+});
+
+describe('a lesson end that waits (review of S26b, D-190)', () => {
+  const endOp = (opId = 'op-end'): OutboxOp => ({ opId, ownerId: 'u1', type: 'lesson.end', payload: { contextId: 'ctx1', lessonId: 'l1' }, contextId: 'ctx1', lessonId: 'l1', clientTime: 1, state: 'pending', attempts: 0, createdAt: 2 });
+
+  function Probe() {
+    const end = useQueuedEnd('ctx1', 'u1');
+    const start = useQueuedStart('ctx1', 'u1');
+    return <output data-testid="probe">{`${end?.opId ?? '-'}:${end?.lessonId ?? '-'}|${start?.opId ?? '-'}`}</output>;
+  }
+
+  it('a queued end is found for its lesson (so the classroom shows it instead of the board), apart from a queued start', async () => {
+    ops = [endOp()];
+    resetStatus({ online: false, pending: 1 });
+    wrap(<Probe />);
+    await act(async () => undefined);
+    expect(screen.getByTestId('probe').textContent).toBe('op-end:l1|-');
+    ops = [endOp(), { ...startOp('op-next'), createdAt: 3 }];
+    await act(async () => resetStatus({ online: false, pending: 2 }));
+    expect(screen.getByTestId('probe').textContent).toBe('op-end:l1|op-next');
+  });
+
+  it('is reported as queued while offline, like a start', async () => {
+    resetStatus({ online: false, pending: 1 });
+    await expect(awaitOrQueued('op-end')).resolves.toEqual({ queued: true });
+  });
+
+  it('offline: says the end is saved, and lets the teacher go back to the lesson', async () => {
+    ops = [endOp()];
+    resetStatus({ online: false, pending: 1 });
+    wrap(<QueuedEndCard context={context} opId="op-end" onEnded={() => undefined} />);
+    expect(screen.getByTestId('queued-end').textContent).toContain(en['lesson.queuedEnd.offline']);
+    fireEvent.click(screen.getByRole('button', { name: en['lesson.queuedEnd.cancel'] }));
+    await act(async () => undefined);
+    expect(dismissed).toEqual(['op-end']);
+  });
+
+  it('online again: shows the summary once the server accepted the end', async () => {
+    ops = [endOp()];
+    resetStatus({ online: true, sending: true, pending: 1 });
+    const onEnded = vi.fn();
+    wrap(<QueuedEndCard context={context} opId="op-end" onEnded={onEnded} />);
+    expect(screen.getByTestId('queued-end').textContent).toContain(en['lesson.queuedEnd.sending']);
+    expect(screen.queryByRole('button', { name: en['lesson.queuedEnd.cancel'] })).toBeNull();
+    await act(async () => succeed('op-end', { lessonId: 'l1' }));
+    expect(onEnded).toHaveBeenCalledWith({ lessonId: 'l1' });
   });
 });
 

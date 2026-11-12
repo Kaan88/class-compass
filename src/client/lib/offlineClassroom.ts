@@ -19,7 +19,7 @@
  */
 import { Dexie, type Table } from 'dexie';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
-import type { Me } from './session.ts';
+import { requireRelock, type Me } from './session.ts';
 
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const ME_ROOT = 'me';
@@ -216,6 +216,8 @@ export async function restoreOfflineClassroom(qc: QueryClient): Promise<Me | nul
   await chain;
   const snap = await getStore().load();
   if (!snap) return null;
+  // The server was not told to engage classroom mode: it is, before its next `me` is trusted (PIN-6).
+  requireRelock();
   restoring = true;
   try {
     for (const q of snap.queries) {

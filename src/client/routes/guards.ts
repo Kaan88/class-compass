@@ -44,6 +44,9 @@ export async function requireSession({ context, location }: { context: RouterCon
  * and start a lesson that waits in the outbox. `offline` tells the caller not to call the server.
  * Any answer of the server (a 401 included) is followed as usual.
  */
+/** How long the classroom guard waits for the server before it opens the device copy (as the worker's NAV_TIMEOUT_MS). */
+export const SESSION_TIMEOUT_MS = 4000;
+
 export async function requireClassroomSession(args: { context: RouterContext; location: ParsedLocation }): Promise<{ me: Me; offline: boolean }> {
   // The browser knows it has no connection: the server is not asked (a query would wait for the
   // connection). Without a copy on this device the usual guard runs and waits for the connection.
@@ -52,7 +55,20 @@ export async function requireClassroomSession(args: { context: RouterContext; lo
     if (me) return { me, offline: true };
   }
   try {
-    return { ...(await requireSession(args)), offline: false };
+    // A network that takes requests but never answers (school Wi-Fi up, the way to the server down)
+    // would leave the page blank: after SESSION_TIMEOUT_MS the copy opens, if there is one, and the
+    // server's answer still counts when it comes (the relock of PIN-6 waits for it).
+    const asked = requireSession(args);
+    const timedOut = Symbol('timeout');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const first = await Promise.race([asked, new Promise<typeof timedOut>((resolve) => (timer = setTimeout(() => resolve(timedOut), SESSION_TIMEOUT_MS)))]).finally(() => clearTimeout(timer));
+    if (first !== timedOut) return { ...first, offline: false };
+    const me = await restoreOfflineClassroom(args.context.queryClient);
+    if (me) {
+      asked.catch(() => undefined);
+      return { me, offline: true };
+    }
+    return { ...(await asked), offline: false };
   } catch (err) {
     if (!isUnreachable(err)) throw err;
     const me = await restoreOfflineClassroom(args.context.queryClient);

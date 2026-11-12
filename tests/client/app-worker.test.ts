@@ -106,7 +106,7 @@ function fakeScope() {
   const scope = {
     location: { origin: ORIGIN },
     skipWaiting: vi.fn(async () => undefined),
-    clients: { claim: vi.fn(async () => undefined) },
+    clients: { claim: vi.fn(async () => undefined), get: async (id: string) => (id ? { url: `${ORIGIN}${id}` } : undefined) },
     addEventListener: (type: string, fn: Handler) => handlers.set(type, fn),
   };
   const lifecycle = async (type: 'install' | 'activate') => {
@@ -114,12 +114,15 @@ function fakeScope() {
     handlers.get(type)!({ waitUntil: (p: Promise<unknown>) => waits.push(p) });
     await Promise.all(waits);
   };
-  /** Dispatch a fetch; resolves to the response, or null when the worker did not answer. */
-  const fetchEvent = async (path: string, mode: RequestMode | 'navigate' = 'cors') => {
+  /**
+   * Dispatch a fetch; resolves to the response, or null when the worker did not answer. `client` is
+   * the path of the page that asks (the fake `clients.get` takes the path as the client id).
+   */
+  const fetchEvent = async (path: string, mode: RequestMode | 'navigate' = 'cors', client = '') => {
     let answer: Promise<Response> | null = null;
     const waits: Promise<unknown>[] = [];
     const request = { url: `${ORIGIN}${path}`, method: 'GET', mode } as unknown as Request;
-    handlers.get('fetch')!({ request, respondWith: (r: Promise<Response>) => (answer = Promise.resolve(r)), waitUntil: (p: Promise<unknown>) => waits.push(p) });
+    handlers.get('fetch')!({ request, clientId: client, respondWith: (r: Promise<Response>) => (answer = Promise.resolve(r)), waitUntil: (p: Promise<unknown>) => waits.push(p) });
     const answered = answer as Promise<Response> | null;
     const res = answered ? await answered : null;
     await Promise.all(waits);
@@ -128,7 +131,9 @@ function fakeScope() {
   return { scope, lifecycle, fetchEvent, handlers };
 }
 
-const page = (build: string) => new Response(`<html><head><meta name="cc-build" content="${build}" /></head></html>`, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
+const CSP = "default-src 'self'; frame-ancestors 'none'";
+const page = (build: string) =>
+  new Response(`<html><head><meta name="cc-build" content="${build}" /></head></html>`, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' } });
 
 describe('the worker (fake caches, D-190)', () => {
   afterEach(() => {
@@ -210,6 +215,38 @@ describe('the worker (fake caches, D-190)', () => {
     expect(w.scope.skipWaiting).toHaveBeenCalledOnce();
   });
 
+  it('serves the offline page with the server’s security headers (review of S26b)', async () => {
+    const { w, setOnline } = setup();
+    await w.lifecycle('install');
+    // The first online visit replaces the installed shell; it keeps the headers too.
+    expect(await (await w.fetchEvent('/teacher', 'navigate'))!.text()).toContain('content="b1"');
+    setOnline(false);
+    const shell = (await w.fetchEvent('/classroom', 'navigate'))!;
+    expect(shell.headers.get('content-security-policy')).toBe(CSP);
+    expect(shell.headers.get('x-frame-options')).toBe('DENY');
+    expect(await shell.text()).toContain('content="b1"');
+  });
+
+  it('never stores the files of the student page or the hall board (review of S26b)', async () => {
+    const { caches, w, fetched, setOnline } = setup();
+    await w.lifecycle('install');
+    const cache = caches.all.get(cacheNameOf('b1'))!;
+    for (const client of ['/s', '/s/x', '/board']) {
+      const res = await w.fetchEvent(`/assets/student-7${client.replace(/\//gu, '-')}.js`, 'cors', client);
+      expect(await res!.text()).toContain('/assets/student-7');
+    }
+    expect([...cache.store.keys()].filter((k) => k.includes('student-7'))).toEqual([]);
+    // Not even a file of this build that is cached: those pages get the network's answer.
+    const before = fetched.length;
+    await w.fetchEvent('/assets/main-1.js', 'cors', '/s');
+    expect(fetched.length).toBe(before + 1);
+    // The same file asked for by the classroom is cached.
+    await w.fetchEvent('/assets/student-7-shared.js', 'cors', '/classroom');
+    expect(cache.store.has(`${ORIGIN}/assets/student-7-shared.js`)).toBe(true);
+    setOnline(false);
+    expect(await (await w.fetchEvent('/assets/student-7-shared.js', 'cors', '/classroom'))!.text()).toContain('student-7-shared');
+  });
+
   it('fills the cache with a built file on first use', async () => {
     const { caches, w } = setup();
     await w.lifecycle('install');
@@ -278,7 +315,9 @@ describe('moving to a new build (D-190)', () => {
     expect(isQuietMoment({ ...base, screen: 'lesson', hidden: true })).toBe(false);
     expect(isQuietMoment({ ...base, screen: 'flow', hidden: true })).toBe(false);
     expect(isQuietMoment({ ...base, screen: null })).toBe(false);
-    expect(isQuietMoment({ ...base, screen: null, hidden: true })).toBe(true);
+    // A teacher page in a background tab may hold a typed draft: never reloaded (review of S26b).
+    expect(isQuietMoment({ screen: null, hidden: true, pending: 0, online: true })).toBe(false);
+    expect(isQuietMoment({ ...base, hidden: true })).toBe(true);
   });
 
   it('reads the page’s build from its meta tag', () => {
