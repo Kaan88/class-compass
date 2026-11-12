@@ -21,7 +21,8 @@
  *   `FLOOR` whole cards in at least two full rows, and "N more students below" says how many and
  *   scrolls until the last card is in view. What the box can hold is limited by the + button: a card is
  *   never lower than a touch target, so the Students box of 1536×703 (about 238 px under the routine,
- *   the timer and the counter) has room for two rows of cards (D-195).
+ *   the timer and the counter) has room for three rows of the lowest cards (`snug`), every student of
+ *   24 (S27c review, D-195); with nine class tabs (two lines) a class of 32 still shows two full rows.
  * Then this lesson's achievements and the group numbers (card marks from the achievements and grouping
  * add-ons) are given in the 24 and 40 classes: they show with their accessible names, never overlap the
  * name, the + button or the chips, and disappear when the module is switched off. On a phone (375×812,
@@ -56,18 +57,20 @@ type Round = 'plain' | 'marks';
  * and with the card marks (measured for S27c, D-195, with the default layout and these fictional names).
  */
 const ALL_FIT: Record<Size['name'], Record<Round, number>> = {
-  '1536x703@1.25': { plain: 16, marks: 16 },
-  '1536x864@1.25': { plain: 24, marks: 16 },
+  '1536x703@1.25': { plain: 24, marks: 16 },
+  '1536x864@1.25': { plain: 24, marks: 24 },
   '1440x787@2': { plain: 16, marks: 16 },
   '1280x720': { plain: 16, marks: 16 },
 };
 /** Whole cards a larger class shows at least (two full rows or more), without and with the card marks. */
 const FLOOR: Record<Size['name'], Record<Round, number>> = {
-  '1536x703@1.25': { plain: 18, marks: 16 },
-  '1536x864@1.25': { plain: 24, marks: 21 },
-  '1440x787@2': { plain: 18, marks: 16 },
-  '1280x720': { plain: 14, marks: 14 },
+  '1536x703@1.25': { plain: 24, marks: 20 },
+  '1536x864@1.25': { plain: 28, marks: 24 },
+  '1440x787@2': { plain: 21, marks: 21 },
+  '1280x720': { plain: 21, marks: 18 },
 };
+/** Whole cards of a class of 32 at 1536×703 when the class tabs take two lines (nine tabs, S27c review). */
+const FLOOR_TWO_TAB_LINES = 16;
 
 const GIVEN = ['Ada', 'Bora', 'Ceren', 'Deniz', 'Ece', 'Furkan', 'Gökçe Nur', 'Harun', 'Irmak', 'İlkay', 'Kerem', 'Lale', 'Mert', 'Nehir', 'Oğuz', 'Öykü', 'Rüzgar', 'Selin', 'Şahin', 'Tuana'];
 const FAMILY = ['Kurgu', 'Örnekçi', 'Deneme', 'Karaağaçlıoğlu', 'Yıldırımkaya', 'Uydurma', 'Masalcı', 'Hayaloğlu'];
@@ -281,8 +284,8 @@ async function checkPhone(browser: Browser, cls: TestClass, label: string) {
 /** The scroll position of the student box (the element "N more students below" scrolls). */
 const studentsScrollTop = (page: Page) => page.evaluate((sel) => document.querySelector(sel)!.scrollTop, BOX);
 const fitStep = (page: Page) => page.locator('.cc-student-grid').getAttribute('data-fit');
-/** The step's place on the ladder: tight < s0 < … < s2 (where the fit starts) < … < s3 (the largest). */
-const stepValue = (step: string | null) => (step === 'tight' ? -1 : step ? Number(step.slice(1)) : Number.NaN);
+/** The step's place on the ladder: tight < snug < s0 < … < s2 (where the fit starts) < … < s3 (the largest). */
+const stepValue = (step: string | null) => (step === 'tight' ? -1 : step === 'snug' ? -0.5 : step ? Number(step.slice(1)) : Number.NaN);
 
 async function settle(p: Page) {
   await p.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
@@ -397,7 +400,7 @@ async function checkMarks(p: Page, cls: TestClass, label: string) {
   await expect(p.locator('[data-mark="group"]')).toHaveCount(cls.size);
   await settle(p);
   const seen = await checkBoard(p, cls, label);
-  if (seen.step === 'tight') expect(await marksOffCountLine(p), `${label}: marks on the count's line in tight`).toEqual([]);
+  if (seen.step === 'tight' || seen.step === 'snug') expect(await marksOffCountLine(p), `${label}: marks on the count's line in ${seen.step}`).toEqual([]);
   return seen;
 }
 
@@ -425,7 +428,7 @@ async function checkLate(p: Page, teacher: Page, cls: TestClass, label: string) 
     await expect(lateCards).toHaveCount(late.length);
     await expect(lateCards.locator('.cc-student-card__count')).toHaveCount(late.length);
     const seen = await checkMarks(p, cls, label);
-    expect(seen.step, `${label}: the narrowest layout`).toBe('tight');
+    expect(['tight', 'snug'], `${label}: one of the two lowest layouts`).toContain(seen.step);
     const heights = await p.locator('.cc-student-card').evaluateAll((cards) => {
       const h = (late: boolean) => Math.max(...cards.filter((c) => !!c.querySelector('.cc-att-chip[data-status="late"]') === late).map((c) => c.getBoundingClientRect().height));
       return { late: h(true), others: h(false) };
@@ -499,7 +502,7 @@ for (const classSize of CLASS_SIZES) {
             if (classSize === 8) expect(stepValue(seen.step), `${label}: cards grown above the middle size (step ${seen.step})`).toBeGreaterThan(2);
             // S25a (D-185): the measured classroom display shows a class of 40 in `tight`, where the marks share the count's line.
             if (round === 'marks' && classSize === 40 && size === SIZES[0]) {
-              expect(seen.step, `${label}: the narrowest layout`).toBe('tight');
+              expect(['tight', 'snug'], `${label}: one of the two lowest layouts`).toContain(seen.step);
               await checkLate(p, teacher, cls, `${label} late`);
             }
             if (size === SIZES[0] && (classSize === 8 || round === 'marks')) await checkPhone(browser, cls, `${PHONE.name} ${classSize}${round === 'marks' ? ' marks' : ''}`);
@@ -534,6 +537,44 @@ for (const classSize of CLASS_SIZES) {
           }
         } finally {
           await ctx.close();
+        }
+      }
+
+      if (classSize === 32) {
+        // S27c review (D-195): a teacher with many classes. Four more (empty) classes of the teacher make
+        // nine class tabs, two lines of them at 1536×703, which take a line's height from the Students
+        // box; without marks the box still shows two full rows (`FLOOR_TWO_TAB_LINES`) and the cue counts
+        // the rest. (With the marks of a lesson the cards are taller and one row shows: D-195, open for
+        // the owner.)
+        const extras: Array<{ classId: string; contextId: string | null }> = [];
+        const { ctx, p } = await openDisplay(browser, SIZES[0]);
+        try {
+          for (let i = 0; i < 4; i += 1) {
+            const extra = await api(page, 'POST', '/api/admin/classes', { schoolYearId: year.id, name: `9-${letters().toUpperCase()}`, grade: null });
+            expect(extra.status).toBe(200);
+            const ctxRow = await api(page, 'POST', '/api/admin/teaching-contexts', { teacherId: teacherUser.id, classId: extra.body.id as string, subjectId: english.id });
+            extras.push({ classId: extra.body.id as string, contextId: ctxRow.status === 200 ? (ctxRow.body.id as string) : null });
+            expect(ctxRow.status).toBe(200);
+          }
+          await p.reload();
+          await showClass(p, cls);
+          // The class tabs are the buttons named "<class> · English".
+          const tabLines = await p.evaluate(() => {
+            const tabs = [...document.querySelectorAll('[data-testid="classroom-shell"] button')].filter((b) => / · English/u.test(b.textContent ?? ''));
+            return new Set(tabs.map((b) => Math.round(b.getBoundingClientRect().top))).size;
+          });
+          expect(tabLines, 'nine class tabs take two lines at 1536×703').toBe(2);
+          const label = `${SIZES[0].name} ${classSize} nine tabs`;
+          const seen = await checkBoard(p, cls, label);
+          expect(seen.visible, `${label}: whole cards on screen`).toBeGreaterThanOrEqual(FLOOR_TWO_TAB_LINES);
+          expect(seen.rows, `${label}: full rows of cards on screen`).toBeGreaterThanOrEqual(2);
+        } finally {
+          await ctx.close();
+          for (const e of extras) {
+            if (e.contextId) await api(page, 'POST', `/api/admin/teaching-contexts/${e.contextId}/end`, {});
+            const archived = await api(page, 'POST', `/api/admin/classes/${e.classId}/archive`, {});
+            if (archived.status !== 200) cleanupFailures.push(`archive an extra class: ${archived.status}`);
+          }
         }
       }
     } finally {

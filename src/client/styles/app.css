@@ -2943,6 +2943,11 @@ html:has(.cc-classroom) {
 .cc-lesson-board .cc-student-grid[data-fit] .cc-student-card .cc-avatar {
   --cc-avatar-size: var(--cc-card-avatar);
 }
+/* The name too (S27c review: the compact mode's 0.95rem made the names of a class over 24 larger than
+   the step's, two-line names a row taller, and a class of 32 lost its third row at 1536×703). */
+.cc-lesson-board .cc-student-grid[data-fit] .cc-student-card__name {
+  font-size: var(--cc-card-name);
+}
 .cc-lesson-board .cc-student-grid[data-fit] .cc-student-card__add {
   min-width: var(--cc-card-add);
   min-height: var(--cc-card-add);
@@ -2957,24 +2962,46 @@ html:has(.cc-classroom) {
     'name name name'
     'avatar meta add';
 }
-.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta {
+/* The lowest card with the name beside the + button (`snug`, S27c review, D-195): the name over the
+   avatar and the count, the + button beside both lines, so the name's column is the card without the
+   + button and the card is as low as the + button. */
+.cc-lesson-board .cc-student-grid[data-fit='snug']:not([data-fit-name='across']) .cc-student-card {
+  grid-template-areas:
+    'name name add'
+    'avatar meta add';
+  column-gap: 0.35rem;
+}
+/* The lowest steps leave no room above a card for a theme's top trim (a drift's cap reached 10px over
+   the name, a scallop or torn edge over the + button of the card above): the cards keep their frame,
+   without the edge, like compact cards did before S27c. */
+.cc-lesson-board .cc-student-grid:is([data-fit='tight'], [data-fit='snug']) .cc-student-card > :is(.cc-frame__edge--drift, .cc-frame__edge--scallop, .cc-frame__edge--torn) {
+  display: none;
+}
+.cc-lesson-board .cc-student-grid[data-fit='snug'] .cc-student-card__meta {
+  line-height: 1.1;
+}
+.cc-lesson-board .cc-student-grid[data-fit='snug'] .cc-student-card .cc-level {
+  padding-block: 0;
+  line-height: 1.2;
+}
+.cc-lesson-board .cc-student-grid:is([data-fit='tight'], [data-fit='snug']) .cc-student-card__meta {
   align-self: center;
   gap: 0.2rem;
 }
-/* S25a (D-185): in `tight` the marks are their icon and number only (no pill edge or padding; the
+/* S25a (D-185): in `tight` (and `snug`, S27c review) the marks are their icon and number only (no pill edge or padding; the
    accessible name is unchanged) and come right after the count, so they share its line; the level chip
    (or a notice) takes the next line when the line is full. The DOM order, and so the reading order,
    stays count, level, marks. On a card with a count, every other chip (the level, a notice, and an
    attendance chip such as Late, which comes before the count in the DOM) goes after the marks, so
    the count and the marks lead the first line (S25a review). A card without a count (away) keeps its
    order: its attendance chip leads. */
-.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__mark {
+.cc-lesson-board .cc-student-grid:is([data-fit='tight'], [data-fit='snug']) .cc-student-card__mark {
   gap: 0.05em;
   padding: 0;
   border: none;
 }
-.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta > :is(.cc-level, .cc-student-card__notice),
-.cc-lesson-board .cc-student-grid[data-fit='tight'] .cc-student-card__meta:has(> .cc-student-card__count) > :not(.cc-student-card__count, .cc-student-card__mark) {
+.cc-lesson-board .cc-student-grid:is([data-fit='tight'], [data-fit='snug']) .cc-student-card__meta > :is(.cc-level, .cc-student-card__notice),
+.cc-lesson-board .cc-student-grid:is([data-fit='tight'], [data-fit='snug']) .cc-student-card__meta:has(> .cc-student-card__count) > :not(.cc-student-card__count, .cc-student-card__mark) {
   order: 1;
 }
 .cc-lesson-board .cc-student-card__name {

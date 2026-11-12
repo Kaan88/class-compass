@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
 import { achievementsCardAddon, achievementsKey } from '../../src/client/modules/achievements/AchievementsPanel.tsx';
 import { groupsCardAddon } from '../../src/client/modules/grouping/GroupsPanel.tsx';
+import { useCardsBelow } from '../../src/client/modules/lessons/board/Box.tsx';
 import { FIT_START, FIT_STEPS, chooseFitStep, type FitMeasure } from '../../src/client/modules/lessons/board/cardFit.ts';
 import { lessonKey } from '../../src/client/modules/lessons/lessonClient.ts';
 import type { ClassroomContext } from '../../src/client/modules/types.ts';
@@ -65,19 +66,30 @@ describe('chooseFitStep (CRD-3, DSH-1)', () => {
     expect(chooseFitStep(base, N, ladder(-1, (s) => (s === base ? -1 : 6)).measure)).toBe(base - 1);
   });
 
-  it('starts at the middle step (the old Normal size), with the readable minimum at the bottom', () => {
+  it('starts at the middle step (the old Normal size), with the readable minimum and the lowest card at the bottom', () => {
     expect(FIT_STEPS[FIT_START]!.key).toBe('s2');
     expect(FIT_STEPS.at(-1)!.key).toBe('s3');
     expect(FIT_STEPS[0]).toMatchObject({ key: 'tight', tight: true });
+    expect(FIT_STEPS[1]).toMatchObject({ key: 'snug', tight: false });
   });
 
   it('never makes the + button smaller than a touch target, and the sizes grow along the ladder', () => {
     const rem = (v: string | undefined) => parseFloat(v ?? 'NaN');
     for (const step of FIT_STEPS) expect(step.vars['--cc-card-add']).toMatch(/^calc\(var\(--cc-touch\) \+ [\d.]+rem\)$/u);
-    for (const name of ['--cc-card-min', '--cc-card-h', '--cc-card-avatar', '--cc-card-name']) {
-      const values = FIT_STEPS.map((s) => rem(s.vars[name]));
+    // From `snug` up (`tight` is a layout of its own: the name across the whole card).
+    const beside = FIT_STEPS.filter((s) => !s.tight);
+    for (const name of ['--cc-card-min', '--cc-card-h', '--cc-card-avatar', '--cc-card-name', '--cc-card-pad-y', '--cc-card-gap']) {
+      const values = beside.map((s) => rem(s.vars[name]));
       expect(values, name).toEqual([...values].sort((a, b) => a - b));
     }
+  });
+
+  it('S27c review (D-195): the lowest card has no vertical padding and the narrowest gaps, the + a touch target', () => {
+    const snug = FIT_STEPS.find((s) => s.key === 'snug')!;
+    expect(snug.vars['--cc-card-pad-y']).toBe('0rem');
+    expect(snug.vars['--cc-card-row-gap']).toBe('0rem');
+    expect(parseFloat(snug.vars['--cc-card-gap']!)).toBeLessThan(parseFloat(FIT_STEPS.find((s) => s.key === 's0')!.vars['--cc-card-gap']!));
+    expect(snug.vars['--cc-card-add']).toBe('calc(var(--cc-touch) + 0rem)');
   });
 });
 
@@ -163,5 +175,42 @@ describe('card add-ons: achievements and groups', () => {
     expect(renderHook(() => groupsCardAddon.useAddon(context, lesson, false), { wrapper: wrapper('en') }).result.current).toBeNull();
     client.setQueryData(lessonKey(context.id), lessonWithGroups(false));
     expect(renderHook(() => groupsCardAddon.useAddon(context, lesson, true), { wrapper: wrapper('en') }).result.current).toBeNull();
+  });
+});
+
+describe('"N more students below" (D-148, D-174)', () => {
+  /** A scrolling box of 303 px at y 397 with three cards, the last one cut by `cut` px. */
+  function box(cut: number, scrollHeight: number) {
+    const scroller = document.createElement('div');
+    scroller.style.overflowY = 'auto';
+    const section = document.createElement('section');
+    scroller.append(section);
+    document.body.append(scroller);
+    const rect = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 100, width: 100, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    Object.defineProperty(scroller, 'clientHeight', { value: 303 });
+    Object.defineProperty(scroller, 'scrollHeight', { value: scrollHeight });
+    scroller.getBoundingClientRect = () => rect(397.03, 700.47);
+    for (const bottom of [520, 640.7, 700.47 + cut]) {
+      const card = document.createElement('div');
+      card.className = 'cc-student-card';
+      card.getBoundingClientRect = () => rect(bottom - 59, bottom);
+      section.append(card);
+    }
+    return { current: section };
+  }
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('S27c review: counts a last row cut by 0.6 px (1440×787), whose box scrolls by a single pixel', () => {
+    const ref = box(0.63, 304);
+    const { result } = renderHook(() => useCardsBelow(ref, []));
+    expect(result.current).toBe(1);
+  });
+
+  it('counts nothing when every card is whole', () => {
+    const ref = box(0, 303);
+    const { result } = renderHook(() => useCardsBelow(ref, []));
+    expect(result.current).toBe(0);
   });
 });

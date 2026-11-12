@@ -40,11 +40,13 @@ export function useCardsBelow(sectionRef: RefObject<HTMLElement | null>, deps: r
     const scroller = section?.parentElement;
     if (!section || !scroller) return;
     const measure = () => {
-      const scrolls = scroller.scrollHeight > scroller.clientHeight + 1 && /auto|scroll/u.test(getComputedStyle(scroller).overflowY);
+      // Whole pixels for the scroll check and half a pixel for a card: a last row cut by 0.6 px (1440×787,
+      // S27c review) is a row that is not whole, and the card fit (D-177) did not count it either.
+      const scrolls = scroller.scrollHeight > scroller.clientHeight && /auto|scroll/u.test(getComputedStyle(scroller).overflowY);
       if (!scrolls) return setBelow(0);
       const bottom = scroller.getBoundingClientRect().bottom;
       let n = 0;
-      for (const card of section.querySelectorAll('.cc-student-card')) if (card.getBoundingClientRect().bottom > bottom + 1) n += 1;
+      for (const card of section.querySelectorAll('.cc-student-card')) if (card.getBoundingClientRect().bottom > bottom + 0.5) n += 1;
       setBelow(n);
     };
     measure();

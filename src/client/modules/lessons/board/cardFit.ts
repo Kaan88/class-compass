@@ -10,6 +10,8 @@
  *   while every card still fits, up to the largest size (a small class fills the free height instead
  *   of leaving it empty);
  * - when they do not, the cards shrink step by step to the largest size at which every card fits;
+ * - the lowest step beside the + button is `snug` (the name over the avatar and the count, no vertical
+ *   padding: a card as low as its + button, S27c review);
  * - when no size fits them all (a class of 40 on a short display), the size that shows the most whole
  *   cards, never below the readable minimum (`tight`: the name across the whole card on its own line,
  *   so it breaks only between words, then the avatar, the count, the marks and the + button at
@@ -26,7 +28,7 @@
 import { useLayoutEffect, type RefObject } from 'react';
 
 export interface FitStep {
-  /** `tight`, or `s<t>` with t from 0 (smallest) to 3 (largest); the fit starts at 2. */
+  /** `tight`, `snug`, or `s<t>` with t from 0 to 3 (largest); the fit starts at 2. */
   key: string;
   /** The readable-minimum layout: the name on its own line across the card. */
   tight: boolean;
@@ -63,9 +65,27 @@ function varsAt(t: number): Record<string, string> {
   };
 }
 
+/**
+ * The lowest card with the name beside the + button (S27c review, D-195): the name takes the first line
+ * over the avatar and the count (`data-fit="snug"`: 'name name add' / 'avatar meta add'), so its column
+ * is the card's width without the + button only, a smaller avatar keeps two lines of a name with the
+ * count under them (the level chip without its vertical padding) as low as the + button, and there is
+ * no vertical padding and only a narrow gap. A card is then as low as its + button (a touch target) and
+ * its border: at the classroom display in its window (1536×703) three rows of cards fit in the Students
+ * box, every student of a class of 24, where `s0` and `tight` held two rows.
+ */
+const SNUG: Record<string, string> = {
+  ...varsAt(0),
+  '--cc-card-avatar': '1.5rem',
+  '--cc-card-pad-y': '0rem',
+  '--cc-card-gap': '0.1rem',
+  '--cc-card-row-gap': '0rem',
+};
+
 /** The ladder, smallest first. */
 export const FIT_STEPS: readonly FitStep[] = [
   { key: 'tight', tight: true, vars: varsAt(0) },
+  { key: 'snug', tight: false, vars: SNUG },
   ...[0, 0.5, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3].map((t) => ({ key: `s${t}`, tight: false, vars: varsAt(t) })),
 ];
 
@@ -165,7 +185,9 @@ function measureIn(scroller: HTMLElement, grid: HTMLElement): FitMeasure {
   const room = scroller.clientHeight - offset - (parseFloat(getComputedStyle(scroller).paddingBottom) || 0);
   let full = 0;
   const cards = grid.children;
-  for (const card of cards) if (card.getBoundingClientRect().bottom - g.top <= room + 0.5) full += 1;
+  // A card counts only when it is whole: at most a tenth of a pixel of rounding (with 0.5 px a card of
+  // 1440×787 was cut by 0.6 px once its avatars were drawn, S27c review).
+  for (const card of cards) if (card.getBoundingClientRect().bottom - g.top <= room + 0.1) full += 1;
   return { all: full === cards.length, full };
 }
 

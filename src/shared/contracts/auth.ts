@@ -10,7 +10,8 @@ export type Locale = z.infer<typeof Locale>;
  * S22d (D-178): how roomy the teacher and admin areas are, per account (user setting `area.density`).
  * Compact / Normal / Large change spacing, table row height and card padding only (layout variables
  * on `<html data-area-density>`); touch targets keep `--cc-touch`. Normal is the look before S22d.
- * The classroom screen has its own per-device Compact / Normal / Large (D-103).
+ * The classroom screen sizes its student cards by itself (the D-177 fit; its own choice was removed
+ * in S27c, D-195).
  */
 export const AREA_DENSITIES = ['compact', 'normal', 'large'] as const;
 export const AreaDensity = z.enum(AREA_DENSITIES);

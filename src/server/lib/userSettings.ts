@@ -37,7 +37,7 @@ export const USER_SETTINGS = {
   'displayInfo.lastSeen': setting(DisplayInfoRecord, EMPTY_DISPLAY_INFO),
   /** S18 (D-167): Start lesson enters full screen and End lesson leaves it (on by default; the board's button works either way). */
   'lessons.fullscreen': setting(z.boolean(), true),
-  /** S22d (D-178): Compact / Normal / Large in the teacher and admin areas (Normal by default; the classroom screen keeps its per-device size). */
+  /** S22d (D-178): Compact / Normal / Large in the teacher and admin areas (Normal by default; the classroom screen sizes its cards by itself: the D-177 fit, D-195). */
   'area.density': setting(AreaDensity, DEFAULT_AREA_DENSITY),
 } as const;
 
