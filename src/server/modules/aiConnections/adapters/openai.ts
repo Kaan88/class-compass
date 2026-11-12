@@ -74,6 +74,7 @@ export const openAiAdapter: Adapter = async function* (req) {
     policy: req.target.policy,
     signal: req.signal,
     chat: true,
+    totalTimeoutMs: req.timeoutMs,
   });
   if (res.status < 200 || res.status >= 300) {
     res.cancel();

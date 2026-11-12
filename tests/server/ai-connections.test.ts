@@ -6,6 +6,7 @@
  * and the daily message limit; OpenRouter's sign-in with PKCE (state bound to the account, single use,
  * expiry, verifier checked by the provider). Fictional data only.
  */
+import type http from 'node:http';
 import zlib from 'node:zlib';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -14,7 +15,7 @@ import type { RequestContext } from '../../src/server/lib/context.ts';
 import { challengeOf } from '../../src/server/modules/aiConnections/oauth.ts';
 import { openConnectionSecret } from '../../src/server/modules/aiConnections/provider.ts';
 import { beginAssistantMessage, recordTokens } from '../../src/server/modules/aiConnections/service.ts';
-import { TEST_MAX_TOKENS } from '../../src/server/modules/aiConnections/testConnection.ts';
+import { TEST_MAX_TOKENS, TEST_TIMEOUT_MS } from '../../src/server/modules/aiConnections/testConnection.ts';
 import { FAKE_KEYS, FakeProvider } from '../ai-fake.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
@@ -168,6 +169,31 @@ describe('OpenAI-compatible addresses', () => {
     }
     expect(caps).toEqual([TEST_MAX_TOKENS, TEST_MAX_TOKENS]);
     expect(TEST_MAX_TOKENS).toBeGreaterThanOrEqual(4096);
+    await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
+  });
+
+  it('audit review 2/3 (chat time limits): the Test button keeps a short total limit; a server that accepts but never answers ends it with TIMEOUT', async () => {
+    const v = await okBody(create(s.admin, { type: 'openaiCompatible', name: 'Silent', baseUrl: `${base}/v1`, localNetwork: true, apiKey: FAKE_KEYS.compatible, models: ['local-silent'] }));
+    const held: http.ServerResponse[] = [];
+    // Accepts the request and never sends the headers (the chat limits would wait up to ten minutes).
+    fake.override = (r, res) => {
+      if (!r.path.endsWith('/chat/completions')) return false;
+      held.push(res);
+      return true;
+    };
+    expect(TEST_TIMEOUT_MS).toBeLessThanOrEqual(60_000);
+    env.deps.aiTestTimeoutMs = 300;
+    try {
+      const started = Date.now();
+      const t = await okBody(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'local-silent' }));
+      expect(t).toMatchObject({ ok: false, text: false, tools: false, failure: 'TIMEOUT', httpStatus: null });
+      expect(Date.now() - started).toBeLessThan(5000);
+    } finally {
+      delete env.deps.aiTestTimeoutMs;
+      fake.override = null;
+      for (const res of held) res.destroy();
+    }
+    expect(held).toHaveLength(1);
     await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
   });
 

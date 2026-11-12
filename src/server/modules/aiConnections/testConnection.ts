@@ -9,6 +9,10 @@
  * a small cap made a working model look broken. The prompts keep the visible answer to a word, so the
  * cap costs nothing unless the model thinks. A reply cut off by the cap before anything visible came is
  * reported as `OUT_OF_TOKENS`, not as "text / tools do not work".
+ *
+ * Each test request has a short total limit (`TEST_TIMEOUT_MS`), not the chat's ten minutes: a server
+ * that accepts the connection but never answers ends the test with `TIMEOUT` instead of keeping the
+ * page waiting (review of the 2026-11-12 audit fixes).
  */
 import type { z } from 'zod';
 import { AI_TEST_TOOL, AI_TEST_WORD, type AiFailure } from '../../../shared/aiConnections.ts';
@@ -22,6 +26,8 @@ import { assertTeachersAllowed, recordTest, recordTokens, statusOf } from './ser
 
 /** The output cap of each test request: room for a reasoning model's hidden thinking (see above). */
 export const TEST_MAX_TOKENS = 4096;
+/** The total limit of each of the two test requests (both together stay under a proxy's 100 s). */
+export const TEST_TIMEOUT_MS = 45_000;
 
 export const TEST_TOOL: ToolDefinition = {
   name: AI_TEST_TOOL,
@@ -61,13 +67,14 @@ export async function testConnection(ctx: RequestContext, row: ConnectionRow, mo
   let text = false;
   let tools = false;
   let failure: AiFailure | null = null;
+  const timeoutMs = ctx.aiTestTimeoutMs ?? TEST_TIMEOUT_MS;
   try {
-    const a = await collect(streamChat(ctx, { connection: row, model, system: SYSTEM, messages: [{ role: 'user', content: `Reply with the single word: ${AI_TEST_WORD}` }], tools: [], maxTokens: TEST_MAX_TOKENS }));
+    const a = await collect(streamChat(ctx, { connection: row, model, system: SYSTEM, messages: [{ role: 'user', content: `Reply with the single word: ${AI_TEST_WORD}` }], tools: [], maxTokens: TEST_MAX_TOKENS, timeoutMs }));
     recordTokens(ctx, row.id, user.id, a.usage);
     text = a.text.trim().length > 0;
     if (!text && a.stop === 'length') failure = 'OUT_OF_TOKENS';
     const b = await collect(
-      streamChat(ctx, { connection: row, model, system: SYSTEM, messages: [{ role: 'user', content: `Call the ${AI_TEST_TOOL} tool with the word "${AI_TEST_WORD}". Do not write anything else.` }], tools: [TEST_TOOL], maxTokens: TEST_MAX_TOKENS }),
+      streamChat(ctx, { connection: row, model, system: SYSTEM, messages: [{ role: 'user', content: `Call the ${AI_TEST_TOOL} tool with the word "${AI_TEST_WORD}". Do not write anything else.` }], tools: [TEST_TOOL], maxTokens: TEST_MAX_TOKENS, timeoutMs }),
     );
     recordTokens(ctx, row.id, user.id, b.usage);
     tools = b.calls.some((c) => c.name === AI_TEST_TOOL && typeof c.arguments.word === 'string');

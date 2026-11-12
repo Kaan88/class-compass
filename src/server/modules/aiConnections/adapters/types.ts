@@ -69,6 +69,8 @@ export interface StreamRequest {
   tools: ToolDefinition[];
   maxTokens: number;
   signal?: AbortSignal | undefined;
+  /** The total limit of the request (default `AI_TOTAL_TIMEOUT_MS`); the Test button sets a short one. */
+  timeoutMs?: number | undefined;
 }
 
 export type Adapter = (req: StreamRequest) => AsyncGenerator<ChatEvent>;

@@ -12,7 +12,7 @@
  */
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { assistantChats, assistantMessages, auditEvents, homeworkAssignments, sessions } from '../../src/server/db/schema.ts';
+import { aiConnectionUsage, assistantChats, assistantMessages, auditEvents, homeworkAssignments, sessions } from '../../src/server/db/schema.ts';
 import { ASSISTANT_TUNING } from '../../src/server/modules/assistantChat/agent.ts';
 import { purgeOldChats } from '../../src/server/modules/assistantChat/retention.ts';
 import { settleRuns } from '../../src/server/modules/assistantChat/routes.ts';
@@ -472,6 +472,39 @@ describe('long chats, retention, export, erasure and the list', () => {
         const d = await detail(s.teacherA, chat.id);
         expect(d.compacted).toBe(true);
         expect(d.messages).toHaveLength(8);
+      });
+    } finally {
+      Object.assign(ASSISTANT_TUNING, old);
+    }
+  });
+
+  it('audit review 6 (blocked replies): a summary the provider blocks leaves the chat uncompacted, the messages are answered and the summary tokens count', async () => {
+    const old = { ...ASSISTANT_TUNING };
+    ASSISTANT_TUNING.compactAtTokens = 100;
+    ASSISTANT_TUNING.keepRecentTokens = 120;
+    try {
+      await withAssistant(async () => {
+        // The summary request (no tools) is stopped by the provider's filter (`content_filter`, a BLOCKED failure).
+        const seen = script(fake, [(body) => (body.tools ? { text: 'Answer for the teacher.' } : { finish: 'content_filter' })]);
+        const tokens = () => env.db.select().from(aiConnectionUsage).where(eq(aiConnectionUsage.connectionId, connectionId)).all().reduce((n, r) => n + r.inputTokens, 0);
+        // Its own address, so the send limit (per address and minute) of the other tests is not used up.
+        const t = new Client(env);
+        t.ip = '192.0.2.61';
+        await t.login('ayse.teacher');
+        const chat = await newChat(t);
+        const before = tokens();
+        for (let i = 1; i <= 2; i += 1) {
+          const evs = await events(t, (await send(t, chat.id, `Question ${i} ${'y'.repeat(300)}`)).runId);
+          expect(endOf(evs)).toMatchObject({ end: 'complete' });
+          expect(streamedText(evs)).toContain('Answer for the teacher.');
+        }
+        const summaries = seen.filter((r) => !r.body.tools);
+        expect(summaries.length).toBeGreaterThan(0);
+        const d = await detail(t, chat.id);
+        expect(d.compacted).toBe(false);
+        expect(d.messages).toHaveLength(4);
+        // Every request reported 100 input tokens; the blocked summaries count too.
+        expect(tokens() - before).toBe(100 * seen.length);
       });
     } finally {
       Object.assign(ASSISTANT_TUNING, old);

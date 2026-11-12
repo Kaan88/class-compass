@@ -88,6 +88,8 @@ export interface AppDeps {
    * public addresses only.
    */
   aiProviderUrls?: Partial<Record<'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'chatgpt' | 'chatgptToken', string>>;
+  /** Tests only: a shorter total limit for "Test connection" requests; production uses `TEST_TIMEOUT_MS`. */
+  aiTestTimeoutMs?: number;
 }
 
 export interface RequestContext extends AppDeps {

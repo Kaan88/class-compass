@@ -112,6 +112,7 @@ export const geminiAdapter: Adapter = async function* (req) {
     policy: req.target.policy,
     signal: req.signal,
     chat: true,
+    totalTimeoutMs: req.timeoutMs,
   });
   if (res.status < 200 || res.status >= 300) throw await geminiFailure(res);
   let input = 0;

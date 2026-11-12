@@ -211,8 +211,15 @@ async function maybeCompact(
       if (ev.type === 'text') summary += ev.text;
       else if (ev.type === 'usage') usage = { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
     }
+  } catch (e) {
+    // A summary the provider's filter blocked, or that ended with nothing written (no HTTP status), is
+    // no summary: the chat goes on uncompacted, as with an empty one. Anything else (a stop, a key or
+    // network failure) ends the run as before.
+    const noSummary = e instanceof AiCallError && (e.failure === 'BLOCKED' || (e.failure === 'PROVIDER_ERROR' && e.httpStatus === null));
+    if (!noSummary || signal.aborted) throw e;
+    summary = '';
   } finally {
-    // Counted also when the summary failed or was stopped (an estimate when no usage arrived).
+    // Counted also when the summary failed, was blocked or was stopped (an estimate when no usage arrived).
     recordTokens(deps, conn.connection.id, user.id, usageOrEstimate(usage, { system, messages }, { text: summary }));
   }
   if (!summary.trim()) return chat;

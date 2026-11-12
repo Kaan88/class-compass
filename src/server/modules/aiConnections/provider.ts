@@ -130,6 +130,8 @@ export interface ChatRequest {
   tools: ToolDefinition[];
   maxTokens?: number;
   signal?: AbortSignal;
+  /** The total limit of the request (default `AI_TOTAL_TIMEOUT_MS`): the Test button keeps it short. */
+  timeoutMs?: number;
 }
 
 /**
@@ -138,5 +140,5 @@ export interface ChatRequest {
  */
 export async function* streamChat(deps: AppDeps, req: ChatRequest): AsyncGenerator<ChatEvent> {
   const target = await targetOf(deps, req.connection);
-  yield* ADAPTERS[WIRE_FORMAT[req.connection.type]]({ target, model: req.model, system: req.system, messages: req.messages, tools: req.tools, maxTokens: req.maxTokens ?? DEFAULT_MAX_TOKENS, signal: req.signal });
+  yield* ADAPTERS[WIRE_FORMAT[req.connection.type]]({ target, model: req.model, system: req.system, messages: req.messages, tools: req.tools, maxTokens: req.maxTokens ?? DEFAULT_MAX_TOKENS, signal: req.signal, timeoutMs: req.timeoutMs });
 }
