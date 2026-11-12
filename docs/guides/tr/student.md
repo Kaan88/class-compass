@@ -85,6 +85,7 @@ Yalnızca cümle başı yetmez: **Cümleni bitir: ___ olan yere kendi sözcükle
 **Hedeflerim** hedeflerini ve **Bu hedef için yazılanlar**'ı gösterir: senin sözlerin, çalışmaların ve öğretmeninin yazdıkları (**Öğretmenimden**).
 
 - **Nasıl gittiğini anlat** o hedef için **Nasıl gidiyor?** ekranını açar.
+- **Çalışmamı ekle** o hedefe çalışma ekler: **Çalışmamı göster**'deki seçeneklerin aynısı, yalnızca **Hangi hedef için?** sorusu yok. **Çalışmamı kaydet**'e basınca hedefine geri dönersin. **Çalışman bu hedefe eklendi.** yazısını ve çalışmanı **Bu hedef için çalışmalarım** altında görürsün. Kendi çalışmalarını orada da silebilirsin.
 - Hedefini başardığında **Başardım!**'a bas. Aferin!
 - **Sözlerimi değiştir** ile yazdıklarını değiştirebilirsin: hedefini ya da onun hakkında yazdıklarını. Sözlerini değiştir ve **Sözlerimi kaydet**'e bas (ya da **Vazgeç**). Yalnızca kendi yazdıklarını değiştirebilirsin.
 - **Hedefi sil** de önce sorar.

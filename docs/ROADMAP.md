@@ -510,6 +510,16 @@ Decision D-189; no migration.
 - [x] Windows baselines committed in `e2e/visual-baselines/win32/`; how to update and review them in CONVENTIONS → Tests and OPERATIONS → "Visual baseline"
 - [ ] Linux baselines for CI (`e2e/visual-baselines/linux/`), taken in the CI image when CI is switched back on after 2026-12-01
 
+## S27b Add work from the student's My goals (wave S27, owner 2026-11-12)
+Decision D-194; no migration.
+- [x] "Add my work" on each goal in My goals opens the shared `EvidenceAdder` steps for that goal (how → the work, no goal step; the same choices, media flags and upload pipeline as Show my work), with the steps in the page address and Back working
+- [x] After Save: back at the goal with a calm note, the focus on its "Add my work", and the goal's work listed under it (own work deletable, asking first); Show my work unchanged
+- [x] Teacher Goals page checked: "Add evidence" on each goal card already opens the form for that goal (S20b, D-170)
+- [x] EN/TR words in the main dictionary, student guide EN/TR; no new imports on the student page (size budget)
+- [x] Tests: `tests/client/student-goal-work.test.tsx`, `e2e/student-goal-work.spec.ts` (text and picture from My goals at 375 px, axe)
+- [ ] Guide screenshot of My goals with the new button (the later screenshot pass)
+- [ ] Checked by children on a real phone and tablet
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site

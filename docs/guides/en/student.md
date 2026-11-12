@@ -85,6 +85,7 @@ You see **Saved!** and the list of **My work**. You can delete your own work the
 **My goals** shows your goals and **What was written about this goal**: your words, your work and what your teacher wrote (**From my teacher**).
 
 - **Tell how it is going** opens **How is it going?** for that goal.
+- **Add my work** adds work to that goal: the same choices as **Show my work**, without the question **Which goal is it for?** Press **Save my work** and you are back at your goal. You see **Your work is saved with this goal.** and your work under **My work for this goal**. You can delete your own work there too.
 - When you have done it, press **I did it!** Well done!
 - **Change my words** lets you change what you wrote: your goal or what you wrote about it. Change the words and press **Save my words** (or **Cancel**). Only your own words can be changed.
 - **Delete goal** asks first, like above.
