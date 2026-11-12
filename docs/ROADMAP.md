@@ -6,7 +6,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 ## S-1 Project startup
 - [x] Name chosen (Class Compass) — D-001
 - [x] Folder inspected (empty, no prior work), git initialised
-- [x] Private repo `Kaan88/class-compass` created and verified private — D-002
+- [x] Repo `Kaan88/class-compass` created (private 2026-11-07, public since 2026-11-12) — D-002
 - [x] REQUIREMENTS.md, DECISIONS.md
 - [x] Stack options evaluated (3 independent proposals + judged synthesis) → ARCHITECTURE.md
 - [x] ROADMAP.md, OPERATIONS.md (skeleton)
@@ -153,7 +153,8 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
 - [x] Docker image, compose example (127.0.0.1, cloudflared and backup profiles), systemd timers, restic env example and the deployment / upgrade / rollback / restore-drill steps in OPERATIONS are written — D-093; the image has been built and run on the test VM, the mini PC and the Oracle server (x86 and ARM)
 - [x] Review fixes — D-094: counters "absent" weeks and per-attended-lesson cells, correct totals with the Attendance module off; goals report with entries by kind, evidence counts and a weekly self-assessment history; ended assignments limited to the days they were held; restic `forget --group-by host,tags`; backup commands never migrate (upgrade/rollback steps stop and restart the backup jobs with the same tag); restore refuses a database held by another process even with `--force` (SQLite lock, works across containers); Maintenance off-site state from recorded runs; exports swept when expired and downloadable only by their creator; per-student export covers JSON group/role/absentee lists, missed assistant turns, importer rows, evidence files and the photo; rollover can leave out and rename classes and applies exactly the previewed plan; `OCR_CACHE_DIR` no longer hides the baked OCR data
 - [x] Owner decision: should the full admin export include private teacher notes? Decided 2026-11-08: yes, the full export includes them (S13b2, D-114); unrevealed Secret Student choices stay out by SEC-3
-- [ ] Restic exercised against a real R2/B2 repository (only the command wrapper and redaction are tested, with a fake restic)
+- [x] Off-site copies on the real server: not by the app's restic step but by the owner's nightly PBS job, which sends all of `/home/ubuntu` (encrypted) to R2, B2 and IDrive (owner, 2026-11-12; OPERATIONS → Oracle server → Backups)
+- [ ] Restic exercised against a real R2/B2 repository (only the command wrapper and redaction are tested, with a fake restic): optional, for a school that does not have its own off-site backup
 - [x] Test install on the LAN test VM (D-096): image built and run, demo data, sign-in, restore drill passed (OPERATIONS → Test VM install)
 - [x] `seed:demo-history`: weeks of fictional history for the test VM through the real commands and services, incl. achievements, avatars and Super Speakers (D-136; OPERATIONS → Test VM install)
 - [x] Isolated install behind Cloudflare Tunnel, on the owner's request (2026-11-09): the Oracle ARM server runs sareteacher.com (empty real school, own pepper, first admin via `admin:create`, hourly local backups plus the owner's nightly PBS backup) and test.sareteacher.com (moved from the mini PC with its data), both behind Cloudflare Access (OPERATIONS → "Oracle server")
@@ -600,7 +601,7 @@ Decision D-201; no migration.
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site
-- [ ] **Owner decisions:** open sareteacher.com to the school (Access, KVKK sign-off before real students); off-site backups with restic (the nightly PBS backup covers the server today); a separate Super Speakers hostname; AI tools tried with Claude Code, claude.ai, Claude Desktop and MCP Inspector on fictional data (needs the Access bypass for the AI paths); split End Lesson into a class-facing and a teacher-only part (S13a); CI again after 2026-12-01
+- [ ] **Owner decisions:** open sareteacher.com to the school (Access, KVKK sign-off before real students); a separate Super Speakers hostname; AI tools tried with Claude Code, claude.ai, Claude Desktop and MCP Inspector on fictional data (needs the Access bypass for the AI paths); split End Lesson into a class-facing and a teacher-only part (S13a); CI again after 2026-12-01
 - [x] **Small product gap: an ordered level picker for grouping** (S25c, D-187)
 - [x] **Small product gap: lesson goals per class** (S25d, D-188)
 - [x] **Small product gap: a school holiday calendar for coverage** (S25b, D-186)

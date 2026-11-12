@@ -11,7 +11,7 @@ Nothing here may be dropped silently — de-scoping requires an entry in `DECISI
 - Name: **Class Compass** (TR: *Sınıf Pusulası*). Chosen to fit the explorer theme and future multi-subject use.
 
 ## 1. Project & operations (OPS)
-- OPS-1 Private GitHub repo `Kaan88/class-compass` (created, verified private 2026-11-07).
+- OPS-1 GitHub repo `Kaan88/class-compass` (created private 2026-11-07; made public by the owner 2026-11-12, D-002).
 - OPS-2 Persistent docs: requirements, decisions, architecture & data model, roadmap/checklist, setup/testing/backup/restore/deployment.
 - OPS-3 Checklist kept current so work can resume across sessions.
 - OPS-4 Production: Linux (details TBD). Test deployment on owner's Debian VM: inspect first, preserve existing services, isolate the app. VM access ≠ production authorisation.

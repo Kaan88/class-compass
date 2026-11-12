@@ -1,5 +1,5 @@
 name: CI
-# Kept lean because GitHub Actions minutes on a private repo are limited (D-082):
+# Kept lean (D-082; written while the repo was private and Actions minutes were limited):
 # - every push to main: one Ubuntu job (typecheck, lint, unit/integration tests, build);
 #   docs-only pushes are skipped and superseded runs are cancelled
 # - Windows and browser (e2e) jobs: weekly and on demand (Actions tab → CI → Run workflow).

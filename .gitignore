@@ -52,3 +52,5 @@ data-test/
 
 # Agent worktrees (parallel stage runs)
 .claude/worktrees/
+# Local secrets folder, never committed
+.cc-secrets/

@@ -95,13 +95,13 @@ Format version stays **1**; every new field is optional; old packages and `docs/
 The theme tools (`theme_schema`, `validate_theme`, `import_theme_draft`, the examples resource) pick up the new schema automatically; add tests that they expose and validate the new fields.
 
 ### Snow Day example package
-`docs/examples/peppermint-snow-day.theme.json`: the owner's package (`C:\Users\owner\Downloads\peppermint-snow-day.theme (1).json`) extended per `Main.dc.html` / `ThemedBoard.dc.html` (theme `snow`):
+`docs/examples/peppermint-snow-day.theme.json`: the owner's package (from the owner's downloads) extended per `Main.dc.html` / `ThemedBoard.dc.html` (theme `snow`):
 - a 3-layer village scene (far hills, fir trees, cottages with lit windows and string lights), cover, bottom anchor, `smallScreens: bottomStrip`;
 - `frame`: edge `snowDrift`, trim `candyStripe` on routine + timer, corners `frost`;
 - `ambient`: snowfall, slow, mixed, density about 60;
 - `sets`: achievement frame `snowflake`.
 
-Validate it with `validateThemePackage` (and a test that keeps it valid). Fictional text only. Copy it to `C:\Users\owner\Downloads\peppermint-snow-day.theme.json` for the owner. Do not enable it anywhere.
+Validate it with `validateThemePackage` (and a test that keeps it valid). Fictional text only. Copy it to the owner's downloads folder. Do not enable it anywhere.
 
 ### Docs
 THEMING: a section "Scenes, frames, ambient and sets" (fields and limits, fit and anchor per screen size, the contrast rules, an authoring recipe for AI agents) and a mention in "For AI agents: making a package"; `npm run docs:theming` regenerates the tables and `docs/theme-package.schema.json`; EN/TR admin guide note.

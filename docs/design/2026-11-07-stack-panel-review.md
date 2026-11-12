@@ -1,6 +1,6 @@
 # Class Compass: architecture review and recommendation
 
-I read both files in full: `C:/Users/owner/Desktop/class/docs/REQUIREMENTS.md` (every requirement ID) and `C:/Users/owner/Desktop/class/docs/DECISIONS.md` (D-001 to D-005; D-005 still needs an owner decision). I wrote no files.
+I read both files in full: `docs/REQUIREMENTS.md` (every requirement ID) and `docs/DECISIONS.md` (D-001 to D-005; D-005 still needs an owner decision). I wrote no files.
 
 ## 1. Scores (1–10)
 
