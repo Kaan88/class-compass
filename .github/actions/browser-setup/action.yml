@@ -1,0 +1,26 @@
+name: Browser and fonts for e2e
+description: >
+  Chromium plus the fonts a Windows classroom display has (D-205), shared by the e2e job and the
+  visual baseline jobs so their text is drawn the same way. Run after `npm ci`.
+runs:
+  using: composite
+  steps:
+    - run: npx playwright install --with-deps chromium
+      shell: bash
+    # Ubuntu has none of the fonts the app names (system-ui is Segoe UI on the Windows classroom
+    # displays the fit specs were written for) and falls back to the much wider DejaVu Sans.
+    # Selawik is Microsoft's open (OFL) stand-in made to Segoe UI's metrics; Comic Neue is in the
+    # playful preset's own list. Pinned by checksum (D-205; e2e/fonts/fonts.conf).
+    - name: Fonts like a Windows classroom display
+      shell: bash
+      run: |
+        sudo apt-get install -y --no-install-recommends fonts-comic-neue
+        curl -fsSL -o /tmp/selawik.zip https://github.com/microsoft/Selawik/releases/download/1.01/Selawik_Release.zip
+        echo "3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423  /tmp/selawik.zip" | sha256sum -c -
+        mkdir -p ~/.local/share/fonts/selawik ~/.config/fontconfig
+        unzip -o -q -j /tmp/selawik.zip '*.ttf' -d ~/.local/share/fonts/selawik
+        cp e2e/fonts/fonts.conf ~/.config/fontconfig/fonts.conf
+        fc-cache -f
+        for f in system-ui sans-serif 'Segoe UI' 'Trebuchet MS' 'Comic Sans MS'; do echo "$f -> $(fc-match "$f")"; done
+        fc-match 'Segoe UI' | grep -q Selawik
+        fc-match system-ui | grep -q Selawik

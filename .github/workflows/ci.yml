@@ -16,6 +16,10 @@ on:
         description: 'e2e only: spec files to run (space-separated, e.g. e2e/board-40.spec.ts); empty runs the whole suite'
         required: false
         default: ''
+      visual_update:
+        description: 'Take the Linux visual baseline set instead of running the suite (uploads e2e/visual-baselines/linux/ as an artifact; docs/OPERATIONS.md)'
+        type: boolean
+        default: false
   schedule:
     - cron: '0 3 * * 1'
 
@@ -54,7 +58,7 @@ jobs:
 
   e2e:
     # Browser tests against a throw-away server with the fictional demo school (D-037).
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: (github.event_name == 'workflow_dispatch' && !inputs.visual_update) || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -64,23 +68,7 @@ jobs:
           node-version: 26
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      # Ubuntu has none of the fonts the app names (system-ui is Segoe UI on the Windows classroom
-      # displays the fit specs were written for) and falls back to the much wider DejaVu Sans.
-      # Selawik is Microsoft's open (OFL) stand-in made to Segoe UI's metrics; Comic Neue is in the
-      # playful preset's own list. Pinned by checksum (D-205; e2e/fonts/fonts.conf).
-      - name: Fonts like a Windows classroom display
-        run: |
-          sudo apt-get install -y --no-install-recommends fonts-comic-neue
-          curl -fsSL -o /tmp/selawik.zip https://github.com/microsoft/Selawik/releases/download/1.01/Selawik_Release.zip
-          echo "3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423  /tmp/selawik.zip" | sha256sum -c -
-          mkdir -p ~/.local/share/fonts/selawik ~/.config/fontconfig
-          unzip -o -q -j /tmp/selawik.zip '*.ttf' -d ~/.local/share/fonts/selawik
-          cp e2e/fonts/fonts.conf ~/.config/fontconfig/fonts.conf
-          fc-cache -f
-          for f in system-ui sans-serif 'Segoe UI' 'Trebuchet MS' 'Comic Sans MS'; do echo "$f -> $(fc-match "$f")"; done
-          fc-match 'Segoe UI' | grep -q Selawik
-          fc-match system-ui | grep -q Selawik
+      - uses: ./.github/actions/browser-setup
       - run: npx playwright test $SPECS
         env:
           SPECS: ${{ github.event.inputs.specs }}
@@ -91,4 +79,24 @@ jobs:
           path: |
             playwright-report/
             test-results/
+          retention-days: 7
+
+  visual-update:
+    # Manual only: takes the Linux pixel-diff baseline in the same image as the e2e job (D-206).
+    if: github.event_name == 'workflow_dispatch' && inputs.visual_update
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/browser-setup
+      - run: npm run test:visual:update
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-linux
+          path: e2e/visual-baselines/linux/
           retention-days: 7
