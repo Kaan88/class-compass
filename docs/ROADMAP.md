@@ -520,6 +520,19 @@ Decision D-189; no migration.
 - [x] Tests (unit, client, server, Docker) and `e2e/offline-start.spec.ts` (load, go offline, reload, start, queued, online, the start reaches the server once); teacher guide EN/TR: what works offline
 - [ ] On the real classroom PC (see S5): an offline reload and start, and a deploy while a lesson runs (the new build waits for the end)
 
+## S27a Student video evidence: record and attach (wave S27, 2026-11-12)
+Decision D-193; no migration. Owner request 2026-11-12 ("for the students page, add video uploading capability, both recording and attaching"); owner answers: up to 3 minutes, a new admin switch off by default like photos and audio (KVKK).
+- [x] Admin switch `media.evidenceVideo` (off by default, Admin → Modules → Photos and media, with a hint in EN/TR); while off the choices are hidden and the server refuses uploads (403) and attaching
+- [x] Student page and teacher Goals page: **Record a video** (system camera in video mode on phones and tablets; elsewhere an in-page recorder, a lazy chunk: preview, timer to 3:00 that stops by itself, Stop, Record again, Use this video, Switch camera) and **Add a video** (MP4, MOV, WebM, about 150 MB, checked on the device first)
+- [x] Server: container by magic bytes with a picture track (MP4/MOV `ftyp`, WebM EBML), size cap, duration cap from `mvhd`/`mdhd`/`mehd` and WebM Info/blocks (unknown → accepted within the size cap, audited as unknown), location and device tags blanked in place without re-encoding, no transcoding
+- [x] Serving: byte ranges (206/416), the sniffed type, inline, a short private cache; the owner, the student's teachers and admins only (404 for everyone else); `<video controls preload="metadata">` wherever evidence is shown
+- [x] Quotas, erasure, per-student and full exports and backups include videos; AI tools never see files; notifications (`evidenceVideo`) and the achievement filter (`video`)
+- [x] Guides EN/TR (student and parents, teacher, administrator), OPERATIONS (quota, Cloudflare's 100 MB request limit), CONVENTIONS, REQUIREMENTS (GOL-4), D-193
+- [x] Tests: `tests/server/video-evidence.test.ts` (flag off → 403, magic bytes, size, duration, Range, IDOR, metadata, exports, erasure, quota), `tests/client/video-evidence.test.tsx` (recorder states with a fake MediaRecorder, choices, device checks, player), `e2e/video-evidence.spec.ts` (the admin switches it on in the UI, a student adds a canvas-made WebM and records with the fake camera, the teacher plays it with 206 ranges, axe, phone capture input; switched off in `finally`)
+- [ ] Real devices: recording and playback on an iPhone (MOV/HEVC, Safari's MP4 recorder), an Android phone, a classroom laptop's webcam, and a large phone video through the Cloudflare tunnel on the test site
+- [ ] Owner decision: the per-student upload space on the server (`UPLOAD_STUDENT_QUOTA_MB`, 100 MB today) before videos are switched on for real classes, and the KVKK sign-off for videos
+- [ ] Guide screenshots of the video choices and the recorder (the later `npm run docs:screenshots` pass)
+
 ## S27b Add work from the student's My goals (wave S27, owner 2026-11-12)
 Decision D-194; no migration.
 - [x] "Add my work" on each goal in My goals opens the shared `EvidenceAdder` steps for that goal (how → the work, no goal step; the same choices, media flags and upload pipeline as Show my work), with the steps in the page address and Back working

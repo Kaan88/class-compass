@@ -278,7 +278,7 @@ On the **Goals** page, choose the class and subject. The **Students** tab lists 
 
 - **New goal**: pick a **Category** and a **Ready-made goal**, or **Write my own (below)** and type it in **Goal text**; add **Ways to practise** (up to 6, separated by commas) and a **Review date**.
 - On each goal: **Progress update**, **Record outcome** (your four outcome labels) and the student's own reflections and self-assessments ("How sure do you feel?", 1 to 5). The student's self-assessment and your assessment are always kept apart.
-- **Evidence**: you can add evidence too (it is marked "Teacher" on the student's page and the student cannot change it): **Write**, **Add a link**, **Add a document**, and, only if your administrator allowed them, **Add a picture**, **Take a picture**, **Record my voice** and **Add a voice file**. **Delete evidence** removes your own evidence and its file.
+- **Evidence**: you can add evidence too (it is marked "Teacher" on the student's page and the student cannot change it): **Write**, **Add a link**, **Add a document**, and, only if your administrator allowed them, **Add a picture**, **Take a picture**, **Record my voice**, **Add a voice file**, **Record a video** and **Add a video** (up to 3 minutes and 150 MB: MP4, MOV or WebM; on a computer **Record a video** uses the webcam with a timer that stops at 3:00, on a phone or tablet it opens the camera). Videos play on the page for you, the student and administrators only. **Delete evidence** removes your own evidence and its file.
 - **Add evidence** on a goal opens the evidence form for that goal (for example a worksheet the student did in class, as a document). The list under **Evidence** shows which goal each item is for. Photos of students still follow the school's consent rules: add a picture only when your administrator allowed photo evidence.
 - **Feedback for the student**: choose a goal or **All goals in this subject**, write and **Save feedback**. The student reads it on their page.
 - **Show topic** filters goals and evidence by category.
@@ -403,7 +403,7 @@ The statistics panel shows the class and subject (choose another one if the stud
 
 ![Notifications](../img/en/notifications.png)
 
-The **bell** on the teacher menu and in the row of links shows how many new things your students did on their own pages: new or changed goals, goals reached, reflections, notes, self-assessments, work they showed (writing, links, pictures, documents, voice), achievements earned, avatars changed, a student link opened on a new device, text stopped by the kind words check (a count only) and Super Speakers points (one line a day). Only students you teach now are listed, and only for modules that are on.
+The **bell** on the teacher menu and in the row of links shows how many new things your students did on their own pages: new or changed goals, goals reached, reflections, notes, self-assessments, work they showed (writing, links, pictures, documents, voice, videos), achievements earned, avatars changed, a student link opened on a new device, text stopped by the kind words check (a count only) and Super Speakers points (one line a day). Only students you teach now are listed, and only for modules that are on.
 
 On the **Notifications** page:
 

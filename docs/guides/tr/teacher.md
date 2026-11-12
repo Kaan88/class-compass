@@ -278,7 +278,7 @@ Başarıyı verdikten hemen sonra ekranın altındaki mesaj birkaç saniye **Ger
 
 - **Yeni hedef**: bir **Kategori** ve bir **Hazır hedef** seçin ya da **Kendim yazacağım (aşağıya)**'yı seçip hedefi **Hedef metni**'ne yazın; **Çalışma yolları** (en fazla 6, virgülle ayrılmış) ve bir **Gözden geçirme tarihi** ekleyin.
 - Her hedefte: **İlerleme notu**, **Sonucu kaydet** (dört sonuç adınız) ve öğrencinin kendi düşünceleri ve öz değerlendirmeleri ("Ne kadar eminsin?", 1–5). Öğrencinin öz değerlendirmesi ile sizin değerlendirmeniz her zaman ayrı tutulur.
-- **Kanıtlar**: siz de kanıt ekleyebilirsiniz (öğrencinin sayfasında "Öğretmen" diye işaretlenir ve öğrenci değiştiremez): **Yaz**, **Bağlantı ekle**, **Belge ekle** ve yalnızca yöneticiniz izin verdiyse **Resim ekle**, **Fotoğraf çek**, **Sesimi kaydet** ve **Ses dosyası ekle**. **Kanıtı sil** kendi eklediğiniz kanıtı ve dosyasını siler.
+- **Kanıtlar**: siz de kanıt ekleyebilirsiniz (öğrencinin sayfasında "Öğretmen" diye işaretlenir ve öğrenci değiştiremez): **Yaz**, **Bağlantı ekle**, **Belge ekle** ve yalnızca yöneticiniz izin verdiyse **Resim ekle**, **Fotoğraf çek**, **Sesimi kaydet**, **Ses dosyası ekle**, **Video çek** ve **Video ekle** (en fazla 3 dakika ve 150 MB: MP4, MOV ya da WebM; bilgisayarda **Video çek** web kamerasını 3:00'te duran bir sayaçla kullanır, telefonda ya da tablette kamerayı açar). Videolar sayfada yalnızca sizin, öğrencinin ve yöneticilerin izlemesi içindir. **Kanıtı sil** kendi eklediğiniz kanıtı ve dosyasını siler.
 - Bir hedefin üzerindeki **Kanıt ekle**, kanıt formunu o hedef için açar (örneğin öğrencinin sınıfta yaptığı bir çalışma kâğıdını belge olarak ekleyebilirsiniz). **Kanıtlar** listesi her kanıtın hangi hedef için olduğunu gösterir. Öğrenci fotoğraflarında okulun izin kuralları aynen geçerlidir: resmi yalnızca yöneticiniz fotoğraf kanıtına izin verdiyse ekleyin.
 - **Öğrenciye geri bildirim**: bir hedef ya da **Bu dersteki tüm hedefler**'i seçin, yazın ve **Geri bildirimi kaydet**'e basın. Öğrenci bunu kendi sayfasında okur.
 - **Konu göster** hedefleri ve kanıtları kategoriye göre süzer.
@@ -403,7 +403,7 @@ Sayfanın adresi sınıfı, öğrenciyi, görünümü ve süreyi her zaman içer
 
 ![Bildirimler](../img/tr/notifications.png)
 
-Öğretmen menüsündeki ve bağlantı satırındaki **zil**, öğrencilerinizin kendi sayfalarında yaptığı yeni şeylerin sayısını gösterir: yeni ya da değiştirilmiş hedefler, ulaşılan hedefler, düşünceler, notlar, öz değerlendirmeler, gösterdikleri çalışmalar (yazı, bağlantı, resim, belge, ses), kazanılan başarılar, değiştirilen avatarlar, bir öğrenci bağlantısının yeni bir cihazda açılması, nazik sözcük denetiminin durdurduğu metinler (yalnızca sayı) ve Süper Konuşmacılar puanları (günde bir satır). Yalnızca şu an ders verdiğiniz öğrenciler ve açık olan modüller yer alır.
+Öğretmen menüsündeki ve bağlantı satırındaki **zil**, öğrencilerinizin kendi sayfalarında yaptığı yeni şeylerin sayısını gösterir: yeni ya da değiştirilmiş hedefler, ulaşılan hedefler, düşünceler, notlar, öz değerlendirmeler, gösterdikleri çalışmalar (yazı, bağlantı, resim, belge, ses, video), kazanılan başarılar, değiştirilen avatarlar, bir öğrenci bağlantısının yeni bir cihazda açılması, nazik sözcük denetiminin durdurduğu metinler (yalnızca sayı) ve Süper Konuşmacılar puanları (günde bir satır). Yalnızca şu an ders verdiğiniz öğrenciler ve açık olan modüller yer alır.
 
 **Bildirimler** sayfasında:
 

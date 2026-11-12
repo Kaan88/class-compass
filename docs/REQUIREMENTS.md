@@ -146,7 +146,7 @@ Nothing here may be dropped silently — de-scoping requires an entry in `DECISI
 - GOL-1 Default skill categories: Reading, Writing, Grammar, Vocabulary, Listening; custom categories; preset or custom goals.
 - GOL-2 Teacher-created goals; student-selected preset goals; student-written goals; practice choices; review dates; progress updates; notes & reflections; evidence; teacher feedback & outcomes.
 - GOL-3 Student self-assessment kept separate from teacher assessment.
-- GOL-4 Evidence: text, web links, photos, documents, audio uploads, in-browser audio recording where supported.
+- GOL-4 Evidence: text, web links, photos, documents, audio uploads, in-browser audio recording where supported; videos (recorded in the page or attached, up to 3 minutes, behind their own admin switch; S27a, D-193).
 - GOL-5 Students manage own contributions; cannot alter teacher assessments.
 - GOL-6 Private teacher notes clearly separated from student-visible feedback.
 
