@@ -7,7 +7,7 @@
  * A call's `id` is sent back (as `functionCall.id` and `functionResponse.id`) only when Gemini gave
  * one; an id the adapter made up (`generatedId`) stays on our side.
  */
-import { AiCallError, aiRequest, failureOfStatus, readText, sseEvents, type AiHttpResponse } from '../http.ts';
+import { AiCallError, aiRequest, assertKept, countBytes, failureOfStatus, finishWord, newStreamStats, readText, sseEvents, statusError, withStats, type AiHttpResponse } from '../http.ts';
 import { toolCall, type Adapter, type ChatMessage, type StopReason, type ToolDefinition } from './types.ts';
 
 const KEEP = new Set(['type', 'format', 'description', 'nullable', 'enum', 'properties', 'required', 'items', 'minItems', 'maxItems', 'minimum', 'maximum', 'minLength', 'maxLength', 'pattern', 'anyOf', 'title']);
@@ -81,7 +81,7 @@ export function geminiContents(messages: ChatMessage[]): Content[] {
 export async function geminiFailure(res: AiHttpResponse): Promise<AiCallError> {
   if (res.status !== 400) {
     res.cancel();
-    return new AiCallError(failureOfStatus(res.status), res.status);
+    return statusError(res.status);
   }
   try {
     const d: any = JSON.parse(await readText(res, 64 * 1024));
@@ -122,42 +122,60 @@ export const geminiAdapter: Adapter = async function* (req) {
   let wrote = false;
   let blocked = false;
   let any = false;
-  for await (const ev of sseEvents(res.body)) {
-    let d: any;
-    try {
-      d = JSON.parse(ev.data);
-    } catch {
-      throw new AiCallError('BAD_RESPONSE');
-    }
-    if (d?.error) {
-      res.cancel();
-      throw new AiCallError(Number(d.error.code) === 429 ? 'RATE_LIMITED' : 'PROVIDER_ERROR');
-    }
-    any = true;
-    if (d?.usageMetadata) {
-      input = Number(d.usageMetadata.promptTokenCount) || input;
-      output = (Number(d.usageMetadata.candidatesTokenCount) || 0) + (Number(d.usageMetadata.thoughtsTokenCount) || 0) || output;
-      yield { type: 'usage', inputTokens: input, outputTokens: output };
-    }
-    const cand = d?.candidates?.[0];
-    for (const part of Array.isArray(cand?.content?.parts) ? cand.content.parts : []) {
-      if (part?.functionCall) {
-        calls += 1;
-        yield { type: 'toolCall', call: toolCall(part.functionCall.id ? String(part.functionCall.id) : null, String(part.functionCall.name ?? ''), part.functionCall.args ?? {}, typeof part.thoughtSignature === 'string' ? part.thoughtSignature : undefined) };
-      } else if (typeof part?.text === 'string' && part.text && part.thought !== true) {
-        wrote = true;
-        yield { type: 'text', text: part.text };
+  const stats = newStreamStats();
+  try {
+    for await (const ev of sseEvents(countBytes(res.body, stats))) {
+      stats.events += 1;
+      let d: any;
+      try {
+        d = JSON.parse(ev.data);
+      } catch {
+        throw new AiCallError('BAD_RESPONSE', null, true, 'BAD_SSE_JSON');
       }
+      if (d?.error) {
+        res.cancel();
+        throw new AiCallError(Number(d.error.code) === 429 ? 'RATE_LIMITED' : 'PROVIDER_ERROR', null, true, 'STREAM_ERROR_EVENT');
+      }
+      any = true;
+      if (d?.usageMetadata) {
+        stats.sawUsage = true;
+        input = Number(d.usageMetadata.promptTokenCount) || input;
+        output = (Number(d.usageMetadata.candidatesTokenCount) || 0) + (Number(d.usageMetadata.thoughtsTokenCount) || 0) || output;
+        yield { type: 'usage', inputTokens: input, outputTokens: output };
+      }
+      const cand = d?.candidates?.[0];
+      for (const part of Array.isArray(cand?.content?.parts) ? cand.content.parts : []) {
+        if (part?.functionCall) {
+          calls += 1;
+          stats.toolCalls = calls;
+          yield { type: 'toolCall', call: toolCall(part.functionCall.id ? String(part.functionCall.id) : null, String(part.functionCall.name ?? ''), part.functionCall.args ?? {}, typeof part.thoughtSignature === 'string' ? part.thoughtSignature : undefined) };
+        } else if (typeof part?.text === 'string' && part.text && part.thought !== true) {
+          wrote = true;
+          stats.contentChars += part.text.length;
+          assertKept(stats, 0);
+          yield { type: 'text', text: part.text };
+        } else if (typeof part?.text === 'string' && part.text) {
+          // A thought summary: never shown, counted for the token estimate (D-203).
+          stats.reasoningChars += part.text.length;
+          assertKept(stats, 0);
+          yield { type: 'reasoning', text: part.text };
+        }
+      }
+      if (cand?.finishReason) {
+        stats.lastFinishReason = finishWord(cand.finishReason);
+        stop = STOP[String(cand.finishReason)] ?? 'other';
+        if (BLOCKED.has(String(cand.finishReason))) blocked = true;
+      }
+      if (d?.promptFeedback?.blockReason) blocked = true;
     }
-    if (cand?.finishReason) {
-      stop = STOP[String(cand.finishReason)] ?? 'other';
-      if (BLOCKED.has(String(cand.finishReason))) blocked = true;
-    }
-    if (d?.promptFeedback?.blockReason) blocked = true;
+    // Nothing at all: an event stream that ended before its first event stopped early (D-203); anything else was not an event stream.
+    if (!any) throw /^text\/event-stream/iu.test(res.contentType) ? new AiCallError('STREAM_ENDED', null, true, 'STREAM_ENDED_EARLY') : new AiCallError('BAD_RESPONSE', null, true, 'NOT_AN_EVENT_STREAM');
+    // Blocked, or ended for another reason (OTHER, MALFORMED_FUNCTION_CALL, none) with nothing written: a failure, not an empty answer.
+    if (blocked) throw new AiCallError('BLOCKED');
+    if (stop === 'other' && !wrote && !calls) throw new AiCallError('PROVIDER_ERROR');
+    yield { type: 'done', stop: stop === 'length' ? 'length' : calls ? 'toolUse' : stop };
+  } catch (e) {
+    res.cancel();
+    throw withStats(e, stats);
   }
-  if (!any) throw new AiCallError('BAD_RESPONSE');
-  // Blocked, or ended for another reason (OTHER, MALFORMED_FUNCTION_CALL, none) with nothing written: a failure, not an empty answer.
-  if (blocked) throw new AiCallError('BLOCKED');
-  if (stop === 'other' && !wrote && !calls) throw new AiCallError('PROVIDER_ERROR');
-  yield { type: 'done', stop: stop === 'length' ? 'length' : calls ? 'toolUse' : stop };
 };

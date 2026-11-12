@@ -11,7 +11,8 @@ import { anthropicAdapter, anthropicMessages } from '../../src/server/modules/ai
 import { geminiAdapter, geminiContents, geminiSchema } from '../../src/server/modules/aiConnections/adapters/gemini.ts';
 import { openAiAdapter, openAiCallId, openAiMessages } from '../../src/server/modules/aiConnections/adapters/openai.ts';
 import { newCallId, type Adapter, type ChatEvent, type ChatMessage, type ProviderTarget, type ToolDefinition } from '../../src/server/modules/aiConnections/adapters/types.ts';
-import { AiCallError, aiRequest, sseEvents } from '../../src/server/modules/aiConnections/http.ts';
+import { AI_MAX_CHAT_RESPONSE_BYTES, AI_MAX_KEPT_CHARS, AI_MAX_RESPONSE_BYTES, AiCallError, aiRequest, SSE_MAX_LINE_CHARS, sseEvents } from '../../src/server/modules/aiConnections/http.ts';
+import { sendsReasoningBack } from '../../src/server/modules/aiConnections/provider.ts';
 import { toolDefinitions } from '../../src/server/modules/aiConnections/tools.ts';
 import { mayHaveProcessed, usageOrEstimate } from '../../src/server/modules/assistantChat/agent.ts';
 import { allTools } from '../../src/server/modules/mcp/registry.ts';
@@ -171,7 +172,7 @@ describe('OpenAI Chat Completions adapter (OpenAI, OpenRouter, compatible server
       res.end('data: {"choices":[{"delta":{"content":"half"}}]}\n\n');
       return true;
     };
-    await expect(run(openAiAdapter, target(FAKE_KEYS.openai))).rejects.toMatchObject({ failure: 'BAD_RESPONSE' });
+    await expect(run(openAiAdapter, target(FAKE_KEYS.openai))).rejects.toMatchObject({ failure: 'STREAM_ENDED', detail: 'STREAM_ENDED_EARLY' });
   });
 });
 
@@ -596,5 +597,179 @@ describe('review of the audit fixes: tokens are estimated only for a request the
     expect(usageOrEstimate({ inputTokens: 3, outputTokens: 4 }, sent, { text: '' }, new AiCallError('KEY_REJECTED', 401))).toEqual({ inputTokens: 3, outputTokens: 4 });
     // No failure (a finished reply without a usage event): estimated as before.
     expect(usageOrEstimate(null, sent, { text: '' }).inputTokens).toBeGreaterThan(100);
+  });
+});
+
+describe('D-203: long thinking streams, early ends and failure details (DeepSeek incident 2026-11-12)', () => {
+  // DeepSeek's chunk shape: one reasoning token per chunk, about 300 bytes each; usage only on the last chunk.
+  const ID = 'c0ffee00-1111-2222-3333-444455556666';
+  const base0 = { id: ID, object: 'chat.completion.chunk', created: 1762900000, model: 'deepseek-v4-pro', system_fingerprint: 'fp_fake0000_prod0000_fp8_kvcache' };
+  const dsChunk = (delta: unknown, finish: string | null = null) => ({ ...base0, choices: [{ index: 0, delta, logprobs: null, finish_reason: finish }] });
+  const line = (d: unknown) => `data: ${typeof d === 'string' ? d : JSON.stringify(d)}\n\n`;
+  const thinkLine = line(dsChunk({ content: null, reasoning_content: 'x' }));
+  /** Writes the parts with back-pressure (a long stream must not sit in memory on the fake's side either). */
+  async function writeAll(res: http.ServerResponse, parts: Iterable<string>, end = true) {
+    res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
+    let buf = '';
+    for (const p of parts) {
+      buf += p;
+      if (buf.length > 64 * 1024) {
+        if (res.destroyed) return;
+        if (!res.write(buf)) await new Promise((r) => res.once('drain', r));
+        buf = '';
+      }
+    }
+    if (buf && !res.destroyed) res.write(buf);
+    if (end) res.end();
+  }
+  const compatible = (): ProviderTarget => ({ ...target(FAKE_KEYS.compatible), sendReasoning: true });
+
+  it('more than 8 MiB of reasoning chunks, then content and finish stop, succeeds (chat byte cap 64 MiB)', async () => {
+    const n = Math.ceil((AI_MAX_RESPONSE_BYTES + 512 * 1024) / Buffer.byteLength(thinkLine));
+    expect(AI_MAX_CHAT_RESPONSE_BYTES).toBe(64 * 1024 * 1024);
+    const r = await runWith(openAiAdapter, compatible(), (res) =>
+      void writeAll(
+        res,
+        (function* () {
+          yield line(dsChunk({ role: 'assistant', content: null, reasoning_content: '' }));
+          for (let i = 0; i < n; i++) yield thinkLine;
+          yield line(dsChunk({ content: 'Done.', reasoning_content: null }));
+          yield line(dsChunk({ content: '', reasoning_content: null }, 'stop'));
+          yield line({ ...base0, choices: [], usage: { prompt_tokens: 23700, completion_tokens: 999 } });
+          yield line('[DONE]');
+        })(),
+      ),
+    );
+    expect(r.error).toBeNull();
+    expect(n * Buffer.byteLength(thinkLine)).toBeGreaterThan(AI_MAX_RESPONSE_BYTES);
+    expect(textOf(r.events)).toBe('Done.');
+    expect(r.events.filter((e) => e.type === 'reasoning').length).toBe(n);
+    expect(usageOf(r.events)).toEqual({ type: 'usage', inputTokens: 23700, outputTokens: 999 });
+    expect(r.events[r.events.length - 1]).toEqual({ type: 'done', stop: 'end' });
+  }, 60_000);
+
+  it('what an adapter keeps is capped: more text than AI_MAX_KEPT_CHARS is OUT_OF_TOKENS (KEPT_TOO_LARGE)', async () => {
+    const piece = 'y'.repeat(64 * 1024);
+    const r = await runWith(openAiAdapter, compatible(), (res) =>
+      void writeAll(
+        res,
+        (function* () {
+          for (let i = 0; i < AI_MAX_KEPT_CHARS / piece.length + 2; i++) yield line(dsChunk({ content: piece }));
+          yield line(dsChunk({}, 'stop'));
+          yield line('[DONE]');
+        })(),
+      ),
+    );
+    expect(r.error).toMatchObject({ failure: 'OUT_OF_TOKENS', detail: 'KEPT_TOO_LARGE' });
+    expect((r.error as AiCallError).stats!.contentChars).toBeGreaterThan(AI_MAX_KEPT_CHARS);
+    // Tool-call arguments count too.
+    const args = await runWith(openAiAdapter, compatible(), (res) =>
+      void writeAll(
+        res,
+        (function* () {
+          yield line(dsChunk({ tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'list_classes', arguments: '' } }] }));
+          for (let i = 0; i < AI_MAX_KEPT_CHARS / piece.length + 2; i++) yield line(dsChunk({ tool_calls: [{ index: 0, function: { arguments: piece } }] }));
+          yield line(dsChunk({}, 'tool_calls'));
+          yield line('[DONE]');
+        })(),
+      ),
+    );
+    expect(args.error).toMatchObject({ failure: 'OUT_OF_TOKENS', detail: 'KEPT_TOO_LARGE', stats: { toolCalls: 1 } });
+    expect(callsOf(args.events)).toEqual([]);
+  });
+
+  it('one huge line without a newline, or one event with too much data, fails at the SSE line cap', async () => {
+    const r = await runWith(openAiAdapter, compatible(), (res) => void writeAll(res, [`data: ${'z'.repeat(SSE_MAX_LINE_CHARS + 1024)}`]));
+    expect(r.error).toMatchObject({ failure: 'BAD_RESPONSE', detail: 'SSE_LINE_TOO_LONG' });
+    expect((r.error as AiCallError).stats!.bytes).toBeGreaterThan(SSE_MAX_LINE_CHARS);
+    const many = await runWith(openAiAdapter, compatible(), (res) => void writeAll(res, Array.from({ length: 40 }, () => `data: ${'z'.repeat(32 * 1024)}\n`)));
+    expect(many.error).toMatchObject({ failure: 'BAD_RESPONSE', detail: 'SSE_LINE_TOO_LONG' });
+  });
+
+  it('keep-alive comments then a clean close is STREAM_ENDED with its detail and counters (also after reasoning and usage)', async () => {
+    const r = await runWith(openAiAdapter, compatible(), (res) => void writeAll(res, Array.from({ length: 100 }, () => ': keep-alive\n\n')));
+    expect(r.error).toBeInstanceOf(AiCallError);
+    expect(r.error).toMatchObject({ failure: 'STREAM_ENDED', detail: 'STREAM_ENDED_EARLY', httpStatus: null, sent: true });
+    expect((r.error as AiCallError).stats).toMatchObject({ events: 0, sawDone: false, lastFinishReason: null, sawUsage: false });
+    expect((r.error as AiCallError).stats!.bytes).toBeGreaterThan(0);
+    const thinking = await runWith(openAiAdapter, compatible(), (res) =>
+      void writeAll(res, [...Array.from({ length: 50 }, () => thinkLine), line({ ...base0, choices: [], usage: { prompt_tokens: 1, completion_tokens: 2 } })]),
+    );
+    expect(thinking.error).toMatchObject({ failure: 'STREAM_ENDED', stats: { events: 51, reasoningChars: 50, contentChars: 0, sawUsage: true, sawDone: false } });
+    // The same for Anthropic (no message_stop) and Gemini (nothing at all).
+    const anth = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) => sseOf(res, [{ type: 'message_start', message: { usage: { input_tokens: 5, output_tokens: 1 } } }]));
+    expect(anth.error).toMatchObject({ failure: 'STREAM_ENDED', detail: 'STREAM_ENDED_EARLY' });
+    const gem = await runWith(geminiAdapter, target(FAKE_KEYS.gemini), (res) => void writeAll(res, [': keep-alive\n\n']));
+    expect(gem.error).toMatchObject({ failure: 'STREAM_ENDED', detail: 'STREAM_ENDED_EARLY' });
+    // A body that is not an event stream at all, or a data line that is not JSON, stays a format error.
+    const html = await runWith(openAiAdapter, compatible(), (res) => {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end('<html>502 Bad Gateway</html>');
+    });
+    expect(html.error).toMatchObject({ failure: 'BAD_RESPONSE', detail: 'NOT_AN_EVENT_STREAM' });
+    const badJson = await runWith(openAiAdapter, compatible(), (res) => sseOf(res, ['{"choi']));
+    expect(badJson.error).toMatchObject({ failure: 'BAD_RESPONSE', detail: 'BAD_SSE_JSON' });
+  });
+
+  it('finish insufficient_system_resource or aborted after content is a PROVIDER_ERROR; the text written stays with the events', async () => {
+    for (const finish of ['insufficient_system_resource', 'aborted']) {
+      const r = await runWith(openAiAdapter, compatible(), (res) =>
+        sseOf(res, [dsChunk({ content: 'Partial', reasoning_content: null }), dsChunk({ content: '' }, finish), { ...base0, choices: [], usage: { prompt_tokens: 5, completion_tokens: 100 } }, '[DONE]']),
+      );
+      expect(r.error, finish).toMatchObject({ failure: 'PROVIDER_ERROR', detail: 'PROVIDER_FINISH', stats: { lastFinishReason: finish, sawDone: true } });
+      expect(textOf(r.events)).toBe('Partial');
+      expect(r.events.some((e) => e.type === 'done')).toBe(false);
+    }
+    // finish length is still the length stop.
+    const length = await runWith(openAiAdapter, compatible(), (res) => sseOf(res, [dsChunk({ content: null, reasoning_content: 'hm' }), dsChunk({ content: '' }, 'length'), '[DONE]']));
+    expect(length.events.pop()).toEqual({ type: 'done', stop: 'length' });
+  });
+
+  it('reads delta.reasoning (OpenRouter) as reasoning, never as text', async () => {
+    const r = await runWith(openAiAdapter, compatible(), (res) => sseOf(res, [{ choices: [{ index: 0, delta: { reasoning: 'Thinking…' } }] }, { choices: [{ index: 0, delta: { content: 'Hi' }, finish_reason: 'stop' }] }, '[DONE]']));
+    expect(textOf(r.events)).toBe('Hi');
+    expect(r.events.filter((e) => e.type === 'reasoning')).toEqual([{ type: 'reasoning', text: 'Thinking…' }]);
+  });
+
+  it('reasoning_content goes back on an assistant message with tool calls only when the target asks for it (openaiCompatible and openrouter, never openai or chatgpt)', async () => {
+    const history: ChatMessage[] = [
+      { role: 'user', content: 'Q' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'x', arguments: {} }], reasoning: 'I should look it up.' },
+      { role: 'tool', toolCallId: 'call_1', name: 'x', content: '1' },
+      { role: 'assistant', content: 'Plain answer', reasoning: 'never sent: no tool calls' },
+      { role: 'user', content: 'Again' },
+    ];
+    expect(openAiMessages('', history, { reasoning: true })[1]).toEqual({ role: 'assistant', content: null, reasoning_content: 'I should look it up.', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'x', arguments: '{}' } }] });
+    expect(openAiMessages('', history, { reasoning: true })[3]).toEqual({ role: 'assistant', content: 'Plain answer' });
+    expect(openAiMessages('', history)[1]).not.toHaveProperty('reasoning_content');
+    await run(openAiAdapter, compatible(), [], history);
+    expect(last().body.messages[2].reasoning_content).toBe('I should look it up.');
+    await run(openAiAdapter, target(FAKE_KEYS.openai), [], history);
+    expect(JSON.stringify(last().body)).not.toContain('look it up');
+    expect(sendsReasoningBack('openaiCompatible')).toBe(true);
+    expect(sendsReasoningBack('openrouter')).toBe(true);
+    for (const t of ['openai', 'chatgpt', 'anthropic', 'gemini'] as const) expect(sendsReasoningBack(t), t).toBe(false);
+    // Anthropic and Gemini never send it.
+    expect(JSON.stringify(anthropicMessages(history))).not.toContain('look it up');
+    expect(JSON.stringify(geminiContents(history))).not.toContain('look it up');
+  });
+
+  it('a reasoning-only reply cut short is not counted as 0 output tokens', () => {
+    const sent = { system: 'Be brief.', messages: [{ role: 'user' as const, content: 'x'.repeat(40) }] };
+    const e = new AiCallError('STREAM_ENDED', null, true, 'STREAM_ENDED_EARLY');
+    expect(usageOrEstimate(null, sent, { text: '', reasoningChars: 4000 }, e).outputTokens).toBe(1000);
+    expect(usageOrEstimate(null, sent, { text: '' }, e).outputTokens).toBe(0);
+    // Even a failure that would count nothing counts the reasoning it received.
+    expect(usageOrEstimate(null, sent, { text: '', reasoningChars: 8 }, new AiCallError('TIMEOUT', null, false)).outputTokens).toBe(2);
+  });
+
+  it('a redirect says so in its detail', async () => {
+    fake.override = (_r, res) => {
+      fake.override = null;
+      res.writeHead(307, { location: 'http://169.254.169.254/' });
+      res.end();
+      return true;
+    };
+    await expect(run(openAiAdapter, compatible())).rejects.toMatchObject({ failure: 'BAD_RESPONSE', detail: 'REDIRECT', httpStatus: 307 });
   });
 });

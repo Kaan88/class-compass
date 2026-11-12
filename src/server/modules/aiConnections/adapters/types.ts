@@ -34,18 +34,31 @@ export interface ToolCall {
 
 export type ChatMessage =
   | { role: 'user'; content: string }
-  | { role: 'assistant'; content: string; toolCalls?: ToolCall[] }
+  | {
+      role: 'assistant';
+      content: string;
+      toolCalls?: ToolCall[];
+      /**
+       * The model's hidden reasoning for this message, held in the agent's run memory only (never stored,
+       * shown or logged; D-203). The OpenAI adapter sends it back as `reasoning_content` on a message
+       * with tool calls when the target asks for it (`ProviderTarget.sendReasoning`).
+       */
+      reasoning?: string;
+    }
   | { role: 'tool'; toolCallId: string; name: string; content: string; isError?: boolean };
 
 export type StopReason = 'end' | 'toolUse' | 'length' | 'other';
 
 /**
- * What a streamed reply yields: text as it arrives, each complete tool call, the token usage as soon
- * as the provider reports it (possibly several times, each one the total so far: a consumer keeps the
- * last one and records it once, so a reply cut short still counts what it used), then `done` last.
+ * What a streamed reply yields: text as it arrives, the model's hidden reasoning as it arrives (never
+ * shown; counted for the token estimate and, for some providers, sent back during the same run), each
+ * complete tool call, the token usage as soon as the provider reports it (possibly several times, each
+ * one the total so far: a consumer keeps the last one and records it once, so a reply cut short still
+ * counts what it used), then `done` last.
  */
 export type ChatEvent =
   | { type: 'text'; text: string }
+  | { type: 'reasoning'; text: string }
   | { type: 'toolCall'; call: ToolCall }
   | { type: 'usage'; inputTokens: number; outputTokens: number }
   | { type: 'done'; stop: StopReason };
@@ -59,6 +72,11 @@ export interface ProviderTarget {
   secret: string | null;
   /** OpenAI's own API wants `max_completion_tokens`; compatible servers and OpenRouter take `max_tokens`. */
   maxTokensField?: 'max_tokens' | 'max_completion_tokens';
+  /**
+   * Send an assistant message's reasoning back as `reasoning_content` when it made tool calls
+   * (OpenAI-compatible servers and OpenRouter only: DeepSeek requires it in a tool loop; D-203).
+   */
+  sendReasoning?: boolean;
 }
 
 export interface StreamRequest {

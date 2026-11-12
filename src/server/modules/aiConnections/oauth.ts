@@ -99,7 +99,7 @@ export async function finishOAuth(ctx: RequestContext, input: { state: string; c
         policy: base.policy,
       });
       const d = (await readJson(res)) as { key?: unknown };
-      if (typeof d?.key !== 'string' || d.key.length < 8) throw new AiCallError('BAD_RESPONSE');
+      if (typeof d?.key !== 'string' || d.key.length < 8) throw new AiCallError('BAD_RESPONSE', null, true, 'BAD_TOKEN_REPLY');
       sealed = sealConnectionSecret(ctx, row.id, d.key);
     } else if (row.type === 'chatgpt' && chatgptAvailable(ctx.config)) {
       const tokens = await chatgptTokenRequest(ctx, { grant_type: 'authorization_code', code: input.code, code_verifier: verifier, redirect_uri: `${ctx.config.origins.main}${RETURN_PATH}` });

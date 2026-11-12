@@ -67,7 +67,7 @@ export async function chatgptTokenRequest(deps: AppDeps, params: Record<string, 
     policy: token.policy,
   });
   const d = (await readJson(res)) as { access_token?: unknown; refresh_token?: unknown; expires_in?: unknown };
-  if (typeof d?.access_token !== 'string' || !d.access_token) throw new AiCallError('BAD_RESPONSE');
+  if (typeof d?.access_token !== 'string' || !d.access_token) throw new AiCallError('BAD_RESPONSE', null, true, 'BAD_TOKEN_REPLY');
   return {
     accessToken: d.access_token,
     refreshToken: typeof d.refresh_token === 'string' ? d.refresh_token : null,
@@ -97,6 +97,14 @@ async function chatgptAccessToken(deps: AppDeps, row: ConnectionRow): Promise<st
   return next.accessToken;
 }
 
+/**
+ * Connection types whose assistant messages with tool calls carry their reasoning back
+ * (`reasoning_content`) during one run's tool loop (D-203): DeepSeek and similar servers behind an
+ * OpenAI-compatible address or OpenRouter require it. Never OpenAI's own API or ChatGPT (which keep
+ * reasoning on their side), never Anthropic or Gemini (other formats).
+ */
+export const sendsReasoningBack = (type: AiConnectionType) => type === 'openaiCompatible' || type === 'openrouter';
+
 /** Where a connection's requests go, with what secret. Throws `AiCallError` (NEEDS_KEY, NOT_AVAILABLE, URL_NOT_ALLOWED). */
 export async function targetOf(deps: AppDeps, row: ConnectionRow): Promise<ProviderTarget> {
   switch (row.type) {
@@ -107,13 +115,13 @@ export async function targetOf(deps: AppDeps, row: ConnectionRow): Promise<Provi
       const secret = openConnectionSecret(deps, row);
       if (!secret) throw new AiCallError('NEEDS_KEY');
       const a = fixedAddress(deps, row.type, PROVIDER_BASE[row.type]);
-      return { baseUrl: a.url, policy: a.policy, secret, maxTokensField: row.type === 'openai' ? 'max_completion_tokens' : 'max_tokens' };
+      return { baseUrl: a.url, policy: a.policy, secret, maxTokensField: row.type === 'openai' ? 'max_completion_tokens' : 'max_tokens', ...(sendsReasoningBack(row.type) ? { sendReasoning: true } : {}) };
     }
     case 'openaiCompatible': {
       // Checked again on every use, in case the rules changed since it was saved.
       const checked = checkBaseUrl(row.baseUrl ?? '', row.localNetwork);
       if (!checked.ok) throw new AiCallError('URL_NOT_ALLOWED');
-      return { baseUrl: checked.url, policy: row.localNetwork ? 'local' : 'public', secret: openConnectionSecret(deps, row), maxTokensField: 'max_tokens' };
+      return { baseUrl: checked.url, policy: row.localNetwork ? 'local' : 'public', secret: openConnectionSecret(deps, row), maxTokensField: 'max_tokens', sendReasoning: true };
     }
     case 'chatgpt': {
       if (!chatgptAvailable(deps.config)) throw new AiCallError('NOT_AVAILABLE');
@@ -152,7 +160,7 @@ export async function* streamChat(deps: AppDeps, req: ChatRequest): AsyncGenerat
     target = await targetOf(deps, req.connection);
   } catch (e) {
     // No chat request was made (no key, an address refused, a token refresh that failed).
-    throw e instanceof AiCallError ? new AiCallError(e.failure, e.httpStatus, false) : e;
+    throw e instanceof AiCallError ? new AiCallError(e.failure, e.httpStatus, false, e.detail) : e;
   }
   yield* ADAPTERS[WIRE_FORMAT[req.connection.type]]({ target, model: req.model, system: req.system, messages: req.messages, tools: req.tools, maxTokens: req.maxTokens ?? DEFAULT_MAX_TOKENS, signal: req.signal, timeoutMs: req.timeoutMs });
 }

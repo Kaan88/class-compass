@@ -24,24 +24,102 @@ export const AI_CONNECT_TIMEOUT_MS = 30_000;
 export const AI_IDLE_TIMEOUT_MS = 60_000;
 /** The longest one request may take in total, from sending it to the end of the streamed reply (10 minutes since 2026-11-12: a long reply such as a theme package from a model that thinks first). */
 export const AI_TOTAL_TIMEOUT_MS = 10 * 60_000;
-/** The most a provider may send in one reply. */
+/** The most a provider may send in one reply (small JSON calls: model lists, OAuth). */
 export const AI_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+/**
+ * The raw-byte backstop of a chat request (`chat: true`; D-203). A model that thinks first streams its
+ * hidden reasoning one token per event of about 300 bytes (DeepSeek), so 65,536 output tokens can be
+ * well over 8 MiB on the wire although little of it is kept. Memory stays bounded by the SSE line cap
+ * (`SSE_MAX_LINE_CHARS`) and each adapter's cap on what it keeps (`AI_MAX_KEPT_CHARS`).
+ */
+export const AI_MAX_CHAT_RESPONSE_BYTES = 64 * 1024 * 1024;
+/** The longest unfinished SSE line, and the most data one SSE event may carry (characters; D-203). */
+export const SSE_MAX_LINE_CHARS = 1024 * 1024;
+/**
+ * The most a streaming adapter keeps of one reply (characters of text, tool-call arguments and reasoning
+ * together; D-203): far above any real answer (65,536 tokens are about 260,000 characters), so going
+ * over it means a runaway reply, which ends as `OUT_OF_TOKENS`.
+ */
+export const AI_MAX_KEPT_CHARS = 2 * 1024 * 1024;
+
+/**
+ * Non-personal detail of a failure, for the server log only (D-203): which check failed, never what
+ * the provider sent.
+ */
+export type AiErrorDetail =
+  | 'BODY_TOO_LARGE'
+  | 'SSE_LINE_TOO_LONG'
+  | 'BAD_SSE_JSON'
+  | 'BAD_JSON_BODY'
+  | 'NOT_AN_EVENT_STREAM'
+  | 'STREAM_ENDED_EARLY'
+  | 'KEPT_TOO_LARGE'
+  | 'PROVIDER_FINISH'
+  | 'STREAM_ERROR_EVENT'
+  | 'REDIRECT'
+  | 'BAD_TOKEN_REPLY';
+
+/**
+ * Counters of one streamed reply (D-203), exposed on a failure (`AiCallError.stats`) for the server log:
+ * sizes and flags only, never text. `lastFinishReason` is the provider's finish reason when it is a plain
+ * word (anything else is kept as `other`).
+ */
+export interface StreamStats {
+  bytes: number;
+  events: number;
+  sawDone: boolean;
+  lastFinishReason: string | null;
+  sawUsage: boolean;
+  reasoningChars: number;
+  contentChars: number;
+  toolCalls: number;
+}
+export const newStreamStats = (): StreamStats => ({ bytes: 0, events: 0, sawDone: false, lastFinishReason: null, sawUsage: false, reasoningChars: 0, contentChars: 0, toolCalls: 0 });
+/** A finish reason as the counters keep it (a short plain word; anything else is `other`). */
+export const finishWord = (v: unknown): string => (typeof v === 'string' && /^[A-Za-z0-9_.-]{1,40}$/u.test(v) ? v : 'other');
+
+/** Counts the bytes of a body as it is read. */
+export async function* countBytes(body: AsyncIterable<Buffer>, stats: StreamStats): AsyncGenerator<Buffer> {
+  for await (const c of body) {
+    stats.bytes += c.length;
+    yield c;
+  }
+}
+
+/** Puts a stream's counters on a failure (another error passes unchanged). */
+export function withStats(e: unknown, stats: StreamStats): unknown {
+  if (e instanceof AiCallError && !e.stats) e.stats = { ...stats };
+  return e;
+}
+
+/**
+ * Throws `OUT_OF_TOKENS` (`KEPT_TOO_LARGE`) when an adapter has kept more of one reply than
+ * `AI_MAX_KEPT_CHARS` (text, tool-call arguments and reasoning together).
+ */
+export function assertKept(stats: StreamStats, toolArgChars: number) {
+  if (stats.contentChars + stats.reasoningChars + toolArgChars > AI_MAX_KEPT_CHARS) throw new AiCallError('OUT_OF_TOKENS', null, true, 'KEPT_TOO_LARGE');
+}
 
 export class AiCallError extends Error {
   readonly failure: AiFailure;
   readonly httpStatus: number | null;
+  /** Which check failed (non-personal, for the server log). */
+  readonly detail: AiErrorDetail | null;
+  /** The stream's counters when it failed while streaming (set by the adapter). */
+  stats: StreamStats | null = null;
   /**
    * Whether the request may have reached the provider: false when it failed before a connection was
    * made (refused address, unreachable host, stopped before sending) or before any provider request
    * (no key, a token that could not be refreshed). Token counting uses it: nothing sent counts nothing.
    */
   readonly sent: boolean;
-  constructor(failure: AiFailure, httpStatus: number | null = null, sent = true) {
-    super(`AI provider call failed: ${failure}${httpStatus ? ` (HTTP ${httpStatus})` : ''}`);
+  constructor(failure: AiFailure, httpStatus: number | null = null, sent = true, detail: AiErrorDetail | null = null) {
+    super(`AI provider call failed: ${failure}${httpStatus ? ` (HTTP ${httpStatus})` : ''}${detail ? ` [${detail}]` : ''}`);
     this.name = 'AiCallError';
     this.failure = failure;
     this.httpStatus = httpStatus;
     this.sent = sent;
+    this.detail = detail;
   }
 }
 
@@ -53,6 +131,9 @@ export function failureOfStatus(status: number): AiFailure {
   if (status >= 300 && status < 400) return 'BAD_RESPONSE';
   return 'PROVIDER_ERROR';
 }
+
+/** The error of a non-2xx answer (a redirect, which is never followed, says so in its detail). */
+export const statusError = (status: number) => new AiCallError(failureOfStatus(status), status, true, status >= 300 && status < 400 ? 'REDIRECT' : null);
 
 export interface AiHttpRequest {
   url: string;
@@ -105,7 +186,7 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
       if (settled) return;
       settled = true;
       const failure: AiFailure = e instanceof AiCallError ? e.failure : (e as Error)?.name === 'AddressRefused' || e instanceof AddressRefused ? 'URL_NOT_ALLOWED' : 'UNREACHABLE';
-      reject(e instanceof AiCallError && connected ? e : new AiCallError(failure, e instanceof AiCallError ? e.httpStatus : null, connected));
+      reject(e instanceof AiCallError && connected ? e : new AiCallError(failure, e instanceof AiCallError ? e.httpStatus : null, connected, e instanceof AiCallError ? e.detail : null));
     };
     const r = lib.request(
       u,
@@ -127,11 +208,12 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
         if (!req.chat) r.setTimeout(req.idleTimeoutMs ?? AI_IDLE_TIMEOUT_MS);
         res.on('close', () => clearTimeout(total));
         let size = 0;
+        const max = req.chat ? AI_MAX_CHAT_RESPONSE_BYTES : AI_MAX_RESPONSE_BYTES;
         const body = (async function* () {
           try {
             for await (const chunk of res as AsyncIterable<Buffer>) {
               size += chunk.length;
-              if (size > AI_MAX_RESPONSE_BYTES) throw new AiCallError('BAD_RESPONSE');
+              if (size > max) throw new AiCallError('BAD_RESPONSE', null, true, 'BODY_TOO_LARGE');
               yield chunk;
             }
           } catch (e) {
@@ -175,7 +257,7 @@ export async function readText(res: AiHttpResponse, max = 1024 * 1024): Promise<
     size += c.length;
     if (size > max) {
       res.cancel();
-      throw new AiCallError('BAD_RESPONSE');
+      throw new AiCallError('BAD_RESPONSE', null, true, 'BODY_TOO_LARGE');
     }
     parts.push(c);
   }
@@ -186,13 +268,13 @@ export async function readText(res: AiHttpResponse, max = 1024 * 1024): Promise<
 export async function readJson(res: AiHttpResponse): Promise<unknown> {
   if (res.status < 200 || res.status >= 300) {
     res.cancel();
-    throw new AiCallError(failureOfStatus(res.status), res.status);
+    throw statusError(res.status);
   }
   try {
     return JSON.parse(await readText(res));
   } catch (e) {
     if (e instanceof AiCallError) throw e;
-    throw new AiCallError('BAD_RESPONSE');
+    throw new AiCallError('BAD_RESPONSE', null, true, 'BAD_JSON_BODY');
   }
 }
 
@@ -202,17 +284,25 @@ export interface SseEvent {
   data: string;
 }
 
-/** Splits a byte stream into Server-Sent Events (LF or CRLF line ends, multi-line data, comments skipped). */
+const tooLong = () => new AiCallError('BAD_RESPONSE', null, true, 'SSE_LINE_TOO_LONG');
+
+/**
+ * Splits a byte stream into Server-Sent Events (LF or CRLF line ends, multi-line data, comments skipped).
+ * An unfinished line, or one event's data, longer than `SSE_MAX_LINE_CHARS` is a `BAD_RESPONSE`
+ * (`SSE_LINE_TOO_LONG`, D-203), so a stream without line ends cannot grow the buffer up to the byte cap.
+ */
 export async function* sseEvents(body: AsyncIterable<Buffer>): AsyncGenerator<SseEvent> {
   const decoder = new TextDecoder();
   let buf = '';
   let event: string | null = null;
   let data: string[] = [];
+  let dataChars = 0;
   const flushLine = function* (line: string): Generator<SseEvent> {
     if (line === '') {
       if (data.length) yield { event, data: data.join('\n') };
       event = null;
       data = [];
+      dataChars = 0;
       return;
     }
     if (line.startsWith(':')) return;
@@ -220,7 +310,11 @@ export async function* sseEvents(body: AsyncIterable<Buffer>): AsyncGenerator<Ss
     const field = i === -1 ? line : line.slice(0, i);
     const value = i === -1 ? '' : line.slice(i + 1).replace(/^ /u, '');
     if (field === 'event') event = value;
-    else if (field === 'data') data.push(value);
+    else if (field === 'data') {
+      dataChars += value.length + 1;
+      if (dataChars > SSE_MAX_LINE_CHARS) throw tooLong();
+      data.push(value);
+    }
   };
   for await (const chunk of body) {
     buf += decoder.decode(chunk, { stream: true });
@@ -232,6 +326,7 @@ export async function* sseEvents(body: AsyncIterable<Buffer>): AsyncGenerator<Ss
       buf = buf.slice(buf[nl] === '\r' && buf[nl + 1] === '\n' ? nl + 2 : nl + 1);
       yield* flushLine(line);
     }
+    if (buf.length > SSE_MAX_LINE_CHARS) throw tooLong();
   }
   buf += decoder.decode();
   if (buf) yield* flushLine(buf);
