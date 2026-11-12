@@ -556,6 +556,16 @@ describe('review of the audit fixes: tokens are estimated only for a request the
     expect(r.error).toMatchObject({ sent: true });
   });
 
+  it('an in-stream rate-limit error after partial tool-call arguments (OpenAI, HTTP 200) is estimated, not counted 0', async () => {
+    const r = await runWith(openAiAdapter, target(FAKE_KEYS.openai), (res) =>
+      sseOf(res, [{ choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'list_classes', arguments: '{"ye' } }] } }] }, { error: { code: 429, message: 'Rate limit' } }]),
+    );
+    expect(r.error).toMatchObject({ failure: 'RATE_LIMITED', httpStatus: null, sent: true });
+    expect(r.events.filter((e) => e.type === 'usage' || e.type === 'toolCall' || e.type === 'text')).toEqual([]);
+    expect(mayHaveProcessed(r.error)).toBe(true);
+    expect(usageOrEstimate(null, sent, { text: '' }, r.error).inputTokens).toBeGreaterThan(100);
+  });
+
   it('refusals (401/403/404/429) and failures before sending count 0; other failures are estimated', () => {
     const none = { inputTokens: 0, outputTokens: 0 };
     const refused = [
@@ -573,6 +583,11 @@ describe('review of the audit fixes: tokens are estimated only for a request the
       expect(mayHaveProcessed(e)).toBe(false);
     }
     for (const e of [new AiCallError('PROVIDER_ERROR', 500), new AiCallError('UNREACHABLE'), new AiCallError('TIMEOUT'), new AiCallError('BAD_RESPONSE'), new Error('boom')]) {
+      expect(usageOrEstimate(null, sent, { text: '' }, e).inputTokens).toBeGreaterThan(100);
+    }
+    // The same codes from inside an accepted (HTTP 200) stream: the provider already worked, so estimated.
+    for (const e of [new AiCallError('RATE_LIMITED'), new AiCallError('KEY_REJECTED'), new AiCallError('MODEL_NOT_FOUND')]) {
+      expect(mayHaveProcessed(e), e.message).toBe(true);
       expect(usageOrEstimate(null, sent, { text: '' }, e).inputTokens).toBeGreaterThan(100);
     }
     // Text already written, or the provider's own usage, always counts.

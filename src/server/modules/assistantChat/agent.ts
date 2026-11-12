@@ -50,16 +50,20 @@ export const ASSISTANT_TUNING = { compactAtTokens: 40_000, keepRecentTokens: 12_
 const estimate = (msgs: ChatMessage[]) => Math.ceil(msgs.reduce((n, m) => n + m.content.length + ('toolCalls' in m && m.toolCalls ? JSON.stringify(m.toolCalls).length : 0) + 20, 0) / 4);
 
 type Usage = { inputTokens: number; outputTokens: number };
+/** Failures where the provider was never asked (no key, address refused, the connection paused, over budget or not available). */
+const NEVER_ASKED: ReadonlySet<AiFailure> = new Set<AiFailure>(['NEEDS_KEY', 'URL_NOT_ALLOWED', 'NOT_AVAILABLE', 'PAUSED', 'OVER_BUDGET']);
 /**
- * Failures that mean the provider processed nothing: refused before any work (key, rate limit, unknown
- * model) or never asked (no key, address refused, the connection paused, over budget or not available).
+ * Failures that mean nothing was processed only when they are a refusal at the headers (an HTTP status:
+ * key, rate limit, unknown model). The same code from inside an accepted (HTTP 200) stream, e.g. an
+ * in-stream 429 or overloaded error, comes after the provider started working and is estimated.
  */
-const NOTHING_PROCESSED: ReadonlySet<AiFailure> = new Set<AiFailure>(['KEY_REJECTED', 'RATE_LIMITED', 'MODEL_NOT_FOUND', 'NEEDS_KEY', 'URL_NOT_ALLOWED', 'NOT_AVAILABLE', 'PAUSED', 'OVER_BUDGET']);
+const REFUSED_AT_HEADERS: ReadonlySet<AiFailure> = new Set<AiFailure>(['KEY_REJECTED', 'RATE_LIMITED', 'MODEL_NOT_FOUND']);
 
 /** Whether a failed request may have been processed (and billed) by the provider. */
 export function mayHaveProcessed(failure: unknown): boolean {
   if (!(failure instanceof AiCallError)) return true;
-  return failure.sent && !NOTHING_PROCESSED.has(failure.failure);
+  if (!failure.sent || NEVER_ASKED.has(failure.failure)) return false;
+  return !(REFUSED_AT_HEADERS.has(failure.failure) && failure.httpStatus !== null);
 }
 
 /**
