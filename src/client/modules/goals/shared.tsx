@@ -10,7 +10,7 @@ import { useI18n } from '../../lib/i18n.tsx';
 import { formatBytes } from '../../lib/images.ts';
 import { Button } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
-import { IconFile, IconImage, IconLink, IconMic, IconNote } from '../../ui/icons.tsx';
+import { IconFile, IconFilm, IconImage, IconLink, IconMic, IconNote } from '../../ui/icons.tsx';
 
 export const CONFIDENCE_LEVELS = [1, 2, 3, 4, 5] as const;
 
@@ -100,7 +100,8 @@ export function GoalSummary({ goal, outcomes }: { goal: Goal; outcomes: readonly
 
 /**
  * Evidence item (S13b2, D-119): text, a safe external link, a picture (thumbnail; tap to see it
- * large), a document (icon, name and size; opens as a download) or a voice recording (player).
+ * large), a document (icon, name and size; opens as a download), a voice recording (player) or a
+ * video (S27a, D-193: `<video controls preload="metadata">`, played from the policy-checked file URL).
  */
 /** `goalLabel` (teacher Goals page, S20b): the goal this evidence is for, shown under the kind. */
 export function EvidenceView({ item, fileUrl, actions, goalLabel }: { item: Evidence; fileUrl: (fileId: string, thumb?: boolean) => string; actions?: ReactNode; goalLabel?: string }) {
@@ -108,11 +109,18 @@ export function EvidenceView({ item, fileUrl, actions, goalLabel }: { item: Evid
   const [large, setLarge] = useState(false);
   const f = item.file;
   const picture = f !== null && item.kind === 'file' && f.mime.startsWith('image/');
-  const label = picture ? t('goals.evidenceKind.picture') : item.kind === 'file' ? t('goals.evidenceKind.document') : t(`goals.evidenceKind.${item.kind}` as MessageKey);
+  const video = f !== null && item.kind === 'file' && f.mime.startsWith('video/');
+  const label = picture
+    ? t('goals.evidenceKind.picture')
+    : video
+      ? t('goals.evidenceKind.video')
+      : item.kind === 'file'
+        ? t('goals.evidenceKind.document')
+        : t(`goals.evidenceKind.${item.kind}` as MessageKey);
   return (
-    <li className="cc-card cc-stack cc-evidence" data-kind={picture ? 'picture' : item.kind}>
+    <li className="cc-card cc-stack cc-evidence" data-kind={picture ? 'picture' : video ? 'video' : item.kind}>
       <div className="cc-row">
-        {item.kind === 'link' ? <IconLink /> : item.kind === 'audio' ? <IconMic /> : picture ? <IconImage /> : item.kind === 'file' ? <IconFile /> : <IconNote />}
+        {item.kind === 'link' ? <IconLink /> : item.kind === 'audio' ? <IconMic /> : picture ? <IconImage /> : video ? <IconFilm /> : item.kind === 'file' ? <IconFile /> : <IconNote />}
         <strong>{label}</strong>
         <span className="cc-muted">{whenText(item.createdAt, locale)}</span>
         {item.authorType === 'teacher' ? <span className="cc-chip">{t('goals.byTeacher')}</span> : null}
@@ -130,7 +138,8 @@ export function EvidenceView({ item, fileUrl, actions, goalLabel }: { item: Evid
           <img src={fileUrl(f.id, f.hasThumbnail)} alt={t('goals.photoOf', { name: f.name ?? '' })} className="cc-evidence__thumb" loading="lazy" />
         </button>
       ) : null}
-      {f && item.kind === 'file' && !picture ? (
+      {f && video ? <video controls preload="metadata" playsInline src={fileUrl(f.id)} className="cc-evidence__video" aria-label={t('goals.videoOf', { name: f.name ?? t('goals.evidenceKind.video') })} /> : null}
+      {f && item.kind === 'file' && !picture && !video ? (
         <a href={fileUrl(f.id)} target="_blank" rel="noopener noreferrer" className="cc-row cc-evidence__doc">
           <IconFile />
           <span>{f.name ?? t('goals.openFile')}</span>

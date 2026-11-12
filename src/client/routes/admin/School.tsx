@@ -929,7 +929,9 @@ export function ModulesPage() {
                 ? t('modules.documentsHint')
                 : p.module === 'media.avatarPictures'
                   ? t('modules.avatarPicturesHint')
-                  : t('modules.disabledUntilConsent')
+                  : p.module === 'media.evidenceVideo'
+                    ? t('modules.videoHint')
+                    : t('modules.disabledUntilConsent')
             }
             isSelected={p.availability === 'enabled'}
             onChange={(v) => toggle(p.module, v)}

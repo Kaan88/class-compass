@@ -22,7 +22,7 @@ const GOALS = [
   { id: 'g2', label: 'I will learn five new words.' },
 ];
 
-function Harness({ media, upload, add, start = '' }: { media: { photos: boolean; audio: boolean; documents: boolean }; upload: (k: UploadKind, f: Blob, n: string) => Promise<{ id: string }>; add: (i: NewEvidence) => Promise<unknown>; start?: string }) {
+function Harness({ media, upload, add, start = '' }: { media: { photos: boolean; audio: boolean; documents: boolean; video: boolean }; upload: (k: UploadKind, f: Blob, n: string) => Promise<{ id: string }>; add: (i: NewEvidence) => Promise<unknown>; start?: string }) {
   const [goalId, setGoalId] = useState(start);
   return (
     <>
@@ -38,7 +38,7 @@ describe('evidence from the Goals page (S20b, D-170)', () => {
   it('GOL-4: the page chooses the goal; a document is uploaded and attached for it', async () => {
     const upload = vi.fn(async () => ({ id: 'file-1' }));
     const add = vi.fn(async () => ({}));
-    render(wrap(<Harness media={{ photos: false, audio: false, documents: true }} upload={upload} add={add} />));
+    render(wrap(<Harness media={{ photos: false, audio: false, documents: true, video: false }} upload={upload} add={add} />));
     const goalSelect = screen.getByLabelText(en['student.evidenceGoal']) as HTMLSelectElement;
     expect(goalSelect.value).toBe('');
     // What "Add evidence" on a goal card does: the page sets the goal.
@@ -62,12 +62,12 @@ describe('evidence from the Goals page (S20b, D-170)', () => {
 
   it('D-014: picture and voice choices appear only while the media flags allow them', () => {
     const noop = async () => ({ id: 'x' });
-    const { unmount } = render(wrap(<Harness media={{ photos: false, audio: false, documents: true }} upload={noop} add={noop} />));
+    const { unmount } = render(wrap(<Harness media={{ photos: false, audio: false, documents: true, video: false }} upload={noop} add={noop} />));
     expect(screen.queryByRole('button', { name: en['evidence.mode.picture'] })).toBeNull();
     expect(screen.queryByRole('button', { name: en['evidence.mode.voice'] })).toBeNull();
     expect(screen.getByRole('button', { name: en['evidence.mode.document'] })).toBeTruthy();
     unmount();
-    render(wrap(<Harness media={{ photos: true, audio: true, documents: false }} upload={noop} add={noop} />));
+    render(wrap(<Harness media={{ photos: true, audio: true, documents: false, video: false }} upload={noop} add={noop} />));
     expect(screen.getByRole('button', { name: en['evidence.mode.picture'] })).toBeTruthy();
     expect(screen.getByRole('button', { name: en['evidence.mode.voice'] })).toBeTruthy();
     expect(screen.queryByRole('button', { name: en['evidence.mode.document'] })).toBeNull();

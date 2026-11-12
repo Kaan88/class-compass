@@ -211,7 +211,7 @@ export const TeacherStudentGoals = z.object({
   /** The signed-in teacher's own private notes (GOL-6). Never part of any student response. */
   privateNotes: z.array(PrivateNote).meta(pii('note')),
   library: GoalLibrary,
-  media: z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean() }),
+  media: z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean(), video: z.boolean() }),
 });
 export type TeacherStudentGoals = z.infer<typeof TeacherStudentGoals>;
 export const teacherStudentGoals = endpoint({
@@ -446,7 +446,7 @@ export const StudentPage = z.object({
   theme: Theme,
   /** The class language mode (S13a, D-099): the page is shown in it; the switch only when there are two. */
   language: z.object({ mainLanguage: z.enum(['en', 'tr']), secondLanguageEnabled: z.boolean() }),
-  media: z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean() }),
+  media: z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean(), video: z.boolean() }),
   subjects: z.array(z.object({ subjectId: z.string(), name: LocalizedText, sections: z.array(StudentPageSection) })),
   /** S13c (D-124): the student's avatar, the class lock and the unlocks earned. */
   avatar: StudentAvatarInfo,
@@ -506,8 +506,8 @@ export const studentUpdateEvidence = endpoint({
 });
 export const studentDeleteEvidence = endpoint({ method: 'DELETE', path: '/api/student/evidence/:evidenceId', access: 'student', input: z.object({ evidenceId: Id }), output: Ok });
 
-/** Evidence upload kinds a student may send (multipart field `file`); photos/audio need the media flags (D-014). */
-export const STUDENT_UPLOAD_KINDS = ['document', 'image', 'audio'] as const;
+/** Evidence upload kinds a student may send (multipart field `file`); photos/audio/video need the media flags (D-014, D-193). */
+export const STUDENT_UPLOAD_KINDS = ['document', 'image', 'audio', 'video'] as const;
 export const studentUploadFile = endpoint({
   method: 'POST',
   path: '/api/student/files',

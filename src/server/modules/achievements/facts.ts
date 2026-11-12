@@ -65,7 +65,7 @@ export function collectFactsMany(db: Db, studentIds: readonly string[], context:
     .where(and(inArray(evidence.studentId, ids), eq(evidence.subjectId, context.subjectId), isNull(evidence.deletedAt), isNull(evidence.hiddenAt)))
     .all();
   for (const { e, fileKind } of ev) {
-    const kind: EvidenceFilterKind = e.kind === 'file' ? (fileKind === 'image' ? 'image' : 'document') : e.kind;
+    const kind: EvidenceFilterKind = e.kind === 'file' ? (fileKind === 'image' ? 'image' : fileKind === 'video' ? 'video' : 'document') : e.kind;
     get(e.studentId).evidence.push({ at: e.createdAt, kind, skill: e.goalId ? (goalSkill.get(e.goalId) ?? null) : null });
   }
 

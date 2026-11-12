@@ -109,7 +109,7 @@ function evidenceCategory(ctx: RequestContext, kind: EvidenceRow['kind'], fileId
   if (kind === 'link') return 'evidenceLink';
   if (kind === 'audio') return 'evidenceVoice';
   const f = fileId ? ctx.db.select({ kind: files.kind }).from(files).where(eq(files.id, fileId)).get() : undefined;
-  return f?.kind === 'image' ? 'evidencePicture' : 'evidenceDocument';
+  return f?.kind === 'image' ? 'evidencePicture' : f?.kind === 'video' ? 'evidenceVideo' : 'evidenceDocument';
 }
 
 // ---------------------------------------------------------------- goals
@@ -280,7 +280,7 @@ export function addEvidence(ctx: RequestContext, input: In<typeof C.studentAddEv
       const f = ctx.db.select().from(files).where(eq(files.id, input.fileId)).get();
       // Only a file this student uploaded themselves can be attached (no attaching guessed ids).
       if (!f || f.deletedAt !== null || f.ownerStudentId !== studentId || f.uploadedByType !== 'student' || f.uploadedById !== studentId) throw notFound('File');
-      const okKind = input.kind === 'audio' ? f.kind === 'audio' : f.kind === 'document' || f.kind === 'image';
+      const okKind = input.kind === 'audio' ? f.kind === 'audio' : f.kind === 'document' || f.kind === 'image' || f.kind === 'video';
       if (!okKind) throw invalid('This file does not match the kind of evidence', { reason: 'EVIDENCE_FILE_KIND' });
       // The media flags are checked again: an admin may have switched photos or audio off since the upload (D-014).
       assertMediaAllowed(ctx.db, f.kind, 'evidence');

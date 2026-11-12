@@ -26,6 +26,7 @@ export const NOTIFICATION_CATEGORIES = [
   'evidencePicture',
   'evidenceDocument',
   'evidenceVoice',
+  'evidenceVideo',
   'achievementEarned',
   'avatarChanged',
   'avatarPicture',
@@ -49,6 +50,8 @@ export const DEFAULT_ON: Readonly<Record<NotificationCategory, boolean>> = {
   evidencePicture: true,
   evidenceDocument: true,
   evidenceVoice: true,
+  /** S27a (D-193). */
+  evidenceVideo: true,
   achievementEarned: true,
   avatarChanged: false,
   /** S24 (D-184): a student sent their own picture to check (on by default: nobody else sees it until a teacher decides). */
@@ -75,6 +78,7 @@ export const CATEGORY_MODULE: Readonly<Record<NotificationCategory, PolicyKey | 
   evidencePicture: 'goals',
   evidenceDocument: 'goals',
   evidenceVoice: 'goals',
+  evidenceVideo: 'goals',
   achievementEarned: 'achievements',
   avatarChanged: null,
   avatarPicture: null,
@@ -86,7 +90,7 @@ export const CATEGORY_MODULE: Readonly<Record<NotificationCategory, PolicyKey | 
 /** Groups for the page's filter and the settings screen, in display order. */
 export const NOTIFICATION_GROUPS = {
   goals: ['goalCreated', 'goalEdited', 'goalAchieved', 'reflection', 'note', 'selfAssessment'],
-  evidence: ['evidenceText', 'evidenceLink', 'evidencePicture', 'evidenceDocument', 'evidenceVoice'],
+  evidence: ['evidenceText', 'evidenceLink', 'evidencePicture', 'evidenceDocument', 'evidenceVoice', 'evidenceVideo'],
   achievements: ['achievementEarned', 'speakersPoints'],
   other: ['avatarChanged', 'avatarPicture', 'textBlocked', 'linkNewDevice'],
 } as const satisfies Record<string, readonly NotificationCategory[]>;

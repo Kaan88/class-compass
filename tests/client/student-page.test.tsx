@@ -116,7 +116,7 @@ const section = (subjectId: string, over: Partial<StudentGoalsSection> = {}): St
   ],
   ...over,
 });
-const media = { photos: false, audio: false, documents: true };
+const media = { photos: false, audio: false, documents: true, video: false };
 
 /** A screen with the page's navigation kept in memory. */
 function Harness({ render: show, start }: { render: (p: { nav: StudentNav; go: NavApi['go'] }) => ReactNode; start: StudentNav }) {

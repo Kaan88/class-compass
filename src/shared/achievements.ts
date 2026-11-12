@@ -28,7 +28,7 @@ export const ACHIEVEMENT_SKILLS = ['listening', 'reading', 'vocabulary', 'gramma
 export type AchievementSkill = (typeof ACHIEVEMENT_SKILLS)[number];
 export const SKILL_OF_CATEGORY_ICON: Record<string, AchievementSkill> = { ear: 'listening', book: 'reading', words: 'vocabulary', grammar: 'grammar', pen: 'writing', speech: 'speaking', letters: 'phonics' };
 
-export const EVIDENCE_FILTER_KINDS = ['text', 'link', 'image', 'document', 'audio'] as const;
+export const EVIDENCE_FILTER_KINDS = ['text', 'link', 'image', 'document', 'audio', 'video'] as const;
 export type EvidenceFilterKind = (typeof EVIDENCE_FILTER_KINDS)[number];
 
 /**

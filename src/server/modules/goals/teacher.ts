@@ -172,7 +172,7 @@ export function studentDetail(ctx: RequestContext, contextId: string, studentId:
     feedback: feedbackDtos(ctx.db, feedbackOf(ctx.db, studentId, subjectId)),
     privateNotes: myPrivateNotes(ctx.db, requireUser(ctx).id, studentId, subjectId),
     library: libraryFor(ctx.db, s.context.id, subjectId, teacherIdsOf(s), true),
-    media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments },
+    media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments, video: media.evidenceVideo },
   };
 }
 
@@ -567,7 +567,7 @@ export function addEvidence(ctx: RequestContext, input: In<typeof C.teacherAddEv
       // A student's consent-gated profile photo is never evidence (STU-8): it would become visible to the student
       // and deleting the evidence would delete the photo.
       if (isStudentPhotoFile(ctx, f.id)) throw notFound('File');
-      const okKind = input.kind === 'audio' ? f.kind === 'audio' : f.kind === 'document' || f.kind === 'image';
+      const okKind = input.kind === 'audio' ? f.kind === 'audio' : f.kind === 'document' || f.kind === 'image' || f.kind === 'video';
       if (!okKind) throw invalid('This file does not match the kind of evidence', { reason: 'EVIDENCE_FILE_KIND' });
       assertMediaAllowed(ctx.db, f.kind, 'evidence');
       fileId = f.id;

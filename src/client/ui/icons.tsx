@@ -304,6 +304,20 @@ export const IconCamera = () => (
     <circle cx="12" cy="13" r="3.5" />
   </Icon>
 );
+/** A video camera (S27a, D-193: record a video). */
+export const IconVideo = () => (
+  <Icon>
+    <rect x="3" y="6" width="13" height="12" rx="2" />
+    <path d="m16 10.5 5-3v9l-5-3" />
+  </Icon>
+);
+/** A film strip (a video file). */
+export const IconFilm = () => (
+  <Icon>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4" />
+  </Icon>
+);
 export const IconPrint = () => (
   <Icon>
     <path d="M7 9V3h10v6" />

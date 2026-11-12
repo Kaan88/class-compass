@@ -4854,6 +4854,46 @@ label:has(> input[type='file']:focus-visible) {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
+/* S27a (D-193): video evidence. The player and the recorder's preview keep the picture's own shape
+   (contain, never cropped); the timer is text with a dot that pulses only without reduced motion. */
+.cc-evidence__video {
+  display: block;
+  width: 100%;
+  max-width: 32rem;
+  max-height: 60vh;
+  background: var(--cc-surface-2);
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+}
+.cc-video-recorder .cc-camera__view {
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+}
+.cc-video-recorder__timer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.cc-video-recorder__dot {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--cc-danger);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cc-video-recorder__dot {
+    animation: cc-video-dot 1.6s ease-in-out infinite;
+  }
+}
+@keyframes cc-video-dot {
+  50% {
+    opacity: 0.35;
+  }
+}
 .cc-link-url {
   overflow-wrap: anywhere;
   word-break: break-all;

@@ -124,7 +124,9 @@ describe('categories and defaults (D-155)', () => {
     expect(st).toMatchObject({ categories: {}, digest: { enabled: false, hour: 16, includeNames: false }, emailReady: true, hasEmail: false });
     expect(NOTIFICATION_CATEGORIES.filter((c) => DEFAULT_ON[c])).toEqual([
       'goalCreated', 'goalEdited', 'goalAchieved', 'reflection', 'note', 'selfAssessment',
-      'evidenceText', 'evidenceLink', 'evidencePicture', 'evidenceDocument', 'evidenceVoice', 'achievementEarned',
+      'evidenceText', 'evidenceLink', 'evidencePicture', 'evidenceDocument', 'evidenceVoice',
+      'evidenceVideo', // S27a (D-193)
+      'achievementEarned',
       'avatarPicture', // S24 (D-184)
     ]);
     expect((await s.teacherA.put('/api/teacher/notification-settings', { categories: { nope: true }, digest: st.digest })).status).toBe(400);

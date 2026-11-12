@@ -1,9 +1,12 @@
 /**
  * Add evidence (S13b2, D-119): one shared form for the student page and the teacher Goals page.
  * Big buttons for each way: Write · Add a link · Add a picture (several) · Take a picture ·
- * Add a document (several) · Record my voice · Add a voice file. Picture and voice choices appear only
- * when the admin media flags allow them (D-014), documents only while `media.evidenceDocuments` is on;
- * the server checks every flag again.
+ * Add a document (several) · Record my voice · Add a voice file · Record a video · Add a video. Picture,
+ * voice and video choices appear only when the admin media flags allow them (D-014, D-193), documents
+ * only while `media.evidenceDocuments` is on; the server checks every flag again.
+ * Videos (S27a, D-193): a phone or tablet records with its own camera app (capture input in video
+ * mode); elsewhere the in-page recorder (`VideoRecorder`, a lazy chunk). A chosen video is checked on
+ * the device first (size, and the length where the browser can read it); the server checks again.
  * Pictures are scaled down to 2048 px and re-encoded as JPEG on the device first (`lib/images.ts`).
  * A picture chosen under "Add a document" is sent as a picture, so it follows the photo flag and gets
  * the server's metadata removal. Each file becomes its own evidence item with the same caption.
@@ -19,8 +22,8 @@
  * S27b (D-194): the student's "My goals" opens the `steps` layout for one goal (`fixedGoal`): there is
  * no "which goal" step (1 how → 2 the work) and every step names the goal.
  */
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ACCEPT_HINT } from '../../../shared/contracts/files.ts';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { ACCEPT_HINT, MAX_VIDEO_MS, UPLOAD_LIMITS, VIDEO_DURATION_GRACE_MS } from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
 import type { EvidenceKind } from '../../../shared/contracts/goals.ts';
 import { useI18n } from '../../lib/i18n.tsx';
@@ -28,18 +31,24 @@ import { formatBytes, jpegName, looksLikeImage, prepareImage, preparePicture } f
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { Select, TextArea, TextField } from '../../ui/Fields.tsx';
-import { IconCamera, IconFile, IconImage, IconLink, IconMic, IconNote, IconPlus, IconSound, IconTrash } from '../../ui/icons.tsx';
-import { CameraCapture } from './CameraCapture.tsx';
+import { IconCamera, IconFile, IconFilm, IconImage, IconLink, IconMic, IconNote, IconPlus, IconSound, IconTrash, IconVideo } from '../../ui/icons.tsx';
+import { CameraCapture, prefersSystemCamera } from './CameraCapture.tsx';
 import { FilePick } from './FilePick.tsx';
 import { chosenGoalHint } from './shared.tsx';
 import { VoiceRecorder } from './VoiceRecorder.tsx';
 
-export type EvidenceMode = 'text' | 'link' | 'picture' | 'camera' | 'document' | 'voice' | 'voiceFile';
-export type UploadKind = 'image' | 'document' | 'audio';
-export type EvidenceMedia = { photos: boolean; audio: boolean; documents: boolean };
+/** The in-page video recorder loads only when "Record a video" is chosen (student page budget, D-151). */
+const VideoRecorder = lazy(() => import('./VideoRecorder.tsx'));
+
+export type EvidenceMode = 'text' | 'link' | 'picture' | 'camera' | 'document' | 'voice' | 'voiceFile' | 'video' | 'videoFile';
+export type UploadKind = 'image' | 'document' | 'audio' | 'video';
+export type EvidenceMedia = { photos: boolean; audio: boolean; documents: boolean; video: boolean };
 /** What a live hint checks: evidence words, a caption / link title, or a link's address (language check only). */
 export type EvidenceHintKind = 'evidenceText' | 'linkTitle' | 'url';
 export type NewEvidence = { kind: EvidenceKind; goalId?: string; body?: string; url?: string; fileId?: string };
+
+/** The video size limit in MB, for the hints. */
+const VIDEO_MB = Math.round(UPLOAD_LIMITS.video / (1024 * 1024));
 
 /** Most files added in one go. */
 export const MAX_FILES_AT_ONCE = 10;
@@ -52,6 +61,7 @@ export function evidenceModes(media: EvidenceMedia): EvidenceMode[] {
     ...(media.photos ? (['picture', 'camera'] as const) : []),
     ...(media.documents ? (['document'] as const) : []),
     ...(media.audio ? (['voice', 'voiceFile'] as const) : []),
+    ...(media.video ? (['video', 'videoFile'] as const) : []),
   ];
 }
 
@@ -63,9 +73,43 @@ const MODE_ICON: Record<EvidenceMode, () => React.JSX.Element> = {
   document: IconFile,
   voice: IconMic,
   voiceFile: IconSound,
+  video: IconVideo,
+  videoFile: IconFilm,
 };
 
 type Pending = { key: number; blob: Blob; name: string; kind: UploadKind; preview: string | null };
+
+/** Does a chosen file look like a video (type or name)? The server decides by the bytes. */
+export const looksLikeVideo = (f: File) => f.type.startsWith('video/') || /\.(mp4|m4v|mov|webm)$/iu.test(f.name);
+
+/**
+ * The length of a video file as the browser reads it (ms), or null when it cannot (no `<video>`, an
+ * unknown length as in many browser recordings, or no answer within a few seconds).
+ */
+export function videoDurationMs(file: Blob, timeoutMs = 5000): Promise<number | null> {
+  if (typeof document === 'undefined' || typeof URL.createObjectURL !== 'function') return Promise.resolve(null);
+  const el = document.createElement('video');
+  // A type this browser cannot play (MOV in Chrome, for example) is left to the server's check.
+  if (file.type && typeof el.canPlayType === 'function' && el.canPlayType(file.type) === '') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    let done = false;
+    const finish = (ms: number | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      el.removeAttribute('src');
+      URL.revokeObjectURL(url);
+      resolve(ms);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    el.preload = 'metadata';
+    el.muted = true;
+    el.onloadedmetadata = () => finish(Number.isFinite(el.duration) && el.duration > 0 ? Math.round(el.duration * 1000) : null);
+    el.onerror = () => finish(null);
+    el.src = url;
+  });
+}
 
 /** The text check on Save: a hint to show, and whether the words may be sent anyway (a blocked word is, so it is counted). */
 export type EvidenceCheck = (text: string, kind: EvidenceHintKind) => { hint?: string; send: boolean };
@@ -134,6 +178,8 @@ export function EvidenceAdder({
     [],
   );
   const current = modes.includes(mode) ? mode : 'text';
+  // Phones and tablets (and browsers that cannot record) use the system camera app in video mode.
+  const systemVideo = prefersSystemCamera() || typeof window === 'undefined' || !('MediaRecorder' in window) || !navigator.mediaDevices?.getUserMedia;
 
   // ---- steps (student page): 1 how → 2 which goal (only when there are goals) → last: the work.
   const [localStep, setLocalStep] = useState(1);
@@ -175,10 +221,14 @@ export function EvidenceAdder({
     );
 
   /** Turn chosen files into pending uploads (pictures prepared on the device first). */
-  const take = async (files: File[], as: 'picture' | 'document' | 'voiceFile') => {
+  const take = async (files: File[], as: 'picture' | 'document' | 'voiceFile' | 'videoFile') => {
     setNotice(null);
     const out: Array<Omit<Pending, 'key' | 'preview'>> = [];
     for (const f of files) {
+      if (as === 'videoFile') {
+        if (await videoOk(f)) out.push({ blob: f, name: f.name || 'video', kind: 'video' });
+        continue;
+      }
       if (as === 'voiceFile') {
         out.push({ blob: f, name: f.name || 'voice', kind: 'audio' });
         continue;
@@ -202,8 +252,31 @@ export function EvidenceAdder({
     push(out);
   };
 
+  /** A video file from the device: a video, within the size limit and (where readable) the length limit. */
+  async function videoOk(f: File): Promise<boolean> {
+    if (!looksLikeVideo(f)) {
+      setNotice(t('evidence.videoNotVideo'));
+      return false;
+    }
+    if (f.size > UPLOAD_LIMITS.video) {
+      setNotice(t('evidence.videoTooBig', { mb: VIDEO_MB }));
+      return false;
+    }
+    const ms = await videoDurationMs(f);
+    if (ms !== null && ms > MAX_VIDEO_MS + VIDEO_DURATION_GRACE_MS) {
+      setNotice(t('evidence.videoTooLong', { minutes: MAX_VIDEO_MS / 60000 }));
+      return false;
+    }
+    return true;
+  }
+  /** A video from the phone's camera app (capture input). */
+  const takeVideo = async (f: File | undefined) => {
+    setNotice(null);
+    if (f && (await videoOk(f))) push([{ blob: f, name: f.name || 'video', kind: 'video' }]);
+  };
+
   const urlOk = !url.trim() || G.isSafeHttpUrl(url);
-  const fileMode = current === 'picture' || current === 'camera' || current === 'document' || current === 'voiceFile';
+  const fileMode = current === 'picture' || current === 'camera' || current === 'document' || current === 'voiceFile' || current === 'video' || current === 'videoFile';
   const valid =
     current === 'text' ? Boolean(body.trim()) : current === 'link' ? Boolean(url.trim()) && urlOk : current === 'voice' ? recording !== null : pending.length > 0;
 
@@ -254,7 +327,7 @@ export function EvidenceAdder({
     }
   };
 
-  const fileInput = (as: 'picture' | 'document' | 'voiceFile', label: string, accept: string, multiple: boolean) => {
+  const fileInput = (as: 'picture' | 'document' | 'voiceFile' | 'videoFile', label: string, accept: string, multiple: boolean) => {
     const Icon = MODE_ICON[as];
     return (
       <FilePick
@@ -373,12 +446,23 @@ export function EvidenceAdder({
       {current === 'document' ? <p className="cc-muted">{t('evidence.documentsHint')}</p> : null}
       {current === 'voiceFile' ? fileInput('voiceFile', t('evidence.chooseVoiceFile'), ACCEPT_HINT.audio, false) : null}
       {current === 'voice' ? <VoiceRecorder value={recording} onChange={setRecording} /> : null}
+      {current === 'video' ? (
+        systemVideo ? (
+          <FilePick id={`${idPrefix}-video`} label={t('evidence.openVideoCamera')} icon={<IconVideo />} accept="video/*" capture="environment" onFiles={(files) => void takeVideo(files[0])} />
+        ) : (
+          <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
+            <VideoRecorder onVideo={(blob, name) => push([{ blob, name, kind: 'video' }])} />
+          </Suspense>
+        )
+      ) : null}
+      {current === 'videoFile' ? fileInput('videoFile', t('evidence.chooseVideo'), ACCEPT_HINT.video, false) : null}
+      {current === 'video' || current === 'videoFile' ? <p className="cc-muted">{t('evidence.videoHint', { minutes: MAX_VIDEO_MS / 60000, mb: VIDEO_MB })}</p> : null}
       {notice ? <Alert kind="warning">{notice}</Alert> : null}
       {fileMode && pending.length ? (
         <ul className="cc-evidence-pending" aria-label={t('evidence.ready')} data-testid="evidence-pending">
           {pending.map((it) => (
             <li key={it.key} className="cc-evidence-pending__item">
-              {it.preview ? <img src={it.preview} alt={t('goals.photoOf', { name: it.name })} className="cc-evidence__thumb" /> : it.kind === 'audio' ? <IconSound /> : <IconFile />}
+              {it.preview ? <img src={it.preview} alt={t('goals.photoOf', { name: it.name })} className="cc-evidence__thumb" /> : it.kind === 'audio' ? <IconSound /> : it.kind === 'video' ? <IconFilm /> : <IconFile />}
               <span className="cc-evidence-pending__name">{it.name}</span>
               <span className="cc-muted">{formatBytes(it.blob.size, locale)}</span>
               <Button size="small" variant="ghost" aria-label={t('evidence.remove', { name: it.name })} onPress={() => drop(it.key)}>

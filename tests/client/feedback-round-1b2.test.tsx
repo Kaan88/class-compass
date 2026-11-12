@@ -94,9 +94,9 @@ describe('student-page language (S13b 14b, D-117)', () => {
 
 describe('evidence (S13b 13, 14c, D-119)', () => {
   it('offers only the ways the media flags allow', () => {
-    expect(evidenceModes({ photos: false, audio: false, documents: false })).toEqual(['text', 'link']);
-    expect(evidenceModes({ photos: false, audio: false, documents: true })).toEqual(['text', 'link', 'document']);
-    expect(evidenceModes({ photos: true, audio: true, documents: true })).toEqual(['text', 'link', 'picture', 'camera', 'document', 'voice', 'voiceFile']);
+    expect(evidenceModes({ photos: false, audio: false, documents: false, video: false })).toEqual(['text', 'link']);
+    expect(evidenceModes({ photos: false, audio: false, documents: true, video: false })).toEqual(['text', 'link', 'document']);
+    expect(evidenceModes({ photos: true, audio: true, documents: true, video: false })).toEqual(['text', 'link', 'picture', 'camera', 'document', 'voice', 'voiceFile']);
   });
 
   it('scales pictures down to the long edge without upscaling', () => {

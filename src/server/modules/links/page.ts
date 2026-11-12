@@ -40,7 +40,7 @@ export function studentPage(ctx: RequestContext): StudentPage {
     theme: scope.classes[0] ? effectiveTheme(ctx.db, scope.classes[0].theme) : DEFAULT_THEME,
     // The student-page language of the class (S13b2, D-117): the class mode unless the class gives its student pages their own.
     language: scope.classes[0] ? studentPageLanguage(scope.classes[0]) : DEFAULT_CLASS_LANGUAGE,
-    media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments },
+    media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments, video: media.evidenceVideo },
     subjects: subjects.filter((s) => s.sections.length > 0),
     avatar: studentAvatarInfo(ctx.db, scope.student, scope.classes),
     textLimits: limitsOf(ctx.db),

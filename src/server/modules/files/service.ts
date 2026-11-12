@@ -4,7 +4,8 @@
  * Upload: access check → media policy (before reading the body) → stream to a temp file with the
  * kind's hard size limit → sniff the bytes against the kind's allow-list (client type and name are
  * ignored) → re-encode images (EXIF/GPS stripped, evidence ≤ 2048 px, others ≤ 2560 px, thumbnail),
- * strip audio tags (D-119) → move into place under a
+ * strip audio tags (D-119); videos (D-193): container checked by its own bytes, duration capped,
+ * location and device tags blanked in place, never re-encoded → move into place under a
  * random key → quotas checked in the SAME transaction that inserts the files row.
  *
  * Access: a file is only ever served by `sendFile` after `assertCanReadFile` (owner scope): admins
@@ -18,7 +19,7 @@ import fsp from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { ALLOWED_MIME, EVIDENCE_IMAGE_EDGE, UPLOAD_LIMITS, type FileKind, type FileMeta } from '../../../shared/contracts/files.ts';
+import { ALLOWED_MIME, EVIDENCE_IMAGE_EDGE, MAX_VIDEO_MS, UPLOAD_LIMITS, VIDEO_DURATION_GRACE_MS, type FileKind, type FileMeta } from '../../../shared/contracts/files.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { evidence, files, students } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
@@ -31,6 +32,7 @@ import { neutralStudentFileName } from '../textChecks/service.ts';
 import { AudioMetaError, stripAudioMetadata } from './audioMeta.ts';
 import { MAX_IMAGE_EDGE, reencodeImage } from './image.ts';
 import { sniffFile } from './sniff.ts';
+import { inspectVideo, neutraliseVideoMetadata } from './video.ts';
 import { newStorageKey, newTempPath, removeKey, removeQuietly, sha256File, storeBuffer, storeTemp, storagePath } from './storage.ts';
 
 export type FileRow = typeof files.$inferSelect;
@@ -62,9 +64,22 @@ export function cleanFileName(name: string | undefined | null): string | null {
 export function assertMediaAllowed(db: Db, kind: FileKind, purpose: 'evidence' | 'student_photo' | 'import'): void {
   const media = getMediaPolicy(db);
   const ok =
-    purpose === 'import' ? kind === 'import_source' : purpose === 'student_photo' ? media.studentPhotos : kind === 'image' ? media.evidencePhotos : kind === 'audio' ? media.evidenceAudio : kind === 'document' ? media.evidenceDocuments : false;
+    purpose === 'import'
+      ? kind === 'import_source'
+      : purpose === 'student_photo'
+        ? media.studentPhotos
+        : kind === 'image'
+          ? media.evidencePhotos
+          : kind === 'audio'
+            ? media.evidenceAudio
+            : kind === 'video'
+              ? media.evidenceVideo
+              : kind === 'document'
+                ? media.evidenceDocuments
+                : false;
   if (!ok) {
-    const module = purpose === 'student_photo' ? 'media.studentPhotos' : kind === 'image' ? 'media.evidencePhotos' : kind === 'audio' ? 'media.evidenceAudio' : 'media.evidenceDocuments';
+    const module =
+      purpose === 'student_photo' ? 'media.studentPhotos' : kind === 'image' ? 'media.evidencePhotos' : kind === 'audio' ? 'media.evidenceAudio' : kind === 'video' ? 'media.evidenceVideo' : 'media.evidenceDocuments';
     throw new AppError('FEATURE_DISABLED', 'This kind of upload is turned off by the administrator', { reason: 'MEDIA_DISABLED', module });
   }
 }
@@ -126,13 +141,30 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
   const { tmp, filename } = await receiveToTemp(ctx, req, opts.kind);
   const keys: string[] = [];
   try {
-    const sniff = await sniffFile(tmp, ALLOWED_MIME[opts.kind], { name: filename });
-    if (!sniff.ok) {
+    // Videos (D-193): the container's own bytes decide (MP4/MOV ftyp with a picture track, WebM EBML).
+    let videoDurationMs: number | null | undefined;
+    let videoMime = '';
+    if (opts.kind === 'video') {
+      const v = await inspectVideo(tmp);
+      if (!v.ok) {
+        if (v.reason === 'VIDEO_UNREADABLE') throw invalid('The video could not be read', { reason: 'VIDEO_UNREADABLE' });
+        throw invalid(v.reason === 'FILE_EMPTY' ? 'The file is empty' : 'This type of file is not accepted', { reason: v.reason });
+      }
+      const limit = MAX_VIDEO_MS + VIDEO_DURATION_GRACE_MS;
+      if ((v.durationMs ?? 0) > limit || v.atLeastMs > limit) throw invalid('The video is longer than the limit', { reason: 'VIDEO_TOO_LONG', maxSeconds: MAX_VIDEO_MS / 1000 });
+      if (!ALLOWED_MIME.video.includes(v.mime)) throw invalid('This type of file is not accepted', { reason: 'FILE_TYPE_NOT_ALLOWED' });
+      // Location, device and software tags are blanked in place (no re-encoding; every offset stays valid).
+      await neutraliseVideoMetadata(tmp, v.container, v.metadata);
+      videoDurationMs = v.durationMs;
+      videoMime = v.mime;
+    }
+    const sniff = opts.kind === 'video' ? null : await sniffFile(tmp, ALLOWED_MIME[opts.kind], { name: filename });
+    if (sniff && !sniff.ok) {
       if (sniff.detected === 'image/heic' || sniff.detected === 'image/heif') throw invalid('HEIC pictures cannot be read here', { reason: 'IMAGE_HEIC' });
       throw invalid(sniff.reason === 'FILE_EMPTY' ? 'The file is empty' : 'This type of file is not accepted', { reason: sniff.reason });
     }
     const key = newStorageKey();
-    let mime = sniff.mime;
+    let mime = sniff ? sniff.mime : videoMime;
     let size: number;
     let sha: string;
     let thumbKey: string | null = null;
@@ -193,7 +225,9 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
     tx(ctx.db, () => {
       assertQuota(ctx, opts.ownerStudentId, size + (thumbSize ?? 0));
       ctx.db.insert(files).values(row).run();
-      audit(ctx.db, ctx.actor, { action: 'file.upload', entity: 'file', entityId: row.id, after: { kind: row.kind, mime, size, ownerStudentId: row.ownerStudentId } }, now);
+      // A video's duration is recorded here (null = it could not be read; D-193).
+      const after = { kind: row.kind, mime, size, ownerStudentId: row.ownerStudentId, ...(videoDurationMs !== undefined ? { durationMs: videoDurationMs } : {}) };
+      audit(ctx.db, ctx.actor, { action: 'file.upload', entity: 'file', entityId: row.id, after }, now);
       opts.onStored?.(ctx.db, row);
     });
     return row;
@@ -239,6 +273,9 @@ function disposition(type: 'inline' | 'attachment', name: string | null, fallbac
   return `${type}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(n)}`;
 }
 
+/** How long a browser may keep a video it was allowed to see (D-193): short, private, never shared. */
+export const VIDEO_CACHE_SECONDS = 600;
+
 const EXT: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -255,12 +292,17 @@ const EXT: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
   'application/vnd.oasis.opendocument.text': '.odt',
   'audio/wav': '.wav',
+  'video/mp4': '.mp4',
+  'video/quicktime': '.mov',
+  'video/webm': '.webm',
 };
 
 /**
  * Send a file that passed the policy check. Uploaded content can never run in the app's origin:
- * `Content-Security-Policy: sandbox`, `nosniff`, `no-store`, and anything that is not an image or
- * audio is an attachment. Audio supports single byte ranges (seeking in the player).
+ * `Content-Security-Policy: sandbox`, `nosniff`, `no-store`, and anything that is not an image,
+ * audio or video is an attachment. Audio and video support single byte ranges (206; seeking in the
+ * player). Video (D-193) gets a short private cache instead of `no-store`, so seeking and playing it
+ * again do not download it again; a file id never changes its content, and no shared cache keeps it.
  */
 export async function sendFile(ctx: RequestContext, req: FastifyRequest, reply: FastifyReply, f: FileRow, opts: { thumb?: boolean } = {}) {
   const useThumb = Boolean(opts.thumb && f.thumbStorageKey);
@@ -273,15 +315,16 @@ export async function sendFile(ctx: RequestContext, req: FastifyRequest, reply: 
   } catch {
     throw notFound('File');
   }
-  const inline = mime.startsWith('image/') || mime.startsWith('audio/');
+  const media = mime.startsWith('audio/') || mime.startsWith('video/');
+  const inline = mime.startsWith('image/') || media;
   reply.header('Content-Type', mime === 'text/plain' ? 'text/plain; charset=utf-8' : mime);
   reply.header('X-Content-Type-Options', 'nosniff');
   reply.header('Content-Security-Policy', "sandbox; default-src 'none'");
-  reply.header('Cache-Control', 'private, no-store');
+  reply.header('Cache-Control', mime.startsWith('video/') ? `private, max-age=${VIDEO_CACHE_SECONDS}` : 'private, no-store');
   reply.header('Cross-Origin-Resource-Policy', 'same-origin');
   reply.header('Content-Disposition', disposition(inline ? 'inline' : 'attachment', f.originalName, EXT[mime] ?? ''));
-  reply.header('Accept-Ranges', mime.startsWith('audio/') ? 'bytes' : 'none');
-  const range = mime.startsWith('audio/') ? req.headers.range : undefined;
+  reply.header('Accept-Ranges', media ? 'bytes' : 'none');
+  const range = media ? req.headers.range : undefined;
   if (typeof range === 'string') {
     const m = /^bytes=(\d*)-(\d*)$/u.exec(range.trim());
     let start = m && m[1] !== '' ? Number(m[1]) : NaN;

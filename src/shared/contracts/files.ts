@@ -8,8 +8,11 @@ import { z } from 'zod';
 import { Ok, endpoint } from './define.ts';
 import { Id, QueryBool } from './school.ts';
 
-/** `teacher_sound` (S13b, D-107): a teacher's own time's-up clip, a teacher asset (not student media). */
-export const FILE_KINDS = ['image', 'document', 'audio', 'import_source', 'teacher_sound'] as const;
+/**
+ * `teacher_sound` (S13b, D-107): a teacher's own time's-up clip, a teacher asset (not student media).
+ * `video` (S27a, D-193): video evidence (MP4, MOV, WebM), behind `media.evidenceVideo`.
+ */
+export const FILE_KINDS = ['image', 'document', 'audio', 'import_source', 'teacher_sound', 'video'] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 export const FileKindSchema = z.enum(FILE_KINDS);
 
@@ -21,10 +24,15 @@ export const UPLOAD_LIMITS: Record<FileKind, number> = {
   audio: 25 * MB,
   import_source: 20 * MB,
   teacher_sound: 2 * MB,
+  video: 150 * MB,
 };
 
 /** Longest voice recording on the student page and the teacher Goals page (S13b2, D-119). */
 export const MAX_VOICE_RECORDING_MS = 5 * 60 * 1000;
+/** Longest video evidence (S27a, D-193): the in-page recorder stops here, the server refuses longer files. */
+export const MAX_VIDEO_MS = 3 * 60 * 1000;
+/** Allowance on the server for a container that rounds up (a recording stopped right at 3:00). */
+export const VIDEO_DURATION_GRACE_MS = 2000;
 /** Pictures are scaled down on the device to this long edge before upload (S13b2, D-119); the server caps evidence pictures at the same size. */
 export const EVIDENCE_IMAGE_EDGE = 2048;
 
@@ -58,6 +66,8 @@ export const ALLOWED_MIME: Record<FileKind, readonly string[]> = {
     'application/x-cc-html-table',
   ],
   teacher_sound: ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg'],
+  /** Decided by the container's own bytes (`files/video.ts`): MP4/MOV `ftyp` with a picture track, WebM EBML. */
+  video: ['video/mp4', 'video/quicktime', 'video/webm'],
 };
 
 /** `accept` attribute for file inputs (a hint for the picker only; the server sniffs the content). */
@@ -67,6 +77,7 @@ export const ACCEPT_HINT: Record<FileKind, string> = {
   audio: 'audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,.m4a,.mp3,.ogg,.webm,.wav',
   import_source: '.csv,.txt,.xlsx,.xls,.docx,.pdf,image/jpeg,image/png,image/webp',
   teacher_sound: 'audio/webm,audio/ogg,audio/mp4,audio/mpeg,.m4a,.mp3',
+  video: 'video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov',
 };
 
 export const FileMeta = z.object({
@@ -82,11 +93,11 @@ export const FileMeta = z.object({
 export type FileMeta = z.infer<typeof FileMeta>;
 
 /** Evidence file kinds a teacher uploads for a student: they need the student and the class+subject (D-174). */
-export const EVIDENCE_FILE_KINDS = ['image', 'document', 'audio'] as const satisfies readonly FileKind[];
+export const EVIDENCE_FILE_KINDS = ['image', 'document', 'audio', 'video'] as const satisfies readonly FileKind[];
 
 /**
- * Upload one file (multipart field `file`). Kinds image/document/audio are evidence files and need
- * `ownerStudentId` plus the matching media flag (D-014: photos and audio OFF by default →
+ * Upload one file (multipart field `file`). Kinds image/document/audio/video are evidence files and need
+ * `ownerStudentId` plus the matching media flag (D-014: photos, audio and video (D-193) OFF by default →
  * 403 FEATURE_DISABLED); `import_source` is a student list for the importer (IMP-1).
  * `contextId` (S20b, D-170; required since S21b, D-174): the class+subject the evidence is for, so
  * the upload is refused before any bytes are stored when the teacher does not own that class+subject
@@ -111,8 +122,8 @@ export const uploadFile = endpoint({
 /**
  * Download a file after the policy check (owner scope). Binary response with
  * `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`,
- * attachment for anything but images and audio, Range support for audio. `thumb=true` serves the
- * image thumbnail.
+ * attachment for anything but images, audio and video, Range support (206) for audio and video, and
+ * a short private cache for video (D-193). `thumb=true` serves the image thumbnail.
  */
 export const getFile = endpoint({
   method: 'GET',

@@ -44,6 +44,8 @@ export const MEDIA_MODULE_CATALOG = [
   { key: 'media.evidencePhotos', defaultAvailability: 'disabled' },
   { key: 'media.evidenceAudio', defaultAvailability: 'disabled' },
   { key: 'media.evidenceDocuments', defaultAvailability: 'enabled' },
+  /** S27a (D-193): video evidence usually shows children's faces, so it starts off like photos and audio. */
+  { key: 'media.evidenceVideo', defaultAvailability: 'disabled' },
   /** S24 (D-184): students' own avatar pictures, checked by a teacher before anyone else sees them. */
   { key: 'media.avatarPictures', defaultAvailability: 'disabled' },
 ] as const satisfies readonly CatalogEntry[];
