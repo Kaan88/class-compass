@@ -9,12 +9,12 @@
  * Reasoning (D-203): a model that thinks first streams its hidden reasoning in `delta.reasoning_content`
  * (DeepSeek) or `delta.reasoning` (OpenRouter). It is yielded as `reasoning` events (never shown) and,
  * when the target asks for it (`sendReasoning`), an assistant message with tool calls carries its
- * reasoning back as `reasoning_content`. A stream that ends with neither `[DONE]` nor a finish reason is
+ * reasoning back as `reasoning_content` (OpenRouter: `reasoning`). A stream that ends with neither `[DONE]` nor a finish reason is
  * `STREAM_ENDED`; the finish reasons `insufficient_system_resource` and `aborted` are failures.
  */
 import crypto from 'node:crypto';
 import { AiCallError, aiRequest, assertKept, countBytes, finishWord, newStreamStats, readText, sseEvents, statusError, withStats } from '../http.ts';
-import { MAX_CALL_ID_LENGTH, toolCall, type Adapter, type ChatEvent, type ChatMessage, type StopReason, type ToolDefinition } from './types.ts';
+import { MAX_CALL_ID_LENGTH, toolCall, type Adapter, type ChatEvent, type ChatMessage, type ReasoningField, type StopReason, type ToolDefinition } from './types.ts';
 
 /**
  * A call id as OpenAI accepts it (at most 40 characters). A longer one (another provider's, or one
@@ -22,8 +22,8 @@ import { MAX_CALL_ID_LENGTH, toolCall, type Adapter, type ChatEvent, type ChatMe
  */
 export const openAiCallId = (id: string) => (id.length <= MAX_CALL_ID_LENGTH ? id : `cc_${crypto.createHash('sha256').update(id).digest('hex').slice(0, MAX_CALL_ID_LENGTH - 3)}`);
 
-/** `reasoning`: send an assistant message's reasoning back with its tool calls (`ProviderTarget.sendReasoning`). */
-export function openAiMessages(system: string, messages: ChatMessage[], opts: { reasoning?: boolean } = {}): Array<Record<string, unknown>> {
+/** `reasoning`: the field to send an assistant message's reasoning back in with its tool calls (`ProviderTarget.sendReasoning`). */
+export function openAiMessages(system: string, messages: ChatMessage[], opts: { reasoning?: ReasoningField } = {}): Array<Record<string, unknown>> {
   return [
     ...(system ? [{ role: 'system', content: system }] : []),
     ...messages.map((m) => {
@@ -32,7 +32,7 @@ export function openAiMessages(system: string, messages: ChatMessage[], opts: { 
         return {
           role: 'assistant',
           content: m.content || null,
-          ...(opts.reasoning && m.toolCalls?.length && m.reasoning ? { reasoning_content: m.reasoning } : {}),
+          ...(opts.reasoning && m.toolCalls?.length && m.reasoning ? { [opts.reasoning]: m.reasoning } : {}),
           ...(m.toolCalls?.length ? { tool_calls: m.toolCalls.map((c) => ({ id: openAiCallId(c.id), type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } })) } : {}),
         };
       return { role: 'tool', tool_call_id: openAiCallId(m.toolCallId), content: m.content };
@@ -78,7 +78,7 @@ function* fromCompletion(d: any): Generator<ChatEvent> {
 export const openAiAdapter: Adapter = async function* (req) {
   const body = {
     model: req.model,
-    messages: openAiMessages(req.system, req.messages, { reasoning: req.target.sendReasoning === true }),
+    messages: openAiMessages(req.system, req.messages, req.target.sendReasoning ? { reasoning: req.target.sendReasoning } : {}),
     ...(req.tools.length ? { tools: openAiTools(req.tools) } : {}),
     [req.target.maxTokensField ?? 'max_tokens']: req.maxTokens,
     stream: true,

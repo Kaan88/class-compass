@@ -12,7 +12,7 @@ import { geminiAdapter, geminiContents, geminiSchema } from '../../src/server/mo
 import { openAiAdapter, openAiCallId, openAiMessages } from '../../src/server/modules/aiConnections/adapters/openai.ts';
 import { newCallId, type Adapter, type ChatEvent, type ChatMessage, type ProviderTarget, type ToolDefinition } from '../../src/server/modules/aiConnections/adapters/types.ts';
 import { AI_MAX_CHAT_RESPONSE_BYTES, AI_MAX_KEPT_CHARS, AI_MAX_RESPONSE_BYTES, AiCallError, aiRequest, SSE_MAX_LINE_CHARS, sseEvents } from '../../src/server/modules/aiConnections/http.ts';
-import { sendsReasoningBack } from '../../src/server/modules/aiConnections/provider.ts';
+import { reasoningFieldOf, sendsReasoningBack } from '../../src/server/modules/aiConnections/provider.ts';
 import { toolDefinitions } from '../../src/server/modules/aiConnections/tools.ts';
 import { mayHaveProcessed, usageOrEstimate } from '../../src/server/modules/assistantChat/agent.ts';
 import { allTools } from '../../src/server/modules/mcp/registry.ts';
@@ -622,7 +622,7 @@ describe('D-203: long thinking streams, early ends and failure details (DeepSeek
     if (buf && !res.destroyed) res.write(buf);
     if (end) res.end();
   }
-  const compatible = (): ProviderTarget => ({ ...target(FAKE_KEYS.compatible), sendReasoning: true });
+  const compatible = (): ProviderTarget => ({ ...target(FAKE_KEYS.compatible), sendReasoning: 'reasoning_content' });
 
   it('more than 8 MiB of reasoning chunks, then content and finish stop, succeeds (chat byte cap 64 MiB)', async () => {
     const n = Math.ceil((AI_MAX_RESPONSE_BYTES + 512 * 1024) / Buffer.byteLength(thinkLine));
@@ -696,11 +696,15 @@ describe('D-203: long thinking streams, early ends and failure details (DeepSeek
       void writeAll(res, [...Array.from({ length: 50 }, () => thinkLine), line({ ...base0, choices: [], usage: { prompt_tokens: 1, completion_tokens: 2 } })]),
     );
     expect(thinking.error).toMatchObject({ failure: 'STREAM_ENDED', stats: { events: 51, reasoningChars: 50, contentChars: 0, sawUsage: true, sawDone: false } });
-    // The same for Anthropic (no message_stop) and Gemini (nothing at all).
+    // The same for Anthropic (no message_stop) and Gemini (no finish reason, or nothing at all).
     const anth = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) => sseOf(res, [{ type: 'message_start', message: { usage: { input_tokens: 5, output_tokens: 1 } } }]));
     expect(anth.error).toMatchObject({ failure: 'STREAM_ENDED', detail: 'STREAM_ENDED_EARLY' });
     const gem = await runWith(geminiAdapter, target(FAKE_KEYS.gemini), (res) => void writeAll(res, [': keep-alive\n\n']));
     expect(gem.error).toMatchObject({ failure: 'STREAM_ENDED', detail: 'STREAM_ENDED_EARLY' });
+    // Gemini text without any finish reason was cut short too: not stored as a finished answer.
+    const gemCut = await runWith(geminiAdapter, target(FAKE_KEYS.gemini), (res) => sseOf(res, [{ candidates: [{ content: { role: 'model', parts: [{ text: 'Half an ans' }] } }] }]));
+    expect(gemCut.error).toMatchObject({ failure: 'STREAM_ENDED', detail: 'STREAM_ENDED_EARLY', stats: { contentChars: 11, lastFinishReason: null } });
+    expect(gemCut.events.some((e) => e.type === 'done')).toBe(false);
     // A body that is not an event stream at all, or a data line that is not JSON, stays a format error.
     const html = await runWith(openAiAdapter, compatible(), (res) => {
       res.writeHead(200, { 'content-type': 'text/html' });
@@ -731,7 +735,7 @@ describe('D-203: long thinking streams, early ends and failure details (DeepSeek
     expect(r.events.filter((e) => e.type === 'reasoning')).toEqual([{ type: 'reasoning', text: 'Thinking…' }]);
   });
 
-  it('reasoning_content goes back on an assistant message with tool calls only when the target asks for it (openaiCompatible and openrouter, never openai or chatgpt)', async () => {
+  it('reasoning goes back on an assistant message with tool calls only when the target asks for it (openaiCompatible as reasoning_content, openrouter as reasoning, never openai or chatgpt)', async () => {
     const history: ChatMessage[] = [
       { role: 'user', content: 'Q' },
       { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'x', arguments: {} }], reasoning: 'I should look it up.' },
@@ -739,16 +743,26 @@ describe('D-203: long thinking streams, early ends and failure details (DeepSeek
       { role: 'assistant', content: 'Plain answer', reasoning: 'never sent: no tool calls' },
       { role: 'user', content: 'Again' },
     ];
-    expect(openAiMessages('', history, { reasoning: true })[1]).toEqual({ role: 'assistant', content: null, reasoning_content: 'I should look it up.', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'x', arguments: '{}' } }] });
-    expect(openAiMessages('', history, { reasoning: true })[3]).toEqual({ role: 'assistant', content: 'Plain answer' });
+    expect(openAiMessages('', history, { reasoning: 'reasoning_content' })[1]).toEqual({ role: 'assistant', content: null, reasoning_content: 'I should look it up.', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'x', arguments: '{}' } }] });
+    expect(openAiMessages('', history, { reasoning: 'reasoning_content' })[3]).toEqual({ role: 'assistant', content: 'Plain answer' });
     expect(openAiMessages('', history)[1]).not.toHaveProperty('reasoning_content');
     await run(openAiAdapter, compatible(), [], history);
     expect(last().body.messages[2].reasoning_content).toBe('I should look it up.');
     await run(openAiAdapter, target(FAKE_KEYS.openai), [], history);
     expect(JSON.stringify(last().body)).not.toContain('look it up');
+    // OpenRouter takes it back as `reasoning` (its assistant-message field), not `reasoning_content`.
+    expect(openAiMessages('', history, { reasoning: 'reasoning' })[1]).toEqual({ role: 'assistant', content: null, reasoning: 'I should look it up.', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'x', arguments: '{}' } }] });
+    await run(openAiAdapter, { ...target(FAKE_KEYS.openrouter, '/api/v1'), sendReasoning: 'reasoning' }, [], history);
+    expect(last().body.messages[2]).toMatchObject({ reasoning: 'I should look it up.' });
+    expect(last().body.messages[2]).not.toHaveProperty('reasoning_content');
+    expect(reasoningFieldOf('openaiCompatible')).toBe('reasoning_content');
+    expect(reasoningFieldOf('openrouter')).toBe('reasoning');
     expect(sendsReasoningBack('openaiCompatible')).toBe(true);
     expect(sendsReasoningBack('openrouter')).toBe(true);
-    for (const t of ['openai', 'chatgpt', 'anthropic', 'gemini'] as const) expect(sendsReasoningBack(t), t).toBe(false);
+    for (const t of ['openai', 'chatgpt', 'anthropic', 'gemini'] as const) {
+      expect(sendsReasoningBack(t), t).toBe(false);
+      expect(reasoningFieldOf(t), t).toBeNull();
+    }
     // Anthropic and Gemini never send it.
     expect(JSON.stringify(anthropicMessages(history))).not.toContain('look it up');
     expect(JSON.stringify(geminiContents(history))).not.toContain('look it up');

@@ -122,6 +122,7 @@ export const geminiAdapter: Adapter = async function* (req) {
   let wrote = false;
   let blocked = false;
   let any = false;
+  let sawFinish = false;
   const stats = newStreamStats();
   try {
     for await (const ev of sseEvents(countBytes(res.body, stats))) {
@@ -162,6 +163,7 @@ export const geminiAdapter: Adapter = async function* (req) {
         }
       }
       if (cand?.finishReason) {
+        sawFinish = true;
         stats.lastFinishReason = finishWord(cand.finishReason);
         stop = STOP[String(cand.finishReason)] ?? 'other';
         if (BLOCKED.has(String(cand.finishReason))) blocked = true;
@@ -172,6 +174,8 @@ export const geminiAdapter: Adapter = async function* (req) {
     if (!any) throw /^text\/event-stream/iu.test(res.contentType) ? new AiCallError('STREAM_ENDED', null, true, 'STREAM_ENDED_EARLY') : new AiCallError('BAD_RESPONSE', null, true, 'NOT_AN_EVENT_STREAM');
     // Blocked, or ended for another reason (OTHER, MALFORMED_FUNCTION_CALL, none) with nothing written: a failure, not an empty answer.
     if (blocked) throw new AiCallError('BLOCKED');
+    // Events but never a finish reason: the stream was cut short, even after some text (D-203), as for OpenAI and Anthropic.
+    if (!sawFinish) throw new AiCallError('STREAM_ENDED', null, true, 'STREAM_ENDED_EARLY');
     if (stop === 'other' && !wrote && !calls) throw new AiCallError('PROVIDER_ERROR');
     yield { type: 'done', stop: stop === 'length' ? 'length' : calls ? 'toolUse' : stop };
   } catch (e) {

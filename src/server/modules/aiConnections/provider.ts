@@ -13,7 +13,7 @@ import { openSecret, sealSecret } from '../../lib/crypto.ts';
 import { anthropicAdapter } from './adapters/anthropic.ts';
 import { geminiAdapter } from './adapters/gemini.ts';
 import { openAiAdapter } from './adapters/openai.ts';
-import type { Adapter, ChatEvent, ChatMessage, ProviderTarget, ToolDefinition } from './adapters/types.ts';
+import type { Adapter, ChatEvent, ChatMessage, ProviderTarget, ReasoningField, ToolDefinition } from './adapters/types.ts';
 import { AiCallError, aiRequest, readJson } from './http.ts';
 import { checkBaseUrl, type NetPolicy } from './urlSafety.ts';
 
@@ -98,12 +98,15 @@ async function chatgptAccessToken(deps: AppDeps, row: ConnectionRow): Promise<st
 }
 
 /**
- * Connection types whose assistant messages with tool calls carry their reasoning back
- * (`reasoning_content`) during one run's tool loop (D-203): DeepSeek and similar servers behind an
- * OpenAI-compatible address or OpenRouter require it. Never OpenAI's own API or ChatGPT (which keep
- * reasoning on their side), never Anthropic or Gemini (other formats).
+ * The field in which a connection type's assistant messages with tool calls carry their reasoning back
+ * during one run's tool loop (D-203), or null: DeepSeek and similar servers behind an OpenAI-compatible
+ * address require `reasoning_content`; OpenRouter takes it as `reasoning` (the field it streams it in).
+ * Never OpenAI's own API or ChatGPT (which keep reasoning on their side), never Anthropic or Gemini
+ * (other formats).
  */
-export const sendsReasoningBack = (type: AiConnectionType) => type === 'openaiCompatible' || type === 'openrouter';
+export const reasoningFieldOf = (type: AiConnectionType): ReasoningField | null => (type === 'openaiCompatible' ? 'reasoning_content' : type === 'openrouter' ? 'reasoning' : null);
+/** Whether a connection type sends reasoning back at all (`reasoningFieldOf`). */
+export const sendsReasoningBack = (type: AiConnectionType) => reasoningFieldOf(type) !== null;
 
 /** Where a connection's requests go, with what secret. Throws `AiCallError` (NEEDS_KEY, NOT_AVAILABLE, URL_NOT_ALLOWED). */
 export async function targetOf(deps: AppDeps, row: ConnectionRow): Promise<ProviderTarget> {
@@ -115,13 +118,14 @@ export async function targetOf(deps: AppDeps, row: ConnectionRow): Promise<Provi
       const secret = openConnectionSecret(deps, row);
       if (!secret) throw new AiCallError('NEEDS_KEY');
       const a = fixedAddress(deps, row.type, PROVIDER_BASE[row.type]);
-      return { baseUrl: a.url, policy: a.policy, secret, maxTokensField: row.type === 'openai' ? 'max_completion_tokens' : 'max_tokens', ...(sendsReasoningBack(row.type) ? { sendReasoning: true } : {}) };
+      const field = reasoningFieldOf(row.type);
+      return { baseUrl: a.url, policy: a.policy, secret, maxTokensField: row.type === 'openai' ? 'max_completion_tokens' : 'max_tokens', ...(field ? { sendReasoning: field } : {}) };
     }
     case 'openaiCompatible': {
       // Checked again on every use, in case the rules changed since it was saved.
       const checked = checkBaseUrl(row.baseUrl ?? '', row.localNetwork);
       if (!checked.ok) throw new AiCallError('URL_NOT_ALLOWED');
-      return { baseUrl: checked.url, policy: row.localNetwork ? 'local' : 'public', secret: openConnectionSecret(deps, row), maxTokensField: 'max_tokens', sendReasoning: true };
+      return { baseUrl: checked.url, policy: row.localNetwork ? 'local' : 'public', secret: openConnectionSecret(deps, row), maxTokensField: 'max_tokens', sendReasoning: 'reasoning_content' };
     }
     case 'chatgpt': {
       if (!chatgptAvailable(deps.config)) throw new AiCallError('NOT_AVAILABLE');

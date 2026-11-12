@@ -146,15 +146,16 @@ describe('D-203: reasoning goes back with a tool-call message during the same ru
   const roster: () => Turn = () => () => ({ reasoning: SECRET_REASONING, text: 'Let me look.', calls: [{ name: 'class_roster', args: { contextId: s.ctxA.id } }] });
   const assistantWithCalls = (body: any) => (body.messages as any[]).filter((m) => m.role === 'assistant' && m.tool_calls);
 
-  for (const type of ['openaiCompatible', 'openrouter'] as const) {
-    it(`${type}: reasoning_content is sent back in the next round, never stored, and not carried into a new run`, async () => {
+  for (const [type, field] of [['openaiCompatible', 'reasoning_content'], ['openrouter', 'reasoning']] as const) {
+    it(`${type}: the reasoning is sent back (as ${field}) in the next round, never stored, and not carried into a new run`, async () => {
       await withAssistant(async () => {
         const seen = script(fake, [roster(), () => ({ text: 'Three students.' })]);
         const chat = await newChat({ connectionId: conn[type], model: type === 'openrouter' ? 'vendor/thinker' : 'deepseek-v4-pro' });
         const evs = await ask(chat.id, 'Who is in 3-A?');
         expect(endOf(evs)).toMatchObject({ end: 'complete' });
         expect(seen).toHaveLength(2);
-        expect(assistantWithCalls(seen[1]!.body)).toEqual([expect.objectContaining({ reasoning_content: SECRET_REASONING })]);
+        expect(assistantWithCalls(seen[1]!.body)).toEqual([expect.objectContaining({ [field]: SECRET_REASONING })]);
+        if (field === 'reasoning') expect(assistantWithCalls(seen[1]!.body)[0]).not.toHaveProperty('reasoning_content');
         // Never shown, never stored.
         expect(JSON.stringify(evs)).not.toContain('volcano facts');
         expect(JSON.stringify(await detail(chat.id))).not.toContain('volcano facts');
@@ -162,7 +163,7 @@ describe('D-203: reasoning goes back with a tool-call message during the same ru
         // A new run rebuilds the history from the database: the reasoning is gone (run memory only).
         const again = script(fake, [() => ({ text: 'Still three.' })]);
         await ask(chat.id, 'And now?');
-        expect(assistantWithCalls(again[0]!.body)[0]).not.toHaveProperty('reasoning_content');
+        expect(assistantWithCalls(again[0]!.body)[0]).not.toHaveProperty(field);
       });
     });
   }

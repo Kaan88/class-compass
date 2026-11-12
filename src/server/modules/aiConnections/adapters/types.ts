@@ -40,7 +40,7 @@ export type ChatMessage =
       toolCalls?: ToolCall[];
       /**
        * The model's hidden reasoning for this message, held in the agent's run memory only (never stored,
-       * shown or logged; D-203). The OpenAI adapter sends it back as `reasoning_content` on a message
+       * shown or logged; D-203). The OpenAI adapter sends it back (`reasoning_content`, or `reasoning` on OpenRouter) on a message
        * with tool calls when the target asks for it (`ProviderTarget.sendReasoning`).
        */
       reasoning?: string;
@@ -73,11 +73,15 @@ export interface ProviderTarget {
   /** OpenAI's own API wants `max_completion_tokens`; compatible servers and OpenRouter take `max_tokens`. */
   maxTokensField?: 'max_tokens' | 'max_completion_tokens';
   /**
-   * Send an assistant message's reasoning back as `reasoning_content` when it made tool calls
-   * (OpenAI-compatible servers and OpenRouter only: DeepSeek requires it in a tool loop; D-203).
+   * Send an assistant message's reasoning back in this field when it made tool calls (D-203):
+   * `reasoning_content` for OpenAI-compatible servers (DeepSeek requires it in a tool loop),
+   * `reasoning` for OpenRouter (its assistant-message field). Unset: never sent back.
    */
-  sendReasoning?: boolean;
+  sendReasoning?: ReasoningField;
 }
+
+/** The assistant-message field a provider takes its own reasoning back in (D-203). */
+export type ReasoningField = 'reasoning_content' | 'reasoning';
 
 export interface StreamRequest {
   target: ProviderTarget;
