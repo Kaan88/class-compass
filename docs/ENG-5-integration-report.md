@@ -10,7 +10,7 @@ are thin, the report says so instead of filling the gap.
 
 **Status at the time of writing (2026-11-12):** the app has been installed and exercised on three
 machines (a Debian test VM, the owner's mini PC and the owner's Oracle ARM server). The test site
-`test.sareteacher.com` runs `42a6501`. Many checks that need people, real devices or outside
+`test.sareteacher.com` runs `050127f`. Many checks that need people, real devices or outside
 services are still open (section 5).
 
 ## 1. Environments actually used
@@ -89,6 +89,7 @@ by one: for each deploy they state only "healthy", with the backup and migration
 | 2026-11-12 | `75a449b` (S26b, S26c, S27a–d) | test | `0033` | backup, pre-migration snapshot, healthy; student page 347.7 kB gzip |
 | 2026-11-12 | `4f76f2c` (S27 guide screenshots, docs only) | test | none | backup, healthy |
 | 2026-11-12 | `42a6501` (S28a lesson goal on the routine stage and summary, S28b larger word lists, S28c this report, S28 verify) | test | none | backup, healthy; student page 348.1 kB gzip |
+| 2026-11-12 | `050127f` (S29 whole stage names and a one-line Today's focus on the classroom board, review fixes) | test | none | backup, healthy; student page 348.6 kB gzip; full e2e 149 passed, 4 skipped |
 
 So every migration from the baseline to `0033` has been applied on a deployed copy holding weeks of
 fictional history, on top of the snapshot the app takes first. A **rollback** (OPERATIONS section 5)
