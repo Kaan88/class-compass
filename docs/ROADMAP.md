@@ -173,7 +173,7 @@ Each stage ends with: tests green, docs updated, commit(s) pushed, demo with fic
   - [x] `LangFields` in the other label editors (S20d, D-172): routine names and stages, counter labels and responses, homework statuses, goal categories, preset goals, own sentence starters and outcomes, arrangement, group and role names; a Turkish-only class shows only Turkish fields, a two-language class both, main language first; the Goals library (stored per subject and teacher) offers the languages of all the teacher's classes in the subject (`tests/client/lang-fields.test.tsx`, `tests/client/starters-library.test.tsx`, `e2e/turkish-class.spec.ts`)
   - [x] Seeded defaults in the class's languages only (S20d, D-172): assistant duties, the English reminder counter and the default arrangements with their "Group N" names; a language switched on later completes the defaults the teacher never changed (audited), edited labels are marked "Needs translation" instead (`tests/server/class-language-defaults.test.ts`); a string scan of a Turkish-only classroom board, a dock view and a student page finds no English UI text (`e2e/turkish-class.spec.ts`)
 - [ ] Size/density control and automatic fitting (MacBook Air), usability audit (D-103, `docs/design/usability-audit-2026-11.md`)
-  - [x] Compact/Normal/Large on the classroom screen (per device + teacher), auto-fit, 19 cards at Normal on 1440x900, no horizontal scroll on the listed displays incl. 4K at 150/200%
+  - [x] Compact/Normal/Large on the classroom screen (per device + teacher), auto-fit, 19 cards at Normal on 1440x900, no horizontal scroll on the listed displays incl. 4K at 150/200% (the choice was removed again by the owner in S27c, D-195: one automatic size)
   - [x] Usability audit written; critical and major issues fixed; minor ones listed
   - [x] Screenshot matrix for the group screen, start and end lesson, teacher menu and admin home (re-checked in S20d: `npm run usability:screens` shoots them at every listed viewport in EN and TR, with a 200 % text pass, S14i)
   - [x] Compact / Normal / Large in the teacher area (S22d, D-178): Profile → Spacing, per account (user setting `area.density`, Normal by default and unchanged), for the teacher and the admin areas; spacing, table row height and card padding through the `--cc-area-*` layout variables, buttons and fields keep `--cc-touch`; `tests/server/area-density.test.ts`, `tests/client/area-density.test.tsx`, `e2e/area-density.spec.ts` (audit table rows lower at Compact and higher at Large, card padding, the same button heights, axe clean, also on the phone; the classroom screen never carries it)
@@ -434,7 +434,7 @@ Decision D-177; no migration.
 - [x] e2e at 1536×703@1.25, 1536×864@1.25, 1920×1080 and 1366×768 for 8, 19, 28 and 40 students, Normal / Compact / Large with and without marks, no overlap of name, + and chips, axe on the Students box, screenshots under `test-results/s22c/`: a class of 40 shows two full rows at 1536×703@1.25 (S16c box closed); a class of 8 grows above Normal at every size
 - [x] Review fixes: Compact cards no longer taller than Large where the cards fit (the old Compact rule now only for cards the fit does not size; e2e: Compact ≤ Large for a class of 8); on a phone the name goes across the card (whole words) and the + button is a touch target (e2e at 375×812 for 8 and 19 with marks); the marks round now also covers the class of 19 and D-177 records the counts with marks (14 of 19 at 1536×703@1.25 and 1366×768: the pills take a line of their own, a whole row lost); the teacher guides no longer promise two rows
 - [x] Card marks on the count line at the fitted sizes (narrower chips or pills) so they do not add a line to the card (S22c review; needs room in the student page budget), and on phone cards (S23b, D-183: small pills; the short displays show as many whole cards with marks as without, a phone card 104 px; the `tight` layout could still put them on a second line: done in S25a, D-185)
-- [ ] Seen on the classroom display (owner): cards of a class of 8 and of a large class at 1536×703, and whether Compact / Normal / Large should still pick a fixed size (D-177, owner question)
+- [ ] Seen on the classroom display (owner): cards of a class of 8 and of a large class at 1536×703 (the D-177 owner question is answered: Compact / Normal / Large removed by the owner, 2026-11-12, S27c, D-195)
 
 ## S23a Student page budget headroom without behaviour change (2026-11-11)
 Decision D-182; no migration. The student page was at 459 997 of 460 000 B gzip.
@@ -519,6 +519,15 @@ Decision D-194; no migration.
 - [x] Tests: `tests/client/student-goal-work.test.tsx`, `e2e/student-goal-work.spec.ts` (text and picture from My goals at 375 px, axe)
 - [ ] Guide screenshot of My goals with the new button (the later screenshot pass)
 - [ ] Checked by children on a real phone and tablet
+
+## S27c One default card size on the classroom screen (owner 2026-11-12)
+Decision D-195; no migration (the removed preference lived only in the browser's storage).
+- [x] Compact / Normal / Large removed from the classroom screen: the Display popover's Size row, the stored `cc.density.<userId>` (old values ignored), `data-density` on the classroom shell and its CSS, the six strings; the board reports `density: null` on the classroom screens page
+- [x] One automatic fit (`board/cardFit.ts`): starts at the middle step (the old Normal), ends at the largest step where every card fits, else the most whole cards; whole-word names and the + at `var(--cc-touch)` unchanged; the teacher's text size kept
+- [x] Spacing (D-178) kept: it is the teacher and admin areas' room in tables and cards, not a card size, and never reaches the classroom screen; its hint no longer points at Display
+- [x] `e2e/board-40.spec.ts` for 8, 16, 24, 32 and 40 students at 1536×703 and 1536×864 (1.25), 1440×787 (2), 1280×720 and 375 px with the default layout (routine, timer, counter, dock): every card on screen for 8 and 16 everywhere and for 24 at 1536×864; card-size specs, unit tests, guides EN/TR, CONVENTIONS, THEMING updated
+- [ ] Every student of 24, 32 and 40 at 1536×703 with the routine, timer and counter above the students: not possible with a touch-size + (two rows fit in the 238 px box: 18 of 24 or 40, 16 with marks; D-195 has the numbers); owner to choose full screen (24 of 24), fewer boxes above the students, or a smaller + on the classroom cards
+- [ ] Seen on the classroom display (owner): the one size for a class of 8 and a large class at 1536×703
 
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.

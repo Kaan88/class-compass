@@ -554,8 +554,8 @@ The presets and their default colour tokens (generated from `src/shared/themePac
   is ever cut off or drawn under another, in any theme.
 - The overlays sit outside the content box: the content's padding, its hit areas and the focus
   outline are unchanged (overlays over the card fade away while keyboard focus is inside it). Student
-  cards, ordinary cards, the classroom top bar (its class name and buttons reach its corners), compact
-  density and phones get the edge only; a board box's corner is a 21 px ornament on the box corner, at
+  cards, ordinary cards, the classroom top bar (its class name and buttons reach its corners) and
+  phones get the edge only (the classroom screen's Compact density did too until S27c removed it, D-195); a board box's corner is a 21 px ornament on the box corner, at
   most 7 px out into the gaps and 14 px in, so it never sits on a control (e2e checks every corner against
   the board's buttons, links and the class name in every built-in theme and Snow Day); dialogs get the edge and the
   corners (drawn just inside their top, because dialogs scroll); the trim is only on the board boxes
