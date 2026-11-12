@@ -4,7 +4,7 @@ name: CI
 #   docs-only pushes are skipped and superseded runs are cancelled
 # - Windows and browser (e2e) jobs: weekly and on demand (Actions tab → CI → Run workflow; the
 #   `specs` input runs only the named e2e specs). They are also run locally before each stage is
-#   committed. The full e2e suite takes about 25 minutes on the Ubuntu runner (D-205).
+#   committed. The full e2e suite takes about 20 minutes on the Ubuntu runner (D-205).
 on:
   push:
     branches: [main]
