@@ -167,7 +167,9 @@ test('a group of this lesson ticks its members in the award dialog in one tap (S
     const button = dialog.getByTestId('achievements-group').filter({ hasText: group.name.en! }).first();
     await expect(button).toHaveAttribute('aria-pressed', 'false');
     await expect(button).toContainText(members.length === 1 ? '1 student' : `${members.length} students`);
-    const checked = () => dialog.getByTestId('achievements-student').evaluateAll((els) => els.filter((e) => (e as HTMLInputElement).checked).map((e) => e.closest('label')!.textContent!.trim()));
+    // Names from the name span only: an avatar saved by an earlier spec may be a jersey with a "7" in its SVG,
+    // which textContent would read as part of the name (a Linux CI flake, 2026-11-12).
+    const checked = () => dialog.getByTestId('achievements-student').evaluateAll((els) => els.filter((e) => (e as HTMLInputElement).checked).map((e) => e.closest('label')!.querySelector(':scope > span:not([aria-hidden])')!.textContent!.trim()));
     // One tap ticks every member of the group, and nobody else ...
     await button.click();
     await expect(button).toHaveAttribute('aria-pressed', 'true');
@@ -189,7 +191,8 @@ test('a group of this lesson ticks its members in the award dialog in one tap (S
     // Given quietly to the group and the other student: one award command for exactly those students
     // (the server skips anyone who already had the achievement from an earlier spec).
     const roster = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/roster`)).body.students as Array<{ id: string; fullName: string }>;
-    const otherName = (await other.innerText()).trim();
+    // The name span only: the avatar beside it is aria-hidden art that can hold text (a jersey's "7").
+    const otherName = (await other.locator(':scope > span:not([aria-hidden])').innerText()).trim();
     const expected = roster.filter((s) => members.includes(s.fullName) || s.fullName === otherName).map((s) => s.id).sort();
     expect(expected).toHaveLength(members.length + 1);
     const sent = page.waitForRequest((r) => r.url().endsWith('/api/commands') && r.method() === 'POST' && (r.postData() ?? '').includes('achievements.award'));

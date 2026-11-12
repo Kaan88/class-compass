@@ -2268,11 +2268,16 @@ html:has(.cc-classroom) {
 }
 /* D-205: above 90rem the bar is one flex row with the same sizes as the grid above when there is
    room (class and date blocks grow equally from their own width, so the quote stays centred between
-   them), but when the row is short the quote gives way first (shrink factor 100: it wraps to more
-   lines) and a tool drops to a second row only after the quote is at its narrowest. As grid `auto`
-   columns, the quote and the tools shared the shortage equally, and "Öğretmen alanı" wrapped onto a
-   second row at 1470×956 in Turkish with a font a little wider than Segoe UI (found on the Ubuntu
-   CI runner). The tools can still wrap, so large text never pushes the bar off the screen. */
+   them), but when the row is short the quote gives way first (it wraps to more lines) and a tool
+   drops to a second row only after the quote is at its narrowest. The quote grows from 0 ahead of
+   the class and date blocks up to its own width (at most 40rem), so the row counts it at its longest
+   word: the row shrinks, and so the tools wrap, only when even that does not fit. A shrink factor on
+   the quote (`flex: 0 100 auto`) was not enough: flex takes a shortage from every item by shrink
+   factor × width, so the tools lost a pixel whenever the quote of the day was long and "Öğretmen
+   alanı" wrapped (148 px at 1470×956 in Turkish on the Ubuntu CI runner, only for a demo class id and
+   day with a long quote). As grid `auto` columns, the quote and the tools shared the shortage equally.
+   The tools can still wrap, so large text never pushes the bar off the screen (the classroom root
+   size times the teacher's text size can be far more than the 16 px the 90rem query is measured in). */
 @media (width > 90rem) {
   .cc-classroom-bar {
     display: flex;
@@ -2287,7 +2292,11 @@ html:has(.cc-classroom) {
     justify-content: flex-end;
   }
   .cc-topbar__slot--quote {
-    flex: 0 100 auto;
+    flex: 1000 1 0;
+    max-width: max-content;
+  }
+  .cc-topbar__slot--quote .cc-quote {
+    max-width: 40rem;
   }
 }
 /* S14b (D-148): the quote stays on the bar's one row down to 75rem (at most two lines), so the
