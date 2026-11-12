@@ -9,6 +9,7 @@ import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/goals.ts';
 import { OutcomeSet, type Category, type DEFAULT_ITEM_KINDS, type Evidence, type Feedback, type Goal, type GoalLibrary, type Preset, type PrivateNote, type Starter, type StarterKind, type TeacherStudentGoals } from '../../../shared/contracts/goals.ts';
 import { fillBlank, hasBlank, normaliseStarter, STARTER_SAMPLE, STARTER_TEXT_KIND } from '../../../shared/text/starters.ts';
+import { LARGE_WORDS } from '../../../shared/text/largeWords.ts';
 import { checkStudentText, findRiskyWord } from '../../../shared/text/textQuality.ts';
 import { initials, normaliseName } from '../../../shared/text/turkish.ts';
 import type { LocalizedTextValue } from '../../../shared/contracts/define.ts';
@@ -460,7 +461,7 @@ function cleanStarterText(ctx: RequestContext, kind: StarterKind, text: Localize
     if (!raw) continue;
     const t = normaliseStarter(raw);
     if (!hasBlank(t)) throw invalid('Put ___ where the student writes', { reason: 'STARTER_NEEDS_BLANK', lang });
-    const res = findRiskyWord(t, lists) ? ({ ok: false, reason: 'BLOCKED_WORD' } as const) : checkStudentText(fillBlank(t, STARTER_SAMPLE[lang]), STARTER_TEXT_KIND[kind], { limits: limitsOf(ctx.db), lists });
+    const res = findRiskyWord(t, lists) ? ({ ok: false, reason: 'BLOCKED_WORD' } as const) : checkStudentText(fillBlank(t, STARTER_SAMPLE[lang]), STARTER_TEXT_KIND[kind], { limits: limitsOf(ctx.db), lists, words: LARGE_WORDS });
     if (!res.ok && res.reason !== 'TOO_SHORT') throw invalid('Students could not use this starter', { reason: 'STARTER_INVALID', textReason: res.reason, lang });
     out[lang] = t;
   }

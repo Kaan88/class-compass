@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import type { StudentGoalsSection } from '../../shared/contracts/goals.ts';
 import type { Locale } from '../../shared/i18n/index.ts';
 import { blankRange, hasBlank, starterKindsOf, type StarterKind } from '../../shared/text/starters.ts';
-import { checkStudentText, exampleKeyFor, findRiskyWord, type TextKind } from '../../shared/text/textQuality.ts';
+import { checkStudentText, DICTIONARY_REASONS, exampleKeyFor, findRiskyWord, type TextKind, type WordDictionary } from '../../shared/text/textQuality.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from '../ui/Button.tsx';
 
@@ -31,10 +31,29 @@ export function startersOf(data: StudentGoalsSection, kind: StarterKind, locale:
 export type SaveCheck = { hint?: string; send: boolean };
 
 /**
+ * The large word lists (S28b, D-198), about 117 kB gzip: loaded only once the small lists missed a word,
+ * never with the page. Until they are here, a text the small lists cannot read is sent and the server,
+ * which always has them, decides (a refusal shows its message); the next check on this page uses them.
+ */
+let largeWords: WordDictionary | undefined;
+let largeLoading: Promise<void> | undefined;
+export function loadLargeWords(): Promise<void> {
+  largeLoading ??= import('../../shared/text/largeWords.ts').then(
+    (m) => {
+      largeWords = m.LARGE_WORDS;
+    },
+    () => {
+      largeLoading = undefined; // offline: try again at the next check
+    },
+  );
+  return largeLoading;
+}
+
+/**
  * Check a text when the student presses Save (S14d: hints show only then). The same shared rules as
  * the server, with the school's limits and the page's starters. A text with an unkind word is still
  * sent, so the server counts the attempt for the teacher's notice (D-123); anything else waits for
- * the student to change it.
+ * the student to change it. A word the page does not know yet is the server's call (D-198, above).
  */
 export function useSaveCheck(data: StudentGoalsSection) {
   const { t } = useI18n();
@@ -48,8 +67,12 @@ export function useSaveCheck(data: StudentGoalsSection) {
       }
       return findRiskyWord(words) ? { hint: t('textCheck.BLOCKED_WORD'), send: true } : { send: true };
     }
-    const r = checkStudentText(text, kind, { limits: data.textLimits, starters: starterTexts(data, kind) });
+    const r = checkStudentText(text, kind, { limits: data.textLimits, starters: starterTexts(data, kind), words: largeWords });
     if (r.ok) return { send: true };
+    if (!largeWords && DICTIONARY_REASONS.has(r.reason)) {
+      void loadLargeWords();
+      return { send: true };
+    }
     if (r.reason === 'BLOCKED_WORD') return { hint: t('textCheck.BLOCKED_WORD'), send: true };
     // With the blank still there say where the words go; without it (the blank was deleted) do not name a ___ the child cannot see.
     if (r.reason === 'STARTER_UNFINISHED') return { hint: t(hasBlank(text) ? 'textCheck.STARTER_UNFINISHED' : 'starters.addWords'), send: false };

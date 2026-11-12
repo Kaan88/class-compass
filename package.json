@@ -34,7 +34,8 @@
     "new:language": "node scripts/new-language.ts",
     "check:language": "node scripts/language-check.ts",
     "docs:theming": "node scripts/theme-docs.ts",
-    "docs:theme-examples": "node scripts/theme-examples.ts"
+    "docs:theme-examples": "node scripts/theme-examples.ts",
+    "gen:word-lists": "node scripts/word-lists.ts"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",

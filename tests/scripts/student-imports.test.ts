@@ -4,7 +4,7 @@
  * and what only a writing screen or an imported theme needs must be behind a lazy `import()`.
  * Measured with `npm run build` and `npm run size:student`: 368.6 → 345.1 kB gzip (entry 21.3 → 10.2 kB).
  */
-import { relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { reachableFiles, ROOT, STUDENT_ENTRY } from '../../scripts/i18n-split.ts';
 
@@ -36,9 +36,19 @@ describe('student page imports (S26c, D-191)', () => {
       'src/client/student/SentenceStarters.tsx',
       'src/client/student/common.tsx',
       'src/shared/text/textQuality.ts',
+      // The large word lists (S28b, D-198): behind their own import(), loaded only when the small lists miss a word.
+      'src/shared/text/largeWords.ts',
+      'src/shared/text/wordsLargeEn.ts',
+      'src/shared/text/wordsLargeTr.ts',
     ]) {
       expect(eager, f).not.toContain(f);
       expect(all, f).toContain(f);
     }
+  });
+
+  it('the writing screens load the large word lists only with their own import() (S28b, D-198)', () => {
+    const writing = reachableFiles(join(ROOT, 'src', 'client', 'student', 'common.tsx'), { lazy: false }).map(rel);
+    expect(writing).toContain('src/shared/text/textQuality.ts');
+    for (const f of ['src/shared/text/largeWords.ts', 'src/shared/text/wordsLargeEn.ts', 'src/shared/text/wordsLargeTr.ts']) expect(writing, f).not.toContain(f);
   });
 });

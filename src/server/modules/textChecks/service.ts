@@ -2,7 +2,8 @@
  * Student text checks, server side (S13c item 12, D-123). The server is authoritative: every student
  * write of free text (goal, reflection, note, self-assessment comment, evidence text, link title,
  * practice choice) goes through `assertStudentText`; the student page only gives live feedback with
- * the same shared rules (`shared/text/textQuality.ts`).
+ * the same shared rules (`shared/text/textQuality.ts`). The server always knows the large word lists
+ * (`LARGE_WORDS`, D-198); the student page loads them only when its small lists miss a word.
  *
  * - A blocked word is never stored: the write is rejected (400 `TEXT_BLOCKED_WORD`) and only a count
  *   per student, subject and day is kept (`text_check_attempts`), for the optional teacher notice.
@@ -14,6 +15,7 @@ import type { z } from 'zod';
 import { localDate } from '../../../domain/dates.ts';
 import type * as C from '../../../shared/contracts/textChecks.ts';
 import { compareTr } from '../../../shared/intl.ts';
+import { LARGE_WORDS } from '../../../shared/text/largeWords.ts';
 import { checkStudentText, findRiskyWord, type TextKind, type TextLimits, type WordLists } from '../../../shared/text/textQuality.ts';
 import { starterKindsOf } from '../../../shared/text/starters.ts';
 import { tx, type Db } from '../../db/client.ts';
@@ -66,7 +68,7 @@ export interface StudentTextTarget {
  */
 export function assertStudentText(ctx: RequestContext, target: StudentTextTarget, text: string | null | undefined, kind: TextKind): void {
   if (text === null || text === undefined) return;
-  const res = checkStudentText(text, kind, { limits: limitsOf(ctx.db), lists: wordListsFor(ctx.db, target.teacherIds), starters: starterTextsFor(ctx.db, target.subjectId, target.teacherIds, starterKindsOf(kind)) });
+  const res = checkStudentText(text, kind, { limits: limitsOf(ctx.db), lists: wordListsFor(ctx.db, target.teacherIds), starters: starterTextsFor(ctx.db, target.subjectId, target.teacherIds, starterKindsOf(kind)), words: LARGE_WORDS });
   if (res.ok) return;
   throw new AppError('VALIDATION', res.reason === 'BLOCKED_WORD' ? 'Please use kind words' : 'Please write real words and a little more', {
     reason: `TEXT_${res.reason}`,

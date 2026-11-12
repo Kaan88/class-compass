@@ -12,7 +12,9 @@
  *    mostly symbols or digits, shouting, keyboard mashing (QWERTY, Turkish Q and F rows), words
  *    and repeated short pieces ("asdasd"), words without vowels, very long unknown words, repeated
  *    words ("yes yes yes", "I will I will"), a goal without a content word, and too few recognised
- *    EN/TR words (our own word lists with simple suffix stripping, so "okuyacağım" counts as real).
+ *    EN/TR words (word lists with simple suffix stripping, so "okuyacağım" counts as real: our own
+ *    small lists, plus the larger generated SCOWL / Zemberek lists on the server and, once loaded,
+ *    on the student page, D-198).
  * 3. Unfinished starter (S14d, D-152): the sentence starter's blank (`___`) is still there, or the text
  *    is only a starter (`STARTER_UNFINISHED`). Never counted as a blocked attempt.
  *
@@ -78,35 +80,57 @@ const TR_SUFFIXES_LONGEST_FIRST = [...TR_SUFFIX_SET].sort((a, b) => b.length - a
 /** Final consonant change before a vowel ending (kitap → kitabı, ekmek → ekmeği, git → gidiyor). */
 const MUTATIONS: Record<string, string> = { b: 'p', d: 't', g: 'k', c: 'c' };
 
-function enRecognised(w: string): boolean {
-  if (EN_WORDS.has(w)) return true;
+/**
+ * The words a check knows, folded (`foldForSearch`, no apostrophes). `SMALL_WORDS` are our own lists
+ * (always loaded, small enough for the student page); `LARGE_WORDS` in `largeWords.ts` adds the
+ * generated lists from SCOWL (English) and Zemberek (Turkish) (S28b, D-198). The server always passes
+ * the large dictionary; the student page loads it lazily. A large dictionary contains the small one,
+ * so a text the small lists accept is accepted with the large ones too.
+ */
+export interface WordDictionary {
+  readonly en: ReadonlySet<string>;
+  readonly tr: ReadonlySet<string>;
+}
+export const SMALL_WORDS: WordDictionary = { en: EN_WORDS, tr: TR_WORDS };
+
+/**
+ * Reasons that depend on the dictionary passed in: with a larger one they can only become rarer. Keyboard
+ * mashing is not one of them: it always looks at the words our small lists do not know (D-198), so a
+ * generated list can never make mashing ("lololo", "asdf") pass.
+ */
+export const DICTIONARY_REASONS: ReadonlySet<TextReason> = new Set<TextReason>(['LONG_WORD', 'FEW_VOWELS', 'UNKNOWN_WORDS']);
+
+/** A folded English word, or the word without a simple ending (-s, -ed, -ing, …), is in `words`. */
+export function enRecognised(w: string, words: ReadonlySet<string> = EN_WORDS): boolean {
+  if (words.has(w)) return true;
   for (const end of EN_ENDINGS) {
     if (!w.endsWith(end) || w.length - end.length < 2) continue;
     const base = w.slice(0, -end.length);
-    if (EN_WORDS.has(base) || EN_WORDS.has(`${base}e`)) return true;
-    if (end === 'ies' && EN_WORDS.has(`${base}y`)) return true;
+    if (words.has(base) || words.has(`${base}e`)) return true;
+    if (end === 'ies' && words.has(`${base}y`)) return true;
     // stopped → stop, running → run
-    if (base.length > 2 && base.at(-1) === base.at(-2) && EN_WORDS.has(base.slice(0, -1))) return true;
+    if (base.length > 2 && base.at(-1) === base.at(-2) && words.has(base.slice(0, -1))) return true;
   }
   return false;
 }
 
-function trRecognised(w: string, depth = 0): boolean {
-  if (TR_WORDS.has(w)) return true;
+/** A folded Turkish word, or the word without up to four suffixes (and a consonant change), is in `words`. */
+export function trRecognised(w: string, words: ReadonlySet<string> = TR_WORDS, depth = 0): boolean {
+  if (words.has(w)) return true;
   const last = w.at(-1) ?? '';
-  if (MUTATIONS[last] && TR_WORDS.has(w.slice(0, -1) + MUTATIONS[last])) return true;
+  if (MUTATIONS[last] && words.has(w.slice(0, -1) + MUTATIONS[last])) return true;
   if (depth >= 4) return false;
   for (const s of TR_SUFFIXES_LONGEST_FIRST) {
-    if (w.length - s.length >= 2 && w.endsWith(s) && trRecognised(w.slice(0, -s.length), depth + 1)) return true;
+    if (w.length - s.length >= 2 && w.endsWith(s) && trRecognised(w.slice(0, -s.length), words, depth + 1)) return true;
   }
   return false;
 }
 
 /** Is this word an English or Turkish word we know (after folding and simple ending removal)? */
-export function isRecognisedWord(word: string): boolean {
+export function isRecognisedWord(word: string, words: WordDictionary = SMALL_WORDS): boolean {
   const w = foldForSearch(word).replace(/['’]/gu, '');
   if (!w) return false;
-  return enRecognised(w) || trRecognised(w);
+  return enRecognised(w, words.en) || trRecognised(w, words.tr);
 }
 
 // ---------------------------------------------------------------- language check
@@ -228,11 +252,16 @@ const vowelRatio = (w: string) => {
 
 /**
  * Check one piece of student text. `limits` are the school's goal limits; `lists` the extra words;
+ * `words` the known words (default: our small lists; the server passes `LARGE_WORDS`, D-198);
  * `starters` the sentence starters offered to the student (S14d: a text that is only a starter is not
  * finished; a blank `___` left in the text is caught without the list too).
  * Empty optional text (a link without a title) is fine: callers only check text that was written.
  */
-export function checkStudentText(text: string, kind: TextKind, opts: { limits?: TextLimits; lists?: WordLists; starters?: readonly string[] } = {}): TextCheckResult {
+export function checkStudentText(
+  text: string,
+  kind: TextKind,
+  opts: { limits?: TextLimits; lists?: WordLists; starters?: readonly string[]; words?: WordDictionary } = {},
+): TextCheckResult {
   const t = text.normalize('NFC').trim();
   if (!t) return kind === 'linkTitle' || kind === 'practiceChoice' ? { ok: true } : { ok: false, reason: 'TOO_SHORT' };
   if (findRiskyWord(t, opts.lists)) return { ok: false, reason: 'BLOCKED_WORD' };
@@ -258,9 +287,13 @@ export function checkStudentText(text: string, kind: TextKind, opts: { limits?: 
   const upper = letters.filter((ch) => ch !== lowerTr(ch) && ch === ch.toLocaleUpperCase('tr-TR')).length;
   if (upper >= SHOUT_LETTERS && upper / letters.length > 0.7) return { ok: false, reason: 'SHOUTING' };
 
-  const known = words.map((w) => isRecognisedWord(w));
-  const unknown = words.filter((_, i) => !known[i]).map((w) => lowerTr(w).replace(/['’]/gu, ''));
-  if (unknown.some((w) => w.length >= 4 && (hasRowRun(w) || REPEATED_UNIT.test(w))) || hasRowRun(unknown.join(''))) return { ok: false, reason: 'KEYBOARD_MASH' };
+  // Keyboard mashing looks at the words our own small lists do not know, whatever dictionary is passed in
+  // (D-198: the rule behaves exactly as before the larger lists); the other rules use `opts.words`.
+  const plain = (w: string) => lowerTr(w).replace(/['’]/gu, '');
+  const smallUnknown = words.filter((w) => !isRecognisedWord(w)).map(plain);
+  if (smallUnknown.some((w) => w.length >= 4 && (hasRowRun(w) || REPEATED_UNIT.test(w))) || hasRowRun(smallUnknown.join(''))) return { ok: false, reason: 'KEYBOARD_MASH' };
+  const known = words.map((w) => isRecognisedWord(w, opts.words));
+  const unknown = words.filter((_, i) => !known[i]).map(plain);
   if (unknown.some((w) => [...w].length > MAX_WORD)) return { ok: false, reason: 'LONG_WORD' };
   if (unknown.some((w) => [...w].length >= 5 && vowelRatio(w) < 0.2) || (letters.length >= 8 && vowelRatio(t) < 0.22)) return { ok: false, reason: 'FEW_VOWELS' };
 
@@ -274,8 +307,8 @@ export function checkStudentText(text: string, kind: TextKind, opts: { limits?: 
   // One word said three times ("yes yes yes"), or half the words or fewer are different ("I will I will").
   if ((folded.length >= 3 && unique === 1) || (folded.length >= 4 && unique / folded.length <= 0.5)) return { ok: false, reason: 'REPEATED_WORDS' };
 
-  // Our word lists are small, so longer texts may have more words we do not know (names, topic words):
-  // from four words on, two in five recognised is enough; shorter texts need half.
+  // Texts have words no list knows (names, topic words): from four words on, two in five recognised is
+  // enough; shorter texts need half (D-123; unchanged with the larger lists of D-198).
   const needKnown = words.length >= 4 ? 0.4 : 0.5;
   if (rule.dictionary && words.length > 0 && known.filter(Boolean).length / words.length < needKnown) return { ok: false, reason: 'UNKNOWN_WORDS' };
   return { ok: true };
