@@ -101,7 +101,7 @@ test('Assistant: a theme file attached, a Markdown answer, a teacher draft confi
     const preview = call.getByTestId('theme-package-preview');
     await expect(preview).toBeVisible();
     await expect(preview.getByRole('heading', { name: 'Preview: E2E Autumn' })).toBeVisible();
-    await expect(preview.getByTestId(`theme-preview-area-cc-preview-${KEY}`)).toBeVisible();
+    await expect(preview.getByTestId(`theme-preview-area-cc-preview--${KEY}`)).toBeVisible();
     expect((await api(admin, 'GET', '/api/admin/themes')).body.themes.some((t: { key: string }) => t.key === KEY)).toBe(false);
     await preview.getByRole('button', { name: 'Close the preview' }).click();
     await expect(preview).toHaveCount(0);

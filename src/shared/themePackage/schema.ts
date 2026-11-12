@@ -27,7 +27,7 @@ import {
   SCENE_SMALL_SCREENS,
   SCENE_VIEWBOX,
 } from './engine.ts';
-import { AMBIENT_LIMITS, ART_LIMITS, FRAME_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS, SCENE_LIMITS, SETS_LIMITS, SOUND_PARAM_LIMITS, STYLE_LIMITS } from './limits.ts';
+import { AMBIENT_LIMITS, ART_LIMITS, FRAME_LIMITS, MOTION_LIMITS, PACKAGE_LIMITS, SCENE_LIMITS, SETS_LIMITS, SOUND_LIMITS, SOUND_PARAM_LIMITS, STYLE_LIMITS } from './limits.ts';
 import { EASINGS, MOTION_PRESETS } from './motion.ts';
 import { FONT_PRESETS, SHADOW_PRESETS } from './presets.ts';
 import { SOUND_SCALES, SOUND_WAVES } from './sound.ts';
@@ -127,7 +127,12 @@ export const Sounds = z
     scale: z.enum(SOUND_SCALES),
     gain: range(...SOUND_PARAM_LIMITS.gain).describe('Peak gain of the main voice; the tap must still peak between -12 and -6 dBFS at volume 80.'),
     tempo: range(...SOUND_PARAM_LIMITS.tempo).describe('Speed: above 1 is snappier, below 1 calmer.'),
-    overrides: z.partialRecord(z.enum(SOUND_EVENTS), z.array(ToneNoteSchema).min(1)).optional().describe('Hand-made cues for single events; every limit still applies.'),
+    // The note count is capped here, before the loudness checks run (audit: an uncapped cue made the
+    // overlap check block the server).
+    overrides: z
+      .partialRecord(z.enum(SOUND_EVENTS), z.array(ToneNoteSchema).min(1).max(SOUND_LIMITS.maxNotesPerCue))
+      .optional()
+      .describe(`Hand-made cues for single events (at most ${SOUND_LIMITS.maxNotesPerCue} notes each); every limit still applies.`),
   })
   .nullable()
   .describe('null keeps the theme silent (every visual signal stays).');

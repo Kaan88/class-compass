@@ -976,7 +976,7 @@
               "description": "Speed: above 1 is snappier, below 1 calmer."
             },
             "overrides": {
-              "description": "Hand-made cues for single events; every limit still applies.",
+              "description": "Hand-made cues for single events (at most 64 notes each); every limit still applies.",
               "type": "object",
               "propertyNames": {
                 "type": "string",
@@ -1005,6 +1005,7 @@
               },
               "additionalProperties": {
                 "minItems": 1,
+                "maxItems": 64,
                 "type": "array",
                 "items": {
                   "type": "object",

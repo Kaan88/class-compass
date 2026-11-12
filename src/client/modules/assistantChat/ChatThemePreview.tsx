@@ -3,7 +3,7 @@
  * (`import_theme_draft`) (owner 2026-11-12, D-196 note): the page asks the server for that call's
  * package, checked again by the theme validator (`assistantCallTheme`), and shows the same preview as
  * Admin → Themes (classroom, student page, board, celebration, engine, mascot, sounds, contrast). The
- * package is registered only as a preview (`cc-preview-<key>`), never offered to classes; nothing is
+ * package is registered only as a preview (`cc-preview--<key>`), never offered to classes; nothing is
  * saved. A package with errors shows how many instead of a preview.
  */
 import { useState } from "react";

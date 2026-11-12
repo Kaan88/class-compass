@@ -33,13 +33,25 @@ export function requireRelock() {
 /** Whether the next `me` relocks the server session first (tests). */
 export const relockIsPending = () => relockPending;
 
+/**
+ * The server's definite "classroom mode cannot be engaged" answers to `enterClassroom`: not a teacher
+ * account (403 FORBIDDEN) or no PIN any more (400 PIN_NOT_SET). Then there is nothing to relock.
+ */
+function cannotEngageClassroom(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false;
+  const reason = (err.details as { reason?: unknown } | undefined)?.reason;
+  if (err.status === 403 && err.code === 'FORBIDDEN') return reason !== 'MUST_CHANGE_PASSWORD';
+  return err.status === 400 && err.code === 'VALIDATION' && reason === 'PIN_NOT_SET';
+}
+
 async function relock() {
   try {
     await call(Auth.enterClassroom, {});
   } catch (err) {
-    // A 401 is answered by `fetchMe` (signed out) and no connection keeps the relock pending. Any other
-    // answer (no PIN any more, not a teacher) means classroom mode cannot be engaged: nothing to relock.
-    if (!(err instanceof ApiError) || err.status === 401) throw err;
+    // A 401 is answered by `fetchMe` (signed out). Anything that is not a definite "cannot be engaged"
+    // (no connection, 429, 5xx, a proxy's error page, a temporary password) keeps the relock pending
+    // and no `me` is trusted until the server has been told (audit: a 503 used to clear it, PIN-6).
+    if (!cannotEngageClassroom(err)) throw err;
   }
   relockPending = false;
   purgeSensitive(queryClient);

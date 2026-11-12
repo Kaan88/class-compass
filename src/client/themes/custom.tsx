@@ -35,10 +35,17 @@ export { loadThemePackage, resetThemeLoader, THEME_RECHECK_MS } from './customLo
 
 export type CustomStatus = NonNullable<ThemeDefinition['custom']>['status'];
 
-/** The key a preview of package `key` is drawn under, so it never replaces the live theme on the page. */
-export const previewKey = (key: string) => `cc-preview-${key}`;
-/** Keys that may reach a CSS selector or keyframe name: a theme slug, or a preview of one. */
-const SAFE_KEY = /^(?:cc-preview-)?[a-z](?:[a-z0-9]|-(?=[a-z0-9])){2,31}$/u;
+const PREVIEW_PREFIX = 'cc-preview--';
+/**
+ * The key a preview of package `key` is drawn under, so it never replaces the live theme on the page.
+ * The double hyphen is refused by the key slug (`THEME_SLUG`), so a preview can never share a key with
+ * an imported theme (audit: a package keyed `cc-preview-ocean` was replaced by the preview of `ocean`).
+ */
+export const previewKey = (key: string) => `${PREVIEW_PREFIX}${key}`;
+const SLUG = '[a-z](?:[a-z0-9]|-(?=[a-z0-9])){2,31}';
+/** Keys that may reach a CSS selector or keyframe name: a theme slug (enabled themes), or a preview of one (previews only). */
+const SLUG_KEY = new RegExp(`^${SLUG}$`, 'u');
+const PREVIEW_KEY = new RegExp(`^${PREVIEW_PREFIX}${SLUG}$`, 'u');
 
 const em = (n: number) => (n === 0 ? 'normal' : `${n}em`);
 
@@ -47,8 +54,9 @@ export function definitionFromPackage(raw: unknown, status: CustomStatus, key?: 
   const parsed = StoredThemePackage.safeParse(raw);
   if (!parsed.success || isThemeKey(parsed.data.key)) return null;
   const pkg = parsed.data;
-  const themeKey = key ?? pkg.key;
-  if (!SAFE_KEY.test(themeKey) || isThemeKey(themeKey)) return null;
+  const themeKey = key ?? (status === 'preview' ? previewKey(pkg.key) : pkg.key);
+  // A preview is drawn only under a preview key, and anything else never under one.
+  if (!(status === 'preview' ? PREVIEW_KEY : SLUG_KEY).test(themeKey) || isThemeKey(themeKey)) return null;
   const base = THEMES[pkg.base];
   const own = Object.fromEntries(PACKAGE_COLOR_TOKENS.flatMap((t) => (pkg.colors[t] ? [[t, pkg.colors[t]]] : [])));
   // Optional tokens the package left out follow its own colours (S17a: scene-scrim = its surface).
@@ -125,7 +133,7 @@ export function definitionFromPackage(raw: unknown, status: CustomStatus, key?: 
   };
 }
 
-/** Builds and registers a package (an enabled theme, or a preview under `previewKey`). */
+/** Builds and registers a package (an enabled theme under its own key, or a preview under `previewKey`). */
 export function registerThemePackage(raw: unknown, status: CustomStatus, key?: string): ThemeDefinition | null {
   const def = definitionFromPackage(raw, status, key);
   if (def) setCustomTheme(def);

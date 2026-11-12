@@ -423,7 +423,9 @@ export function soundPackProblems(pack: Partial<ThemeSoundPack>): SoundProblem[]
       out.push({ event, kind: 'missing', value: 0, limit: 1 });
       continue;
     }
-    if (spec.length > L.maxNotesPerCue) out.push({ event, kind: 'tooManyNotes', value: spec.length, limit: L.maxNotesPerCue });
+    // Too many notes: reported, and the overlap check below (quadratic in the notes) is skipped.
+    const tooMany = spec.length > L.maxNotesPerCue;
+    if (tooMany) out.push({ event, kind: 'tooManyNotes', value: spec.length, limit: L.maxNotesPerCue });
     const maxMs = L.longEvents.includes(event) ? L.longCueMaxMs : L.shortCueMaxMs;
     const len = soundLength(spec);
     if (len > maxMs) out.push({ event, kind: 'tooLong', value: len, limit: maxMs });
@@ -437,6 +439,7 @@ export function soundPackProblems(pack: Partial<ThemeSoundPack>): SoundProblem[]
       }
     }
     // Before the soft ceiling (S21a, D-173): the ceiling catches transients, not cues written too loud.
+    if (tooMany) continue;
     const db = compressedPeakDb(loudestMoment(spec), 100);
     if (db >= L.clipDbAt100) out.push({ event, kind: 'clips', value: Math.round(db * 10) / 10, limit: L.clipDbAt100 });
   }

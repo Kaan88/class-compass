@@ -78,7 +78,7 @@ test('import a theme package (bad contrast → fix → enable), use it in a clas
     await expect(report.getByTestId('theme-report-warnings')).toContainText('classroom');
     const preview = admin.getByTestId('theme-package-preview');
     await expect(preview).toContainText('Preview: Ocean');
-    await expect(preview.getByTestId('theme-preview-area-cc-preview-ocean')).toBeVisible();
+    await expect(preview.getByTestId('theme-preview-area-cc-preview--ocean')).toBeVisible();
     await expect(admin.locator('html')).not.toHaveAttribute('data-theme', 'ocean'); // the live page is untouched
     await preview.getByRole('button', { name: 'Play the celebration' }).click();
     await expect(preview.getByTestId('celebration-preview')).toBeVisible();

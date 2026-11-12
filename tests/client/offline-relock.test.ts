@@ -14,6 +14,8 @@ import * as Auth from '../../src/shared/contracts/auth.ts';
 const calls: string[] = [];
 /** The server's session as the fake API sees it. */
 const server = { classroomMode: false, pinUnlocked: true, reachable: true };
+/** An error answer of "enter classroom" (status, code, reason), or null to engage classroom mode. */
+let enterRefusal: [number, string, string | undefined] | null = null;
 const me = (over: Record<string, unknown> = {}) => ({
   kind: 'user',
   id: 'u1',
@@ -40,6 +42,7 @@ vi.mock('../../src/client/lib/api.ts', async (importOriginal) => {
       calls.push(ep.path);
       if (!server.reachable) throw new TypeError('Failed to fetch');
       if (ep.path === Auth.enterClassroom.path) {
+        if (enterRefusal) throw new real.ApiError(enterRefusal[0], enterRefusal[1], 'refused', enterRefusal[2] ? { reason: enterRefusal[2] } : undefined);
         server.classroomMode = true;
         server.pinUnlocked = false;
         return { classroomMode: true };
@@ -65,6 +68,7 @@ let store: ReturnType<typeof offline.createOfflineStore>;
 beforeEach(async () => {
   calls.length = 0;
   meHook = null;
+  enterRefusal = null;
   Object.assign(server, { classroomMode: false, pinUnlocked: true, reachable: true });
   n += 1;
   store = offline.createOfflineStore({ dbName: `cc-offline-relock-${n}` });
@@ -78,6 +82,7 @@ afterEach(async () => {
   store.close();
   // Leave no relock pending for the next test.
   server.reachable = true;
+  enterRefusal = null;
   await session.fetchMe().catch(() => null);
 });
 
@@ -146,6 +151,46 @@ describe('the classroom opened offline relocks on reconnect (PIN-6, review of S2
     server.pinUnlocked = false;
     const r = await requireClassroomSession({ context: { queryClient: new QueryClient() }, location });
     expect(r.offline).toBe(false);
+    expect(session.relockIsPending()).toBe(false);
+  });
+
+  it.each([
+    [503, 'UNAVAILABLE'],
+    [502, 'INTERNAL'],
+    [504, 'INTERNAL'],
+    [500, 'INTERNAL'],
+    [429, 'RATE_LIMITED'],
+  ])('audit finding: an enter-classroom answer %i keeps the relock pending and no me is trusted', async (status, code) => {
+    session.requireRelock();
+    server.classroomMode = true;
+    server.pinUnlocked = true;
+    enterRefusal = [status, code, undefined];
+    await expect(session.fetchMe()).rejects.toMatchObject({ status });
+    expect(calls).toEqual([Auth.enterClassroom.path]);
+    expect(session.relockIsPending()).toBe(true);
+    // Once the server takes the request, it is relocked before me is read.
+    enterRefusal = null;
+    calls.length = 0;
+    expect(await session.fetchMe()).toMatchObject({ classroomMode: true, pinUnlocked: false });
+    expect(calls).toEqual([Auth.enterClassroom.path, Auth.me.path]);
+    expect(session.relockIsPending()).toBe(false);
+  });
+
+  it('audit finding: a temporary password (403 MUST_CHANGE_PASSWORD) keeps the relock pending', async () => {
+    session.requireRelock();
+    enterRefusal = [403, 'FORBIDDEN', 'MUST_CHANGE_PASSWORD'];
+    await expect(session.fetchMe()).rejects.toMatchObject({ status: 403 });
+    expect(session.relockIsPending()).toBe(true);
+  });
+
+  it.each([
+    [403, 'FORBIDDEN', undefined],
+    [400, 'VALIDATION', 'PIN_NOT_SET'],
+  ] as const)('audit finding: a definite "cannot be engaged" (%i %s) leaves nothing to relock', async (status, code, reason) => {
+    session.requireRelock();
+    enterRefusal = [status, code, reason];
+    expect(await session.fetchMe()).toMatchObject({ kind: 'user' });
+    expect(calls).toEqual([Auth.enterClassroom.path, Auth.me.path]);
     expect(session.relockIsPending()).toBe(false);
   });
 });

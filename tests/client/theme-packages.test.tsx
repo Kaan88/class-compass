@@ -26,13 +26,16 @@ import { parseSvg, SVG_ATTRIBUTES, SVG_ELEMENTS, svgToString, type SvgNode } fro
 import { contrastFailures, CONTRAST_PAIRS, pairContrast } from '../../src/shared/themePackage/contrast.ts';
 import { isDerivedPackageToken, PACKAGE_COLOR_TOKENS, TRANSLUCENT_COLOR_TOKENS } from '../../src/shared/themePackage/tokens.ts';
 import { validateThemePackage } from '../../src/shared/themePackage/validate.ts';
+import { SOUND_LIMITS } from '../../src/shared/themePackage/limits.ts';
+import { soundPackProblems } from '../../src/shared/themePackage/sound.ts';
+import { isThemeSlug } from '../../src/shared/themes.ts';
 
 const OCEAN = readFileSync(join(import.meta.dirname, '..', '..', 'docs', 'examples', 'ocean.theme.json'), 'utf8');
 const ocean = () => JSON.parse(OCEAN) as Record<string, any>;
 const render = (nodes: readonly SvgNode[]) => renderToStaticMarkup(createElement('svg', null, createElement(SvgTree, { nodes })));
 
 afterEach(() => {
-  for (const k of ['ocean', previewKey('ocean'), 'evil']) removeCustomTheme(k);
+  for (const k of ['ocean', previewKey('ocean'), 'evil', 'cc-preview-ocean']) removeCustomTheme(k);
 });
 
 describe('SVG sanitiser (allow-list)', () => {
@@ -188,6 +191,23 @@ describe('package validator', () => {
     expect(validateThemePackage(big).report.errors.map((e) => e.code)).toEqual(['TOO_LARGE']);
   });
 
+  it('audit finding: a sound override cue is capped at maxNotesPerCue by the schema, before the loudness checks run', () => {
+    const note = { freq: 600, at: 0, dur: 100, type: 'sine', gain: 0.05 };
+    const atCap = ocean();
+    atCap.sounds.overrides = { tap: Array.from({ length: SOUND_LIMITS.maxNotesPerCue }, () => ({ ...note })) };
+    expect(validateThemePackage(atCap).report.errors.map((e) => e.code)).not.toContain('SCHEMA');
+    const over = ocean();
+    over.sounds.overrides = { tap: Array.from({ length: 5000 }, () => ({ ...note })) };
+    const { report } = validateThemePackage(over);
+    expect(report.errors.map((e) => e.code)).toEqual(['SCHEMA']);
+    expect(report.errors[0]!.path).toBe('sounds.overrides.tap');
+    // Called directly (built-in packs), too many notes is reported and the quadratic overlap check is skipped.
+    const loud = Array.from({ length: SOUND_LIMITS.maxNotesPerCue + 1 }, () => ({ freq: 600, at: 0, dur: 100, type: 'sine' as const, gain: 0.3 }));
+    const kinds = soundPackProblems({ tap: loud }).filter((p) => p.event === 'tap').map((p) => p.kind);
+    expect(kinds).toContain('tooManyNotes');
+    expect(kinds).not.toContain('clips');
+  });
+
   it('a silent theme is allowed with a note', () => {
     const p = ocean();
     p.sounds = null;
@@ -246,6 +266,19 @@ describe('imported themes on the client', () => {
     delete p.colors['badge-shine'];
     expect(ThemePackage.safeParse(p).success).toBe(false);
     expect(definitionFromPackage(p, 'enabled')?.colors['badge-shine']).toBe(themeOf('classroom').colors['badge-shine']);
+  });
+
+  it('audit finding: preview keys can never be a theme key, so a preview never replaces an enabled theme', () => {
+    expect(isThemeSlug(previewKey('ocean'))).toBe(false);
+    // An enabled package whose own key looks like the old preview key ("cc-preview-ocean").
+    registerThemePackage({ ...ocean(), key: 'cc-preview-ocean' }, 'enabled');
+    registerThemePackage(ocean(), 'preview', previewKey('ocean'));
+    expect(getCustomTheme('cc-preview-ocean')?.custom?.status).toBe('enabled');
+    expect(getCustomTheme(previewKey('ocean'))?.custom?.status).toBe('preview');
+    // A preview is drawn only under a preview key, an enabled theme never under one.
+    expect(definitionFromPackage(ocean(), 'preview', 'cc-preview-ocean')).toBeNull();
+    expect(definitionFromPackage(ocean(), 'enabled', previewKey('ocean'))).toBeNull();
+    expect(definitionFromPackage(ocean(), 'preview')?.key).toBe(previewKey('ocean'));
   });
 
   it('generated CSS cannot be injected: hostile values never reach the stylesheet', () => {
