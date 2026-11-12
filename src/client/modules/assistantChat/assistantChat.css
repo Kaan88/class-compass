@@ -291,3 +291,8 @@
   gap: 0.5rem;
   min-width: 0;
 }
+/* The model picker and the chat buttons on one line, bottoms aligned (owner 2026-11-12): the picker's
+   label sits above it, so the buttons line up with the picker itself, at the same touch height. */
+.cc-assistant__header-row {
+  align-items: flex-end;
+}

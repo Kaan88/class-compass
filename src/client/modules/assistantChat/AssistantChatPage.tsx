@@ -850,7 +850,7 @@ function ChatHeader({
           {chat.title || t("assistantChat.untitled")}
         </h2>
       )}
-      <div className="cc-row">
+      <div className="cc-row cc-assistant__header-row">
         {options.length ? (
           <Select
             label={t("assistantChat.connection")}
@@ -872,7 +872,6 @@ function ChatHeader({
         ) : null}
         {renaming ? null : (
           <Button
-            size="small"
             onPress={() => {
               setTitle(chat.title);
               setRenaming(true);
@@ -883,7 +882,6 @@ function ChatHeader({
           </Button>
         )}
         <Button
-          size="small"
           onPress={() =>
             void run(
               () =>
@@ -903,7 +901,6 @@ function ChatHeader({
           </span>
         </Button>
         <InlineConfirmButton
-          size="small"
           variant="danger-outline"
           message={t("assistantChat.deleteConfirm")}
           confirmLabel={t("assistantChat.delete")}

@@ -201,6 +201,10 @@ describe('theme drafts in the chat (D-196)', () => {
       const chat = await ok(s.teacherA.post(`${API}/chats`, {}));
       const evs = await events(s.teacherA, (await ok(s.teacherA.post(`${API}/chats/${chat.id}/messages`, { text: 'Make me an autumn theme' }))).runId);
       expect(endOf(evs).end).toBe('awaiting');
+      // The system prompt has the model offer the draft card unasked once the package is valid (owner 2026-11-12).
+      const system = String(seen[0]!.body.messages[0].content);
+      expect(system).toMatch(/As soon as validate_theme reports no errors, call import_theme_draft in that same reply/u);
+      expect(system).toMatch(/do not ask "Shall I save it\?" in text/u);
       // The validator ran at once (read-only); the import waits on a card that says what the package is.
       expect(lastToolResult(seen[1]!.body).report.ok).toBe(true);
       const d = await ok(s.teacherA.get(`${API}/chats/${chat.id}`));
