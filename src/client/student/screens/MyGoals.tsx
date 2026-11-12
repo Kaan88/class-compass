@@ -9,7 +9,7 @@
  * (the same choices and media flags as "Show my work") for that goal, as steps in the page address
  * (`goal` + `step` 2 how, 3 the work; Back works). After Save the child is back at the goal: the
  * focus returns to its "Add my work" button, a calm note says the work is there, and the goal lists
- * its work (with the child's own delete, as on "Show my work").
+ * its work (with the child's own delete, as on "Show my work"; deleting work there clears the note).
  */
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import * as G from '../../../shared/contracts/goals.ts';
@@ -187,7 +187,12 @@ export function MyGoals({ data, subjectId, media, nav, go, finish }: ScreenProps
                       actions={
                         data.canWrite && e.authorType === 'student' ? (
                           <div>
-                            <InlineConfirmButton size="small" variant="ghost" {...confirm} onConfirm={() => void run(() => call(G.studentDeleteEvidence, { evidenceId: e.id }), t('student.toast.deleted'))}>
+                            <InlineConfirmButton size="small" variant="ghost" {...confirm} onConfirm={() => {
+                                // The "saved with this goal" note would contradict the deleted work.
+                                if (justAdded === g.id) setJustAdded(null);
+                                void run(() => call(G.studentDeleteEvidence, { evidenceId: e.id }), t('student.toast.deleted'));
+                              }}
+                            >
                               <IconTrash />
                               {t('student.delete')}
                             </InlineConfirmButton>

@@ -6,7 +6,7 @@
  * while the child may write, never on an archived goal; a stale address goes back to the list.
  * Fictional data only.
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -159,6 +159,39 @@ describe('add my work from My goals (S27b, D-194)', () => {
     render(wrap(<Harness data={section()} start={{ screen: 'goals', subject: 'sub-en', goal: 'g-old', step: 3 }} onGo={(n, replace) => moves.push([n, replace])} />));
     expect(moves).toEqual([[{ screen: 'goals', subject: 'sub-en', goal: null, step: 1 }, true]]);
     expect(screen.getByTestId('student-goals')).toBeTruthy();
+  });
+
+  it('a goal id that is not one of the child’s own goals goes back to the list and never opens the evidence steps', () => {
+    const moves: Array<[StudentNav, boolean]> = [];
+    render(wrap(<Harness data={section()} start={{ screen: 'goals', subject: 'sub-en', goal: 'g-not-mine', step: 3 }} onGo={(n, replace) => moves.push([n, replace])} />));
+    expect(moves).toEqual([[{ screen: 'goals', subject: 'sub-en', goal: null, step: 1 }, true]]);
+    expect(screen.queryByTestId('evidence-form')).toBeNull();
+    expect(screen.queryByTestId('student-goal-add-work')).toBeNull();
+    expect(screen.getByTestId('student-goals')).toBeTruthy();
+  });
+
+  it('deleting work on the goal takes the "saved" note away (no note that contradicts the deleted work)', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(evidence('e9', 'g-spell', 'x')), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const data = section({ evidence: [evidence('e1', 'g-spell', 'My spelling list')] });
+    render(wrap(<Harness data={data} start={{ ...HOME, screen: 'goals', subject: 'sub-en' }} />));
+    fireEvent.click(screen.getByRole('button', { name: `Add my work: ${SPELL}` }));
+    fireEvent.click(screen.getByRole('button', { name: en['evidence.mode.text'] }));
+    fireEvent.change(screen.getByLabelText(en['student.work.words']), { target: { value: 'I wrote my five new words in a fictional story.' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en['student.work.save'] }));
+    });
+    expect(screen.getByRole('status').textContent).toBe(en['student.goals.workAdded']);
+
+    const work = screen.getByTestId('student-goal-work');
+    fireEvent.click(within(work).getByRole('button', { name: en['student.delete'] }));
+    await act(async () => {
+      fireEvent.click(within(work).getByRole('button', { name: en['student.confirm.yes'] }));
+    });
+    const [url, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
+    expect(url).toContain('/api/student/evidence/e1');
+    expect(init.method).toBe('DELETE');
+    expect(screen.queryByText(en['student.goals.workAdded'])).toBeNull();
   });
 
   it('has natural Turkish words for the new labels', () => {

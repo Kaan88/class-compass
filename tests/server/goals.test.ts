@@ -144,6 +144,7 @@ describe('only their own contributions (GOL-5, STU-5)', () => {
       boraPhone.patch(`/api/student/evidence/${ev.id}`, { body: 'x' }),
       boraPhone.del(`/api/student/evidence/${ev.id}`),
       boraPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'file', fileId: file.id }),
+      // The payload My goals "Add my work" sends (S27b, D-194), with another student's goal.
       boraPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'text', body: 'x', goalId: goal.id }),
       boraPhone.get(`/api/student/files/${file.id}`),
     ];
