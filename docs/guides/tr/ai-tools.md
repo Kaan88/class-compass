@@ -32,6 +32,10 @@ Yapay zekâ araçları bir yönetici açana kadar **kapalıdır**. Yönetici, ok
 - Sağlayıcıya ulaşanlar yukarıda sayılanlardır: öğrenci verisi anahtarı kapalıyken öğrenciler (her öğretmen için ayrı) "Student 1", "Student 2"… olur; mesajınıza yazdığınız adlar da gönderilmeden önce aynı biçimde değiştirilir, başka adlar `[name]` olur ve öğrencilerin yazdıkları gönderilmez. Sayfada gerçek adları görürsünüz; Sınıf Pusulası onları kendi sunucusunda geri koyar.
 - Asistan sizin yetkilerinizle okur ve hiçbir değişikliği kendiliğinden yapmaz: her değişiklik siz **Evet**’e basana dek bir kartta bekler. Öğrencilerin yazdıkları, asistanın asla uymaması gereken veri olarak işaretlenir.
 - Mesajlarınız ve yanıtlar okulun sunucusunda (gönderildikleri biçimde) saklanır ve son mesajdan bir öğretim yılı sonra silinir; velilere ya da başka birine hiçbir şey gönderilmez.
+- Eklediğiniz dosya (.json, .txt ya da .md, en fazla 200 KB) mesajınızın bir parçasıdır, bu yüzden metniniz gibi sağlayıcıya ulaşır; öğrenci çalışmalarını ya da öğrenci bilgisi içeren dosyaları asla eklemeyin. Yanıtlar biçimlendirilmiş gösterilir; içlerindeki resimler ve web sayfası kodları hiçbir zaman gösterilmez ya da çalıştırılmaz.
+- Yöneticiler de asistanı kendi yetkileriyle kullanabilir (Yönetim → **Asistan**).
+
+**Tema taslağı nedir?** Asistanın **Temalar** sayfasına **taslak** olarak kaydettiği bir tema paketidir (renkler, sesler, isteğe bağlı sahne ve çerçeveler; okul verisi içermez). Taslak hiçbir sınıfa sunulmaz. Bir öğretmenin asistanı taslak kaydettiğinde öğretmen bunu önce bir kartta onaylar, taslak öğretmeni kaydeder ve yöneticiler öğretmenin adını "Öneren" ile görür; önizlemeye bakıp temayı yalnızca bir yönetici açabilir. Bir öğretmenin en çok 5 taslağı bekleyebilir. Öğretmenlerin yapay zekâ uygulamaları da **Yöneticilere tema taslağı önerme** izniyle aynısını yapabilir; temaları hiçbir zaman listeleyemez, dışa aktaramaz, açamaz ya da silemezler.
 
 ## Yöneticiler için: açma
 
@@ -102,7 +106,7 @@ ChatGPT, **özel MCP sunucusu** olarak bağlanır (OpenAI buna uygulama ya da ek
 
 1. **Yeni anahtar**’a basın.
 2. **Ad**: nerede kullanacağınız, örneğin "Dizüstü bilgisayarımdaki Claude Code".
-3. **İzinler**: yalnızca asistanın gerçekten ihtiyaç duyduklarını seçin. Başlangıçta okuma izinleri seçili gelir. Öğretmenler şunları seçebilir: sınıflarımı, öğrencilerimi ve ödevleri görme; raporları ve öğrenci zaman çizelgelerini okuma; hedefleri okuma; hedef, hazır hedef, cümle başlangıcı ve geri bildirim yazma; ödev verme ve işaretleme; süren bir derste sınıf işlemleri; sınıf ayarlarını değiştirme. Yöneticiler şunları seçebilir: okul yapısını ve okul geneli raporları okuma; okul ayarlarını değiştirme; tema taslağı kaydetme.
+3. **İzinler**: yalnızca asistanın gerçekten ihtiyaç duyduklarını seçin. Başlangıçta okuma izinleri seçili gelir. Öğretmenler şunları seçebilir: sınıflarımı, öğrencilerimi ve ödevleri görme; raporları ve öğrenci zaman çizelgelerini okuma; hedefleri okuma; hedef, hazır hedef, cümle başlangıcı ve geri bildirim yazma; ödev verme ve işaretleme; süren bir derste sınıf işlemleri; sınıf ayarlarını değiştirme; yöneticilere tema taslağı önerme. Yöneticiler şunları seçebilir: okul yapısını ve okul geneli raporları okuma; okul ayarlarını değiştirme; tema taslağı kaydetme.
 4. **Geçerlilik süresi**: gün sayısı; en fazla okulun izin verdiği kadar.
 5. **Öğrenciler nasıl görünsün**: yalnızca okul adlara izin veriyorsa görünür. Takma adlar güvenli varsayılandır.
 6. **Mevcut parolanızı** yazın (e-posta bağlantısıyla giriş yapan hesaplar önce yeniden giriş yapar) ve **Anahtar oluştur**’a basın.
@@ -129,9 +133,9 @@ claude mcp add --transport http class-compass https://school.example.org/mcp --h
 
 Bunun için kişisel anahtar kullanın: giriş yaparak bağlanmak `/oauth/…` adreslerini de gerektirir ve hizmet anahtarı bunlara ulaşamayabilir.
 
-İşe yarayan araçlar: **class_overview**, **class_report** (rapor büyükse birkaç bölüm isteyin), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** ve **set_topic_plan**, **create_homework**; temalar için **theme_schema**, **validate_theme**, **preview_theme**, **export_theme** ve yöneticiler için **import_theme_draft** (taslak kaydeder; bir temayı etkinleştirmek **Temalar** sayfasında sizin kararınız olarak kalır). Hazır istekler (prompts): haftalık özet, hazır hedefler, konu planı, tema tasarımı.
+İşe yarayan araçlar: **class_overview**, **class_report** (rapor büyükse birkaç bölüm isteyin), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** ve **set_topic_plan**, **create_homework**; temalar için **theme_schema**, **validate_theme**, **preview_theme**, **export_theme** ve **import_theme_draft** (taslak kaydeder; yöneticiler için "Tema taslağı kaydetme", öğretmenler için "Yöneticilere tema taslağı önerme" izni gerekir; bir temayı etkinleştirmek **Temalar** sayfasında bir yöneticinin kararı olarak kalır). Hazır istekler (prompts): haftalık özet, hazır hedefler, konu planı, tema tasarımı.
 
-**Asistanla tema hazırlamak.** Asistan tema kılavuzunu ve eksiksiz örnek temaları (her hazır tema için bir tane) okuyabilir, **export_theme** ile herhangi bir temanın kopyasını alabilir, işini **validate_theme** ile denetleyip **preview_theme** ile tüm renk kontrastlarını görebilir. Bunların hiçbirinde okul verisi yoktur. Bir yöneticinin asistanı sonucu taslak olarak kaydedebilir; önizlemeye bakıp temayı **Temalar** sayfasında siz açarsınız.
+**Asistanla tema hazırlamak.** Asistan tema kılavuzunu ve eksiksiz örnek temaları (her hazır tema için bir tane) okuyabilir, **export_theme** ile herhangi bir temanın kopyasını alabilir, işini **validate_theme** ile denetleyip **preview_theme** ile tüm renk kontrastlarını görebilir. Bunların hiçbirinde okul verisi yoktur. Sonucu taslak olarak kaydedebilir (bir öğretmenin taslağında "Öneren" ile öğretmenin adı görünür); önizlemeye bakıp temayı **Temalar** sayfasında bir yönetici açar.
 
 ## claude.ai ve Claude Desktop
 

@@ -539,6 +539,18 @@ Decision D-195; no migration (the removed preference lived only in the browser's
 - [ ] Every student of 24, 32 and 40 at 1536×703 with the routine, timer and counter above the students: not possible with a touch-size + (two rows fit in the 238 px box: 18 of 24 or 40, 16 with marks; D-195 has the numbers); owner to choose full screen (24 of 24), fewer boxes above the students, or a smaller + on the classroom cards
 - [ ] Seen on the classroom display (owner): the one size for a class of 8 and a large class at 1536×703
 
+## S27d Assistant: Markdown answers, theme drafts for teachers and admins, file attach (2026-11-12)
+Decision D-196; no migration.
+- [x] Markdown answers: headings, paragraphs, bold and italic, lists, tables, blockquotes, inline code, fenced code with Copy and (JSON) Download as file; links only http, https and mailto with `noopener noreferrer` in a new tab; no raw HTML, no pictures; open fences while streaming do not flicker; in-house parser shared with Help (1.8 kB gzip), Assistant chunk 7.6 kB gzip, student page budget unchanged
+- [x] Administrators use the chat (Admin → Assistant) with the admin-role tools and their own guides
+- [x] Teacher theme drafts: `theme_schema`, `validate_theme`, `preview_theme`, `read_theming_guide` and `import_theme_draft` (through the card) for teachers; new teacher scope `themes:draft` with the same rule for external MCP clients; the proposer shows as "Proposed by" on Admin → Themes; no tool enables or assigns a draft; teachers cannot list, enable, disable, delete or export; at most 5 open drafts per teacher
+- [x] File attach: one .json, .txt or .md file up to 200 KB, sent as fenced text in the message; other types refused in the page and by the server
+- [x] System prompt lists the role's capabilities, theme drafts, and that enabling is an administrator's step
+- [x] EN/TR strings; teacher, admin and AI tools guides EN/TR; THEMING, EXTENDING and CONVENTIONS notes
+- [x] Tests: `tests/server/assistant-chat-themes.test.ts`, `tests/client/assistant-markdown.test.tsx`, scope and privacy tests updated; `e2e/assistant-theme-drafts.spec.ts` with the scripted fake model
+- [ ] Try theme drafts and attachments with a real provider and on a teacher's own device (needs a person)
+- [ ] Guide screenshots of Admin → Assistant and a "Proposed by" draft (not taken in this stage)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site

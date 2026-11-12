@@ -32,6 +32,10 @@ The **Assistant** page in the teacher area (see the [teacher guide](teacher.md#a
 - What reaches the provider is what is listed above: with the student data switch off, students are "Student 1", "Student 2"… (for each teacher), names you type in your message are replaced the same way before it is sent, other names become `[name]`, and what students wrote is not sent. You see real names on the page; Class Compass puts them back on its own server.
 - The assistant reads with your permissions and runs no change on its own: each change waits on a card until you press **Yes**. What students wrote is marked as data the assistant must never obey.
 - Your messages and the answers are stored on the school's server (as they were sent) and deleted a school year after the last message; nothing is sent to parents or anyone else.
+- A file you attach (.json, .txt or .md, up to 200 KB) is part of your message, so it reaches the provider like your text; never attach student work or files with student data. Answers are shown formatted; pictures and web page code in them are never shown or run.
+- Administrators can use the assistant too (Admin → **Assistant**), with their own permissions.
+
+**What a theme draft is.** A theme package (colours, sounds, optional scene and frames: no school data) that the assistant saved on **Themes** as a **draft**. A draft is not offered to any class. When a teacher's assistant saves one, the teacher confirms it on a card first, the draft records the teacher, and administrators see "Proposed by" with the teacher's name; only an administrator can look at the preview and enable it. A teacher can have up to 5 drafts waiting. Teachers' AI apps can do the same with the permission **Propose theme drafts for the administrators**; they can never list, export, enable or delete themes.
 
 ## For administrators: switch it on
 
@@ -102,7 +106,7 @@ Open **Profile → AI tools** and then **Advanced: personal tokens and connected
 
 1. Press **New token**.
 2. **Name**: where you will use it, for example "Claude Code on my laptop".
-3. **Permissions**: choose only what the assistant needs. Read permissions are chosen to start with. Teachers can choose: see my classes, students and homework; read reports and student timelines; read goals; write goals, presets, sentence starters and feedback; set and mark homework; classroom actions in a running lesson; change class settings. Administrators can choose: read school structure and school-wide reports; change school settings; save theme drafts.
+3. **Permissions**: choose only what the assistant needs. Read permissions are chosen to start with. Teachers can choose: see my classes, students and homework; read reports and student timelines; read goals; write goals, presets, sentence starters and feedback; set and mark homework; classroom actions in a running lesson; change class settings; propose theme drafts for the administrators. Administrators can choose: read school structure and school-wide reports; change school settings; save theme drafts.
 4. **Valid for**: a number of days, at most what the school allows.
 5. **Students are shown as**: only when the school allows names. Pseudonyms are the safe default.
 6. Type your **current password** (accounts that sign in with an email link sign in again first) and press **Make token**.
@@ -129,9 +133,9 @@ claude mcp add --transport http class-compass https://school.example.org/mcp --h
 
 Use a personal token for this: signing in also needs the `/oauth/…` addresses, which the service token may not reach.
 
-Useful tools: **class_overview**, **class_report** (ask for a few sections when a report is large), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** and **set_topic_plan**, **create_homework**; for themes **theme_schema**, **validate_theme**, **preview_theme**, **export_theme** and, for administrators, **import_theme_draft** (it saves a draft; enabling a theme stays your decision on **Themes**). Ready-made requests (prompts): weekly summary, goal presets, topic plan, design a theme.
+Useful tools: **class_overview**, **class_report** (ask for a few sections when a report is large), **student_summary**, **goal_library**, **create_goal_preset**, **create_sentence_starter**, **get_topic_plan** and **set_topic_plan**, **create_homework**; for themes **theme_schema**, **validate_theme**, **preview_theme**, **export_theme** and **import_theme_draft** (it saves a draft; administrators need "Save theme drafts", teachers "Propose theme drafts for the administrators"; enabling a theme stays an administrator's decision on **Themes**). Ready-made requests (prompts): weekly summary, goal presets, topic plan, design a theme.
 
-**Making a theme with an assistant.** The assistant can read the theming guide and complete example themes (one for each built-in theme), copy any theme with **export_theme**, check its work with **validate_theme** and see every colour contrast with **preview_theme**. None of this contains school data. An administrator's assistant can save the result as a draft; you look at the preview and switch the theme on yourself on **Themes**.
+**Making a theme with an assistant.** The assistant can read the theming guide and complete example themes (one for each built-in theme), copy any theme with **export_theme**, check its work with **validate_theme** and see every colour contrast with **preview_theme**. None of this contains school data. It can save the result as a draft (a teacher's draft shows "Proposed by" with their name); an administrator looks at the preview and switches the theme on on **Themes**.
 
 ## claude.ai and Claude Desktop
 

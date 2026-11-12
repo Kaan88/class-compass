@@ -458,12 +458,23 @@ folder. What it gets:
 | Export on Admin → Themes | `export_theme`: a built-in key gives the same package as the admin page (`<key>-copy`); an imported theme its stored package (teachers: enabled themes; administrators with `themes:write`: any). Read-only |
 | `validateThemePackage` | `validate_theme` (the same report; nothing is saved) |
 | `/dev/catalog` and the admin preview | `preview_theme`: the report, the base theme, every colour token with its value and source (package, base theme, fixed print colour), every contrast pair with ratio, minimum and pass, the worst avatar hue for big and small initials, the avatar faces (ink on its rim and the worst avatar colour or skin tone, S21a), and which mascot poses, illustrations, decoration and pattern come from the base theme. No images are drawn |
-| Import on Admin → Themes | `import_theme_draft` (administrators with `themes:write`): saves a **draft** only |
+| Import on Admin → Themes | `import_theme_draft`: saves a **draft** only. Administrators need `themes:write`; teachers need `themes:draft` (S27d, D-196): their draft records them and Admin → Themes shows "Proposed by <teacher>"; at most 5 drafts wait per teacher |
 
 The server's instructions (sent on `initialize`) and every theme tool's description point at this
 guide and the examples, so an assistant that does not read resources by itself still finds them; the
 prompt `design_theme` walks through the checklist above. Looking at the real preview and **enabling**
 a theme stay human actions on Admin → Themes.
+
+**Theme drafts in the Assistant chat (S27d, D-196).** The in-app Assistant (teachers on their
+Assistant page, administrators on Admin → Assistant) has no MCP resources, so it reads this guide with
+`read_theming_guide` (part `palette`, `packages` or `engine`, or a complete `example` package) and
+uses `theme_schema`, `validate_theme`, `preview_theme` and `import_theme_draft`. A teacher's chat
+has only these drafting tools (never `list_custom_themes`, `export_theme`, enable, disable or delete);
+`import_theme_draft` is a change, so it waits for the teacher's Yes on a card that shows the key, the
+names, the base theme, the size and what happens next. A package with validation errors gets no card:
+the model is told the errors. A teacher can also attach a `.json` theme file (up to 200 KB) to a
+message, and a JSON block in an answer has **Download as file**. The draft is never enabled or assigned
+to a class by any tool; an administrator looks at the preview and enables it on Admin → Themes.
 
 ## Scenes, frames, ambient and sets (S17a, D-166)
 

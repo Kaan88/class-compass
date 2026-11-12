@@ -71,7 +71,12 @@ AI tools (`/mcp`) get a module's data only through its contracts:
 1. Add `mcp: { scope, tool, description, readOnly, cost? }` to a `classroom`, `teacher` or `admin`
    endpoint in `src/shared/contracts/<m>.ts` (registered with `route()`). `scope` is one of
    `MCP_SCOPES` (`src/shared/mcp.ts`): teacher scopes for teacher endpoints, `settings:admin`,
-   `themes:write` or `school:read` for admin endpoints. `tool` is a unique snake_case name.
+   `themes:write` or `school:read` for admin endpoints. `tool` is a unique snake_case name. A
+   hand-written tool for both roles (`role: 'any'`) with a scope names the administrator's scope in
+   `scope` and the teacher's in `teacherScope` (S27d, D-196: `import_theme_draft` asks administrators
+   for `themes:write` and teachers for `themes:draft`); read the needed scope only with
+   `requiredScope` (`modules/mcp/registry.ts`). A change tool may add `precheck` (its own check of the
+   arguments): the Assistant chat refuses a call that fails it instead of showing a card.
    `description` is for an AI client: what the tool returns, what it changes, what is withheld.
    Reports and other heavy reads set `cost` (5); the default is 1.
 2. Mark the output schema: every string field that could hold personal data gets
