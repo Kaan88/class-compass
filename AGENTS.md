@@ -107,6 +107,7 @@ decision and migration numbers.
 | `docs/DECISIONS.md` | Why things are the way they are (D-numbers). |
 | `docs/ROADMAP.md` | Stages and what is done. |
 | `docs/OPERATIONS.md` | Setup, demo data, backups, deployment, upgrade and rollback, the test VM install and the test server, the Cloudflare Access bypass for AI tools. |
+| `docs/ENG-5-integration-report.md` | What was tested on the test VM and servers (deploys, migrations, restore drills, mail, AI tools) and what was not (ENG-5, D-199). |
 | `docs/ASSETS.md` | Third-party assets and licences (art and sounds are original or CC0). |
 | `docs/guides/` | User guides in English and Turkish (shown in the app under Help); `docs/guides/en/ai-tools.md` explains what leaves the school when AI tools are on. |
 
