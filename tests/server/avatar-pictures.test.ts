@@ -289,6 +289,32 @@ describe('the teacher check (confirmation, reasons)', () => {
   });
 });
 
+describe('archived classes are read-only (DAT-1, audit fix)', () => {
+  it('audit finding 1: a teacher or an administrator cannot remove a picture of a student whose class is archived (409 CLASS_ARCHIVED)', async () => {
+    await openAll();
+    const id = await sendOne();
+    await ok(s.teacherA.post(`/api/teacher/avatar-pictures/${id}/approve`, { confirm: true }));
+    await ok(s.admin.post(`/api/admin/classes/${s.c3a.id}/archive`));
+    const refused = [await s.teacherA.req('DELETE', `/api/teacher/avatar-pictures/${id}`, {}), await s.admin.req('DELETE', `/api/admin/avatar-pictures/${id}`, {})];
+    expect(refused.map((r) => [r.status, r.body.error?.details?.reason])).toEqual([
+      [409, 'CLASS_ARCHIVED'],
+      [409, 'CLASS_ARCHIVED'],
+    ]);
+    expect(rows().map((r) => r.status)).toEqual(['approved']);
+    expect(auditRows('avatar_picture.remove')).toHaveLength(0);
+  });
+
+  it('audit finding 2: a student in an archived class cannot send a picture nobody could approve or refuse (409 CLASS_ARCHIVED)', async () => {
+    await openAll();
+    await ok(s.admin.post(`/api/admin/classes/${s.c3a.id}/archive`));
+    const r = await send(adaPhone, await drawing());
+    expect([r.status, r.body.error?.details?.reason]).toEqual([409, 'CLASS_ARCHIVED']);
+    expect(rows()).toEqual([]);
+    expect(quarantined()).toEqual([]);
+    expect(auditRows('avatar_picture.send')).toHaveLength(0);
+  });
+});
+
 describe('the 14-day clean-up', () => {
   it('deletes unchecked pictures (row and file) after 14 days and refusal notes after their time; approved stay', async () => {
     await openAll();

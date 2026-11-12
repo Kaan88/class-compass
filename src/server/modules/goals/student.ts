@@ -14,7 +14,8 @@ import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/goals.ts';
 import type { Evidence, Goal, StudentGoalsSection } from '../../../shared/contracts/goals.ts';
 import { tx } from '../../db/client.ts';
-import { avatarPictures, evidence, files, goalEntries, goals } from '../../db/schema.ts';
+import { evidence, files, goalEntries, goals } from '../../db/schema.ts';
+import { isPictureFile } from '../avatars/pictures.ts';
 import { emitStudentActivity } from '../../lib/activity.ts';
 import { notify } from '../../lib/notify.ts';
 import type { NotificationCategory } from '../../../shared/notifications.ts';
@@ -340,7 +341,7 @@ const isOwnLooseUpload = (ctx: RequestContext, studentId: string, f: FileRow) =>
   f.uploadedByType === 'student' &&
   f.uploadedById === studentId &&
   !ctx.db.select({ id: evidence.id }).from(evidence).where(and(eq(evidence.fileId, f.id), isNull(evidence.deletedAt))).get() &&
-  !ctx.db.select({ id: avatarPictures.id }).from(avatarPictures).where(eq(avatarPictures.fileId, f.id)).get();
+  !isPictureFile(ctx.db, f.id);
 
 /**
  * Deleting own evidence (GOL-5) also deletes the file the student uploaded for it when nothing else

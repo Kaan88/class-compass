@@ -31,7 +31,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import sharp from 'sharp';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull } from 'drizzle-orm';
 import {
   AVATAR_PICTURE_EDGE,
   AVATAR_PICTURE_MAX_BYTES,
@@ -89,6 +89,17 @@ export const picturesOn = (db: Db) => getMediaPolicy(db).avatarPictures;
 
 const rowsOf = (db: Db, studentId: string) => db.select().from(avatarPictures).where(eq(avatarPictures.studentId, studentId)).all();
 
+/** The student sent a picture at or after `since` (any state): the import revert keeps such an enrolment. */
+export const hasPictureSince = (db: Db, studentId: string, since: number): boolean =>
+  !!db
+    .select({ id: avatarPictures.id })
+    .from(avatarPictures)
+    .where(and(eq(avatarPictures.studentId, studentId), gte(avatarPictures.createdAt, since)))
+    .get();
+
+/** A picture row points at this files row (own-upload clean-ups must never delete it). */
+export const isPictureFile = (db: Db, fileId: string): boolean => !!db.select({ id: avatarPictures.id }).from(avatarPictures).where(eq(avatarPictures.fileId, fileId)).get();
+
 /** The approved picture of each student (only live files), for the classroom directory and Super Speakers. */
 export function approvedPictureIds(db: Db, studentIds: readonly string[]): Map<string, string> {
   const out = new Map<string, string>();
@@ -139,6 +150,8 @@ function assertMaySend(ctx: RequestContext, studentId: string) {
   if (!picturesOn(ctx.db)) throw new AppError('FEATURE_DISABLED', 'Own pictures are turned off', { reason: 'MEDIA_DISABLED', module: 'media.avatarPictures' });
   const scope = studentScope(ctx, studentId);
   if (!scope.classes.length) throw notFound('Class');
+  // Archived classes and years are read-only (DAT-1): a picture nobody could approve or refuse is not taken.
+  if (!scope.classes.some((c) => isClassWritable(ctx.db, c))) assertClassWritable(ctx.db, scope.classes[0]!);
   if (scope.classes.some((c) => c.avatarsLocked)) throw new AppError('FORBIDDEN', 'Your teacher has paused avatar changes', { reason: 'AVATAR_LOCKED' });
   if (!scope.classes.some((c) => c.avatarUploads)) throw new AppError('FORBIDDEN', 'Your class does not take pictures now', { reason: 'PICTURES_CLASS_OFF' });
   return scope;
@@ -515,6 +528,7 @@ export async function removePicture(ctx: RequestContext, pictureId: string): Pro
   const row = getRow(ctx.db, pictureId);
   assertDecider(ctx, row);
   if (row.status === 'refused') throw notFound('Picture');
+  assertWritableFor(ctx, row.studentId);
   const purged = tx(ctx.db, () => {
     const p = purgeRows(ctx.db, [row]);
     audit(ctx.db, ctx.actor, { action: 'avatar_picture.remove', entity: 'student', entityId: row.studentId, before: { pictureId, status: row.status } }, ctx.now());

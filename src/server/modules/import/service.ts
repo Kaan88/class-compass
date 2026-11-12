@@ -46,12 +46,13 @@ import {
   type SourceRow,
 } from '../../../domain/importing.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { assistantAssignments, assistantDutyChecks, attendanceDaily, avatarPictures, attendanceLessonExceptions, classes, counterEvents, enrolments, files, homeworkAssignments, homeworkMarkChanges, homeworkMarks, importBatches, importRows, lessons, mcpPseudonyms, notifications, pairConstraints, pointEvents, schoolYears, studentAchievements, studentSubjectLevels, students, teachingContexts, textCheckAttempts, type ImportCandidateJson, users } from '../../db/schema.ts';
+import { assistantAssignments, assistantDutyChecks, attendanceDaily, attendanceLessonExceptions, classes, counterEvents, enrolments, files, homeworkAssignments, homeworkMarkChanges, homeworkMarks, importBatches, importRows, lessons, mcpPseudonyms, notifications, pairConstraints, pointEvents, schoolYears, studentAchievements, studentSubjectLevels, students, teachingContexts, textCheckAttempts, type ImportCandidateJson, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
+import { hasPictureSince } from '../avatars/pictures.ts';
 import { assertCanReadFile } from '../files/service.ts';
 import { storagePath } from '../files/storage.ts';
 import { assertClassWritable, assertTeachesClass, defaultEnrolmentDate, getClass, isClassWritable, todayFor, type ClassRow } from '../school/policy.ts';
@@ -1038,7 +1039,7 @@ function enrolmentHasHistory(db: Db, e: typeof enrolments.$inferSelect): boolean
   if (db.select({ id: pointEvents.id }).from(pointEvents).where(and(eq(pointEvents.studentId, studentId), eq(pointEvents.classIdSnapshot, classId))).get()) return true;
   if (db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.studentId, studentId), gte(notifications.createdAt, e.createdAt))).get()) return true;
   if (db.select({ id: mcpPseudonyms.studentId }).from(mcpPseudonyms).where(and(eq(mcpPseudonyms.studentId, studentId), gte(mcpPseudonyms.createdAt, e.createdAt))).get()) return true;
-  if (db.select({ id: avatarPictures.id }).from(avatarPictures).where(and(eq(avatarPictures.studentId, studentId), gte(avatarPictures.createdAt, e.createdAt))).get()) return true;
+  if (hasPictureSince(db, studentId, e.createdAt)) return true;
   if (referencedInJson(db, studentId)) return true;
   const ctxIds = db.select({ id: teachingContexts.id }).from(teachingContexts).where(eq(teachingContexts.classId, classId)).all().map((r) => r.id);
   if (!ctxIds.length) return false;

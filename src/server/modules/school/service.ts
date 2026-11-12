@@ -16,7 +16,6 @@ import {
   contextModules,
   enrolments,
   modulePolicies,
-  schoolClosures,
   schoolSettings,
   schoolYears,
   students,
@@ -31,6 +30,7 @@ import { requireUser } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
+import { closureOutsideRange } from './closures.ts';
 import { contextModuleStates, getAvailability, mediaRecord, validateModuleConfig, type ContextModuleState } from './modules.ts';
 import { DEFAULT_THEME } from '../../../shared/themes.ts';
 import { assertThemeUsable, effectiveTheme, isThemeUsable } from '../themes/service.ts';
@@ -151,11 +151,7 @@ export function updateYear(ctx: RequestContext, input: In<typeof C.updateYear>) 
       .find((t) => t.startsOn < next.startsOn || t.endsOn > next.endsOn);
     if (outsideTerm) throw conflict('A term of this year would fall outside the new dates; change the term first', { reason: 'TERM_OUTSIDE_YEAR', termId: outsideTerm.id });
     // The holiday calendar too (S25b, D-186): a closure stays inside its year.
-    const outsideClosure = ctx.db
-      .select({ id: schoolClosures.id })
-      .from(schoolClosures)
-      .where(and(eq(schoolClosures.schoolYearId, y.id), sql`(${schoolClosures.startsOn} < ${next.startsOn} or ${schoolClosures.endsOn} > ${next.endsOn})`))
-      .get();
+    const outsideClosure = closureOutsideRange(ctx.db, y.id, next.startsOn, next.endsOn);
     if (outsideClosure) throw conflict('A holiday of this year would fall outside the new dates; change the holiday first', { reason: 'CLOSURE_OUTSIDE_YEAR', closureId: outsideClosure.id });
     const outsideEnrolment = ctx.db
       .select({ id: enrolments.id })

@@ -5,7 +5,7 @@
  * `closedDatesBetween` / `closedDatesOfYear`, and the classroom asks `closureOn` for today's calm note.
  * Every change is audited in its transaction and needs a writable (not archived) school year (DAT-1).
  */
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, lt, lte, or } from 'drizzle-orm';
 import type { z } from 'zod';
 import { closedDates, closedSchoolDays, fixedHolidaysIn } from '../../../domain/holidays.ts';
 import type * as C from '../../../shared/contracts/school.ts';
@@ -36,6 +36,17 @@ function closureDto(r: ClosureRow): C.Closure {
 }
 
 const rowsOfYear = (db: Db, yearId: string) => db.select().from(schoolClosures).where(eq(schoolClosures.schoolYearId, yearId)).orderBy(asc(schoolClosures.startsOn), asc(schoolClosures.endsOn)).all();
+
+/** A closure of this year that would fall outside `startsOn`..`endsOn` (changing the year's dates keeps every closure inside), or null. */
+export function closureOutsideRange(db: Db, yearId: string, startsOn: string, endsOn: string): { id: string } | null {
+  return (
+    db
+      .select({ id: schoolClosures.id })
+      .from(schoolClosures)
+      .where(and(eq(schoolClosures.schoolYearId, yearId), or(lt(schoolClosures.startsOn, startsOn), gt(schoolClosures.endsOn, endsOn))))
+      .get() ?? null
+  );
+}
 
 export function listClosures(db: Db, yearId: string) {
   const y = getYear(db, yearId);
