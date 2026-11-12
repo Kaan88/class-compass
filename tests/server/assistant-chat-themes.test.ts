@@ -228,6 +228,37 @@ describe('theme drafts in the chat (D-196)', () => {
     });
   });
 
+  it('Preview theme (owner 2026-11-12): the owner gets a call’s validated package; a package with errors gives the report; nothing is saved; others get 404', async () => {
+    await withAssistant(async () => {
+      const pkg = themeWith('chat-preview', 'Preview Pines', 'Önizleme Çamları');
+      const bad = { ...themeWith('chat-preview-bad'), colors: { ...ocean.colors, text: '#ffffff', surface: '#ffffff' } };
+      script(fake, [
+        () => ({ text: 'Here it is.', calls: [{ id: 'pv1', name: 'preview_theme', args: { package: pkg } }, { id: 'pv2', name: 'preview_theme', args: { package: bad } }, { id: 'v1', name: 'validate_theme', args: { package: pkg } }] }),
+        () => ({ text: 'Shall I save it?', calls: [{ id: 'imp9', name: 'import_theme_draft', args: { package: JSON.stringify(pkg) } }] }),
+      ]);
+      const chat = await ok(s.teacherA.post(`${API}/chats`, {}));
+      await events(s.teacherA, (await ok(s.teacherA.post(`${API}/chats/${chat.id}/messages`, { text: 'Show me a pine theme' }))).runId);
+      const d = await ok(s.teacherA.get(`${API}/chats/${chat.id}`));
+      const calls = d.messages.flatMap((m: any) => m.calls.map((c: any) => ({ ...c, messageId: m.id })));
+      const byId = (id: string) => calls.find((c: any) => c.id === id);
+      expect([byId('pv1').theme, byId('pv2').theme, byId('v1').theme, byId('imp9').theme]).toEqual([true, true, false, true]);
+      const url = (id: string) => `${API}/chats/${chat.id}/messages/${byId(id).messageId}/calls/${id}/theme`;
+      const shown = await ok(s.teacherA.get(url('pv1')));
+      expect(shown.report.ok).toBe(true);
+      expect(shown.package).toMatchObject({ key: 'chat-preview', name: { en: 'Preview Pines', tr: 'Önizleme Çamları' } });
+      expect((await ok(s.teacherA.get(url('imp9')))).package.key).toBe('chat-preview');
+      const broken = await ok(s.teacherA.get(url('pv2')));
+      expect(broken.package).toBeNull();
+      expect(broken.report.errors.length).toBeGreaterThan(0);
+      // Not a theme preview tool, another teacher, an unknown call or message: 404. Nothing was saved.
+      expect((await s.teacherA.get(url('v1'))).status).toBe(404);
+      expect((await s.teacherB.get(url('pv1'))).status).toBe(404);
+      expect((await s.teacherA.get(`${API}/chats/${chat.id}/messages/${byId('pv1').messageId}/calls/nope/theme`)).status).toBe(404);
+      expect((await s.teacherA.get(`${API}/chats/${chat.id}/messages/${byId('imp9').messageId}/calls/pv1/theme`)).status).toBe(404);
+      expect(env.db.select().from(customThemes).all()).toEqual([]);
+    });
+  });
+
   it('an invalid package gets no card (the model gets the errors); enable, list, export and delete are not tools of a teacher', async () => {
     await withAssistant(async () => {
       const bad = { ...themeWith('chat-bad'), colors: { ...ocean.colors, text: '#ffffff', surface: '#ffffff' } };

@@ -371,7 +371,29 @@ export function callView(p: AssistantPrivacy, look: CardLookup, call: AssistantT
   const parsed = tool && !readOnly && resolved?.ok ? parseAssistantArgs(tool, resolved.args, p) : null;
   const args = parsed?.ok && isRecord(parsed.data) ? parsed.data : call.arguments;
   const changes = readOnly || call.state === 'refused' ? [] : changeLines(look, call.name, args);
-  return { id: call.id, tool: tool ? call.name : 'unknown', readOnly, state: call.state, target: targetOf(look, args), changes, failed: result ? result.isError : null };
+  const theme = !!tool && THEME_PREVIEW_TOOLS.includes(call.name) && call.state !== 'refused' && !call.invalidArguments;
+  return { id: call.id, tool: tool ? call.name : 'unknown', readOnly, state: call.state, target: targetOf(look, args), changes, failed: result ? result.isError : null, theme };
+}
+
+/** Calls whose theme package the page can preview (the model showing a theme, or offering to save it). */
+export const THEME_PREVIEW_TOOLS: readonly string[] = ['preview_theme', 'import_theme_draft'];
+
+/**
+ * The theme package of one call in the owner's chat, validated again (owner 2026-11-12): the page
+ * renders the same preview as Admin → Themes from it. 404 for anything else: another teacher's chat,
+ * a message or call that is not there, a tool without a package, a refused call or a file that is gone.
+ */
+export function callTheme(ctx: RequestContext, input: { chatId: string; messageId: string; callId: string }) {
+  const user = requireUser(ctx);
+  const chat = loadChat(ctx, input.chatId);
+  const msg = ctx.db.select().from(assistantMessages).where(and(eq(assistantMessages.id, input.messageId), eq(assistantMessages.chatId, chat.id))).get();
+  const call = msg?.role === 'assistant' ? (msg.toolCallsJson ?? []).find((c) => c.id === input.callId) : undefined;
+  if (!call || !THEME_PREVIEW_TOOLS.includes(call.name) || call.state === 'refused' || call.invalidArguments || !assistantToolByName(user.role, call.name)) throw notFound('Theme');
+  const resolved = resolveAttachmentArgs(ctx.db, chat.id, call.name, call.arguments);
+  const pkg = resolved.ok ? resolved.args.package : undefined;
+  if (pkg === undefined || pkg === null) throw notFound('Theme');
+  const { report, pkg: valid } = validateThemePackage(typeof pkg === 'string' ? pkg : JSON.stringify(pkg));
+  return { report, package: valid as unknown as z.infer<typeof C.assistantCallTheme.output>['package'] };
 }
 
 export function messageViews(p: AssistantPrivacy, look: CardLookup, rows: MessageRow[]): Array<z.infer<typeof C.AssistantMessageView>> {

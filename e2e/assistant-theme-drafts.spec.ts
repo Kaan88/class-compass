@@ -95,6 +95,16 @@ test('Assistant: a theme file attached, a Markdown answer, a teacher draft confi
     await expect(card).toContainText(KEY);
     await expect(card).toContainText('E2E Autumn');
     expect((await api(admin, 'GET', '/api/admin/themes')).body.themes.some((t: { key: string }) => t.key === KEY)).toBe(false);
+    // Preview theme (owner 2026-11-12): the Admin → Themes preview inside the chat, before saying Yes.
+    const call = page.getByTestId('assistant-theme-preview').last();
+    await call.getByTestId('assistant-theme-preview-open').click();
+    const preview = call.getByTestId('theme-package-preview');
+    await expect(preview).toBeVisible();
+    await expect(preview.getByRole('heading', { name: 'Preview: E2E Autumn' })).toBeVisible();
+    await expect(preview.getByTestId(`theme-preview-area-cc-preview-${KEY}`)).toBeVisible();
+    expect((await api(admin, 'GET', '/api/admin/themes')).body.themes.some((t: { key: string }) => t.key === KEY)).toBe(false);
+    await preview.getByRole('button', { name: 'Close the preview' }).click();
+    await expect(preview).toHaveCount(0);
     await card.getByTestId('assistant-card-yes').click();
     await expect(messages.getByText(/Saved as a draft:/u)).toBeVisible();
     await expect(messages.getByText('E2E Autumn', { exact: true })).toBeVisible();

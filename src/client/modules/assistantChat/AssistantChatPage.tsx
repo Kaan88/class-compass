@@ -73,6 +73,7 @@ import {
 import type { TeacherPageSearch } from "../types.ts";
 import "./assistantChat.css";
 import { ChatMarkdown, UserText } from "./ChatMarkdown.tsx";
+import { ChatThemePreview } from "./ChatThemePreview.tsx";
 
 const BASE = ["sensitive", "assistant-chat"] as const;
 const STATUS_KEY = [...BASE, "status"] as const;
@@ -648,6 +649,7 @@ function ChatView({
             key={m.id}
             message={m}
             calls={mergeCalls(m.calls, liveCalls[m.id])}
+            chatId={chatId}
             busy={busy}
             onAnswer={answer}
           />
@@ -665,6 +667,7 @@ function ChatView({
               calls: [],
             }}
             calls={liveCalls[id] ?? []}
+            chatId={chatId}
             busy
             streaming
             onAnswer={answer}
@@ -927,12 +930,14 @@ function ChatHeader({
 function MessageItem({
   message,
   calls,
+  chatId,
   busy,
   streaming = false,
   onAnswer,
 }: {
   message: AssistantMessageView;
   calls: AssistantCallView[];
+  chatId: string;
   busy: boolean;
   streaming?: boolean;
   onAnswer: (
@@ -968,18 +973,23 @@ function MessageItem({
           <ChatMarkdown text={message.text} streaming={streaming} />
         )
       ) : null}
-      {calls.map((c) =>
-        c.readOnly || c.state === "refused" ? (
-          <ActivityLine key={c.id} call={c} />
-        ) : (
-          <ChangeCard
-            key={c.id}
-            call={c}
-            busy={busy}
-            onAnswer={(yes) => onAnswer(message.id, c.id, yes)}
-          />
-        ),
-      )}
+      {calls.map((c) => (
+        <div key={c.id} className="cc-assistant__call">
+          {c.readOnly || c.state === "refused" ? (
+            <ActivityLine call={c} />
+          ) : (
+            <ChangeCard
+              call={c}
+              busy={busy}
+              onAnswer={(yes) => onAnswer(message.id, c.id, yes)}
+            />
+          )}
+          {/* A theme the model shows or offers to save: the same preview as Admin → Themes (owner 2026-11-12). */}
+          {c.theme ? (
+            <ChatThemePreview chatId={chatId} messageId={message.id} callId={c.id} />
+          ) : null}
+        </div>
+      ))}
       {message.status === "cancelled" ? (
         <p className="cc-muted cc-assistant__note">
           {t("assistantChat.stopped")}

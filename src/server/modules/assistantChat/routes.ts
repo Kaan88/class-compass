@@ -9,7 +9,7 @@ import { sessionGate, type AgentEnv } from './agent.ts';
 import { RunRegistry } from './runs.ts';
 import { answerCall, cancelRun, checkChoice, sendMessage, statusView } from './service.ts';
 import { adminView, setAdmin } from './settings.ts';
-import { CardLookup, createChat, deleteChat, exportChats, listChats, loadChat, messageViews, messagesOf, summaryOf, updateChat } from './store.ts';
+import { callTheme, CardLookup, createChat, deleteChat, exportChats, listChats, loadChat, messageViews, messagesOf, summaryOf, updateChat } from './store.ts';
 
 /** A message reaches the provider (and costs tokens): at most 30 a minute per address, besides the daily limit per teacher. */
 const SEND_LIMIT = { rateLimit: { max: 30, timeWindow: '1 minute' } };
@@ -63,6 +63,7 @@ export function registerAssistantChatRoutes(app: FastifyInstance, deps: AppDeps)
   route(app, deps, C.sendAssistantMessage, (ctx, input) => sendMessage(a, ctx, input), SEND_LIMIT);
   route(app, deps, C.answerAssistantCall, (ctx, input) => answerCall(a, ctx, input), SEND_LIMIT);
   route(app, deps, C.cancelAssistantRun, (ctx, input) => cancelRun(a, ctx, input.runId));
+  route(app, deps, C.assistantCallTheme, (ctx, input) => callTheme(ctx, input));
 
   /**
    * The answer as it is written (Server-Sent Events, D-180 refining D-134): this stream carries data,

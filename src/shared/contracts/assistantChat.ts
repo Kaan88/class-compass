@@ -23,6 +23,7 @@ import {
   ASSISTANT_UNAVAILABLE,
 } from '../assistantChat.ts';
 import { AiConnectionTypeSchema } from './aiConnections.ts';
+import { PackageDto, ThemeReport } from './themes.ts';
 import { endpoint, Empty, Ok } from './define.ts';
 import { Id } from './school.ts';
 
@@ -94,6 +95,8 @@ export const AssistantCallView = z.object({
   changes: z.array(AssistantChangeLine),
   /** The tool ran and failed (null: it has not run). */
   failed: z.boolean().nullable(),
+  /** The call carries a theme package the page can preview (`assistantCallTheme`, owner 2026-11-12). */
+  theme: z.boolean(),
 });
 export type AssistantCallView = z.infer<typeof AssistantCallView>;
 
@@ -172,6 +175,18 @@ export const answerAssistantCall = endpoint({
   access: 'account',
   input: z.object({ chatId: Id, messageId: Id, callId: z.string().min(1).max(200), approve: z.boolean() }),
   output: z.object({ runId: z.string().nullable() }),
+});
+/**
+ * The theme package of one call (`preview_theme` or `import_theme_draft`), checked again with the theme
+ * validator, so the page can show the same preview as Admin → Themes (owner 2026-11-12). The owner's
+ * own chat only; nothing is saved. `package` is null when the package has errors (the report says which).
+ */
+export const assistantCallTheme = endpoint({
+  method: 'GET',
+  path: '/api/teacher/assistant-chat/chats/:chatId/messages/:messageId/calls/:callId/theme',
+  access: 'account',
+  input: z.object({ chatId: Id, messageId: Id, callId: z.string().min(1).max(200) }),
+  output: z.object({ report: ThemeReport, package: PackageDto.nullable() }),
 });
 export const cancelAssistantRun = endpoint({ method: 'POST', path: '/api/teacher/assistant-chat/runs/:runId/cancel', access: 'account', input: z.object({ runId: Id }), output: Ok });
 /** Raw route: `text/event-stream` of `AssistantRunEvent`s after `after`; ends with the `end` event. */

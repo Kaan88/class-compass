@@ -278,3 +278,16 @@
     display: inline-flex;
   }
 }
+/* A theme preview under a call (owner 2026-11-12): the Admin → Themes preview, inside the message. */
+.cc-assistant__call {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.cc-assistant__theme-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
