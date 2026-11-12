@@ -80,6 +80,18 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+      # Pixel-diff baseline of 17 screens against e2e/visual-baselines/linux/ (D-206); runs even when
+      # a spec failed, but not with a specs subset.
+      - run: npm run test:visual
+        if: ${{ !cancelled() && github.event.inputs.specs == '' }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-visual
+          path: |
+            playwright-report-visual/
+            test-results/visual/
+          retention-days: 7
 
   visual-update:
     # Manual only: takes the Linux pixel-diff baseline in the same image as the e2e job (D-206).
