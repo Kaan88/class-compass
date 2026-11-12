@@ -15,7 +15,8 @@ export const DEFAULT_SOUND_VOLUME = 80;
 export const TIME_UP_PHRASE = "Time's up! Time's up!";
 
 /**
- * Default weather location (owner decision 2026-11-07): Kızılay, Ankara. Coordinates at city
+ * Default weather location for a new install: a neutral example place (Kızılay, Ankara); each school sets
+ * its own under Admin → School settings, and an existing school keeps the place it has. Coordinates at city
  * precision; Open-Meteo's model grid is a few kilometres wide, so a closer point changes nothing.
  */
 export const DEFAULT_WEATHER = { label: 'Ankara, Kızılay', latitude: 39.92, longitude: 32.85 } as const;
