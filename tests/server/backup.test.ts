@@ -51,7 +51,11 @@ function uploadHashes(root: string): Record<string, string> {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (!p.includes(`${path.sep}tmp${path.sep}`)) out[path.relative(root, p).replaceAll('\\', '/')] = sha(p);
+      else {
+        // Skip the uploads folder's own tmp/ only: on Linux the whole test folder is under /tmp/.
+        const rel = path.relative(root, p).replaceAll('\\', '/');
+        if (!rel.startsWith('tmp/') && !rel.includes('/tmp/')) out[rel] = sha(p);
+      }
     }
   };
   walk(root);
