@@ -2780,28 +2780,28 @@ html:has(.cc-classroom) {
   font-size: 0.95rem;
 }
 /* In a routine box at least 40rem wide (the default board from 1024 px) the chips keep to one line of
-   chips (D-148, D-099): the line is a grid whose columns share the room fairly (every chip gets an
-   equal share, a chip that needs less keeps its full size and gives the rest to the others), and a
-   chip narrower than its name puts it on two lines inside the chip (two lines fit in the touch height,
-   so the chip is no taller); only a single word wider than its chip is cut with an ellipsis (the name
-   stays the chip's accessible name, and the stage now is in big type above). So longer stage names (a
-   Turkish class) never add a chip line that takes a card row from the student grid. In a box under
-   60rem (the default board up to about 1500 px) the chips are a little tighter and the "now" word
-   gives way to the current chip's frame (the head says which stage is now). In a box narrower than
-   40rem the chips wrap. */
+   chips (D-148, D-099), and every name is whole, never cut mid-word (S29, D-200). The fit in
+   RoutineClassroom.tsx (`fitStepper`) sets `data-fit` on the list to the first that fits:
+   - `one`: every name on one line;
+   - `two`: the chips share the line, each at least as wide as its longest word, and a longer name takes
+     two balanced lines inside its chip (two lines fit in the touch height, so the chip is no taller);
+   - `compact`: the chips other than the current one show only their number (the name stays their
+     accessible name; the stage now is in big type above and its chip keeps its name); a routine with
+     very many stages may then wrap its number chips.
+   So longer stage names (a Turkish class) never add a chip line that takes a card row from the student
+   grid. In a box under 60rem (the default board up to about 1500 px) the chips are a little tighter and
+   the "now" word gives way to the current chip's frame (the head says which stage is now). In a box
+   narrower than 40rem the chips wrap. */
 @container (min-width: 40rem) {
   .cc-lesson-box .cc-stepper {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, max-content);
+    flex-wrap: nowrap;
   }
   .cc-lesson-box .cc-stepper > li {
-    min-width: 0;
+    flex: 0 1 auto;
     display: flex;
   }
   .cc-lesson-box .cc-stepper__btn.cc-btn {
     flex: 1 1 auto;
-    min-width: 0;
     justify-content: flex-start;
     text-align: start;
   }
@@ -2810,14 +2810,33 @@ html:has(.cc-classroom) {
     flex: none;
   }
   .cc-lesson-box .cc-stepper__name {
-    min-width: 0;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-    text-overflow: ellipsis;
     line-height: 1.2;
+    white-space: nowrap;
+  }
+  .cc-lesson-box .cc-stepper:is([data-fit='two'], [data-fit='compact']) .cc-stepper__name {
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: manual;
+    text-wrap: balance;
+  }
+  .cc-lesson-box .cc-stepper[data-fit='compact'] {
+    flex-wrap: wrap;
+  }
+  .cc-lesson-box .cc-stepper[data-fit='compact'] > li:not([data-state='current']) {
+    flex: none;
+  }
+  .cc-lesson-box .cc-stepper[data-fit='compact'] > li:not([data-state='current']) .cc-stepper__btn.cc-btn {
+    justify-content: center;
+    padding-inline: 0.4rem;
+  }
+  .cc-lesson-box .cc-stepper[data-fit='compact'] > li:not([data-state='current']) .cc-stepper__name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 }
 @container (min-width: 40rem) and (max-width: 60rem) {
@@ -3067,6 +3086,94 @@ html:has(.cc-classroom) {
 }
 .cc-lesson-box .cc-focus {
   padding: 0.45rem 0.8rem;
+}
+/* Today's focus in its box (S29, D-200): a small heading over one line of topics, with Change as an
+   icon beside both. The line shows the topics that fit (the first one always; it may take two lines of
+   whole words in a very narrow box) and "+N" for the others (hidden on screen only: the list still
+   names every topic for screen readers). Three topics used to wrap onto a second line with Change
+   under them, which made the board's second row twice as high and took the last whole row of student
+   cards at 1536×703; now the box is no higher than the goal box and the counters beside it. */
+.cc-lesson-box .cc-focus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title change'
+    'list change';
+  align-items: center;
+  gap: 0.1rem 0.8rem;
+}
+.cc-lesson-box .cc-focus__title {
+  grid-area: title;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+.cc-lesson-box .cc-focus__list {
+  grid-area: list;
+}
+.cc-lesson-box .cc-focus__change {
+  grid-area: change;
+}
+.cc-focus__list[data-one-line] {
+  min-width: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem 0.6rem;
+}
+.cc-focus__list[data-one-line] > li {
+  flex: none;
+  white-space: nowrap;
+}
+.cc-focus__list[data-one-line] > .cc-focus__topic {
+  font-size: 1.2rem;
+  gap: 0.35rem;
+}
+.cc-focus__list[data-one-line] > .cc-focus__topic:first-child {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: normal;
+}
+.cc-focus__list[data-one-line] > [data-overflow] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.cc-focus__more {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+  font-size: 1.1rem;
+  font-weight: 850;
+  color: var(--cc-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.cc-focus__more[data-unused] {
+  display: none;
+}
+/* While the fit measures (one synchronous pass before paint) every item has its natural width. */
+.cc-focus__list[data-measuring] > li,
+.cc-focus__list[data-measuring] > .cc-focus__topic:first-child {
+  flex: none;
+  white-space: nowrap;
+}
+.cc-focus__list[data-measuring] > [data-overflow] {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+}
+.cc-focus__list[data-measuring] > .cc-focus__more[data-unused] {
+  display: inline-flex;
+}
+.cc-focus__change.cc-btn {
+  flex: none;
+  min-height: var(--cc-touch);
+  margin-left: auto;
 }
 /* Below 64rem: one column that scrolls with the page; the dock stays at the bottom of the screen and
    the layout editor is not offered. */

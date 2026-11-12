@@ -1966,6 +1966,7 @@ export const tr = {
   'lesson.step.topics': 'Bugünün konusu',
   'lesson.topic.choices': 'Konular',
   'lesson.topic.change': 'Değiştir',
+  'lesson.topic.more': '+{count}',
   'lesson.topic.changeTitle': 'Bugünün odağı',
   'lesson.topic.choose': 'Konu seç',
   'lesson.topic.fromPlan': 'Haftalık plandan önerildi. Değiştirmek için dokunun.',

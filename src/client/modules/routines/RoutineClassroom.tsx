@@ -7,7 +7,7 @@
  * fills only while Lesson goals is on for the class+subject: this module reads no other module's data
  * and imports nothing from it.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_ROUTINE_ID, LEARNING_GOAL_STAGE_ID } from '../../../domain/routines.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
@@ -72,19 +72,78 @@ function revealIn(el: HTMLElement | null, item: Element) {
   else if (r.bottom > box.bottom) el.scrollTop += r.bottom - box.bottom + 8;
 }
 
+/** How the stage chips fit one line (S29, D-200): names on one line, names on two lines, or compact. */
+export const STEPPER_FITS = ['one', 'two', 'compact'] as const;
+export type StepperFit = (typeof STEPPER_FITS)[number];
+
+/** Do the chips of `list`, as laid out now, fit: one line of chips, no name over `maxLines` lines? */
+function stepperFits(list: HTMLElement, maxLines: number): boolean {
+  if (list.scrollWidth > list.clientWidth + 1) return false;
+  for (const name of list.querySelectorAll<HTMLElement>('.cc-stepper__name')) {
+    const box = name.getBoundingClientRect();
+    if (box.width === 0) continue; // hidden (compact)
+    if (name.scrollWidth > name.clientWidth + 1) return false;
+    const line = parseFloat(getComputedStyle(name).lineHeight);
+    if (Number.isFinite(line) && box.height > maxLines * line + 1) return false;
+  }
+  return true;
+}
+
+/**
+ * Choose the first fit at which every chip shows its whole name in whole words (S29, D-200): one line
+ * of names, then names on up to two balanced lines (the chips keep the touch height), and otherwise
+ * `compact`, where the chips other than the current one show only their number (the name stays their
+ * accessible name) and the current chip and the stage name above it are shown in full. Sets
+ * `data-fit` on the list; in a box narrower than 40rem the chips wrap and every fit looks the same.
+ */
+export function fitStepper(list: HTMLElement): StepperFit {
+  for (const fit of STEPPER_FITS) {
+    list.dataset.fit = fit;
+    if (fit === 'compact' || stepperFits(list, fit === 'one' ? 1 : 2)) return fit;
+  }
+  return 'compact';
+}
+
 /**
  * The routine on the classroom board (S14b, D-148): name, the current stage in big type, Previous /
  * Next, and every stage as a chip (no sideways strip). In a box at least 40rem wide the chips keep to
- * one line and a chip that does not fit shortens its name with an ellipsis (its full name is its
- * accessible name), so long stage names (Turkish) never take a second line from the student grid; in
- * a narrower box they wrap. When a teacher's own layout makes the box too small for all chips, the box
- * scrolls and the current chip is kept in view.
+ * one line and the fit (S29, D-200, `fitStepper`) chooses names on one line, on two lines of whole
+ * words, or compact chips (numbers, the current chip named), so long stage names (Turkish) are never
+ * cut mid-word and never take a second line of chips from the student grid; in a narrower box they
+ * wrap. When a teacher's own layout makes the box too small for all chips, the box scrolls and the
+ * current chip is kept in view.
  */
 function RoutineStepper({ lesson }: DashboardSlotProps) {
   const { t, locale } = useI18n();
   const listRef = useRef<HTMLOListElement | null>(null);
   const stages = lesson.routine.stages;
   const idx = lesson.stageIndex;
+  const stageNames = stages.map((s) => pickText(s.name, locale)).join('\n');
+  // The fit runs before paint, again when the list's width changes and once the fonts have loaded.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    fitStepper(list);
+    let width = list.clientWidth;
+    let alive = true;
+    void document.fonts?.ready.then(() => {
+      if (alive) fitStepper(list);
+    });
+    if (typeof ResizeObserver === 'undefined')
+      return () => {
+        alive = false;
+      };
+    const ro = new ResizeObserver(() => {
+      if (list.clientWidth === width) return;
+      width = list.clientWidth;
+      fitStepper(list);
+    });
+    ro.observe(list);
+    return () => {
+      alive = false;
+      ro.disconnect();
+    };
+  }, [idx, stageNames]);
   // Read from the lesson state the board already polls (no fetch of its own): null while Lesson goals is off.
   const goalText = useQuery({ ...lessonQueryOptions(lesson.contextId), enabled: false, refetchInterval: false, refetchOnWindowFocus: false, select: (q) => q.data.lessonGoal?.text ?? null }).data ?? null;
   useEffect(() => {

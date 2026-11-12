@@ -173,7 +173,74 @@ const routineFacts = (page: Page) =>
     };
   });
 
-test('the goal on the Learning goal stage fits the routine box in whole words at 1536x703 and 1536x864 (1.25), English and Turkish, with one and three topics (S28a, D-197)', async ({ page, browser }) => {
+/**
+ * The routine's stage chips (S29, D-200): is every visible stage name whole (no ellipsis, no word split
+ * over two lines, at most two lines), do the chips keep to one line, is every chip a touch target, and
+ * does every chip's accessible name hold its whole stage name?
+ */
+const stepperFacts = (page: Page) =>
+  page.evaluate(() => {
+    const list = document.querySelector<HTMLElement>('[data-box="routine"] [data-testid="routine-stages"]')!;
+    const probe = document.createElement('div');
+    probe.style.height = 'var(--cc-touch)';
+    document.body.append(probe);
+    const touch = probe.getBoundingClientRect().height;
+    probe.remove();
+    const problems: string[] = [];
+    const tops = new Set<number>();
+    let shown = 0;
+    for (const li of list.querySelectorAll<HTMLElement>(':scope > li')) {
+      const btn = li.querySelector<HTMLElement>('button')!;
+      const name = li.querySelector<HTMLElement>('.cc-stepper__name')!;
+      const label = name.textContent ?? '';
+      const b = btn.getBoundingClientRect();
+      tops.add(Math.round(b.top));
+      if (b.height < touch - 0.5 || b.width < touch - 0.5) problems.push(`${label}: ${b.width.toFixed(1)}x${b.height.toFixed(1)} under the touch size`);
+      if (!(btn.textContent ?? '').includes(label)) problems.push(`${label}: not in the accessible name`);
+      const r = name.getBoundingClientRect();
+      if (r.width <= 1) continue; // compact: only the number on screen, the name for screen readers
+      shown++;
+      if (name.scrollWidth > name.clientWidth + 1 || getComputedStyle(name).textOverflow === 'ellipsis') problems.push(`${label}: cut`);
+      if (r.right > b.right + 0.5 || r.left < b.left - 0.5) problems.push(`${label}: outside its chip`);
+      const lines = Math.round(r.height / parseFloat(getComputedStyle(name).lineHeight));
+      if (lines > 2) problems.push(`${label}: ${lines} lines`);
+      const node = name.firstChild;
+      if (node && node.nodeType === Node.TEXT_NODE)
+        for (const m of (node.textContent ?? '').matchAll(/\S+/gu)) {
+          const range = document.createRange();
+          range.setStart(node, m.index!);
+          range.setEnd(node, m.index! + m[0].length);
+          if (new Set([...range.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size > 1) problems.push(`${label}: "${m[0]}" split`);
+        }
+    }
+    const current = list.querySelector<HTMLElement>('[aria-current="step"] .cc-stepper__name');
+    return {
+      fit: list.dataset.fit ?? null,
+      chipLines: tops.size,
+      overflow: list.scrollWidth > list.clientWidth + 1,
+      shown,
+      currentShown: current ? current.getBoundingClientRect().width > 1 : false,
+      problems,
+    };
+  });
+
+/** Today's focus box on the board (S29, D-200): one line of topics, "+N" for the rest, Change as an icon. */
+const focusFacts = (page: Page) =>
+  page.evaluate(() => {
+    const box = document.querySelector<HTMLElement>('[data-box="focus"] [data-testid="todays-focus"]');
+    if (!box) return null;
+    const visible = [...box.querySelectorAll<HTMLElement>('.cc-focus__topic')].filter((li) => li.getBoundingClientRect().width > 1);
+    const more = box.querySelector<HTMLElement>('[data-testid="focus-more"]');
+    return {
+      lines: new Set(visible.map((li) => Math.round(li.getBoundingClientRect().top))).size,
+      visible: visible.length,
+      listed: box.querySelectorAll('.cc-focus__topic').length,
+      more: more && more.getBoundingClientRect().width > 0 ? (more.textContent ?? '') : null,
+      cut: visible.some((li) => li.scrollWidth > li.clientWidth + 1),
+    };
+  });
+
+test('the goal on the Learning goal stage fits the routine box in whole words at 1536x703 and 1536x864 (1.25), English and Turkish, with one and three topics (S28a, D-197; S29, D-200: a whole row of cards with three topics, whole stage names)', async ({ page, browser }) => {
   test.setTimeout(480_000);
   mkdirSync('test-results/fit', { recursive: true });
   await login(page, 'english');
@@ -221,7 +288,7 @@ test('the goal on the Learning goal stage fits the routine box in whole words at
               await expect(p.locator('.cc-student-card').first()).toBeVisible();
               await p.waitForTimeout(300);
               await p.screenshot({ path: `test-results/fit/stage-goal-${vp.name}-${lang}-${nTopics}t-${shot}.png` });
-              return { ...(await cardsOnScreen(p)), ...(await routineFacts(p)), goal: await p.getByTestId('stage-goal').count() };
+              return { ...(await cardsOnScreen(p)), ...(await routineFacts(p)), goal: await p.getByTestId('stage-goal').count(), stepper: await stepperFacts(p), box: await focusFacts(p) };
             } finally {
               await c.close();
             }
@@ -244,12 +311,23 @@ test('the goal on the Learning goal stage fits the routine box in whole words at
           expect(long.split, `${run}: whole words`).toEqual([]);
           expect(long.focusBesideName, `${run}: the topics move up beside the stage name`).toBe(true);
           // While the class reads the goal the student grid gives up at most one row of cards and keeps a
-          // whole row on screen whenever the same stage had one without the goal; on every other stage the
-          // goal costs nothing. (With three topics at 1536x703 the stage has no whole row even without a
-          // goal: the board's own Today's focus box takes two lines there; D-197 and ROADMAP record it.)
+          // whole row on screen; on every other stage the goal costs nothing. With three topics at
+          // 1536x703 the stage used to show no whole row even without a goal (D-197): the board's Today's
+          // focus box now keeps to one line ("+N", Change as an icon), so a whole row stays (S29, D-200).
           expect(long.cards, `${run}: at most one row less`).toBeGreaterThanOrEqual(none.cards - long.perRow);
-          expect(long.cards, `${run}: a whole row of cards stays`).toBeGreaterThanOrEqual(Math.min(none.cards, long.perRow));
+          expect(none.cards, `${run}: a whole row of cards without the goal`).toBeGreaterThanOrEqual(none.perRow);
+          expect(long.cards, `${run}: a whole row of cards with the goal`).toBeGreaterThanOrEqual(long.perRow);
           expect(other.cards, `${run}: another stage`).toBeGreaterThanOrEqual(none.cards);
+          // Every stage name whole on every screen of the run (S29, D-200).
+          for (const [shot, m] of [['no goal', none], ['goal', long], ['other stage', other]] as const) {
+            expect(m.stepper.problems, `${run} ${shot}: stage names`).toEqual([]);
+            expect(m.stepper.overflow, `${run} ${shot}: the chips stay inside the box`).toBe(false);
+            expect(m.stepper.chipLines, `${run} ${shot}: one line of chips`).toBe(1);
+            expect(m.stepper.shown, `${run} ${shot}: the default routine names every stage`).toBe(6);
+            expect(m.box, `${run} ${shot}: today's focus`).toMatchObject({ lines: 1, listed: nTopics, cut: false });
+            if (nTopics === 1) expect(m.box?.more, `${run} ${shot}: no +N with one topic`).toBeNull();
+            else expect(m.box!.visible + Number((m.box!.more ?? '+0').slice(1)), `${run} ${shot}: shown topics and +N add up`).toBe(nTopics);
+          }
         }
       }
     }
@@ -257,6 +335,137 @@ test('the goal on the Learning goal stage fits the routine box in whole words at
     await endActiveLessons(page);
     await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false });
     await api(office, 'PUT', `/api/teacher/contexts/${ctx.id}/modules/lessonGoals`, { enabled: false });
+    await officeCtx.close();
+  }
+});
+
+/** Every measured classroom display (D-177, S16c): the window and full screen at 1.25, the MacBook, 1280x720 and a phone. */
+const ALL_DISPLAYS = [
+  ...DISPLAYS_125,
+  { name: '1440x787@2', width: 1440, height: 787, scale: 2 },
+  { name: '1280x720@1', width: 1280, height: 720, scale: 1 },
+  { name: '375x812@3', width: 375, height: 812, scale: 3 },
+];
+
+test('every stage name of the default routine is whole in English and Turkish at every classroom display, and a routine of the most stages keeps the current one named (S29, D-200)', async ({ page, browser }) => {
+  test.setTimeout(480_000);
+  await login(page, 'english');
+  await ensurePin(page);
+  const officeCtx = await browser.newContext();
+  const office = await officeCtx.newPage();
+  await login(office, 'english');
+  const contexts = (await api(office, 'GET', '/api/teacher/contexts')).body.contexts as Array<{ id: string; classId: string; className: string; subjectName: { en: string } }>;
+  const ctx = contexts.find((c) => c.className === '3-A' && c.subjectName.en === 'English')!;
+  // A routine with the most stages a routine may have (MAX_STAGES = 20): the default six, then fourteen more (fictional).
+  const stages = (
+    [
+      ['Greeting', 'Selamlaşma'],
+      ['Date and weather', 'Tarih ve hava durumu'],
+      ['Assistant', 'Günün yardımcısı'],
+      ['Learning goal', 'Öğrenme hedefi'],
+      ['Activities', 'Etkinlikler'],
+      ['Reflection', 'Değerlendirme'],
+      ['Warm-up song', 'Isınma şarkısı'],
+      ['Story time', 'Hikâye zamanı'],
+      ['Vocabulary game', 'Kelime oyunu'],
+      ['Pair work', 'Eşli çalışma'],
+      ['Group work', 'Grup çalışması'],
+      ['Reading aloud', 'Sesli okuma'],
+      ['Listening', 'Dinleme'],
+      ['Speaking circle', 'Konuşma çemberi'],
+      ['Writing', 'Yazma'],
+      ['Drawing', 'Çizim'],
+      ['Quiz', 'Küçük sınav'],
+      ['Show and tell', 'Göster ve anlat'],
+      ['Tidy up', 'Toparlanma'],
+      ['Goodbye song', 'Veda şarkısı'],
+    ] as const
+  ).map(([en, tr]) => ({ name: { en, tr } }));
+  expect(stages).toHaveLength(20);
+  const created = await api(office, 'POST', '/api/teacher/routines', { name: { en: 'Long day', tr: 'Uzun gün' }, contextId: ctx.id, stages });
+  expect(created.status).toBe(200);
+  const longRoutine = created.body.id as string;
+  await endActiveLessons(page);
+  const cmd = async (type: string, payload: Record<string, unknown>) => {
+    const r = await api(page, 'POST', '/api/commands', { commands: [{ opId: randomUUID(), type, contextId: ctx.id, ...(payload.lessonId ? { lessonId: payload.lessonId } : {}), payload: { contextId: ctx.id, ...payload } }] });
+    expect(r.body.results[0].ok, type).toBe(true);
+    return r.body.results[0].result;
+  };
+  const open = async (vp: (typeof ALL_DISPLAYS)[number]) => {
+    const { c, p } = await onDevice(browser, page, vp);
+    await p.goto('/classroom');
+    await p.getByRole('button', { name: /3-A · (English|İngilizce)/u }).first().click();
+    await expect(p.getByTestId('lesson-dashboard')).toBeVisible();
+    await expect(p.locator('.cc-student-card').first()).toBeVisible();
+    await p.evaluate(() => document.fonts.ready);
+    await p.waitForTimeout(300);
+    return { c, p };
+  };
+  try {
+    // The default routine with three topics: every stage in turn at the window size, two stages at the other displays.
+    const { lessonId } = (await cmd('lesson.start', { routineTemplateId: 'builtin:default', othersPresent: true, attendance: [] })) as { lessonId: string };
+    const topics = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/topics`)).body.topics as Array<{ id: string }>;
+    await cmd('lesson.setTopics', { lessonId, topicIds: topics.slice(0, 3).map((t) => t.id) });
+    for (const lang of ['en', 'tr'] as const) {
+      expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
+      for (const vp of ALL_DISPLAYS) {
+        for (const stageIndex of vp.name.startsWith('1536x703') ? [0, 1, 2, 3, 4, 5] : [0, 3]) {
+          await cmd('lesson.setStage', { lessonId, stageIndex });
+          const { c, p } = await open(vp);
+          try {
+            const run = `${vp.name} ${lang} stage ${stageIndex + 1}`;
+            await expect(p.getByTestId('current-stage')).toContainText(stages[stageIndex]!.name[lang]);
+            await p.screenshot({ path: `test-results/fit/stage-names-${vp.name}-${lang}-${stageIndex + 1}.png` });
+            const s = await stepperFacts(p);
+            test.info().annotations.push({ type: 'stage chips', description: `${run}: ${s.fit}, ${s.chipLines} line(s)` });
+            expect(s.problems, run).toEqual([]);
+            expect(s.overflow, `${run}: no sideways strip`).toBe(false);
+            expect(s.shown, `${run}: every stage named on screen`).toBe(6);
+            // A box at least 40rem wide keeps the chips to one line; a phone wraps them.
+            if (vp.width >= 1024) expect(s.chipLines, `${run}: one line of chips`).toBe(1);
+            if (stageIndex === 3 && vp.name.startsWith('1536x703')) {
+              await axe(p, '[data-box="routine"]');
+              await axe(p, '[data-box="focus"]');
+            }
+          } finally {
+            await c.close();
+          }
+        }
+      }
+    }
+    await endActiveLessons(page);
+
+    // Twenty stages: the chips other than the current one show their number (the name stays the chip's
+    // accessible name); the current chip and the head name the stage in full.
+    const long = (await cmd('lesson.start', { routineTemplateId: longRoutine, othersPresent: true, attendance: [] })) as { lessonId: string };
+    for (const lang of ['en', 'tr'] as const) {
+      expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
+      for (const stageIndex of [0, 12, 19]) {
+        await cmd('lesson.setStage', { lessonId: long.lessonId, stageIndex });
+        for (const vp of [DISPLAYS_125[0]!, ALL_DISPLAYS[3]!]) {
+          const { c, p } = await open(vp);
+          try {
+            const run = `${vp.name} ${lang} 20 stages, stage ${stageIndex + 1}`;
+            await expect(p.getByTestId('current-stage')).toContainText(stages[stageIndex]!.name[lang]);
+            await p.screenshot({ path: `test-results/fit/stage-names-20-${vp.name}-${lang}-${stageIndex + 1}.png` });
+            const s = await stepperFacts(p);
+            test.info().annotations.push({ type: 'stage chips', description: `${run}: ${s.fit}, ${s.chipLines} line(s), ${s.shown} named` });
+            expect(s.problems, run).toEqual([]);
+            expect(s.overflow, `${run}: no sideways strip`).toBe(false);
+            expect(s.fit, run).toBe('compact');
+            expect(s.currentShown, `${run}: the current stage is named`).toBe(true);
+            expect(s.chipLines, `${run}: at most two lines of chips`).toBeLessThanOrEqual(2);
+            if (stageIndex === 12 && vp === DISPLAYS_125[0]) await axe(p, '[data-box="routine"]');
+          } finally {
+            await c.close();
+          }
+        }
+      }
+    }
+  } finally {
+    await endActiveLessons(page);
+    await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false });
+    await api(office, 'POST', `/api/teacher/routines/${longRoutine}/archive`, {});
     await officeCtx.close();
   }
 });

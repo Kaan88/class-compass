@@ -1969,6 +1969,7 @@ export const en = {
   'lesson.step.topics': 'Today\'s topic',
   'lesson.topic.choices': 'Topics',
   'lesson.topic.change': 'Change',
+  'lesson.topic.more': '+{count}',
   'lesson.topic.changeTitle': 'Today\'s focus',
   'lesson.topic.choose': 'Choose a topic',
   'lesson.topic.fromPlan': 'Suggested by the weekly plan. Tap to change.',

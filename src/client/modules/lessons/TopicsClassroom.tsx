@@ -6,20 +6,23 @@
  * shows the topics too)
  * ('lesson.setTopics', an outbox command naming the lesson). Topics are the subject's skill
  * categories (Reading, Speaking, Phonics … and the teacher's own).
+ * On the board the focus box keeps to one line (S29, D-200): the topics that do not fit after the
+ * first are hidden on screen behind "+N" (still read by screen readers) and Change is an icon button,
+ * so three topics no longer take a second line from the student grid.
  */
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as L from '../../../shared/contracts/lessons.ts';
-import type { LessonState, LessonTopic } from '../../../shared/contracts/lessons.ts';
+import type { LessonTopic } from '../../../shared/contracts/lessons.ts';
 import { MAX_LESSON_TOPICS } from '../../../shared/lessons.ts';
 import { pickText } from '../../../shared/i18n/index.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
-import { Button } from '../../ui/Button.tsx';
+import { Button, IconButton } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
-import { IconBook, IconCheck } from '../../ui/icons.tsx';
+import { IconBook, IconCheck, IconPencil } from '../../ui/icons.tsx';
 import { TopicPicto } from '../../ui/pictos.tsx';
-import { startStep, type ClassroomContext, type DashboardSlot, type StartStepProps } from '../types.ts';
+import { startStep, type ClassroomContext, type DashboardSlot, type DashboardSlotProps, type StartStepProps } from '../types.ts';
 import { patchLesson, sendLessonCommand } from './lessonClient.ts';
 
 export const topicsKey = (contextId: string) => ['classroom', 'topics', contextId] as const;
@@ -88,7 +91,7 @@ export const topicStartStep = startStep<TopicDraft>({
   useContribution: useTopicContribution,
 });
 
-function TodaysFocus({ context, lesson }: { context: ClassroomContext; lesson: LessonState }) {
+function TodaysFocus({ context, lesson, presentation }: DashboardSlotProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const q = useClassroomTopics(open ? context.id : null);
@@ -126,31 +129,82 @@ function TodaysFocus({ context, lesson }: { context: ClassroomContext; lesson: L
         {dialog}
       </div>
     );
+  // On the board one line (S29, D-200): the heading, the topics that fit with "+N" for the others, and
+  // Change as an icon with its name for screen readers (like the goal box beside it).
   return (
     <section className="cc-focus" aria-labelledby="cc-focus-title" data-testid="todays-focus">
       <h2 id="cc-focus-title" className="cc-focus__title">
         {t('lesson.topic.todaysFocus')}
       </h2>
-      <FocusTopics topics={lesson.topics} />
-      <Button size="small" className="cc-push-right" onPress={openDialog}>
-        {t('lesson.topic.change')}
-      </Button>
+      <FocusTopics topics={lesson.topics} oneLine={presentation === 'box'} />
+      <IconButton className="cc-focus__change" icon={<IconPencil />} label={t('lesson.topic.change')} hideLabel onPress={openDialog} />
       {dialog}
     </section>
   );
 }
 
-/** The lesson's topics as icon + name (the focus strip and the routine's "Learning goal" stage). */
-export function FocusTopics({ topics, size = '1.8em' }: { topics: readonly LessonTopic[]; size?: string }) {
-  const { locale } = useI18n();
+/**
+ * How many of the items fit on one line of `avail` px: all when they do, otherwise as many as fit
+ * beside the "+N" marker (`more` px), but always at least the first (S29, D-200).
+ */
+export function topicsThatFit(widths: readonly number[], gap: number, more: number, avail: number): number {
+  const line = (n: number) => widths.slice(0, n).reduce((sum, w) => sum + w, 0) + gap * Math.max(0, n - 1);
+  if (line(widths.length) <= avail + 0.5) return widths.length;
+  for (let n = widths.length - 1; n >= 1; n--) if (line(n) + gap + more <= avail + 0.5) return n;
+  return Math.min(1, widths.length);
+}
+
+/**
+ * The lesson's topics as icon + name (the focus strip and the routine's "Learning goal" stage). With
+ * `oneLine` (the board's focus box, S29, D-200) the list keeps to one line: the topics that do not fit
+ * are hidden on screen (still in the list for screen readers) and a "+N" marker, hidden from screen
+ * readers, says how many more there are.
+ */
+export function FocusTopics({ topics, size = '1.8em', oneLine = false }: { topics: readonly LessonTopic[]; size?: string; oneLine?: boolean }) {
+  const { t, locale } = useI18n();
+  const ref = useRef<HTMLUListElement | null>(null);
+  const [shown, setShown] = useState(topics.length);
+  const names = topics.map((tp) => pickText(tp.name, locale)).join('\n');
+  useLayoutEffect(() => {
+    const list = ref.current;
+    if (!oneLine || !list) {
+      setShown(topics.length);
+      return;
+    }
+    const fit = () => {
+      // Measure every topic and the marker at their natural width, then hide what does not fit.
+      list.dataset.measuring = '';
+      const widths = [...list.querySelectorAll<HTMLElement>(':scope > .cc-focus__topic')].map((li) => li.getBoundingClientRect().width);
+      const more = list.querySelector<HTMLElement>(':scope > .cc-focus__more')?.getBoundingClientRect().width ?? 0;
+      delete list.dataset.measuring;
+      const gap = parseFloat(getComputedStyle(list).columnGap) || 0;
+      setShown(topicsThatFit(widths, gap, more, list.clientWidth));
+    };
+    fit();
+    if (typeof ResizeObserver === 'undefined') return;
+    let width = list.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (list.clientWidth === width) return;
+      width = list.clientWidth;
+      fit();
+    });
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [oneLine, names, topics.length]);
+  const hidden = oneLine ? topics.length - Math.min(shown, topics.length) : 0;
   return (
-    <ul className="cc-focus__list">
-      {topics.map((tp) => (
-        <li key={tp.id} className="cc-focus__topic">
+    <ul ref={ref} className="cc-focus__list" data-one-line={oneLine ? '' : undefined}>
+      {topics.map((tp, i) => (
+        <li key={tp.id} className="cc-focus__topic" data-overflow={i >= topics.length - hidden ? '' : undefined}>
           <TopicPicto icon={tp.icon} size={size} />
           <span>{pickText(tp.name, locale)}</span>
         </li>
       ))}
+      {oneLine && topics.length > 1 ? (
+        <li className="cc-focus__more" aria-hidden="true" data-unused={hidden ? undefined : ''} data-testid="focus-more">
+          {t('lesson.topic.more', { count: hidden || topics.length - 1 })}
+        </li>
+      ) : null}
     </ul>
   );
 }
