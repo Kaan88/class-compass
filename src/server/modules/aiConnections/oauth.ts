@@ -109,9 +109,19 @@ export async function finishOAuth(ctx: RequestContext, input: { state: string; c
     if (e instanceof AiCallError) throw invalid('The provider did not accept the sign-in', { reason: 'AI_OAUTH_FAILED', failure: e.failure });
     throw e;
   }
-  tx(ctx.db, () => {
-    ctx.db.update(aiConnections).set({ secretCipher: sealed, secretSetAt: now, secretSource: 'oauth', updatedAt: now }).where(eq(aiConnections.id, row.id)).run();
+  // The connection may have been deleted while the code was exchanged: the key is then discarded,
+  // never written to the deleted row, and nothing is audited as connected (audit 2026-11-12).
+  const written = tx(ctx.db, () => {
+    const done = ctx.db
+      .update(aiConnections)
+      .set({ secretCipher: sealed, secretSetAt: now, secretSource: 'oauth', updatedAt: now })
+      .where(and(eq(aiConnections.id, row.id), isNull(aiConnections.deletedAt)))
+      .returning({ id: aiConnections.id })
+      .get();
+    if (!done) return false;
     audit(ctx.db, ctx.actor, { action: 'ai_connection.connect', entity: 'ai_connection', entityId: row.id, after: { scope, type: row.type, via: 'oauth' } }, now);
+    return true;
   });
+  if (!written) throw notFound('Sign-in request');
   return { connectionId: row.id, scope, name: row.name };
 }

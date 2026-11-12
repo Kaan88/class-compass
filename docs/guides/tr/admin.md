@@ -149,7 +149,7 @@ Asistan sohbetini açtığınızda öğretmenler bu bağlantıları **Asistan** 
 
 **Bağlantı ekle** şunları sorar:
 
-- **Bağlantı türü**: Anthropic (Claude), OpenAI, Google Gemini, OpenRouter ya da bir **OpenAI uyumlu sunucu** (örneğin Mistral, Groq ya da okulun kendi sunucusunda çalışan Ollama gibi bir model). OpenAI uyumlu sunucu için **Adres (temel URL)** alanına adresini yazarsınız; **Bu adres bu sunucuda ya da okulun ağında** kutusunu yalnızca adres gerçekten yerelse işaretleyin (kutu işaretli değilse yerel adres ya da düz http reddedilir; bulut meta veri adresleri her zaman reddedilir).
+- **Bağlantı türü**: Anthropic (Claude), OpenAI, Google Gemini, OpenRouter ya da bir **OpenAI uyumlu sunucu** (örneğin Mistral, Groq ya da okulun kendi sunucusunda çalışan Ollama gibi bir model). OpenAI uyumlu sunucu için **Adres (temel URL)** alanına adresini yazarsınız; **Bu adres bu sunucuda ya da okulun ağında** kutusunu yalnızca adres gerçekten yerelse işaretleyin (kutu işaretli değilse yerel adres ya da düz http reddedilir; bulut meta veri adresleri her zaman reddedilir). Adresi ya da bu kutuyu sonradan değiştirmek kayıtlı anahtarı siler; böylece anahtar yeni adrese hiç gönderilmez: anahtarı aynı düzenlemede yeniden yapıştırın.
 - **Ad**: öğretmenlerin gördüğü ad.
 - **API anahtarı**: bir kez yapıştırılır ve mühürlü saklanır. Yöneticiler de dahil kimse onu bir daha göremez. Değiştirmek için bağlantıyı düzenleyip yenisini yapıştırın. OpenRouter için boş bırakıp kaydettikten sonra **OpenRouter’ı bağla** düğmesini kullanabilirsiniz: OpenRouter'da oturum açar, Sınıf Pusulası'na dönersiniz ve aldığı anahtarı Sınıf Pusulası saklar.
 - **Modeller, her satıra bir tane**: sağlayıcının kullandığı model adlarının tam hâli.

@@ -149,7 +149,7 @@ Teachers use these connections on their **Assistant** page once you switch the a
 
 **Add connection** asks for:
 
-- **Kind of connection**: Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, or an **OpenAI-compatible server** (for example Mistral, Groq, or a model running on the school's own server such as Ollama). For an OpenAI-compatible server you give its **Address (base URL)**; tick **This address is on this server or the school's network** only when it really is local (a local address or plain http is refused without the tick; cloud metadata addresses are always refused).
+- **Kind of connection**: Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, or an **OpenAI-compatible server** (for example Mistral, Groq, or a model running on the school's own server such as Ollama). For an OpenAI-compatible server you give its **Address (base URL)**; tick **This address is on this server or the school's network** only when it really is local (a local address or plain http is refused without the tick; cloud metadata addresses are always refused). Changing the address or the tick later removes the saved key, so it is never sent to the new address: paste the key again in the same edit.
 - **Name**: what teachers see.
 - **API key**: pasted once and stored sealed. Nobody can see it again, administrators included. To change it, edit the connection and paste a new one. For OpenRouter you can leave it empty and use **Connect OpenRouter** after saving: you sign in at OpenRouter and come back to Class Compass, which then stores the key it receives.
 - **Models, one per line**: the exact model names of the provider.

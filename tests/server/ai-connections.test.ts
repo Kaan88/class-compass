@@ -382,6 +382,64 @@ describe('Connect OpenRouter (OAuth with PKCE)', () => {
     env.clock.advance(11 * 60 * 1000);
     expect((await req(s.admin.post('/api/account/ai-connections/oauth/finish', { state: b.state, code: fake.acceptCode }))).status).toBe(404);
   });
+
+  it('audit finding 4: a connection deleted while the code is exchanged gets no key and no connect audit row', async () => {
+    conn = (await okBody(create(s.admin, { type: 'openrouter', name: 'Deleted while signing in', models: ['vendor/a'] }))).id;
+    const { state, challenge } = await start();
+    fake.expectChallenge = challenge;
+    // The administrator deletes the connection while the provider is still answering the key exchange.
+    fake.override = (r, res) => {
+      if (!r.path.endsWith('/auth/keys')) return false;
+      fake.override = null;
+      void s.admin.del(`/api/admin/ai-connections/${conn}`).then(() => fake.answer(r, res));
+      return true;
+    };
+    const r = await req(s.admin.post('/api/account/ai-connections/oauth/finish', { state, code: fake.acceptCode }));
+    expect(r.status).toBe(404);
+    const row = env.db.select().from(aiConnections).where(eq(aiConnections.id, conn)).get()!;
+    expect(row.deletedAt).not.toBeNull();
+    expect(row.secretCipher).toBeNull();
+    expect(row.secretSource).toBeNull();
+    const connects = env.db.select().from(auditEvents).all().filter((a) => a.action === 'ai_connection.connect' && a.entityId === conn);
+    expect(connects).toEqual([]);
+  });
+});
+
+describe('audit finding 1: a saved key never follows a changed address', () => {
+  const secretOf = (id: string) => env.db.select().from(aiConnections).where(eq(aiConnections.id, id)).get()!;
+  const lastUpdate = (id: string) =>
+    JSON.parse(
+      env.db
+        .select()
+        .from(auditEvents)
+        .all()
+        .filter((a) => a.action === 'ai_connection.update' && a.entityId === id)
+        .pop()!.afterJson!,
+    );
+
+  it('changing the address or the local network setting without a new key removes the key (audited as keyRemoved)', async () => {
+    const v = await okBody(create(s.admin, { type: 'openaiCompatible', name: 'Moving server', baseUrl: `${base}/v1`, localNetwork: true, apiKey: FAKE_KEYS.compatible }));
+    // Saving the form unchanged (it always sends the address) keeps the key.
+    expect(await okBody(s.admin.patch(`/api/admin/ai-connections/${v.id}`, { name: 'Moved server', baseUrl: `${base}/v1`, localNetwork: true }))).toMatchObject({ hasSecret: true });
+    expect(openConnectionSecret(env.deps, secretOf(v.id))).toBe(FAKE_KEYS.compatible);
+    // A new address without a key: the key is gone, so it is never sent there.
+    const moved = await okBody(s.admin.patch(`/api/admin/ai-connections/${v.id}`, { baseUrl: `${base}/other/v1`, localNetwork: true }));
+    expect(moved).toMatchObject({ hasSecret: false, secretSetAt: null, secretSource: null, baseUrl: `${base}/other/v1` });
+    expect(secretOf(v.id).secretCipher).toBeNull();
+    expect(lastUpdate(v.id)).toMatchObject({ keyRemoved: true, baseUrl: `${base}/other/v1` });
+    // A new address with a new key in the same request: the new key is stored.
+    expect(await okBody(s.admin.patch(`/api/admin/ai-connections/${v.id}`, { baseUrl: `${base}/v1`, localNetwork: true, apiKey: FAKE_KEYS.openai }))).toMatchObject({ hasSecret: true, secretSource: 'pasted' });
+    expect(openConnectionSecret(env.deps, secretOf(v.id))).toBe(FAKE_KEYS.openai);
+    expect(lastUpdate(v.id)).toMatchObject({ keyReplaced: true });
+    await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
+
+    const p = await okBody(create(s.admin, { type: 'openaiCompatible', name: 'Public server', baseUrl: 'https://compat.example.org/v1', apiKey: FAKE_KEYS.compatible }));
+    expect(p).toMatchObject({ hasSecret: true, localNetwork: false });
+    // Only the local network setting changes: the key is removed too.
+    expect(await okBody(s.admin.patch(`/api/admin/ai-connections/${p.id}`, { localNetwork: true }))).toMatchObject({ hasSecret: false, localNetwork: true });
+    expect(lastUpdate(p.id)).toMatchObject({ keyRemoved: true, localNetwork: true });
+    await okBody(s.admin.del(`/api/admin/ai-connections/${p.id}`));
+  });
 });
 
 describe('secrets never leave', () => {

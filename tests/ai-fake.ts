@@ -114,7 +114,8 @@ export class FakeProvider {
     });
   }
 
-  private answer(r: Recorded, res: http.ServerResponse) {
+  /** The normal answer (an `override` may call it later, e.g. after changing the app meanwhile). */
+  answer(r: Recorded, res: http.ServerResponse) {
     const deny = () => {
       res.writeHead(401, { 'content-type': 'application/json' });
       // A real provider may echo part of the key; the app must never pass this on.

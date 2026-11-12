@@ -14,7 +14,12 @@ import net from 'node:net';
 import type { AiFailure } from '../../../shared/aiConnections.ts';
 import { AddressRefused, addressAllowed, policyLookup, type NetPolicy } from './urlSafety.ts';
 
-/** Time until the response headers arrive, and the longest quiet gap while a reply streams. */
+/**
+ * Small JSON calls (model lists, OAuth): the time until the response headers arrive, and the longest
+ * quiet gap after them. A chat request (`chat: true`) uses the first only for connecting (socket and
+ * TLS) and then only the total limit: a model that thinks first can be silent for minutes before its
+ * headers (a server that ignores `stream`) or between streamed pieces (audit 2026-11-12).
+ */
 export const AI_CONNECT_TIMEOUT_MS = 30_000;
 export const AI_IDLE_TIMEOUT_MS = 60_000;
 /** The longest one request may take in total, from sending it to the end of the streamed reply (10 minutes since 2026-11-12: a long reply such as a theme package from a model that thinks first). */
@@ -51,6 +56,11 @@ export interface AiHttpRequest {
   signal?: AbortSignal | undefined;
   /** The total limit for this request (default `AI_TOTAL_TIMEOUT_MS`); tests set a short one. */
   totalTimeoutMs?: number;
+  /** A chat request: connecting is limited, waiting for the headers and quiet gaps only by the total limit. */
+  chat?: boolean;
+  /** Tests only: shorter connect and idle limits (defaults `AI_CONNECT_TIMEOUT_MS`, `AI_IDLE_TIMEOUT_MS`). */
+  connectTimeoutMs?: number;
+  idleTimeoutMs?: number;
 }
 
 export interface AiHttpResponse {
@@ -78,8 +88,11 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
     if (req.signal?.aborted) return reject(new AiCallError('TIMEOUT'));
     const lib = u.protocol === 'https:' ? https : http;
     let settled = false;
+    const connectMs = req.connectTimeoutMs ?? AI_CONNECT_TIMEOUT_MS;
+    let connecting: ReturnType<typeof setTimeout> | undefined;
     const fail = (e: unknown) => {
       clearTimeout(total);
+      clearTimeout(connecting);
       if (settled) return;
       settled = true;
       reject(e instanceof AiCallError ? e : (e as Error)?.name === 'AddressRefused' || e instanceof AddressRefused ? new AiCallError('URL_NOT_ALLOWED') : new AiCallError('UNREACHABLE'));
@@ -91,7 +104,8 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
         headers: { 'user-agent': 'class-compass-assistant', ...req.headers, ...(req.body !== undefined ? { 'content-length': String(Buffer.byteLength(req.body)) } : {}) },
         lookup: policyLookup(req.policy),
         agent: false,
-        timeout: AI_CONNECT_TIMEOUT_MS,
+        // A chat request is not limited by socket silence (see `AI_CONNECT_TIMEOUT_MS`).
+        ...(req.chat ? {} : { timeout: connectMs }),
       },
       (res) => {
         if (settled) {
@@ -99,7 +113,8 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
           return;
         }
         settled = true;
-        r.setTimeout(AI_IDLE_TIMEOUT_MS);
+        clearTimeout(connecting);
+        if (!req.chat) r.setTimeout(req.idleTimeoutMs ?? AI_IDLE_TIMEOUT_MS);
         res.on('close', () => clearTimeout(total));
         let size = 0;
         const body = (async function* () {
@@ -124,6 +139,11 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
     // idle timeout alone would never end it (security review of D-179). Only callbacks that run
     // after this line read `total`.
     const total = setTimeout(() => r.destroy(new AiCallError('TIMEOUT')), req.totalTimeoutMs ?? AI_TOTAL_TIMEOUT_MS);
+    if (req.chat) {
+      // Only connecting (TCP, and TLS for https) has the short limit.
+      connecting = setTimeout(() => r.destroy(new AiCallError('TIMEOUT')), connectMs);
+      r.once('socket', (socket) => socket.once(u.protocol === 'https:' ? 'secureConnect' : 'connect', () => clearTimeout(connecting)));
+    }
     r.on('timeout', () => r.destroy(new AiCallError('TIMEOUT')));
     r.on('error', fail);
     req.signal?.addEventListener('abort', () => r.destroy(new AiCallError('TIMEOUT')), { once: true });

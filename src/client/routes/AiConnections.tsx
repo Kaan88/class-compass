@@ -149,6 +149,11 @@ function ConnectionForm({
           </>
         ) : null}
         {takesKey ? <TextField label={keyLabel} description={t('aiConn.form.apiKeyHint')} type="password" autoComplete="off" value={apiKey} onChange={setApiKey} maxLength={1000} /> : null}
+        {editing?.hasSecret && type === 'openaiCompatible' && !apiKey.trim() && (baseUrl.trim() !== (editing.baseUrl ?? '') || localNetwork !== editing.localNetwork) ? (
+          <p className="cc-field__hint" role="status" data-testid="ai-conn-address-drops-key" style={{ margin: 0 }}>
+            {t('aiConn.form.addressDropsKey')}
+          </p>
+        ) : null}
         {editing?.hasSecret && takesKey ? (
           <label className="cc-check cc-ai-check">
             <input type="checkbox" checked={removeKey} onChange={(e) => setRemoveKey(e.target.checked)} />

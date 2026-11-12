@@ -6,8 +6,15 @@
  * messages. A server that ignores `stream` and answers one JSON completion is read too (some small
  * local servers do).
  */
+import crypto from 'node:crypto';
 import { AiCallError, aiRequest, failureOfStatus, readText, sseEvents } from '../http.ts';
-import { toolCall, type Adapter, type ChatEvent, type ChatMessage, type StopReason, type ToolDefinition } from './types.ts';
+import { MAX_CALL_ID_LENGTH, toolCall, type Adapter, type ChatEvent, type ChatMessage, type StopReason, type ToolDefinition } from './types.ts';
+
+/**
+ * A call id as OpenAI accepts it (at most 40 characters). A longer one (another provider's, or one
+ * made up before ids were shortened) becomes a hash of itself, the same for the call and its result.
+ */
+export const openAiCallId = (id: string) => (id.length <= MAX_CALL_ID_LENGTH ? id : `cc_${crypto.createHash('sha256').update(id).digest('hex').slice(0, MAX_CALL_ID_LENGTH - 3)}`);
 
 export function openAiMessages(system: string, messages: ChatMessage[]): Array<Record<string, unknown>> {
   return [
@@ -18,9 +25,9 @@ export function openAiMessages(system: string, messages: ChatMessage[]): Array<R
         return {
           role: 'assistant',
           content: m.content || null,
-          ...(m.toolCalls?.length ? { tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } })) } : {}),
+          ...(m.toolCalls?.length ? { tool_calls: m.toolCalls.map((c) => ({ id: openAiCallId(c.id), type: 'function', function: { name: c.name, arguments: JSON.stringify(c.arguments) } })) } : {}),
         };
-      return { role: 'tool', tool_call_id: m.toolCallId, content: m.content };
+      return { role: 'tool', tool_call_id: openAiCallId(m.toolCallId), content: m.content };
     }),
   ];
 }
@@ -29,13 +36,24 @@ export const openAiTools = (tools: ToolDefinition[]) => tools.map((t) => ({ type
 
 const STOP: Record<string, StopReason> = { stop: 'end', tool_calls: 'toolUse', function_call: 'toolUse', length: 'length' };
 
+/**
+ * A reply the provider's filter blocked is a `BLOCKED` failure; one that ended for another unknown
+ * reason with neither text nor calls a `PROVIDER_ERROR` (not an empty, finished answer).
+ */
+function assertAnswered(reason: string | null, wrote: boolean, calls: number) {
+  if (reason === 'content_filter') throw new AiCallError('BLOCKED');
+  if (!wrote && !calls && STOP[String(reason)] === undefined) throw new AiCallError('PROVIDER_ERROR');
+}
+
 function* fromCompletion(d: any): Generator<ChatEvent> {
   const msg = d?.choices?.[0]?.message ?? {};
-  if (typeof msg.content === 'string' && msg.content) yield { type: 'text', text: msg.content };
+  yield { type: 'usage', inputTokens: Number(d?.usage?.prompt_tokens) || 0, outputTokens: Number(d?.usage?.completion_tokens) || 0 };
+  const wrote = typeof msg.content === 'string' && msg.content !== '';
+  if (wrote) yield { type: 'text', text: msg.content };
   const calls: any[] = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
   for (let i = 0; i < calls.length; i++) yield { type: 'toolCall', call: toolCall(calls[i]?.id ? String(calls[i].id) : null, String(calls[i]?.function?.name ?? ''), calls[i]?.function?.arguments) };
-  yield { type: 'usage', inputTokens: Number(d?.usage?.prompt_tokens) || 0, outputTokens: Number(d?.usage?.completion_tokens) || 0 };
   const reason = d?.choices?.[0]?.finish_reason;
+  assertAnswered(reason == null ? null : String(reason), wrote, calls.length);
   // Cut off by the output limit wins over tool calls: the last call may be unfinished.
   yield { type: 'done', stop: STOP[String(reason)] === 'length' ? 'length' : calls.length ? 'toolUse' : (STOP[String(reason)] ?? 'other') };
 }
@@ -55,6 +73,7 @@ export const openAiAdapter: Adapter = async function* (req) {
     body: JSON.stringify(body),
     policy: req.target.policy,
     signal: req.signal,
+    chat: true,
   });
   if (res.status < 200 || res.status >= 300) {
     res.cancel();
@@ -75,6 +94,7 @@ export const openAiAdapter: Adapter = async function* (req) {
   let input = 0;
   let output = 0;
   let reason: string | null = null;
+  let wrote = false;
   let finished = false;
   for await (const ev of sseEvents(res.body)) {
     if (ev.data === '[DONE]') {
@@ -94,11 +114,15 @@ export const openAiAdapter: Adapter = async function* (req) {
     if (d?.usage) {
       input = Number(d.usage.prompt_tokens) || input;
       output = Number(d.usage.completion_tokens) || output;
+      yield { type: 'usage', inputTokens: input, outputTokens: output };
     }
     const choice = d?.choices?.[0];
     if (!choice) continue;
     const delta = choice.delta ?? {};
-    if (typeof delta.content === 'string' && delta.content) yield { type: 'text', text: delta.content };
+    if (typeof delta.content === 'string' && delta.content) {
+      wrote = true;
+      yield { type: 'text', text: delta.content };
+    }
     for (const tc of Array.isArray(delta.tool_calls) ? delta.tool_calls : []) {
       const index = Number(tc.index ?? 0);
       const cur = calls.get(index) ?? { id: '', name: '', args: '' };
@@ -112,7 +136,7 @@ export const openAiAdapter: Adapter = async function* (req) {
   // Some servers end the stream without `[DONE]`; a finish reason is enough.
   if (!finished && reason === null) throw new AiCallError('BAD_RESPONSE');
   const ordered = [...calls.entries()].sort((a, b) => a[0] - b[0]);
+  assertAnswered(reason, wrote, ordered.length);
   for (const [, c] of ordered) yield { type: 'toolCall', call: toolCall(c.id || null, c.name, c.args) };
-  yield { type: 'usage', inputTokens: input, outputTokens: output };
   yield { type: 'done', stop: STOP[String(reason)] === 'length' ? 'length' : ordered.length ? 'toolUse' : (STOP[String(reason)] ?? 'other') };
 };

@@ -58,5 +58,5 @@ export const AI_TEST_WORD = 'ready';
  * The reasons a request to a provider can fail, as the admin page shows them. Never the provider's
  * own message: it can echo part of a key.
  */
-export const AI_FAILURES = ['KEY_REJECTED', 'MODEL_NOT_FOUND', 'RATE_LIMITED', 'PROVIDER_ERROR', 'UNREACHABLE', 'URL_NOT_ALLOWED', 'BAD_RESPONSE', 'TIMEOUT', 'NEEDS_KEY', 'NOT_AVAILABLE', 'OUT_OF_TOKENS', 'PAUSED', 'OVER_BUDGET'] as const;
+export const AI_FAILURES = ['KEY_REJECTED', 'MODEL_NOT_FOUND', 'RATE_LIMITED', 'PROVIDER_ERROR', 'UNREACHABLE', 'URL_NOT_ALLOWED', 'BAD_RESPONSE', 'TIMEOUT', 'NEEDS_KEY', 'NOT_AVAILABLE', 'OUT_OF_TOKENS', 'PAUSED', 'OVER_BUDGET', 'BLOCKED'] as const;
 export type AiFailure = (typeof AI_FAILURES)[number];

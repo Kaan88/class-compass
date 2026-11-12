@@ -269,12 +269,15 @@ export function updateConnection(ctx: RequestContext, input: In<typeof C.updateA
     changed.baseUrl = patch.baseUrl;
     changed.localNetwork = local;
   }
+  // A saved key is never sent to a new address: changing the address or the local network setting
+  // without a new key in the same request removes it (audit 2026-11-12).
+  const addressChanged = patch.baseUrl !== undefined && (patch.baseUrl !== row.baseUrl || patch.localNetwork !== row.localNetwork);
   if (input.apiKey !== undefined) {
     patch.secretCipher = sealConnectionSecret(ctx, row.id, input.apiKey);
     patch.secretSetAt = now;
     patch.secretSource = 'pasted';
     changed.keyReplaced = true;
-  } else if (input.removeSecret && row.secretCipher !== null) {
+  } else if ((input.removeSecret || addressChanged) && row.secretCipher !== null) {
     patch.secretCipher = null;
     patch.secretSetAt = null;
     patch.secretSource = null;

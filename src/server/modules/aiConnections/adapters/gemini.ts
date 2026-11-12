@@ -94,6 +94,8 @@ export async function geminiFailure(res: AiHttpResponse): Promise<AiCallError> {
 }
 
 const STOP: Record<string, StopReason> = { STOP: 'end', MAX_TOKENS: 'length' };
+/** Finish reasons that mean Gemini's filters stopped the answer (a `BLOCKED` failure, not a finished answer). */
+const BLOCKED = new Set(['SAFETY', 'RECITATION', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'IMAGE_SAFETY', 'IMAGE_PROHIBITED_CONTENT', 'IMAGE_RECITATION']);
 
 export const geminiAdapter: Adapter = async function* (req) {
   const model = req.model.replace(/^models\//u, '');
@@ -109,12 +111,15 @@ export const geminiAdapter: Adapter = async function* (req) {
     body: JSON.stringify(body),
     policy: req.target.policy,
     signal: req.signal,
+    chat: true,
   });
   if (res.status < 200 || res.status >= 300) throw await geminiFailure(res);
   let input = 0;
   let output = 0;
   let stop: StopReason = 'other';
   let calls = 0;
+  let wrote = false;
+  let blocked = false;
   let any = false;
   for await (const ev of sseEvents(res.body)) {
     let d: any;
@@ -131,18 +136,27 @@ export const geminiAdapter: Adapter = async function* (req) {
     if (d?.usageMetadata) {
       input = Number(d.usageMetadata.promptTokenCount) || input;
       output = (Number(d.usageMetadata.candidatesTokenCount) || 0) + (Number(d.usageMetadata.thoughtsTokenCount) || 0) || output;
+      yield { type: 'usage', inputTokens: input, outputTokens: output };
     }
     const cand = d?.candidates?.[0];
     for (const part of Array.isArray(cand?.content?.parts) ? cand.content.parts : []) {
       if (part?.functionCall) {
         calls += 1;
         yield { type: 'toolCall', call: toolCall(part.functionCall.id ? String(part.functionCall.id) : null, String(part.functionCall.name ?? ''), part.functionCall.args ?? {}, typeof part.thoughtSignature === 'string' ? part.thoughtSignature : undefined) };
-      } else if (typeof part?.text === 'string' && part.text && part.thought !== true) yield { type: 'text', text: part.text };
+      } else if (typeof part?.text === 'string' && part.text && part.thought !== true) {
+        wrote = true;
+        yield { type: 'text', text: part.text };
+      }
     }
-    if (cand?.finishReason) stop = STOP[String(cand.finishReason)] ?? 'other';
-    if (d?.promptFeedback?.blockReason) stop = 'other';
+    if (cand?.finishReason) {
+      stop = STOP[String(cand.finishReason)] ?? 'other';
+      if (BLOCKED.has(String(cand.finishReason))) blocked = true;
+    }
+    if (d?.promptFeedback?.blockReason) blocked = true;
   }
   if (!any) throw new AiCallError('BAD_RESPONSE');
-  yield { type: 'usage', inputTokens: input, outputTokens: output };
+  // Blocked, or ended for another reason (OTHER, MALFORMED_FUNCTION_CALL, none) with nothing written: a failure, not an empty answer.
+  if (blocked) throw new AiCallError('BLOCKED');
+  if (stop === 'other' && !wrote && !calls) throw new AiCallError('PROVIDER_ERROR');
   yield { type: 'done', stop: stop === 'length' ? 'length' : calls ? 'toolUse' : stop };
 };

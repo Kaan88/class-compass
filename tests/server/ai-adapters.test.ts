@@ -5,11 +5,12 @@
  * declarations, message history translation, and failures that never carry the provider's text.
  */
 import http from 'node:http';
+import net from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { anthropicAdapter, anthropicMessages } from '../../src/server/modules/aiConnections/adapters/anthropic.ts';
 import { geminiAdapter, geminiContents, geminiSchema } from '../../src/server/modules/aiConnections/adapters/gemini.ts';
-import { openAiAdapter, openAiMessages } from '../../src/server/modules/aiConnections/adapters/openai.ts';
-import type { Adapter, ChatEvent, ChatMessage, ProviderTarget, ToolDefinition } from '../../src/server/modules/aiConnections/adapters/types.ts';
+import { openAiAdapter, openAiCallId, openAiMessages } from '../../src/server/modules/aiConnections/adapters/openai.ts';
+import { newCallId, type Adapter, type ChatEvent, type ChatMessage, type ProviderTarget, type ToolDefinition } from '../../src/server/modules/aiConnections/adapters/types.ts';
 import { AiCallError, aiRequest, sseEvents } from '../../src/server/modules/aiConnections/http.ts';
 import { toolDefinitions } from '../../src/server/modules/aiConnections/tools.ts';
 import { allTools } from '../../src/server/modules/mcp/registry.ts';
@@ -40,12 +41,14 @@ async function run(adapter: Adapter, t: ProviderTarget, tools: ToolDefinition[] 
 const textOf = (es: ChatEvent[]) => es.flatMap((e) => (e.type === 'text' ? [e.text] : [])).join('');
 const callsOf = (es: ChatEvent[]) => es.flatMap((e) => (e.type === 'toolCall' ? [e.call] : []));
 const last = () => fake.requests[fake.requests.length - 1]!;
+/** The usage a consumer records: the last `usage` event (each one is the total so far). */
+const usageOf = (es: ChatEvent[]) => es.filter((e) => e.type === 'usage').pop();
 
 describe('Anthropic Messages adapter', () => {
   it('streams text, usage and the stop reason', async () => {
     const es = await run(anthropicAdapter, target(FAKE_KEYS.anthropic));
     expect(textOf(es)).toBe('ready');
-    expect(es.find((e) => e.type === 'usage')).toEqual({ type: 'usage', inputTokens: 21, outputTokens: 3 });
+    expect(usageOf(es)).toEqual({ type: 'usage', inputTokens: 21, outputTokens: 3 });
     expect(es[es.length - 1]).toEqual({ type: 'done', stop: 'end' });
     const r = last();
     expect(r.path).toBe('/v1/messages');
@@ -94,7 +97,7 @@ describe('OpenAI Chat Completions adapter (OpenAI, OpenRouter, compatible server
   it('streams text and usage with a bearer key', async () => {
     const es = await run(openAiAdapter, { ...target(FAKE_KEYS.openai), maxTokensField: 'max_completion_tokens' });
     expect(textOf(es)).toBe('ready');
-    expect(es.find((e) => e.type === 'usage')).toEqual({ type: 'usage', inputTokens: 17, outputTokens: 5 });
+    expect(usageOf(es)).toEqual({ type: 'usage', inputTokens: 17, outputTokens: 5 });
     expect(es[es.length - 1]).toEqual({ type: 'done', stop: 'end' });
     const r = last();
     expect(r.path).toBe('/chat/completions');
@@ -131,7 +134,7 @@ describe('OpenAI Chat Completions adapter (OpenAI, OpenRouter, compatible server
     };
     const plain = await run(openAiAdapter, target(null, '/v1'), [TOOL]);
     expect(callsOf(plain)).toEqual([{ id: 'c1', name: 'connection_check', arguments: {}, invalidArguments: true }]);
-    expect(plain.find((e) => e.type === 'usage')).toEqual({ type: 'usage', inputTokens: 3, outputTokens: 4 });
+    expect(usageOf(plain)).toEqual({ type: 'usage', inputTokens: 3, outputTokens: 4 });
   });
 
   it('translates history to assistant tool_calls and tool messages', () => {
@@ -175,7 +178,7 @@ describe('Gemini adapter', () => {
   it('streams text (thought parts left out) and usage', async () => {
     const es = await run(geminiAdapter, target(FAKE_KEYS.gemini));
     expect(textOf(es)).toBe('ready');
-    expect(es.find((e) => e.type === 'usage')).toEqual({ type: 'usage', inputTokens: 30, outputTokens: 2 });
+    expect(usageOf(es)).toEqual({ type: 'usage', inputTokens: 30, outputTokens: 2 });
     const r = last();
     expect(r.path).toBe('/v1beta/models/fake-model:streamGenerateContent?alt=sse');
     expect(r.headers['x-goog-api-key']).toBe(FAKE_KEYS.gemini);
@@ -186,7 +189,7 @@ describe('Gemini adapter', () => {
   it('returns function calls with their thought signature and sends function declarations', async () => {
     const es = await run(geminiAdapter, target(FAKE_KEYS.gemini), [TOOL]);
     // The fake sends no id: one is made up, unique across replies, and marked as made up.
-    expect(callsOf(es)).toEqual([{ id: expect.stringMatching(/^cc_call_[0-9a-f-]{36}$/u), generatedId: true, name: 'connection_check', arguments: { word: 'ready' }, signature: 'sig-fake-1' }]);
+    expect(callsOf(es)).toEqual([{ id: expect.stringMatching(/^cc_call_[0-9a-f]{32}$/u), generatedId: true, name: 'connection_check', arguments: { word: 'ready' }, signature: 'sig-fake-1' }]);
     const again = callsOf(await run(geminiAdapter, target(FAKE_KEYS.gemini), [TOOL]));
     expect(again[0]!.id).not.toBe(callsOf(es)[0]!.id);
     expect(es[es.length - 1]).toEqual({ type: 'done', stop: 'toolUse' });
@@ -313,6 +316,189 @@ describe('outgoing request rules', () => {
       expect(stall.open()).toBe(0);
     } finally {
       await stall.close();
+    }
+  });
+});
+
+/** Runs an adapter against a one-off answer of the fake; returns the events and the error (if any). */
+async function runWith(adapter: Adapter, t: ProviderTarget, answer: (res: http.ServerResponse) => void) {
+  fake.override = (_r, res) => {
+    fake.override = null;
+    answer(res);
+    return true;
+  };
+  const events: ChatEvent[] = [];
+  let error: unknown = null;
+  try {
+    for await (const e of adapter({ target: t, model: 'fake-model', system: 'Be brief.', messages: [{ role: 'user', content: 'Hello' }], tools: [], maxTokens: 50 })) events.push(e);
+  } catch (e) {
+    error = e;
+  }
+  return { events, error };
+}
+const sseOf = (res: http.ServerResponse, events: unknown[], end = true) => {
+  res.writeHead(200, { 'content-type': 'text/event-stream' });
+  for (const d of events) res.write(`data: ${typeof d === 'string' ? d : JSON.stringify(d)}\n\n`);
+  if (end) res.end();
+};
+/** Sends the events, then breaks the connection (a reply cut off midway). */
+const cutAfter = (res: http.ServerResponse, events: unknown[]) => {
+  sseOf(res, events, false);
+  setTimeout(() => res.socket?.destroy(), 30);
+};
+
+describe('audit finding 5: made-up call ids fit OpenAI’s 40-character limit', () => {
+  it('a generated id is at most 40 characters, and a longer stored id is shortened the same way for the call and its result', () => {
+    for (let i = 0; i < 20; i++) expect(newCallId().length).toBeLessThanOrEqual(40);
+    const long = 'cc_call_8a1f2c3d-4b5e-6789-abcd-ef0123456789';
+    expect(long.length).toBe(44);
+    const wire = openAiMessages('', [
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [
+          { id: long, generatedId: true, name: 'x', arguments: {} },
+          { id: 'call_short', name: 'y', arguments: {} },
+        ],
+      },
+      { role: 'tool', toolCallId: long, name: 'x', content: '1' },
+      { role: 'tool', toolCallId: 'call_short', name: 'y', content: '2' },
+    ]) as any[];
+    const sent = wire[0].tool_calls.map((c: { id: string }) => c.id);
+    expect(sent[0].length).toBeLessThanOrEqual(40);
+    expect(sent[0]).not.toBe(long);
+    expect(wire[1].tool_call_id).toBe(sent[0]);
+    expect(sent[1]).toBe('call_short');
+    expect(wire[2].tool_call_id).toBe('call_short');
+    expect(openAiCallId(long)).toBe(sent[0]);
+  });
+});
+
+describe('audit finding 6: a blocked or empty abnormal reply is a failure, not a finished answer', () => {
+  it('Gemini: a safety finish reason or a blocked prompt is BLOCKED; another abnormal end with nothing is PROVIDER_ERROR', async () => {
+    const t = target(FAKE_KEYS.gemini);
+    const safety = await runWith(geminiAdapter, t, (res) => sseOf(res, [{ candidates: [{ content: { role: 'model', parts: [] }, finishReason: 'SAFETY' }], usageMetadata: { promptTokenCount: 9 } }]));
+    expect(safety.error).toMatchObject({ failure: 'BLOCKED' });
+    expect(safety.events.some((e) => e.type === 'done')).toBe(false);
+    const prompt = await runWith(geminiAdapter, t, (res) => sseOf(res, [{ promptFeedback: { blockReason: 'PROHIBITED_CONTENT' }, usageMetadata: { promptTokenCount: 9 } }]));
+    expect(prompt.error).toMatchObject({ failure: 'BLOCKED' });
+    const other = await runWith(geminiAdapter, t, (res) => sseOf(res, [{ candidates: [{ content: { role: 'model', parts: [] }, finishReason: 'MALFORMED_FUNCTION_CALL' }] }]));
+    expect(other.error).toMatchObject({ failure: 'PROVIDER_ERROR' });
+    // A normal reply still finishes.
+    const fine = await runWith(geminiAdapter, t, (res) => sseOf(res, [{ candidates: [{ content: { role: 'model', parts: [{ text: 'ok' }] }, finishReason: 'STOP' }] }]));
+    expect(fine.error).toBeNull();
+    expect(fine.events.pop()).toEqual({ type: 'done', stop: 'end' });
+  });
+
+  it('OpenAI: content_filter is BLOCKED (streamed and plain JSON); an end with nothing and no known reason is PROVIDER_ERROR', async () => {
+    const t = target(FAKE_KEYS.openai);
+    const filtered = await runWith(openAiAdapter, t, (res) => sseOf(res, [{ choices: [{ delta: {}, finish_reason: 'content_filter' }] }, '[DONE]']));
+    expect(filtered.error).toMatchObject({ failure: 'BLOCKED' });
+    const plain = await runWith(openAiAdapter, t, (res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: null }, finish_reason: 'content_filter' }] }));
+    });
+    expect(plain.error).toMatchObject({ failure: 'BLOCKED' });
+    const empty = await runWith(openAiAdapter, t, (res) => sseOf(res, [{ choices: [{ delta: {}, finish_reason: 'error' }] }, '[DONE]']));
+    expect(empty.error).toMatchObject({ failure: 'PROVIDER_ERROR' });
+  });
+
+  it('Anthropic: a refusal is BLOCKED', async () => {
+    const r = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) =>
+      sseOf(res, [{ type: 'message_start', message: { usage: { input_tokens: 5, output_tokens: 1 } } }, { type: 'message_delta', delta: { stop_reason: 'refusal' }, usage: { output_tokens: 2 } }, { type: 'message_stop' }]),
+    );
+    expect(r.error).toMatchObject({ failure: 'BLOCKED' });
+  });
+});
+
+describe('audit finding 7: usage is reported as soon as it is known, so a reply cut short still counts', () => {
+  it('Anthropic: input tokens at message_start, output tokens at message_delta, before the stream breaks', async () => {
+    const r = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) =>
+      cutAfter(res, [
+        { type: 'message_start', message: { usage: { input_tokens: 40, output_tokens: 1 } } },
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+        { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Half an ans' } },
+        { type: 'message_delta', delta: {}, usage: { output_tokens: 7 } },
+      ]),
+    );
+    expect(r.error).toBeInstanceOf(AiCallError);
+    expect(usageOf(r.events)).toEqual({ type: 'usage', inputTokens: 40, outputTokens: 7 });
+  });
+
+  it('Gemini: usageMetadata of each chunk, before the stream breaks', async () => {
+    const r = await runWith(geminiAdapter, target(FAKE_KEYS.gemini), (res) => cutAfter(res, [{ candidates: [{ content: { role: 'model', parts: [{ text: 'Half' }] } }], usageMetadata: { promptTokenCount: 33, candidatesTokenCount: 4 } }]));
+    expect(r.error).toBeInstanceOf(AiCallError);
+    expect(usageOf(r.events)).toEqual({ type: 'usage', inputTokens: 33, outputTokens: 4 });
+  });
+
+  it('OpenAI: the usage chunk, before the stream breaks; a whole reply reports one total', async () => {
+    const r = await runWith(openAiAdapter, target(FAKE_KEYS.openai), (res) => cutAfter(res, [{ choices: [{ delta: { content: 'Half' } }], usage: { prompt_tokens: 12, completion_tokens: 2 } }]));
+    expect(r.error).toBeInstanceOf(AiCallError);
+    expect(usageOf(r.events)).toEqual({ type: 'usage', inputTokens: 12, outputTokens: 2 });
+    const whole = await run(openAiAdapter, target(FAKE_KEYS.openai));
+    expect(whole.filter((e) => e.type === 'usage')).toEqual([{ type: 'usage', inputTokens: 17, outputTokens: 5 }]);
+  });
+});
+
+describe('audit findings 2 and 3: a chat request waits for a model that thinks silently', () => {
+  const start = async (handler: http.RequestListener) => {
+    const srv = http.createServer(handler);
+    await new Promise<void>((resolve) => srv.listen(0, '127.0.0.1', () => resolve()));
+    return { url: `http://127.0.0.1:${(srv.address() as { port: number }).port}/v1/chat/completions`, close: () => new Promise<void>((resolve) => srv.close(() => resolve())) };
+  };
+  const readAll = async (r: Awaited<ReturnType<typeof aiRequest>>) => {
+    let out = '';
+    for await (const c of r.body) out += c.toString('utf8');
+    return out;
+  };
+
+  it('finding 2: a quiet gap after the headers ends a small call at the idle limit but not a chat request', async () => {
+    const srv = await start((_q, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.write('data: 1\n\n');
+      setTimeout(() => res.end('data: 2\n\n'), 400);
+    });
+    try {
+      const small = await aiRequest({ url: srv.url, headers: {}, body: '{}', policy: 'local', idleTimeoutMs: 100 });
+      await expect(readAll(small)).rejects.toBeInstanceOf(AiCallError);
+      const chat = await aiRequest({ url: srv.url, headers: {}, body: '{}', policy: 'local', idleTimeoutMs: 100, chat: true });
+      expect(await readAll(chat)).toBe('data: 1\n\ndata: 2\n\n');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('finding 3: slow response headers end a small call at the connect limit but not a chat request', async () => {
+    const srv = await start((_q, res) => {
+      setTimeout(() => {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('{"ok":true}');
+      }, 400);
+    });
+    try {
+      await expect(aiRequest({ url: srv.url, headers: {}, body: '{}', policy: 'local', connectTimeoutMs: 100 })).rejects.toMatchObject({ failure: 'TIMEOUT' });
+      const chat = await aiRequest({ url: srv.url, headers: {}, body: '{}', policy: 'local', connectTimeoutMs: 100, chat: true });
+      expect(await readAll(chat)).toBe('{"ok":true}');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it('finding 3: connecting still has the short limit for a chat request (a TLS handshake that never finishes)', async () => {
+    const sockets = new Set<net.Socket>();
+    const silent = net.createServer((sock) => {
+      sockets.add(sock);
+      sock.on('error', () => {});
+    });
+    await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', () => resolve()));
+    try {
+      const started = Date.now();
+      const url = `https://127.0.0.1:${(silent.address() as { port: number }).port}/v1/chat/completions`;
+      await expect(aiRequest({ url, headers: {}, body: '{}', policy: 'local', connectTimeoutMs: 150, chat: true })).rejects.toMatchObject({ failure: 'TIMEOUT' });
+      expect(Date.now() - started).toBeLessThan(3000);
+    } finally {
+      for (const sock of sockets) sock.destroy();
+      await new Promise<void>((resolve) => silent.close(() => resolve()));
     }
   });
 });

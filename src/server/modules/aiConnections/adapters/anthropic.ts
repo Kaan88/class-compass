@@ -38,6 +38,8 @@ export function anthropicMessages(messages: ChatMessage[]): Turn[] {
 export const anthropicTools = (tools: ToolDefinition[]) => tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
 
 const STOP: Record<string, StopReason> = { end_turn: 'end', stop_sequence: 'end', tool_use: 'toolUse', max_tokens: 'length' };
+/** Stop reasons that mean the provider refused to answer. */
+const BLOCKED = new Set(['refusal']);
 
 export const anthropicAdapter: Adapter = async function* (req) {
   const body = {
@@ -54,6 +56,7 @@ export const anthropicAdapter: Adapter = async function* (req) {
     body: JSON.stringify(body),
     policy: req.target.policy,
     signal: req.signal,
+    chat: true,
   });
   if (res.status < 200 || res.status >= 300) {
     res.cancel();
@@ -63,6 +66,7 @@ export const anthropicAdapter: Adapter = async function* (req) {
   let input = 0;
   let output = 0;
   let stop: StopReason = 'other';
+  let blocked = false;
   let finished = false;
   for await (const ev of sseEvents(res.body)) {
     let d: any;
@@ -76,6 +80,7 @@ export const anthropicAdapter: Adapter = async function* (req) {
       const u = d.message?.usage ?? {};
       input += (Number(u.input_tokens) || 0) + (Number(u.cache_creation_input_tokens) || 0) + (Number(u.cache_read_input_tokens) || 0);
       output += Number(u.output_tokens) || 0;
+      yield { type: 'usage', inputTokens: input, outputTokens: output };
     } else if (type === 'content_block_start') {
       const b = d.content_block ?? {};
       if (b.type === 'tool_use') blocks.set(Number(d.index), { id: String(b.id ?? `call_${d.index}`), name: String(b.name ?? ''), json: '' });
@@ -94,8 +99,14 @@ export const anthropicAdapter: Adapter = async function* (req) {
         yield { type: 'toolCall', call: toolCall(b.id, b.name, b.json) };
       }
     } else if (type === 'message_delta') {
-      if (d.usage?.output_tokens !== undefined) output = Number(d.usage.output_tokens) || output;
-      if (d.delta?.stop_reason) stop = STOP[String(d.delta.stop_reason)] ?? 'other';
+      if (d.usage?.output_tokens !== undefined) {
+        output = Number(d.usage.output_tokens) || output;
+        yield { type: 'usage', inputTokens: input, outputTokens: output };
+      }
+      if (d.delta?.stop_reason) {
+        stop = STOP[String(d.delta.stop_reason)] ?? 'other';
+        blocked = BLOCKED.has(String(d.delta.stop_reason));
+      }
     } else if (type === 'message_stop') {
       finished = true;
     } else if (type === 'error') {
@@ -104,6 +115,6 @@ export const anthropicAdapter: Adapter = async function* (req) {
     }
   }
   if (!finished) throw new AiCallError('BAD_RESPONSE');
-  yield { type: 'usage', inputTokens: input, outputTokens: output };
+  if (blocked) throw new AiCallError('BLOCKED');
   yield { type: 'done', stop };
 };

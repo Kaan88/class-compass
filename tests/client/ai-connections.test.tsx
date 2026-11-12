@@ -126,6 +126,20 @@ describe('Admin → AI tools → Assistant connections', () => {
     });
   });
 
+  it('audit finding 1: editing the address of a connection with a key says the key must be pasted again', async () => {
+    wrap(<AiConnectionsAdminSection />);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[0]!);
+    const dialog = await screen.findByTestId('ai-conn-dialog');
+    expect(within(dialog).queryByTestId('ai-conn-address-drops-key')).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText(/^Address/u), { target: { value: 'http://127.0.0.1:8080/v1' } });
+    const note = within(dialog).getByTestId('ai-conn-address-drops-key');
+    expect(note.textContent).toContain('removes the saved key');
+    expect(note.getAttribute('role')).toBe('status');
+    // A new key typed in the same edit is kept: no warning then.
+    fireEvent.change(within(dialog).getByLabelText(/New key/u), { target: { value: FAKE_KEY } });
+    expect(within(dialog).queryByTestId('ai-conn-address-drops-key')).toBeNull();
+  });
+
   it('Test reports in words what works (a status region, not colour)', async () => {
     answers['POST /api/admin/ai-connections/:connectionId/test'] = { ok: false, text: true, tools: false, failure: null, httpStatus: null, ms: 40 };
     wrap(<AiConnectionsAdminSection />);

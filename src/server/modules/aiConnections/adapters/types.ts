@@ -40,8 +40,9 @@ export type ChatMessage =
 export type StopReason = 'end' | 'toolUse' | 'length' | 'other';
 
 /**
- * What a streamed reply yields: text as it arrives, each complete tool call, the token usage once
- * (after the reply), then `done` last.
+ * What a streamed reply yields: text as it arrives, each complete tool call, the token usage as soon
+ * as the provider reports it (possibly several times, each one the total so far: a consumer keeps the
+ * last one and records it once, so a reply cut short still counts what it used), then `done` last.
  */
 export type ChatEvent =
   | { type: 'text'; text: string }
@@ -88,8 +89,11 @@ export function parseArguments(raw: unknown): { args: Record<string, unknown>; i
   return { args: v as Record<string, unknown>, invalid: false };
 }
 
-/** A tool call id for a provider that sent none: unique across turns, so an agent loop can key on it. */
-export const newCallId = () => `cc_call_${crypto.randomUUID()}`;
+/** The longest tool call id OpenAI accepts (a chat may move to an OpenAI connection). */
+export const MAX_CALL_ID_LENGTH = 40;
+
+/** A tool call id for a provider that sent none: unique across turns, so an agent loop can key on it; at most 40 characters. */
+export const newCallId = () => `cc_call_${crypto.randomUUID().replace(/-/gu, '')}`;
 
 /** A tool call; `id` null means the provider sent none (a unique one is made and marked `generatedId`). */
 export const toolCall = (id: string | null, name: string, raw: unknown, signature?: string): ToolCall => {
