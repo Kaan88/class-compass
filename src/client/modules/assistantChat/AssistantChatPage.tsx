@@ -805,9 +805,13 @@ function ChatHeader({
   const currentModel = chat.model ?? status.defaultModel;
   const current =
     currentConn && currentModel ? `${currentConn}|${currentModel}` : "";
+  // A chat's own choice that can no longer be used falls back to the school default, like on the server.
+  const fallback = `${status.defaultConnectionId ?? ""}|${status.defaultModel ?? ""}`;
   const value = options.some((o) => o.id === current)
     ? current
-    : (options[0]?.id ?? "");
+    : options.some((o) => o.id === fallback)
+      ? fallback
+      : (options[0]?.id ?? "");
   const saveTitle = async (e: FormEvent) => {
     e.preventDefault();
     const next = title.trim();

@@ -57,6 +57,17 @@ export class RunRegistry {
     return run;
   }
 
+  /**
+   * Gives back the slot of a run taken by `start` that never began (the send or answer it was taken for
+   * was refused or needs no answer): the slot is taken first, so a refused request has no side effects.
+   */
+  discard(run: Run) {
+    if (run.events.length || run.done) return;
+    this.runs.delete(run.id);
+    run.done = true;
+    run.resolveFinished();
+  }
+
   /** The caller's run (another account's run is a 404, like their chats). */
   get(runId: string, userId: string): Run {
     const r = this.runs.get(runId);

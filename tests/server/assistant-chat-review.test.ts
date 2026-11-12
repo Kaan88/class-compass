@@ -98,7 +98,9 @@ describe('review fixes (S19b)', () => {
         const r = await s.teacherA.post(`${API}/chats/${chat.id}/messages`, { text: 'Hello' });
         expect(r.status, JSON.stringify(r.body)).toBe(200);
         expect(endOf(await events(s.teacherA, r.body.runId))).toMatchObject({ end: 'complete' });
-        expect((await detail(s.teacherA, chat.id)).chat).toMatchObject({ connectionId, model: 'fake-chat' });
+        // The message used it; the chat is not pinned to it (it follows the default, audit finding 5).
+        expect((await detail(s.teacherA, chat.id)).chat).toMatchObject({ connectionId: null, model: null });
+        expect(env.db.select().from(assistantMessages).where(eq(assistantMessages.chatId, chat.id)).all()[0]).toMatchObject({ connectionId, model: 'fake-chat' });
       });
     } finally {
       await ok(s.admin.put('/api/admin/ai-connection-settings', { defaultConnectionId: connectionId, defaultModel: 'fake-chat' }));

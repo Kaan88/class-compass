@@ -34,6 +34,7 @@ import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext, type UserRow } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { conflict, notFound } from '../../lib/errors.ts';
+import { categoryName, categoryNamesOf } from '../goals/library.ts';
 import { ATTACHMENT_TOOLS, assistantPseudonymsOf, assistantToolByName, parseAssistantArgs, RESULT_PREFIX, studentNameFor, toBrowser, toBrowserAnswer, type AssistantPrivacy } from '../mcp/assistant.ts';
 import { foldSameLength, NameScrubber } from '../mcp/privacy.ts';
 
@@ -67,6 +68,7 @@ export class CardLookup {
   private user: UserRow;
   private p: AssistantPrivacy;
   private ctxs: Map<string, string> | null = null;
+  private ctxSubjects = new Map<string, string>();
   private cache = new Map<string, unknown>();
   constructor(db: Db, user: UserRow, p: AssistantPrivacy) {
     this.db = db;
@@ -85,13 +87,14 @@ export class CardLookup {
     if (typeof id !== 'string') return null;
     if (!this.ctxs) {
       const rows = this.db
-        .select({ id: teachingContexts.id, className: classes.name, subject: subjects.name })
+        .select({ id: teachingContexts.id, className: classes.name, subject: subjects.name, subjectId: teachingContexts.subjectId })
         .from(teachingContexts)
         .innerJoin(classes, eq(classes.id, teachingContexts.classId))
         .innerJoin(subjects, eq(subjects.id, teachingContexts.subjectId))
         .where(eq(teachingContexts.teacherId, this.user.id))
         .all();
       this.ctxs = new Map(rows.map((r) => [r.id, `${r.className} ${this.text(r.subject)}`.trim()]));
+      this.ctxSubjects = new Map(rows.map((r) => [r.id, r.subjectId]));
     }
     return this.ctxs.get(id) ?? null;
   }
@@ -129,11 +132,32 @@ export class CardLookup {
       return owns?.name ?? null;
     });
   }
-  category(id: unknown): string | null {
+  /** The subject of a call's class+subject (its `contextId`, or the context of its lesson, goal or homework), when it is this teacher's. */
+  subjectOf(args: Record<string, unknown>): string | null {
+    const own = (contextId: unknown) => (this.context(contextId) ? (this.ctxSubjects.get(contextId as string) ?? null) : null);
+    if (typeof args.contextId === 'string') return own(args.contextId);
+    const id = (v: unknown) => (typeof v === 'string' ? v : '');
+    const via = args.lessonId
+      ? this.db.select({ c: lessons.contextId }).from(lessons).where(eq(lessons.id, id(args.lessonId))).get()
+      : args.goalId
+        ? this.db.select({ c: goals.contextId }).from(goals).where(eq(goals.id, id(args.goalId))).get()
+        : args.assignmentId
+          ? this.db.select({ c: homeworkAssignments.contextId }).from(homeworkAssignments).where(eq(homeworkAssignments.id, id(args.assignmentId))).get()
+          : undefined;
+    return via?.c ? own(via.c) : null;
+  }
+  /**
+   * A goal category (lesson topic) by the name this teacher sees in the call's subject: a default they
+   * renamed there by their own name (D-176, `categoryNamesOf`). Another teacher's own category is not
+   * this teacher's to use: it stays unresolved (a `missing` line).
+   */
+  category(id: unknown, subjectId: string | null = null): string | null {
     if (typeof id !== 'string') return null;
-    return this.once(`k:${id}`, () => {
-      const r = this.db.select({ name: skillCategories.name }).from(skillCategories).where(eq(skillCategories.id, id)).get();
-      return r ? this.text(r.name) || null : null;
+    return this.once(`k:${id}:${subjectId ?? ''}`, () => {
+      const r = this.db.select({ id: skillCategories.id, name: skillCategories.name, createdBy: skillCategories.createdBy, subjectId: skillCategories.subjectId }).from(skillCategories).where(eq(skillCategories.id, id)).get();
+      if (!r || (r.createdBy !== null && r.createdBy !== this.user.id)) return null;
+      const subject = r.subjectId ?? subjectId;
+      return this.text(categoryName(r, subject ? categoryNamesOf(this.db, this.user.id, subject) : undefined)) || null;
     });
   }
   preset(id: unknown): string | null {
@@ -219,6 +243,9 @@ function plain(v: unknown): string {
  */
 export function changeLines(look: CardLookup, tool: string, args: Record<string, unknown>): AssistantChangeLine[] {
   const out: AssistantChangeLine[] = [];
+  // Categories are named as the teacher named them in the call's subject (D-176).
+  let subjectId: string | null | undefined;
+  const subject = () => (subjectId === undefined ? (subjectId = look.subjectOf(args)) : subjectId);
   for (const [key, v] of Object.entries(args)) {
     if (SKIP_KEYS.has(key)) continue;
     if (key === 'package' && tool === 'import_theme_draft') {
@@ -235,7 +262,7 @@ export function changeLines(look: CardLookup, tool: string, args: Record<string,
       continue;
     }
     if (key === 'categoryId') {
-      const name = look.category(v);
+      const name = look.category(v, subject());
       out.push(name ? line(key, 'name', name) : line(key, 'missing'));
       continue;
     }
@@ -250,7 +277,7 @@ export function changeLines(look: CardLookup, tool: string, args: Record<string,
       continue;
     }
     if (key === 'topicIds' && Array.isArray(v)) {
-      out.push(line(key, 'list', '', v.map((x) => look.category(x) ?? plain(x))));
+      out.push(line(key, 'list', '', v.map((x) => look.category(x, subject()) ?? plain(x))));
       continue;
     }
     if (key === 'outcome' && typeof v === 'string') {
@@ -279,7 +306,7 @@ export function changeLines(look: CardLookup, tool: string, args: Record<string,
       continue;
     }
     if (key === 'plan' && tool === 'set_topic_plan' && isRecord(v)) {
-      out.push(line(key, 'list', '', Object.entries(v).map(([day, ids]) => `${look.weekday(day)}: ${Array.isArray(ids) && ids.length ? ids.map((x) => look.category(x) ?? plain(x)).join(', ') : '—'}`)));
+      out.push(line(key, 'list', '', Object.entries(v).map(([day, ids]) => `${look.weekday(day)}: ${Array.isArray(ids) && ids.length ? ids.map((x) => look.category(x, subject()) ?? plain(x)).join(', ') : '—'}`)));
       continue;
     }
     if (typeof v === 'boolean') {
@@ -413,6 +440,15 @@ export function messageViews(p: AssistantPrivacy, look: CardLookup, rows: Messag
 }
 
 // ---------------------------------------------------------------- what the provider gets
+/** Tool names every provider accepts back in a chat (OpenAI's and Anthropic's rule; Gemini's is wider). */
+const PROVIDER_TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/u;
+/**
+ * A stored call's name as the provider gets it back: a name it would refuse (empty, a dot or other
+ * characters, too long: never one of our tools, so the call was refused as unknown) is sent as
+ * `invalid_tool_name`, so one bad call does not make every later request of the chat fail.
+ */
+export const providerToolName = (name: string): string => (PROVIDER_TOOL_NAME.test(name) ? name : 'invalid_tool_name');
+
 /**
  * The chat as provider messages, from the last summary on: every tool call is followed by its result
  * (a call that never ran, refused or declined or expired, gets a short result that says so).
@@ -436,7 +472,7 @@ export function historyFor(chat: ChatRow, rows: MessageRow[]): ChatMessage[] {
       const toolCalls: ToolCall[] = calls.map((c) => ({
         id: c.id,
         ...(c.generatedId ? { generatedId: true as const } : {}),
-        name: c.name,
+        name: providerToolName(c.name),
         arguments: c.arguments,
         ...(c.invalidArguments ? { invalidArguments: true as const } : {}),
         ...(c.signature ? { signature: c.signature } : {}),
@@ -444,8 +480,8 @@ export function historyFor(chat: ChatRow, rows: MessageRow[]): ChatMessage[] {
       out.push(toolCalls.length ? { role: 'assistant', content: r.content, toolCalls } : { role: 'assistant', content: r.content });
       for (const c of calls) {
         const res = results.get(c.id);
-        if (res) out.push({ role: 'tool', toolCallId: c.id, name: c.name, content: res.content, ...(res.isError ? { isError: true } : {}) });
-        else out.push({ role: 'tool', toolCallId: c.id, name: c.name, content: c.state === 'expired' ? 'Not done: the teacher moved on without answering.' : 'Not done.', isError: true });
+        if (res) out.push({ role: 'tool', toolCallId: c.id, name: providerToolName(c.name), content: res.content, ...(res.isError ? { isError: true } : {}) });
+        else out.push({ role: 'tool', toolCallId: c.id, name: providerToolName(c.name), content: c.state === 'expired' ? 'Not done: the teacher moved on without answering.' : 'Not done.', isError: true });
       }
     }
   }

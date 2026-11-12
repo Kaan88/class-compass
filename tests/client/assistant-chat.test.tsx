@@ -190,6 +190,31 @@ describe('assistant page (S19b, D-180)', () => {
     expect(calls.find((c) => c.path.endsWith('/calls/:callId'))!.input).toEqual({ chatId: CHAT, messageId: BOT_MSG, callId: 'call_hw', approve: false });
   });
 
+  it('audit finding 5: the model picker shows the default for a chat that follows it, and when the chat’s own choice can no longer be used', async () => {
+    const two = status({
+      connections: [
+        { id: 'conn-1', name: 'School model', type: 'openai', scope: 'school', models: [{ name: 'fake-chat', tools: true }] },
+        { id: 'conn-2', name: 'Second model', type: 'openai', scope: 'school', models: [{ name: 'fake-other', tools: true }] },
+      ],
+      defaultConnectionId: 'conn-2',
+      defaultModel: 'fake-other',
+    });
+    answers['GET /api/teacher/assistant-chat'] = two;
+    for (const chat of [
+      { ...summary, connectionId: null, model: null },
+      { ...summary, connectionId: 'conn-gone', model: 'gone-model' },
+    ]) {
+      answers['GET /api/teacher/assistant-chat/chats/:chatId'] = detail({ chat });
+      wrap(<AssistantChatPage search={{ chat: CHAT }} />);
+      await waitFor(() => expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('conn-2|fake-other'));
+      cleanup();
+    }
+    // A chat's own usable choice is shown as it is.
+    answers['GET /api/teacher/assistant-chat/chats/:chatId'] = detail({ chat: { ...summary, connectionId: 'conn-1', model: 'fake-chat' } });
+    wrap(<AssistantChatPage search={{ chat: CHAT }} />);
+    await waitFor(() => expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('conn-1|fake-chat'));
+  });
+
   it('decided cards say what happened in words', async () => {
     answers['GET /api/teacher/assistant-chat/chats/:chatId'] = detail({
       messages: [
