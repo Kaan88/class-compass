@@ -102,11 +102,11 @@ describe('full screen during lessons (S18, D-167)', () => {
     expect(sent).toEqual(['lesson.start']);
   });
 
-  it('uses the default (on) before the preference is loaded', async () => {
+  it('uses the default (off, owner 2026-11-12) before the preference is loaded', async () => {
     const fs = stubFullscreen(true);
     start(null);
     await press('Begin lesson');
-    expect(fs.request).toHaveBeenCalledTimes(1);
+    expect(fs.request).not.toHaveBeenCalled();
   });
 
   it('Save and end lesson leaves full screen (LES-3)', async () => {

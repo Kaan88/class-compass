@@ -79,7 +79,7 @@ Pages of a module that is switched off in all your classes are left out of the m
    - **Today's topic**: the focus of the lesson (Listening, Reading, Vocabulary, Grammar, Writing, Speaking, Phonics or your own topics). The weekly plan from **Lesson topics** suggests it; you can change it.
    - **Today's goal** (only when **Lesson goals** is on for the class, see [Lesson goals](#lesson-goals)): one short sentence the class can read, for example "We can ask and answer about the weather." Leave it empty for no goal today.
    - **Routine**: choose the routine for this lesson.
-4. Press **Begin lesson**. The board fills the whole screen (full screen), so the browser's bars do not take space from the class.
+4. Press **Begin lesson**. If you switched on **Full screen during lessons** (see [Full screen](#full-screen)), the board fills the whole screen, so the browser's bars do not take space from the class.
 
 On a school holiday (the administrator's holiday calendar) the classroom screen says so with a calm note. You can still start a lesson, for example a make-up lesson; reports leave holidays out of the school days.
 
@@ -89,7 +89,7 @@ On a school holiday (the administrator's holiday calendar) the classroom screen 
 
 While a lesson runs, the top bar has a **Full screen** button; in full screen it becomes a small **Leave full screen** button. That button stays on the top bar (and in the teacher area) as long as the page is in full screen, also after the lesson ends, so you can always leave by touch. **Esc** on the keyboard always leaves full screen too. Dialogs, the PIN lock, celebrations and messages all keep working in full screen. **Save and end lesson** leaves full screen; **Back to the lesson** keeps it.
 
-If you do not want this, switch off **Full screen during lessons** in **Profile and PIN** → **Lessons**. It is your own setting and follows you to every classroom computer; the **Full screen** button on the board still works. Browsers without full screen (for example on an iPhone) show no button and nothing changes.
+To have **Begin lesson** enter full screen and **Save and end lesson** leave it, switch on **Full screen during lessons** in **Profile and PIN** → **Lessons** (it is off at first). It is your own setting and follows you to every classroom computer; the **Full screen** button on the board works either way. Browsers without full screen (for example on an iPhone) show no button and nothing changes.
 
 A lesson keeps running when you refresh the page or switch to another class and back. A class with a running lesson is marked **Lesson in progress**. If the Wi-Fi drops, your taps are kept on the device and sent later; the save status shows **Offline – N changes waiting**. Anything the server could not save appears under **Needs attention** with **Try again** and **Dismiss**.
 

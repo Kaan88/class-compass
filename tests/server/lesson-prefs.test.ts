@@ -1,5 +1,5 @@
 /**
- * S18 (D-167): "Full screen during lessons" is a per-account preference (UX-4), on by default, read on
+ * S18 (D-167): "Full screen during lessons" is a per-account preference (UX-4), off by default (owner 2026-11-12), read on
  * the classroom board (LES-1, LES-3) while the teacher area is locked and changed only behind the PIN.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -17,20 +17,20 @@ describe('lesson preferences (S18, D-167)', () => {
     await env.app.close();
   });
 
-  it('is on by default and follows the account, not other teachers (UX-4)', async () => {
-    expect(await ok(s.teacherA.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: true });
-    expect(await ok(s.teacherA.put('/api/teacher/lesson-prefs', { fullscreen: false }))).toEqual({ fullscreen: false });
+  it('is off by default and follows the account, not other teachers (UX-4)', async () => {
     expect(await ok(s.teacherA.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: false });
-    expect(await ok(s.teacherB.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: true });
     expect(await ok(s.teacherA.put('/api/teacher/lesson-prefs', { fullscreen: true }))).toEqual({ fullscreen: true });
+    expect(await ok(s.teacherA.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: true });
+    expect(await ok(s.teacherB.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: false });
+    expect(await ok(s.teacherA.put('/api/teacher/lesson-prefs', { fullscreen: false }))).toEqual({ fullscreen: false });
   });
 
   it('is readable on the locked classroom board but changed only after the PIN (LES-1)', async () => {
     await ok(s.teacherA.post('/api/auth/pin', { currentPassword: 'correct-horse-battery', pin: '2468' }));
     await ok(s.teacherA.post('/api/classroom/enter'));
-    expect(await ok(s.teacherA.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: true });
-    expect((await s.teacherA.put('/api/teacher/lesson-prefs', { fullscreen: false })).status).not.toBe(200);
-    expect(await ok(s.teacherA.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: true });
+    expect(await ok(s.teacherA.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: false });
+    expect((await s.teacherA.put('/api/teacher/lesson-prefs', { fullscreen: true })).status).not.toBe(200);
+    expect(await ok(s.teacherA.get('/api/classroom/lesson-prefs'))).toEqual({ fullscreen: false });
   });
 
   it('is for teachers only and refuses anything but a boolean', async () => {

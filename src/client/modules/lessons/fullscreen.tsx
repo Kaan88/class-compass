@@ -16,8 +16,8 @@ import { Toggle } from '../../ui/Fields.tsx';
 import { IconFullscreen, IconFullscreenExit } from '../../ui/icons.tsx';
 
 export const lessonPrefsKey = ['classroom', 'lessonPrefs'] as const;
-/** Used until the preference is read (and when it cannot be): the setting is on by default. */
-export const DEFAULT_LESSON_PREFS: L.LessonPrefs = { fullscreen: true };
+/** Used until the preference is read (and when it cannot be): the setting is off by default (owner 2026-11-12). */
+export const DEFAULT_LESSON_PREFS: L.LessonPrefs = { fullscreen: false };
 
 export function useLessonPrefs(): L.LessonPrefs {
   const q = useQuery({ queryKey: lessonPrefsKey, queryFn: () => call(L.getLessonPrefs, {}), staleTime: 5 * 60_000 });

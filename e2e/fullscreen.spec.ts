@@ -94,8 +94,9 @@ test('Begin lesson enters full screen, the top bar toggles it, Save and end leav
   test.setTimeout(120_000);
   const { context, page, ctx } = await teacher(browser);
   try {
-    // The preference is on by default (UX-4).
-    expect((await api(page, 'GET', '/api/classroom/lesson-prefs')).body).toEqual({ fullscreen: true });
+    // The preference is off by default (owner 2026-11-12, UX-4): switched on before the classroom.
+    expect((await api(page, 'GET', '/api/classroom/lesson-prefs')).body).toEqual({ fullscreen: false });
+    expect((await api(page, 'PUT', '/api/teacher/lesson-prefs', { fullscreen: true })).status).toBe(200);
     await startLesson(page);
     expect(await fsLog(page)).toEqual({ requests: 1, exits: 0 });
 
@@ -119,22 +120,36 @@ test('Begin lesson enters full screen, the top bar toggles it, Save and end leav
   } finally {
     await endLesson(page, ctx.id);
     await context.close();
+    await resetPref(browser);
   }
 });
+
+/** Back to the default (off) in a fresh session: the one used is in classroom mode, PIN-locked. */
+async function resetPref(browser: Browser) {
+  const reset = await browser.newContext();
+  const r = await reset.newPage();
+  await login(r, 'english');
+  expect((await api(r, 'PUT', '/api/teacher/lesson-prefs', { fullscreen: false })).status).toBe(200);
+  await reset.close();
+}
 
 test('with "Full screen during lessons" off, Start and End lesson leave full screen alone (S18)', async ({ browser }) => {
   test.setTimeout(120_000);
   const { context, page, ctx } = await teacher(browser);
   try {
-    // Switched off on the profile page (before the classroom: no PIN needed outside classroom mode).
+    // Off by default on the profile page; switched on and off again there (before the classroom: no PIN
+    // needed outside classroom mode).
     await page.goto('/teacher/profile');
     const section = page.getByTestId('lesson-prefs');
     const toggle = section.getByRole('switch', { name: 'Full screen during lessons' });
-    await expect(toggle).toBeChecked();
-    const saved = page.waitForResponse((r) => r.url().endsWith('/api/teacher/lesson-prefs') && r.request().method() === 'PUT');
-    await toggle.click({ force: true });
-    expect((await saved).status()).toBe(200);
     await expect(toggle).not.toBeChecked();
+    for (const on of [true, false]) {
+      const saved = page.waitForResponse((r) => r.url().endsWith('/api/teacher/lesson-prefs') && r.request().method() === 'PUT');
+      await toggle.click({ force: true });
+      expect((await saved).status()).toBe(200);
+      if (on) await expect(toggle).toBeChecked();
+      else await expect(toggle).not.toBeChecked();
+    }
     expect((await api(page, 'GET', '/api/classroom/lesson-prefs')).body).toEqual({ fullscreen: false });
 
     await startLesson(page);
@@ -152,11 +167,6 @@ test('with "Full screen during lessons" off, Start and End lesson leave full scr
   } finally {
     await endLesson(page, ctx.id);
     await context.close();
-    // Back to the default in a fresh session (the one above is in classroom mode, PIN-locked).
-    const reset = await browser.newContext();
-    const r = await reset.newPage();
-    await login(r, 'english');
-    expect((await api(r, 'PUT', '/api/teacher/lesson-prefs', { fullscreen: true })).status).toBe(200);
-    await reset.close();
+    await resetPref(browser);
   }
 });

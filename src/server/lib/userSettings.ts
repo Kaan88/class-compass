@@ -35,8 +35,8 @@ export const USER_SETTINGS = {
   'notifications.settings': setting(NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS),
   /** S16c (D-165): the last classroom screen seen by this account (removable module `displayInfo`; not a preference, account metadata only the admin sees). */
   'displayInfo.lastSeen': setting(DisplayInfoRecord, EMPTY_DISPLAY_INFO),
-  /** S18 (D-167): Start lesson enters full screen and End lesson leaves it (on by default; the board's button works either way). */
-  'lessons.fullscreen': setting(z.boolean(), true),
+  /** S18 (D-167): Start lesson enters full screen and End lesson leaves it (off by default since the owner's 2026-11-12 change to D-167; the board's button works either way). */
+  'lessons.fullscreen': setting(z.boolean(), false),
   /** S22d (D-178): Compact / Normal / Large in the teacher and admin areas (Normal by default; the classroom screen sizes its cards by itself: the D-177 fit, D-195). */
   'area.density': setting(AreaDensity, DEFAULT_AREA_DENSITY),
 } as const;

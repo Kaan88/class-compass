@@ -79,7 +79,7 @@ Bütün sınıflarınızda kapalı olan bir modülün sayfaları menüde görün
    - **Bugünün konusu**: dersin odağı (Dinleme, Okuma, Kelime bilgisi, Dil bilgisi, Yazma, Konuşma, Sesletim ya da kendi konularınız). **Ders konuları**'ndaki haftalık plan bir öneri getirir; değiştirebilirsiniz.
    - **Bugünün hedefi** (yalnızca sınıfta **Ders hedefleri** açıksa, bkz. [Ders hedefleri](#ders-hedefleri)): sınıfın okuyabileceği kısa bir cümle, örneğin "Hava durumunu sorup cevaplayabiliriz." Bugün hedef koymayacaksanız boş bırakın.
    - **Rutin**: bu dersin rutinini seçin.
-4. **Derse başla**'ya basın. Pano tüm ekranı kaplar (tam ekran); tarayıcının çubukları sınıftan yer çalmaz.
+4. **Derse başla**'ya basın. **Derslerde tam ekran** ayarını açtıysanız (bkz. [Tam ekran](#tam-ekran)) pano tüm ekranı kaplar; tarayıcının çubukları sınıftan yer çalmaz.
 
 Okul tatilinde (yöneticinin tatil takvimi) sınıf ekranı bunu sakin bir notla söyler. Yine de ders başlatabilirsiniz, örneğin telafi dersi; raporlar tatilleri okul günlerine katmaz.
 
@@ -89,7 +89,7 @@ Okul tatilinde (yöneticinin tatil takvimi) sınıf ekranı bunu sakin bir notla
 
 Ders sürerken üst çubukta bir **Tam ekran** düğmesi vardır; tam ekrandayken bu düğme küçük bir **Tam ekrandan çık** düğmesine dönüşür. Sayfa tam ekranda kaldığı sürece bu düğme üst çubukta (ve öğretmen alanında) durur, ders bittikten sonra da; böylece dokunarak her zaman çıkabilirsiniz. Klavyedeki **Esc** tuşu da her zaman tam ekrandan çıkarır. Pencereler, PIN kilidi, kutlamalar ve bildirimler tam ekranda da çalışır. **Kaydet ve dersi bitir** tam ekrandan çıkar; **Derse dön** tam ekranı korur.
 
-Bunu istemiyorsanız **Profil ve PIN** → **Dersler** bölümünde **Derslerde tam ekran** ayarını kapatın. Bu sizin kendi ayarınızdır ve girdiğiniz her sınıf bilgisayarında geçerlidir; panodaki **Tam ekran** düğmesi yine çalışır. Tam ekranı olmayan tarayıcılarda (örneğin iPhone'da) düğme görünmez ve hiçbir şey değişmez.
+**Derse başla**'nın tam ekrana girmesini, **Kaydet ve dersi bitir**'in de tam ekrandan çıkmasını istiyorsanız **Profil ve PIN** → **Dersler** bölümünde **Derslerde tam ekran** ayarını açın (başlangıçta kapalıdır). Bu sizin kendi ayarınızdır ve girdiğiniz her sınıf bilgisayarında geçerlidir; panodaki **Tam ekran** düğmesi her iki durumda da çalışır. Tam ekranı olmayan tarayıcılarda (örneğin iPhone'da) düğme görünmez ve hiçbir şey değişmez.
 
 Sayfayı yenileseniz ya da başka bir sınıfa geçip geri dönseniz de ders sürer. Dersi süren sınıf **Ders sürüyor** olarak işaretlenir. Kablosuz ağ koparsa dokunuşlarınız cihazda saklanır ve sonra gönderilir; kayıt göstergesinde **Çevrimdışı – N değişiklik bekliyor** yazar. Sunucunun kaydedemediği her şey **Kontrol gerekiyor** altında **Yeniden dene** ve **Kapat** düğmeleriyle görünür.
 
