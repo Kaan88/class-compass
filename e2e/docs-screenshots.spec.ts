@@ -203,7 +203,14 @@ for (const lang of ['en', 'tr'] as const) {
       await tp.goto('/teacher/goals');
       await expect(tp.getByTestId('goals-page')).toBeVisible();
       await tp.getByLabel(T('teacher.chooseClass'), { exact: true }).selectOption({ label: classLabel });
-      await tp.getByTestId('goals-page').locator('table button').first().click();
+      // The demo history gives goals by chance and its length follows today's date, so the first
+      // student may have none: open the first one with an active goal (the "Active" column).
+      const goalRows = tp.getByTestId('goals-page').locator('table tbody tr');
+      await expect(goalRows.first()).toBeVisible();
+      const activeCounts = await goalRows.evaluateAll((rows) => rows.map((r) => Number(r.querySelectorAll('td, th')[1]?.textContent?.trim() ?? '0')));
+      const withGoal = activeCounts.findIndex((n) => n > 0);
+      expect(withGoal).toBeGreaterThanOrEqual(0);
+      await goalRows.nth(withGoal).getByRole('button').first().click();
       await expect(tp.getByTestId('teacher-student-goals')).toBeVisible();
       await expect(tp.getByTestId('teacher-goal').first()).toBeVisible();
       await shot(tp, lang, 'goals-student', { from: '[data-testid="teacher-student-goals"]' });
