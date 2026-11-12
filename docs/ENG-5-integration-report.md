@@ -10,7 +10,7 @@ are thin, the report says so instead of filling the gap.
 
 **Status at the time of writing (2026-11-12):** the app has been installed and exercised on three
 machines (a Debian test VM, the owner's mini PC and the owner's Oracle ARM server). The test site
-`test.sareteacher.com` runs `d135461`. Many checks that need people, real devices or outside
+`test.sareteacher.com` and production (`sareteacher.com`) run `d135461`. Many checks that need people, real devices or outside
 services are still open (section 5).
 
 ## 1. Environments actually used
@@ -98,6 +98,7 @@ by one: for each deploy they state only "healthy", with the backup and migration
 | 2026-11-12 | `8141bb6` (audit fixes: Fable audit and ultrareview, 26 findings, D-201) | test | none | backup, healthy; `npm run check` green (2814 tests), build within the student page budget, 28 tests in the 15 touched e2e specs pass |
 | 2026-11-12 | `7076232` (AI stream failures: 64 MiB chat stream backstop, early end is `STREAM_ENDED` with one retry, fact-only failure log, DeepSeek reasoning sent back in the tool loop; D-203) | test | none | backup, healthy; `npm run check` green (2831 tests), build within the student page budget, AI and Assistant e2e specs green; the first deploy after the history rewrite (D-202), so the image tag uses the new id |
 | 2026-11-12 | `d135461` (assistant answers finish behind the classroom PIN lock; a stream broken by the lock reads its missed events after the unlock; D-204) | test | none | backup, healthy; `npm run check` green (2835 tests), build within the student page budget |
+| 2026-11-12 | `d135461` (from `4a770f2`; owner's request) | **production** | `0025`–`0033` | backup and pre-migration snapshot, healthy, no error lines, still behind Access; full e2e not rerun for this commit (last full run 149 passed at `050127f`; Linux e2e being fixed separately) |
 
 So every migration from the baseline to `0033` has been applied on a deployed copy holding weeks of
 fictional history, on top of the snapshot the app takes first. A **rollback** (OPERATIONS section 5)

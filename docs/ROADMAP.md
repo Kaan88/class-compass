@@ -598,7 +598,7 @@ Decision D-201; no migration.
 - [x] All 26 fixed with tests (privacy: compaction summary filter, offline relock, split import source file, keys on a changed address; assistant chat; provider time limits and blocked replies; stale offline lesson start; closures; avatars; theme previews and sound caps; HTML import), each fix reviewed again by a separate Fable agent
 - [x] Assistant on a model that thinks first (DeepSeek incident, D-203): a 64 MiB chat stream backstop with line and kept-text caps, a new `STREAM_ENDED` failure asked again once, `insufficient_system_resource` and `aborted` as failures, reasoning counted and sent back in the tool loop for OpenAI-compatible and OpenRouter connections, a warn log line with facts only; tests in `tests/server/ai-adapters.test.ts` and `tests/server/assistant-chat-stream.test.ts`
 - [x] Assistant answers finish behind the classroom PIN lock (D-204): only a signed-out or ended session stops a run; read tools run, changes still wait for the Yes, nothing is shown while locked; tests in `tests/server/assistant-chat-stream.test.ts`
-- [ ] Production update with these fixes (owner decides)
+- [x] Production update with these fixes (owner decides): `d135461` on sareteacher.com 2026-11-12 (owner: "take a backup and push to production")
 
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
