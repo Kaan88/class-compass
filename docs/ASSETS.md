@@ -21,6 +21,15 @@ No CC0 audio is currently included. If one is ever added, list it here with its 
 | Badge icons (94) and tier frames (S13c) | Original SVG paths drawn for Class Compass (`src/client/achievements/icons.tsx`), stroked and filled with theme tokens. No third-party icon set (D-125) | Part of this code base |
 | Avatars: 120+ ready-made characters and the layered creator parts (S13c) | Original SVG shapes drawn in code (`src/client/avatars/AvatarArt.tsx`) from a catalogue (`src/shared/avatars.ts`), coloured with theme tokens. Not copied from or imitating South Park or any other show or game (D-125) | Part of this code base |
 
+## Fonts (test only, never shipped)
+
+The app ships no font: it uses the device's own (`src/shared/themePackage/presets.ts`). Only the e2e job on the Ubuntu CI runner installs fonts, so that text is measured as on a Windows classroom display (D-205). Nothing of them is committed or reaches a build.
+
+| Font | Source | Licence |
+|---|---|---|
+| Selawik 1.01 (stand-in for `system-ui` and `Segoe UI`) | Microsoft, https://github.com/microsoft/Selawik, release `1.01`, `Selawik_Release.zip` (SHA-256 `3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423`), downloaded by `.github/workflows/ci.yml` | SIL Open Font License 1.1 |
+| Comic Neue (in the playful preset's own list) | Ubuntu package `fonts-comic-neue` | SIL Open Font License 1.1 |
+
 ## Text
 
 | Asset | Source | Licence |

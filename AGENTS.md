@@ -94,6 +94,7 @@ decision and migration numbers.
 - **Test-only overrides** (e.g. `CC_TEST_PIN_RATE_LIMIT`, `CC_TEST_LOGIN_RATE_LIMIT` in `src/server/config.ts`) take effect only under `NODE_ENV=test`; never add one that works in production.
 - **`.env` is for the Node server only.** `vite.config.ts` sets `envDir: false`, because a `NODE_ENV` read from `.env` once made `vite build` ship React's development build. Keep it that way.
 - **The student page has a size budget** (`scripts/student-budget.ts`, D-151), checked by `npm run build`. Do not import teacher-only or server-only code into shared modules the student page uses; the `mcp` property on contracts is stripped from client builds, so never read it in client code. A new string goes into the staff dictionary (`src/shared/i18n/areas/staff/`) unless the student page shows it (D-182; `tests/scripts/i18n-split.test.ts` says which).
+- **Fit specs and fonts.** The app ships no font; the e2e job on Ubuntu draws `system-ui` / `Segoe UI` with Selawik (Segoe UI's metrics, `e2e/fonts/fonts.conf`, D-205). A fit spec that passes on Windows and fails in CI by a few pixels usually means a layout with no slack: give the screen room to wrap or shrink, do not loosen the assertion. Manual CI runs take a `specs` input.
 - **Docker images contain only what `.dockerignore` lets in and the Dockerfile copies.** A file the client build or the server reads at run time (guides, docs used as AI tool resources) must be in both; `tests/scripts/docker.test.ts` checks this.
 
 ## Docs index

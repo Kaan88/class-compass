@@ -2,14 +2,20 @@ name: CI
 # Kept lean (D-082; written while the repo was private and Actions minutes were limited):
 # - every push to main: one Ubuntu job (typecheck, lint, unit/integration tests, build);
 #   docs-only pushes are skipped and superseded runs are cancelled
-# - Windows and browser (e2e) jobs: weekly and on demand (Actions tab → CI → Run workflow).
-#   They are also run locally before each stage is committed.
+# - Windows and browser (e2e) jobs: weekly and on demand (Actions tab → CI → Run workflow; the
+#   `specs` input runs only the named e2e specs). They are also run locally before each stage is
+#   committed. The full e2e suite takes about 25 minutes on the Ubuntu runner (D-205).
 on:
   push:
     branches: [main]
     paths-ignore: ['docs/**', '**/*.md']
   pull_request:
   workflow_dispatch:
+    inputs:
+      specs:
+        description: 'e2e only: spec files to run (space-separated, e.g. e2e/board-40.spec.ts); empty runs the whole suite'
+        required: false
+        default: ''
   schedule:
     - cron: '0 3 * * 1'
 
@@ -50,7 +56,7 @@ jobs:
     # Browser tests against a throw-away server with the fictional demo school (D-037).
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,7 +65,25 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      # Ubuntu has none of the fonts the app names (system-ui is Segoe UI on the Windows classroom
+      # displays the fit specs were written for) and falls back to the much wider DejaVu Sans.
+      # Selawik is Microsoft's open (OFL) stand-in made to Segoe UI's metrics; Comic Neue is in the
+      # playful preset's own list. Pinned by checksum (D-205; e2e/fonts/fonts.conf).
+      - name: Fonts like a Windows classroom display
+        run: |
+          sudo apt-get install -y --no-install-recommends fonts-comic-neue
+          curl -fsSL -o /tmp/selawik.zip https://github.com/microsoft/Selawik/releases/download/1.01/Selawik_Release.zip
+          echo "3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423  /tmp/selawik.zip" | sha256sum -c -
+          mkdir -p ~/.local/share/fonts/selawik ~/.config/fontconfig
+          unzip -o -q -j /tmp/selawik.zip '*.ttf' -d ~/.local/share/fonts/selawik
+          cp e2e/fonts/fonts.conf ~/.config/fontconfig/fonts.conf
+          fc-cache -f
+          for f in system-ui sans-serif 'Segoe UI' 'Trebuchet MS' 'Comic Sans MS'; do echo "$f -> $(fc-match "$f")"; done
+          fc-match 'Segoe UI' | grep -q Selawik
+          fc-match system-ui | grep -q Selawik
+      - run: npx playwright test $SPECS
+        env:
+          SPECS: ${{ github.event.inputs.specs }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
