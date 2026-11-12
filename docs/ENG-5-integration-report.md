@@ -10,7 +10,7 @@ are thin, the report says so instead of filling the gap.
 
 **Status at the time of writing (2026-11-12):** the app has been installed and exercised on three
 machines (a Debian test VM, the owner's mini PC and the owner's Oracle ARM server). The test site
-`test.sareteacher.com` and production (`sareteacher.com`) run `d135461`. Many checks that need people, real devices or outside
+`test.sareteacher.com` and production (`sareteacher.com`) run `403b7a2`. Many checks that need people, real devices or outside
 services are still open (section 5).
 
 ## 1. Environments actually used
@@ -99,6 +99,7 @@ by one: for each deploy they state only "healthy", with the backup and migration
 | 2026-11-12 | `7076232` (AI stream failures: 64 MiB chat stream backstop, early end is `STREAM_ENDED` with one retry, fact-only failure log, DeepSeek reasoning sent back in the tool loop; D-203) | test | none | backup, healthy; `npm run check` green (2831 tests), build within the student page budget, AI and Assistant e2e specs green; the first deploy after the history rewrite (D-202), so the image tag uses the new id |
 | 2026-11-12 | `d135461` (assistant answers finish behind the classroom PIN lock; a stream broken by the lock reads its missed events after the unlock; D-204) | test | none | backup, healthy; `npm run check` green (2835 tests), build within the student page budget |
 | 2026-11-12 | `d135461` (from `4a770f2`; owner's request) | **production** | `0025`–`0033` | backup and pre-migration snapshot, healthy, no error lines, still behind Access; full e2e not rerun for this commit (last full run 149 passed at `050127f`; Linux e2e being fixed separately) |
+| 2026-11-13 | `403b7a2` (top bar fix, D-205 note) | test, then **production** | none | backups, healthy, no error lines; CI green twice in a row on `b35ca99` (check, check-windows, e2e with the Linux visual step) |
 
 So every migration from the baseline to `0033` has been applied on a deployed copy holding weeks of
 fictional history, on top of the snapshot the app takes first. A **rollback** (OPERATIONS section 5)
