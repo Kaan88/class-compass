@@ -134,11 +134,18 @@ test('admin creates links; a phone scorer finds "isik", gives +1 and undoes; the
 });
 
 /** How many lines the text of an element takes. */
+/** Lines of text inside an element: only its text nodes count, so an icon beside the text (a box of
+ * its own height, whose bottom can round apart from the text's with another font) is not a line. */
 async function textLines(locator: Locator) {
   return locator.evaluate((el) => {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    return new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.bottom))).size;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const bottoms = new Set<number>();
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const r of range.getClientRects()) if (r.width > 0) bottoms.add(Math.round(r.bottom));
+    }
+    return bottoms.size;
   });
 }
 

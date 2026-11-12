@@ -2266,6 +2266,30 @@ html:has(.cc-classroom) {
   justify-content: flex-end;
   gap: 0.5rem;
 }
+/* D-205: above 90rem the bar is one flex row with the same sizes as the grid above when there is
+   room (class and date blocks grow equally from their own width, so the quote stays centred between
+   them), but when the row is short the quote gives way first (shrink factor 100: it wraps to more
+   lines) and a tool drops to a second row only after the quote is at its narrowest. As grid `auto`
+   columns, the quote and the tools shared the shortage equally, and "Öğretmen alanı" wrapped onto a
+   second row at 1470×956 in Turkish with a font a little wider than Segoe UI (found on the Ubuntu
+   CI runner). The tools can still wrap, so large text never pushes the bar off the screen. */
+@media (width > 90rem) {
+  .cc-classroom-bar {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+  .cc-classroom-bar__class,
+  .cc-classroom-bar__when {
+    flex: 1 1 0;
+    min-width: max-content;
+  }
+  .cc-classroom-bar__when {
+    justify-content: flex-end;
+  }
+  .cc-topbar__slot--quote {
+    flex: 0 100 auto;
+  }
+}
 /* S14b (D-148): the quote stays on the bar's one row down to 75rem (at most two lines), so the
    board keeps that height for the student grid on 1280–1440 px displays. */
 @media (max-width: 90rem) {
