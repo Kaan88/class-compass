@@ -177,7 +177,11 @@ Hedef sınıfa gösterilir; çocuklar için yazın. Modülü kapatmak adımı, k
 
 ![Panoda, bugünün odağının yanında Bugünkü hedefimiz](../img/tr/classroom-goal.png)
 
+![Öğrenme hedefi aşamasında rutin kutusu ve bugünün hedefi](../img/tr/routine-goal.png)
+
 ![Dersi bitir: Hedefimize ulaştık mı?](../img/tr/end-lesson-goal.png)
+
+![Ders kaydedildi: Hedefimiz ve sınıfın cevabı](../img/tr/lesson-summary-goal.png)
 
 ### Rutin ve zamanlayıcı
 

@@ -177,7 +177,11 @@ The goal is shown to the class, so write it for the children. Switching the modu
 
 ![Today's goal on the board, next to today's focus](../img/en/classroom-goal.png)
 
+![The routine box on the Learning goal stage, with today's goal](../img/en/routine-goal.png)
+
 ![End lesson: Did we reach our goal?](../img/en/end-lesson-goal.png)
+
+![Lesson saved: Our goal with the class's answer](../img/en/lesson-summary-goal.png)
 
 ### Routine and timer
 

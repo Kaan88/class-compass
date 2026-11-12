@@ -472,16 +472,17 @@ for (const lang of ['en', 'tr'] as const) {
         await groups.click();
         const screen = tp.getByTestId('dock-view-groups');
         await expect(screen).toBeVisible();
+        // The options arrive with the grouping query: wait for them (a count() before they load skipped the
+        // tap, and the picture and the award dialog then had no groups).
         const option = screen.getByTestId('group-options').getByRole('button').first();
-        if (await option.count()) {
-          // A tap while the screen is still opening can be lost: tap again until the groups are shown.
-          const cards = screen.getByTestId('group-card').first();
-          for (let i = 0; i < 3 && !(await cards.isVisible()); i++) {
-            await option.click();
-            await cards.waitFor({ state: 'visible', timeout: 4000 }).catch(() => undefined);
-          }
-          await expect(cards).toBeVisible();
+        await expect(option).toBeVisible();
+        // A tap while the screen is still opening can be lost: tap again until the groups are shown.
+        const cards = screen.getByTestId('group-card').first();
+        for (let i = 0; i < 3 && !(await cards.isVisible()); i++) {
+          await option.click();
+          await cards.waitFor({ state: 'visible', timeout: 4000 }).catch(() => undefined);
         }
+        await expect(cards).toBeVisible();
         await tp.waitForTimeout(800);
         await shot(tp, lang, 'group-screen');
         await tp.keyboard.press('Escape');
@@ -527,6 +528,45 @@ for (const lang of ['en', 'tr'] as const) {
       await tp.getByRole('button', { name: T('classroom.teacherArea') }).click();
       await expect(tp.getByText(T('pin.enter')).first()).toBeVisible();
       await shot(tp, lang, 'pin-lock');
+      for (const d of PIN) await tp.getByRole('button', { name: d, exact: true }).click();
+      await tp.getByRole('button', { name: T('pin.unlock') }).click().catch(() => undefined);
+      await expect(tp.getByTestId('teacher-menu')).toBeVisible();
+      await endActiveLessons(tp);
+
+      // S28a (D-197): a second lesson with the default routine (the demo history gives 3-A a routine of
+      // its own without a "Learning goal" stage) and today's goal: the goal on that stage, then the
+      // lesson saved with the class's answer and the "Lesson saved" summary.
+      const cmd3A = async (type: string, payload: Record<string, unknown>) => {
+        const r = await api(tp, 'POST', '/api/commands', {
+          commands: [{ opId: randomUUID(), type, contextId: ctx3A.id, ...(payload.lessonId ? { lessonId: payload.lessonId } : {}), payload: { contextId: ctx3A.id, ...payload } }],
+        });
+        expect(r.body.results[0].ok, type).toBe(true);
+        return r.body.results[0].result as { lessonId: string };
+      };
+      const { lessonId: goalLessonId } = await cmd3A('lesson.start', { routineTemplateId: 'builtin:default', othersPresent: true });
+      await cmd3A('lessonGoals.set', { lessonId: goalLessonId, text: goalText });
+      const goalLesson = (await api(tp, 'GET', `/api/classroom/contexts/${ctx3A.id}/lesson`)).body;
+      const goalStageIndex = (goalLesson.lesson.routine.stages as Array<{ id: string }>).findIndex((st) => st.id === 'learning-goal');
+      expect(goalStageIndex).toBeGreaterThanOrEqual(0);
+      await tp.goto('/classroom');
+      if (!(await dashboard.isVisible())) await tp.getByRole('button', { name: /^3-A · (English|İngilizce)/u }).click();
+      await expect(dashboard).toBeVisible();
+      await tp.getByTestId('routine-stages').getByRole('button').nth(goalStageIndex).click();
+      await expect(tp.getByTestId('stage-goal')).toContainText(goalText);
+      await tp.waitForTimeout(800);
+      await shotAround(tp, lang, 'routine-goal', ['[data-box="routine"]']);
+      await tp.getByRole('button', { name: T('lesson.end'), exact: true }).click();
+      await expect(tp.getByTestId('end-lesson')).toBeVisible();
+      await tp.getByTestId('lesson-goal-review').getByRole('radio', { name: T('lessonGoals.outcome.reached') }).click();
+      await tp.getByRole('button', { name: T('lesson.saveAndEnd') }).click();
+      const summary = tp.getByTestId('lesson-summary');
+      await expect(summary.getByTestId('summary-goal')).toContainText(goalText);
+      await expect(summary.getByTestId('summary-goal')).toContainText(T('lessonGoals.outcome.reached'));
+      await tp.waitForTimeout(500);
+      await shot(tp, lang, 'lesson-summary-goal', { clipTo: '[data-testid="lesson-summary"]' });
+      // Back to the teacher area (the PIN again), as the rest of the script expects.
+      await tp.getByRole('button', { name: T('classroom.teacherArea') }).click();
+      await expect(tp.getByText(T('pin.enter')).first()).toBeVisible();
       for (const d of PIN) await tp.getByRole('button', { name: d, exact: true }).click();
       await tp.getByRole('button', { name: T('pin.unlock') }).click().catch(() => undefined);
       await expect(tp.getByTestId('teacher-menu')).toBeVisible();
