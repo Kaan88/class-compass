@@ -53,7 +53,8 @@ export function loadLargeWords(): Promise<void> {
  * Check a text when the student presses Save (S14d: hints show only then). The same shared rules as
  * the server, with the school's limits and the page's starters. A text with an unkind word is still
  * sent, so the server counts the attempt for the teacher's notice (D-123); anything else waits for
- * the student to change it. A word the page does not know yet is the server's call (D-198, above).
+ * the student to change it. A word the page does not know yet is the server's call (D-198, above), also
+ * when it makes the text look like keyboard mashing ("property" has the keyboard row "erty").
  */
 export function useSaveCheck(data: StudentGoalsSection) {
   const { t } = useI18n();

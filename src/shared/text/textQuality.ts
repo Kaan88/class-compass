@@ -90,23 +90,34 @@ const MUTATIONS: Record<string, string> = { b: 'p', d: 't', g: 'k', c: 'c' };
 export interface WordDictionary {
   readonly en: ReadonlySet<string>;
   readonly tr: ReadonlySet<string>;
+  /**
+   * Words this dictionary never calls known, not even through a shorter word plus an ending ("boner" is
+   * not "bone" + "r", "kerhanede" not "kerhan" + "e" + "de"): the slurs, vulgar and drug words of
+   * `notForSchool.ts` and the folded risky words that the large lists leave out (D-198). Never a word the
+   * small lists recognise, so a text the small lists accept is accepted with the large ones too.
+   */
+  readonly notKnown?: ReadonlySet<string>;
 }
 export const SMALL_WORDS: WordDictionary = { en: EN_WORDS, tr: TR_WORDS };
 
 /**
- * Reasons that depend on the dictionary passed in: with a larger one they can only become rarer. Keyboard
- * mashing is not one of them: it always looks at the words our small lists do not know (D-198), so a
- * generated list can never make mashing ("lololo", "asdf") pass.
+ * Reasons that depend on the dictionary passed in: with a larger one they can only become rarer.
+ * Keyboard mashing is one of them since the S28b review (D-198): a real word the large lists know
+ * ("property", "poverty") is no longer read as a keyboard row. With them a text is mashing only when it
+ * is mashing with our small lists too, and the generated lists hold no word that looks like mashing
+ * (no vowel, three same letters, a repeated piece), so "asdf" and "lololo" are still caught.
  */
-export const DICTIONARY_REASONS: ReadonlySet<TextReason> = new Set<TextReason>(['LONG_WORD', 'FEW_VOWELS', 'UNKNOWN_WORDS']);
+export const DICTIONARY_REASONS: ReadonlySet<TextReason> = new Set<TextReason>(['KEYBOARD_MASH', 'LONG_WORD', 'FEW_VOWELS', 'UNKNOWN_WORDS']);
 
-/** A folded English word, or the word without a simple ending (-s, -ed, -ing, …), is in `words`. */
-export function enRecognised(w: string, words: ReadonlySet<string> = EN_WORDS): boolean {
+/** A folded English word, or the word without a simple ending (-s, -ed, -ing, …), is in `words` (a `notKnown` word never is). */
+export function enRecognised(w: string, words: ReadonlySet<string> = EN_WORDS, notKnown?: ReadonlySet<string>): boolean {
   if (words.has(w)) return true;
+  if (notKnown?.has(w)) return false;
   for (const end of EN_ENDINGS) {
     if (!w.endsWith(end) || w.length - end.length < 2) continue;
     const base = w.slice(0, -end.length);
-    if (words.has(base) || words.has(`${base}e`)) return true;
+    // A not-known word plus an ending stays unknown ("hookers"); "spiced" is still "spice" + "d".
+    if ((words.has(base) && !notKnown?.has(base)) || words.has(`${base}e`)) return true;
     if (end === 'ies' && words.has(`${base}y`)) return true;
     // stopped → stop, running → run
     if (base.length > 2 && base.at(-1) === base.at(-2) && words.has(base.slice(0, -1))) return true;
@@ -114,14 +125,18 @@ export function enRecognised(w: string, words: ReadonlySet<string> = EN_WORDS): 
   return false;
 }
 
-/** A folded Turkish word, or the word without up to four suffixes (and a consonant change), is in `words`. */
-export function trRecognised(w: string, words: ReadonlySet<string> = TR_WORDS, depth = 0): boolean {
+/**
+ * A folded Turkish word, or the word without up to four suffixes (and a consonant change), is in `words`;
+ * a `notKnown` word on the way ends that path ("kerhanede" → "kerhane" is not "kerhan" + "e").
+ */
+export function trRecognised(w: string, words: ReadonlySet<string> = TR_WORDS, depth = 0, notKnown?: ReadonlySet<string>): boolean {
   if (words.has(w)) return true;
+  if (notKnown?.has(w)) return false;
   const last = w.at(-1) ?? '';
   if (MUTATIONS[last] && words.has(w.slice(0, -1) + MUTATIONS[last])) return true;
   if (depth >= 4) return false;
   for (const s of TR_SUFFIXES_LONGEST_FIRST) {
-    if (w.length - s.length >= 2 && w.endsWith(s) && trRecognised(w.slice(0, -s.length), words, depth + 1)) return true;
+    if (w.length - s.length >= 2 && w.endsWith(s) && trRecognised(w.slice(0, -s.length), words, depth + 1, notKnown)) return true;
   }
   return false;
 }
@@ -130,7 +145,9 @@ export function trRecognised(w: string, words: ReadonlySet<string> = TR_WORDS, d
 export function isRecognisedWord(word: string, words: WordDictionary = SMALL_WORDS): boolean {
   const w = foldForSearch(word).replace(/['’]/gu, '');
   if (!w) return false;
-  return enRecognised(w, words.en) || trRecognised(w, words.tr);
+  // With `notKnown` our small lists are asked first, so the large dictionary never knows less than they do.
+  if (words.notKnown && words !== SMALL_WORDS && (enRecognised(w, EN_WORDS) || trRecognised(w, TR_WORDS))) return true;
+  return enRecognised(w, words.en, words.notKnown) || trRecognised(w, words.tr, 0, words.notKnown);
 }
 
 // ---------------------------------------------------------------- language check
@@ -287,13 +304,16 @@ export function checkStudentText(
   const upper = letters.filter((ch) => ch !== lowerTr(ch) && ch === ch.toLocaleUpperCase('tr-TR')).length;
   if (upper >= SHOUT_LETTERS && upper / letters.length > 0.7) return { ok: false, reason: 'SHOUTING' };
 
-  // Keyboard mashing looks at the words our own small lists do not know, whatever dictionary is passed in
-  // (D-198: the rule behaves exactly as before the larger lists); the other rules use `opts.words`.
+  // Keyboard mashing looks at the unknown words: one typed along a keyboard row or made of a repeated
+  // piece, or a row run across them ("asd fgh"). With a larger dictionary (D-198) a text is mashing only
+  // when it is mashing with our small lists AND without the words the larger one knows: "property" and
+  // "hunter tyrannosaurus" are real, "asdf" is still mashing, and the reason never comes up more often.
   const plain = (w: string) => lowerTr(w).replace(/['’]/gu, '');
-  const smallUnknown = words.filter((w) => !isRecognisedWord(w)).map(plain);
-  if (smallUnknown.some((w) => w.length >= 4 && (hasRowRun(w) || REPEATED_UNIT.test(w))) || hasRowRun(smallUnknown.join(''))) return { ok: false, reason: 'KEYBOARD_MASH' };
+  const mashing = (unknownWords: readonly string[]) => unknownWords.some((w) => w.length >= 4 && (hasRowRun(w) || REPEATED_UNIT.test(w))) || hasRowRun(unknownWords.join(''));
   const known = words.map((w) => isRecognisedWord(w, opts.words));
   const unknown = words.filter((_, i) => !known[i]).map(plain);
+  const smallUnknown = opts.words ? words.filter((w) => !isRecognisedWord(w)).map(plain) : unknown;
+  if (mashing(smallUnknown) && mashing(unknown)) return { ok: false, reason: 'KEYBOARD_MASH' };
   if (unknown.some((w) => [...w].length > MAX_WORD)) return { ok: false, reason: 'LONG_WORD' };
   if (unknown.some((w) => [...w].length >= 5 && vowelRatio(w) < 0.2) || (letters.length >= 8 && vowelRatio(t) < 0.22)) return { ok: false, reason: 'FEW_VOWELS' };
 

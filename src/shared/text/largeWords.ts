@@ -5,6 +5,7 @@
  * loads it with its first render: the server always checks with it, and the page loads it (`import()`)
  * only after its own small lists found a word they did not know (`student/common.tsx`).
  */
+import { NOT_KNOWN } from './notForSchool.ts';
 import type { WordDictionary } from './textQuality.ts';
 import { EN_WORDS } from './wordsEn.ts';
 import { LARGE_EN, LARGE_EN_NOTICE } from './wordsLargeEn.ts';
@@ -13,9 +14,10 @@ import { TR_WORDS } from './wordsTr.ts';
 
 const words = (list: string) => list.split(/\s+/u).filter(Boolean);
 
-/** `notices`: the copyright and licence notices of the generated lists, a property so that every build carrying the lists carries them. */
+/** `notKnown`: slurs, vulgar and drug words never known (`notForSchool.ts`). `notices`: the copyright and licence notices of the generated lists, a property so that every build carrying the lists carries them. */
 export const LARGE_WORDS: WordDictionary & { readonly notices: readonly string[] } = {
   en: new Set([...EN_WORDS, ...words(LARGE_EN)]),
   tr: new Set([...TR_WORDS, ...words(LARGE_TR)]),
+  notKnown: NOT_KNOWN,
   notices: [LARGE_EN_NOTICE, LARGE_TR_NOTICE],
 };

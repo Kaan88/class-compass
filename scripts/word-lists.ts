@@ -27,19 +27,22 @@
  *    changes. Words that look like mashing are dropped too: no vowel, three same letters in a row, one
  *    short piece repeated ("haha", "tutu").
  * 2. Drops every word the built-in language check refuses (`findRiskyWord`, with its endings and
- *    spellings), the words of `NOT_FOR_SCHOOL` and the beginnings of `NOT_FOR_SCHOOL_STEMS` below (adult,
- *    drug and insult words the language check does not block) and `NOT_WORDS`. Those words are not
- *    "known": a word that is not known is never refused for that alone, it only counts towards the
- *    unknown share.
+ *    spellings), the folded spelling of every risky word (also the `noFold` ones: "pust", "pic"), the
+ *    words of `NOT_FOR_SCHOOL` (`src/shared/text/notForSchool.ts`) and the beginnings of
+ *    `NOT_FOR_SCHOOL_STEMS` below (slurs, sexual, vulgar and drug words the language check does not
+ *    block) and `NOT_WORDS`. Those words are not "known": a word that is not known is never refused for
+ *    that alone, it only counts towards the unknown share.
  * 3. Drops every word the check already recognises with our own small lists or with shorter words of the
  *    list (shortest first: "walked" goes when "walk" is in), which keeps the lists small without changing
- *    what they accept.
+ *    what they accept. A not-known word is never such a shorter word (`notKnown`, D-198).
+ * 4. Fails when a not-known word or its plural is still recognised with the finished lists.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { NOT_FOR_SCHOOL, NOT_FOR_SCHOOL_EN, NOT_FOR_SCHOOL_TR, NOT_KNOWN } from '../src/shared/text/notForSchool.ts';
 import { RISKY_EN, RISKY_TR } from '../src/shared/text/riskyWords.ts';
-import { enRecognised, findRiskyWord, trRecognised } from '../src/shared/text/textQuality.ts';
+import { enRecognised, findRiskyWord, isRecognisedWord, trRecognised } from '../src/shared/text/textQuality.ts';
 import { foldForSearch, lowerTr } from '../src/shared/text/turkish.ts';
 import { EN_WORDS } from '../src/shared/text/wordsEn.ts';
 import { TR_WORDS } from '../src/shared/text/wordsTr.ts';
@@ -71,21 +74,13 @@ const PINNED: Record<string, string> = {
 
 /**
  * Words that are real but not wanted as "known" in a primary-school app and that the language check
- * does not block (it blocks `riskyWords.ts`): slurs and insults, sexual and drug words. Words with an
- * everyday meaning stay (crack, weed, strip). Matched on the folded word and, for English, its plural.
+ * does not block: the hand list in `src/shared/text/notForSchool.ts` (slurs and insults, sexual, vulgar
+ * and drug words). Matched on the folded word and, for English, its plural; `NOT_KNOWN` adds the folded
+ * spelling of every built-in risky word, which `findRiskyWord` does not match for the `noFold` entries
+ * ("pust" for "puşt", "pic" for "piç").
  */
-export const NOT_FOR_SCHOOL = new Set(
-  `
-  anal anus arousal bimbo blowjob boner booze brothel cannabis cocaine condom dildo drunkard erection genital genitals
-  hardcore heroin homo horny incest junkie kinky marijuana nude nudity orgy pervert pimp scum semen sperm stripper
-  testicle vulgar whore hooker bong cum dyke kike spic chink gook wop dago tranny coon jap paki queer nazi hell
-  esrar eroin kokain prezervatif fahise genelev kerhane kevase surtuk kancik durzu deyyus yosma kaltak pezevenk zina
-  ensest vajina travesti ibne cinsellik seks seksi sexy
-  `
-    .split(/\s+/u)
-    .filter(Boolean)
-    .map((w) => foldForSearch(w)),
-);
+export { NOT_FOR_SCHOOL };
+const RISKY_FOLDS = new Set([...RISKY_EN, ...RISKY_TR].map((e) => foldForSearch(e.w)));
 
 /** Tokens of the Turkish frequency list (news and web text) that are not words: web addresses, agency and party abbreviations, filler. */
 export const NOT_WORDS = new Set('com www http https html org net edit dha aa iha akp chp mhp hdp nde yaa'.split(' '));
@@ -110,14 +105,17 @@ function readPinned(dir: string, name: string): Buffer {
 export const NOT_FOR_SCHOOL_STEMS: readonly string[] = [
   ...[...RISKY_EN, ...RISKY_TR].filter((e) => !e.noFold && !e.exact).map((e) => foldForSearch(e.w)).filter((w) => w.length >= 4),
   ...'damn piss sexual sexie sexed sexes penis vagin porn masturb orgasm erotic prostitut fornicat rapist pedophil paedophil'.split(' '),
-  ...'porno sevisme sevismek tecavuz fahise uyusturucu'.split(' '),
+  ...'ejaculat copulat sodom molest nymphoman masochis sadis booz'.split(' '),
+  ...'porno sevisme sevismek tecavuz fahise uyusturucu osur tasak sehvet erotik orgazm kulampara zampara esrarkes gerizekal cinsel kokain'.split(' '),
 ];
 
 /** Not a word we want to call known: unwanted, risky, or looks like mashing (no vowel, only vowels, "aaah", "hmm", "haha"). */
 export const unwanted = (w: string) =>
   NOT_FOR_SCHOOL.has(w) ||
+  NOT_KNOWN.has(w) ||
+  RISKY_FOLDS.has(w) ||
   NOT_WORDS.has(w) ||
-  (w.endsWith('s') && NOT_FOR_SCHOOL.has(w.slice(0, -1))) ||
+  (w.endsWith('s') && NOT_FOR_SCHOOL_EN.has(w.slice(0, -1))) ||
   NOT_FOR_SCHOOL_STEMS.some((stem) => w.startsWith(stem)) ||
   findRiskyWord(w) !== null ||
   !/[aeiouy]/u.test(w) ||
@@ -129,12 +127,24 @@ export const unwanted = (w: string) =>
 /** Shortest first, then alphabetical: base forms come before the forms made from them. */
 const byLength = (a: string, b: string) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0);
 
+/**
+ * A not-known word of the same language with endings ("clitorises", "seduced", "mulattoes",
+ * "gavurcasina"): the language's recognition with those words as the dictionary. Turkish only from four
+ * letters, because its suffix stripping would make innocent words of the short ones ("sicim" is not
+ * "sic" + "im"), and never with English words ("analiz" is not "anal" + "iz").
+ */
+const notKnownOf = (words: ReadonlySet<string>, risky: readonly { w: string }[], min: number) =>
+  new Set([...words, ...risky.map((e) => foldForSearch(e.w))].filter((w) => NOT_KNOWN.has(w) && w.length >= min));
+const NOT_KNOWN_EN = notKnownOf(NOT_FOR_SCHOOL_EN, RISKY_EN, 3);
+const NOT_KNOWN_TR4 = notKnownOf(NOT_FOR_SCHOOL_TR, RISKY_TR, 4);
+export const notKnownForm = { en: (w: string) => enRecognised(w, NOT_KNOWN_EN), tr: (w: string) => trRecognised(w, NOT_KNOWN_TR4) };
+
 /** Keep only what `recognised` does not already accept with the small list and the words kept so far. */
-function compact(candidates: Iterable<string>, small: ReadonlySet<string>, recognised: (w: string, words: ReadonlySet<string>) => boolean): string[] {
+function compact(candidates: Iterable<string>, small: ReadonlySet<string>, recognised: (w: string, words: ReadonlySet<string>) => boolean, derived: (w: string) => boolean): string[] {
   const words = new Set(small);
   const kept: string[] = [];
   for (const w of [...new Set(candidates)].sort(byLength)) {
-    if (unwanted(w) || recognised(w, words)) continue;
+    if (unwanted(w) || derived(w) || recognised(w, words)) continue;
     words.add(w);
     kept.push(w);
   }
@@ -155,7 +165,7 @@ export function englishWords(scowlFinal: string): string[] {
       }
     }
   }
-  return compact(out, EN_WORDS, enRecognised);
+  return compact(out, EN_WORDS, (w, words) => enRecognised(w, words, NOT_KNOWN), notKnownForm.en);
 }
 
 const TR_LETTERS = /^[a-zçğıöşüâîû]+$/u;
@@ -197,16 +207,34 @@ export function turkishWords(zemberek: string): string[] {
     const raw = line.trim();
     if (raw && raw === lowerTr(raw) && TR_LETTERS.test(raw)) add(raw);
   }
-  return compact(out, TR_WORDS, trRecognised);
+  return compact(out, TR_WORDS, (w, words) => trRecognised(w, words, 0, NOT_KNOWN), notKnownForm.tr);
 }
 
-/** The short notices that travel with the lists into the client build (the full texts are in `src/shared/text/licenses/`). */
+/**
+ * Words the finished lists must not recognise, also not through a shorter word plus endings ("boner"
+ * as "bone" + "r"): every `NOT_KNOWN` word. Returns the ones that are (empty when fine).
+ */
+export function recognisedNotKnown(en: readonly string[], tr: readonly string[]): string[] {
+  const dict = { en: new Set([...EN_WORDS, ...en]), tr: new Set([...TR_WORDS, ...tr]), notKnown: NOT_KNOWN };
+  return [...NOT_KNOWN].filter((w) => isRecognisedWord(w, dict));
+}
+
+/**
+ * The notices that travel with the lists into the client build: a short line, then the full text of
+ * `src/shared/text/licenses/<file>` (SCOWL's Copyright file with the VarCon, Ispell and WordNet notices
+ * and the WordNet disclaimer, which must appear on all copies; the Apache License for Zemberek-NLP).
+ */
 export const NOTICES = {
   LARGE_EN:
-    'English word list derived from SCOWL 2020.12.07 (http://wordlist.aspell.net/). Copyright 2000-2018 by Kevin Atkinson; WordNet 1.6 Copyright 1997 by Princeton University. Permission to use, copy, modify, distribute and sell these word lists for any purpose is granted without fee, provided the copyright notices appear in all copies. Provided "as is" without warranty.',
+    'English word list derived from SCOWL 2020.12.07 (http://wordlist.aspell.net/), changed by Class Compass (filtered). Copyright 2000-2018 by Kevin Atkinson; VarCon Copyright 2000-2016 by Kevin Atkinson and Copyright 2016 by Benjamin Titze; Ispell word lists Copyright 1993, Geoff Kuenning, Granada Hills, CA, all rights reserved; WordNet 1.6 Copyright 1997 by Princeton University, all rights reserved. The full notices, conditions and disclaimers follow.',
   LARGE_TR:
-    'Turkish word list derived from Zemberek-NLP 0.18.0 (https://github.com/ahmetaa/zemberek-nlp). Copyright 2018 Ahmet A. Akın, Mehmet D. Akın. Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0); changed by Class Compass (stems, filtered).',
+    'Turkish word list derived from Zemberek-NLP 0.18.0 (https://github.com/ahmetaa/zemberek-nlp). Copyright 2018 Ahmet A. Akın, Mehmet D. Akın. Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0); changed by Class Compass (stems, filtered). The licence follows.',
 } as const;
+export const LICENSE_FILES = { LARGE_EN: 'scowl.txt', LARGE_TR: 'zemberek-nlp.txt' } as const;
+
+/** The notice string of a generated file: the short line and the full licence text. */
+export const noticeOf = (name: 'LARGE_EN' | 'LARGE_TR') =>
+  `${NOTICES[name]}\n\n${readFileSync(join(ROOT, 'src', 'shared', 'text', 'licenses', LICENSE_FILES[name]), 'utf8').replace(/\r\n/gu, '\n')}`;
 
 /** The generated TypeScript file: a header with the source and licence, the words in lines of about 120 characters. */
 export function render(name: 'LARGE_EN' | 'LARGE_TR', words: readonly string[], source: string): string {
@@ -226,8 +254,8 @@ export function render(name: 'LARGE_EN' | 'LARGE_TR', words: readonly string[], 
     ` * ${words.length} folded words; forms the check recognises from shorter words or our own lists are left out.`,
     ' */',
     // A string, not only a comment: the minifier drops comments, and `LARGE_WORDS.notices` holds the
-    // notices, so the built chunk the student page loads carries them too.
-    `export const ${name}_NOTICE = '${NOTICES[name].replace(/'/gu, "\\'")}';`,
+    // notices with the full licence texts, so the built chunk the student page loads carries them too.
+    `export const ${name}_NOTICE = ${JSON.stringify(noticeOf(name))};`,
     '',
     `export const ${name} = \``,
     ...lines,
@@ -239,9 +267,12 @@ export function render(name: 'LARGE_EN' | 'LARGE_TR', words: readonly string[], 
 export const EN_SOURCE = `English: SCOWL 2020.12.07 (http://wordlist.aspell.net/), size levels ${SCOWL_LEVELS.join(', ')} of the
 english, american and british word lists. Copyright 2000-2018 by Kevin Atkinson, and the copyrights
 of its sources (12dicts, Moby Words II and Brian Kelk's word list: public domain; WordNet 1.6
-Copyright 1997 by Princeton University): permission to use, copy, modify, distribute and sell these
-word lists for any purpose without fee, provided the notices appear in all copies. The full notices
-are in src/shared/text/licenses/scowl.txt; the lists are provided "as is" without warranty.`;
+Copyright 1997 by Princeton University; the american and british lists made with VarCon, Copyright
+2000-2016 by Kevin Atkinson and Copyright 2016 by Benjamin Titze, from the Ispell word lists,
+Copyright 1993, Geoff Kuenning, BSD licence): permission to use, copy, modify, distribute and sell
+these word lists for any purpose without fee, provided the notices appear in all copies. The full
+notices are in src/shared/text/licenses/scowl.txt and in LARGE_EN_NOTICE below; the lists are
+provided "as is" without warranty. Changed for Class Compass: folded, filtered.`;
 
 export const TR_SOURCE = `Turkish: Zemberek-NLP 0.18.0 (https://github.com/ahmetaa/zemberek-nlp), commit 688bd9b,
 morphology/src/main/resources/tr/master-dictionary.dict and first-10K. Copyright 2018 Ahmet A. Akın,
@@ -259,6 +290,8 @@ if (isMain) {
   };
   const en = englishWords(arg('--scowl'));
   const tr = turkishWords(arg('--zemberek'));
+  const leaks = recognisedNotKnown(en, tr);
+  if (leaks.length) throw new Error(`not-for-school words still recognised: ${leaks.join(' ')}`);
   writeFileSync(OUT_EN, render('LARGE_EN', en, EN_SOURCE));
   writeFileSync(OUT_TR, render('LARGE_TR', tr, TR_SOURCE));
   console.log(`wrote ${en.length} English and ${tr.length} Turkish words`);

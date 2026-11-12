@@ -5,9 +5,9 @@
  * Mehmet D. Akın, licensed under the Apache License, Version 2.0 (src/shared/text/licenses/zemberek-nlp.txt,
  * http://www.apache.org/licenses/LICENSE-2.0). Changed for Class Compass: reduced to folded stems,
  * filtered for a school app and for what the check already recognises.
- * 16600 folded words; forms the check recognises from shorter words or our own lists are left out.
+ * 16577 folded words; forms the check recognises from shorter words or our own lists are left out.
  */
-export const LARGE_TR_NOTICE = 'Turkish word list derived from Zemberek-NLP 0.18.0 (https://github.com/ahmetaa/zemberek-nlp). Copyright 2018 Ahmet A. Akın, Mehmet D. Akın. Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0); changed by Class Compass (stems, filtered).';
+export const LARGE_TR_NOTICE = "Turkish word list derived from Zemberek-NLP 0.18.0 (https://github.com/ahmetaa/zemberek-nlp). Copyright 2018 Ahmet A. Akın, Mehmet D. Akın. Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0); changed by Class Compass (stems, filtered). The licence follows.\n\nZemberek-NLP 0.18.0 (https://github.com/ahmetaa/zemberek-nlp, commit 688bd9b3cfde3cf6e3cc9c132609b859fccbf411),\nused by Class Compass for the generated Turkish word list src/shared/text/wordsLargeTr.ts (scripts/word-lists.ts,\nD-198): morphology/src/main/resources/tr/master-dictionary.dict and first-10K. Changes made by Class Compass:\nthe entries were reduced to folded stems and word forms and filtered for a primary-school app and for what\nthe text check already recognises. The LICENSE file of the project and the Apache License, Version 2.0 follow.\n\nCopyright 2018 Ahmet A. Akın, Mehmet D. Akın\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    http://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n\n\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.\n";
 
 export const LARGE_TR = `
 aba abajur abakus abandone abanoz abanozgiller abart abaso abat abazan abd abdal abdest abdestbozan abdesthane abdiaciz
@@ -148,9 +148,9 @@ biyoelektronik biyoenerji biyofizik biyogaz biyograf biyografik biyojeografi biy
 biyoloji biyolojik biyomedikal biyomekanik biyometeoroloji biyometeorolojik biyonik biyopsi biyosfer biyosimi biyotit
 biyotop bizatihi bizlengic bizmut bizon bizzat blastula blender blof blok blokaj bloknot blucin blum bluz boa boagiller
 bobinaj bobrek boca boce bocek bocekbasi bocekcil bocekhane bocekkabugu bocekkapan boceksavar boci bocu bocuk bocurgat
-bodosla boduc bog bogak boganak bogasak bogaz bogazkesen boguk bogunuk bogurtlen bogus bohca bohem bohriyum bok boks
-boksit boksor bol bolal bold bolero bolge bolgesel bolmec bolometre boluk bolukbasi bolungu bolunmez bolus bolut bom
-bomba bombardon bombe bombok bombos bomboz bon boncuk bonfile bonjur bonkor bono bonservis bop bopstil bor borak boraks
+bodosla boduc bog bogak boganak bogasak bogaz bogazkesen boguk bogunuk bogurtlen bogus bohca bohem bohriyum boks boksit
+boksor bol bolal bold bolero bolge bolgesel bolmec bolometre boluk bolukbasi bolungu bolunmez bolus bolut bom bomba
+bombardon bombe bombok bombos bomboz bon boncuk bonfile bonjur bonkor bono bonservis bop bopstil bor borak boraks
 borasit borat borazan borazancibasi borc bordo bordomtirak bordro borek borik bork borkenek bornoz bort boruk borulce
 bos bosal bosaltac bosat bosbogaz bosver bot botanik bovling boy boyahane boydak boydas boykot boykotaj boynuzlugiller
 boynuzluteke boyoz boyunduruk boyut boz bozahane bozarik bozbakkal bozdogan bozgeven bozgun bozkurt bozlak bozordek
@@ -194,10 +194,10 @@ cikagel cikak cikarayaz cikardigi cikarildi cikarildigi cikarilmasi cikarken cik
 cikolata cikrik ciktigi cil cilban cilbent cilbir cilehane cilekes cilet cilingir cilk cilkava cillop cilt cilve
 cilvebaz cilvekar cilveles cim cimbakuka cimbali cimbar cimbiz cimcek cimcik cimek cimento cin cinakop cinargiller cinas
 cinayaz cinayet cincik cincilya cincilyagiller cinekop cingar cingene cingi cingil cingirak cingirdak cingoz cinko
-cinkograf cinlak cinnet cins cinsabah cinsel cinsilatif cinsiyet cinyolu cip cipil ciplak cipo cips cir cirag cirak
-ciramoz cirboga circil circiplak cirdaval cirilciplak cirilda cirilti ciris cirit cirkef cirlak cirlayik cirmik cirnak
-cirnik ciro ciroz cirp cirpis cirt cirtlak cis ciset cisik cit citak citcitla citirbom citkirildim citlat citlembik
-citmik citpit civ civadra civankasi civanmert civanpercemi civelek civgar civgin civik civilda civildas civilti civit
+cinkograf cinlak cinnet cins cinsabah cinsilatif cinsiyet cinyolu cip cipil ciplak cipo cips cir cirag cirak ciramoz
+cirboga circil circiplak cirdaval cirilciplak cirilda cirilti ciris cirit cirkef cirlak cirlayik cirmik cirnak cirnik
+ciro ciroz cirp cirpis cirt cirtlak cis ciset cisik cit citak citcitla citirbom citkirildim citlat citlembik citmik
+citpit civ civadra civankasi civanmert civanpercemi civelek civgar civgin civik civilda civildas civilti civit
 civiyukari ciy ciyakla cizbiz cizelge cizgara cizge cizgi cizik cizilda cizilti cobanaldatan cobanaldatangiller
 cobancantasi cobandagarcigi cobandegnegi cobandudugu cobanignesi cobanpuskulu cobanpuskulugiller cobansuzgeci
 cobantaragi cobantuzlugu cocukcagiz cogal cografi cografya coguncek cogunlugu cogurcuk cokal cokbilmis cokek cokel
@@ -300,15 +300,15 @@ epey epidemi epidemik epidemiyoloji epidemiyolojik epiderm epifit epigenez epigr
 epilog episantir epistemoloji epistemolojik epitel epizot epope epri epsilon eradikasyon erat erbain erbap erbas erbin
 erbiyum erdem erden erdi erecek erek ereksiyon eren erg ergit ergonomi ergonomik erguvan erguvangiller eri erik eril
 erinc erincek eris erit eritrosit eriyik erk erkaniharbiyeiumumiye erkaniharp erkec erkecsakali erkekcil erkekevi ermin
-eroinman eros erotik erotizm erozyon erse ertele ertesi ervah erzak erzel esame esans esantiyon esaret esarp esas esatir
-esbabimucibe esbak esbap escinsel esef esek esekbasi esekkulagi esele eselek eselmobil eseme esen eser esericedit esey
-esham eshas esi esik esirge esit esitligi eskal eskalasyon eskatologya eskaza eskenar eskiz eskort eskrim eskulabi eslaf
-esle eslek eslenik eslik esmayihusna esmayiserife esmer esna esnaf esne esnek esofman espadril espas esperi espressivo
-espresso espri esprituel esraf esrarengiz esrarkes esre esref esri esrik essah essiz estamp estampaj ester estet estetik
-estomp esvap esya etajer etalon etanol etap etcil etek etibba etik etiket etil etilalkol etimolog etimoloji etimolojik
-etiyoloji etiyolojik etken etkinligi etmedigi etmez etnik etnograf etnografik etnolog etnoloji etnolojik etobur etokrasi
-etol etoloji etolojik etraf ettigi ettirgen ettoprak etut etuv etyemez euro eurobond evaze evc evcek evcil evdemonizm
-evdes evelallah evgin evham evic evirgen evkaf evladuiyal evlat evlek evolusyon evrak evrat evrensel evrik evril evrisik
+eros erotizm erozyon erse ertele ertesi ervah erzak erzel esame esans esantiyon esaret esarp esas esatir esbabimucibe
+esbak esbap escinsel esef esek esekbasi esekkulagi esele eselek eselmobil eseme esen eser esericedit esey esham eshas
+esi esik esirge esit esitligi eskal eskalasyon eskatologya eskaza eskenar eskiz eskort eskrim eskulabi eslaf esle eslek
+eslenik eslik esmayihusna esmayiserife esmer esna esnaf esne esnek esofman espadril espas esperi espressivo espresso
+espri esprituel esraf esrarengiz esre esref esri esrik essah essiz estamp estampaj ester estet estetik estomp esvap esya
+etajer etalon etanol etap etcil etek etibba etik etiket etil etilalkol etimolog etimoloji etimolojik etiyoloji
+etiyolojik etken etkinligi etmedigi etmez etnik etnograf etnografik etnolog etnoloji etnolojik etobur etokrasi etol
+etoloji etolojik etraf ettigi ettirgen ettoprak etut etuv etyemez euro eurobond evaze evc evcek evcil evdemonizm evdes
+evelallah evgin evham evic evirgen evkaf evladuiyal evlat evlek evolusyon evrak evrat evrensel evrik evril evrisik
 evropiyum evsaf evvel evveliyat eyalet eyer eyle eytam eytisim eyvah eyvallah eyvan eyyam eza ezber ezcumle ezel
 ezercesine ezgi ezgic ezik ezilgen ezimevi ezinc ezinti eziyet ezkaza ezofori ezoterik faal faaliyet fabl fabrika
 fabrikasyon fabrikator faca faceta facia factoring facuna fagfur fagosit fagositoz fagot fahis fahrenhayt fahri fahte
@@ -351,70 +351,70 @@ galatimeshur gale galebe galenit gali galibiyet galip galiz galon galos galsame 
 galvanometre galvanoplasti galvanoskop galvanotip galyot galyum gam gamaglobulin gamba gambot gamet gammaz gamze gang
 gangliyon gangster gani ganimet ganyan gar garabet garaj garantor garaz garazkar gard gardenparti gardifren gardirop
 garez gariban garibe gark garnizon garoz garp garpkari garson gasbet gaseyan gasil gasilhane gasip gasiy gasl gaslet
-gasp gassal gastrit gastroenterolog gastroenteroloji gastronom gastroskop gastrula gasy gasyol gato gauss gavot gavur
-gayakol gaybubet gayda gaye gayet gayr gayretkes gayriahlaki gayriakli gayriciddi gayriihtiyari gayriilmi gayrikabil
-gayrikafi gayrikanuni gayrilayik gayrimahdut gayrimahsus gayrimakul gayrimenkul gayrimeskun gayrimesru gayrimesul
-gayrimezru gayrimuayyen gayrimuhtemel gayrimumkun gayrimunasip gayrimuntazam gayrimusavi gayrimutabik gayrimutecanis
-gayriresmi gayrisafi gayrisahsi gayrisihhi gayritabii gayrivaki gayrivazih gayur gayya gayz gayzerit gaz gazal gazap
-gazel gazelhan gazeliyat gazetecilere gazetecilerin gazhane gazino gazisil gazoil gazojen gazolcer gazolin gazometre
-gazometri gazoyl gazoz gazve gebe geberik gebes gebre gec gecek gecekondu gecenek gecerken gecesefasi gecesefasigiller
-gecgecle gecik gecildi gecirdigi gecirgen gecirildi gecirilmesi gecis gecit gecmez gectigi ged gedik gedil gegir gegrek
-gelberi geldigi gelegen gelembe gelenek geleneksel gelgec gelgelelim gelgit gelinbogan gelincik gelincikgiller
-gelinfeneri gelinkusagi gelinparmagi gelirken gelis gelisiguzel gelistirdigi gelistirilmesi gelmez gelmic gem gen genc
-gencecik gencel genel genelge genelkurmay general genis genitif genles genlesmeolcer genom genosit genotip gensoru genz
-genzek genzel geoit geometri geometrik gepegenc gepgenc ger gercek gerceklesecek gerceklesmesi gerceklesti gerceklestigi
-gerceklestirdigi gerceklestirildi gerceklestirilecek gercekustu gerdaniyebuselik gerdek gerdel gerec gerek gerekirken
-gerekmez gerektigi gerelti gergedan gergedangiller gergef gergi geriatri gerilek gerilimolcer gerilla gerisingeri
-gerontoloji gerzek gestalt gestapo getirdigi getirildi getirildigi getirilmesi getirilmis getr getto gev geveze gevher
-gevis gevrek gevret gevsek gey geyik geyikgiller gez gezegen gezgin gibiydi gicik gicir gicis gidakla gidegen giderayak
-giderilmesi giderken gidik gidis gidisat gidon gik gilaburu gilligis gillugis gina gine ginseng gipta gir giranbaha
-giray girdap girdigi girerken girgin girgirla girift giriftzen giris girisik girisimolcer girisken girizgah girt girtlak
-gise gitarist gitgide gitmez gittigi giyap giybet giydigi giyimevi giyinik giyit giyotin giz gizil gladyator glase
-glasnost glasyolog glasyoloji glayol glikojen glikol glikoz glikozit gliserin global globulin glokom glokoni gluten
-gnays gobek gobel gobelek gobelez goblen goc gocebe gocelge gocerkonar gockun gocuk godes godos gofret gogs gogus gok
-gokcek gokcul gokevi gokkandil gokkusagi gokkuzgun gokkuzgungiller goksogan goktirmalayan gokyolu gokyuzu golcul golek
-golet golf golfstrim golge golgecil gom gomalak gomgok gomlek gomuk gomulduruk gomultu gomut gon gonc gonderdigi
-gonderge gonderildi gonderilen gondol gonenc gonk gonl gonokok gonul gonuldas gordek gordugu gorenek gorevdas gorgul
-goril gork gormez gorsel goruldu goruldugu gorulebilir gorulecek gorulmektedir gorulmesi gorunge gorungu gorunmez
-goruntulendi gorunus gorus gosist gosizm gosterdigi gosterge gostergec gosterildi gosteris got gotik goturuldu govde
-govek govel govem gover goy goygoycu goynuk goyuk gozalti gozaydin gozdagi gozenek gozet gozevi gozgu gozlegi gozlemevi
-gozuk gozyaslari graben grado grafik grafit grafolog grafoloji grafolojik grafometre gram gramaj gramatikal gramkuvvet
-gramofon gramsantimetre grandi granduk granit granul granulit gravite gravur gravyer grekoromen gren gres grev greyder
-greyfurt gril grimtirak grip grizu grizumetre grizuolcer grosa groston grotesk guaj guano guarani guard guas guatr gubre
-gubur guc gucenik gucuk gudek guderihane gudubet guduk gufran gufte guguk gugukgiller gugum guhercile gulabdan gulas
-gulbahar gulbank gulbeseker guldeste gulec gulegen gulet gulfidan gulgiller gulgule gulhatmi gulibrisim gulistan
-gulkurusu gullabi gullac gulucuk guluk gulumset gulunc gulus gulut gulyabani gum gumbedek gumburde gumburtu gumec gumrah
-gumruk gumul gumus gumusgoz gumusservi gunah gunahkar gunasik gunbegun gunberi guncek guncel gundas gundes gundondu
-gunduz gunduzsefasi gunebakan gunec gunegik gunestopu guney guneybati guneydogu gungormez gungormus gunku gunote
-gunubirlik gupegunduz gupguzel gur gurbet gurbetzede gurbuz gures gurgengiller gurk gurlek gurpedek guruh gurulda
-gurulde gurultu gurz gusa gusl guslet gusto gusul gusulhane gut gutaperka guve guvec guvenc guvenligi guvenoyu
-guvercinboynu guvercingiller guvercingogsu guvernor guvey guveyfeneri guvez guya guz guzaf guzelligi guzergah guzeste
-guzey guzlek hab habaset habbe haberles habis habitat habitus hac hacamat hacc haccet hacet haciaga hacilarkusagi
-hacilaryolu haciyatmaz haciyolu hacker hacvari hacz haczet had hadd haddehane haddikifaye hademeihayrat hadis hadisat
-haf hafakan hafif hafifmesrep hafit hafizikutup hafriyat haham hahambasi hahamhane hahha hahniyum hail hain haiz haje
-hak hakaret hakeza hakikat hakimiyet hakimiyetimilliye hakk hakkak hakkaniyet hakket hakkihiyar hakkihuzur hakkimuktesep
-hakkisukut hakperest haksever haksinas hal halaoglu halas halaskar halat halavet halay halayik halaza halbuki halef
-halel halet haletinez haletiruhiye halfa halic halife halihazir halik halis halisuddem halk halkavi halkevi halkiyat
-halkoyu hall hallac halles hallet hallihamur hallol halojen halt haluk halusinasyon halvet halvethane ham hamail hamak
-hamakat hamal hamalbasi hamarat hamaset hamburger hamhalat hamil hamilikart hamis hamiyet hamiyetperver hamlac hamlet
-hamsigiller hamsikusu hamt hamurkar hamut han hanay handikap hanek hangar hanigiller hanimefendi hanimeligiller
-hanimgobegi hanimparmagi hantal hanut hap hapaz hapis hapishane haploit haploloji haps hapset hapsirik hapsol haptet har
-harabat harabiyet harac haramzade harap hararet haraso haraza harc harcirah hardal harekat hareke hareket harfendaz
-harfitarif harharyas harharyasgiller haric harikulade harilda harilti haris harlak harmoni harmonyum harp harrangurra
-hars hart hartadak harttadak hartuc has hasarat hasat hasbelkader hasbetenlillah hasbi hasbihal hasefe hasekikupesi
-hasenat hasep haserat haset hashashane hasil hasilat hasilikelam hasiralti hasis hasiv hasiyet haslak haslet hasmet
-haspa hasret hasrolun hassas hassasiyet hast hastahane hastaligi hastel hasut hasv hasviyat hasyet hat hatif hatil
-hatirat hatirlatarak hatirlatti hatirsinas hatmet hatt hattat hattihareket hav havaciva havadis havaiyat havas havayolu
-havil havl havut havvaanaeli havza haya hayal hayalat hayalbaz hayalet hayalhane hayalifener hayalperest hayat hayatiyet
-haybe hayda haydat haydi haydut hayf hayhuy hayif hayirhah hayirperver hayirsever hayit hayiz haykir hayla haylaz hayli
-haymana haymatlos hayr hayrat hayret hayrulhalef haysiyet hayta hayvan hayvanat hayvancagiz hayvaniyet hayvansever hayz
-haz hazakat hazfet hazik hazircevap hazirladigi hazirlop hazmet hazret hazz hazzet hebenneka heccav hecin heder hedik
-hediye hedonist hedonizm hegemonya hekim hekimbasi hektar hektogram hektolitre hektometre hela helak helal helalles
-helalzade hele helezon helik helikoit helikon helikopter heliport helis helke hellim helme helmintoloji helva helvahane
-helyodor helyograf helyoterapi helyum hem hematit hematolog hematoloji hemcins hemdert hemencecik hemfikir hemhal
-hemhudut hemodiyaliz hemofil hemoglobin hemoroit hempa hemsehri hemsirezade hemze hendek hendese hendesi hengam hentbol
-henuz hepatit hepatoloji hepatolojik hepcil hepyek heralde herbiri hercumerc herek herhalde herhangi herif herifcioglu
-herik herk herkes hermafrodit hersey hertz herzaman herze herzevekil hesap hesaplas heterodoks heterojen heteroseksuel
+gasp gassal gastrit gastroenterolog gastroenteroloji gastronom gastroskop gastrula gasy gasyol gato gauss gavot gayakol
+gaybubet gayda gaye gayet gayr gayretkes gayriahlaki gayriakli gayriciddi gayriihtiyari gayriilmi gayrikabil gayrikafi
+gayrikanuni gayrilayik gayrimahdut gayrimahsus gayrimakul gayrimenkul gayrimeskun gayrimesru gayrimesul gayrimezru
+gayrimuayyen gayrimuhtemel gayrimumkun gayrimunasip gayrimuntazam gayrimusavi gayrimutabik gayrimutecanis gayriresmi
+gayrisafi gayrisahsi gayrisihhi gayritabii gayrivaki gayrivazih gayur gayya gayz gayzerit gaz gazal gazap gazel gazelhan
+gazeliyat gazetecilere gazetecilerin gazhane gazino gazisil gazoil gazojen gazolcer gazolin gazometre gazometri gazoyl
+gazoz gazve gebe geberik gebes gebre gec gecek gecekondu gecenek gecerken gecesefasi gecesefasigiller gecgecle gecik
+gecildi gecirdigi gecirgen gecirildi gecirilmesi gecis gecit gecmez gectigi ged gedik gedil gegir gegrek gelberi geldigi
+gelegen gelembe gelenek geleneksel gelgec gelgelelim gelgit gelinbogan gelincik gelincikgiller gelinfeneri gelinkusagi
+gelinparmagi gelirken gelis gelisiguzel gelistirdigi gelistirilmesi gelmez gelmic gem gen genc gencecik gencel genel
+genelge genelkurmay general genis genitif genles genlesmeolcer genom genosit genotip gensoru genz genzek genzel geoit
+geometri geometrik gepegenc gepgenc ger gercek gerceklesecek gerceklesmesi gerceklesti gerceklestigi gerceklestirdigi
+gerceklestirildi gerceklestirilecek gercekustu gerdaniyebuselik gerdek gerdel gerec gerek gerekirken gerekmez gerektigi
+gerelti gergedan gergedangiller gergef gergi geriatri gerilek gerilimolcer gerilla gerisingeri gerontoloji gerzek
+gestalt gestapo getirdigi getirildi getirildigi getirilmesi getirilmis getr getto gev geveze gevher gevis gevrek gevret
+gevsek gey geyik geyikgiller gez gezegen gezgin gibiydi gicik gicir gicis gidakla gidegen giderayak giderilmesi giderken
+gidik gidis gidisat gidon gik gilaburu gilligis gillugis gina gine ginseng gipta gir giranbaha giray girdap girdigi
+girerken girgin girgirla girift giriftzen giris girisik girisimolcer girisken girizgah girt girtlak gise gitarist
+gitgide gitmez gittigi giyap giybet giydigi giyimevi giyinik giyit giyotin giz gizil gladyator glase glasnost glasyolog
+glasyoloji glayol glikojen glikol glikoz glikozit gliserin global globulin glokom glokoni gluten gnays gobek gobel
+gobelek gobelez goblen goc gocebe gocelge gocerkonar gockun gocuk godes gofret gogs gogus gok gokcek gokcul gokevi
+gokkandil gokkusagi gokkuzgun gokkuzgungiller goksogan goktirmalayan gokyolu gokyuzu golcul golek golet golf golfstrim
+golge golgecil gom gomalak gomgok gomlek gomuk gomulduruk gomultu gomut gon gonc gonderdigi gonderge gonderildi
+gonderilen gondol gonenc gonk gonl gonokok gonul gonuldas gordek gordugu gorenek gorevdas gorgul goril gork gormez
+gorsel goruldu goruldugu gorulebilir gorulecek gorulmektedir gorulmesi gorunge gorungu gorunmez goruntulendi gorunus
+gorus gosist gosizm gosterdigi gosterge gostergec gosterildi gosteris gotik goturuldu govde govek govel govem gover goy
+goygoycu goynuk goyuk gozalti gozaydin gozdagi gozenek gozet gozevi gozgu gozlegi gozlemevi gozuk gozyaslari graben
+grado grafik grafit grafolog grafoloji grafolojik grafometre gram gramaj gramatikal gramkuvvet gramofon gramsantimetre
+grandi granduk granit granul granulit gravite gravur gravyer grekoromen gren gres grev greyder greyfurt gril grimtirak
+grip grizu grizumetre grizuolcer grosa groston grotesk guaj guano guarani guard guas guatr gubre gubur guc gucenik gucuk
+gudek guderihane gudubet guduk gufran gufte guguk gugukgiller gugum guhercile gulabdan gulas gulbahar gulbank gulbeseker
+guldeste gulec gulegen gulet gulfidan gulgiller gulgule gulhatmi gulibrisim gulistan gulkurusu gullabi gullac gulucuk
+guluk gulumset gulunc gulus gulut gulyabani gum gumbedek gumburde gumburtu gumec gumrah gumruk gumul gumus gumusgoz
+gumusservi gunah gunahkar gunasik gunbegun gunberi guncek guncel gundas gundes gundondu gunduz gunduzsefasi gunebakan
+gunec gunegik gunestopu guney guneybati guneydogu gungormez gungormus gunku gunote gunubirlik gupegunduz gupguzel gur
+gurbet gurbetzede gurbuz gures gurgengiller gurk gurlek gurpedek guruh gurulda gurulde gurultu gurz gusa gusl guslet
+gusto gusul gusulhane gut gutaperka guve guvec guvenc guvenligi guvenoyu guvercinboynu guvercingiller guvercingogsu
+guvernor guvey guveyfeneri guvez guya guz guzaf guzelligi guzergah guzeste guzey guzlek hab habaset habbe haberles habis
+habitat habitus hac hacamat hacc haccet hacet haciaga hacilarkusagi hacilaryolu haciyatmaz haciyolu hacker hacvari hacz
+haczet had hadd haddehane haddikifaye hademeihayrat hadis hadisat haf hafakan hafif hafifmesrep hafit hafizikutup
+hafriyat haham hahambasi hahamhane hahha hahniyum hail hain haiz haje hak hakaret hakeza hakikat hakimiyet
+hakimiyetimilliye hakk hakkak hakkaniyet hakket hakkihiyar hakkihuzur hakkimuktesep hakkisukut hakperest haksever
+haksinas hal halaoglu halas halaskar halat halavet halay halayik halaza halbuki halef halel halet haletinez haletiruhiye
+halfa halic halife halihazir halik halis halisuddem halk halkavi halkevi halkiyat halkoyu hall hallac halles hallet
+hallihamur hallol halojen halt haluk halusinasyon halvet halvethane ham hamail hamak hamakat hamal hamalbasi hamarat
+hamaset hamburger hamhalat hamil hamilikart hamis hamiyet hamiyetperver hamlac hamlet hamsigiller hamsikusu hamt
+hamurkar hamut han hanay handikap hanek hangar hanigiller hanimefendi hanimeligiller hanimgobegi hanimparmagi hantal
+hanut hap hapaz hapis hapishane haploit haploloji haps hapset hapsirik hapsol haptet har harabat harabiyet harac
+haramzade harap hararet haraso haraza harc harcirah hardal harekat hareke hareket harfendaz harfitarif harharyas
+harharyasgiller haric harikulade harilda harilti haris harlak harmoni harmonyum harp harrangurra hars hart hartadak
+harttadak hartuc has hasarat hasat hasbelkader hasbetenlillah hasbi hasbihal hasefe hasekikupesi hasenat hasep haserat
+haset hashashane hasil hasilat hasilikelam hasiralti hasis hasiv hasiyet haslak haslet hasmet hasret hasrolun hassas
+hassasiyet hast hastahane hastaligi hastel hasut hasv hasviyat hasyet hat hatif hatil hatirat hatirlatarak hatirlatti
+hatirsinas hatmet hatt hattat hattihareket hav havaciva havadis havaiyat havas havayolu havil havl havut havvaanaeli
+havza haya hayal hayalat hayalbaz hayalet hayalhane hayalifener hayalperest hayat hayatiyet haybe hayda haydat haydi
+haydut hayf hayhuy hayif hayirhah hayirperver hayirsever hayit hayiz haykir hayla haylaz hayli haymana haymatlos hayr
+hayrat hayret hayrulhalef haysiyet hayta hayvan hayvanat hayvancagiz hayvaniyet hayvansever hayz haz hazakat hazfet
+hazik hazircevap hazirladigi hazirlop hazmet hazret hazz hazzet hebenneka heccav hecin heder hedik hediye hedonist
+hedonizm hegemonya hekim hekimbasi hektar hektogram hektolitre hektometre hela helak helal helalles helalzade hele
+helezon helik helikoit helikon helikopter heliport helis helke hellim helme helmintoloji helva helvahane helyodor
+helyograf helyoterapi helyum hem hematit hematolog hematoloji hemcins hemdert hemencecik hemfikir hemhal hemhudut
+hemodiyaliz hemofil hemoglobin hemoroit hempa hemsehri hemsirezade hemze hendek hendese hendesi hengam hentbol henuz
+hepatit hepatoloji hepatolojik hepcil hepyek heralde herbiri hercumerc herek herhalde herhangi herif herifcioglu herik
+herk herkes hermafrodit hersey hertz herzaman herze herzevekil hesap hesaplas heterodoks heterojen heteroseksuel
 heterotrof hevenk heves heveskar heyamola heybe heybet heyecan heyelan heyet heykel heykeltiras heyula hezaren hezel
 hezeyan hezimet hezliyat hibe hibrit hicap hicaz hicazkar hicbir hiciv hickirik hicret hicv hicvet hidatit hidayet
 hiddet hidiv hidrasit hidrat hidrellez hidrobiyoloji hidrobiyolojik hidrodinamik hidroelektrik hidrofil hidrofobi
@@ -571,19 +571,19 @@ klavye kleptoman klerikalizm klik klima klimatolog klimatoloji klinik klinker kl
 klitoris klon klor klorhidrat klorhidrik klorik klorofil kloroform klorolcer klorometri kloroplast kloroz klos
 klostrofobi klostrofobik klozet kluz koala koalisyon koaptor kobalt kobay kobaygiller kobragiller koc kocabas kocak
 kocal kocalak kocaoglan kocat kocbasi kocboynuzu kocek kockar kocus kod kodeks kodes kodifikasyon kodos kof koftehor
-koful kognitif kogus kohenit kohezyon kohne kok kokainomani kokak kokart kokboyasi koket kokimbit kokona kokorec kokoroz
-kokos kokot kokoz kokpit koktes kokteyl kokus kokusuk kokut kolagasi kolagiller kolaj kolaycacik kolbasi kolbasti kolcak
-koldas koledok kolej koleksiyon kolektif kolektivist kolektivizm kolektor kolemanit kolesterin kolesterol kolhoz
-kolibasil kolibri kolibrigiller kolik kolit kolkola kolodyum kolofan koloidal koloit kolokyum kolombiyum kolon kolonyal
+koful kognitif kogus kohenit kohezyon kohne kok kokak kokart kokboyasi koket kokimbit kokona kokorec kokoroz kokos kokot
+kokoz kokpit koktes kokteyl kokus kokusuk kokut kolagasi kolagiller kolaj kolaycacik kolbasi kolbasti kolcak koldas
+koledok kolej koleksiyon kolektif kolektivist kolektivizm kolektor kolemanit kolesterin kolesterol kolhoz kolibasil
+kolibri kolibrigiller kolik kolit kolkola kolodyum kolofan koloidal koloit kolokyum kolombiyum kolon kolonyal
 kolonyalist kolordu koloridye kolorimetre kolorimetri kolostrum kolpo kolyoz kolza kom komandit komando kombe kombi
 kombinasyon kombinezon komec komedya komedyen komik komisyon komodor komot kompartiman kompas kompetan kompetitif
 kompilasyon komple kompleks komplikasyon komplike kompliman komplo kompost komposto kompoze kompozisyon kompozit
 kompozitor komprador kompres kompresor komprime komputer komunikasyon komunike komunist komus komut komutator kon konak
-konalga konargocer konc koncerto kondansator kondisyon kondom kondor konduit konduktor konektor konfederasyon
-konfederatif konfedere konfeksiyon konferans konfeti konfigurasyon konfirmasyon konfor konformist konglomera kongovde
-kongre konik konje konjonktivit konjonktur konkasor konkav konken konkordato konkre konkret konkur konkurhipik
-konsantrasyon konsantre konsensus konsept konseptualizm konservatif konservator konservatuvar konserve konsey konsimento
-konsol konsolidasyon konsolit konsolos konsoloshane konsomasyon konsomatris konson konsonant konsorsiyum konstruksiyon
+konalga konargocer konc koncerto kondansator kondisyon kondor konduit konduktor konektor konfederasyon konfederatif
+konfedere konfeksiyon konferans konfeti konfigurasyon konfirmasyon konfor konformist konglomera kongovde kongre konik
+konje konjonktivit konjonktur konkasor konkav konken konkordato konkre konkret konkur konkurhipik konsantrasyon
+konsantre konsensus konsept konseptualizm konservatif konservator konservatuvar konserve konsey konsimento konsol
+konsolidasyon konsolit konsolos konsoloshane konsomasyon konsomatris konson konsonant konsorsiyum konstruksiyon
 konstruktivizm konsul konsultasyon konsulto kont kontak kontekst kontenjan kontes konteyner kontor kontraksiyon
 kontralto kontrasomun kontrast kontrat kontratabla kontratak kontrbas kontrfile kontrgerilla kontrolor kontrpiye
 kontrplak kontrpuan kontuvar konuk konukevi konuksever konuldu konuskan konusurken konut konvansiyon konvansiyonel
@@ -603,53 +603,53 @@ kromatofor kromoplast kromosfer kromotropizm kromozom kron kronaksi kronik krono
 kros krupiye kruvasan kruvaze kruvaziyer kruvazor ksenon ksilofon ksiloloji kuafor kuantum kuartet kubas kubat kubbe
 kubik kubist kucak kucaklas kucucuk kucukbas kucul kucumen kucumse kucurek kudas kudret kudumzen kudurgan kuduruk kuf
 kuffar kufret kufurbaz kugu kuheylan kuhi kuintet kuka kukla kuklavari kukre kukuleta kukumav kukurt kukurtdioksit kul
-kulac kulagakacan kulah kulakcik kulaktozu kulampara kulbasti kuldoken kulek kulfet kulhan kulhanbeyi kulis kulkedisi
-kullandigi kullanilabilir kullanilacak kullanilarak kullanildi kullanildigi kullanilmasi kullanilmis kullanimina
-kullaniminin kullap kulliyat kulliyet kuloglu kulot kulp kult kultivator kulturel kulturfizik kulube kulubu kulucka
-kuluckahane kulunc kulunk kulustur kulvar kulyuc kulyutmaz kum kumarbaz kumarhane kumas kumbara kumbarahane kumbasi
-kumbet kumcul kumes kumkazan kumkuma kumpanya kumpas kumpir kumral kumsal kumuc kumul kumulatif kumulus kuncu kundak
-kundekari kunefe kungfu kunh kunk kunt kunye kup kupegi kupes kupkok kupkuru kuplegi kupon kur kurak kurakcil kuraso
-kurator kurbagacik kurban kurcatovyum kurdilihicazkar kurdugu kurek kuresel kurevi kureyve kurit kurk kurkas kurlagan
-kurmay kurnaz kuron kurs kursak kursungecirmez kurt kurtagzi kurtaj kurtayagi kurtbagri kurtbogan kurtcul kurtpencesi
-kurttirnagi kurtul kurtulus kurukafa kurul kuruldugu kurultay kurulus kurumsal kurus kurut kurutac kurutmac kusak kusat
-kusbasi kusbaz kusburnu kuscubasi kusegen kusekmegi kuset kusgomu kusgozu kushane kuskanadi kuskonmaz kusku kuskut
-kuslak kuslokumu kusmuk kuspalazi kuspe kustah kusuf kusurat kusus kut kutikul kutlet kutp kutsal kutsiyet kuttedek
-kutuk kutuphane kuvars kuvarsit kuver kuvet kuvoz kuvve kuvvet kuvvetolcer kuymak kuyruk kuyrukkakan kuyruksallayan
-kuyruksallayangiller kuytu kuyu kuyudat kuz kuzey kuzeybati kuzeydogu kuzgun kuzugobegi kuzukulagi laakal labada
-labirent laborant laboratuvar labrador labros lacerem lacin lacivert lacka laden ladengiller lades ladin laedri laf
-lafazan lafuguzaf lafz lagiv lagos lagv lagvet lagvol lahana lahika lahit lahmacun lahos laht lahuraki lahuri lahut
-lahza laik lain laisizm lak lakap lakayit lakayt laklaka laklakiyat lakonik lakoz lakrimal laktaz laktoz lal lalanga
-lalettayin lalezar laluebkem lam lamba lambri lamekan lamel lamelif laminant lan lanarkit lando lanet langirt langur
-langust lanolin lanoz lansman lantanit lapa lapcin lapina lapinagiller lappadak laptop larenjit larghetto largo larp
-larpadak larva larvacil lase laski laso lasta lasteks lastik lastikotin lata lateks laterit laterna latesbih latif
-latilokum laubali lav lavabo lavaj lavas lavdanom lavrensiyum lavrovit lavsonit lavuk layemut layenkati layiha layik
-laytmotif layuhti laza lazer lazim lazut leasing leb lebalep leblebi lece lecek ledun lef leff leffet leffunesr legal
-legato legen legorn leh lejant lejitimist lejyon leke leksikograf leksikolog leksikoloji lektor lemis lems lenduha lenf
-lenfatizm lenfoma lenfosit lenger lenguist lenguistik lens lento leopar lep lepiska lerzan lerze les lescil lesepase
-lesker letafet letarji letarjik leva levazim levazimat levent levha levrek levrekgiller levuloz levye ley leylak leylek
-leylekayagi leylekgagasi leylekgiller lezar lezbiyen leziz lezyon lezzet libas liberal liberalist liberasyon libero
-libido libos libre libretto lider liet lif lift lig light lika liken likidasyon likirda likirti likit likor likorinoz
-lim limbo limit limited limitet limnoloji limon limonit linc lineer linet linin link linolyum linotip linyit lipari
-liparit lipit lipom liposuction lipsos lir liret lirik lisan lisanihal lisanimunasip lisaniyat lisans lisansustu lise
-liste literatur litografi litografya litoloji litosfer litre liturya lityum liva liyakat lizol lizoz lobelya lobut loca
-lodos log logaritma logaritmik logo logos lohusa lojik lojistik lojman lok lokal lokalizasyon lokatif lokavt lokomobil
-lokomotif lokoplast lokosit lokoz lombar lomboz lonca longa longoz lop loppadak lor lort los losemit lostra lostromo
-losyon lot lotus lufer lufergiller lugat lugol luknet luks luksmetre lule lumbago lumen lumensaat lumpen lunapark lunet
-lup luplet lustrin lutesyum lutf lutfet luti lutr lutuf lutufkar luzucet luzum maada maaile maalesef maalmemnuniye
-maarif maas maatteessuf mabat mabet mabeyin mabeyn mablak mabut mac maceraperest maco madalya madalyon maddiyat maddiyet
-madenkirmiz madersahi maderzat madik madrabaz madreporlar maestoso maestro mafevk mafis mafsal mafya maganda magara
-magaza magazin magdur magduriyet magfiret magfur maglubiyet maglup magma magmum magnezit magnezyum magri magrip magrur
-magsus mah mahal mahall maharet mahbes mahbup mahcubiyet mahcup mahcuz mahdut mahfaza mahfe mahfi mahfil mahfuz mahiv
-mahiyet mahkeme mahkuk mahkukat mahkum mahkumiyet mahlas mahlep mahlukat mahlul mahlut mahmul mahpus mahpushane mahrec
-mahrek mahremiyet mahrukat mahrumiyet mahrut mahsul mahsulat mahsup mahsus mahurbuselik mahut mahv mahvet mahviyet
-mahvol mahzar mahzen mahzun mahzur mai mail maiset maiyet majeste major majuskul makabil makabl makak makale makam
-makara makarena makarna makas makaskar makat makber makbul makbuz maket makferlan maki makigiller makinist makosen makro
-makroekonomi makroekonomik makrosefal maksat maksi maksimal maksure maksut makta maktel maktu maktul makul makus makyaj
-makyoz mal malafa malak malakit malaz malc malgama malihulya malik malikiyet maliyet malkoc malt maltoz malul maluliyet
-malumat malumatfurus malzeme mamafih mamaliga mambo mamelek mamografi mamul mamulat mamur mamut mana manas manat manav
-manca mancinik manda mandagozu mandal mandapost mandepsi mandira mandolin manej manen manevi maneviyat manevra manga
-mangal manganez mangir mangiz mango mani manifatura manifesto manika manikur maniple manipulasyon manipulator maniska
-manivela mankafa manken mankurt manolya manolyagiller manometre mansap manset mansip mansiyon manson mantalite mantar
+kulac kulagakacan kulah kulakcik kulaktozu kulbasti kuldoken kulek kulfet kulhan kulhanbeyi kulis kulkedisi kullandigi
+kullanilabilir kullanilacak kullanilarak kullanildi kullanildigi kullanilmasi kullanilmis kullanimina kullaniminin
+kullap kulliyat kulliyet kuloglu kulot kulp kult kultivator kulturel kulturfizik kulube kulubu kulucka kuluckahane
+kulunc kulunk kulustur kulvar kulyuc kulyutmaz kum kumarbaz kumarhane kumas kumbara kumbarahane kumbasi kumbet kumcul
+kumes kumkazan kumkuma kumpanya kumpas kumpir kumral kumsal kumuc kumul kumulatif kumulus kuncu kundak kundekari kunefe
+kungfu kunh kunk kunt kunye kup kupegi kupes kupkok kupkuru kuplegi kupon kur kurak kurakcil kuraso kurator kurbagacik
+kurban kurcatovyum kurdilihicazkar kurdugu kurek kuresel kurevi kureyve kurit kurk kurkas kurlagan kurmay kurnaz kuron
+kurs kursak kursungecirmez kurt kurtagzi kurtaj kurtayagi kurtbagri kurtbogan kurtcul kurtpencesi kurttirnagi kurtul
+kurtulus kurukafa kurul kuruldugu kurultay kurulus kurumsal kurus kurut kurutac kurutmac kusak kusat kusbasi kusbaz
+kusburnu kuscubasi kusegen kusekmegi kuset kusgomu kusgozu kushane kuskanadi kuskonmaz kusku kuskut kuslak kuslokumu
+kusmuk kuspalazi kuspe kustah kusuf kusurat kusus kut kutikul kutlet kutp kutsal kutsiyet kuttedek kutuk kutuphane
+kuvars kuvarsit kuver kuvet kuvoz kuvve kuvvet kuvvetolcer kuymak kuyruk kuyrukkakan kuyruksallayan kuyruksallayangiller
+kuytu kuyu kuyudat kuz kuzey kuzeybati kuzeydogu kuzgun kuzugobegi kuzukulagi laakal labada labirent laborant
+laboratuvar labrador labros lacerem lacin lacivert lacka laden ladengiller lades ladin laedri laf lafazan lafuguzaf lafz
+lagiv lagos lagv lagvet lagvol lahana lahika lahit lahmacun lahos laht lahuraki lahuri lahut lahza laik lain laisizm lak
+lakap lakayit lakayt laklaka laklakiyat lakonik lakoz lakrimal laktaz laktoz lal lalanga lalettayin lalezar laluebkem
+lam lamba lambri lamekan lamel lamelif laminant lan lanarkit lando lanet langirt langur langust lanolin lanoz lansman
+lantanit lapa lapcin lapina lapinagiller lappadak laptop larenjit larghetto largo larp larpadak larva larvacil lase
+laski laso lasta lasteks lastik lastikotin lata lateks laterit laterna latesbih latif latilokum laubali lav lavabo lavaj
+lavas lavdanom lavrensiyum lavrovit lavsonit lavuk layemut layenkati layiha layik laytmotif layuhti laza lazer lazim
+lazut leasing leb lebalep leblebi lece lecek ledun lef leff leffet leffunesr legal legato legen legorn leh lejant
+lejitimist lejyon leke leksikograf leksikolog leksikoloji lektor lemis lems lenduha lenf lenfatizm lenfoma lenfosit
+lenger lenguist lenguistik lens lento leopar lep lepiska lerzan lerze les lescil lesepase lesker letafet letarji
+letarjik leva levazim levazimat levent levha levrek levrekgiller levuloz levye ley leylak leylek leylekayagi
+leylekgagasi leylekgiller lezar lezbiyen leziz lezyon lezzet libas liberal liberalist liberasyon libero libido libos
+libre libretto lider liet lif lift lig light lika liken likidasyon likirda likirti likit likor likorinoz lim limbo limit
+limited limitet limnoloji limon limonit linc lineer linet linin link linolyum linotip linyit lipari liparit lipit lipom
+liposuction lipsos lir liret lirik lisan lisanihal lisanimunasip lisaniyat lisans lisansustu lise liste literatur
+litografi litografya litoloji litosfer litre liturya lityum liva liyakat lizol lizoz lobelya lobut loca lodos log
+logaritma logaritmik logo logos lohusa lojik lojistik lojman lok lokal lokalizasyon lokatif lokavt lokomobil lokomotif
+lokoplast lokosit lokoz lombar lomboz lonca longa longoz lop loppadak lor lort los losemit lostra lostromo losyon lot
+lotus lufer lufergiller lugat lugol luknet luks luksmetre lule lumbago lumen lumensaat lumpen lunapark lunet lup luplet
+lustrin lutesyum lutf lutfet luti lutr lutuf lutufkar luzucet luzum maada maaile maalesef maalmemnuniye maarif maas
+maatteessuf mabat mabet mabeyin mabeyn mablak mabut mac maceraperest maco madalya madalyon maddiyat maddiyet madenkirmiz
+madersahi maderzat madik madrabaz madreporlar maestoso maestro mafevk mafis mafsal mafya maganda magara magaza magazin
+magdur magduriyet magfiret magfur maglubiyet maglup magma magmum magnezit magnezyum magri magrip magrur magsus mah mahal
+mahall maharet mahbes mahbup mahcubiyet mahcup mahcuz mahdut mahfaza mahfe mahfi mahfil mahfuz mahiv mahiyet mahkeme
+mahkuk mahkukat mahkum mahkumiyet mahlas mahlep mahlukat mahlul mahlut mahmul mahpus mahpushane mahrec mahrek mahremiyet
+mahrukat mahrumiyet mahrut mahsul mahsulat mahsup mahsus mahurbuselik mahut mahv mahvet mahviyet mahvol mahzar mahzen
+mahzun mahzur mai mail maiset maiyet majeste major majuskul makabil makabl makak makale makam makara makarena makarna
+makas makaskar makat makber makbul makbuz maket makferlan maki makigiller makinist makosen makro makroekonomi
+makroekonomik makrosefal maksat maksi maksimal maksure maksut makta maktel maktu maktul makul makus makyaj makyoz mal
+malafa malak malakit malaz malc malgama malihulya malik malikiyet maliyet malkoc malt maltoz malul maluliyet malumat
+malumatfurus malzeme mamafih mamaliga mambo mamelek mamografi mamul mamulat mamur mamut mana manas manat manav manca
+mancinik manda mandagozu mandal mandapost mandepsi mandira mandolin manej manen manevi maneviyat manevra manga mangal
+manganez mangir mangiz mango mani manifatura manifesto manika manikur maniple manipulasyon manipulator maniska manivela
+mankafa manken mankurt manolya manolyagiller manometre mansap manset mansip mansiyon manson mantalite mantar
 mantardoguran mantarhane manti mantik mantinota mantis manto manuel manya manyak manyat manyetik manyetit manyetize
 manyetizma manyeto manyetofon manyetometre manyezi manyezit manyok manzara manzum mapa mapus mapushane maraba marabut
 maral marangoz marangozhane maranta maraton maraz maresal marifet marihuana marina marine mariz marj marjinal mark
@@ -776,7 +776,7 @@ nezih nezir nezle nezr nezret nice nicel nicin nida nifak nihai nihale nihan nih
 nikap nikbet nikbin nikel nikelaj nikotin nikris nikriz nilufer nilufergiller nim nimbus nimet nimetsinas nin nipel
 nirengi nis nisaburek nisangah nisangec nisap nisasta nisf nisfet nisfinnehar nisif nispet nispi nite nitel niteligi
 nitramit nitrat nitrogliserin nitrojen nitroseluloz niyabet niyaz niye niyet niyobyum niza nobelyum nobet nobran nodul
-nohut nokra noksan nokta noktainazar nolu nom nomanklatur nominal nominatif nomografi nonfiguratif nonos norm normal
+nohut nokra noksan nokta noktainazar nolu nom nomanklatur nominal nominatif nomografi nonfiguratif norm normal
 normalalti normalustu normatif norolog noroloji norolojik noron norosirurji norotik nostalji nostaljik nosyon not
 notasyon notebook notralizasyon notron nova nuans nubuvvet nudist nufus nufuz nufuzkar nuhuft nuhuset nukleer nukleon
 nukleoprotein nuks nukset nukte nukul nukut numara numayis numayiskar numen numerik numismat numune nun nur nuruaynim
@@ -797,62 +797,62 @@ onomatopeik ons onsezi ontogenez ontojenez ontoloji ontolojik ontolojizm onul oo
 operakomik operasyon operasyonel operator operatris operet oportunist oportunizm opsiyon opsiyonel optik optimal
 optimetri optimist optimizasyon optimizm optimum opucuk opus ora oracikta orak oral oramiral orangutan oratoryo orcin
 ordek ordekbasi ordekgagasi ordekgiller ordinaryus ordinat ordino ordonat ordovr ordubozan orduevi ordugah ore orek oret
-orf orfoz organel organik organizasyon organizator organoleptik organze orgazm orgeneral orgenles orgut origami orijin
-orijinal ork orkestra orkinos orkit orlon ornat ornek ornitolog ornitoloji ornitorenk orografya orojeni orostopol ors
-ort ortac ortak ortaligi ortaogrenim ortaogretim ortaokul ortay ortbas ortenek ortez ortodonti ortoklaz ortopedi
-ortopedik ortopedist ortoz ortuk ortus oru oruc oruk orumcek orya oryantal oryantalist oryantasyon oryantiring
-osinografi osmiyum osr ostaki osteolog osteoloji osteoporoz ostrojen osur osurgan osuruk ota otag otanazi otcul ote
-oteberi otel otelgarni otist otistik otizm otla otlak otlegen otlegengiller otlegi otlubaga otluk oto otoban
-otobiyografi otobiyografik otobur otodidakt otoerotizm otogar otograf otojestiyon otokar otoklav otokontrol otokrasi
-otokrat otokratik otokritik otokton otolit otomasyon otomat otomobil otomotiv otonom otopark otoplasti otopomp
-otoproduktor otopsi otoray otorizasyon otosist otostop ototrof otoyol otre otsul otugiller otumlu otumsuz oturak
-oturdugu oturuk otus otyiyenler ova oval ovec overlok ovgu ovmac ovogon ovolit ovun ovunc ovunek ovungen ovustur oya
-oybirligiyle oydas oyku oyla oyle oyluk oylum oymak oymakbasi oynadigi oynak oynarken oynas oynat oynuyor oysa oyu oyuk
-oyulga oyunbaz oyunbozan ozalit ozan ozbeoz ozcesi ozdek ozden ozdes ozdeyis oze ozek ozel ozelge ozellestirme ozelligi
-ozenc ozengen ozerk ozet ozezer ozge ozgecil ozgu ozgul ozgurlugu ozle ozles ozmonoloji ozmos ozne oznel ozokerit ozon
-ozonolcer ozonoliz ozonometre ozonosfer ozonoskop ozr ozsever ozu ozuga ozumlet ozut ozveren ozveri pabuc paca pacal
-pacavra pacoz padalya padisah padok pafta pagoda pah pahal pak paket pakt pal paladyum palamut palandiz palandoken
-palanga palanka palas palaska palaspare palavra palaz paleograf paleontoloji paleontolojik paleozoik palet palikarya
-palmitat palmitil palmiyegiller palto palyaco palyatif palyos pampa pamuk panama panayir pancar panda pandantif pandik
-pandispanya pandomim pandul panel panelist panik panikatak panjur pankart pankras pankreas pano panoramik pansiyon
-pansuman panteist panteizm panteon panter pantograf pantolon pantomim pantufla panzehir panzehr panzer papagangiller
-papaganyemi papak papalina papara paparazi papatya papaya papaz papazkacti papazkarasi papel papikci papirus
-papirusgiller paprika papura papyekuse papyon para parabellum parabol parabolik paraboloit paracol paradigma paradoks
-paradoksal paraf parafazi paragoz paraka parakete paralaks paralel paralelkenar paralizi paralojik paralojizm parametre
-parametrik paramparca paranoya paranoyak parantez parapet parapsikoloji parapsikolojik parasal parasempatik parasut
-paratoner paratuberkuloz paravan parazit parazitoloji parca pardon pardosu pare parfum parilda parilti parite parkmetre
-parla parlak parlamentarizm parlamento parmak parmican parodi parola parpa pars parsel parselasyon parsomen partal
-partenogenez partenojenez parter parti partikul partilerustu partisip partisyon partizan partner partoner parya pas
-pasababa pasaj pasak pasaparola pasaport pasavan pasazade pasif pasifik pasifikasyon pasifist pasiyans paskal paslanmaz
-paslas paso paspal paspartu paspasla pastahane pastal pastav pastel pastil pastis pastoral pastorizasyon pastorize
-pastra pat patadak patak patalya patavatsiz patent paternalizm patik patinaj patis patiska patlak patlangac patlangic
-patlicangiller patojen patolog patoloji patolojik patoz patriarkal patrik patrikhane patron patronaj pattadak pavkir
-pavurya pavyon pay paydas paydos payet payitaht paylastigi payplayn payreks paytak payton pazarbasi pazen pazi pazibent
-pazval pazvant pec pecic pedagog pedagoji pedagojik pedal pedavra peder pedersahi pediatri pedikur pediyatrik pedodonti
-pedofil pedolog pedoloji pedometre peeling peganit pegmatit pehlivan pehpehle pejmurde pejoratif pek pekent pekis pekit
-pekmez pekmezkefi pekmezkopugu peksimet pektoral peleng pelenk pelerin pelesenk pelikan pelikangiller pelikul pelin
-pelit pelte peltek pelur pelus pembekurt pembemtirak pembezar pena penalti pence penceles pencgah pencik pencudu pencuse
-pencuyek pendname peneplen penes pengo penguengiller peni pens pentan pentatlon pentur penuar penuvar penye pepele
-pepeme pepsin pepton per perakende perdah perestis perestiskar perforaj perforje performans pergel pergola perhiz
-perhizkar peribacasi perido peridot peridotit periferi perikart peripatetizm periskop periton peritonit periyodik
-periyot perkusyon perlit perlon permanant permanganat peroksit peron peronospora persenk personel perspektif pert peruk
-perva pervaz pes pesek pesimist pesinat peskes pesmelba peso pespaye pespembe pespesele pesrev pest pestahta pestamal
-pestenkerani pestil pesus petek petrifikasyon petrografi petrokimya petrol petroloji petrolojik petunya pey peyapey
-peydah peyderpey peygamber peygamberdevesi peygambervari peyk peynirhane peyrev peyzaj pezo pianta pic picsinek pigment
-pihti pijama pik pikaj pikap piket piknik piknometre piko pil pilav pilic piling pilot pilotaj pim pimpirik pinar
-pinekle pinel pines pingpong pinhan pinpon pinti pipet pipo pir piramidal piramit pirazvana pirekapan pirekiran pirifani
-pirilda pirildak pirilti pirinc pirit pirlak pirlangic pirnal pirogravur pirohi piroksen piromani pirometre pirometri
-pirosfer pirpi pirpit pirtla pirtlak piruhi pirupak piryol pirzola pis pisbogaz pisek pisik pisirgec pisirik piskopos
-piskoposhane pislikcil pispirik pispisla pist piston pistov pisuvar pit pitikare piton pitoresk pitrak pitsikato piyade
-piyale piyan piyango piyanist piyano piyasa piyata piyaz piyes piyon piyore pizolit pizza pizzicato placka plaj
-plajiyoklaz plak plaket planerit planet plankton planor plantasyon plase plasman plaster plastik plastron platerina
-platform platika platin plato platonik play playback plaza plazma plebisit pleistosen plevra pleybek pli pliyosen
-plonjon pluralist pluralizm plutokrasi plutonyum pluviyometre poc pocuk podosuet poetik pof pog pogrom pohpohla pohrenk
-poker polar polargi polarimetre polarimetri polariskop polarizasyon polaroit polarolcer polat polemik polen poliandri
-poliasit police polietilen polifoni polifonik poligam poligon polijini poliklinik polim polinom polip polis polisaj
-polisevi politeist politeizm politik politize poliuretan polka polo polyester pomat pompa pompaj ponje ponksiyon ponton
-ponza pop populasyon populist populizm porfir porfirit porselen porsiyon porsu porsuk porsukgiller portal portatif
-portbagaj portbebe porte portfoy portle portlek portmanto portmone porto portre pos poset post postal postis postmodern
+orf orfoz organel organik organizasyon organizator organoleptik organze orgeneral orgenles orgut origami orijin orijinal
+ork orkestra orkinos orkit orlon ornat ornek ornitolog ornitoloji ornitorenk orografya orojeni orostopol ors ort ortac
+ortak ortaligi ortaogrenim ortaogretim ortaokul ortay ortbas ortenek ortez ortodonti ortoklaz ortopedi ortopedik
+ortopedist ortoz ortuk ortus oru oruc oruk orumcek orya oryantal oryantalist oryantasyon oryantiring osinografi osmiyum
+osr ostaki osteolog osteoloji osteoporoz ostrojen ota otag otanazi otcul ote oteberi otel otelgarni otist otistik otizm
+otla otlak otlegen otlegengiller otlegi otlubaga otluk oto otoban otobiyografi otobiyografik otobur otodidakt otoerotizm
+otogar otograf otojestiyon otokar otoklav otokontrol otokrasi otokrat otokratik otokritik otokton otolit otomasyon
+otomat otomobil otomotiv otonom otopark otoplasti otopomp otoproduktor otopsi otoray otorizasyon otosist otostop ototrof
+otoyol otre otsul otugiller otumlu otumsuz oturak oturdugu oturuk otus otyiyenler ova oval ovec overlok ovgu ovmac
+ovogon ovolit ovun ovunc ovunek ovungen ovustur oya oybirligiyle oydas oyku oyla oyle oyluk oylum oymak oymakbasi
+oynadigi oynak oynarken oynas oynat oynuyor oysa oyu oyuk oyulga oyunbaz oyunbozan ozalit ozan ozbeoz ozcesi ozdek ozden
+ozdes ozdeyis oze ozek ozel ozelge ozellestirme ozelligi ozenc ozengen ozerk ozet ozezer ozge ozgecil ozgu ozgul
+ozgurlugu ozle ozles ozmonoloji ozmos ozne oznel ozokerit ozon ozonolcer ozonoliz ozonometre ozonosfer ozonoskop ozr
+ozsever ozu ozuga ozumlet ozut ozveren ozveri pabuc paca pacal pacavra pacoz padalya padisah padok pafta pagoda pah
+pahal pak paket pakt pal paladyum palamut palandiz palandoken palanga palanka palas palaska palaspare palavra palaz
+paleograf paleontoloji paleontolojik paleozoik palet palikarya palmitat palmitil palmiyegiller palto palyaco palyatif
+palyos pampa pamuk panama panayir pancar panda pandantif pandik pandispanya pandomim pandul panel panelist panik
+panikatak panjur pankart pankras pankreas pano panoramik pansiyon pansuman panteist panteizm panteon panter pantograf
+pantolon pantomim pantufla panzehir panzehr panzer papagangiller papaganyemi papak papalina papara paparazi papatya
+papaya papaz papazkacti papazkarasi papel papikci papirus papirusgiller paprika papura papyekuse papyon para parabellum
+parabol parabolik paraboloit paracol paradigma paradoks paradoksal paraf parafazi paragoz paraka parakete paralaks
+paralel paralelkenar paralizi paralojik paralojizm parametre parametrik paramparca paranoya paranoyak parantez parapet
+parapsikoloji parapsikolojik parasal parasempatik parasut paratoner paratuberkuloz paravan parazit parazitoloji parca
+pardon pardosu pare parfum parilda parilti parite parkmetre parla parlak parlamentarizm parlamento parmak parmican
+parodi parola parpa pars parsel parselasyon parsomen partal partenogenez partenojenez parter parti partikul partilerustu
+partisip partisyon partizan partner partoner parya pas pasababa pasaj pasak pasaparola pasaport pasavan pasazade pasif
+pasifik pasifikasyon pasifist pasiyans paskal paslanmaz paslas paso paspal paspartu paspasla pastahane pastal pastav
+pastel pastil pastis pastoral pastorizasyon pastorize pastra pat patadak patak patalya patavatsiz patent paternalizm
+patik patinaj patis patiska patlak patlangac patlangic patlicangiller patojen patolog patoloji patolojik patoz
+patriarkal patrik patrikhane patron patronaj pattadak pavkir pavurya pavyon pay paydas paydos payet payitaht paylastigi
+payplayn payreks paytak payton pazarbasi pazen pazi pazibent pazval pazvant pec pecic pedagog pedagoji pedagojik pedal
+pedavra peder pedersahi pediatri pedikur pediyatrik pedodonti pedofil pedolog pedoloji pedometre peeling peganit
+pegmatit pehlivan pehpehle pejmurde pejoratif pek pekent pekis pekit pekmez pekmezkefi pekmezkopugu peksimet pektoral
+peleng pelenk pelerin pelesenk pelikan pelikangiller pelikul pelin pelit pelte peltek pelur pelus pembekurt pembemtirak
+pembezar pena penalti pence penceles pencgah pencik pencudu pencuse pencuyek pendname peneplen penes pengo penguengiller
+peni pens pentan pentatlon pentur penuar penuvar penye pepele pepeme pepsin pepton per perakende perdah perestis
+perestiskar perforaj perforje performans pergel pergola perhiz perhizkar peribacasi perido peridot peridotit periferi
+perikart peripatetizm periskop periton peritonit periyodik periyot perkusyon perlit perlon permanant permanganat
+peroksit peron peronospora persenk personel perspektif pert peruk perva pervaz pes pesek pesimist pesinat peskes
+pesmelba peso pespaye pespembe pespesele pesrev pest pestahta pestamal pestenkerani pestil pesus petek petrifikasyon
+petrografi petrokimya petrol petroloji petrolojik petunya pey peyapey peydah peyderpey peygamber peygamberdevesi
+peygambervari peyk peynirhane peyrev peyzaj pezo pianta picsinek picuta pigment pihti pijama pik pikaj pikap piket
+piknik piknometre piko pil pilav pilic piling pilot pilotaj pim pimpirik pinar pinekle pinel pines pingpong pinhan
+pinpon pinti pipet pipo pir piramidal piramit pirazvana pirekapan pirekiran pirifani pirilda pirildak pirilti pirinc
+pirit pirlak pirlangic pirnal pirogravur pirohi piroksen piromani pirometre pirometri pirosfer pirpi pirpit pirtla
+pirtlak piruhi pirupak piryol pirzola pis pisbogaz pisek pisik pisirgec pisirik piskopos piskoposhane pislikcil pispirik
+pispisla pist piston pistov pisuvar pit pitikare piton pitoresk pitrak pitsikato piyade piyale piyan piyango piyanist
+piyano piyasa piyata piyaz piyes piyon piyore pizolit pizza pizzicato placka plaj plajiyoklaz plak plaket planerit
+planet plankton planor plantasyon plase plasman plaster plastik plastron platerina platform platika platin plato
+platonik play playback plaza plazma plebisit pleistosen plevra pleybek pli pliyosen plonjon pluralist pluralizm
+plutokrasi plutonyum pluviyometre poc pocuk podosuet poetik pof pog pogrom pohpohla pohrenk poker polar polargi
+polarimetre polarimetri polariskop polarizasyon polaroit polarolcer polat polemik polen poliandri poliasit police
+polietilen polifoni polifonik poligam poligon polijini poliklinik polim polinom polip polis polisaj polisevi politeist
+politeizm politik politize poliuretan polka polo polyester pomat pompa pompaj ponje ponksiyon ponton ponza pop
+populasyon populist populizm porfir porfirit porselen porsiyon porsu porsuk porsukgiller portal portatif portbagaj
+portbebe porte portfoy portle portlek portmanto portmone porto portre pos poset post postal postis postmodern
 postmodernist postrestant postulat pot potansiyel potas potibor potifur potikare potkal potlac potpuri potuk pound poy
 poyraz poz pozisyon pozitif pozitivist pozitivizm poziton pozitron prafa pragmatik pragmatist pragmatizm pranga
 praseodim pratisyen prediksiyon prefabrik prefabrikasyon prehistorik prehistorya prekambriyen prelut premature prens
@@ -864,7 +864,7 @@ protesto protez protojin protokol proton protoplazma prototip prova providansiya
 provoke prozodi pruva psikanalist psikanaliz psikasteni psikiyatr psikiyatrist psikolog psikoloji psikolojik psikolojizm
 psikometri psikopat psikopatoloji psikopatolojik psikoteknik psikoterapi psikoz psisik ptiyalin puan puantaj puantor
 puding puf pufkur pufurdet puhu puklum pul puluc pulverizator puma pumba punc punez punt punto pupa pur purcek purcuk
-purdikkat purhiddet purmelal puro pursihhat purtelas pus pusarik pusat puset pusku puskul puskurtec puskuruk pust pustul
+purdikkat purhiddet purmelal puro pursihhat purtelas pus pusarik pusat puset pusku puskul puskurtec puskuruk pustul
 pusval put putperest putrel puzzle rabbani rabit rabt raca raci racon radansa radar radde radika radikal radon radyan
 radyasyon radyator radyo radyoaktif radyoaktivite radyobiyoloji radyobiyolojik radyodifuzyon radyoelektrik
 radyoelektronik radyoevi radyofizik radyofizyoloji radyofoni radyofonik radyofoto radyografi radyogram radyoizotop
@@ -893,15 +893,15 @@ rubap rubidyum ruble rubu ruchan rucu ruesa ruf rufeka rugan rugbi ruh ruhaniyet
 ruhsal ruhsat ruj rukn ruku rukus rulet rulman rulo rumba rumuz run runik rupi rus ruseym rust rusumat rusva rusvet
 rutbe rutenyum rutherfordyum rutin rutubet ruya ruyet ruz ruzgaralti ruzgargulu ruzgarolcer ruzuseb saadet saadethane
 sabahyildizi sabankiran sabik sabit sabitkadem sablon sabo sabotaj sabret sabuh sabukla sabunhane sacak sacayak sacik
-sad sadak sadakat sadakor sadaret sadet sadeyag sadik sadirvan sadist sadrazam saf safahat safak safdil saffet safha
-safiha safiyet safkan saft saftirik saftorik saful sag sagal saganak sagbegeni sagdic saggoru sagistem sagladigi
-saglicakla sagligi saglikevi sagmal sagol sagyag sah sahabet sahaf sahap sahavet sahbaz sahh sahibe sahibi sahife sahih
-sahika sahil sahipkiran sahipligi sahis sahit sahlep sahnis sahs sahsiyat sahsiyet sahtekar sahteregiller saibe saik
-sair sairfilmenam sak sakaciktan sakaf sakak sakal sakalas sakamet sakandirik sakarimetre sakarimetri sakaroz sakat
-sakatat sakatligi sakayik sakil sakildak sakingan sakirga sakirt sakit sakk sakkadak sakket saklaban saklambac sako
-sakrak saksafon saksagan saksiguzeli saksonya sakul sal salabet salah salahiyet salamandra salamanje salangan salapurya
-salas salaspur salat salavat saldirgan salep salepgiller salgam salgi salhane salik salincak salisilat saliver sallabas
-sallak sallapati sallasirt salmastra salon saloz salpa salpak salt saltanat salto salvar salvo salyangoz sam samandirala
+sad sadak sadakat sadakor sadaret sadet sadeyag sadik sadirvan sadrazam saf safahat safak safdil saffet safha safiha
+safiyet safkan saft saftirik saftorik saful sag sagal saganak sagbegeni sagdic saggoru sagistem sagladigi saglicakla
+sagligi saglikevi sagmal sagol sagyag sah sahabet sahaf sahap sahavet sahbaz sahh sahibe sahibi sahife sahih sahika
+sahil sahipkiran sahipligi sahis sahit sahlep sahnis sahs sahsiyat sahsiyet sahtekar sahteregiller saibe saik sair
+sairfilmenam sak sakaciktan sakaf sakak sakal sakalas sakamet sakandirik sakarimetre sakarimetri sakaroz sakat sakatat
+sakatligi sakayik sakil sakildak sakingan sakirga sakirt sakit sakk sakkadak sakket saklaban saklambac sako sakrak
+saksafon saksagan saksiguzeli saksonya sakul sal salabet salah salahiyet salamandra salamanje salangan salapurya salas
+salaspur salat salavat saldirgan salep salepgiller salgam salgi salhane salik salincak salisilat saliver sallabas sallak
+sallapati sallasirt salmastra salon saloz salpa salpak salt saltanat salto salvar salvo salyangoz sam samandirala
 samankapan samaroglani samba sambaba sambrel samil samimiyet sampanya sampiyon sampiyonlugu sampuan samuray samut san
 sanal sanat sanatevi sanatkar sanatoryum sanatsever sanayiinefise sanc sancak sandal sandalet sandalgiller sandel
 sandiga sandvic sangi sanik sanitasyon sanjan sanjman sano sans sansargiller sansasyon sansasyonel sansolye sanson
@@ -920,234 +920,233 @@ sayikla sayilti sayis sayisal sayka saykal saylav sayril sayrilarevi sayrimsak s
 sazkayasi seamet seans seb sebabet sebat sebatkar sebboy sebebiyet sebek sebep sebiarus sebil sebilhane sebiyelda
 sebkihindi sebzevat sec secaat secal secenek secik secil sedaraban sedef sedefkar sedimantasyon sedit sef sefaat sefahat
 sefalet sefaret sefarethane seferber seffaf sefih sefik sefil sefirikebir sefkat segah segirt segment sehadet sehbender
-seher sehevi sehim sehit sehiv sehla sehm sehname sehnaz sehnazbuselik sehpa sehr sehv sehvaniyet sehvet sehvetperest
-sehzade sek sekans sekant sekavet sekban sekbanbasi sekel sekerciboyasi sekerpare sekerrenk sekil sekildas sekilperest
-sekizgen sekiztek sekk sekl sekoya sekretarya sekreterya seksapel seksiyon seksolog seksoloji seksolojik sekstant
-seksuel sekteikalp sektor sektorel sekularist sekva sel selamet selanik selaset selef selek seleksiyon selektif selektor
-selentereler self selika selis sellemehusselam selobant selofan seloteyp selp selulit seluloit seluloz selulozik selva
-selvi selzede sem semafor semah semahat semail semaver semavi semazen semazenbasi sembol sembolik sembolist
-semendergiller semih semirgin semitizm semiyoloji semiyolojik semiyotik semizotu semizotugiller sempanze sempati
-sempatik sempatizan sempozyum semptom sems semt semturreis senaat senarist senaryo senato sendelet sendikal sendikalist
-sendrom seneidevriye seneikebise senek senel senet senevi senfoni senfonik senit seniyet senkretizm senkron senkronik
-senkronizasyon senozoik sensor sent sentagma sentaks sentaktik sentez sentrozom sepek sepele sepet sepetkulpu sepi sepit
-sepken septik septisemi septisizm sepya ser serait serak seramik serap serasker serazat serbaz serbest serbet serc
-sercegiller serdengecti serdet seref serefyap seremoni serenat sereserpe serf sergen sergerde sergi sergil serguzest
-serh serhat serhatt seriat serif serigrafi serik serinkanli seris serit seritgiller serkes serlevha sermest sermuharrir
-sermurettip serp serpelet serpis serpus sersefil sert sertabip sertel sertifika sertifikasyon seruven servant server
-servet servi servigiller servis seryaver serzenis sesbes sescihar sescil sesper sestas sestes sesyazar sesyek set
-setaret setik setlant setlic setret setriavret sett sevahit sevap sevdigi sevinc sevis sevk sevkefza sevket sevkitabii
-sevkiyat sevkulceys sevval seyahat seyek seyfiye seyh seyhulislam seyirt seyis seyishane seyit seylap seyrek seyrel
-seyrusefer seytanarabasi seytanet seytanfeneri seytanignesi seytanignesigiller seytanminaresi seytantirnagi seyyah
-seyyal seyyiat seyyibe sez sezgi sezis sezlong sezon sfagnum sfenks siar sibak sibakusiyak sibernasyon siborgiyum sic
-sicacik sicak sicakkanli sicakligi sicaklikolcer sicangiller sicanimsilar sicankulagi sicankuyrugu sicanotu sicil
-sicirgan siddet siderit sideroz sidik sidk siesta sif sifahane sifahen sifahi sifilis sifon siftah sig sigamsal sigil
-siginak siginik siginis siginmaevi sigircik sigirdiligiller sigirgozu sigirkuyrugu sigirodu sigirtmac sigis sigorta
-sihhat sihhi sihir sihirbaz sihr sihriyet siiriyet sikatif sikayet sikbogaz sikemperver sikeste sikil sikilgan sikilmaz
-sikis sikisik sikit sikiyonetim sikk siklamen siklat siklet siklon sikmac sil silah silahalti silahendaz silahhane
-silahsor silaj silep silgec silgic silik silikat silikon silikoz silindiraj silindirik silis siliscil silisseven silk
-silo silsileimeratip silt siluet sim simal simarik simendifer simetri simetrik simge simgesel simiotaksi simiotropizm
-simit simsek simsicak simsirgiller simsiyah simulasyon simulator simultane sin sinaat sinagog sinanay sinarit sincap
-sincapgiller sinek sinekcil sinekkapan sinekkapangiller sinekkaydi sinekoloji sinekolojik sinekromi sineksavar
-sinemasever sinemaskop sinematek sinematograf sinematografik sinerji sinerjik sineroman sinestezi sinfirti singil singin
-singirda singirti single sinik sinirdas sinonim sintigrafi sinus sinuzit sinuzoidal sinuzoit sinyal sinyalizasyon sip
-sipahi siparis siperisaika sipka sipolin sippadak sipsak sipsevdi sipsicak sipsivri sir siracagiller siradag sirak
-sirakkadak siralac siraolcer sirat sirayet siraze sirdas sirf sirik sirilda sirilsiklam sirilti siringa sirit siritkan
-sirk sirkat sirkengebin sirket sirkulasyon sirlagan sirmakes sirmakeshane sirmo sirnas sirnasik siroko siroz sirpence
-sirret sirrol sirrus sirsiklam sirt sirtlangiller sirto sirtustu sis sisek sishane sisik siska sisko sismik sismograf
-sismolog sismoloji sist sistemik sistit sistol sit sitayis sitayiskar sitemkar sitil sitoloji sitoplazma sitotoksik
-sitrik sitteisevir sitteisevr siva sivas sivat sivazla sive sivekar sivgin sivi sivik sivil siviolcer sivis sivisik
-sivri sivric sivrifare sivrikuyruk sivril sivrisinek siy siyahimtirak siyak siyakat siyakusibak siyanet siyanojen
-siyanurik siyasal siyaset siyasiyat siyek siyenit siyga siygi siyirga siyonist siyonizm siyrik siyril sizak sizgit
-sizildan sizilti sizlayis sizofren sizofrenik skala skandal skandiyum skavut skec ski skif skink skinkgiller skleroz
-skolastik skor slalom slap slayt slempe slip slogan smac smacor smokin snitzel snop snorkel sobiyet soda sodyum sof
-sofben sofist sofistik sofor sogrul soguk sogukkanli sogumolcer sogurgan sogus sogut sogutgiller sogutkan sogutmac
-sohbet sohret sok sokak sokel soket sokola sokuk sokul sokulgan sokus sol solak solfej solgun solidarist solidarizm
-solist solo solpu solpuk soluk solungac solusyon som somak somestr somikok somon somurge somurt somurtkan somut sonat
-soncul sondaj sondor sonuc sonuk sonurgu sonusmaz sop soprano sopsoguk sorf sorgu sorguc sorit sorkun sormuk sorolo
-sorolop sort sorulmasi sorus sorutkan sos soset sosis soson sosyal sosyalist sosyalistik sosyalizasyon sosyoekonomik
-sosyokulturel sosyolenguistik sosyolog sosyoloji sosyolojik sosyolojizm sosyopat sote sov sovalye sovgu sovhoz sovus soy
-soydas soygun soyka soyledigi soylerken soyles soylev soymuk soysal soyut soz sozcuk sozel sozgoturmez sozkonusu sozles
-sozunubilmez spagetti spangle spastik spatula spazm spektroskop spektrum spekulasyon spekulatif spekulator sperma
-spermatozoit spesifik spesiyal spesiyalist spiker spiral spiril spiritualizm spirituel sponsor spontane spor sporsever
-sportif sportmen spot sprey sprint stabil stabilizasyon stabilizator stafilokok stagflasyon staj stalagmit stalaktit
-standardizasyon standart stant star start stat statik statolit stator statosist statuko stearik stearin sten steno
-stenograf stenotip stent step ster steradyan stereo stereofoni stereofonik stereografi stereografik stereoskop
-stereoskopik stereotip steril sterilizasyon sterol stetoskop steysin sticker stil stilist stilistik stilizasyon stilo
-stok stop stopaj stor stratej stratejik stratejist stratigrafi stratosfer stratus strec streptokok streptomisin stres
-striknin striptiz stronsiyum struktur strukturalist strukturalizm strukturel studyo sual subasman subay subek subjektif
-subjektivist subjektivite subjektivizm sublimles subret subuk subut subvanse subvansiyon suc sucicegi sucuk sucul
-sucustu sucut sudak sudoku suet sufa sufi sufle sufli suflor sugecirmez suh suhulet suhunet suibrigi suibrigigiller
-suikast suiniyet suistimal suit suje sukr sukret sukse sukun sukunet sukur sukut sukutuhayal sulak sulf sulfamit sulfat
-sulfit sulfurik sulfurimetre sulh sulhperver sulhsever sulp sulta sultanibuselik sultanihuzzam sultaniyegah sultanoglu
-sulugen sulungiller sulus sumbul sumbulteber sumkur summettedarik sumo sumsuk sumsukgiller sumuk sumul sunak suncacik
-sundugu sundus sunepe sunger sungu sunnet suntirac suntiras sunulacak sunuldu sunus suoku suokugiller suolcer sup
-supangle supanglez supap supermarket superstar suphe suples supurge suracikta surahi surat surc surdugu surdurdugu
-surdurulebilir surec suregel suregit surek sureolcer surerken suret sureyazar surfe surfile surgit surgu surmanset
-surmenaj surnaturalist surnaturalizm surpriz surrealist surrealite surrealizm sursarj sursat surt surtus surucul surukle
-surul surungen surustur surut surveyan sus susak susallar susamgiller susengiller susku suspansiyon suspus sutbaba
-suthane sutkardes sutkiz sutlac sutlegen sutlegengiller sutogl sutogul sutolcer suuralti suvar suvat suven suveter
-suveyda suyek suyolu suyuk suz suzek suzgec suzgu suzidil suzinak suzuk suzul svester taaccup taaddut taaffun taahhut
-taalluk taallukat taam taammut taannut taarruz taassuk taassup taayyun taayyus tab tabaat tababet tabak tabakhane
-tabanvay tabasbus tabet tabiat tabiatustu tabiiyet tabl tablakar tabldot tablo tabut tabutuvan tac tacil tadat tadil
-tadilat taflan tafra tafsil tafsilat tafta tafzih tagaddi tagallup tagayyur tagsis tahaccum tahaccur tahaffuz
-tahaffuzhane tahakkuk tahakkum tahammul tahammulfersa tahammur tahammuz taharet taharri taharrus tahassun tahassur
-tahassus tahassut tahattur tahavvul tahayyul tahdidat tahdit tahfif tahil tahin tahirbuselik tahkik tahkikat tahkim
-tahkimat tahkir tahkiye tahlif tahlil tahlis tahliye tahmil tahmin tahmis tahnit tahra tahribat tahrif tahrifat tahrik
-tahrikat tahril tahrip tahripkar tahrir tahrirat tahris tahsil tahsilat tahsis tahsisat tahsisatimesture tahsiye taht
-tahtabos tahtakurusu tahtalikoy tahtelbahir tahtelbahr tahterevalli tahtessuur tahtirevan tahvil tahvilat taife tak
-takallus takanak takas takat takayyut takaza takbih takdiriilahi takdirkar takdis takeometre takibat takibe takibi
-takigraf takik takil takilgan takimetre takimyildiz takinak takis takkadak takke taklak taklavat taklip taklit takograf
-takometre takoz takriben takribi taksimat taksimetre taksirat taksit taksonomi takt takva takvim takviye takyit tal
-talak talakat talas talaz talep talepkar talih talik talil talimat talimgah talimhane talk taltif talveg tam tamah
-tamahkar tamamiyet tamanit tambur tamik tamirat tamirhane tampon tamzara tan tanassur tandans tanecil tango tanidigi
-tanik tanis tanisik tanit tanjant tank tanksavar tanritanimaz tansik tansiyometre tansiyon tantal tanzifat tanzim tanzir
-tap tapikla tapinak tapincak tapirgiller tapisla tapon taptaze tapyoka tar taraba taraf tarafeyn tarafgir tarak taranga
-taras tarassut tarator taravet taraz taret tarh tarif tarih tarihsel tarik tarikat tarimsal tarlakoz tarpan tart
-tartakla tartarat tartarik tartil tartis tarz tas tasak tasallup tasallut tasarruf tasavvuf tasavvur tascil
-tasemengiller taseron tasfiye tasfiyehane tasgir tashih tasidigi tasikardi tasil tasinmaz tasit taskirangiller taslak
-tasnif tasrif tasrih tassarimsagi tasvip tasvir tat tatava tatbik tatbikat tatil tatminkar taun tav tavaf tavassut
-tavattun tavazzuh tavhane tavik tavizkar tavsanagzi tavsanayagi tavsanbiyigi tavsancil tavsangiller tavsankani
-tavsankulagi tavsif tavukayagi tavukgiller tavukgogsu tavukgotu tavukkarasi tavukpencesi tavulga tavus tavuskuyrugu
-tavzif tavzih tay taydas tayf tayfolcer tayga taygeldi taylak tayt tayyet tazallum tazammun tazarru taze tazi tazimat
-tazip taziyet taziz tazmin tazminat tazyik teadul teakup teali teamul tearuz teati teavun tebahhur tebaiyet tebcil
-tebdil tebdilihava tebeddul tebeddulat tebelles tebellug tebellur teberruk tebessum tebeyyun teblig tebligat tebrik
-tebyiz tecahul tecahuluarif tecanus tecdit teceddut tecelli tecelliyat tecemmu tecennun tecerrut tecessum tecessus
-tecezzi techil techiz techizat tecil tecim tecimevi tecrit tecrube tecrubi tecvit tecviz tecziye tedafui tedahul tedai
-tedarik tedavi tedavul tedbir tedenni tedfin tedhis tedip tedirgin tediye tedric tedris tedrisat tedvin tedvir teeddup
-teehhul teehhur teemmul teenni teessuf teessur teessurat teessus teeyyut tef tefahhus tefahur tefarik tefavut tefehhum
-tefek tefekkur teferruat teferruc teferrut tefessuh tefeul tefevvuk tefeyyuz tefhim teflon tefrik tefris tefrisat tefrit
-teftih teftis tefviz tegaful tegelti teget tehacum tehaluf tehaluk tehcir tehdit tehditkar tehevvur teheyyuc tehi
-tehiriicra tehlike tehyic tehzil tein teist teizm tek tekabul tekalif tekamul tekapu tekasuf tekasul tekaut tekbenci
-tekbir tekduze tekebbur tekefful tekel tekelluf tekemmul tekerlek tekesakali tekessur tekevvun tekfin tekfir tekfur
-tekgovde tekit tekke teklif tekmil teknetyum teknik teknisyen teknokent teknokrasi teknokrat teknolog teknoloji
-teknolojik teknopark teksif tekst tekstil tektas tektonik tekvando tekvin tekzip tel telafi telakki telas telef telefat
-teleferik telefonometre telefotografi telek telekart telekinezi telekomunikasyon telekonferans teleks telemetre
-telemetri teleobjektif teleoloji teleolojik telepati telepatik teles telesekreter telesiyej teleskobik teleskop
-teleskopik televizyon telfin telgraf telgrafhane telhis telif telis telkari telkih tellak tellal telmih telve telvis
-telyazi tem temas temayul temayuz tembel tembelhane tembih tembihat tembul temcit temdit temedduh temeddun temek temel
-temennah temerkuz temerrut temessul temettu temevvuc temeyyuz temhir teminat tempo temsil temyiz ten tenafur tenakus
-tenakuz tenasuh tenasul tenasup tenazur tendon tendurust teneffus teneffushane teneke tenevvu tenezzuh tenezzul tenge
-tenha tenis tenkil tenkis tenkisat tenkit tenor tensik tensikat tensil tensip tenturdiyot tenvir tenvirat tenzih tenzil
-tenzilat tenzilirutbe teogoni teokrasi teokrat teokratik teolog teoloji teolojik teorem teori teorik teorisyen tep
-tepebasi tepecik tepegoz tepetakla tepetaklak tepeustu tephir tephirhane tepik tepis tepke ter terakki terakkiperver
-terakum terapi terapist teras teravi teravih terazi terbi terbiyesizcesine terbiyevi tercih terciibent tercumeihal
-terebentin tereddi tereddut terek terekkup terelelli teres teressup terettup tereyagi terfi terfih terfik tergal terhin
-terhis terk terkibi terkibibent terkiphane termal termik terminal terminoloji terminolojik termit termodinamik
-termoelektrik termofor termograf termokimya termometre termonukleer termoplast termos termosfer termosifon termostat
-teror terorist ters tertibat tertip terutaze tervic terzi terzihane terzil tesaduf tesahup tesalup tesanut tesbih tesci
-tescil tesdis tesdit tesebbus tesehhut tesekkul teselli tesellum teselsul teserruf tesettur tesevvus teseyyup teshil
-teshin teshir teshis tesir tesis tesisat tesit teskere teskil teskilat teskin teslim teslimat teslimiyet teslis tesmil
-tesmiye tesne tespih tespit tesri tesrif tesrifat tesrih tesrihhane tesrik tesrinievvel testis testosteron tesvik
-tesvikkar tesvis tesvit tesviye tesviyeruhu tesyi tetabuk tetanos tetebbu tetik tetir tetkik tetkikat tevabi tevafuk
-tevahhus tevakki tevakkuf tevali tevarus tevatur tevazu tevbih tevcih tevdi tevdiat teveccuh tevehhum tevek tevekkel
-tevekkul tevellut teverrum tevessu tevessul tevettur tevfik tevhit tevil tevki tevkif tevkifat tevkifhane tevkil tevlit
-tevliyet tevriye tevsi tevsih tevsik tevzi tevziat teyakkuz teyel teyemmum teyit teyp teyzezade tez tezahur tezahurat
-tezat tezayut tezek tezekkur tezelden tezellul tezelzul tezevvuc tezgah tezhip tezkere tezpisti tezvir tezvirat tezyif
-tezyifkar tezyinat tezyit the tibben tibbi ticaret ticaretgah ticarethane ticari tifdruk tifil tifo tiftik tifus tig tik
-tikac tikanik tikel tikis tikisik tiklat tiknaz tiknefes tiksinc tiksirik tilavet tilkikuyrugu tilmiz tilsim tim
-timarhane timbal timsah timsal timus tin tinaz tingadak tingilda tingir tinnet tip tipatip tipik tipisla tipkibasim tipo
-tipografi tipografik tipografya tipoloji tipolojik tipp tir tirabzan tiraj tirak tiramola tiras tirat tirbuson tirendaz
-tirfil tirhandil tirhos tirik tiril tirink tiris tiriska tirit tiriviri tirkaz tirmik tirnak tiroit tirokalsitonin
-tiroksin tirpan tirpit tirs tirtil tiryak tis tisort titan titiz titr titrek titres titret tiyatro tiynet tiz tofu
-tohmet toht tohum tok tokac tokalas tokat tokez tokezlet tokmakbas toksik toksikolog toksikoloji toksikolojik toksikoman
-tokus tokyo tol tolerans tolga tolksov tomahavk tomak tomar tombak tombala tombalak tombaz tombeki tombik tombil
-tombilik tombul tomografi tomruk tomur tomurcuk ton tonaj tonga tonik tonilato tonmayster tonoz topac topak topal
-topalak toparlacik toparlak topaz topbas topceker tophane topik toplac toplanik toplumdas toplumsal topograf topografik
-topoloji topolojik toponimi toprak toprakbasti toprakcil topuk topukdoven toput topyekun tor torak torba toreador torel
-torero toretanimaz torik tork torlak tornado tornavida tornet tornistan torpido torpidobot torpil torpu tortop tortul
-tos tosbaga toskur tost tostoparlak total totalitarizm totem tovbe tovbekar toy toyaka toyga toygiller toynak toz tozat
-tozel tozkoparan tozpembe tozut tradisyon tradisyonel trafik trafo tragedya trahom trajedi trajik trajikomedi trajikomik
-trake trakeit trakit traksiyon traktor trakunya trampa trampet tramplen tramvay tranca trankilizan trans transandantal
-transatlantik transfer transformasyon transformator transformizm transfuzyon transistor transit transkripsiyon
-transliterasyon transmisyon transparan transplantasyon transport transseksuel trap trapez tras trata travers traverten
-travma travmatoloji travmatolojik trekking tremolit trenckot trend tretuvar treyler trias triatlon tribun triftong
-trigonometri trigonometrik triko trikosefal trikotaj triloji trilyon trinketa trio tripleks tripoli triportor triptik
-trisin triton trityum triyas trok trol troleybus trombon trombosit tromboz tromp trompet tropik tropikal tropizm troplar
-troposfer trost trotinet trotuvar troyka truakar truk trup tsunami tubeless tuberkulin tuberkuloz tuccar tuf tufek
-tufekhane tufeyli tug tugamiral tugay tugbay tuggeneral tugrakes tuhaf tuk tukenik tukenmez tuket tukuruk tul tulbent
-tuluat tuluk tulumba tum tumagi tumamiral tumba tumbadiz tumbek tumdengelim tumel tumevarim tumgeneral tumlec tumlesik
-tumor tumsek tumsel tumsuk tumturak tun tunc tundra tunek tunel tungsten tunik tup tur turac turap turbo turbulans
-turdes turel turev turfa turgay turgor turist turistik turk turkkiymasi turkkupasi turkuaz turnaayagi turnagagasi
-turnagecidi turnagiller turnagozu turnike turno turnusol turnuva turp turpgiller turunc turuncgiller turuncumtirak tus
-tutac tutak tutamac tutanak tutarga tutarik tutkal tutku tutmac tutsak tutsat tuttugu tutturabildigine tutturac
-tutturgac tutuk tutukevi tutul tutulmaz tuturuk tutus tuval tuvalet tuvana tuveyc tuvit tuy tuyo tuyug tuz tuzak tuzcul
-tuzel tuzlak tuzuk tvist twitter ubudiyet ucaksavar ucayak ucgen ucgul uckagit uckun uckur ucret uctas ucteker ucube
-ucuk ucuncul ucurt ucus udeba udi ufacik ufak ufal ufarak ufk ufkuis ufla ufle uflec ufuk uful ufunet ufur ufuruk ugr
-ugradigi ugrak ugras ugrat ugulda ugultu ugun ugur ugut uhde uhrevi uhuvvet ukala ukde uknum ukubet ula ulac ulak ulas
-ulastigi ulema ulen ules ulfet ulger ulku ulkudas ulser ultimatom ultramodern ultrason ultraviyole ulu ulufe uluhiyet
-uluorta ulus ulusal ulusotesi ulussever ulvi ulviyet umaci umar umde umera umit umitvar ummadik umman ummet ummi umran
-umre umu umuk umumhane umumiyet umursamaz umut undes uniforma unik unite universal universite unla unle unlu unsiyet
-unsur unutkan unutmabeni unutulmaz unvan upuslu upuygun upuzun uragan uran urat uray urba ure uremik uret uretec
-uretimevi uretken urettigi urk urkek urkunc urkut urodel urokultur urolog uroloji urolojik urpen urper urtiker uru uruk
-urup urus uryan usak usakkapan usan usanc usangin usare usavur usen usenc usengec usengen usera uskuf uskumru
-uskumrugiller uskumrumsugiller uskun uskur uslamla uslan uslen uslu uslup usniye uss ussak ust ustabasi ustat ustcavus
-ustegmen ustel ustlendigi ustsubay ustubec ustunc ustunkoru ustunlugu usturlap usturpa ustuvane ustuvani ustyapi usu
-usul usulcacik utan utanc utangac utangan utanmaz uterus utku utopik utopist utopya utu uvendire uvertur uvey uveyik
-uvez uyak uyanik uyar uyarlac uydu uydurmasyon uyduruk uye uyeligi uygar uygula uyguladigi uygun uyku uylas uyluk uymaz
-uyruk uysal uyukla uyurgezer uyus uyuskan uyusuk uyuz uza uzak uzaklas uzat uzay uzengi uzenti uzere uzeri uzgoren
-uzgorur uzgu uzlas uzlasmaz uzlet uzman uzme uzo uzre uzucu uzunc uzunesek uzunkuyruk uzuv uzv uzviyet vaat vaaz vabeste
-vacip vadet vaftiz vaftizhane vagon vagonet vagotoni vaha vahamet vahdaniyet vahdet vahdetivucut vahi vahit vahiy vahset
-vahsi vaht vahvahlan vahy vahyol vaiz vajinal vaka vakanuvis vaketa vakf vakfet vaki vakif vakit vakla vaks vakt
-vaktizamaninda vakum vakur vakvakla vale valf vali valiz valla vallahi valor vals vamp vana vanadyum vandal vanilya
-vantilator vantrilok vantuz vapur varak varakpare vardabandira vardakosta vareste vargel vargi varidat varil varis varit
-variyet varken varligi varolus varos varsagi varsay varsil vart varyant varyasyon varyemez varyos vasak vasat vasektomi
-vasf vasi vasif vasil vasistas vasiyet vat vatandas vatanperver vatansever vatka vatoz vaveyla vay vaz vazet vazgec
-vazgecilmez vazife vazifesinas vazih vazihamil vazihaml vaziikanun vaziyet vazo veba vebal vech vechisebeh vecibe vecih
-vecit veciz vect vefa vefakar vefat vefiyat vehim vehleten vehm vehmet vejetalin vejetalizm vejetarizm vejetaryen
-vejetasyon vekalet vekil vekilharc vektor veladet velayet veledrom velespit velet velev velfecri velhasil velhasilikelam
-veliaht velinimet veliyullah velut velvele venuscarigi veraset verdigi verev vergi verildi verildigi verilecek verilerek
-verilmedi verilmesi verilmis verimkar verirken veristir verit verkac vermedigi vermez vermut vernik veronika versiyon
-vertigo vesaik vesait vesaitinakliye vesayet vesika vesselam vestiyer veston vesvese veto veyahut vezaret vezikul vezin
-vezir veziriazam vezirparmagi vezn vibrasyon vibrator vibriyo vicahen vicahi vicdan vicik vicirda vicirdas vida vidanjor
-videobant videokaset videoteyp vido vigla vikaye vikont vikontes viladi vilayet villa vin vinc vinilti vinyet vira viraj
-viral virdizeban vire virgul virilda virilti virla virman virolog viroloji virolojik virt virtuoz virus virutik visal
+seher sehevi sehim sehit sehiv sehla sehm sehname sehnaz sehnazbuselik sehpa sehr sehv sehvaniyet sehzade sek sekans
+sekant sekavet sekban sekbanbasi sekel sekerciboyasi sekerpare sekerrenk sekil sekildas sekilperest sekizgen sekiztek
+sekk sekl sekoya sekretarya sekreterya seksapel seksiyon seksolog seksoloji seksolojik sekstant seksuel sekteikalp
+sektor sektorel sekularist sekva sel selamet selanik selaset selef selek seleksiyon selektif selektor selentereler self
+selika selis sellemehusselam selobant selofan seloteyp selp selulit seluloit seluloz selulozik selva selvi selzede sem
+semafor semah semahat semail semaver semavi semazen semazenbasi sembol sembolik sembolist semendergiller semih semirgin
+semitizm semiyoloji semiyolojik semiyotik semizotu semizotugiller sempanze sempati sempatik sempatizan sempozyum semptom
+sems semt semturreis senaat senarist senaryo senato sendelet sendikal sendikalist sendrom seneidevriye seneikebise senek
+senel senet senevi senfoni senfonik senit seniyet senkretizm senkron senkronik senkronizasyon senozoik sensor sent
+sentagma sentaks sentaktik sentez sentrozom sepek sepele sepet sepetkulpu sepi sepit sepken septik septisemi septisizm
+sepya ser serait serak seramik serap serasker serazat serbaz serbest serbet serc sercegiller serdengecti serdet seref
+serefyap seremoni serenat sereserpe serf sergen sergerde sergi sergil serguzest serh serhat serhatt seriat serif
+serigrafi serik serinkanli seris serit seritgiller serkes serlevha sermest sermuharrir sermurettip serp serpelet serpis
+serpus sersefil sert sertabip sertel sertifika sertifikasyon seruven servant server servet servi servigiller servis
+seryaver serzenis sesbes sescihar sescil sesper sestas sestes sesyazar sesyek set setaret setik setlant setlic setret
+setriavret sett sevahit sevap sevdigi sevinc sevis sevk sevkefza sevket sevkitabii sevkiyat sevkulceys sevval seyahat
+seyek seyfiye seyh seyhulislam seyirt seyis seyishane seyit seylap seyrek seyrel seyrusefer seytanarabasi seytanet
+seytanfeneri seytanignesi seytanignesigiller seytanminaresi seytantirnagi seyyah seyyal seyyiat seyyibe sez sezgi sezis
+sezlong sezon sfagnum sfenks siar sibak sibakusiyak sibernasyon siborgiyum sicacik sicak sicakkanli sicakligi
+sicaklikolcer sican sicangiller sicankulagi sicankuyrugu sicanotu sicil sicim sicirgan sicra siddet siderit sideroz
+sidik sidk siesta sif sifahane sifahen sifahi sifilis sifon siftah sig sigamsal sigil siginak siginik siginis siginmaevi
+sigircik sigirdiligiller sigirgozu sigirkuyrugu sigirodu sigirtmac sigis sigorta sihhat sihhi sihir sihirbaz sihr
+sihriyet siiriyet sikatif sikayet sikbogaz sikemperver sikeste sikil sikilgan sikilmaz sikis sikisik sikit sikiyonetim
+sikk siklamen siklat siklet siklon sikmac sil silah silahalti silahendaz silahhane silahsor silaj silep silgec silgic
+silik silikat silikon silikoz silindiraj silindirik silis siliscil silisseven silk silo silsileimeratip silt siluet sim
+simal simarik simendifer simetri simetrik simge simgesel simiotaksi simiotropizm simit simsek simsicak simsirgiller
+simsiyah simulasyon simulator simultane sin sinaat sinagog sinanay sinarit sincap sincapgiller sinek sinekcil sinekkapan
+sinekkapangiller sinekkaydi sinekoloji sinekolojik sinekromi sineksavar sinemasever sinemaskop sinematek sinematograf
+sinematografik sinerji sinerjik sineroman sinestezi sinfirti singil singin singirda singirti single sinik sinirdas
+sinonim sintigrafi sinus sinuzit sinuzoidal sinuzoit sinyal sinyalizasyon sip sipahi siparis siperisaika sipka sipolin
+sippadak sipsak sipsevdi sipsicak sipsivri sir siracagiller siradag sirak sirakkadak siralac siraolcer sirat sirayet
+siraze sirdas sirf sirik sirilda sirilsiklam sirilti siringa sirit siritkan sirk sirkat sirkengebin sirket sirkulasyon
+sirlagan sirmakes sirmakeshane sirmo sirnas sirnasik siroko siroz sirpence sirret sirrol sirrus sirsiklam sirt
+sirtlangiller sirto sirtustu sis sisek sishane sisik siska sisko sismik sismograf sismolog sismoloji sist sistemik
+sistit sistol sit sitayis sitayiskar sitemkar sitil sitoloji sitoplazma sitotoksik sitrik sitteisevir sitteisevr siva
+sivas sivat sivazla sive sivekar sivgin sivi sivik sivil siviolcer sivis sivisik sivri sivric sivrifare sivrikuyruk
+sivril sivrisinek siy siyahimtirak siyak siyakat siyakusibak siyanet siyanojen siyanurik siyasal siyaset siyasiyat siyek
+siyenit siyga siygi siyirga siyonist siyonizm siyrik siyril sizak sizgit sizildan sizilti sizlayis sizofren sizofrenik
+skala skandal skandiyum skavut skec ski skif skink skinkgiller skleroz skolastik skor slalom slap slayt slempe slip
+slogan smac smacor smokin snitzel snop snorkel sobiyet soda sodyum sof sofben sofist sofistik sofor sogrul soguk
+sogukkanli sogumolcer sogurgan sogus sogut sogutgiller sogutkan sogutmac sohbet sohret sok sokak sokel soket sokola
+sokuk sokul sokulgan sokus sol solak solfej solgun solidarist solidarizm solist solo solpu solpuk soluk solungac
+solusyon som somak somestr somikok somon somurge somurt somurtkan somut sonat soncul sondaj sondor sonuc sonuk sonurgu
+sonusmaz sop soprano sopsoguk sorf sorgu sorguc sorit sorkun sormuk sorolo sorolop sort sorulmasi sorus sorutkan sos
+soset sosis soson sosyal sosyalist sosyalistik sosyalizasyon sosyoekonomik sosyokulturel sosyolenguistik sosyolog
+sosyoloji sosyolojik sosyolojizm sosyopat sote sov sovalye sovgu sovhoz sovus soy soydas soygun soyka soyledigi
+soylerken soyles soylev soymuk soysal soyut soz sozcuk sozel sozgoturmez sozkonusu sozles sozunubilmez spagetti spangle
+spastik spatula spazm spektroskop spektrum spekulasyon spekulatif spekulator sperma spermatozoit spesifik spesiyal
+spesiyalist spiker spiral spiril spiritualizm spirituel sponsor spontane spor sporsever sportif sportmen spot sprey
+sprint stabil stabilizasyon stabilizator stafilokok stagflasyon staj stalagmit stalaktit standardizasyon standart stant
+star start stat statik statolit stator statosist statuko stearik stearin sten steno stenograf stenotip stent step ster
+steradyan stereo stereofoni stereofonik stereografi stereografik stereoskop stereoskopik stereotip steril sterilizasyon
+sterol stetoskop steysin sticker stil stilist stilistik stilizasyon stilo stok stop stopaj stor stratej stratejik
+stratejist stratigrafi stratosfer stratus strec streptokok streptomisin stres striknin striptiz stronsiyum struktur
+strukturalist strukturalizm strukturel studyo sual subasman subay subek subjektif subjektivist subjektivite subjektivizm
+sublimles subret subuk subut subvanse subvansiyon suc sucicegi sucuk sucul sucustu sucut sudak sudoku suet sufa sufi
+sufle sufli suflor sugecirmez suh suhulet suhunet suibrigi suibrigigiller suikast suiniyet suistimal suit suje sukr
+sukret sukse sukun sukunet sukur sukut sukutuhayal sulak sulf sulfamit sulfat sulfit sulfurik sulfurimetre sulh
+sulhperver sulhsever sulp sulta sultanibuselik sultanihuzzam sultaniyegah sultanoglu sulugen sulungiller sulus sumbul
+sumbulteber sumkur summettedarik sumo sumsuk sumsukgiller sumuk sumul sunak suncacik sundugu sundus sunepe sunger sungu
+sunnet suntirac suntiras sunulacak sunuldu sunus suoku suokugiller suolcer sup supangle supanglez supap supermarket
+superstar suphe suples supurge suracikta surahi surat surc surdugu surdurdugu surdurulebilir surec suregel suregit surek
+sureolcer surerken suret sureyazar surfe surfile surgit surgu surmanset surmenaj surnaturalist surnaturalizm surpriz
+surrealist surrealite surrealizm sursarj sursat surt surtus surucul surukle surul surungen surustur surut surveyan sus
+susak susallar susamgiller susengiller susku suspansiyon suspus sutbaba suthane sutkardes sutkiz sutlac sutlegen
+sutlegengiller sutogl sutogul sutolcer suuralti suvar suvat suven suveter suveyda suyek suyolu suyuk suz suzek suzgec
+suzgu suzidil suzinak suzuk suzul svester taaccup taaddut taaffun taahhut taalluk taallukat taam taammut taannut taarruz
+taassuk taassup taayyun taayyus tab tabaat tababet tabak tabakhane tabanvay tabasbus tabet tabiat tabiatustu tabiiyet
+tabl tablakar tabldot tablo tabut tabutuvan tac tacil tadat tadil tadilat taflan tafra tafsil tafsilat tafta tafzih
+tagaddi tagallup tagayyur tagsis tahaccum tahaccur tahaffuz tahaffuzhane tahakkuk tahakkum tahammul tahammulfersa
+tahammur tahammuz taharet taharri taharrus tahassun tahassur tahassus tahassut tahattur tahavvul tahayyul tahdidat
+tahdit tahfif tahil tahin tahirbuselik tahkik tahkikat tahkim tahkimat tahkir tahkiye tahlif tahlil tahlis tahliye
+tahmil tahmin tahmis tahnit tahra tahribat tahrif tahrifat tahrik tahrikat tahril tahrip tahripkar tahrir tahrirat
+tahris tahsil tahsilat tahsis tahsisat tahsisatimesture tahsiye taht tahtabos tahtakurusu tahtalikoy tahtelbahir
+tahtelbahr tahterevalli tahtessuur tahtirevan tahvil tahvilat taife tak takallus takanak takas takat takayyut takaza
+takbih takdiriilahi takdirkar takdis takeometre takibat takibe takibi takigraf takik takil takilgan takimetre
+takimyildiz takinak takis takkadak takke taklak taklavat taklip taklit takograf takometre takoz takriben takribi
+taksimat taksimetre taksirat taksit taksonomi takt takva takvim takviye takyit tal talak talakat talas talaz talep
+talepkar talih talik talil talimat talimgah talimhane talk taltif talveg tam tamah tamahkar tamamiyet tamanit tambur
+tamik tamirat tamirhane tampon tamzara tan tanassur tandans tanecil tango tanidigi tanik tanis tanisik tanit tanjant
+tank tanksavar tanritanimaz tansik tansiyometre tansiyon tantal tanzifat tanzim tanzir tap tapikla tapinak tapincak
+tapirgiller tapisla tapon taptaze tapyoka tar taraba taraf tarafeyn tarafgir tarak taranga taras tarassut tarator
+taravet taraz taret tarh tarif tarih tarihsel tarik tarikat tarimsal tarlakoz tarpan tart tartakla tartarat tartarik
+tartil tartis tarz tas tasallup tasallut tasarruf tasavvuf tasavvur tascil tasemengiller taseron tasfiye tasfiyehane
+tasgir tashih tasidigi tasikardi tasil tasinmaz tasit taskirangiller taslak tasnif tasrif tasrih tassarimsagi tasvip
+tasvir tat tatava tatbik tatbikat tatil tatminkar taun tav tavaf tavassut tavattun tavazzuh tavhane tavik tavizkar
+tavsanagzi tavsanayagi tavsanbiyigi tavsancil tavsangiller tavsankani tavsankulagi tavsif tavukayagi tavukgiller
+tavukgogsu tavukgotu tavukkarasi tavukpencesi tavulga tavus tavuskuyrugu tavzif tavzih tay taydas tayf tayfolcer tayga
+taygeldi taylak tayt tayyet tazallum tazammun tazarru taze tazi tazimat tazip taziyet taziz tazmin tazminat tazyik
+teadul teakup teali teamul tearuz teati teavun tebahhur tebaiyet tebcil tebdil tebdilihava tebeddul tebeddulat tebelles
+tebellug tebellur teberruk tebessum tebeyyun teblig tebligat tebrik tebyiz tecahul tecahuluarif tecanus tecdit teceddut
+tecelli tecelliyat tecemmu tecennun tecerrut tecessum tecessus tecezzi techil techiz techizat tecil tecim tecimevi
+tecrit tecrube tecrubi tecvit tecviz tecziye tedafui tedahul tedai tedarik tedavi tedavul tedbir tedenni tedfin tedhis
+tedip tedirgin tediye tedric tedris tedrisat tedvin tedvir teeddup teehhul teehhur teemmul teenni teessuf teessur
+teessurat teessus teeyyut tef tefahhus tefahur tefarik tefavut tefehhum tefek tefekkur teferruat teferruc teferrut
+tefessuh tefeul tefevvuk tefeyyuz tefhim teflon tefrik tefris tefrisat tefrit teftih teftis tefviz tegaful tegelti teget
+tehacum tehaluf tehaluk tehcir tehdit tehditkar tehevvur teheyyuc tehi tehiriicra tehlike tehyic tehzil tein teist teizm
+tek tekabul tekalif tekamul tekapu tekasuf tekasul tekaut tekbenci tekbir tekduze tekebbur tekefful tekel tekelluf
+tekemmul tekerlek tekesakali tekessur tekevvun tekfin tekfir tekfur tekgovde tekit tekke teklif tekmil teknetyum teknik
+teknisyen teknokent teknokrasi teknokrat teknolog teknoloji teknolojik teknopark teksif tekst tekstil tektas tektonik
+tekvando tekvin tekzip tel telafi telakki telas telef telefat teleferik telefonometre telefotografi telek telekart
+telekinezi telekomunikasyon telekonferans teleks telemetre telemetri teleobjektif teleoloji teleolojik telepati
+telepatik teles telesekreter telesiyej teleskobik teleskop teleskopik televizyon telfin telgraf telgrafhane telhis telif
+telis telkari telkih tellak tellal telmih telve telvis telyazi tem temas temayul temayuz tembel tembelhane tembih
+tembihat tembul temcit temdit temedduh temeddun temek temel temennah temerkuz temerrut temessul temettu temevvuc
+temeyyuz temhir teminat tempo temsil temyiz ten tenafur tenakus tenakuz tenasuh tenasul tenasup tenazur tendon tendurust
+teneffus teneffushane teneke tenevvu tenezzuh tenezzul tenge tenha tenis tenkil tenkis tenkisat tenkit tenor tensik
+tensikat tensil tensip tenturdiyot tenvir tenvirat tenzih tenzil tenzilat tenzilirutbe teogoni teokrasi teokrat
+teokratik teolog teoloji teolojik teorem teori teorik teorisyen tep tepebasi tepecik tepegoz tepetakla tepetaklak
+tepeustu tephir tephirhane tepik tepis tepke ter terakki terakkiperver terakum terapi terapist teras teravi teravih
+terazi terbi terbiyesizcesine terbiyevi tercih terciibent tercumeihal terebentin tereddi tereddut terek terekkup
+terelelli teres teressup terettup tereyagi terfi terfih terfik tergal terhin terhis terk terkibi terkibibent terkiphane
+termal termik terminal terminoloji terminolojik termit termodinamik termoelektrik termofor termograf termokimya
+termometre termonukleer termoplast termos termosfer termosifon termostat teror terorist ters tertibat tertip terutaze
+tervic terzi terzihane terzil tesaduf tesahup tesalup tesanut tesbih tesci tescil tesdis tesdit tesebbus tesehhut
+tesekkul teselli tesellum teselsul teserruf tesettur tesevvus teseyyup teshil teshin teshir teshis tesir tesis tesisat
+tesit teskere teskil teskilat teskin teslim teslimat teslimiyet teslis tesmil tesmiye tesne tespih tespit tesri tesrif
+tesrifat tesrih tesrihhane tesrik tesrinievvel testis testosteron tesvik tesvikkar tesvis tesvit tesviye tesviyeruhu
+tesyi tetabuk tetanos tetebbu tetik tetir tetkik tetkikat tevabi tevafuk tevahhus tevakki tevakkuf tevali tevarus
+tevatur tevazu tevbih tevcih tevdi tevdiat teveccuh tevehhum tevek tevekkel tevekkul tevellut teverrum tevessu tevessul
+tevettur tevfik tevhit tevil tevki tevkif tevkifat tevkifhane tevkil tevlit tevliyet tevriye tevsi tevsih tevsik tevzi
+tevziat teyakkuz teyel teyemmum teyit teyp teyzezade tez tezahur tezahurat tezat tezayut tezek tezekkur tezelden
+tezellul tezelzul tezevvuc tezgah tezhip tezkere tezpisti tezvir tezvirat tezyif tezyifkar tezyinat tezyit the tibben
+tibbi ticaret ticaretgah ticarethane ticari tifdruk tifil tifo tiftik tifus tig tik tikac tikanik tikel tikis tikisik
+tiklat tiknaz tiknefes tiksinc tiksirik tilavet tilkikuyrugu tilmiz tilsim tim timarhane timbal timsah timsal timus tin
+tinaz tingadak tingilda tingir tinnet tip tipatip tipik tipisla tipkibasim tipo tipografi tipografik tipografya tipoloji
+tipolojik tipp tir tirabzan tiraj tirak tiramola tiras tirat tirbuson tirendaz tirfil tirhandil tirhos tirik tiril
+tirink tiris tiriska tirit tiriviri tirkaz tirmik tirnak tiroit tirokalsitonin tiroksin tirpan tirpit tirs tirtil tiryak
+tis tisort titan titiz titr titrek titres titret tiyatro tiynet tiz tofu tohmet toht tohum tok tokac tokalas tokat tokez
+tokezlet tokmakbas toksik toksikolog toksikoloji toksikolojik toksikoman tokus tokyo tol tolerans tolga tolksov tomahavk
+tomak tomar tombak tombala tombalak tombaz tombeki tombik tombil tombilik tombul tomografi tomruk tomur tomurcuk ton
+tonaj tonga tonik tonilato tonmayster tonoz topac topak topal topalak toparlacik toparlak topaz topbas topceker tophane
+topik toplac toplanik toplumdas toplumsal topograf topografik topoloji topolojik toponimi toprak toprakbasti toprakcil
+topuk topukdoven toput topyekun tor torak torba toreador torel torero toretanimaz torik tork torlak tornado tornavida
+tornet tornistan torpido torpidobot torpil torpu tortop tortul tos tosbaga toskur tost tostoparlak total totalitarizm
+totem tovbe tovbekar toy toyaka toyga toygiller toynak toz tozat tozel tozkoparan tozpembe tozut tradisyon tradisyonel
+trafik trafo tragedya trahom trajedi trajik trajikomedi trajikomik trake trakeit trakit traksiyon traktor trakunya
+trampa trampet tramplen tramvay tranca trankilizan trans transandantal transatlantik transfer transformasyon
+transformator transformizm transfuzyon transistor transit transkripsiyon transliterasyon transmisyon transparan
+transplantasyon transport transseksuel trap trapez tras trata travers traverten travma travmatoloji travmatolojik
+trekking tremolit trenckot trend tretuvar treyler trias triatlon tribun triftong trigonometri trigonometrik triko
+trikosefal trikotaj triloji trilyon trinketa trio tripleks tripoli triportor triptik trisin triton trityum triyas trok
+trol troleybus trombon trombosit tromboz tromp trompet tropik tropikal tropizm troplar troposfer trost trotinet trotuvar
+troyka truakar truk trup tsunami tubeless tuberkulin tuberkuloz tuccar tuf tufek tufekhane tufeyli tug tugamiral tugay
+tugbay tuggeneral tugrakes tuhaf tuk tukenik tukenmez tuket tukuruk tul tulbent tuluat tuluk tulumba tum tumagi
+tumamiral tumba tumbadiz tumbek tumdengelim tumel tumevarim tumgeneral tumlec tumlesik tumor tumsek tumsel tumsuk
+tumturak tun tunc tundra tunek tunel tungsten tunik tup tur turac turap turbo turbulans turdes turel turev turfa turgay
+turgor turist turistik turk turkkiymasi turkkupasi turkuaz turnaayagi turnagagasi turnagecidi turnagiller turnagozu
+turnike turno turnusol turnuva turp turpgiller turunc turuncgiller turuncumtirak tus tutac tutak tutamac tutanak tutarga
+tutarik tutkal tutku tutmac tutsak tutsat tuttugu tutturabildigine tutturac tutturgac tutuk tutukevi tutul tutulmaz
+tuturuk tutus tuval tuvalet tuvana tuveyc tuvit tuy tuyo tuyug tuz tuzak tuzcul tuzel tuzlak tuzuk tvist twitter
+ubudiyet ucaksavar ucayak ucgen ucgul uckagit uckun uckur ucret uctas ucteker ucube ucuk ucuncul ucurt ucus udeba udi
+ufacik ufak ufal ufarak ufk ufkuis ufla ufle uflec ufuk uful ufunet ufur ufuruk ugr ugradigi ugrak ugras ugrat ugulda
+ugultu ugun ugur ugut uhde uhrevi uhuvvet ukala ukde uknum ukubet ula ulac ulak ulas ulastigi ulema ulen ules ulfet
+ulger ulku ulkudas ulser ultimatom ultramodern ultrason ultraviyole ulu ulufe uluhiyet uluorta ulus ulusal ulusotesi
+ulussever ulvi ulviyet umaci umar umde umera umit umitvar ummadik umman ummet ummi umran umre umu umuk umumhane umumiyet
+umursamaz umut undes uniforma unik unite universal universite unla unle unlu unsiyet unsur unutkan unutmabeni unutulmaz
+unvan upuslu upuygun upuzun uragan uran urat uray urba ure uremik uret uretec uretimevi uretken urettigi urk urkek
+urkunc urkut urodel urokultur urolog uroloji urolojik urpen urper urtiker uru uruk urup urus uryan usak usakkapan usan
+usanc usangin usare usavur usen usenc usengec usengen usera uskuf uskumru uskumrugiller uskumrumsugiller uskun uskur
+uslamla uslan uslen uslu uslup usniye uss ussak ust ustabasi ustat ustcavus ustegmen ustel ustlendigi ustsubay ustubec
+ustunc ustunkoru ustunlugu usturlap usturpa ustuvane ustuvani ustyapi usu usul usulcacik utan utanc utangac utangan
+utanmaz uterus utku utopik utopist utopya utu uvendire uvertur uvey uveyik uvez uyak uyanik uyar uyarlac uydu
+uydurmasyon uyduruk uye uyeligi uygar uygula uyguladigi uygun uyku uylas uyluk uymaz uyruk uysal uyukla uyurgezer uyus
+uyuskan uyusuk uyuz uza uzak uzaklas uzat uzay uzengi uzenti uzere uzeri uzgoren uzgorur uzgu uzlas uzlasmaz uzlet uzman
+uzme uzo uzre uzucu uzunc uzunesek uzunkuyruk uzuv uzv uzviyet vaat vaaz vabeste vacip vadet vaftiz vaftizhane vagon
+vagonet vagotoni vaha vahamet vahdaniyet vahdet vahdetivucut vahi vahit vahiy vahset vahsi vaht vahvahlan vahy vahyol
+vaiz vajinal vaka vakanuvis vaketa vakf vakfet vaki vakif vakit vakla vaks vakt vaktizamaninda vakum vakur vakvakla vale
+valf vali valiz valla vallahi valor vals vamp vana vanadyum vandal vanilya vantilator vantrilok vantuz vapur varak
+varakpare vardabandira vardakosta vareste vargel vargi varidat varil varis varit variyet varken varligi varolus varos
+varsagi varsay varsil vart varyant varyasyon varyemez varyos vasak vasat vasektomi vasf vasi vasif vasil vasistas
+vasiyet vat vatandas vatanperver vatansever vatka vatoz vaveyla vay vaz vazet vazgec vazgecilmez vazife vazifesinas
+vazih vazihamil vazihaml vaziikanun vaziyet vazo veba vebal vech vechisebeh vecibe vecih vecit veciz vect vefa vefakar
+vefat vefiyat vehim vehleten vehm vehmet vejetalin vejetalizm vejetarizm vejetaryen vejetasyon vekalet vekil vekilharc
+vektor veladet velayet veledrom velespit velet velev velfecri velhasil velhasilikelam veliaht velinimet veliyullah velut
+velvele venuscarigi veraset verdigi verev vergi verildi verildigi verilecek verilerek verilmedi verilmesi verilmis
+verimkar verirken veristir verit verkac vermedigi vermez vermut vernik veronika versiyon vertigo vesaik vesait
+vesaitinakliye vesayet vesika vesselam vestiyer veston vesvese veto veyahut vezaret vezikul vezin vezir veziriazam
+vezirparmagi vezn vibrasyon vibrator vibriyo vicahen vicahi vicdan vicik vicirda vicirdas vida vidanjor videobant
+videokaset videoteyp vido vigla vikaye vikont vikontes viladi vilayet villa vin vinc vinilti vinyet vira viraj viral
+virdizeban vire virgul virilda virilti virla virman virolog viroloji virolojik virt virtuoz virus virutik visal
 visamiral viski viskonsul viskoz visnap visne visnecurugu vitamin vitellus vites vitir vitr vitray vitrifiye viya viyak
 viyol viyolonist viyolonsel viyolonselist viz vizilda vizilti vizon vizor vizyon vodvil vokabuler vokal vokalist volan
 vole voleybol volfram voli volkan volkanik volontarizm volt voltaj voltametre voltamper voltmetre vombat vonoz votka
-voyvoda vucut vukela vuku vukuat vukuf vulgarize vulva vur vurac vurdumduymaz vurgu vurtut vuruk vurul vurus vuruskan
-vurut vusat vuslat vusul vuzera vuzuh web yabancil yabanil yabantirak yabgu yad yadigar yadirga yafa yafta yag yaghane
-yagilti yagis yagisolcer yagmurolcer yagolcer yahni yahsi yahu yahut yak yakamoz yakaza yakinsak yakis yakisik yakit
-yaklas yaklasik yakmac yakut yal yalabi yalabik yalak yalamuk yalanciktan yalapsap yalavac yalaz yaldirak yaldiz yalelli
-yalgin yalicapkini yalicapkinigiller yalinc yalincak yalingac yalingoz yalit yalitkan yalpa yalpak yalpi yalpik yaltak
-yalvac yalvar yama yamac yamak yamal yampiri yamru yamrul yamuk yamul yamyas yan yanak yanal yanardag yanardoner yanas
-yanasik yanay yanaz yandas yangi yanik yanil yanilgi yaniltmac yanisolcer yankesici yansak yansitac yantutmaz yapak
-yapalak yapamaz yaparken yapay yapayalniz yapboz yapik yapilabilecek yapilabilir yapilacak yapilarak yapildi yapildigi
-yapilip yapilirken yapilmadi yapilmak yapilmali yapilmasi yapilmis yapilsin yapimevi yapincak yapis yapisal yapisik
-yapiskan yapit yapmacik yapmaz yaprak yaprakcil yaprakkurusu yapsatci yaptigi yapyalniz yar yarabbi yaradilis
-yaralandigi yaramaz yaras yarasik yarat yarattigi yarbay yardak yardimlas yarenbasi yargi yargic yargievi yargilandigi
-yaricap yarik yaris yariyil yarka yarkurul yarliga yarpuz yaruagyar yas yasadigi yasak yasal yasandigi yasarken yasatkan
-yasindayken yasit yasmik yastagac yat yatak yatakhane yatalak yatay yatik yatis yatuk yavan yave yavru yavruagzi
-yavrucak yavrukurt yavsan yavsi yavukla yavuklu yavuz yay yaycizer yaygara yaygi yayik yayil yayimladigi yayinevi
-yayinik yayinispi yayinladigi yaylak yayvan yazanak yazarcizer yazarken yazboz yazdigi yazgi yazihane yazik yazilmis
-yazis yazit yed yedek yedigen yedigi yediveren yeg yegah yegrek yeis yek yekdigeri yeknesak yekpare yekvucut yel yelec
-yelek yelengec yelken yelkesen yelkovan yelkovangiller yelloz yelolcer yelpaze yelpik yelpirde yeltek yelve yelyazar
-yemekalti yemekhane yemiscil yemyesil yenge yengec yengecvari yengi yenibahar yenidogan yenik yenilgi yenis yepelek
-yepyeni yeralti yerberi yerdegezen yerdes yeregecen yerel yerelles yeresegi yerey yergi yerkure yerles yerlesik yerleske
-yerote yeryuzu yesilbaga yesilbas yesilbiber yesilcekirge yesilfasulye yesilimtirak yesilkertenkele yesilsazan
-yesilzeytin yestehle yesyeni yet yetenek yetimhane yetingen yetis yetisek yetke yetmez yevmi yeygi yezit yigilis yiginak
-yigisik yigit yigitbasi yikik yikis yilanbasi yilancil yilangiller yilanignesi yilankavi yilanyastigi yilanyastigigiller
-yilbasi yilbik yildirak yildirimkiran yildirimsavar yildonumu yilgi yilik yilis yilisik yiliskan yilligina yilmaz yine
-yipra yiprak yiprat yir yirik yirmibir yirmigen yirt yirtlak yirtmac yit yitik yiv yivis yivisik yiyecek yiyen yiyici
-yiyim yiyinti yobaz yogal yogrul yogunlac yogunlugu yogunlukolcer yogurt yogurthane yogus yokken yokogluyok yoksul yokus
-yolak yoldas yolduzler yolkesen yoluk yolustu yom yon yondes yonel yonelt yoneltec yonerge yonet yonetsel yonettigi
-yonga yont yor yorekent yorga yort yorunge yosun yosuncul yoz yuce yucel yufka yugruk yuhala yuk yukac yuksek
-yukseklikolcer yuksekogrenim yuksekogretim yuksekokul yuksel yukselis yukseltec yukseltge yuksuk yulaf yular yulgu yulu
-yuluk yum yumak yumruk yumrul yumuk yumurcak yumurtakoku yumurtla yumusacik yumusak yun yunak yunus yunusgiller yupur
-yurek yurt yurtsever yurttas yuruk yururken yururluge yurut yurutec yuruttugu yuruyus yusru yusufcuk yusyumru
-yusyuvarlak yut yutak yutkun yuva yuvak yuvarlak yuvarolcer yuvgu yuzbasi yuzbeyuz yuzergezer yuzey yuzgec yuzgoz yuzles
-yuzuk yuzukoyun yuzustu yuzyil zaaf zabit zabt zac zadegan zafer zafiyet zafran zag zaganos zahir zahit zahmet zahter
-zail zait zakkum zakkumgiller zalim zam zamandas zamazingo zambak zambakgiller zamk zamkiarabi zamkinos zammet zampara
-zan zanaat zanaatkar zangirda zangirti zangoc zanka zannet zannolun zaparta zaping zapt zapturapt zar zarafet zargana
-zarif zaruret zat zatulcenp zavalli zaviye zaviyevi zayi zayiat zayif zeamet zeban zebella zebercet zebra zebun zebunkus
-zecir zecr zede zefir zehap zehir zehr zehret zehrol zeka zekat zekavet zeker zeki zelil zelve zelzele zem zemberek
-zembil zemheri zemmet zen zencefil zencefilgiller zencirek zendost zengin zephiye zeplin zer zeravent zerdecal zerdeva
-zerk zerzevat zevahir zeval zevat zevc zeveban zevk zevkusefa zevzek zeybek zeyil zeyl zeyrek zeytin zeytingiller
-zeytinyagi zeytuni ziddiyet zifaf zifin zifir zifos zift zigon zigot zih zihaf zihayat zihinsel zihniyet zikir zikiymet
-zikkim zikr zikret zikrol zikzak zil zilgit zilhicce zilkade zillet zilyet zilzurna zimamdar zimba zimbirda zimbirti
-zimmet zimmi zimnen zimni zimpara zincifre zincir zindan zinde zindik zingadak zingilda zingilti zinhar zink zip
-zipcikti zipka zippadak zir ziraat zircahil zirh zirilda zirilti zirkon zirlak zirnik zirtapoz zirtlak zirva zirve
-zirzop zit zitt zivana zivir zivircik ziya ziyafet ziyankar ziyaret ziyaretgah ziynet ziypak zloti zodyak zoka zom zombi
-zona zonkla zoolog zooloji zoolojik zoospor zootekni zorba zorgu zorundayiz zorunlulugu zubde zuccaciye zugurt zuhrevi
-zuht zuhul zuhur zuhurat zukam zul zulal zulf zulfaris zull zulmet zuluf zum zumrut zuppe zurafagiller zurefa zurna
-zurnazen zurra zurriyet zuyuf
+voyvoda vucut vukela vuku vukuat vukuf vulgarize vur vurac vurdumduymaz vurgu vurtut vuruk vurul vurus vuruskan vurut
+vusat vuslat vusul vuzera vuzuh web yabancil yabanil yabantirak yabgu yad yadigar yadirga yafa yafta yag yaghane yagilti
+yagis yagisolcer yagmurolcer yagolcer yahni yahsi yahu yahut yak yakamoz yakaza yakinsak yakis yakisik yakit yaklas
+yaklasik yakmac yakut yal yalabi yalabik yalak yalamuk yalanciktan yalapsap yalavac yalaz yaldirak yaldiz yalelli yalgin
+yalicapkini yalicapkinigiller yalinc yalincak yalingac yalingoz yalit yalitkan yalpa yalpak yalpi yalpik yaltak yalvac
+yalvar yama yamac yamak yamal yampiri yamru yamrul yamuk yamul yamyas yan yanak yanal yanardag yanardoner yanas yanasik
+yanay yanaz yandas yangi yanik yanil yanilgi yaniltmac yanisolcer yankesici yansak yansitac yantutmaz yapak yapalak
+yapamaz yaparken yapay yapayalniz yapboz yapik yapilabilecek yapilabilir yapilacak yapilarak yapildi yapildigi yapilip
+yapilirken yapilmadi yapilmak yapilmali yapilmasi yapilmis yapilsin yapimevi yapincak yapis yapisal yapisik yapiskan
+yapit yapmacik yapmaz yaprak yaprakcil yaprakkurusu yapsatci yaptigi yapyalniz yar yarabbi yaradilis yaralandigi yaramaz
+yaras yarasik yarat yarattigi yarbay yardak yardimlas yarenbasi yargi yargic yargievi yargilandigi yaricap yarik yaris
+yariyil yarka yarkurul yarliga yarpuz yaruagyar yas yasadigi yasak yasal yasandigi yasarken yasatkan yasindayken yasit
+yasmik yastagac yat yatak yatakhane yatalak yatay yatik yatis yatuk yavan yave yavru yavruagzi yavrucak yavrukurt yavsan
+yavsi yavukla yavuklu yavuz yay yaycizer yaygara yaygi yayik yayil yayimladigi yayinevi yayinik yayinispi yayinladigi
+yaylak yayvan yazanak yazarcizer yazarken yazboz yazdigi yazgi yazihane yazik yazilmis yazis yazit yed yedek yedigen
+yedigi yediveren yeg yegah yegrek yeis yek yekdigeri yeknesak yekpare yekvucut yel yelec yelek yelengec yelken yelkesen
+yelkovan yelkovangiller yelloz yelolcer yelpaze yelpik yelpirde yeltek yelve yelyazar yemekalti yemekhane yemiscil
+yemyesil yenge yengec yengecvari yengi yenibahar yenidogan yenik yenilgi yenis yepelek yepyeni yeralti yerberi
+yerdegezen yerdes yeregecen yerel yerelles yeresegi yerey yergi yerkure yerles yerlesik yerleske yerote yeryuzu
+yesilbaga yesilbas yesilbiber yesilcekirge yesilfasulye yesilimtirak yesilkertenkele yesilsazan yesilzeytin yestehle
+yesyeni yet yetenek yetimhane yetingen yetis yetisek yetke yetmez yevmi yeygi yezit yigilis yiginak yigisik yigit
+yigitbasi yikik yikis yilanbasi yilancil yilangiller yilanignesi yilankavi yilanyastigi yilanyastigigiller yilbasi
+yilbik yildirak yildirimkiran yildirimsavar yildonumu yilgi yilik yilis yilisik yiliskan yilligina yilmaz yine yipra
+yiprak yiprat yir yirik yirmibir yirmigen yirt yirtlak yirtmac yit yitik yiv yivis yivisik yiyecek yiyen yiyici yiyim
+yiyinti yobaz yogal yogrul yogunlac yogunlugu yogunlukolcer yogurt yogurthane yogus yokken yokogluyok yoksul yokus yolak
+yoldas yolduzler yolkesen yoluk yolustu yom yon yondes yonel yonelt yoneltec yonerge yonet yonetsel yonettigi yonga yont
+yor yorekent yorga yort yorunge yosun yosuncul yoz yuce yucel yufka yugruk yuhala yuk yukac yuksek yukseklikolcer
+yuksekogrenim yuksekogretim yuksekokul yuksel yukselis yukseltec yukseltge yuksuk yulaf yular yulgu yulu yuluk yum yumak
+yumruk yumrul yumuk yumurcak yumurtakoku yumurtla yumusacik yumusak yun yunak yunus yunusgiller yupur yurek yurt
+yurtsever yurttas yuruk yururken yururluge yurut yurutec yuruttugu yuruyus yusru yusufcuk yusyumru yusyuvarlak yut yutak
+yutkun yuva yuvak yuvarlak yuvarolcer yuvgu yuzbasi yuzbeyuz yuzergezer yuzey yuzgec yuzgoz yuzles yuzuk yuzukoyun
+yuzustu yuzyil zaaf zabit zabt zac zadegan zafer zafiyet zafran zag zaganos zahir zahit zahmet zahter zail zait zakkum
+zakkumgiller zalim zam zamandas zamazingo zambak zambakgiller zamk zamkiarabi zamkinos zammet zan zanaat zanaatkar
+zangirda zangirti zangoc zanka zannet zannolun zaparta zaping zapt zapturapt zar zarafet zargana zarif zaruret zat
+zatulcenp zavalli zaviye zaviyevi zayi zayiat zayif zeamet zeban zebella zebercet zebra zebun zebunkus zecir zecr zede
+zefir zehap zehir zehr zehret zehrol zeka zekat zekavet zeker zeki zelil zelve zelzele zem zemberek zembil zemheri
+zemmet zen zencefil zencefilgiller zencirek zendost zengin zephiye zeplin zer zeravent zerdecal zerdeva zerk zerzevat
+zevahir zeval zevat zevc zeveban zevk zevkusefa zevzek zeybek zeyil zeyl zeyrek zeytin zeytingiller zeytinyagi zeytuni
+ziddiyet zifaf zifin zifir zifos zift zigon zigot zih zihaf zihayat zihinsel zihniyet zikir zikiymet zikkim zikr zikret
+zikrol zikzak zil zilgit zilhicce zilkade zillet zilyet zilzurna zimamdar zimba zimbirda zimbirti zimmet zimmi zimnen
+zimni zimpara zincifre zincir zindan zinde zindik zingadak zingilda zingilti zinhar zink zip zipcikti zipka zippadak zir
+ziraat zircahil zirh zirilda zirilti zirkon zirlak zirnik zirtapoz zirtlak zirva zirve zirzop zit zitt zivana zivir
+zivircik ziya ziyafet ziyankar ziyaret ziyaretgah ziynet ziypak zloti zodyak zoka zom zombi zona zonkla zoolog zooloji
+zoolojik zoospor zootekni zorba zorgu zorundayiz zorunlulugu zubde zuccaciye zugurt zuhrevi zuht zuhul zuhur zuhurat
+zukam zul zulal zulf zulfaris zull zulmet zuluf zum zumrut zuppe zurafagiller zurefa zurna zurnazen zurra zurriyet zuyuf
 `;
