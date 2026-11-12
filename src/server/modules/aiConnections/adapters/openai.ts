@@ -36,7 +36,8 @@ function* fromCompletion(d: any): Generator<ChatEvent> {
   for (let i = 0; i < calls.length; i++) yield { type: 'toolCall', call: toolCall(calls[i]?.id ? String(calls[i].id) : null, String(calls[i]?.function?.name ?? ''), calls[i]?.function?.arguments) };
   yield { type: 'usage', inputTokens: Number(d?.usage?.prompt_tokens) || 0, outputTokens: Number(d?.usage?.completion_tokens) || 0 };
   const reason = d?.choices?.[0]?.finish_reason;
-  yield { type: 'done', stop: calls.length ? 'toolUse' : (STOP[String(reason)] ?? 'other') };
+  // Cut off by the output limit wins over tool calls: the last call may be unfinished.
+  yield { type: 'done', stop: STOP[String(reason)] === 'length' ? 'length' : calls.length ? 'toolUse' : (STOP[String(reason)] ?? 'other') };
 }
 
 export const openAiAdapter: Adapter = async function* (req) {
@@ -113,5 +114,5 @@ export const openAiAdapter: Adapter = async function* (req) {
   const ordered = [...calls.entries()].sort((a, b) => a[0] - b[0]);
   for (const [, c] of ordered) yield { type: 'toolCall', call: toolCall(c.id || null, c.name, c.args) };
   yield { type: 'usage', inputTokens: input, outputTokens: output };
-  yield { type: 'done', stop: ordered.length ? 'toolUse' : (STOP[String(reason)] ?? 'other') };
+  yield { type: 'done', stop: STOP[String(reason)] === 'length' ? 'length' : ordered.length ? 'toolUse' : (STOP[String(reason)] ?? 'other') };
 };

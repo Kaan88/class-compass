@@ -403,6 +403,9 @@ export function historyFor(chat: ChatRow, rows: MessageRow[]): ChatMessage[] {
     if (r.role === 'user') out.push({ role: 'user', content: r.content });
     else if (r.role === 'assistant') {
       const calls = r.toolCallsJson ?? [];
+      // An empty reply (cut off or failed before any output) is not sent back: providers refuse an
+      // assistant message with neither text nor tool calls (DeepSeek answers HTTP 400).
+      if (!r.content && !calls.length) continue;
       // A call still waiting for the teacher is not sent (the model gets it back once it is answered).
       if (calls.some((c) => c.state === 'pending')) {
         if (r.content) out.push({ role: 'assistant', content: r.content });

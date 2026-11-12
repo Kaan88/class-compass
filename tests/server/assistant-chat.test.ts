@@ -384,6 +384,40 @@ describe('limits, errors and Stop', () => {
     });
   });
 
+  it('a reply cut off by the output limit ends with OUT_OF_TOKENS, drops its unfinished call and is not sent back empty (DeepSeek, 2026-11-12)', async () => {
+    await withAssistant(async () => {
+      const seen = script(fake, [() => ({ calls: [{ name: 'class_roster', args: '{"contextId":"' }], finish: 'length' }), () => ({ text: 'Done.' })]);
+      const chat = await newChat();
+      const evs = await events(s.teacherA, (await send(s.teacherA, chat.id, 'Make me a theme')).runId);
+      expect(endOf(evs)).toMatchObject({ end: 'error', reason: 'OUT_OF_TOKENS' });
+      expect(seen[0]!.body.max_completion_tokens).toBe(ASSISTANT_TUNING.maxOutputTokens);
+      const d = await detail(s.teacherA, chat.id);
+      expect(d.messages[1]).toMatchObject({ role: 'assistant', status: 'error', errorCode: 'OUT_OF_TOKENS' });
+      expect(d.messages[1].toolCalls ?? []).toEqual([]);
+      // The next message works: the empty reply is left out of what the provider gets.
+      const next = await events(s.teacherA, (await send(s.teacherA, chat.id, 'Continue')).runId);
+      expect(endOf(next).end).toBe('complete');
+      const assistantTurns = (seen[1]!.body.messages as Array<{ role: string; content: unknown; tool_calls?: unknown }>).filter((m) => m.role === 'assistant');
+      expect(assistantTurns.filter((m) => !m.content && !m.tool_calls)).toEqual([]);
+    });
+  });
+
+  it('a provider that refuses the larger output limit (HTTP 400) is asked again with the default', async () => {
+    await withAssistant(async () => {
+      const seen = script(fake, [() => ({ status: 400 }), () => ({ text: 'Hello there.' })]);
+      const chat = await newChat();
+      const evs = await events(s.teacherA, (await send(s.teacherA, chat.id, 'Hello')).runId);
+      expect(endOf(evs).end).toBe('complete');
+      expect(streamedText(evs)).toBe('Hello there.');
+      expect(seen.map((r) => r.body.max_completion_tokens)).toEqual([ASSISTANT_TUNING.maxOutputTokens, 4096]);
+      // Refused again with the default: shown as a provider error, no loop.
+      const again = script(fake, [() => ({ status: 400 })]);
+      const evs2 = await events(s.teacherA, (await send(s.teacherA, chat.id, 'Hello again')).runId);
+      expect(endOf(evs2)).toMatchObject({ end: 'error', reason: 'PROVIDER_ERROR' });
+      expect(again.length).toBe(2);
+    });
+  });
+
   it('Stop ends the answer and keeps what was written, marked as stopped', async () => {
     await withAssistant(async () => {
       script(fake, [() => ({ text: 'A long answer that keeps going and going for a while.', delayMs: 40 })]);

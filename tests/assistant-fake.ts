@@ -15,6 +15,8 @@ export interface Reply {
   status?: number;
   /** Wait between pieces (ms), so a test can stop the answer half-way. */
   delayMs?: number;
+  /** The finish reason sent (default `tool_calls` with calls, else `stop`); `length` = cut off by the output limit. */
+  finish?: string;
 }
 export type Turn = (body: any) => Reply;
 
@@ -37,7 +39,7 @@ export function openAiReply(res: http.ServerResponse, reply: Reply) {
     chunks.push(chunk({ tool_calls: [{ index: i, id: c.id ?? `call_${i}_${Math.random().toString(36).slice(2, 8)}`, type: 'function', function: { name: c.name, arguments: '' } }] }));
     chunks.push(chunk({ tool_calls: [{ index: i, function: { arguments: args } }] }));
   });
-  chunks.push(chunk({}, reply.calls?.length ? 'tool_calls' : 'stop'));
+  chunks.push(chunk({}, reply.finish ?? (reply.calls?.length ? 'tool_calls' : 'stop')));
   chunks.push({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 20 } });
   const lines = [...chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`), 'data: [DONE]\n\n'];
   if (!reply.delayMs) {

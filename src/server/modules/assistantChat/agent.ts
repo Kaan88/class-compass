@@ -12,6 +12,12 @@
  *    a tool that changes anything is stored as `pending` and the run ends with `awaiting`: only the
  *    teacher's Yes on its card runs it (`answerCall`), with the arguments the server holds.
  * 4. Rounds repeat until the model answers without tools (or `ASSISTANT_MAX_ROUNDS`).
+ *
+ * Output limit (2026-11-12, D-196 note): a reply may use `ASSISTANT_TUNING.maxOutputTokens`, because a
+ * theme package is long and a model that thinks first spends part of the limit on hidden reasoning. A
+ * provider that refuses that limit for a model (HTTP 400 before anything was written) is asked again with
+ * the default (`DEFAULT_MAX_TOKENS`) for the rest of the run. A reply cut off by the limit is never
+ * stored as complete: it ends the run with `OUT_OF_TOKENS` and its unfinished tool calls are dropped.
  */
 import type { FastifyInstance } from 'fastify';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -19,9 +25,9 @@ import { ASSISTANT_MAX_CALLS_PER_ROUND, ASSISTANT_MAX_ROUNDS, PSEUDONYM_TEXT } f
 import { localDate } from '../../../domain/dates.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { assistantChats, assistantMessages, sessions, users, type AssistantToolCallJson } from '../../db/schema.ts';
-import { newCallId, type ChatMessage, type ToolCall } from '../aiConnections/adapters/types.ts';
+import { newCallId, type ChatMessage, type StopReason, type ToolCall } from '../aiConnections/adapters/types.ts';
 import { AiCallError } from '../aiConnections/http.ts';
-import { streamChat, type ConnectionRow } from '../aiConnections/provider.ts';
+import { DEFAULT_MAX_TOKENS, streamChat, type ConnectionRow } from '../aiConnections/provider.ts';
 import { connectionForUse, recordTokens } from '../aiConnections/service.ts';
 import type { AppDeps, RequestContext, UserRow } from '../../lib/context.ts';
 import { AppError } from '../../lib/errors.ts';
@@ -36,7 +42,7 @@ import { unavailableReason } from './settings.ts';
 import { appendMessage, callView, CardLookup, historyFor, messagesOf, resolveAttachmentArgs, type ChatRow, type MessageRow } from './store.ts';
 
 /** When to summarise the earlier part of a chat (estimated tokens of the messages) and how much to keep as it is. Tests lower them. */
-export const ASSISTANT_TUNING = { compactAtTokens: 40_000, keepRecentTokens: 12_000 };
+export const ASSISTANT_TUNING = { compactAtTokens: 40_000, keepRecentTokens: 12_000, maxOutputTokens: 16_384 };
 
 /** A rough token estimate (about four characters a token) for the compaction decision. */
 const estimate = (msgs: ChatMessage[]) => Math.ceil(msgs.reduce((n, m) => n + m.content.length + ('toolCalls' in m && m.toolCalls ? JSON.stringify(m.toolCalls).length : 0) + 20, 0) / 4);
@@ -277,6 +283,8 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
   const finish = (end: Parameters<RunRegistry['finish']>[1], reason: string | null = null) => a.registry.finish(run, end, reason, ctx.now());
   let connection = s.connection;
   const model = s.model;
+  // The output limit of this run's requests: lowered once to the default when the provider refuses it.
+  let maxTokens = Math.max(ASSISTANT_TUNING.maxOutputTokens, DEFAULT_MAX_TOKENS);
   try {
     for (let round = 0; ; round += 1) {
       if (run.abort.signal.aborted) return finish('cancelled');
@@ -298,17 +306,25 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
       const text = new TextStream(p, (t) => a.registry.emit(run, { type: 'text', messageId, text: t }));
       const calls: ToolCall[] = [];
       let usage = { inputTokens: 0, outputTokens: 0 };
+      let ended: StopReason = 'other';
       try {
-        for await (const ev of streamChat(ctx, { connection, model, system: systemPrompt(ctx, user, p.mode, summary), messages: history, tools: defs, signal: run.abort.signal })) {
+        for await (const ev of streamChat(ctx, { connection, model, system: systemPrompt(ctx, user, p.mode, summary), messages: history, tools: defs, maxTokens, signal: run.abort.signal })) {
           if (ev.type === 'text') text.add(ev.text);
           else if (ev.type === 'toolCall') calls.push(ev.call);
           else if (ev.type === 'usage') usage = ev;
+          else if (ev.type === 'done') ended = ev.stop;
         }
       } catch (e) {
         recordTokens(ctx, connection.id, user.id, usage);
         const cancelled = run.abort.signal.aborted;
         const failure = e instanceof AiCallError ? e.failure : null;
         if (!cancelled && !failure) throw e;
+        // The larger output limit refused for this model (HTTP 400 before any output): ask again with the default.
+        if (!cancelled && e instanceof AiCallError && e.httpStatus === 400 && maxTokens > DEFAULT_MAX_TOKENS && !text.raw && !calls.length) {
+          maxTokens = DEFAULT_MAX_TOKENS;
+          round -= 1;
+          continue;
+        }
         text.end();
         // Whatever was written is kept (marked stopped or failed); the provider's own error text never is.
         tx(db, () =>
@@ -329,6 +345,24 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
       }
       text.end();
       recordTokens(ctx, connection.id, user.id, usage);
+      // Cut off by the output limit: what was written is kept, unfinished tool calls are dropped, the teacher is told.
+      if (ended === 'length') {
+        tx(db, () =>
+          appendMessage(db, s.chatId, ctx.now(), {
+            id: messageId,
+            role: 'assistant',
+            content: text.raw,
+            privacy: p.mode,
+            status: 'error',
+            errorCode: 'OUT_OF_TOKENS',
+            connectionId: connection.id,
+            model,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+          }),
+        );
+        return finish('error', 'OUT_OF_TOKENS');
+      }
       // Call ids come from the provider: one that repeats an id of this chat gets a new one, so a card's
       // Yes is bound to exactly one call (the provider gets the new id back with the call).
       const seen = new Set(rows.flatMap((r) => (r.toolCallsJson ?? []).map((c) => c.id)));

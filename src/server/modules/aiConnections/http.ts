@@ -17,8 +17,8 @@ import { AddressRefused, addressAllowed, policyLookup, type NetPolicy } from './
 /** Time until the response headers arrive, and the longest quiet gap while a reply streams. */
 export const AI_CONNECT_TIMEOUT_MS = 30_000;
 export const AI_IDLE_TIMEOUT_MS = 60_000;
-/** The longest one request may take in total, from sending it to the end of the streamed reply. */
-export const AI_TOTAL_TIMEOUT_MS = 5 * 60_000;
+/** The longest one request may take in total, from sending it to the end of the streamed reply (10 minutes since 2026-11-12: a long reply such as a theme package from a model that thinks first). */
+export const AI_TOTAL_TIMEOUT_MS = 10 * 60_000;
 /** The most a provider may send in one reply. */
 export const AI_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 

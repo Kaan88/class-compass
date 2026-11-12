@@ -144,5 +144,5 @@ export const geminiAdapter: Adapter = async function* (req) {
   }
   if (!any) throw new AiCallError('BAD_RESPONSE');
   yield { type: 'usage', inputTokens: input, outputTokens: output };
-  yield { type: 'done', stop: calls ? 'toolUse' : stop };
+  yield { type: 'done', stop: stop === 'length' ? 'length' : calls ? 'toolUse' : stop };
 };
