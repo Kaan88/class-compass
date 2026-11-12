@@ -120,6 +120,35 @@ describe('seed:demo-history', () => {
     expect(board.places.length).toBe(3);
     expect(board.week.start).toBe('2026-11-09');
 
+    // Lesson goals (S28a, D-197): the opt-in module is switched on (audited, by the teacher) in 3-B and
+    // 4-C English and 3-A Mathematics only; about two lessons in three there have a goal, most of them
+    // answered with all three answers, some not (the report's "not recorded"); no goal anywhere else.
+    const goalContexts = env.db.$client
+      .prepare(
+        `select c.name as cls, json_extract(s.name, '$.en') as subject from context_modules m join teaching_contexts t on t.id = m.context_id join classes c on c.id = t.class_id join subjects s on s.id = t.subject_id where m.module = 'lessonGoals' and m.enabled = 1 order by c.name, subject`,
+      )
+      .all();
+    expect(goalContexts).toEqual([
+      { cls: '3-A', subject: 'Mathematics' },
+      { cls: '3-B', subject: 'English' },
+      { cls: '4-C', subject: 'English' },
+    ]);
+    for (const id of contextIds) expect(isModuleEnabled(env.db, id, 'lessonGoals')).toBe(rows(`context_modules where module = 'lessonGoals' and enabled = 1 and context_id = '${id}'`) === 1);
+    const goalLessons = rows(`lessons where context_id in (select context_id from context_modules where module = 'lessonGoals' and enabled = 1)`);
+    const goalsSet = rows('lesson_goals');
+    expect(goalsSet / goalLessons).toBeGreaterThan(0.5);
+    expect(goalsSet / goalLessons).toBeLessThan(0.85);
+    expect(rows(`lesson_goals where context_id not in (select context_id from context_modules where module = 'lessonGoals' and enabled = 1)`)).toBe(0);
+    const answered = rows('lesson_goals where outcome is not null');
+    expect(answered / goalsSet).toBeGreaterThan(0.7);
+    expect(answered).toBeLessThan(goalsSet);
+    const outcomes = env.db.$client.prepare(`select distinct outcome from lesson_goals where outcome is not null order by outcome`).all() as Array<{ outcome: string }>;
+    expect(outcomes.map((o) => o.outcome)).toEqual(['notYet', 'partly', 'reached']);
+    expect(rows(`audit_events where action = 'context_module.set'`)).toBeGreaterThanOrEqual(3);
+    expect(rows(`audit_events where action = 'lesson_goal.set'`)).toBeGreaterThanOrEqual(goalsSet);
+    expect(rows(`audit_events where action = 'lesson_goal.review'`)).toBe(answered);
+    for (const text of env.db.$client.prepare('select text from lesson_goals').all() as Array<{ text: string }>) expect(text.text.length).toBeLessThanOrEqual(140);
+
     // No lesson on a weekend or in the future; nothing is left running.
     const all = env.db.select().from(lessons).all();
     for (const l of all) {
@@ -152,6 +181,12 @@ describe('seed:demo-history', () => {
         for (const t of sec.tables) expect(meta!.tables.some((m) => tableMatches(m, t.key)), `${sec.key}.${t.key}`).toBe(true);
       }
     }
+    // The report section "Lesson goals" (D-188) has data in 3-B English and is not in 3-A English (off).
+    const c3b = contexts.find((c) => c.className === '3-B')!;
+    const goals3b = (await ok(english.get(`/api/teacher/contexts/${c3b.id}/report?from=2026-09-01&to=2026-11-08`))).sections.find((s: any) => s.key === 'lessonGoals');
+    expect(goals3b?.tables.map((t: any) => t.key)).toEqual(['outcomes', 'lessons']);
+    expect(goals3b.metrics.length).toBe(3);
+    expect(keys).not.toContain('lessonGoals');
     const kid = report.students[0];
     const timeline = await ok(english.get(`/api/teacher/contexts/${c3a.id}/students/${kid.id}/timeline`));
     expect(JSON.stringify(timeline).length).toBeGreaterThan(500);

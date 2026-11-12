@@ -761,6 +761,8 @@ export const tr = {
   'summary.routine': 'Rutin',
   'summary.stages': '{name}: {reached}. aşamaya ulaşıldı (toplam {total})',
   'summary.attendance': 'Yoklama',
+  'summary.goal': 'Hedefimiz',
+  'summary.goalNotAnswered': 'Cevaplanmadı',
   'summary.pending': 'Özet, bağlantı geri geldiğinde görünür.',
   'summary.backToClasses': 'Sınıflara dön',
   'routines.title': 'Rutinler',

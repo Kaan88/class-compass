@@ -16,7 +16,7 @@ import type { AppDeps, RequestContext } from '../lib/context.ts';
 import type { AttendanceListener } from './attendance/service.ts';
 import type { EndLessonStep } from './lessons/endSteps.ts';
 import type { StartLessonStep } from './lessons/startSteps.ts';
-import type { LessonCloseHook, LessonStateContributor } from './lessons/service.ts';
+import type { LessonCloseHook, LessonStateContributor, LessonSummaryContributor } from './lessons/service.ts';
 import type { ModuleConfigSpec } from './school/modules.ts';
 import type { ClassRow, ContextRow, YearRow } from './school/policy.ts';
 import type { StudentRow } from './students/service.ts';
@@ -164,6 +164,8 @@ export interface ServerModuleManifest {
   commands?: readonly AnyCommandDef[];
   /** Classroom-safe data added to the polled lesson state (D-045); must be safe for the classroom display. */
   lessonState?: readonly LessonStateContributor[];
+  /** Classroom-safe data added to the "Lesson saved" summary after End Lesson (S28a, D-197). */
+  lessonSummary?: readonly LessonSummaryContributor[];
   /** End Lesson steps (D-051); `module` must be this manifest's policyKey (or null for core steps). */
   endSteps?: readonly EndLessonStep[];
   /**

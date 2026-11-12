@@ -337,7 +337,12 @@ export function seedDemoHistory(deps: AppDeps, opts: HistoryOptions = {}): Histo
         const isLast = index === plan.lessonDates.length - 1;
         h.setTime(startAt);
         const start: Record<string, unknown> = { contextId: plan.context.id };
-        for (const g of gens) Object.assign(start, g.startInput?.(h, plan, date));
+        for (const g of gens) {
+          // The Start Lesson step inputs (`steps`) of several generators are merged, not replaced (S28a).
+          const { steps, ...rest } = g.startInput?.(h, plan, date) ?? {};
+          Object.assign(start, rest);
+          if (steps) start.steps = { ...(start.steps as Record<string, unknown> | undefined), ...(steps as Record<string, unknown>) };
+        }
         const res = h.command(plan.ctx, 'lesson.start', start).result as { started: boolean; lessonId: string };
         if (!res.started) throw new Error(`demo history: a lesson of ${plan.cls.name} was already running on ${date}`);
         h.setTime(startAt + 60_000);

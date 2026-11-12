@@ -2,16 +2,20 @@
  * Routines on the classroom device (RTN-1..3), contributed through the routines manifest (D-069):
  * the Start Lesson routine choice (adds `routineTemplateId` to 'lesson.start') and the stage stepper
  * beside the lesson timer (the board's routine box, S14b). On the "Learning goal" stage the stepper also
- * shows the lesson's topics ("Today's focus", S13a 7).
+ * shows the lesson's topics ("Today's focus", S13a 7) and, when the lesson has one, today's goal
+ * sentence (S28a, D-197). The goal comes from the polled lesson state's `lessonGoal`, which the server
+ * fills only while Lesson goals is on for the class+subject: this module reads no other module's data
+ * and imports nothing from it.
  */
 import { useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_ROUTINE_ID, LEARNING_GOAL_STAGE_ID } from '../../../domain/routines.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import { pickText } from '../../../shared/i18n/index.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
-import { IconCheck, IconList, IconNext, IconPrev } from '../../ui/icons.tsx';
-import { patchLesson, sendLessonCommand, useRoutines } from '../lessons/lessonClient.ts';
+import { IconCheck, IconList, IconNext, IconPrev, IconTarget } from '../../ui/icons.tsx';
+import { lessonQueryOptions, patchLesson, sendLessonCommand, useRoutines } from '../lessons/lessonClient.ts';
 import { FocusTopics } from '../lessons/TopicsClassroom.tsx';
 import { startStep, type ClassroomContext, type DashboardSlot, type DashboardSlotProps, type StartStepProps } from '../types.ts';
 import { playEvent } from '../../themes/index.tsx';
@@ -81,6 +85,8 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
   const listRef = useRef<HTMLOListElement | null>(null);
   const stages = lesson.routine.stages;
   const idx = lesson.stageIndex;
+  // Read from the lesson state the board already polls (no fetch of its own): null while Lesson goals is off.
+  const goalText = useQuery({ ...lessonQueryOptions(lesson.contextId), enabled: false, refetchInterval: false, refetchOnWindowFocus: false, select: (q) => q.data.lessonGoal?.text ?? null }).data ?? null;
   useEffect(() => {
     const list = listRef.current;
     const current = list?.querySelector('[aria-current="step"]');
@@ -96,6 +102,9 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
     void sendLessonCommand('lesson.setStage', { contextId: lesson.contextId, lessonId: lesson.id, stageIndex: i });
   };
   const current = stages[idx];
+  const goalStage = current?.id === LEARNING_GOAL_STAGE_ID;
+  // A longer sentence is set smaller (like the board's goal box), so 140 characters stay in the box.
+  const goalLength = goalText && goalText.length > 90 ? 'long' : goalText && goalText.length > 45 ? 'mid' : undefined;
   return (
     <section className="cc-card cc-routine" aria-labelledby="cc-routine-title">
       <div className="cc-routine__head">
@@ -105,11 +114,19 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
           </h2>
           <span className="cc-routine__now-label">{t('routine.now', { n: idx + 1, total: stages.length })}</span>
           <span className="cc-routine__now-name">{current ? pickText(current.name, locale) : ''}</span>
-          {current?.id === LEARNING_GOAL_STAGE_ID && lesson.topics.length ? (
+          {goalStage && lesson.topics.length ? (
             <div className="cc-routine__focus" data-testid="stage-focus">
               <span className="cc-routine__now-label">{t('lesson.topic.todaysFocus')}</span>
               <FocusTopics topics={lesson.topics} />
             </div>
+          ) : null}
+          {goalStage && goalText ? (
+            <p className="cc-routine__goal" data-testid="stage-goal" data-length={goalLength}>
+              <IconTarget />
+              <span className="cc-routine__goal-body">
+                <span className="cc-routine__now-label cc-routine__goal-label">{t('lessonGoals.title')}</span> <span className="cc-routine__goal-text">{goalText}</span>
+              </span>
+            </p>
           ) : null}
         </div>
         <div className="cc-routine__nav">

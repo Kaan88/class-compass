@@ -152,6 +152,37 @@ describe('a lesson with a goal (LES-1, LES-3, DSH-4)', () => {
   });
 });
 
+describe('the "Lesson saved" summary (S28a, D-197; LES-3)', () => {
+  it('carries the goal and the class answer, or no answer; nothing without a goal or while the module is off', async () => {
+    await switchOn();
+    const goal = 'We can name ten animals and say what they can do.';
+    let lessonId = await start(s.teacherA, s.ctxA.id, { othersPresent: true, steps: { lessonGoal: { text: goal } } });
+    let end = await cmd(s.teacherA, 'lesson.end', { contextId: s.ctxA.id, lessonId, steps: { lessonGoal: { outcome: 'reached' } } });
+    // The end command's result is the summary the classroom shows at once ...
+    expect(end.result.lessonGoal).toEqual({ text: goal, outcome: 'reached' });
+    // ... and the classroom summary endpoint says the same.
+    expect((await ok(s.teacherA.get(`/api/classroom/lessons/${lessonId}/summary`))).lessonGoal).toEqual({ text: goal, outcome: 'reached' });
+
+    // A goal the class did not answer: outcome null ("Not answered" on screen).
+    lessonId = await start(s.teacherA, s.ctxA.id, { steps: { lessonGoal: { text: goal } } });
+    end = await cmd(s.teacherA, 'lesson.end', { contextId: s.ctxA.id, lessonId, steps: {} });
+    expect(end.result.lessonGoal).toEqual({ text: goal, outcome: null });
+
+    // No goal: nothing.
+    lessonId = await start(s.teacherA, s.ctxA.id);
+    end = await cmd(s.teacherA, 'lesson.end', { contextId: s.ctxA.id, lessonId, steps: {} });
+    expect(end.result.lessonGoal).toBeNull();
+
+    // Switched off: the goal is kept (CFG-2) but not shown.
+    const withGoal = await start(s.teacherA, s.ctxA.id, { steps: { lessonGoal: { text: goal } } });
+    await cmd(s.teacherA, 'lesson.end', { contextId: s.ctxA.id, lessonId: withGoal, steps: { lessonGoal: { outcome: 'partly' } } });
+    await switchOn(false);
+    expect((await ok(s.teacherA.get(`/api/classroom/lessons/${withGoal}/summary`))).lessonGoal).toBeNull();
+    await switchOn(true);
+    expect((await ok(s.teacherA.get(`/api/classroom/lessons/${withGoal}/summary`))).lessonGoal).toEqual({ text: goal, outcome: 'partly' });
+  });
+});
+
 describe('reports (RPT-1, RPT-5) and switching off (CFG-2)', () => {
   it('lists each lesson goal with its answer; an unanswered goal is "not recorded", never "not yet"; kept after switching off', async () => {
     await switchOn();

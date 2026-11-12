@@ -170,3 +170,30 @@ export const LEVELS = ['Beginner', 'Intermediate', 'Advanced'] as const;
 
 /** Titles children give their links (checked like other student text, kind 'linkTitle'). */
 export const LINK_TITLES = ['Look at my work!', 'My animal poster', 'Our class song'];
+
+/**
+ * Lesson goal sentences (S28a, D-197): what a teacher writes for the class to read on the board, per
+ * subject, in English and Turkish (at most 140 characters). Nothing about a single child.
+ */
+export const LESSON_GOALS: Record<string, string[]> = {
+  english: [
+    'We can ask and answer about the weather.',
+    'We can name ten animals and say what they can do.',
+    'We can say what we like and what we do not like.',
+    'We can read the story and answer two questions about it.',
+    'We can count to twenty and spell the numbers.',
+    'We can describe our classroom with "there is" and "there are".',
+    'We can sing the days of the week song without help.',
+    'Hava durumunu İngilizce sorup cevaplayabiliriz.',
+    'Sevdiğimiz yiyecekleri İngilizce söyleyebiliriz.',
+  ],
+  mathematics: [
+    'We can add two-digit numbers.',
+    'We can name four shapes and count their sides.',
+    'We can read the time to the half hour.',
+    'We can solve a problem by drawing a picture.',
+    'İkişer ikişer 50’ye kadar sayabiliriz.',
+    'Toplama problemini resim çizerek çözebiliriz.',
+  ],
+  science: ['We can name three animals and what they eat.', 'We can sort things into solids and liquids.', 'Bitkinin bölümlerini söyleyebiliriz.'],
+};

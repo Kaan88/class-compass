@@ -119,6 +119,21 @@ export function registerLessonStateContributor(c: LessonStateContributor) {
   if (!contributors.some((x) => x.key === c.key)) contributors.push(c);
 }
 
+// ---------------------------------------------------------------- lesson summary contributors
+/**
+ * Modules that add classroom-safe data to the "Lesson saved" summary (S28a, D-197: today's goal and the
+ * class's answer). `build` returns null when there is nothing to show, also when the module is off for
+ * the class+subject (its data is kept, CFG-2). The key is a field of the shared `LessonSummary`.
+ */
+export interface LessonSummaryContributor {
+  key: 'lessonGoal';
+  build: (db: Db, lesson: LessonRow) => unknown;
+}
+const summaryContributors: LessonSummaryContributor[] = [];
+export function registerLessonSummaryContributor(c: LessonSummaryContributor) {
+  if (!summaryContributors.some((x) => x.key === c.key)) summaryContributors.push(c);
+}
+
 // ---------------------------------------------------------------- lesson close hooks
 /**
  * Modules that must react when a lesson closes, whether or not they are enabled for the context
@@ -198,6 +213,7 @@ export function lessonRoster(ctx: RequestContext, contextId: string, lessonId?: 
 }
 
 export function summaryOf(db: Db, l: LessonRow): LessonSummary {
+  const extra = Object.fromEntries(summaryContributors.map((c) => [c.key, c.build(db, l)]));
   return {
     id: l.id,
     contextId: l.contextId,
@@ -212,6 +228,7 @@ export function summaryOf(db: Db, l: LessonRow): LessonSummary {
     stageReached: l.routineSnapshotJson.length ? l.stageIndex + 1 : 0,
     attendance: isModuleEnabled(db, l.contextId, 'attendance') ? lessonAttendanceCounts(db, l) : null,
     reflection: l.reflectionJson ?? null,
+    lessonGoal: (extra.lessonGoal ?? null) as LessonGoalState | null,
   };
 }
 

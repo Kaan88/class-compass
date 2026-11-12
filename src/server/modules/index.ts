@@ -26,7 +26,7 @@ import { registerEndLessonStep } from './lessons/endSteps.ts';
 import { registerStartLessonStep } from './lessons/startSteps.ts';
 import { lessonsManifest } from './lessons/manifest.ts';
 import { linksManifest } from './links/manifest.ts';
-import { registerLessonCloseHook, registerLessonStateContributor } from './lessons/service.ts';
+import { registerLessonCloseHook, registerLessonStateContributor, registerLessonSummaryContributor } from './lessons/service.ts';
 import type { ClassroomCardContribution, ReportContribution, ServerModuleManifest, StudentPageContribution, TimelineContribution } from './manifest.ts';
 import { maintenanceManifest } from './maintenance/manifest.ts';
 import { mcpManifest } from './mcp/manifest.ts';
@@ -125,6 +125,7 @@ export function installModules(): void {
     keys.add(m.key);
     for (const c of m.commands ?? []) defineCommand(c);
     for (const c of m.lessonState ?? []) registerLessonStateContributor(c);
+    for (const c of m.lessonSummary ?? []) registerLessonSummaryContributor(c);
     for (const s of m.endSteps ?? []) {
       if (s.module !== null && s.module !== m.policyKey) throw new Error(`End Lesson step ${s.key} belongs to ${s.module}, not ${m.key}`);
       registerEndLessonStep(s);

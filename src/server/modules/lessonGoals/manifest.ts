@@ -6,13 +6,14 @@
 import { defineServerModule } from '../manifest.ts';
 import { lessonGoalEndStep, lessonGoalStartStep, lessonGoalsCommands } from './commands.ts';
 import { lessonGoalsSection } from './report.ts';
-import { lessonGoalLessonState } from './routes.ts';
+import { lessonGoalLessonState, lessonGoalSummary } from './routes.ts';
 
 export const lessonGoalsManifest = defineServerModule({
   key: 'lessonGoals',
   policyKey: 'lessonGoals',
   commands: lessonGoalsCommands,
   lessonState: [lessonGoalLessonState],
+  lessonSummary: [lessonGoalSummary],
   startSteps: [lessonGoalStartStep],
   endSteps: [lessonGoalEndStep],
   reports: [

@@ -153,6 +153,8 @@ export const LessonSummary = z.object({
   stageReached: z.number().int(),
   attendance: AttendanceCounts.nullable(),
   reflection: Reflection.nullable(),
+  /** Today's goal and the class's answer (S28a, D-197): null without a goal or while Lesson goals is off. */
+  lessonGoal: LessonGoalState.nullable(),
 });
 export type LessonSummary = z.infer<typeof LessonSummary>;
 export const lessonSummary = endpoint({
@@ -161,7 +163,7 @@ export const lessonSummary = endpoint({
   access: 'classroom',
   input: z.object({ lessonId: Id }),
   output: LessonSummary,
-  mcp: { scope: 'reports:read', tool: 'lesson_summary', readOnly: true, description: 'One lesson of yours: class, subject, date, routine and how far it got, attendance counts and your own end-of-lesson reflection (rating and note). Counts only for students.' },
+  mcp: { scope: 'reports:read', tool: 'lesson_summary', readOnly: true, description: 'One lesson of yours: class, subject, date, routine and how far it got, attendance counts, your own end-of-lesson reflection (rating and note) and, when Lesson goals is on, the goal sentence of the lesson with the answer of the class. Counts only for students.' },
 });
 
 // ---------------------------------------------------------------- lesson preferences (S18, D-167)

@@ -4,6 +4,7 @@
  * and changes it through the outbox ('lessonGoals.set', LES-4); without a goal only a quiet "Set a goal"
  * action stays; with the module off nothing renders; the End Lesson review offers three answers in words
  * (never colour alone) and can be cleared; the start step sends a goal only when one was typed (LES-1).
+ * S28a (D-197): the goal on the routine's Learning goal stage and on the Lesson saved summary.
  * Fictional data only.
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -24,6 +25,9 @@ vi.mock('../../src/client/lib/outbox-client.ts', async (importOriginal) => {
 const { queryClient } = await import('../../src/client/lib/queryClient.ts');
 const { lessonKey } = await import('../../src/client/modules/lessons/lessonClient.ts');
 const { endStepsWithGoal, lessonGoalDashboardSlot, lessonGoalEndStepUi, lessonGoalStartStep } = await import('../../src/client/modules/lessonGoals/LessonGoalsPanel.tsx');
+const { routineDashboardSlot } = await import('../../src/client/modules/routines/RoutineClassroom.tsx');
+const { LessonSummaryView } = await import('../../src/client/modules/lessons/EndLesson.tsx');
+const { DEFAULT_ROUTINE_STAGES } = await import('../../src/domain/routines.ts');
 
 const context = { id: 'context-fictional-1', modules: { lessonGoals: true } } as unknown as ClassroomContext;
 const lesson = { id: 'lesson-fictional-1', contextId: context.id, endSteps: ['lessonGoal', 'reflection'] } as unknown as LessonState;
@@ -139,5 +143,92 @@ describe('Start Lesson step (LES-1)', () => {
     expect(contribute(context, '   ', true)).toEqual({ input: {}, ready: true });
     expect(contribute(context, 'We can read a short story.', false)).toEqual({ input: {}, ready: true });
     expect(lessonGoalStartStep.initial()).toBe('');
+  });
+});
+
+describe('the goal on the routine\'s "Learning goal" stage (S28a, D-197; RTN-1)', () => {
+  const Stepper = routineDashboardSlot.Component;
+  const listening = { id: 'topic-fictional-1', name: { en: 'Listening', tr: 'Dinleme' }, icon: 'ear' as const };
+  const learningGoal = DEFAULT_ROUTINE_STAGES.findIndex((st) => st.id === 'learning-goal');
+  const onStage = (stageIndex: number, topics: LessonState['topics'] = [listening]) =>
+    ({ ...lesson, routine: { templateId: null, name: { en: 'Default routine', tr: 'Varsayılan rutin' }, stages: DEFAULT_ROUTINE_STAGES.map((st) => ({ ...st })) }, stageIndex, topics }) as unknown as LessonState;
+  const LONG = 'We can ask and answer questions about the weather, say what we wear on a rainy day and write two short sentences about it.';
+
+  it('shows the goal sentence under the topics on the Learning goal stage, set smaller when it is long', () => {
+    const l = onStage(learningGoal);
+    seed({ text: 'We can name the seasons.', outcome: null }, l);
+    wrap(<Stepper context={context} lesson={l} presentation="box" />);
+    expect(screen.getByTestId('stage-focus').textContent).toContain('Listening');
+    const goal = screen.getByTestId('stage-goal');
+    expect(goal.textContent).toContain(en['lessonGoals.title']);
+    expect(goal.textContent).toContain('We can name the seasons.');
+    expect(goal.getAttribute('data-length')).toBeNull();
+    cleanup();
+    seed({ text: LONG, outcome: null }, l);
+    wrap(<Stepper context={context} lesson={l} presentation="box" />);
+    expect(screen.getByTestId('stage-goal').getAttribute('data-length')).toBe('long');
+  });
+
+  it('shows the goal without topics too, and nothing on another stage, without a goal or with the module off', () => {
+    const noTopics = onStage(learningGoal, []);
+    seed({ text: 'We can count to twenty.', outcome: null }, noTopics);
+    wrap(<Stepper context={context} lesson={noTopics} presentation="box" />);
+    expect(screen.queryByTestId('stage-focus')).toBeNull();
+    expect(screen.getByTestId('stage-goal').textContent).toContain('We can count to twenty.');
+    cleanup();
+    const other = onStage(0);
+    seed({ text: 'We can count to twenty.', outcome: null }, other);
+    wrap(<Stepper context={context} lesson={other} presentation="box" />);
+    expect(screen.queryByTestId('stage-goal')).toBeNull();
+    for (const goal of [{ text: null, outcome: null }, null]) {
+      cleanup();
+      const l = onStage(learningGoal);
+      seed(goal, l);
+      wrap(<Stepper context={context} lesson={l} presentation="box" />);
+      expect(screen.queryByTestId('stage-goal')).toBeNull();
+      expect(screen.getByTestId('stage-focus')).toBeTruthy();
+    }
+  });
+});
+
+describe('the goal on the "Lesson saved" summary (S28a, D-197; LES-3)', () => {
+  const summary = (lessonGoal: LessonGoalState | null) => ({
+    id: 'lesson-fictional-1',
+    contextId: context.id,
+    status: 'ended' as const,
+    className: '3-A',
+    subjectName: { en: 'English', tr: 'İngilizce' },
+    localDate: '2026-11-09',
+    startedAt: Date.UTC(2026, 10, 9, 7, 0),
+    endedAt: Date.UTC(2026, 10, 9, 7, 38),
+    routineName: { en: 'Default routine', tr: 'Varsayılan rutin' },
+    stageCount: 6,
+    stageReached: 6,
+    attendance: null,
+    reflection: null,
+    lessonGoal,
+  });
+  const show = (lessonGoal: LessonGoalState | null) =>
+    wrap(<LessonSummaryView lessonId={`lesson-${Math.random()}`} timezone="Europe/Istanbul" initial={summary(lessonGoal)} onDone={() => {}} />);
+
+  it('shows the goal with the class answer in words (with an icon), or "Not answered"', () => {
+    for (const outcome of ['reached', 'partly', 'notYet'] as const) {
+      show({ text: 'We can name ten animals.', outcome });
+      const row = screen.getByTestId('summary-goal');
+      expect(screen.getByText(en['summary.goal'])).toBeTruthy();
+      expect(row.textContent).toContain('We can name ten animals.');
+      expect(row.textContent).toContain(en[`lessonGoals.outcome.${outcome}`]);
+      expect(row.querySelector('svg')).toBeTruthy();
+      cleanup();
+    }
+    show({ text: 'We can name ten animals.', outcome: null });
+    expect(screen.getByTestId('summary-goal').textContent).toContain(en['summary.goalNotAnswered']);
+  });
+
+  it('shows no goal row without a goal or with the module off', () => {
+    show(null);
+    expect(screen.getByTestId('lesson-summary')).toBeTruthy();
+    expect(screen.queryByTestId('summary-goal')).toBeNull();
+    expect(screen.queryByText(en['summary.goal'])).toBeNull();
   });
 });

@@ -764,6 +764,8 @@ export const en = {
   'summary.routine': 'Routine',
   'summary.stages': '{name}: reached stage {reached} of {total}',
   'summary.attendance': 'Attendance',
+  'summary.goal': 'Our goal',
+  'summary.goalNotAnswered': 'Not answered',
   'summary.pending': 'The summary appears when the connection is back.',
   'summary.backToClasses': 'Back to classes',
   'routines.title': 'Routines',

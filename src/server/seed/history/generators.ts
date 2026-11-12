@@ -12,6 +12,7 @@ import { countersGenerator } from './counters.ts';
 import { goalsGenerator } from './goals.ts';
 import { groupingGenerator } from './grouping.ts';
 import { homeworkGenerator } from './homework.ts';
+import { lessonGoalsGenerator } from './lessonGoals.ts';
 import { lessonsGenerator } from './lessons.ts';
 import { routinesGenerator } from './routines.ts';
 import { secretGenerator } from './secret.ts';
@@ -21,6 +22,7 @@ import type { HistoryGenerator } from './types.ts';
 export const HISTORY_GENERATORS: readonly HistoryGenerator[] = [
   attendanceGenerator,
   lessonsGenerator,
+  lessonGoalsGenerator,
   routinesGenerator,
   groupingGenerator,
   countersGenerator,

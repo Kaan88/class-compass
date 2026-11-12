@@ -15,7 +15,7 @@ import { getOutbox, useOutboxStatus } from '../../lib/outbox-client.ts';
 import { showToast } from '../../lib/toast.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
-import { IconCloudOff, IconFace, IconFlag, IconPrev, IconSync } from '../../ui/icons.tsx';
+import { IconCheck, IconCloudOff, IconFace, IconFlag, IconPrev, IconSync, IconTarget, IconUp } from '../../ui/icons.tsx';
 import { MetricCell } from '../../ui/Students.tsx';
 import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
@@ -175,7 +175,26 @@ export function QueuedEndCard({ context, opId, onEnded }: { context: ClassroomCo
   );
 }
 
-/** After End Lesson: what was saved (LES-3), then back to the class picker. */
+/** The class's answer to "Did we reach our goal?" as a word with an icon (never colour alone, D-188). */
+const GOAL_OUTCOME_ICON = { reached: IconCheck, partly: IconTarget, notYet: IconUp } as const;
+
+function GoalOutcome({ outcome }: { outcome: keyof typeof GOAL_OUTCOME_ICON | null }) {
+  const { t } = useI18n();
+  if (!outcome) return <span className="cc-muted">{t('summary.goalNotAnswered')}</span>;
+  const Icon = GOAL_OUTCOME_ICON[outcome];
+  return (
+    <span className="cc-row" data-outcome={outcome}>
+      <Icon />
+      {t(`lessonGoals.outcome.${outcome}`)}
+    </span>
+  );
+}
+
+/**
+ * After End Lesson: what was saved (LES-3), then back to the class picker. With Lesson goals on, today's
+ * goal and the class's answer (S28a, D-197): the classroom sees it, so words only about the class, and
+ * an unanswered goal reads "Not answered", never as a failure.
+ */
 export function LessonSummaryView({ lessonId, timezone, initial, onDone }: { lessonId: string; timezone: string; initial: LessonSummary | null; onDone: () => void }) {
   const { t, locale } = useI18n();
   const q = useQuery({ queryKey: ['classroom', 'summary', lessonId], queryFn: () => call(L.lessonSummary, { lessonId }), ...(initial ? { initialData: initial } : {}) });
@@ -200,6 +219,15 @@ export function LessonSummaryView({ lessonId, timezone, initial, onDone }: { les
             <>
               <dt>{t('summary.routine')}</dt>
               <dd>{t('summary.stages', { name: pickText(s.routineName, locale), reached: s.stageReached, total: s.stageCount })}</dd>
+            </>
+          ) : null}
+          {s.lessonGoal?.text ? (
+            <>
+              <dt>{t('summary.goal')}</dt>
+              <dd className="cc-summary__goal" data-testid="summary-goal">
+                <span className="cc-summary__goal-text">{s.lessonGoal.text}</span>
+                <GoalOutcome outcome={s.lessonGoal.outcome} />
+              </dd>
             </>
           ) : null}
           {s.attendance ? (
