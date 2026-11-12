@@ -9,13 +9,13 @@
  *   table belongs to the nested table's own rows, never to the outer cell (layout tables around a data
  *   table become blank rows, which the importer drops).
  * - `colspan` keeps later columns in place (the value stays in the first column, like merged cells
- *   in a workbook); `rowspan` leaves the spanned cells of the next rows empty. A rowspan past
- *   `MAX_SPAN` covers the rest of the table (audit fix: never a later row shifted one column left).
+ *   in a workbook); `rowspan` leaves the spanned cells of the next rows empty, for exactly as many
+ *   rows as it says (up to 9999; never clamped, so no later row shifts a column).
  * - The content of `script`, `style`, `template`, `textarea`, `title`, `xml`, `noscript`, `noembed`,
  *   `noframes`, `iframe`, `object`, `svg` and `math` elements and of comments is skipped entirely.
  * - Limits: rows (`MAX_SHEET_ROWS`, then `truncated`), columns (`MAX_SHEET_COLS`), tables
  *   (`MAX_HTML_TABLES`: a page with more stops with `tooManyTables` and the import is refused, never
- *   cut, D-079), characters per cell (`MAX_HTML_CELL_CHARS`), spans (`MAX_SPAN`).
+ *   cut, D-079), characters per cell (`MAX_HTML_CELL_CHARS`), colspans (`MAX_SPAN`).
  * - Character references: numeric ones and the common named ones are decoded; an unknown `&name;`
  *   stays as it was written (never a letter cut out of a name).
  */
@@ -160,14 +160,16 @@ interface TableState {
 const SPAN_ATTR = { colspan: /(?:^|\s)colspan\s*=\s*["']?(\d{1,4})/iu, rowspan: /(?:^|\s)rowspan\s*=\s*["']?(\d{1,4})/iu } as const;
 
 /**
- * A span value, clamped to 1..MAX_SPAN. A rowspan past MAX_SPAN covers the rest of the table
- * (`Infinity`) instead of being cut at MAX_SPAN, so the rows below it never shift one column left.
+ * A span value of at least 1. A colspan is clamped to MAX_SPAN; a rowspan keeps its real value (at
+ * most 9999 by the pattern; it costs one counter per column), so the rows below it, and the rows
+ * after it ends, keep their columns (audit fix: a clamp shifted them one column left, a span "to the
+ * table end" one column right).
  */
 function attr(attrs: string, name: keyof typeof SPAN_ATTR): number {
   const m = SPAN_ATTR[name].exec(attrs);
   const n = m ? Number(m[1]) : 1;
-  if (name === 'rowspan' && Number.isFinite(n) && n > MAX_SPAN) return Infinity;
-  return Math.max(1, Math.min(MAX_SPAN, Number.isFinite(n) ? n : 1));
+  if (!Number.isFinite(n)) return 1;
+  return name === 'rowspan' ? Math.max(1, n) : Math.max(1, Math.min(MAX_SPAN, n));
 }
 
 /** The index of the `>` that ends the tag starting at `from` (quotes respected), or -1. */

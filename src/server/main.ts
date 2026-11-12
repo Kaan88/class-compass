@@ -6,6 +6,7 @@ import { offsetClock } from './lib/testClock.ts';
 import { purgeOldChats, RETENTION_TICK_MS } from './modules/assistantChat/retention.ts';
 import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
 import { PICTURE_SWEEP_MS, sweepAvatarPictures } from './modules/avatars/pictures.ts';
+import { SOURCE_SWEEP_MS, sweepUnusedImportSources } from './modules/import/sweep.ts';
 import { runNotificationTick, TICK_MS as NOTIFICATION_TICK_MS } from './modules/notifications/digest.ts';
 import { migrateWithSnapshot, writeServerLock } from './ops/backup.ts';
 
@@ -51,12 +52,19 @@ const pictureSweep = () => void sweepAvatarPictures({ db, config, now }).catch((
 pictureSweep();
 const pictureSweepTimer = setInterval(pictureSweep, PICTURE_SWEEP_MS);
 pictureSweepTimer.unref();
+// Uploaded class lists that never became an import batch (cancelled or refused) name children that
+// erasure cannot find: deleted an hour after the upload; at start-up and every 10 minutes (D-109).
+const importSourceSweep = () => void sweepUnusedImportSources({ db, config, now }).catch((err: unknown) => app.log.warn({ err }, 'import source clean-up failed'));
+importSourceSweep();
+const importSourceSweepTimer = setInterval(importSourceSweep, SOURCE_SWEEP_MS);
+importSourceSweepTimer.unref();
 
 const shutdown = async () => {
   clearInterval(exportSweep);
   clearInterval(notificationTimer);
   clearInterval(chatRetentionTimer);
   clearInterval(pictureSweepTimer);
+  clearInterval(importSourceSweepTimer);
   await app.close();
   db.$client.close();
   releaseLock();

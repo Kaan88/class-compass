@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { auditEvents, files } from '../../src/server/db/schema.ts';
 import { storagePath } from '../../src/server/modules/files/storage.ts';
+import { sweepUnusedImportSources, UNUSED_SOURCE_MS } from '../../src/server/modules/import/sweep.ts';
 import { makeEnv, type Client, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
 import { htmlTableXls, multiClassCsv, multiClassRows, multiClassXlsx, multipart } from '../import-fixtures.ts';
@@ -313,5 +314,52 @@ describe('several classes in one file (IMP-2, D-171)', () => {
     } finally {
       await ok(s.admin.post(`/api/admin/years/${year2.id}/archive`, {}));
     }
+  });
+});
+
+describe('audit finding 4 (review): class list uploads that never became a batch are swept (D-109)', () => {
+  let env: TestEnv;
+  let s: School;
+  let root: string;
+  beforeAll(async () => {
+    root = await fsp.mkdtemp(path.join(os.tmpdir(), 'cc-import-sweep-'));
+    env = await makeEnv({ uploadsDir: path.join(root, 'uploads'), ocrCacheDir: path.join(root, 'ocr') });
+    s = await buildSchool(env);
+  });
+  afterAll(async () => {
+    await env.app.close();
+    await fsp.rm(root, { recursive: true, force: true });
+  });
+
+  it('a split preview that was cancelled or refused leaves no file behind; a file a batch uses stays', async () => {
+    const bytesOf = (id: string) => storagePath(env.config, env.db.select().from(files).where(eq(files.id, id)).get()!.storageKey);
+    // Cancelled at the split preview: previewed, then nothing made.
+    const cancelled = await uploadList(s.admin, multiClassXlsx(), 'okul-listesi.xlsx', 'application/octet-stream');
+    await ok(s.admin.post('/api/import/split/preview', { fileId: cancelled }));
+    // Refused at the split preview: no class column.
+    const refused = await uploadList(s.admin, Buffer.from('Adı Soyadı\nAda Kurgu\nCan Örnek\n'), 'liste.csv', 'text/csv');
+    expect((await s.admin.post('/api/import/split/preview', { fileId: refused })).body.error.details.reason).toBe('IMPORT_NO_CLASS_COLUMN');
+    // Used by a batch.
+    const used = await uploadList(s.admin, Buffer.from('Adı Soyadı\nAda Kurgu\nCan Örnek\n'), 'sinif.csv', 'text/csv');
+    await ok(s.admin.post('/api/import/batches', { classId: s.c3a.id, fileId: used }));
+    const paths = { cancelled: bytesOf(cancelled), refused: bytesOf(refused), used: bytesOf(used) };
+
+    // Within the grace time the teacher may still go on: nothing is swept.
+    expect(await sweepUnusedImportSources(env.deps)).toBe(0);
+    await fsp.access(paths.cancelled);
+
+    env.clock.advance(UNUSED_SOURCE_MS + 1);
+    expect(await sweepUnusedImportSources(env.deps)).toBe(2);
+    for (const id of [cancelled, refused]) {
+      expect(env.db.select().from(files).where(eq(files.id, id)).get()!.deletedAt).not.toBeNull();
+      expect(env.db.select().from(auditEvents).where(eq(auditEvents.entityId, id)).all().map((e) => e.action)).toContain('file.delete');
+      expect((await s.admin.req('GET', `/api/files/${id}`)).status).toBe(404);
+    }
+    await expect(fsp.access(paths.cancelled)).rejects.toThrow();
+    await expect(fsp.access(paths.refused)).rejects.toThrow();
+    // The batch's own file stays.
+    expect(env.db.select().from(files).where(eq(files.id, used)).get()!.deletedAt).toBeNull();
+    await fsp.access(paths.used);
+    expect(await sweepUnusedImportSources(env.deps)).toBe(0);
   });
 });

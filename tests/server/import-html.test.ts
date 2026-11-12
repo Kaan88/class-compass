@@ -105,6 +105,21 @@ describe('HTML-table .xls: parser (D-171)', () => {
     ]);
   });
 
+  it('audit finding 2 (review): a long rowspan that ends before the table does frees its column, so the next grade cell and its names stay in place', () => {
+    // Grade 3 spans 120 pupils, grade 4 the next 110: both spans are past the old 50-row limit.
+    const rows = Array.from({ length: 230 }, (_, i) => {
+      const grade = i === 0 ? '<td rowspan="120">3</td>' : i === 120 ? '<td rowspan="110">4</td>' : '';
+      return `<tr>${grade}<td>Ela Kurgu${i}</td><td>${7000 + i}</td></tr>`;
+    }).join('');
+    const out = parseHtmlTables(Buffer.from(`<table>${rows}</table>`)).rows.map((r) => r.cells);
+    expect(out).toHaveLength(230);
+    expect(out[0]).toEqual(['3', 'Ela Kurgu0', '7000']);
+    expect(out[119]).toEqual(['', 'Ela Kurgu119', '7119']);
+    expect(out[120]).toEqual(['4', 'Ela Kurgu120', '7120']);
+    expect(out[229]).toEqual(['', 'Ela Kurgu229', '7229']);
+    expect(out.every((r, i) => r.length === 3 && r[1] === `Ela Kurgu${i}` && r[2] === String(7000 + i))).toBe(true);
+  });
+
   it('audit finding 3: an unknown named character reference stays as written; the letters used in names are decoded', () => {
     expect(decodeEntities('Ay&bogus;e')).toBe('Ay&bogus;e');
     expect(decodeEntities('&Ccedil;a&gbreve;r&inodot; &Ouml;z&uuml;m &Scedil;eker &Idot;pek &Uuml;mit &scedil;&ouml;&ccedil;&Gbreve;')).toBe('Çağrı Özüm Şeker İpek Ümit şöçĞ');
