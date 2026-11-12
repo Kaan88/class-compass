@@ -591,6 +591,12 @@ Decision D-200; no migration.
 - [ ] A routine of more than about 14 stages takes two lines of number chips at 1536×703 (a chip is never narrower than a touch target); fewer stages stay on one line. Owner to judge on the classroom display, together with the two-line Turkish names
 - [ ] Seen on the classroom display (owner): Turkish stage names and three topics at 1536×703
 
+## AUDIT Fable audit and ultrareview before the next production update (2026-11-12)
+Decision D-201; no migration.
+- [x] Fable-model audit of the whole difference since production `4a770f2` (8 lenses, 3 skeptics per finding, a completeness pass) and an ultrareview of `src/server`: 26 distinct findings, none critical or high
+- [x] All 26 fixed with tests (privacy: compaction summary filter, offline relock, split import source file, keys on a changed address; assistant chat; provider time limits and blocked replies; stale offline lesson start; closures; avatars; theme previews and sound caps; HTML import), each fix reviewed again by a separate Fable agent
+- [ ] Production update with these fixes (owner decides)
+
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
 - [ ] **Real-device and people checks** (owner, Sare, children): classroom speakers and the iPad silent switch; Sare's MacBook, the 1280×720 projector, the touch panel and a full lesson day on the real display; group drag on iPad, Android, touch panel and VoiceOver; the student page on a low-end Android phone and an iPhone; the scorer app paired on real phones and the hall screen; avatars named by children; starters read by Sare; guides read by the owner and a Turkish-speaking teacher; the digest in a real mailbox (EN, TR); the example theme on the classroom display; the S13 → S14 screenshot review; owner and Sare on the new test site
