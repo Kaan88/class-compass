@@ -402,19 +402,19 @@ describe('limits, errors and Stop', () => {
     });
   });
 
-  it('a provider that refuses the larger output limit (HTTP 400) is asked again with the default', async () => {
+  it('a provider that refuses the output limit (HTTP 400) is asked again with half of it, down to the default', async () => {
     await withAssistant(async () => {
       const seen = script(fake, [() => ({ status: 400 }), () => ({ text: 'Hello there.' })]);
       const chat = await newChat();
       const evs = await events(s.teacherA, (await send(s.teacherA, chat.id, 'Hello')).runId);
       expect(endOf(evs).end).toBe('complete');
       expect(streamedText(evs)).toBe('Hello there.');
-      expect(seen.map((r) => r.body.max_completion_tokens)).toEqual([ASSISTANT_TUNING.maxOutputTokens, 4096]);
-      // Refused again with the default: shown as a provider error, no loop.
+      expect(seen.map((r) => r.body.max_completion_tokens)).toEqual([65_536, 32_768]);
+      // Refused at every step down to the default: shown as a provider error, no loop.
       const again = script(fake, [() => ({ status: 400 })]);
       const evs2 = await events(s.teacherA, (await send(s.teacherA, chat.id, 'Hello again')).runId);
       expect(endOf(evs2)).toMatchObject({ end: 'error', reason: 'PROVIDER_ERROR' });
-      expect(again.length).toBe(2);
+      expect(again.map((r) => r.body.max_completion_tokens)).toEqual([65_536, 32_768, 16_384, 8192, 4096]);
     });
   });
 

@@ -14,9 +14,10 @@
  * 4. Rounds repeat until the model answers without tools (or `ASSISTANT_MAX_ROUNDS`).
  *
  * Output limit (2026-11-12, D-196 note): a reply may use `ASSISTANT_TUNING.maxOutputTokens`, because a
- * theme package is long and a model that thinks first spends part of the limit on hidden reasoning. A
- * provider that refuses that limit for a model (HTTP 400 before anything was written) is asked again with
- * the default (`DEFAULT_MAX_TOKENS`) for the rest of the run. A reply cut off by the limit is never
+ * theme package is long and a model that thinks first spends part of the limit on hidden reasoning (DeepSeek
+ * on the test site used all of 16384 before writing anything). A provider that refuses the limit for a model
+ * (HTTP 400 before anything was written) is asked again with half of it, down to the default
+ * (`DEFAULT_MAX_TOKENS`), and the run keeps the lower limit. A reply cut off by the limit is never
  * stored as complete: it ends the run with `OUT_OF_TOKENS` and its unfinished tool calls are dropped.
  */
 import type { FastifyInstance } from 'fastify';
@@ -42,7 +43,7 @@ import { unavailableReason } from './settings.ts';
 import { appendMessage, callView, CardLookup, historyFor, messagesOf, resolveAttachmentArgs, type ChatRow, type MessageRow } from './store.ts';
 
 /** When to summarise the earlier part of a chat (estimated tokens of the messages) and how much to keep as it is. Tests lower them. */
-export const ASSISTANT_TUNING = { compactAtTokens: 40_000, keepRecentTokens: 12_000, maxOutputTokens: 16_384 };
+export const ASSISTANT_TUNING = { compactAtTokens: 40_000, keepRecentTokens: 12_000, maxOutputTokens: 65_536 };
 
 /** A rough token estimate (about four characters a token) for the compaction decision. */
 const estimate = (msgs: ChatMessage[]) => Math.ceil(msgs.reduce((n, m) => n + m.content.length + ('toolCalls' in m && m.toolCalls ? JSON.stringify(m.toolCalls).length : 0) + 20, 0) / 4);
@@ -319,9 +320,9 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
         const cancelled = run.abort.signal.aborted;
         const failure = e instanceof AiCallError ? e.failure : null;
         if (!cancelled && !failure) throw e;
-        // The larger output limit refused for this model (HTTP 400 before any output): ask again with the default.
+        // The output limit refused for this model (HTTP 400 before any output): ask again with half of it.
         if (!cancelled && e instanceof AiCallError && e.httpStatus === 400 && maxTokens > DEFAULT_MAX_TOKENS && !text.raw && !calls.length) {
-          maxTokens = DEFAULT_MAX_TOKENS;
+          maxTokens = Math.max(DEFAULT_MAX_TOKENS, Math.floor(maxTokens / 2));
           round -= 1;
           continue;
         }
