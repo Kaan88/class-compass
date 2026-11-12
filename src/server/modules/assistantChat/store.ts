@@ -452,8 +452,10 @@ export const providerToolName = (name: string): string => (PROVIDER_TOOL_NAME.te
 /**
  * The chat as provider messages, from the last summary on: every tool call is followed by its result
  * (a call that never ran, refused or declined or expired, gets a short result that says so).
+ * `reasoning` (the running agent's memory, by message id; D-203) is attached to the matching assistant
+ * message with tool calls; it is never stored.
  */
-export function historyFor(chat: ChatRow, rows: MessageRow[]): ChatMessage[] {
+export function historyFor(chat: ChatRow, rows: MessageRow[], reasoning?: ReadonlyMap<string, string>): ChatMessage[] {
   const out: ChatMessage[] = [];
   const results = new Map(rows.filter((r) => r.role === 'tool' && r.toolCallId).map((r) => [r.toolCallId!, r]));
   for (const r of rows) {
@@ -477,7 +479,8 @@ export function historyFor(chat: ChatRow, rows: MessageRow[]): ChatMessage[] {
         ...(c.invalidArguments ? { invalidArguments: true as const } : {}),
         ...(c.signature ? { signature: c.signature } : {}),
       }));
-      out.push(toolCalls.length ? { role: 'assistant', content: r.content, toolCalls } : { role: 'assistant', content: r.content });
+      const thought = toolCalls.length ? reasoning?.get(r.id) : undefined;
+      out.push(toolCalls.length ? { role: 'assistant', content: r.content, toolCalls, ...(thought ? { reasoning: thought } : {}) } : { role: 'assistant', content: r.content });
       for (const c of calls) {
         const res = results.get(c.id);
         if (res) out.push({ role: 'tool', toolCallId: c.id, name: providerToolName(c.name), content: res.content, ...(res.isError ? { isError: true } : {}) });
