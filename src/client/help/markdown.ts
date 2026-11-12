@@ -10,7 +10,9 @@
  *
  * The assistant chat (S27d, D-196) renders AI answers with the same parser (`assistantChat/ChatMarkdown.tsx`):
  * fences keep their language word, a longer fence can hold ``` lines, and a fence not closed yet (an
- * answer still streaming) is marked `open`.
+ * answer still streaming) is marked `open`. After the S27d review: a fence indented under a list item is
+ * a code block of that item, an ordered list keeps its first number (`start`), a code span ends at a
+ * run of as many backticks, and every pass of the block loop moves on at least one line.
  */
 
 export type Inline =
@@ -23,13 +25,16 @@ export type Inline =
 
 export interface ListItem {
   content: Inline[];
+  /** Blocks inside the item after its text: a fenced code block indented under it (S27d review). */
+  blocks?: Block[];
   children: Block | null;
 }
 
 export type Block =
   | { kind: 'heading'; level: 1 | 2 | 3 | 4; content: Inline[]; id: string }
   | { kind: 'paragraph'; content: Inline[] }
-  | { kind: 'list'; ordered: boolean; items: ListItem[] }
+  /** `start`: the first number of an ordered list that does not start at 1 (one interrupted by a code block). */
+  | { kind: 'list'; ordered: boolean; items: ListItem[]; start?: number }
   | { kind: 'quote'; blocks: Block[] }
   | { kind: 'table'; head: Inline[][]; rows: Inline[][][] }
   | { kind: 'figure'; src: string; alt: string }
@@ -74,11 +79,19 @@ export function parseInline(src: string): Inline[] {
       continue;
     }
     if (ch === '`') {
-      const end = src.indexOf('`', i + 1);
-      if (end > i) {
+      // A code span ends at a run of exactly as many backticks (```npm install``` is one span, CommonMark).
+      const run = /^`+/u.exec(rest)![0];
+      const close = new RegExp(`(?<!\`)${run}(?!\`)`, 'u').exec(src.slice(i + run.length));
+      if (close) {
         flush();
-        out.push({ kind: 'code', text: src.slice(i + 1, end) });
-        i = end + 1;
+        const inner = src.slice(i + run.length, i + run.length + close.index);
+        out.push({ kind: 'code', text: run.length > 1 && /^ .* $/u.test(inner) ? inner.slice(1, -1) : inner });
+        i += run.length + close.index + run.length;
+        continue;
+      }
+      if (run.length > 1) {
+        text += run;
+        i += run.length;
         continue;
       }
     }
@@ -128,7 +141,38 @@ export function parseInline(src: string): Inline[] {
 const HEADING = /^(#{1,4})\s+(.*)$/u;
 const FENCE = /^\s*(`{3,})([^`]*)$/u;
 const BULLET = /^(\s*)[-*]\s+(.*)$/u;
-const NUMBERED = /^(\s*)\d+[.)]\s+(.*)$/u;
+const NUMBERED = /^(\s*)(\d{1,9})[.)]\s+(.*)$/u;
+/** A closing fence line (backticks only); it closes an opening fence of at most as many backticks. */
+const FENCE_CLOSE = /^\s*`{3,}\s*$/u;
+
+/** Where the fence opened at `lines[at]` closes (the end of the text while it is not closed yet: an answer still streaming). */
+function fenceEnd(lines: string[], at: number): { stop: number; closed: boolean } {
+  const run = FENCE.exec(lines[at]!)![1]!.length;
+  const end = lines.findIndex((l, j) => j > at && FENCE_CLOSE.test(l) && l.trim().length >= run);
+  return end === -1 ? { stop: lines.length, closed: false } : { stop: end, closed: true };
+}
+
+/** The fenced code block opened at `lines[at]` (its lines lose the fence's own indentation) and the index after it. */
+function fencedBlock(lines: string[], at: number): { block: Block; next: number } {
+  const m = FENCE.exec(lines[at]!)!;
+  const { stop, closed } = fenceEnd(lines, at);
+  const pad = /^\s*/u.exec(lines[at]!)![0].length;
+  const strip = new RegExp(`^\\s{0,${pad}}`, 'u');
+  const text = lines
+    .slice(at + 1, stop)
+    .map((l) => l.replace(strip, ''))
+    .join('\n');
+  const lang = /^[A-Za-z0-9_+.-]{1,20}/u.exec(m[2]!.trim())?.[0].toLowerCase();
+  return { block: { kind: 'code', text, ...(lang ? { lang } : {}), ...(closed ? {} : { open: true as const }) }, next: closed ? stop + 1 : stop };
+}
+
+/** A list marker line: its indentation, its text and, when numbered, its number. */
+function markerOf(line: string): { indent: number; text: string; ordered: boolean; num: number } | null {
+  const b = BULLET.exec(line);
+  if (b) return { indent: b[1]!.length, text: b[2]!, ordered: false, num: 0 };
+  const n = NUMBERED.exec(line);
+  return n ? { indent: n[1]!.length, text: n[3]!, ordered: true, num: Number(n[2]) } : null;
+}
 const ALONE_IMAGE = /^!\[((?:[^\]\\]|\\.)*)\]\(([^)\s]+)\)$/u;
 
 const splitRow = (line: string) =>
@@ -144,19 +188,24 @@ function isTableStart(lines: string[], i: number) {
 }
 
 function parseList(lines: string[]): { block: Block; used: number } {
-  const first = BULLET.exec(lines[0]!) ?? NUMBERED.exec(lines[0]!);
-  const ordered = !BULLET.test(lines[0]!);
-  const indent = first![1]!.length;
+  const first = markerOf(lines[0]!)!;
+  const { ordered, indent } = first;
   const items: ListItem[] = [];
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i]!;
-    const m = (ordered ? NUMBERED : BULLET).exec(line);
-    if (!m || m[1]!.length !== indent) break;
-    let text = m[2]!;
+    const m = markerOf(lines[i]!);
+    if (!m || m.ordered !== ordered || m.indent !== indent) break;
+    let text = m.text;
+    const blocks: Block[] = [];
     i += 1;
-    // Continuation lines (indented, not a list marker) belong to this item.
+    // Continuation lines (indented, not a list marker) belong to this item; an indented fence is a code block in it.
     while (i < lines.length && lines[i]!.trim() !== '' && /^\s{2,}\S/u.test(lines[i]!) && !BULLET.test(lines[i]!) && !NUMBERED.test(lines[i]!)) {
+      if (FENCE.test(lines[i]!)) {
+        const f = fencedBlock(lines, i);
+        blocks.push(f.block);
+        i = f.next;
+        continue;
+      }
       text += ` ${lines[i]!.trim()}`;
       i += 1;
     }
@@ -168,9 +217,9 @@ function parseList(lines: string[]): { block: Block; used: number } {
       while (i < lines.length && lines[i]!.trim() !== '' && (/^\s+/u.exec(lines[i]!)?.[0].length ?? 0) > indent) i += 1;
       children = parseList(lines.slice(start, i)).block;
     }
-    items.push({ content: parseInline(text), children });
+    items.push({ content: parseInline(text), ...(blocks.length ? { blocks } : {}), children });
   }
-  return { block: { kind: 'list', ordered, items }, used: Math.max(i, 1) };
+  return { block: { kind: 'list', ordered, items, ...(ordered && first.num !== 1 ? { start: first.num } : {}) }, used: Math.max(i, 1) };
 }
 
 export function parseMarkdown(source: string): Block[] {
@@ -190,15 +239,11 @@ export function parseMarkdown(source: string): Block[] {
       i += 1;
       continue;
     }
-    const fence = FENCE.exec(line);
-    if (fence) {
+    if (FENCE.test(line)) {
       // Closed by a line of at least as many backticks (CommonMark), so a longer fence can hold ``` lines.
-      const run = fence[1]!.length;
-      const end = lines.findIndex((l, j) => j > i && /^\s*`{3,}\s*$/u.test(l) && l.trim().length >= run);
-      const stop = end === -1 ? lines.length : end;
-      const lang = /^[A-Za-z0-9_+.-]{1,20}/u.exec(fence[2]!.trim())?.[0].toLowerCase();
-      blocks.push({ kind: 'code', text: lines.slice(i + 1, stop).join('\n'), ...(lang ? { lang } : {}), ...(end === -1 ? { open: true } : {}) });
-      i = stop + 1;
+      const f = fencedBlock(lines, i);
+      blocks.push(f.block);
+      i = f.next;
       continue;
     }
     const h = HEADING.exec(line);
@@ -234,17 +279,42 @@ export function parseMarkdown(source: string): Block[] {
       continue;
     }
     if (BULLET.test(line) || NUMBERED.test(line)) {
-      // A list runs over marker lines and indented continuation lines; one blank line between items is allowed.
-      const inList = (l: string) => BULLET.test(l) || NUMBERED.test(l) || /^\s{2,}\S/u.test(l);
+      // A list runs over marker lines and indented continuation lines; one blank line between items (or
+      // before a fence indented under an item) is allowed. An indented fence runs to its closing line,
+      // blank lines inside it included (S27d review: a code block under a numbered step).
+      const marker = (l: string) => BULLET.test(l) || NUMBERED.test(l);
+      const indented = (l: string) => /^\s{2,}\S/u.test(l);
+      const chunk: string[] = [];
       let end = i;
-      while (end < lines.length && inList(lines[end]!)) end += 1;
-      while (end + 1 < lines.length && lines[end]?.trim() === '' && (BULLET.test(lines[end + 1]!) || NUMBERED.test(lines[end + 1]!))) {
-        end += 1;
-        while (end < lines.length && inList(lines[end]!)) end += 1;
+      while (end < lines.length) {
+        const l = lines[end]!;
+        if (indented(l) && FENCE.test(l)) {
+          const { stop, closed } = fenceEnd(lines, end);
+          const next = closed ? stop + 1 : stop;
+          chunk.push(...lines.slice(end, next));
+          end = next;
+          continue;
+        }
+        if (marker(l) || indented(l)) {
+          chunk.push(l);
+          end += 1;
+          continue;
+        }
+        const after = lines[end + 1];
+        if (l.trim() === '' && after !== undefined && (marker(after) || (indented(after) && FENCE.test(after)))) {
+          end += 1;
+          continue;
+        }
+        break;
       }
-      const chunk = lines.slice(i, end).filter((l) => l.trim() !== '');
       let used = 0;
       while (used < chunk.length) {
+        if (FENCE.test(chunk[used]!) && !marker(chunk[used]!)) {
+          const f = fencedBlock(chunk, used);
+          blocks.push(f.block);
+          used = f.next;
+          continue;
+        }
         if (!BULLET.test(chunk[used]!) && !NUMBERED.test(chunk[used]!)) {
           // A stray indented line between lists: keep it as a paragraph.
           blocks.push({ kind: 'paragraph', content: parseInline(chunk[used]!.trim()) });
@@ -273,9 +343,15 @@ export function parseMarkdown(source: string): Block[] {
       !BULLET.test(lines[i]!) &&
       !NUMBERED.test(lines[i]!) &&
       !isTableStart(lines, i) &&
-      !lines[i]!.trim().startsWith('```')
+      // The block loop's own fence test: a line like ```npm install``` is paragraph text, never a stop.
+      !FENCE.test(lines[i]!)
     ) {
       para.push(lines[i]!.trim());
+      i += 1;
+    }
+    // Always moves on: a line no rule above took is a paragraph of its own (never an endless loop).
+    if (!para.length) {
+      para.push(line.trim());
       i += 1;
     }
     blocks.push({ kind: 'paragraph', content: parseInline(para.join(' ')) });
@@ -305,6 +381,7 @@ export function collectTargets(blocks: Block[]): { links: string[]; images: stri
       else if (b.kind === 'list') {
         for (const item of b.items) {
           inl(item.content);
+          if (item.blocks) walk(item.blocks);
           if (item.children) walk([item.children]);
         }
       }

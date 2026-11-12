@@ -108,6 +108,16 @@
 .cc-md ol {
   padding-inline-start: 1.5rem;
 }
+/* The message list sets list-style: none, which lists inside an answer would inherit (S27d review). */
+.cc-md ul {
+  list-style: disc;
+}
+.cc-md ol {
+  list-style: decimal;
+}
+.cc-md li ul {
+  list-style: circle;
+}
 .cc-md li + li {
   margin-top: 0.2rem;
 }
@@ -135,12 +145,22 @@
 .cc-md a {
   text-decoration: underline;
 }
+.cc-md__host {
+  color: var(--cc-text-muted);
+  font-size: 0.9em;
+}
 .cc-md__plain {
   white-space: pre-wrap;
 }
 .cc-md__table {
   max-width: 100%;
   overflow-x: auto;
+}
+/* Cells wrap only between words; a wide table scrolls in its box instead of breaking "Bölüm" mid-word (S27d review). */
+.cc-md__table th,
+.cc-md__table td {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 .cc-md__table:focus-visible,
 .cc-md__code pre:focus-visible {

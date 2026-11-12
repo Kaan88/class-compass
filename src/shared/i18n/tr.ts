@@ -553,6 +553,7 @@ export const tr = {
   'error.THEME_INVALID': 'Tema paketinde hatalar var. Yönetim → Temalar sayfasında yeniden denetleyin.',
   'error.THEME_KEY_TAKEN': 'Bu anahtarla bir tema zaten var. Dosyadaki anahtarı değiştirin ya da kayıtlı temanın yerine koymak için yeniden denetleyin.',
   'error.THEME_DRAFT_LIMIT': 'Bu öğretmenin bekleyen {limit} tema taslağı var. Önce bir yöneticinin bunları açması ya da silmesi gerekir.',
+  'error.THEME_DRAFTS_SCHOOL_LIMIT': 'Öğretmenlerin bekleyen {limit} tema taslağı var. Önce bir yöneticinin bunları açması ya da silmesi gerekir.',
   'error.THEME_LIMIT': 'Okul tutabileceği en çok sayıda içe aktarılan temaya ulaştı. Önce birini silin.',
   'error.THEME_KEY_MISMATCH': 'Dosyadaki anahtar bu temanın anahtarı değil.',
   'error.BAD_PERIOD': 'Başlangıç tarihi bitiş tarihinden sonra olamaz.',

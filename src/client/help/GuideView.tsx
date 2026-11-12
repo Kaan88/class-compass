@@ -106,10 +106,17 @@ function Blocks({ blocks, links, titleId }: { blocks: Block[]; links: GuideLinkH
         const items = b.items.map((item, j) => (
           <li key={j}>
             <InlineNodes nodes={item.content} links={links} />
+            {item.blocks ? <Blocks blocks={item.blocks} links={links} /> : null}
             {item.children ? <Blocks blocks={[item.children]} links={links} /> : null}
           </li>
         ));
-        return b.ordered ? <ol key={i}>{items}</ol> : <ul key={i}>{items}</ul>;
+        return b.ordered ? (
+          <ol key={i} start={b.start}>
+            {items}
+          </ol>
+        ) : (
+          <ul key={i}>{items}</ul>
+        );
       }
       case 'quote':
         return (

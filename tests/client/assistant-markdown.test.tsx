@@ -185,6 +185,60 @@ describe('Markdown answers are safe (D-196)', () => {
   });
 });
 
+describe('Markdown answers after the review', () => {
+  it('a ``` line the fence test rejects never hangs the parser (```npm install```, ```js `x`, > ```x```)', () => {
+    expect(parseMarkdown('Run:\n```npm install```')).toEqual([
+      {
+        kind: 'paragraph',
+        content: [
+          { kind: 'text', text: 'Run: ' },
+          { kind: 'code', text: 'npm install' },
+        ],
+      },
+    ]);
+    expect(parseMarkdown('```js `x`')).toHaveLength(1);
+    expect(parseMarkdown('> ```x```')).toEqual([{ kind: 'quote', blocks: [{ kind: 'paragraph', content: [{ kind: 'code', text: 'x' }] }] }]);
+    expect(parseMarkdown('text\n```js `x`\nmore')).toHaveLength(1);
+    const { container } = wrap(<ChatMarkdown text={'Run:\n```npm install```'} />);
+    expect(container.querySelector('p code')?.textContent).toBe('npm install');
+  });
+
+  it('a fenced block under a list item is a code block of that item, with Copy and Download', () => {
+    const blocks = parseMarkdown('- Use this:\n  ```\n  code\n  ```');
+    expect(blocks).toEqual([{ kind: 'list', ordered: false, items: [{ content: [{ kind: 'text', text: 'Use this:' }], blocks: [{ kind: 'code', text: 'code' }], children: null }] }]);
+    const text = '1. Save this file:\n   ```json\n   {"key": "winter-calm"}\n\n   ```\n2. Then attach it.';
+    const { container } = wrap(<ChatMarkdown text={text} />);
+    const items = container.querySelectorAll('ol > li');
+    expect(items).toHaveLength(2);
+    expect(items[0]!.querySelector('pre code')?.textContent).toBe('{"key": "winter-calm"}\n');
+    expect(within(items[0] as HTMLElement).getByTestId('assistant-code-download')).toBeTruthy();
+    expect(items[1]!.textContent).toBe('Then attach it.');
+  });
+
+  it('an ordered list keeps its first number after an interruption', () => {
+    const { container } = wrap(<ChatMarkdown text={'1. Open the file\n\n```json\n{}\n```\n\n2. Attach it\n3. Send'} />);
+    const lists = container.querySelectorAll('ol');
+    expect(lists).toHaveLength(2);
+    expect(lists[0]!.getAttribute('start')).toBeNull();
+    expect(lists[1]!.getAttribute('start')).toBe('2');
+    expect(parseMarkdown('3. Third\n4. Fourth')[0]).toMatchObject({ kind: 'list', start: 3 });
+  });
+
+  it('lists show their markers and table cells wrap only between words (the message list sets list-style: none)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const css = readFileSync(join(import.meta.dirname, '..', '..', 'src', 'client', 'modules', 'assistantChat', 'assistantChat.css'), 'utf8').replace(/\s+/gu, ' ');
+    expect(css).toContain('.cc-md ul { list-style: disc; }');
+    expect(css).toContain('.cc-md ol { list-style: decimal; }');
+    expect(css).toMatch(/\.cc-md__table th, \.cc-md__table td \{ overflow-wrap: normal; word-break: normal; \}/u);
+  });
+
+  it('a link shows the site it opens next to its words', () => {
+    const { container } = wrap(<ChatMarkdown text={'[See the summary](https://example.org/c?s=student-4) and [https://example.org](https://example.org/) and [mail](mailto:office@example.org)'} />);
+    expect(container.textContent).toBe('See the summary (example.org) and https://example.org and mail');
+  });
+});
+
 describe('attaching a file (D-196)', () => {
   const file = (name: string, text: string | Uint8Array, type = 'text/plain') => new File([text as BlobPart], name, { type });
 

@@ -14,7 +14,7 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/themes.ts';
-import { THEME_DRAFTS_PER_TEACHER, type CustomThemeStatus, type CustomThemeSummary, type ThemeReportDto } from '../../../shared/contracts/themes.ts';
+import { THEME_DRAFTS_PER_SCHOOL, THEME_DRAFTS_PER_TEACHER, type CustomThemeStatus, type CustomThemeSummary, type ThemeReportDto } from '../../../shared/contracts/themes.ts';
 import { DEFAULT_THEME, isThemeKey, type ThemeKey } from '../../../shared/themes.ts';
 import { PACKAGE_LIMITS } from '../../../shared/themePackage/limits.ts';
 import type { ThemePackage } from '../../../shared/themePackage/schema.ts';
@@ -140,12 +140,24 @@ function saveDraft(ctx: RequestContext, source: string, action: 'theme.create' |
   const { pkg, report, bytes } = validOrThrow(source);
   return tx(ctx.db, () => {
     if (ctx.db.select({ key: customThemes.key }).from(customThemes).where(eq(customThemes.key, pkg.key)).get()) throw conflict('A theme with this key exists', { reason: 'THEME_KEY_TAKEN' });
+    // Teachers' waiting drafts have their own room (S27d review, D-196): at most THEME_DRAFTS_PER_TEACHER
+    // per teacher and THEME_DRAFTS_PER_SCHOOL together, and they never count against the administrators'
+    // limit of imported themes, so proposals can never block an administrator's import.
+    const teacherDrafts =
+      ctx.db
+        .select({ n: sql<number>`count(*)` })
+        .from(customThemes)
+        .innerJoin(users, eq(users.id, customThemes.createdBy))
+        .where(and(eq(customThemes.status, 'draft'), eq(users.role, 'teacher')))
+        .get()?.n ?? 0;
     if (action === 'theme.propose') {
       const open = ctx.db.select({ n: sql<number>`count(*)` }).from(customThemes).where(and(eq(customThemes.createdBy, user.id), eq(customThemes.status, 'draft'))).get()?.n ?? 0;
       if (open >= THEME_DRAFTS_PER_TEACHER) throw conflict('Too many theme drafts are waiting', { reason: 'THEME_DRAFT_LIMIT', limit: THEME_DRAFTS_PER_TEACHER });
+      if (teacherDrafts >= THEME_DRAFTS_PER_SCHOOL) throw conflict('Too many theme drafts from teachers are waiting', { reason: 'THEME_DRAFTS_SCHOOL_LIMIT', limit: THEME_DRAFTS_PER_SCHOOL });
+    } else {
+      const count = ctx.db.select({ n: sql<number>`count(*)` }).from(customThemes).get()?.n ?? 0;
+      if (count - teacherDrafts >= PACKAGE_LIMITS.maxCustomThemes) throw conflict('Too many imported themes', { reason: 'THEME_LIMIT', limit: PACKAGE_LIMITS.maxCustomThemes });
     }
-    const count = ctx.db.select({ n: sql<number>`count(*)` }).from(customThemes).get()?.n ?? 0;
-    if (count >= PACKAGE_LIMITS.maxCustomThemes) throw conflict('Too many imported themes', { reason: 'THEME_LIMIT', limit: PACKAGE_LIMITS.maxCustomThemes });
     const now = ctx.now();
     const row: Row = {
       key: pkg.key,

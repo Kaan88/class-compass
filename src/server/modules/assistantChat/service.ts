@@ -17,7 +17,7 @@ import { ASSISTANT_VIA, assistantPrivacy, assistantToolByName, runAssistantTool,
 import { expirePending, runAgent, type AgentEnv } from './agent.ts';
 import type { Run } from './runs.ts';
 import { assertAvailable, assistantSettingsOf, defaultChoice, unavailableReason, usableConnections } from './settings.ts';
-import { appendMessage, loadChat, type ChatRow } from './store.ts';
+import { appendMessage, loadChat, nextAttachmentRef, resolveAttachmentArgs, type ChatRow } from './store.ts';
 
 export function statusView(ctx: RequestContext): z.infer<typeof C.AssistantStatus> {
   const user = requireUser(ctx);
@@ -61,7 +61,7 @@ export function checkChoice(ctx: RequestContext, connectionId: string | null, mo
  * fenced block. Only .json, .txt and .md up to 200 KB (UTF-8 bytes); anything else is refused before
  * the message counts against a limit. An empty message without a file is refused too.
  */
-export function messageText(input: Pick<z.infer<typeof C.sendAssistantMessage.input>, 'text' | 'attachment'>): string {
+export function messageText(input: Pick<z.infer<typeof C.sendAssistantMessage.input>, 'text' | 'attachment'>, ref = 'file-1'): string {
   const text = input.text.trim();
   if (!input.attachment) {
     if (!text) throw invalid('Write a message', { reason: 'ASSISTANT_EMPTY_MESSAGE' });
@@ -70,13 +70,14 @@ export function messageText(input: Pick<z.infer<typeof C.sendAssistantMessage.in
   const lang = attachmentLanguage(input.attachment.name);
   if (!lang) throw invalid('Only .json, .txt and .md files can be attached', { reason: 'ASSISTANT_ATTACHMENT_TYPE' });
   if (utf8Bytes(input.attachment.text) > ASSISTANT_ATTACHMENT_MAX_BYTES) throw invalid('The file is larger than 200 KB', { reason: 'ASSISTANT_ATTACHMENT_TOO_BIG', limit: ASSISTANT_ATTACHMENT_MAX_BYTES });
-  return withAttachment(text, input.attachment, lang);
+  return withAttachment(text, input.attachment, lang, ref);
 }
 
 export function sendMessage(a: AgentEnv, ctx: RequestContext, input: z.infer<typeof C.sendAssistantMessage.input>): { runId: string; messageId: string } {
   const user = requireUser(ctx);
   const chat = loadChat(ctx, input.chatId);
-  const typed = messageText(input);
+  // Checked before anything counts (type, size); the text with the file's reference is made below.
+  messageText(input);
   assertAvailable(ctx, user);
   if (a.registry.activeFor(chat.id)) throw conflict('An answer is still being written', { reason: 'ASSISTANT_BUSY' });
   const choice = choiceOf(ctx, user, chat, input);
@@ -87,8 +88,13 @@ export function sendMessage(a: AgentEnv, ctx: RequestContext, input: z.infer<typ
   const now = ctx.now();
   const message = tx(ctx.db, () => {
     expirePending(ctx.db, chat.id, now);
+    // A .json file is also kept exactly as attached, under its reference, for the theme tools (S27d
+    // review): the provider gets the message text (names filtered while student data is off).
+    const ref = nextAttachmentRef(ctx.db, chat.id);
+    const typed = messageText(input, ref);
     const content = p.toProvider(typed);
-    const row = appendMessage(ctx.db, chat.id, now, { role: 'user', content, privacy: p.mode, connectionId: used.row.id, model: used.model });
+    const keep = input.attachment && attachmentLanguage(input.attachment.name) === 'json' ? { ref, name: input.attachment.name, text: input.attachment.text.replace(/\r\n?/gu, '\n') } : null;
+    const row = appendMessage(ctx.db, chat.id, now, { role: 'user', content, attachmentJson: keep, privacy: p.mode, connectionId: used.row.id, model: used.model });
     const set: Partial<ChatRow> = { connectionId: input.connectionId === null ? null : used.row.id, model: input.model === null ? null : used.model };
     // A chat without a typed title is named after its first message (as stored: pseudonyms, shown with names).
     if (!chat.titleSet && chat.title === '') set.title = content.replace(/\s+/gu, ' ').trim().slice(0, 60);
@@ -135,7 +141,8 @@ export async function answerCall(a: AgentEnv, ctx: RequestContext, input: z.infe
     const tool = assistantToolByName(user.role, call.call.name);
     if (!tool || tool.readOnly) throw new AppError('INTERNAL', 'Not a change tool');
     const toolCtx: RequestContext = { ...ctx, actor: { type: 'mcp', id: user.id, role: user.role, tokenId: `${ASSISTANT_VIA}${chat.id}` }, mcp: null };
-    const r = await runAssistantTool({ app: a.app, ctx: toolCtx }, tool, call.call.arguments, p);
+    const resolved = resolveAttachmentArgs(ctx.db, chat.id, tool.name, call.call.arguments);
+    const r = resolved.ok ? await runAssistantTool({ app: a.app, ctx: toolCtx }, tool, resolved.args, p) : { content: resolved.content, isError: true, untrusted: false };
     tx(ctx.db, () => appendMessage(ctx.db, chat.id, ctx.now(), { role: 'tool', toolCallId: call.call.id, toolName: tool.name, content: r.content, isError: r.isError, untrusted: r.untrusted, privacy: p.mode }));
   } else {
     tx(ctx.db, () =>

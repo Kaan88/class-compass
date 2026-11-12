@@ -239,7 +239,7 @@ function packageErrors(input: { package: z.infer<typeof PackageInput> }): string
 const importThemeDraft = handTool({
   name: 'import_theme_draft',
   description:
-    'Saves a theme package that has no validation errors as a DRAFT on Admin → Themes (audited). Administrators (themes:write) import it; teachers (themes:draft) propose it: the draft records the teacher, administrators see "proposed by" with it, and a teacher can have at most 5 drafts waiting (THEME_DRAFT_LIMIT). A draft is never offered to classes: looking at the preview and enabling it stay a human action of an administrator on the admin page; this tool never enables or assigns a theme. Fails with THEME_KEY_TAKEN when the key exists (choose another key). Returns the theme summary.',
+    'Saves a theme package that has no validation errors as a DRAFT on Admin → Themes (audited). Administrators (themes:write) import it; teachers (themes:draft) propose it: the draft records the teacher, administrators see "proposed by" with it, and a teacher can have at most 5 drafts waiting (THEME_DRAFT_LIMIT) and all teachers together 10 (THEME_DRAFTS_SCHOOL_LIMIT). A draft is never offered to classes: looking at the preview and enabling it stay a human action of an administrator on the admin page; this tool never enables or assigns a theme. Fails with THEME_KEY_TAKEN when the key exists (choose another key). Returns the theme summary.',
   scope: 'themes:write',
   teacherScope: 'themes:draft',
   role: 'any',

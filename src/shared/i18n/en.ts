@@ -560,6 +560,7 @@ export const en = {
   'error.THEME_INVALID': 'The theme package has errors. Check it again on Admin → Themes.',
   'error.THEME_KEY_TAKEN': 'A theme with this key already exists. Change the key in the file, or check it again to replace the saved theme.',
   'error.THEME_DRAFT_LIMIT': 'This teacher already has {limit} theme drafts waiting. An administrator can enable or delete them first.',
+  'error.THEME_DRAFTS_SCHOOL_LIMIT': 'Teachers already have {limit} theme drafts waiting. An administrator can enable or delete them first.',
   'error.THEME_LIMIT': 'The school has the most imported themes it can keep. Delete one first.',
   'error.THEME_KEY_MISMATCH': 'The key in the file is not the key of this theme.',
   'error.BAD_PERIOD': 'The start date must be on or before the end date.',

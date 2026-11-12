@@ -562,11 +562,12 @@ Decision D-195; no migration (the removed preference lived only in the browser's
 - [ ] Seen on the classroom display (owner): the one size for a class of 8 and a large class at 1536×703
 
 ## S27d Assistant: Markdown answers, theme drafts for teachers and admins, file attach (2026-11-12)
-Decision D-196; no migration.
+Decision D-196; migration 0033 (review fixes: attachments kept for the theme tools).
 - [x] Markdown answers: headings, paragraphs, bold and italic, lists, tables, blockquotes, inline code, fenced code with Copy and (JSON) Download as file; links only http, https and mailto with `noopener noreferrer` in a new tab; no raw HTML, no pictures; open fences while streaming do not flicker; in-house parser shared with Help (1.8 kB gzip), Assistant chunk 7.6 kB gzip, student page budget unchanged
 - [x] Administrators use the chat (Admin → Assistant) with the admin-role tools and their own guides
-- [x] Teacher theme drafts: `theme_schema`, `validate_theme`, `preview_theme`, `read_theming_guide` and `import_theme_draft` (through the card) for teachers; new teacher scope `themes:draft` with the same rule for external MCP clients; the proposer shows as "Proposed by" on Admin → Themes; no tool enables or assigns a draft; teachers cannot list, enable, disable, delete or export; at most 5 open drafts per teacher
-- [x] File attach: one .json, .txt or .md file up to 200 KB, sent as fenced text in the message; other types refused in the page and by the server
+- [x] Teacher theme drafts: `theme_schema`, `validate_theme`, `preview_theme`, `read_theming_guide` and `import_theme_draft` (through the card) for teachers; new teacher scope `themes:draft` with the same rule for external MCP clients; the proposer shows as "Proposed by" on Admin → Themes; no tool enables or assigns a draft; teachers cannot list, enable, disable, delete or export; at most 5 open drafts per teacher and 10 from all teachers together, never counted against the administrators' theme limit (review)
+- [x] File attach: one .json, .txt or .md file up to 200 KB, sent as fenced text in the message and marked as data, not instructions; other types refused in the page and by the server
+- [x] Review fixes: theme tools read an attached .json file by its reference (`attachment: "file-N"`), so a real-size package is imported exactly as attached (no copy through the model's output, no name filter on the saved package; tested with the 38 kB peppermint example and a label holding a student's given name); names never put into a link's address; parser hang on ```` ```npm install``` ```` fixed; code blocks under list items, `<ol start>`, list markers and word-only wrapping in tables
 - [x] System prompt lists the role's capabilities, theme drafts, and that enabling is an administrator's step
 - [x] EN/TR strings; teacher, admin and AI tools guides EN/TR; THEMING, EXTENDING and CONVENTIONS notes
 - [x] Tests: `tests/server/assistant-chat-themes.test.ts`, `tests/client/assistant-markdown.test.tsx`, scope and privacy tests updated; `e2e/assistant-theme-drafts.spec.ts` with the scripted fake model

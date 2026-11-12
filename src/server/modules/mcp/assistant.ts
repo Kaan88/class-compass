@@ -19,7 +19,7 @@
  */
 import { z } from 'zod';
 import { pii } from '../../../shared/contracts/define.ts';
-import { PSEUDONYM_TEXT } from '../../../shared/assistantChat.ts';
+import { ASSISTANT_ATTACHMENT_REF, PSEUDONYM_TEXT } from '../../../shared/assistantChat.ts';
 import { LOCALES, type Locale } from '../../../shared/languages.ts';
 import { scopesForRole, type AiPrivacyMode } from '../../../shared/mcp.ts';
 import type { Db } from '../../db/client.ts';
@@ -113,6 +113,32 @@ const readThemingGuide: McpTool = {
 /** Theme tools a teacher's chat offers (D-196): drafting aids and the draft itself; never list, export, enable, disable or delete. */
 export const TEACHER_THEME_TOOLS: readonly string[] = ['theme_schema', 'validate_theme', 'preview_theme', 'import_theme_draft'];
 
+/**
+ * Theme tools that, in the chat, read an attached .json file by its reference (S27d review, D-196):
+ * `attachment: "file-1"` instead of `package`. The chat resolves the reference to the stored file
+ * (`resolveAttachmentArgs` in assistantChat/store.ts) before the arguments are parsed, checked or run,
+ * so the model never copies a package back (its output limit would cut a real one off) and the copy the
+ * model saw (names filtered while student data is off) is never what gets saved.
+ */
+export const ATTACHMENT_TOOLS: readonly string[] = ['validate_theme', 'preview_theme', 'import_theme_draft'];
+
+const NO_PACKAGE = 'Not done: pass package, or attachment with the reference of a .json file attached in this chat (file-N).';
+function withAttachmentInput(t: McpTool): McpTool {
+  const shape = (t.input as z.ZodObject<{ package: z.ZodType }>).shape;
+  return {
+    ...t,
+    description: `${t.description} In this chat, when the user attached the package as a .json file, pass attachment with its reference (the "attachment file-N" next to the file) instead of package: the app reads the file exactly as attached. Never copy an attached file into package.`,
+    input: z.object({ package: shape.package.optional(), attachment: z.string().regex(ASSISTANT_ATTACHMENT_REF).optional() }),
+    ...(t.precheck ? { precheck: (input: unknown) => ((input as { package?: unknown }).package === undefined ? NO_PACKAGE : t.precheck!(input)) } : {}),
+    run: (env, input) => {
+      const v = input as { package?: unknown };
+      // The chat replaces a reference before this runs; a call without a package is the model's mistake.
+      if (v.package === undefined) throw new AppError('VALIDATION', NO_PACKAGE);
+      return t.run(env, { package: v.package });
+    },
+  };
+}
+
 const cache = new Map<AssistantRole, McpTool[]>();
 /**
  * The tools the chat offers an account of this role: its tools of the AI tools layer within every scope
@@ -124,7 +150,7 @@ export function assistantTools(role: AssistantRole): McpTool[] {
   if (!list) {
     const scopes = scopesForRole(role);
     const own = allTools().filter((t) => toolAccess(t, role, scopes) === 'ok' && (t.role === role || role === 'admin' || TEACHER_THEME_TOOLS.includes(t.name)));
-    list = [...own, readGuideFor(role), readThemingGuide];
+    list = [...own.map((t) => (ATTACHMENT_TOOLS.includes(t.name) ? withAttachmentInput(t) : t)), readGuideFor(role), readThemingGuide];
     cache.set(role, list);
   }
   return list;
@@ -182,6 +208,25 @@ export function toBrowser(p: AssistantPrivacy, text: string): string {
     if (!id || (p.own !== 'all' && !p.own.has(id))) return whole;
     return p.env.directory.get(id)?.fullName ?? whole;
   });
+}
+
+/** A Markdown link or image destination, `](…)`, also while it is still streaming (no closing bracket yet). */
+const LINK_TARGET = /\]\([^)\s]*\)?/gu;
+/**
+ * An answer (Markdown) on its way to the browser (S27d review, D-196): like `toBrowser`, but a pseudonym
+ * inside a link destination stays a pseudonym, so a crafted `[summary](https://example.org/?s=student-4)`
+ * can never carry a real name out of the school in its address (only the visible text gets names). The
+ * destination starts with `](`, which is always written before the name, so a streaming answer splits
+ * the same way piece after piece.
+ */
+export function toBrowserAnswer(p: AssistantPrivacy, text: string): string {
+  let out = '';
+  let last = 0;
+  for (const m of text.matchAll(LINK_TARGET)) {
+    out += toBrowser(p, text.slice(last, m.index)) + m[0];
+    last = m.index + m[0].length;
+  }
+  return out + toBrowser(p, text.slice(last));
 }
 
 /** A student id (or `student-N` alias of this family) → the student's name for the browser, else null. */

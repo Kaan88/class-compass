@@ -25,6 +25,7 @@ import {
   skillCategories,
   subjects,
   teachingContexts,
+  type AssistantAttachmentJson,
   type AssistantToolCallJson,
   type HomeworkStatusJson,
 } from '../../db/schema.ts';
@@ -33,7 +34,7 @@ import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext, type UserRow } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { conflict, notFound } from '../../lib/errors.ts';
-import { assistantPseudonymsOf, assistantToolByName, parseAssistantArgs, studentNameFor, toBrowser, type AssistantPrivacy } from '../mcp/assistant.ts';
+import { ATTACHMENT_TOOLS, assistantPseudonymsOf, assistantToolByName, parseAssistantArgs, RESULT_PREFIX, studentNameFor, toBrowser, toBrowserAnswer, type AssistantPrivacy } from '../mcp/assistant.ts';
 import { foldSameLength, NameScrubber } from '../mcp/privacy.ts';
 
 export type ChatRow = typeof assistantChats.$inferSelect;
@@ -160,6 +161,9 @@ export class CardLookup {
   }
   get role() {
     return this.user.role;
+  }
+  get database() {
+    return this.db;
   }
 }
 
@@ -323,12 +327,48 @@ export function targetOf(look: CardLookup, args: Record<string, unknown>): strin
   return parts.length ? parts.join(' · ') : null;
 }
 
+// ---------------------------------------------------------------- attached files (S27d review, D-196)
+/** The next reference for a file attached in this chat (`file-1`, `file-2` …). */
+export function nextAttachmentRef(db: Db, chatId: string): string {
+  const n = db.select({ n: sql<number>`count(*)` }).from(assistantMessages).where(and(eq(assistantMessages.chatId, chatId), isNotNull(assistantMessages.attachmentJson))).get()?.n ?? 0;
+  return `file-${n + 1}`;
+}
+
+/** The .json file attached in this chat under `ref`, exactly as attached, or null. */
+export function attachmentOf(db: Db, chatId: string, ref: string): AssistantAttachmentJson | null {
+  const rows = db
+    .select({ a: assistantMessages.attachmentJson })
+    .from(assistantMessages)
+    .where(and(eq(assistantMessages.chatId, chatId), eq(assistantMessages.role, 'user'), isNotNull(assistantMessages.attachmentJson)))
+    .all();
+  return rows.find((r) => r.a?.ref === ref)?.a ?? null;
+}
+
+/**
+ * A theme tool's arguments with `attachment: "file-N"` replaced by the attached file's text (the model
+ * never copies a package back: its output limit would cut a real one, and the copy it saw went through
+ * the name filter). Other tools and calls with `package` are unchanged; a reference to nothing, or both
+ * at once, is refused with a message the model can act on.
+ */
+export function resolveAttachmentArgs(db: Db, chatId: string, toolName: string, args: Record<string, unknown>): { ok: true; args: Record<string, unknown> } | { ok: false; content: string } {
+  if (!ATTACHMENT_TOOLS.includes(toolName) || args.attachment === undefined) return { ok: true, args };
+  const fail = (message: string) => ({ ok: false as const, content: RESULT_PREFIX + JSON.stringify({ error: { code: 'VALIDATION', message } }) });
+  if (args.package !== undefined) return fail('Not done: pass either package or attachment, not both.');
+  const file = typeof args.attachment === 'string' ? attachmentOf(db, chatId, args.attachment) : null;
+  if (!file) return fail(`Not done: there is no attached .json file "${String(args.attachment).slice(0, 20)}" in this chat. Use the reference written next to the attached file (attachment file-N).`);
+  const rest = { ...args };
+  delete rest.attachment;
+  return { ok: true, args: { ...rest, package: file.text } };
+}
+
 /** A stored call as the browser sees it (`result`: its tool row, when it ran). */
-export function callView(p: AssistantPrivacy, look: CardLookup, call: AssistantToolCallJson, result: MessageRow | undefined): CallView {
+export function callView(p: AssistantPrivacy, look: CardLookup, call: AssistantToolCallJson, result: MessageRow | undefined, chatId: string): CallView {
   const tool = assistantToolByName(look.role, call.name);
   const readOnly = tool?.readOnly ?? true;
-  // The arguments as the tool will get them (parsed: trimmed, defaults), so the card shows what is written.
-  const parsed = tool && !readOnly ? parseAssistantArgs(tool, call.arguments, p) : null;
+  // The arguments as the tool will get them (an attached file read by its reference; parsed: trimmed,
+  // defaults), so the card shows what is written.
+  const resolved = tool && !readOnly ? resolveAttachmentArgs(look.database, chatId, call.name, call.arguments) : null;
+  const parsed = tool && !readOnly && resolved?.ok ? parseAssistantArgs(tool, resolved.args, p) : null;
   const args = parsed?.ok && isRecord(parsed.data) ? parsed.data : call.arguments;
   const changes = readOnly || call.state === 'refused' ? [] : changeLines(look, call.name, args);
   return { id: call.id, tool: tool ? call.name : 'unknown', readOnly, state: call.state, target: targetOf(look, args), changes, failed: result ? result.isError : null };
@@ -341,11 +381,12 @@ export function messageViews(p: AssistantPrivacy, look: CardLookup, rows: Messag
     .map((r) => ({
       id: r.id,
       role: r.role as 'user' | 'assistant',
-      text: toBrowser(p, r.content),
+      // An answer is Markdown: names never go into a link's address (toBrowserAnswer).
+      text: r.role === 'assistant' ? toBrowserAnswer(p, r.content) : toBrowser(p, r.content),
       createdAt: r.createdAt,
       status: r.status,
       errorCode: r.errorCode,
-      calls: (r.toolCallsJson ?? []).map((c) => callView(p, look, c, results.get(c.id))),
+      calls: (r.toolCallsJson ?? []).map((c) => callView(p, look, c, results.get(c.id), r.chatId)),
     }));
 }
 
@@ -532,9 +573,13 @@ export function scrubStudentFromChats(db: Db, student: { id: string; fullName: s
     }
     for (const m of messagesOf(db, chat.id)) {
       const calls = m.toolCallsJson ? JSON.stringify(m.toolCallsJson) : null;
-      if (!might(m.content) && !might(calls)) continue;
+      if (!might(m.content) && !might(calls) && !might(m.attachmentJson?.text ?? null)) continue;
       db.update(assistantMessages)
-        .set({ content: f(m.content), toolCallsJson: m.toolCallsJson ? (deep(f, m.toolCallsJson) as AssistantToolCallJson[]) : null })
+        .set({
+          content: f(m.content),
+          toolCallsJson: m.toolCallsJson ? (deep(f, m.toolCallsJson) as AssistantToolCallJson[]) : null,
+          attachmentJson: m.attachmentJson ? { ...m.attachmentJson, text: f(m.attachmentJson.text) } : null,
+        })
         .where(eq(assistantMessages.id, m.id))
         .run();
       changed += 1;

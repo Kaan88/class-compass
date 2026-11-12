@@ -1,7 +1,8 @@
 /**
  * Assistant: Markdown answers, file attach and theme drafts (S27d, D-196), against a scripted local model
  * (never a real provider). A teacher attaches a theme file; the model sees it as fenced text, answers in
- * Markdown (a table, a JSON code block with Download) and proposes `import_theme_draft`; the teacher says
+ * Markdown (a table, a JSON code block with Download) and proposes `import_theme_draft` with the file's
+ * reference (`attachment: "file-1"`: saved exactly as attached); the teacher says
  * Yes on the card and the administrator sees the draft on Admin → Themes with "Proposed by", never
  * enabled. The administrator then uses the chat on Admin → Assistant. Every switch, chat and draft made
  * here is undone in `finally`. Fictional data only.
@@ -41,12 +42,13 @@ test('Assistant: a theme file attached, a Markdown answer, a teacher draft confi
         const last = body.messages.at(-1);
         if (last.role === 'user' && /Attached file: autumn\.theme\.json/u.test(last.content)) {
           const fenced = /```json\n([\s\S]*)\n```/u.exec(last.content)?.[1] ?? '{}';
+          const ref = /attachment (file-\d+)/u.exec(last.content)?.[1] ?? 'none';
           return {
             text: '## Your theme\n\n| Part | Value |\n|---|---|\n| Key | `' + KEY + '` |\n| Base | Ocean |\n\nThe package:\n\n```json\n' + fenced + '\n```\n\nSee [the guide](https://example.org/themes).',
-            // The file reached the model as fenced text; with student data off a word in it that matches a
-            // student's name (the demo has a Brown) is replaced like in any message (D-161), so the scripted
-            // model sends the clean package back, as a real model repairing it would.
-            calls: [{ name: 'import_theme_draft', args: { package: fenced.includes(KEY) ? pkg : {} } }],
+            // The file reached the model as fenced text (names filtered while student data is off, D-161);
+            // the model saves it by its reference, so the file is imported exactly as attached and never
+            // copied back through the model's output (review fix).
+            calls: [{ name: 'import_theme_draft', args: { attachment: ref } }],
           };
         }
         if (last.role === 'tool') return { text: `Saved as a draft: **${lastToolResult(body)?.name?.en ?? '?'}**. An administrator decides whether to enable it.` };
@@ -117,6 +119,8 @@ test('Assistant: a theme file attached, a Markdown answer, a teacher draft confi
     await admin.getByTestId('assistant-send').click();
     const adminAnswer = admin.getByTestId('assistant-message-assistant').last();
     await expect(adminAnswer.getByRole('listitem').first()).toContainText('Timezone:');
+    // Lists keep their bullets inside the message list (which has none of its own).
+    expect(await adminAnswer.locator('ul').first().evaluate((el) => getComputedStyle(el).listStyleType)).toBe('disc');
     await expect(adminAnswer.locator('strong').first()).toHaveText('Timezone:');
     expect(await admin.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   } finally {

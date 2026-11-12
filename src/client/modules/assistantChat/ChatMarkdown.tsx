@@ -34,6 +34,13 @@ export function safeHref(href: string): string | null {
   }
 }
 
+/** The host of a web link, shown after its words unless the words already are the address (S27d review). */
+export function linkHost(href: string, label: string): string | null {
+  const url = new URL(href);
+  if (url.protocol === 'mailto:') return null;
+  return label.includes(url.host) ? null : url.host;
+}
+
 /** The file name for a JSON block: a theme package's key (a slug) or a neutral name. */
 export function jsonFileName(text: string): string {
   try {
@@ -82,10 +89,15 @@ function InlineNodes({ nodes }: { nodes: Inline[] }): ReactNode {
       case 'link': {
         const href = safeHref(n.href);
         const label = <InlineNodes nodes={n.children} />;
+        // The site a link opens is always visible next to its words (a label cannot hide where it goes).
+        const host = href ? linkHost(href, plainText(n.children)) : null;
         return href ? (
-          <a key={i} href={href} target="_blank" rel="noopener noreferrer">
-            {label}
-          </a>
+          <Fragment key={i}>
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              {label}
+            </a>
+            {host ? <span className="cc-md__host">{` (${host})`}</span> : null}
+          </Fragment>
         ) : (
           <Fragment key={i}>{label}</Fragment>
         );
@@ -149,10 +161,17 @@ function Blocks({ blocks, streaming }: { blocks: Block[]; streaming: boolean }):
         const items = b.items.map((item, j) => (
           <li key={j}>
             <InlineNodes nodes={item.content} />
+            {item.blocks ? <Blocks blocks={item.blocks} streaming={streaming} /> : null}
             {item.children ? <Blocks blocks={[item.children]} streaming={streaming} /> : null}
           </li>
         ));
-        return b.ordered ? <ol key={i}>{items}</ol> : <ul key={i}>{items}</ul>;
+        return b.ordered ? (
+          <ol key={i} start={b.start}>
+            {items}
+          </ol>
+        ) : (
+          <ul key={i}>{items}</ul>
+        );
       }
       case 'quote':
         return (

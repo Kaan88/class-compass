@@ -2052,6 +2052,14 @@ export type AssistantToolCallJson = {
 };
 
 /**
+ * A .json file attached to a teacher's message, exactly as attached (S27d review, D-196): the provider
+ * gets the message text (names filtered while student data is off), the theme tools read this copy by
+ * its reference (`file-1` …), so the model never copies a package back and the name filter never changes
+ * one. Deleted with the chat; scrubbed like the message when a student is erased.
+ */
+export type AssistantAttachmentJson = { ref: string; name: string; text: string };
+
+/**
  * A teacher's assistant chat (S19b, D-180). Private to its owner (another user's chat is a 404 and no AI
  * tool exposes chats); deleted with the account (cascade) and by the retention job a school year after
  * the last message (`assistant_settings.retention_days`). `summary` is the compacted earlier part of the
@@ -2099,6 +2107,7 @@ export const assistantMessages = sqliteTable(
     role: text('role', { enum: ['user', 'assistant', 'tool'] }).notNull(),
     content: text('content').notNull(),
     toolCallsJson: text('tool_calls_json', { mode: 'json' }).$type<AssistantToolCallJson[]>(),
+    attachmentJson: text('attachment_json', { mode: 'json' }).$type<AssistantAttachmentJson>(),
     toolCallId: text('tool_call_id'),
     toolName: text('tool_name'),
     isError: integer('is_error', { mode: 'boolean' }).notNull().default(false),

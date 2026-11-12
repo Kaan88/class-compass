@@ -14,6 +14,12 @@ export const CUSTOM_THEME_STATUSES = ['draft', 'enabled', 'disabled'] as const;
  * assistant (or an AI app with `themes:draft`); an administrator looks at it, enables or deletes it.
  */
 export const THEME_DRAFTS_PER_TEACHER = 5;
+/**
+ * All teachers' waiting drafts together (S27d review, D-196; 409 `THEME_DRAFTS_SCHOOL_LIMIT`). They do
+ * not count against `PACKAGE_LIMITS.maxCustomThemes` for administrators' imports, so teachers can never
+ * block those.
+ */
+export const THEME_DRAFTS_PER_SCHOOL = 10;
 export type CustomThemeStatus = (typeof CUSTOM_THEME_STATUSES)[number];
 
 const Issue = z.object({
@@ -98,7 +104,8 @@ export const createCustomTheme = endpoint({ method: 'POST', path: '/api/admin/th
 /**
  * A teacher proposes a package (S27d, D-196): saved as a draft that records the teacher, exactly like an
  * administrator's import but never enabled or assigned; at most `THEME_DRAFTS_PER_TEACHER` waiting
- * drafts per teacher (409 `THEME_DRAFT_LIMIT`). Used by the AI tool `import_theme_draft` for teachers.
+ * drafts per teacher (409 `THEME_DRAFT_LIMIT`) and `THEME_DRAFTS_PER_SCHOOL` from all teachers together
+ * (409 `THEME_DRAFTS_SCHOOL_LIMIT`). Used by the AI tool `import_theme_draft` for teachers.
  */
 export const proposeCustomTheme = endpoint({ method: 'POST', path: '/api/teacher/themes/drafts', access: 'teacher', input: Source, output: CustomThemeSummary });
 /** Replaces the package of an existing theme with the same key; its status stays (audited). */
