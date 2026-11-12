@@ -173,6 +173,9 @@ test('a student sends their own picture; the teacher refuses with a reason, then
       const scorer = await scorerCtx.newPage();
       await scorer.goto(scorerUrl);
       await expect(scorer).toHaveURL(/\/p$/u);
+      // The address bar loses the token before the link is exchanged for the scorer cookie: wait for
+      // the paired app (or its start screen), not the URL, before using the cookie.
+      await expect(scorer.getByTestId('scorer-start').or(scorer.getByTestId('scorer-app'))).toBeVisible();
       const given = await api(scorer, 'POST', '/api/scorer/commands', { commands: [{ opId: randomUUID(), type: 'points.award', payload: { studentId: student.id } }] });
       expect(given.body.results[0].ok).toBe(true);
       const board = await boardCtx.newPage();

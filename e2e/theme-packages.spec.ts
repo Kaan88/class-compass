@@ -300,7 +300,11 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
         expect(px.dpr).toBe(size.scale);
         if (size.height < 1000) framedClass[size.name] = await visibleClass(page);
         else {
-          // Where the grid ends, the scene shows (no full-height card over it; S17a review).
+          // Where the grid ends, the scene shows (no full-height card over it; S17a review). Since the
+          // one automatic card size (S27c, D-195) the cards grow until the Students box is nearly full,
+          // so the room under the last row is whatever one more step would not fit (about 24 px for
+          // this class), no longer a fixed 40 px; what matters is that a card stays a card's height and
+          // the room left is the box's transparent background, not a card.
           const free = await page.evaluate(() => {
             const body = document.querySelector<HTMLElement>('.cc-lesson-box[data-box="core.students"] > .cc-lesson-box__body')!;
             const cards = [...body.querySelectorAll<HTMLElement>('.cc-student-card')];
@@ -308,9 +312,11 @@ test('Snow Day: scene, frames and snowfall at the classroom display sizes, still
             const b = body.getBoundingClientRect();
             const y = Math.round((last + b.bottom) / 2);
             const hit = document.elementFromPoint(Math.round(b.right - 40), y);
-            return { space: b.bottom - last, background: getComputedStyle(body).backgroundColor, hitCard: !!hit?.closest('.cc-student-card, .cc-card') };
+            const tallest = Math.max(...cards.map((c) => c.getBoundingClientRect().height));
+            return { space: b.bottom - last, tallest, boxHeight: b.height, background: getComputedStyle(body).backgroundColor, hitCard: !!hit?.closest('.cc-student-card, .cc-card') };
           });
-          expect(free.space).toBeGreaterThan(40);
+          expect(free.space).toBeGreaterThan(4);
+          expect(free.tallest).toBeLessThan(free.boxHeight / 2);
           expect(free.background).toBe('rgba(0, 0, 0, 0)');
           expect(free.hitCard).toBe(false);
         }
