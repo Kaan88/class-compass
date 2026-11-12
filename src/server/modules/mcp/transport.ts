@@ -27,7 +27,7 @@ import { appVersion } from '../../ops/version.ts';
 import { CallLog, RateLimiter, type CallRecord, type CallStatus } from './calls.ts';
 import { ownStudentIds, privacyEnv, privateMessage, privateResult, resolveAliases } from './privacy.ts';
 import { PROMPTS, type McpPrompt } from './prompts.ts';
-import { allTools, inputJsonSchema, toolAccess, type McpTool } from './registry.ts';
+import { allTools, inputJsonSchema, requiredScope, toolAccess, type McpTool } from './registry.ts';
 import { allResources, type McpResource } from './resources.ts';
 import type { ToolEnv, ToolRole } from './toolkit.ts';
 
@@ -92,7 +92,11 @@ function httpError(reply: FastifyReply, err: AppError, deps: Pick<AppDeps, 'conf
   return reply.status(err.status).send(fail(null, { code: RPC.SERVER, message: err.message, data: { code: err.code, ...(reason ? { reason } : {}) } }));
 }
 
-const withRole = (role: 'admin' | 'teacher', scopes: readonly string[]) => (x: { role: ToolRole; scope: string | null }) => (x.role === 'any' || x.role === role) && (!x.scope || scopes.includes(x.scope));
+const withRole = (role: 'admin' | 'teacher', scopes: readonly string[]) => (x: { role: ToolRole; scope: string | null; teacherScope?: string }) => {
+  // A tool for both roles may ask a teacher for another scope (`teacherScope`, D-196; `requiredScope`).
+  const scope = role === 'teacher' && x.teacherScope ? x.teacherScope : x.scope;
+  return (x.role === 'any' || x.role === role) && (!scope || scopes.includes(scope));
+};
 
 /** Cut a result that is too big, with a note the model can act on. */
 export function capped(text: string): string {
@@ -238,13 +242,14 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
       const m = messages[0] as Record<string, unknown>;
       const params = isRecord(m.params) ? m.params : {};
       const tool = m.method === 'tools/call' ? toolList().find((t) => t.name === params.name) : undefined;
-      if (tool?.scope && toolAccess(tool, user.role, principal.scopes) === 'SCOPE_NOT_GRANTED') {
-        const scopes = [...new Set([...principal.scopes, tool.scope])].join(' ');
+      const needed = tool ? requiredScope(tool, user.role) : null;
+      if (tool && needed && toolAccess(tool, user.role, principal.scopes) === 'SCOPE_NOT_GRANTED') {
+        const scopes = [...new Set([...principal.scopes, needed])].join(' ');
         log.record(now, { tokenId: principal.tokenId, userId: user.id, method: `tools/call:${tool.name}`, status: 'denied', errorCode: 'SCOPE_NOT_GRANTED', durationMs: 0, bytes: 0 });
         return reply
           .status(403)
-          .header('WWW-Authenticate', `Bearer error="insufficient_scope", scope="${scopes}", resource_metadata="${resourceMetadataUrl(deps)}", error_description="This connection does not have the ${tool.scope} scope"`)
-          .send(fail(isId(m.id) ? m.id : null, { code: RPC.SERVER, message: `This connection does not have the ${tool.scope} scope`, data: { code: 'FORBIDDEN', reason: 'SCOPE_NOT_GRANTED', scope: tool.scope } }));
+          .header('WWW-Authenticate', `Bearer error="insufficient_scope", scope="${scopes}", resource_metadata="${resourceMetadataUrl(deps)}", error_description="This connection does not have the ${needed} scope"`)
+          .send(fail(isId(m.id) ? m.id : null, { code: RPC.SERVER, message: `This connection does not have the ${needed} scope`, data: { code: 'FORBIDDEN', reason: 'SCOPE_NOT_GRANTED', scope: needed } }));
       }
     }
 
@@ -343,7 +348,7 @@ export function registerMcpTransport(app: FastifyInstance, deps: AppDeps) {
         if (!tool) throw new RpcFailure(RPC.INVALID_PARAMS, `Unknown tool: ${String(params.name)}`);
         const access = toolAccess(tool, user.role, principal.scopes);
         if (access !== 'ok') {
-          const message = access === 'ROLE_MISMATCH' ? `This tool is for ${tool.role === 'admin' ? 'administrator' : 'teacher'} accounts` : `This token does not have the ${tool.scope} scope`;
+          const message = access === 'ROLE_MISMATCH' ? `This tool is for ${tool.role === 'admin' ? 'administrator' : 'teacher'} accounts` : `This token does not have the ${requiredScope(tool, user.role)} scope`;
           return { result: toolError('FORBIDDEN', message, { reason: access }), status: 'denied', errorCode: access };
         }
         const pe = penv();

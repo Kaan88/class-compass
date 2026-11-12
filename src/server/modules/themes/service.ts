@@ -14,13 +14,13 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/themes.ts';
-import type { CustomThemeStatus, CustomThemeSummary, ThemeReportDto } from '../../../shared/contracts/themes.ts';
+import { THEME_DRAFTS_PER_TEACHER, type CustomThemeStatus, type CustomThemeSummary, type ThemeReportDto } from '../../../shared/contracts/themes.ts';
 import { DEFAULT_THEME, isThemeKey, type ThemeKey } from '../../../shared/themes.ts';
 import { PACKAGE_LIMITS } from '../../../shared/themePackage/limits.ts';
 import type { ThemePackage } from '../../../shared/themePackage/schema.ts';
 import { validateThemePackage } from '../../../shared/themePackage/validate.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { classes, customThemes, superSpeakersSettings } from '../../db/schema.ts';
+import { classes, customThemes, superSpeakersSettings, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import { requireUser, type RequestContext } from '../../lib/context.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
@@ -71,6 +71,13 @@ function usage(db: Db, key: string) {
   return { classCount: n, board };
 }
 
+/** The teacher who proposed a draft (S27d, D-196): the creator when that account is a teacher's. */
+function proposerOf(db: Db, r: Row): CustomThemeSummary['proposedBy'] {
+  if (!r.createdBy) return null;
+  const u = db.select({ id: users.id, name: users.displayName, role: users.role }).from(users).where(eq(users.id, r.createdBy)).get();
+  return u && u.role === 'teacher' ? { id: u.id, name: u.name } : null;
+}
+
 function summary(db: Db, r: Row): CustomThemeSummary {
   const p = pkgOf(r);
   const report = r.reportJson as unknown as ThemeReportDto;
@@ -84,6 +91,7 @@ function summary(db: Db, r: Row): CustomThemeSummary {
     bytes: r.bytes,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+    proposedBy: proposerOf(db, r),
   };
 }
 
@@ -115,10 +123,27 @@ function validOrThrow(source: string): { pkg: ThemePackage; report: ThemeReportD
 }
 
 export function createTheme(ctx: RequestContext, input: In<typeof C.createCustomTheme>): CustomThemeSummary {
+  return saveDraft(ctx, input.source, 'theme.create');
+}
+
+/**
+ * A teacher's proposal (S27d, D-196): the same validation and limits as an import, saved as a draft
+ * that records the teacher (`created_by`, shown as "Proposed by" on Admin → Themes), at most
+ * `THEME_DRAFTS_PER_TEACHER` waiting drafts per teacher. Never enabled and never assigned here.
+ */
+export function proposeTheme(ctx: RequestContext, input: In<typeof C.proposeCustomTheme>): CustomThemeSummary {
+  return saveDraft(ctx, input.source, 'theme.propose');
+}
+
+function saveDraft(ctx: RequestContext, source: string, action: 'theme.create' | 'theme.propose'): CustomThemeSummary {
   const user = requireUser(ctx);
-  const { pkg, report, bytes } = validOrThrow(input.source);
+  const { pkg, report, bytes } = validOrThrow(source);
   return tx(ctx.db, () => {
     if (ctx.db.select({ key: customThemes.key }).from(customThemes).where(eq(customThemes.key, pkg.key)).get()) throw conflict('A theme with this key exists', { reason: 'THEME_KEY_TAKEN' });
+    if (action === 'theme.propose') {
+      const open = ctx.db.select({ n: sql<number>`count(*)` }).from(customThemes).where(and(eq(customThemes.createdBy, user.id), eq(customThemes.status, 'draft'))).get()?.n ?? 0;
+      if (open >= THEME_DRAFTS_PER_TEACHER) throw conflict('Too many theme drafts are waiting', { reason: 'THEME_DRAFT_LIMIT', limit: THEME_DRAFTS_PER_TEACHER });
+    }
     const count = ctx.db.select({ n: sql<number>`count(*)` }).from(customThemes).get()?.n ?? 0;
     if (count >= PACKAGE_LIMITS.maxCustomThemes) throw conflict('Too many imported themes', { reason: 'THEME_LIMIT', limit: PACKAGE_LIMITS.maxCustomThemes });
     const now = ctx.now();
@@ -134,7 +159,7 @@ export function createTheme(ctx: RequestContext, input: In<typeof C.createCustom
       updatedAt: now,
     };
     ctx.db.insert(customThemes).values(row).run();
-    audit(ctx.db, ctx.actor, { action: 'theme.create', entity: 'custom_theme', entityId: row.key, after: auditOf(row, pkg) }, now);
+    audit(ctx.db, ctx.actor, { action, entity: 'custom_theme', entityId: row.key, after: auditOf(row, pkg) }, now);
     return summary(ctx.db, row);
   });
 }

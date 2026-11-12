@@ -7,7 +7,7 @@
  */
 import { z } from 'zod';
 import type { Endpoint } from '../../../shared/contracts/define.ts';
-import type { McpScope } from '../../../shared/mcp.ts';
+import { ADMIN_ONLY_SCOPES, type McpScope } from '../../../shared/mcp.ts';
 import { registeredEndpoints } from '../../lib/http.ts';
 import { HAND_WRITTEN_TOOLS } from './tools.ts';
 import { callEndpoint, type McpTool, type ToolRole } from './toolkit.ts';
@@ -38,28 +38,50 @@ function generatedTools(): McpTool[] {
   return out;
 }
 
-const ADMIN_SCOPES: readonly McpScope[] = ['settings:admin', 'themes:write', 'school:read'];
+const ADMIN_SCOPES: readonly McpScope[] = ADMIN_ONLY_SCOPES;
 
-/** Every tool, checked once: unique names, admin scopes only on admin tools and the other way round. */
+/**
+ * Every tool, checked once: unique names, admin scopes only on admin tools and the other way round; a
+ * tool for both roles with a scope names an admin scope and a teacher scope (`teacherScope`, D-196).
+ */
 export function allTools(): McpTool[] {
   const tools = [
     ...generatedTools(),
-    ...HAND_WRITTEN_TOOLS.map((t): McpTool => ({ ...t, cost: t.cost ?? 1, run: (env, input) => Promise.resolve(t.run(env, input as never)) })),
+    ...HAND_WRITTEN_TOOLS.map(
+      (t): McpTool => ({
+        ...t,
+        cost: t.cost ?? 1,
+        ...(t.precheck ? { precheck: (input: unknown) => t.precheck!(input as never) } : {}),
+        run: (env, input) => Promise.resolve(t.run(env, input as never)),
+      }),
+    ),
   ];
   const names = new Set<string>();
   for (const t of tools) {
     if (!/^[a-z][a-z0-9_]{2,63}$/u.test(t.name)) throw new Error(`MCP tool name ${t.name} must be snake_case`);
     if (names.has(t.name)) throw new Error(`Duplicate MCP tool ${t.name}`);
     names.add(t.name);
-    if (t.scope && ADMIN_SCOPES.includes(t.scope) !== (t.role === 'admin')) throw new Error(`MCP tool ${t.name}: scope ${t.scope} does not fit role ${t.role}`);
+    if (t.role === 'any') {
+      if (t.scope && (!ADMIN_SCOPES.includes(t.scope) || !t.teacherScope || ADMIN_SCOPES.includes(t.teacherScope))) throw new Error(`MCP tool ${t.name}: a tool for both roles with a scope needs an admin scope and a teacher scope`);
+      if (!t.scope && t.teacherScope) throw new Error(`MCP tool ${t.name}: teacherScope without scope`);
+    } else {
+      if (t.teacherScope) throw new Error(`MCP tool ${t.name}: teacherScope is only for tools of both roles`);
+      if (t.scope && ADMIN_SCOPES.includes(t.scope) !== (t.role === 'admin')) throw new Error(`MCP tool ${t.name}: scope ${t.scope} does not fit role ${t.role}`);
+    }
   }
   return tools.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The scope an account of this role needs for the tool (`teacherScope` for a teacher when the tool has one), or null. */
+export function requiredScope(t: Pick<McpTool, 'scope' | 'teacherScope'>, role: 'admin' | 'teacher'): McpScope | null {
+  return role === 'teacher' && t.teacherScope ? t.teacherScope : t.scope;
 }
 
 /** May this account and token use the tool? (role first, then scope; ownership is the endpoint's job). */
 export function toolAccess(t: McpTool, role: 'admin' | 'teacher', scopes: readonly string[]): 'ok' | 'ROLE_MISMATCH' | 'SCOPE_NOT_GRANTED' {
   if (t.role !== 'any' && t.role !== role) return 'ROLE_MISMATCH';
-  if (t.scope && !scopes.includes(t.scope)) return 'SCOPE_NOT_GRANTED';
+  const scope = requiredScope(t, role);
+  if (scope && !scopes.includes(scope)) return 'SCOPE_NOT_GRANTED';
   return 'ok';
 }
 

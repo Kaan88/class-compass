@@ -310,14 +310,14 @@ describe('review fixes (S19b)', () => {
     }
   });
 
-  it('every tool and every argument of a change has words in English and Turkish', () => {
+  it('every tool and every argument of a change has words in English and Turkish, for teachers and administrators (D-196)', () => {
     const keysOf = (schema: any): string[] => [
       ...Object.keys(schema?.properties ?? {}),
       ...[...(schema?.anyOf ?? []), ...(schema?.oneOf ?? [])].flatMap(keysOf),
     ];
     const missing: string[] = [];
     const has = (key: string) => key in en && key in tr;
-    for (const t of assistantTools()) {
+    for (const t of [...assistantTools('teacher'), ...assistantTools('admin')]) {
       if (!has(`assistantChat.tool.${t.name}`)) missing.push(`assistantChat.tool.${t.name}`);
       if (t.readOnly) continue;
       for (const k of keysOf(inputJsonSchema(t))) if (k !== 'opId' && k !== 'batchId' && !has(`assistantChat.arg.${k}`)) missing.push(`assistantChat.arg.${k} (${t.name})`);

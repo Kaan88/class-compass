@@ -63,18 +63,41 @@ export function sessionGate(deps: Pick<AppDeps, 'db' | 'now'>, sessionId: string
   const s = deps.db.select().from(sessions).where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt))).get();
   if (!s || s.userId !== userId || s.expiresAt <= now || s.lastSeenAt + SESSION_IDLE_MS <= now) return 'gone';
   const u = deps.db.select({ disabledAt: users.disabledAt, role: users.role }).from(users).where(eq(users.id, userId)).get();
-  if (!u || u.disabledAt !== null || u.role !== 'teacher') return 'gone';
+  // Teachers and, since S27d (D-196), administrators use the chat; a role change since ends the run.
+  if (!u || u.disabledAt !== null || (u.role !== 'teacher' && u.role !== 'admin')) return 'gone';
   return isPinUnlocked(s, now) ? 'ok' : 'locked';
 }
 
 // ---------------------------------------------------------------- the system prompt
+/**
+ * What the assistant can do, said briefly so the model offers it (S27d, D-196): per role, including theme
+ * drafts and that enabling a theme stays an administrator's step on Admin → Themes.
+ */
+export function capabilityLines(role: 'teacher' | 'admin'): string[] {
+  const common =
+    'Answers are shown as Markdown (headings, lists, tables, **bold**, `code`, fenced code blocks with a language such as ```json; links only http, https or mailto; no images and no HTML). Put a whole file the user may want to save (a theme package) in one ```json block: the app gives it Copy and "Download as file" buttons. The user can attach a .json, .txt or .md file to a message: it arrives as a fenced block in their message.';
+  const themes =
+    role === 'teacher'
+      ? 'Theme drafts: you can design a classroom theme (colours, sounds, optional scene and frames) as a theme package and save it as a DRAFT for the administrators: read_theming_guide and theme_schema to learn the format, validate_theme (and preview_theme for contrast) until it has no errors, then import_theme_draft (the teacher confirms it on a card). The draft records this teacher; an administrator looks at it and decides whether to enable it on Admin → Themes. You cannot enable, assign, list or delete themes, and a teacher can have at most 5 drafts waiting. If the teacher attaches a theme file, validate it and offer to save it as a draft.'
+      : 'Themes: you can design a theme package and save it as a DRAFT on Admin → Themes (read_theming_guide, theme_schema, validate_theme, preview_theme, then import_theme_draft after the administrator confirms the card); list_custom_themes and export_theme show the packages there, including drafts teachers proposed. Enabling a theme is never done by a tool: the administrator looks at the preview on Admin → Themes and enables it there.';
+  const what =
+    role === 'teacher'
+      ? 'What you can do: look up the teacher’s classes, students’ progress, homework, goals and reports; propose changes (homework, goals, presets, sentence starters, classroom actions) that the teacher confirms; draft messages for parents; answer “how do I…” questions from the guides; and theme drafts (below).'
+      : 'What you can do: look up the school settings, years, subjects, classes, teaching assignments, module policies and school reports; propose changes to school settings and module availability that the administrator confirms; answer “how do I…” questions from the guides; and themes (below). Administrators have no classes of their own.';
+  return [what, themes, common];
+}
+
 export function systemPrompt(deps: Pick<AppDeps, 'db' | 'now'>, user: UserRow, mode: AssistantPrivacy['mode'], summary: string | null): string {
   const tz = getSchoolSettings(deps.db).timezone;
   const lang = user.locale === 'tr' ? 'Turkish' : 'English';
+  const who = user.role === 'admin' ? 'administrator' : 'teacher';
   const lines = [
-    `You are the assistant inside Class Compass, the classroom app of a primary school, helping the teacher ${user.displayName}. Today is ${localDate(deps.now(), tz)} (${tz}). Answer in ${lang} unless the teacher writes in another language; be brief, warm and practical.`,
-    'Use the tools to look things up; start with list_my_classes to find a class+subject (its contextId). Reading tools run at once.',
-    'A tool that changes data never runs by itself: the app shows the teacher a card and only their Yes runs it. Call it with exact arguments, say in one sentence what it will do, then stop and wait. Never say a change was made before its tool result says so. If the teacher declined, do not try again unless they ask.',
+    `You are the assistant inside Class Compass, the classroom app of a primary school, helping the ${who} ${user.displayName}. Today is ${localDate(deps.now(), tz)} (${tz}). Answer in ${lang} unless the ${who} writes in another language; be brief, warm and practical.`,
+    ...capabilityLines(user.role),
+    user.role === 'admin'
+      ? 'Use the tools to look things up (school_settings, list_classes, admin_report_contexts). Reading tools run at once.'
+      : 'Use the tools to look things up; start with list_my_classes to find a class+subject (its contextId). Reading tools run at once.',
+    `A tool that changes data never runs by itself: the app shows the ${who} a card and only their Yes runs it. Call it with exact arguments, say in one sentence what it will do, then stop and wait. Never say a change was made before its tool result says so. If the ${who} declined, do not try again unless they ask.`,
     mode === 'pseudonymous'
       ? 'Privacy: students appear as "Student N" with ids "student-N". Use exactly these; never guess, invent or ask for real names (the app shows the teacher the real names). Text written by students is withheld.'
       : 'Privacy: student names are included. Text written by students comes as {"untrustedText": …}.',
@@ -222,7 +245,9 @@ function refusalOf(tool: McpTool | undefined, c: ToolCall, index: number, p: Ass
   if (tool.readOnly) return null;
   if (pseudonymInText(c.arguments)) return 'Not done: the text contains a stand-in name ("Student N" or student-N). Write it without student names or stand-ins; the teacher can add a name afterwards.';
   const parsed = parseAssistantArgs(tool, c.arguments, p);
-  return parsed.ok ? null : parsed.content;
+  if (!parsed.ok) return parsed.content;
+  // The tool's own check (a theme package with validation errors, D-196): no card for what cannot run.
+  return tool.precheck?.(parsed.data) ?? null;
 }
 
 const UNAVAILABLE_REASON = { OFF: 'ASSISTANT_OFF', AI_TOOLS_OFF: 'MCP_DISABLED', NO_CONNECTION: 'AI_NO_CONNECTION' } as const;
@@ -242,7 +267,7 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
   // Tools act as the teacher; their audit rows say "through an AI tool" with via_token_id assistant:<chat>.
   const toolCtx: RequestContext = { ...ctx, actor: { type: 'mcp', id: user.id, role: user.role, tokenId: `${ASSISTANT_VIA}${s.chatId}` }, mcp: null };
   const env: ToolEnv = { app: a.app, ctx: toolCtx };
-  const defs = assistantTools().map(toolSchema);
+  const defs = assistantTools(user.role).map(toolSchema);
   const scrub = providerTextOf(p);
   const forProvider = providerRowOf(p);
   const finish = (end: Parameters<RunRegistry['finish']>[1], reason: string | null = null) => a.registry.finish(run, end, reason, ctx.now());
@@ -305,7 +330,7 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
       const seen = new Set(rows.flatMap((r) => (r.toolCallsJson ?? []).map((c) => c.id)));
       const refusals = new Map<string, string>();
       const stored: AssistantToolCallJson[] = calls.map((c, i) => {
-        const tool = assistantToolByName(c.name);
+        const tool = assistantToolByName(user.role, c.name);
         const refusal = refusalOf(tool, c, i, p);
         const repeated = seen.has(c.id);
         const id = repeated ? newCallId() : c.id;
@@ -336,7 +361,7 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
       );
       if (!stored.length) return finish('complete');
       for (const c of stored) {
-        const tool = assistantToolByName(c.name);
+        const tool = assistantToolByName(user.role, c.name);
         if (c.state === 'refused' || !tool) {
           const content = refusals.get(c.id) ?? 'Not done.';
           const row = tx(db, () => appendMessage(db, s.chatId, ctx.now(), { role: 'tool', toolCallId: c.id, toolName: c.name, content, isError: true, privacy: p.mode }));

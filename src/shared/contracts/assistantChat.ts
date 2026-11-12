@@ -12,6 +12,8 @@
  */
 import { z } from 'zod';
 import {
+  ASSISTANT_ATTACHMENT_MAX_BYTES,
+  ASSISTANT_ATTACHMENT_NAME_MAX,
   ASSISTANT_MESSAGE_MAX,
   ASSISTANT_RETENTION_MAX_DAYS,
   ASSISTANT_RETENTION_MIN_DAYS,
@@ -128,29 +130,36 @@ export type AssistantRunEvent = z.infer<typeof AssistantRunEvent>;
 const ChatId = z.object({ chatId: Id });
 const Choice = { connectionId: Id.nullable().optional(), model: ModelName.nullable().optional() };
 
-export const assistantStatus = endpoint({ method: 'GET', path: '/api/teacher/assistant-chat', access: 'teacher', input: Empty, output: AssistantStatus });
+export const assistantStatus = endpoint({ method: 'GET', path: '/api/teacher/assistant-chat', access: 'account', input: Empty, output: AssistantStatus });
 export const listAssistantChats = endpoint({
   method: 'GET',
   path: '/api/teacher/assistant-chat/chats',
-  access: 'teacher',
+  access: 'account',
   input: z.object({ q: z.string().max(ASSISTANT_SEARCH_MAX).optional(), archived: z.enum(['true', 'false']).optional() }),
   output: z.object({ chats: z.array(AssistantChatSummary) }),
 });
-export const createAssistantChat = endpoint({ method: 'POST', path: '/api/teacher/assistant-chat/chats', access: 'teacher', input: z.object(Choice), output: AssistantChatSummary });
-export const getAssistantChat = endpoint({ method: 'GET', path: '/api/teacher/assistant-chat/chats/:chatId', access: 'teacher', input: ChatId, output: AssistantChatDetail });
+export const createAssistantChat = endpoint({ method: 'POST', path: '/api/teacher/assistant-chat/chats', access: 'account', input: z.object(Choice), output: AssistantChatSummary });
+export const getAssistantChat = endpoint({ method: 'GET', path: '/api/teacher/assistant-chat/chats/:chatId', access: 'account', input: ChatId, output: AssistantChatDetail });
 export const updateAssistantChat = endpoint({
   method: 'PATCH',
   path: '/api/teacher/assistant-chat/chats/:chatId',
-  access: 'teacher',
+  access: 'account',
   input: z.object({ chatId: Id, title: z.string().trim().min(1).max(ASSISTANT_TITLE_MAX).optional(), archived: z.boolean().optional(), ...Choice }),
   output: AssistantChatSummary,
 });
-export const deleteAssistantChat = endpoint({ method: 'DELETE', path: '/api/teacher/assistant-chat/chats/:chatId', access: 'teacher', input: ChatId, output: Ok });
+export const deleteAssistantChat = endpoint({ method: 'DELETE', path: '/api/teacher/assistant-chat/chats/:chatId', access: 'account', input: ChatId, output: Ok });
 export const sendAssistantMessage = endpoint({
   method: 'POST',
   path: '/api/teacher/assistant-chat/chats/:chatId/messages',
-  access: 'teacher',
-  input: z.object({ chatId: Id, text: z.string().trim().min(1).max(ASSISTANT_MESSAGE_MAX), ...Choice }),
+  access: 'account',
+  input: z.object({
+    chatId: Id,
+    // Empty only with an attachment (the server refuses an empty message: ASSISTANT_EMPTY_MESSAGE).
+    text: z.string().trim().max(ASSISTANT_MESSAGE_MAX),
+    /** A text file (S27d, D-196): .json, .txt or .md up to 200 KB, checked again on the server. */
+    attachment: z.object({ name: z.string().trim().min(1).max(ASSISTANT_ATTACHMENT_NAME_MAX), text: z.string().max(ASSISTANT_ATTACHMENT_MAX_BYTES) }).optional(),
+    ...Choice,
+  }),
   output: z.object({ runId: z.string(), messageId: z.string() }),
 });
 /**
@@ -160,21 +169,21 @@ export const sendAssistantMessage = endpoint({
 export const answerAssistantCall = endpoint({
   method: 'POST',
   path: '/api/teacher/assistant-chat/chats/:chatId/messages/:messageId/calls/:callId',
-  access: 'teacher',
+  access: 'account',
   input: z.object({ chatId: Id, messageId: Id, callId: z.string().min(1).max(200), approve: z.boolean() }),
   output: z.object({ runId: z.string().nullable() }),
 });
-export const cancelAssistantRun = endpoint({ method: 'POST', path: '/api/teacher/assistant-chat/runs/:runId/cancel', access: 'teacher', input: z.object({ runId: Id }), output: Ok });
+export const cancelAssistantRun = endpoint({ method: 'POST', path: '/api/teacher/assistant-chat/runs/:runId/cancel', access: 'account', input: z.object({ runId: Id }), output: Ok });
 /** Raw route: `text/event-stream` of `AssistantRunEvent`s after `after`; ends with the `end` event. */
 export const assistantRunEvents = endpoint({
   method: 'GET',
   path: '/api/teacher/assistant-chat/runs/:runId/events',
-  access: 'teacher',
+  access: 'account',
   input: z.object({ runId: Id, after: z.coerce.number().int().min(0).optional() }),
   output: z.unknown(),
 });
 /** Raw route: the teacher's own chats as a JSON file (their data export, D-180). */
-export const exportAssistantChats = endpoint({ method: 'GET', path: '/api/teacher/assistant-chat/export', access: 'teacher', input: Empty, output: z.unknown() });
+export const exportAssistantChats = endpoint({ method: 'GET', path: '/api/teacher/assistant-chat/export', access: 'account', input: Empty, output: z.unknown() });
 
 // ---------------------------------------------------------------- administrators
 export const AssistantAdmin = z.object({

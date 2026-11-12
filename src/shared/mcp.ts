@@ -9,8 +9,11 @@ export const MCP_PATH = '/mcp';
 
 /**
  * What a token may do. Teacher scopes follow the teacher's own app permissions (every call still runs
- * the normal ownership checks); the last three are for administrator accounts only. Exports, erasure,
- * backups, credentials, link tokens and files are never reachable through any scope.
+ * the normal ownership checks); `settings:admin`, `themes:write` and `school:read` are for administrator
+ * accounts only. `themes:draft` (S27d, D-196) lets a teacher propose a theme package as a draft for the
+ * administrators (only `import_theme_draft` asks for it; enabling a theme stays an administrator's
+ * click). Exports, erasure, backups, credentials, link tokens and files are never reachable through any
+ * scope.
  */
 export const MCP_SCOPES = [
   'classes:read',
@@ -20,6 +23,7 @@ export const MCP_SCOPES = [
   'homework:write',
   'classroom:command',
   'settings:write',
+  'themes:draft',
   'settings:admin',
   'themes:write',
   'school:read',

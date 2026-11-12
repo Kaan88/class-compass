@@ -313,7 +313,7 @@ describe('administrator section (S19b, D-180)', () => {
     wrap(<AssistantChatAdminSection />);
     expect(await screen.findByText('Add a school connection above and test it first.')).toBeTruthy();
     expect((screen.getByRole('switch') as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByTestId('assistant-admin-counts').textContent).toContain('Chats now: 3, by 2 teachers');
+    expect(screen.getByTestId('assistant-admin-counts').textContent).toContain('Chats now: 3, by 2 accounts');
   });
 
   it('switches on and changes the retention', async () => {

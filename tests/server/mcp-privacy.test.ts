@@ -221,7 +221,7 @@ describe('classification (D-161)', () => {
 
 describe('pseudonymous mode (D-161)', () => {
   it('no marker name or student text leaves through any tool, resource or prompt', async () => {
-    const teacher = new Mcp(env, (await makeToken(s.teacherA, { scopes: ['classes:read', 'reports:read', 'goals:read', 'goals:write', 'homework:write', 'classroom:command', 'settings:write'] })).secret);
+    const teacher = new Mcp(env, (await makeToken(s.teacherA, { scopes: ['classes:read', 'reports:read', 'goals:read', 'goals:write', 'homework:write', 'classroom:command', 'settings:write', 'themes:draft'] })).secret);
     const admin = new Mcp(env, (await makeToken(s.admin, { scopes: ['school:read', 'settings:admin', 'themes:write'] })).secret);
     const a = await everything(teacher, 'teacher');
     const b = await everything(admin, 'admin');

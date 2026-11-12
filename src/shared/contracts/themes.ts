@@ -10,6 +10,11 @@ import { THEME_KEYS } from '../themes.ts';
 import { endpoint, Empty, pii } from './define.ts';
 
 export const CUSTOM_THEME_STATUSES = ['draft', 'enabled', 'disabled'] as const;
+/**
+ * Drafts a teacher may have waiting at once (S27d, D-196): a teacher proposes a package through the AI
+ * assistant (or an AI app with `themes:draft`); an administrator looks at it, enables or deletes it.
+ */
+export const THEME_DRAFTS_PER_TEACHER = 5;
 export type CustomThemeStatus = (typeof CUSTOM_THEME_STATUSES)[number];
 
 const Issue = z.object({
@@ -57,6 +62,8 @@ export const CustomThemeSummary = z.object({
   bytes: z.number().int(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  /** The teacher who proposed it as a draft (S27d, D-196); null for a package an administrator imported. */
+  proposedBy: z.object({ id: z.string(), name: z.string().meta(pii('staffName')) }).nullable(),
 });
 export type CustomThemeSummary = z.infer<typeof CustomThemeSummary>;
 
@@ -89,6 +96,12 @@ export const validateCustomTheme = endpoint({
 });
 /** Saves a package that has no errors as a new draft (audited). */
 export const createCustomTheme = endpoint({ method: 'POST', path: '/api/admin/themes', access: 'admin', input: Source, output: CustomThemeSummary });
+/**
+ * A teacher proposes a package (S27d, D-196): saved as a draft that records the teacher, exactly like an
+ * administrator's import but never enabled or assigned; at most `THEME_DRAFTS_PER_TEACHER` waiting
+ * drafts per teacher (409 `THEME_DRAFT_LIMIT`). Used by the AI tool `import_theme_draft` for teachers.
+ */
+export const proposeCustomTheme = endpoint({ method: 'POST', path: '/api/teacher/themes/drafts', access: 'teacher', input: Source, output: CustomThemeSummary });
 /** Replaces the package of an existing theme with the same key; its status stays (audited). */
 export const replaceCustomTheme = endpoint({ method: 'PUT', path: '/api/admin/themes/:key', access: 'admin', input: KeyParam.extend(Source.shape), output: CustomThemeSummary });
 export const enableCustomTheme = endpoint({ method: 'POST', path: '/api/admin/themes/:key/enable', access: 'admin', input: KeyParam, output: CustomThemeSummary });

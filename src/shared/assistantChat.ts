@@ -8,6 +8,33 @@
 /** The longest message a teacher can send (characters). */
 export const ASSISTANT_MESSAGE_MAX = 8000;
 export const ASSISTANT_TITLE_MAX = 80;
+
+/**
+ * A file attached to a message (S27d, D-196): text only (.json, .txt, .md, e.g. a theme package the
+ * teacher already has), at most 200 KB, sent as a fenced block in the message's text; never pictures or
+ * student files. The client checks first, the server again.
+ */
+export const ASSISTANT_ATTACHMENT_MAX_BYTES = 200 * 1024;
+export const ASSISTANT_ATTACHMENT_TYPES = { '.json': 'json', '.txt': 'text', '.md': 'markdown' } as const;
+export const ASSISTANT_ATTACHMENT_NAME_MAX = 120;
+/** The fence language of an attachment's name, or null for a type that cannot be attached. */
+export function attachmentLanguage(name: string): string | null {
+  const m = /\.[a-z]+$/u.exec(name.toLowerCase());
+  return m ? ((ASSISTANT_ATTACHMENT_TYPES as Record<string, string>)[m[0]] ?? null) : null;
+}
+/** The size of a text in UTF-8 bytes (the 200 KB limit counts bytes, like the file on disk). */
+export const utf8Bytes = (text: string) => new TextEncoder().encode(text).length;
+/**
+ * The message text with an attached file: the typed text, a line naming the file, and the file in a
+ * fence longer than any run of backticks inside it (so the file cannot close the block early).
+ */
+export function withAttachment(text: string, file: { name: string; text: string }, lang: string): string {
+  const longest = Math.max(2, ...[...file.text.matchAll(/`+/gu)].map((m) => m[0].length));
+  const fence = '`'.repeat(longest + 1);
+  const name = file.name.replace(/[\r\n`]/gu, '_');
+  const body = file.text.replace(/\r\n?/gu, '\n');
+  return [text ? `${text}\n` : null, `Attached file: ${name}`, `${fence}${lang}`, body, fence].filter((x) => x !== null).join('\n');
+}
 export const ASSISTANT_SEARCH_MAX = 100;
 /** Chats per teacher (oldest archived ones first should be deleted by the teacher; the retention job does the rest). */
 export const ASSISTANT_CHATS_MAX = 500;

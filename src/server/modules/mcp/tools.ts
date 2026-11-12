@@ -228,17 +228,27 @@ const validateTheme = handTool({
   run: (_env, input) => ({ report: validateThemePackage(packageText(input.package)).report }),
 });
 
+/** The validator's first errors in a line the model can act on, or null when the package can be saved (S27d). */
+function packageErrors(input: { package: z.infer<typeof PackageInput> }): string | null {
+  const { report } = validateThemePackage(packageText(input.package));
+  if (report.ok) return null;
+  const list = report.errors.slice(0, 10).map((e) => `${e.path || '(package)'}: ${e.message}`).join('; ');
+  return `Not done: the theme package has ${report.errors.length} validation error(s). Fix them (validate_theme shows the full report) and call import_theme_draft again: ${list}`;
+}
+
 const importThemeDraft = handTool({
   name: 'import_theme_draft',
   description:
-    'Administrators: saves a theme package that has no validation errors as a DRAFT on Admin → Themes (audited). A draft is not offered to classes: enabling it stays a human action on the admin page after looking at the preview. Fails with THEME_KEY_TAKEN when the key exists. Returns the theme summary.',
+    'Saves a theme package that has no validation errors as a DRAFT on Admin → Themes (audited). Administrators (themes:write) import it; teachers (themes:draft) propose it: the draft records the teacher, administrators see "proposed by" with it, and a teacher can have at most 5 drafts waiting (THEME_DRAFT_LIMIT). A draft is never offered to classes: looking at the preview and enabling it stay a human action of an administrator on the admin page; this tool never enables or assigns a theme. Fails with THEME_KEY_TAKEN when the key exists (choose another key). Returns the theme summary.',
   scope: 'themes:write',
-  role: 'admin',
+  teacherScope: 'themes:draft',
+  role: 'any',
   readOnly: false,
   cost: 3,
   input: z.object({ package: PackageInput }),
   output: T.CustomThemeSummary,
-  run: (env, input) => callEndpoint(env, T.createCustomTheme, { source: packageText(input.package) }),
+  precheck: packageErrors,
+  run: (env, input) => callEndpoint(env, env.ctx.user?.role === 'admin' ? T.createCustomTheme : T.proposeCustomTheme, { source: packageText(input.package) }),
 });
 
 const exportTheme = handTool({
@@ -258,7 +268,8 @@ const exportTheme = handTool({
       return { package: T.PackageDto.parse(pkg), note: `The built-in theme "${input.key}" as Admin → Themes exports it (key "${input.key}-copy"). Give it your own key and names before import_theme_draft.` };
     }
     const note = 'An imported theme: give the copy a new key and names before import_theme_draft.';
-    const admin = env.ctx.user?.role === 'admin' && env.ctx.mcp?.scopes.includes('themes:write');
+    // The assistant chat (ctx.mcp null) offers an administrator every administrator scope (D-196).
+    const admin = env.ctx.user?.role === 'admin' && (env.ctx.mcp ? env.ctx.mcp.scopes.includes('themes:write') : true);
     if (admin) return { package: (await callEndpoint(env, T.getCustomTheme, { key: input.key })).package, note };
     return { package: publicTheme(env.ctx, { key: input.key }).body, note };
   },

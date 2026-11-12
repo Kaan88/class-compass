@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import * as C from '../../../shared/contracts/themes.ts';
 import type { AppDeps } from '../../lib/context.ts';
 import { route } from '../../lib/http.ts';
-import { availableThemes, createTheme, deleteTheme, getTheme, listThemes, publicTheme, replaceTheme, setThemeStatus, validateTheme } from './service.ts';
+import { availableThemes, createTheme, deleteTheme, getTheme, listThemes, proposeTheme, publicTheme, replaceTheme, setThemeStatus, validateTheme } from './service.ts';
 
 export function registerThemeRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.listCustomThemes, (ctx) => listThemes(ctx));
@@ -10,6 +10,7 @@ export function registerThemeRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.validateCustomTheme, (ctx, input) => validateTheme(ctx, input));
   route(app, deps, C.getCustomTheme, (ctx, input) => getTheme(ctx, input));
   route(app, deps, C.createCustomTheme, (ctx, input) => createTheme(ctx, input));
+  route(app, deps, C.proposeCustomTheme, (ctx, input) => proposeTheme(ctx, input));
   route(app, deps, C.replaceCustomTheme, (ctx, input) => replaceTheme(ctx, input));
   route(app, deps, C.enableCustomTheme, (ctx, input) => setThemeStatus(ctx, input.key, 'enabled'));
   route(app, deps, C.disableCustomTheme, (ctx, input) => setThemeStatus(ctx, input.key, 'disabled'));

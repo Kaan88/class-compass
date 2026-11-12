@@ -6,12 +6,13 @@
  */
 import { eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import { ASSISTANT_ATTACHMENT_MAX_BYTES, attachmentLanguage, utf8Bytes, withAttachment } from '../../../shared/assistantChat.ts';
 import type * as C from '../../../shared/contracts/assistantChat.ts';
 import { tx } from '../../db/client.ts';
 import { assistantChats, assistantMessages, type AssistantToolCallJson } from '../../db/schema.ts';
 import { beginAssistantMessage, connectionForUse } from '../aiConnections/service.ts';
 import { requireUser, type RequestContext, type UserRow } from '../../lib/context.ts';
-import { AppError, conflict, notFound } from '../../lib/errors.ts';
+import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { ASSISTANT_VIA, assistantPrivacy, assistantToolByName, runAssistantTool, type AssistantPrivacy } from '../mcp/assistant.ts';
 import { expirePending, runAgent, type AgentEnv } from './agent.ts';
 import type { Run } from './runs.ts';
@@ -55,9 +56,27 @@ export function checkChoice(ctx: RequestContext, connectionId: string | null, mo
   connectionForUse(ctx, connectionId, model);
 }
 
+/**
+ * The text a message stores and sends (S27d, D-196): the typed text, with an attached text file as a
+ * fenced block. Only .json, .txt and .md up to 200 KB (UTF-8 bytes); anything else is refused before
+ * the message counts against a limit. An empty message without a file is refused too.
+ */
+export function messageText(input: Pick<z.infer<typeof C.sendAssistantMessage.input>, 'text' | 'attachment'>): string {
+  const text = input.text.trim();
+  if (!input.attachment) {
+    if (!text) throw invalid('Write a message', { reason: 'ASSISTANT_EMPTY_MESSAGE' });
+    return text;
+  }
+  const lang = attachmentLanguage(input.attachment.name);
+  if (!lang) throw invalid('Only .json, .txt and .md files can be attached', { reason: 'ASSISTANT_ATTACHMENT_TYPE' });
+  if (utf8Bytes(input.attachment.text) > ASSISTANT_ATTACHMENT_MAX_BYTES) throw invalid('The file is larger than 200 KB', { reason: 'ASSISTANT_ATTACHMENT_TOO_BIG', limit: ASSISTANT_ATTACHMENT_MAX_BYTES });
+  return withAttachment(text, input.attachment, lang);
+}
+
 export function sendMessage(a: AgentEnv, ctx: RequestContext, input: z.infer<typeof C.sendAssistantMessage.input>): { runId: string; messageId: string } {
   const user = requireUser(ctx);
   const chat = loadChat(ctx, input.chatId);
+  const typed = messageText(input);
   assertAvailable(ctx, user);
   if (a.registry.activeFor(chat.id)) throw conflict('An answer is still being written', { reason: 'ASSISTANT_BUSY' });
   const choice = choiceOf(ctx, user, chat, input);
@@ -68,7 +87,7 @@ export function sendMessage(a: AgentEnv, ctx: RequestContext, input: z.infer<typ
   const now = ctx.now();
   const message = tx(ctx.db, () => {
     expirePending(ctx.db, chat.id, now);
-    const content = p.toProvider(input.text);
+    const content = p.toProvider(typed);
     const row = appendMessage(ctx.db, chat.id, now, { role: 'user', content, privacy: p.mode, connectionId: used.row.id, model: used.model });
     const set: Partial<ChatRow> = { connectionId: input.connectionId === null ? null : used.row.id, model: input.model === null ? null : used.model };
     // A chat without a typed title is named after its first message (as stored: pseudonyms, shown with names).
@@ -113,7 +132,7 @@ export async function answerCall(a: AgentEnv, ctx: RequestContext, input: z.infe
   });
   const p = assistantPrivacy(ctx.db, user, now);
   if (input.approve) {
-    const tool = assistantToolByName(call.call.name);
+    const tool = assistantToolByName(user.role, call.call.name);
     if (!tool || tool.readOnly) throw new AppError('INTERNAL', 'Not a change tool');
     const toolCtx: RequestContext = { ...ctx, actor: { type: 'mcp', id: user.id, role: user.role, tokenId: `${ASSISTANT_VIA}${chat.id}` }, mcp: null };
     const r = await runAssistantTool({ app: a.app, ctx: toolCtx }, tool, call.call.arguments, p);

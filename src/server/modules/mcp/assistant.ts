@@ -3,8 +3,11 @@
  * never touches tools, pseudonyms or the privacy gate itself: it goes through this file, so the rules of
  * `/mcp` (D-160, D-161) hold for it too.
  *
- * - Tools: the teacher's own tools (role `teacher`, every teacher scope) plus `read_guide` (the user
- *   guides). Read-only tools run at once; the chat asks the teacher before any other (`readOnly: false`).
+ * - Tools: the account's own tools (a teacher's: role `teacher` within every teacher scope; an
+ *   administrator's, S27d: everything within the administrator scopes), for teachers the theme drafting
+ *   tools (`TEACHER_THEME_TOOLS`, D-196: never list, export, enable or delete packages), `read_guide`
+ *   (the guides of the role) and `read_theming_guide`. Read-only tools run at once; the chat asks before
+ *   any other (`readOnly: false`).
  * - Running a tool: aliases resolved to the caller's own students only, the input parsed by the tool's
  *   schema, the tool's own endpoint handlers run as the teacher (`callEndpoint`, so access, ownership,
  *   module switches, outbox commands and audit are the app's), the result parsed by its allow-list and
@@ -24,7 +27,7 @@ import { AppError } from '../../lib/errors.ts';
 import { getSchoolSettings } from '../school/policy.ts';
 import { NameScrubber, ownStudentIds, privacyEnv, privateMessage, privateResult, resolveAliases, type PrivacyEnv } from './privacy.ts';
 import { allTools, inputJsonSchema, toolAccess, type McpTool } from './registry.ts';
-import { allResources } from './resources.ts';
+import { allResources, exampleKeys, readExample } from './resources.ts';
 import type { ToolEnv } from './toolkit.ts';
 
 /** The audit rows of the assistant's changes name the account with `via_token_id` = this prefix + the chat id. */
@@ -35,41 +38,98 @@ export const assistantFamily = (userId: string) => `assistant:${userId}`;
 /** The largest tool result the model gets (characters); bigger ones are cut with a note it can act on. */
 export const ASSISTANT_RESULT_MAX = 48_000;
 
-/** The guides a teacher's assistant may read (`read_guide`). */
-export const ASSISTANT_GUIDES = ['teacher', 'quick-start-teacher', 'ai-tools', 'student', 'super-speakers', 'board-screen'] as const;
+export type AssistantRole = 'teacher' | 'admin';
 
-const readGuide: McpTool = {
-  name: 'read_guide',
+/** The guides the assistant may read (`read_guide`), per role. */
+export const ASSISTANT_GUIDES = {
+  teacher: ['teacher', 'quick-start-teacher', 'ai-tools', 'student', 'super-speakers', 'board-screen'],
+  admin: ['admin', 'quick-start-admin', 'ai-tools', 'teacher', 'super-speakers', 'board-screen', 'scorer'],
+} as const satisfies Record<AssistantRole, readonly string[]>;
+
+function readGuideFor(role: AssistantRole): McpTool {
+  return {
+    name: 'read_guide',
+    description:
+      role === 'teacher'
+        ? "Reads one Class Compass user guide (Markdown) to answer 'how do I…' questions about the app: teacher (the whole teacher guide), quick-start-teacher, ai-tools (what AI tools and this assistant can see, and what a theme draft is), student (the student page), super-speakers, board-screen. language: en or tr (answer in the teacher's language). No school data."
+        : "Reads one Class Compass user guide (Markdown) to answer 'how do I…' questions about the app: admin (the whole administrator guide), quick-start-admin, ai-tools (AI tools, the assistant, theme drafts), teacher, super-speakers, board-screen, scorer. language: en or tr (answer in the administrator's language). No school data.",
+    scope: null,
+    role,
+    readOnly: true,
+    cost: 1,
+    input: z.object({ guide: z.enum(ASSISTANT_GUIDES[role]), language: z.enum(['en', 'tr']).default('en') }),
+    output: z.string().meta(pii('none')),
+    run: async (env, input) => {
+      const { guide, language } = input as { guide: string; language: 'en' | 'tr' };
+      const r = allResources().find((x) => x.name === `guide-${language}-${guide}`);
+      if (!r) throw new AppError('NOT_FOUND', 'Guide not found');
+      return r.read(env);
+    },
+  };
+}
+
+/** The parts of the theming guide (docs/THEMING.md) the chat can read, each under the result cap: from one heading to the next. */
+export const THEMING_PARTS = {
+  palette: ['## Palette design and contrast', '## Theme packages'],
+  packages: ['## Theme packages', '## Scenes, frames, ambient and sets'],
+  engine: ['## Scenes, frames, ambient and sets', '## Sound'],
+} as const;
+
+/**
+ * The theming guide for the chat (S27d, D-196), which has no MCP resources: one part of docs/THEMING.md
+ * (palette and contrast with the token table; the package format, SVG allow-list, checklist and the
+ * notes for AI agents; scenes, frames, ambient and sets) or a complete example package.
+ */
+const readThemingGuide: McpTool = {
+  name: 'read_theming_guide',
   description:
-    "Reads one Class Compass user guide (Markdown) to answer 'how do I…' questions about the app: teacher (the whole teacher guide), quick-start-teacher, ai-tools (what AI tools and this assistant can see), student (the student page), super-speakers, board-screen. language: en or tr (answer in the teacher's language). No school data.",
+    'Reads the Class Compass theming guide to design a theme package: part "palette" (palette design, every colour token, the contrast pairs), "packages" (the package format, fields, SVG allow-list, how a draft is imported and enabled, a checklist, notes for AI agents), "engine" (optional scene, frame, ambient snow or leaves, sets), or "example" with exampleKey (a complete valid package: ocean, peppermint-snow-day, or a built-in theme explorer, animals, classroom) to start from. Use theme_schema for the exact JSON Schema and validate_theme before import_theme_draft. No school data.',
   scope: null,
-  role: 'teacher',
+  role: 'any',
   readOnly: true,
   cost: 1,
-  input: z.object({ guide: z.enum(ASSISTANT_GUIDES), language: z.enum(['en', 'tr']).default('en') }),
-  output: z.string().meta(pii('none')),
+  input: z.object({ part: z.enum(['palette', 'packages', 'engine', 'example']), exampleKey: z.string().max(64).optional() }),
+  output: z.union([z.string().meta(pii('none')), z.record(z.string(), z.unknown()).meta(pii('none'))]),
   run: async (env, input) => {
-    const { guide, language } = input as { guide: string; language: 'en' | 'tr' };
-    const r = allResources().find((x) => x.name === `guide-${language}-${guide}`);
-    if (!r) throw new AppError('NOT_FOUND', 'Guide not found');
-    return r.read(env);
+    const { part, exampleKey } = input as { part: keyof typeof THEMING_PARTS | 'example'; exampleKey?: string };
+    if (part === 'example') {
+      const key = exampleKey ?? 'ocean';
+      const pkg = exampleKeys().includes(key) ? readExample(key) : null;
+      if (!pkg) throw new AppError('NOT_FOUND', `No example package "${key}". Examples: ${exampleKeys().join(', ')}`);
+      return pkg;
+    }
+    const doc = allResources().find((x) => x.name === 'theming-guide');
+    if (!doc) throw new AppError('NOT_FOUND', 'The theming guide is missing from this server');
+    const text = String(await doc.read(env));
+    const [from, to] = THEMING_PARTS[part];
+    const start = text.indexOf(`\n${from}`);
+    if (start < 0) throw new AppError('NOT_FOUND', 'That part of the theming guide is missing');
+    const end = text.indexOf(`\n${to}`, start + 1);
+    return text.slice(start + 1, end < 0 ? undefined : end);
   },
 };
 
-let cache: McpTool[] | null = null;
+/** Theme tools a teacher's chat offers (D-196): drafting aids and the draft itself; never list, export, enable, disable or delete. */
+export const TEACHER_THEME_TOOLS: readonly string[] = ['theme_schema', 'validate_theme', 'preview_theme', 'import_theme_draft'];
+
+const cache = new Map<AssistantRole, McpTool[]>();
 /**
- * The tools a teacher's chat offers: the teacher tools of the AI tools layer within the teacher scopes
- * (the theme design aids for administrators are left out), plus `read_guide`.
+ * The tools the chat offers an account of this role: its tools of the AI tools layer within every scope
+ * of the role (an administrator's chat has the administrator tools, D-196; of the tools for both roles a
+ * teacher gets only `TEACHER_THEME_TOOLS`), plus `read_guide` and `read_theming_guide`.
  */
-export function assistantTools(): McpTool[] {
-  if (!cache) {
-    const scopes = scopesForRole('teacher');
-    cache = [...allTools().filter((t) => t.role === 'teacher' && toolAccess(t, 'teacher', scopes) === 'ok'), readGuide];
+export function assistantTools(role: AssistantRole): McpTool[] {
+  let list = cache.get(role);
+  if (!list) {
+    const scopes = scopesForRole(role);
+    const own = allTools().filter((t) => toolAccess(t, role, scopes) === 'ok' && (t.role === role || role === 'admin' || TEACHER_THEME_TOOLS.includes(t.name)));
+    list = [...own, readGuideFor(role), readThemingGuide];
+    cache.set(role, list);
   }
-  return cache;
+  return list;
 }
-export const assistantToolByName = (name: string): McpTool | undefined => assistantTools().find((t) => t.name === name);
-export const toolSchema = (t: McpTool) => ({ name: t.name, description: t.description + (t.readOnly ? '' : ' This changes data: the teacher is asked to confirm it in the app before it runs.'), inputSchema: inputJsonSchema(t) });
+export const assistantToolByName = (role: AssistantRole, name: string): McpTool | undefined => assistantTools(role).find((t) => t.name === name);
+export const toolSchema = (t: McpTool) => ({ name: t.name, description: t.description + (t.readOnly ? '' : ' This changes data: the user is asked to confirm it in the app before it runs.'), inputSchema: inputJsonSchema(t) });
 
 // ---------------------------------------------------------------- privacy for one teacher
 export interface AssistantPrivacy {

@@ -14,11 +14,21 @@ export type ToolRole = 'teacher' | 'admin' | 'any';
 export interface McpTool {
   name: string;
   description: string;
-  /** null: needs no scope (theme schema and validation hold no school data). */
+  /** null: needs no scope (theme schema and validation hold no school data). For role `any`: the administrator's scope. */
   scope: McpScope | null;
+  /**
+   * Role `any` only (S27d, D-196): the scope a teacher needs instead of `scope` (`import_theme_draft`:
+   * administrators need `themes:write`, teachers `themes:draft`). Read it with `requiredScope`.
+   */
+  teacherScope?: McpScope;
   role: ToolRole;
   readOnly: boolean;
   cost: number;
+  /**
+   * A change's own check of its arguments before it is offered (S27d): the assistant chat refuses a call
+   * that fails it (the model gets the message), so a card never asks about a change that cannot run.
+   */
+  precheck?: (input: unknown) => string | null;
   input: z.ZodType;
   /** The allow-list schema of the result, with `pii()` marks for the privacy gate (test-enforced). */
   output: z.ZodType;
@@ -37,11 +47,13 @@ export interface HandTool<I extends z.ZodType = z.ZodType, O extends z.ZodType =
   name: string;
   description: string;
   scope: McpScope | null;
+  teacherScope?: McpScope;
   role: ToolRole;
   readOnly: boolean;
   cost?: number;
   input: I;
   output: O;
+  precheck?: (input: z.infer<I>) => string | null;
   run: (env: ToolEnv, input: z.infer<I>) => Promise<z.input<O>> | z.input<O>;
 }
 export const handTool = <I extends z.ZodType, O extends z.ZodType>(t: HandTool<I, O>): HandTool => t as unknown as HandTool;

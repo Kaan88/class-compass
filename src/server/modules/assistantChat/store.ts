@@ -11,6 +11,7 @@ import type { AssistantChangeLine } from '../../../shared/contracts/assistantCha
 import { pickText } from '../../lib/i18n.ts';
 import type { LocalizedTextValue as LocalizedText } from '../../../shared/contracts/define.ts';
 import { DEFAULT_GOAL_OUTCOMES } from '../../../shared/contracts/goals.ts';
+import { validateThemePackage } from '../../../shared/themePackage/validate.ts';
 import { tx, type Db } from '../../db/client.ts';
 import {
   assistantChats,
@@ -157,6 +158,26 @@ export class CardLookup {
   get locale() {
     return this.user.locale;
   }
+  get role() {
+    return this.user.role;
+  }
+}
+
+/**
+ * A theme package on a card (S27d, D-196): what it is, never the whole JSON: the key, the names, the base
+ * theme, the size and the warnings, and what happens next (a teacher's draft waits for an administrator).
+ */
+function themePackageLines(look: CardLookup, v: unknown): AssistantChangeLine[] {
+  const { report, pkg } = validateThemePackage(typeof v === 'string' ? v : JSON.stringify(v));
+  if (!pkg) return [line('package', 'missing')];
+  return [
+    line('themeKey', 'text', pkg.key),
+    line('themeName', 'list', '', [`EN: ${pkg.name.en}`, `TR: ${pkg.name.tr}`]),
+    line('themeBase', 'option', pkg.base, [], `theme.${pkg.base}`),
+    line('themeSize', 'text', `${Math.max(1, Math.round(report.stats.bytes / 1024))} KB`),
+    line('themeWarnings', 'text', String(report.warnings.length)),
+    line('themeNext', 'option', look.role, [], look.role === 'admin' ? 'assistantChat.value.themeNext.admin' : 'assistantChat.value.themeNext.teacher'),
+  ];
 }
 
 /** Arguments a card never shows (retry keys). */
@@ -196,6 +217,10 @@ export function changeLines(look: CardLookup, tool: string, args: Record<string,
   const out: AssistantChangeLine[] = [];
   for (const [key, v] of Object.entries(args)) {
     if (SKIP_KEYS.has(key)) continue;
+    if (key === 'package' && tool === 'import_theme_draft') {
+      out.push(...themePackageLines(look, v));
+      continue;
+    }
     if ((TARGET_KEYS as readonly string[]).includes(key)) {
       const found = key === 'contextId' ? look.context(v) : key === 'classId' ? look.classOf(v) : key === 'lessonId' ? look.lesson(v) : key === 'assignmentId' ? look.assignment(v) : key === 'studentId' ? look.student(v) : look.goal(v);
       if (!found && v !== null && v !== undefined) out.push(line(key, 'missing'));
@@ -300,7 +325,7 @@ export function targetOf(look: CardLookup, args: Record<string, unknown>): strin
 
 /** A stored call as the browser sees it (`result`: its tool row, when it ran). */
 export function callView(p: AssistantPrivacy, look: CardLookup, call: AssistantToolCallJson, result: MessageRow | undefined): CallView {
-  const tool = assistantToolByName(call.name);
+  const tool = assistantToolByName(look.role, call.name);
   const readOnly = tool?.readOnly ?? true;
   // The arguments as the tool will get them (parsed: trimmed, defaults), so the card shows what is written.
   const parsed = tool && !readOnly ? parseAssistantArgs(tool, call.arguments, p) : null;
