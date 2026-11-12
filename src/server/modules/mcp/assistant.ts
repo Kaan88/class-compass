@@ -20,6 +20,7 @@
 import { z } from 'zod';
 import { pii } from '../../../shared/contracts/define.ts';
 import { PSEUDONYM_TEXT } from '../../../shared/assistantChat.ts';
+import { LOCALES, type Locale } from '../../../shared/languages.ts';
 import { scopesForRole, type AiPrivacyMode } from '../../../shared/mcp.ts';
 import type { Db } from '../../db/client.ts';
 import type { UserRow } from '../../lib/context.ts';
@@ -57,10 +58,10 @@ function readGuideFor(role: AssistantRole): McpTool {
     role,
     readOnly: true,
     cost: 1,
-    input: z.object({ guide: z.enum(ASSISTANT_GUIDES[role]), language: z.enum(['en', 'tr']).default('en') }),
+    input: z.object({ guide: z.enum(ASSISTANT_GUIDES[role]), language: z.enum(LOCALES).default('en') }),
     output: z.string().meta(pii('none')),
     run: async (env, input) => {
-      const { guide, language } = input as { guide: string; language: 'en' | 'tr' };
+      const { guide, language } = input as { guide: string; language: Locale };
       const r = allResources().find((x) => x.name === `guide-${language}-${guide}`);
       if (!r) throw new AppError('NOT_FOUND', 'Guide not found');
       return r.read(env);

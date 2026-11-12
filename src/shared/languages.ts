@@ -36,5 +36,8 @@ const isReady = (code: LanguageCode): code is Locale => LANGUAGES[code].ready;
 /** The ready languages, in list order (a tuple type, so `z.enum(LOCALES)` works). */
 export const LOCALES = (Object.keys(LANGUAGES) as LanguageCode[]).filter(isReady) as unknown as readonly [Locale, ...Locale[]];
 
+/** Whether a string is a ready interface language (guide folders, URLs and other untyped input). */
+export const isLocale = (code: string): code is Locale => (LOCALES as readonly string[]).includes(code);
+
 /** The languages every dictionary is written in first and that teacher-typed labels (`{ en, tr }`) have. */
 export const BASE_LOCALES = ['en', 'tr'] as const;

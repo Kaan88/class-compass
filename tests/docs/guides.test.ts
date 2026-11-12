@@ -8,10 +8,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GUIDE_IDS } from '../../src/client/help/guideList.ts';
+import { LOCALES } from '../../src/shared/languages.ts';
 import { classifyLink, collectTargets, parseMarkdown, slugify, type Block } from '../../src/client/help/markdown.ts';
 
 const root = path.resolve(import.meta.dirname, '../../docs/guides');
-const LANGS = ['en', 'tr'] as const;
+/** Every ready interface language (S26c, D-191): a language marked ready has its guides checked here. */
+const LANGS = LOCALES;
 
 const read = (p: string) => fs.readFileSync(p, 'utf8');
 const mdFiles = (dir: string) => fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
@@ -26,7 +28,7 @@ describe('user guides', () => {
     for (const lang of LANGS) {
       for (const id of GUIDE_IDS) expect(fs.existsSync(path.join(root, lang, `${id}.md`)), `${lang}/${id}.md`).toBe(true);
     }
-    expect(mdFiles(path.join(root, 'tr')).sort()).toEqual(mdFiles(path.join(root, 'en')).sort());
+    for (const lang of LANGS) expect(mdFiles(path.join(root, lang)).sort(), lang).toEqual(mdFiles(path.join(root, 'en')).sort());
     expect(fs.existsSync(path.join(root, 'README.md'))).toBe(true);
   });
 

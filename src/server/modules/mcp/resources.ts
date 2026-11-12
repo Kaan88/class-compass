@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { LocalizedText, pii } from '../../../shared/contracts/define.ts';
 import * as S from '../../../shared/contracts/school.ts';
+import { isLocale, LANGUAGES, LOCALES } from '../../../shared/languages.ts';
 import type { McpScope } from '../../../shared/mcp.ts';
 import { THEME_KEYS } from '../../../shared/themes.ts';
 import { themePackageJsonSchema } from '../../../shared/themePackage/schema.ts';
@@ -62,8 +63,8 @@ export function resourceUriOf(rel: string): string | null {
   if (rel === 'theme-package.schema.json') return `${RESOURCE_SCHEME}themes/package-schema`;
   const ex = /^examples\/([a-z0-9-]+)\.theme\.json$/u.exec(rel);
   if (ex && exists(rel)) return `${RESOURCE_SCHEME}themes/examples/${ex[1]}`;
-  const guide = /^guides\/(en|tr)\/([a-z0-9-]+)\.md$/u.exec(rel);
-  if (guide && exists(rel)) return `${RESOURCE_SCHEME}guides/${guide[1]}/${guide[2]}`;
+  const guide = /^guides\/([a-z]{2,3})\/([a-z0-9-]+)\.md$/u.exec(rel);
+  if (guide && isLocale(guide[1]!) && exists(rel)) return `${RESOURCE_SCHEME}guides/${guide[1]}/${guide[2]}`;
   return null;
 }
 
@@ -94,9 +95,13 @@ function titleOf(rel: string): string {
   return m ? m[1]!.trim() : rel;
 }
 
+/** The guide languages' names in English for resource descriptions (a later language falls back to its own name). */
+const GUIDE_LANGUAGE_NAMES: Partial<Record<string, string>> = { en: 'English', tr: 'Turkish' };
+
 function guideResources(): McpResource[] {
   const out: McpResource[] = [];
-  for (const lang of ['en', 'tr'] as const) {
+  // Every ready interface language (S26c, D-191); the Dockerfile copies each one's guides.
+  for (const lang of LOCALES) {
     const dir = path.join(DOCS, 'guides', lang);
     if (!fs.existsSync(dir)) continue;
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort()) {
@@ -106,7 +111,7 @@ function guideResources(): McpResource[] {
         uri: `${RESOURCE_SCHEME}guides/${lang}/${id}`,
         name: `guide-${lang}-${id}`,
         title: titleOf(rel),
-        description: `Class Compass user guide (${lang === 'en' ? 'English' : 'Turkish'}): ${titleOf(rel)}. Read-only Markdown, no school data.`,
+        description: `Class Compass user guide (${GUIDE_LANGUAGE_NAMES[lang] ?? LANGUAGES[lang].nativeName}): ${titleOf(rel)}. Read-only Markdown, no school data.`,
         mimeType: 'text/markdown',
         scope: null,
         role: 'any',

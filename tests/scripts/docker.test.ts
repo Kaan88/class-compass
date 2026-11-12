@@ -6,6 +6,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/server/config.ts';
+import { LOCALES } from '../../src/shared/languages.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const read = (f: string) => readFileSync(join(ROOT, f), 'utf8');
@@ -211,7 +212,7 @@ describe('Docker build context and image layout (S14i)', () => {
     const help = read('src/client/help/guides.ts');
     expect(help).toContain("import.meta.glob<string>('../../../docs/guides/*/*.md'");
     expect(help).toContain("import.meta.glob<string>('../../../docs/guides/img/*/*.png'");
-    const guides = [...filesIn('docs/guides/en', '.md'), ...filesIn('docs/guides/tr', '.md')];
+    const guides = LOCALES.flatMap((lang) => filesIn(`docs/guides/${lang}`, '.md'));
     const pictures = filesIn('docs/guides/img', '.png');
     expect(guides.length).toBeGreaterThan(15);
     expect(pictures.length).toBeGreaterThan(50);
@@ -246,8 +247,8 @@ describe('Docker build context and image layout (S14i)', () => {
       'drizzle/meta/_journal.json',
       ...filesIn('drizzle', '.sql'),
       // AI tools resources (S14h1, D-160): the guides' Markdown and the theming guide, read from docs/.
-      ...filesIn('docs/guides/en', '.md'),
-      ...filesIn('docs/guides/tr', '.md'),
+      // Every ready interface language (S26c, D-191): a new one needs its own `COPY docs/guides/<code>` line.
+      ...LOCALES.flatMap((lang) => filesIn(`docs/guides/${lang}`, '.md')),
       'docs/THEMING.md',
       'docs/theme-package.schema.json',
       // The theme example packages (S16b, D-164): MCP resources and export_theme of a built-in theme.

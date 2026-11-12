@@ -5,7 +5,7 @@
  * (type-checked: a new key in the union needs an entry here). Kept apart from the client module
  * manifests so the student bundle does not load the teacher app.
  */
-import { lazy, type ReactNode } from 'react';
+import { createElement, lazy, useState, type ComponentType, type ReactNode } from 'react';
 import type { StudentPage, StudentPageSection } from '../../shared/contracts/goals.ts';
 import type { MessageKey } from '../../shared/i18n/index.ts';
 import { IconClipboardCheck, IconFace, IconPlus, IconTarget, IconTrophy, IconUpload } from '../ui/icons.tsx';
@@ -17,19 +17,46 @@ import { MyGoals } from './screens/MyGoals.tsx';
 /**
  * The writing screens (New goal, How is it going?, Show my work) with the text checks and sentence
  * starters they share are lazy chunks (S26c, D-191; budget D-151): the page renders without them and
- * `preloadWritingScreens` fetches them as soon as the page has rendered, so opening one normally does
- * not wait (the screen frame shows "Loading…" if it still has to). My goals, the first tile, stays eager.
+ * `preloadWritingScreens` fetches them right after the page has rendered (so a visit still downloads
+ * them; the saving is in what must load and parse before the first render). A screen opened after the
+ * preload renders at once, without a "Loading…" frame (`preloadable`); only one opened before its chunk
+ * has arrived shows the screen frame's "Loading…". My goals, the first tile, stays eager.
  */
-const loadNewGoal = () => import('./screens/NewGoal.tsx');
-const loadHowIsItGoing = () => import('./screens/HowIsItGoing.tsx');
-const loadShowMyWork = () => import('./screens/ShowMyWork.tsx');
-const NewGoal = lazy(() => loadNewGoal().then((m) => ({ default: m.NewGoal })));
-const HowIsItGoing = lazy(() => loadHowIsItGoing().then((m) => ({ default: m.HowIsItGoing })));
-const ShowMyWork = lazy(() => loadShowMyWork().then((m) => ({ default: m.ShowMyWork })));
+function preloadable<P extends object>(load: () => Promise<ComponentType<P>>) {
+  let loaded: ComponentType<P> | null = null;
+  let pending: Promise<ComponentType<P>> | null = null;
+  const fetchIt = () =>
+    (pending ??= load().then(
+      (c) => (loaded = c),
+      (e: unknown) => {
+        pending = null; // a failed fetch is tried again when the screen opens
+        throw e;
+      },
+    ));
+  const Lazy = lazy(() => fetchIt().then((c) => ({ default: c })));
+  /**
+   * React.lazy suspends once even when the chunk is already here (its own `.then` runs later), and the
+   * Suspense fallback is then held for React's reveal throttle (about 0.8 s). So once the module has
+   * arrived the screen renders it directly. The choice is made once per mount, so a screen that
+   * mounted lazily keeps its state when the chunk arrives.
+   */
+  function Screen(props: P) {
+    const [Use] = useState<ComponentType<P>>(() => loaded ?? Lazy);
+    return createElement(Use, props);
+  }
+  return { Screen, preload: () => fetchIt().then(() => undefined) };
+}
+
+const newGoal = preloadable(() => import('./screens/NewGoal.tsx').then((m) => m.NewGoal));
+const howIsItGoing = preloadable(() => import('./screens/HowIsItGoing.tsx').then((m) => m.HowIsItGoing));
+const showMyWork = preloadable(() => import('./screens/ShowMyWork.tsx').then((m) => m.ShowMyWork));
+const NewGoal = newGoal.Screen;
+const HowIsItGoing = howIsItGoing.Screen;
+const ShowMyWork = showMyWork.Screen;
 
 /** Fetches the lazy writing screens in the background (errors are ignored here; opening a screen loads it). */
-export function preloadWritingScreens(): void {
-  for (const load of [loadNewGoal, loadHowIsItGoing, loadShowMyWork]) load().catch(() => undefined);
+export function preloadWritingScreens(): Promise<void> {
+  return Promise.all([newGoal, howIsItGoing, showMyWork].map((s) => s.preload().catch(() => undefined))).then(() => undefined);
 }
 
 export type SectionKey = StudentPageSection['key'];

@@ -10,7 +10,7 @@
  */
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useRef, useState, type ReactNode } from 'react';
+import { Suspense, useRef, useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_GOAL_OUTCOMES, type Goal, type StudentGoalsSection, type StudentPageSection } from '../../src/shared/contracts/goals.ts';
 import type { Locale } from '../../src/shared/i18n/index.ts';
@@ -18,7 +18,7 @@ import { en, tr } from '../messages.ts';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
 import { HOME, navHref, navSearch, readNav, type NavApi, type StudentNav } from '../../src/client/student/nav.ts';
 import { chipText, SentenceStarters } from '../../src/client/student/SentenceStarters.tsx';
-import { tilesOf } from '../../src/client/student/sections.tsx';
+import { preloadWritingScreens, tilesOf } from '../../src/client/student/sections.tsx';
 import { MyGoals } from '../../src/client/student/screens/MyGoals.tsx';
 import { NewGoal } from '../../src/client/student/screens/NewGoal.tsx';
 import { openLink, StudentApp, type OpenResult } from '../../src/client/student/StudentApp.tsx';
@@ -135,6 +135,29 @@ describe('home tiles (D-151)', () => {
     expect(tilesOf(sections(false)).map((x) => x.screen)).toEqual(['goals', 'showMyWork', 'homework']);
     expect(tilesOf([{ key: 'homework', data: { assignments: [] } }]).map((x) => x.screen)).toEqual(['homework']);
     expect(tilesOf([])).toEqual([]);
+  });
+});
+
+describe('lazy writing screens (S26c, D-191)', () => {
+  it('a writing screen opened after the preload renders at once, without a "Loading…" fallback', async () => {
+    await preloadWritingScreens();
+    const tiles = tilesOf([{ key: 'goals', data: section('sub-en', { canWrite: true }) }]);
+    for (const screenKey of ['newGoal', 'howIsItGoing', 'showMyWork'] as const) {
+      const tile = tiles.find((x) => x.screen === screenKey)!;
+      // act() without awaiting: whatever is on screen right after the synchronous render.
+      act(() => {
+        render(
+          wrap(
+            <Suspense fallback={<p data-testid="fallback">{en['common.loading']}</p>}>
+              <div data-testid="screen">{tile.render({ subjectId: 'sub-en', media, nav: { ...HOME, screen: screenKey }, go: () => undefined, finish: () => undefined, titleId: 't' })}</div>
+            </Suspense>,
+          ),
+        );
+      });
+      expect(screen.queryByTestId('fallback'), screenKey).toBeNull();
+      expect(screen.getByTestId('screen').textContent, screenKey).not.toBe('');
+      cleanup();
+    }
   });
 });
 

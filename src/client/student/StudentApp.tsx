@@ -199,10 +199,10 @@ function Page({ onLanguage, nav }: { onLanguage: (l: ClassLanguage) => void; nav
     if (q.data) setDisplay({ theme: q.data.theme });
     if (q.data) onLanguage(q.data.language);
   }, [q.data, onLanguage]);
-  // S26c (D-191): once the page has rendered, fetch the lazy writing screens so opening one does not wait.
+  // S26c (D-191): once the page has rendered, fetch the lazy writing screens; one opened after that renders at once.
   const loaded = Boolean(q.data);
   useEffect(() => {
-    if (loaded) preloadWritingScreens();
+    if (loaded) void preloadWritingScreens();
   }, [loaded]);
   // New achievements are celebrated on whichever screen the page opens (D-122).
   useCelebrateNewAchievements(
@@ -253,7 +253,7 @@ function Page({ onLanguage, nav }: { onLanguage: (l: ClassLanguage) => void; nav
   else if (tile && subject)
     content = (
       <ScreenFrame title={t(tile.label)} subjectName={subjectName} back={nav.back}>
-        {/* S26c (D-191): the writing screens are lazy chunks, normally preloaded by then. */}
+        {/* S26c (D-191): the writing screens are lazy chunks; this fallback shows only before their preload has arrived. */}
         <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
           {tile.render({ subjectId: subject.subjectId, media: page.media, nav: nav.nav, go: nav.go, finish: nav.finish, titleId: SCREEN_TITLE_ID })}
         </Suspense>

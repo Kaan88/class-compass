@@ -6,6 +6,7 @@
  * classroom bundle.
  */
 import type { Locale } from '../../shared/i18n/index.ts';
+import { isLocale } from '../../shared/languages.ts';
 
 export { GUIDE_IDS, GUIDE_TITLE_KEYS, isGuideId, type GuideId } from './guideList.ts';
 import type { GuideId } from './guideList.ts';
@@ -24,7 +25,8 @@ export async function loadGuide(id: GuideId, locale: Locale): Promise<string | n
  * else (a remote address or a missing file is never loaded).
  */
 export function guideImageUrl(src: string): string | null {
-  const m = /^\.\.\/img\/(en|tr)\/([a-z0-9-]+\.png)$/u.exec(src);
-  if (!m) return null;
+  // Any ready interface language (S26c, D-191), not a hand-written list.
+  const m = /^\.\.\/img\/([a-z]{2,3})\/([a-z0-9-]+\.png)$/u.exec(src);
+  if (!m || !isLocale(m[1]!)) return null;
   return images[`../../../docs/guides/img/${m[1]}/${m[2]}`] ?? null;
 }
