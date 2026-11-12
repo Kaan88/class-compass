@@ -16,6 +16,8 @@
  *
  * S20b (D-170): the teacher Goals page can control the chosen goal (`goalId`, `onGoalChange`), so
  * "Add evidence" on a goal card opens this form for that goal.
+ * S27b (D-194): the student's "My goals" opens the `steps` layout for one goal (`fixedGoal`): there is
+ * no "which goal" step (1 how → 2 the work) and every step names the goal.
  */
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ACCEPT_HINT } from '../../../shared/contracts/files.ts';
@@ -85,6 +87,7 @@ export function EvidenceAdder({
   starters,
   goalId: goalIdProp,
   onGoalChange,
+  fixedGoal,
 }: {
   goals: Array<{ id: string; label: string }>;
   media: EvidenceMedia;
@@ -105,12 +108,14 @@ export function EvidenceAdder({
   /** `form` only: the chosen goal ('' = none) when the page controls it, and how to change it. */
   goalId?: string;
   onGoalChange?: (goalId: string) => void;
+  /** `steps` only: the evidence is for this goal (no goal step); `goals` is then not asked. */
+  fixedGoal?: { id: string; label: string };
 }) {
   const { t, locale } = useI18n();
   const modes = evidenceModes(media);
   const [mode, setMode] = useState<EvidenceMode>('text');
   const [localGoalId, setLocalGoalId] = useState('');
-  const goalId = goalIdProp ?? localGoalId;
+  const goalId = fixedGoal?.id ?? goalIdProp ?? localGoalId;
   const setGoalId = (id: string) => (onGoalChange ? onGoalChange(id) : setLocalGoalId(id));
   const [body, setBody] = useState('');
   const [url, setUrl] = useState('');
@@ -134,7 +139,7 @@ export function EvidenceAdder({
   const [localStep, setLocalStep] = useState(1);
   const [picked, setPicked] = useState({ mode: false, goal: false });
   const steps = layout === 'steps';
-  const goalStep = goals.length > 0;
+  const goalStep = !fixedGoal && goals.length > 0;
   const workStep = goalStep ? 3 : 2;
   const asked = stepProp ?? localStep;
   // A step whose earlier choice is not known here (the page was reloaded there) starts again.
@@ -296,11 +301,13 @@ export function EvidenceAdder({
     </fieldset>
   );
   const stepCount = (n: number) => <p className="cc-student__step">{t('student.step', { n, total: workStep })}</p>;
+  const forFixedGoal = fixedGoal ? <p className="cc-muted" data-testid="evidence-for-goal">{t('student.forGoal', { goal: fixedGoal.label })}</p> : null;
 
   if (steps && step === 1)
     return (
       <div className="cc-card cc-stack cc-evidence-steps" data-testid="evidence-form" data-step="how">
         {stepCount(1)}
+        {forFixedGoal}
         {modeButtons(t('student.work.how'))}
       </div>
     );
@@ -338,6 +345,7 @@ export function EvidenceAdder({
         <>
           {stepCount(workStep)}
           <h2 className="cc-h2 cc-evidence-steps__question">{t(`evidence.mode.${current}`)}</h2>
+          {forFixedGoal}
           {goalStep ? <p className="cc-muted">{goalId ? t('student.forGoal', { goal: goals.find((g) => g.id === goalId)?.label ?? '' }) : t('student.work.all')}</p> : null}
         </>
       ) : (
