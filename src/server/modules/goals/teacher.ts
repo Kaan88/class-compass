@@ -21,7 +21,7 @@ import { newId } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { assertModuleEnabled, getMediaPolicy, isModuleEnabled, mergeModuleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, getClass, type ClassRow, type ContextRow } from '../school/policy.ts';
-import { assertMediaAllowed, deleteFileRow } from '../files/service.ts';
+import { assertMediaAllowed, deleteFileRow, videoMaxBytesFor } from '../files/service.ts';
 import { liveClassIdsOf, rosterRows } from '../students/service.ts';
 import { evidenceDtos, evidenceOf, feedbackDtos, feedbackOf, goalDto, goalDtos, goalsOf, type GoalRow } from './dto.ts';
 import { categoryDto, categoryName, categoryNamesOf, defaultLibrary, getCategory, getPreset, hiddenDefaultsOf, inScope, libraryFor, NOTHING_HIDDEN, outcomesOf, presetDto, type CategoryRow, type HiddenDefaults } from './library.ts';
@@ -172,7 +172,7 @@ export function studentDetail(ctx: RequestContext, contextId: string, studentId:
     feedback: feedbackDtos(ctx.db, feedbackOf(ctx.db, studentId, subjectId)),
     privateNotes: myPrivateNotes(ctx.db, requireUser(ctx).id, studentId, subjectId),
     library: libraryFor(ctx.db, s.context.id, subjectId, teacherIdsOf(s), true),
-    media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments, video: media.evidenceVideo },
+    media: { photos: media.evidencePhotos, audio: media.evidenceAudio, documents: media.evidenceDocuments, video: media.evidenceVideo, videoMaxBytes: videoMaxBytesFor(ctx, studentId) },
   };
 }
 

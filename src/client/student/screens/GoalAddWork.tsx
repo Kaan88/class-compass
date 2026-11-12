@@ -35,7 +35,7 @@ export function GoalAddWork({ data, goal, subjectId, media, nav, go, onDone }: G
         goals={[]}
         fixedGoal={{ id: goal.id, label: goalText(goal, locale) }}
         media={media}
-        upload={(kind, file, name) => upload(G.studentUploadFile, { kind }, file, name)}
+        upload={(kind, file, name, onProgress) => upload(G.studentUploadFile, { kind }, file, name, onProgress)}
         add={(input) => call(G.studentAddEvidence, { subjectId, ...input })}
         run={(fn, success) => run(fn, success)}
         check={check}

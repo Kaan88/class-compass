@@ -6,8 +6,9 @@
  *   MediaRecorder: nothing personal in it) with "Add a video", and records one with the in-page
  *   recorder and Chromium's fake camera ("Record a video": timer, Stop, Use this video).
  * - The teacher opens the student on the Goals page and plays the video: it is served with byte
- *   ranges (206) and plays. Axe on the evidence lists; on a phone "Record a video" opens the system
- *   camera in video mode.
+ *   ranges (206) and plays. Axe on the evidence lists; on a phone "Record a video" is the in-page
+ *   recorder too, with the camera app (capture input in video mode) as a second choice.
+ * - The recorded clip plays back in its own player before "Use this video" (not the stopped camera).
  * The switch is put back off in `finally` (one shared e2e server), and the evidence is deleted.
  */
 import AxeBuilder from '@axe-core/playwright';
@@ -18,7 +19,7 @@ type Ctx = { id: string; classId: string; className: string; subjectName: { en: 
 type Rostered = { id: string; fullName: string };
 
 async function seriousViolations(page: Page, include?: string) {
-  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity));
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
   // Captions are not required for the students' own short videos (owner, D-193); the words under a
   // video describe it. Every other rule applies.
   const builder = new AxeBuilder({ page }).disableRules(['video-caption']);
@@ -134,7 +135,8 @@ test('the admin switches video on; a student adds and records videos; the teache
     const clip = await syntheticVideo(p);
     expect(clip.length).toBeGreaterThan(1000);
     await chooseKind(form, 'Add a video');
-    await expect(form.getByText(/up to 3 minutes long and up to 150 MB/u)).toBeVisible();
+    // The real limit for this student (UPLOAD_VIDEO_MAX_MB, 90 by default, or less space left).
+    await expect(form.getByText(/up to 3 minutes long and up to \d+ MB/u)).toBeVisible();
     await form.getByLabel('Choose a video').setInputFiles({ name: 'colours.webm', mimeType: 'video/webm', buffer: clip });
     await expect(form.getByTestId('evidence-pending')).toContainText('colours.webm');
     await form.getByLabel('A few words (you can skip this)').fill('My colour video');
@@ -154,7 +156,12 @@ test('the admin switches video on; a student adds and records videos; the teache
     await expect(recorder.getByTestId('video-timer')).toContainText('of 3:00');
     await p.waitForTimeout(1500);
     await recorder.getByRole('button', { name: 'Stop' }).click();
-    await expect(recorder.getByLabel('The video you recorded')).toBeVisible();
+    const preview = recorder.getByLabel('The video you recorded');
+    await expect(preview).toBeVisible();
+    // The clip itself loads in the player (a camera stream left on the element would win over src).
+    await expect
+      .poll(() => preview.evaluate((v: HTMLVideoElement) => ({ src: v.currentSrc.startsWith('blob:'), stream: v.srcObject !== null, ready: v.readyState >= 1 })))
+      .toEqual({ src: true, stream: false, ready: true });
     await recorder.getByRole('button', { name: 'Use this video' }).click();
     await expect(form.getByTestId('evidence-pending')).toContainText('video.webm');
     await form.getByLabel('A few words (you can skip this)').fill('Me saying hello');
@@ -194,7 +201,7 @@ test('the admin switches video on; a student adds and records videos; the teache
   }
 });
 
-test('on a phone "Record a video" opens the camera app in video mode, and the form passes axe @mobile', async ({ page, browser }) => {
+test('on a phone "Record a video" is the in-page recorder with the camera app as a second choice, and the form passes axe @mobile', async ({ page, browser }) => {
   test.skip(test.info().project.name !== 'mobile', 'phone layout');
   test.setTimeout(120_000);
   await login(page, 'english');
@@ -209,10 +216,11 @@ test('on a phone "Record a video" opens the camera app in video mode, and the fo
     await p.goto(url);
     const { form, workUrl } = await showMyWork(p);
     await chooseKind(form, 'Record a video');
-    const input = form.getByLabel('Open the camera to record a video');
+    await expect(form.getByTestId('video-recorder')).toHaveCount(1);
+    const input = form.getByLabel('Use the camera app instead');
     await expect(input).toHaveAttribute('capture', 'environment');
     await expect(input).toHaveAttribute('accept', 'video/*');
-    await expect(form.getByTestId('video-recorder')).toHaveCount(0);
+    await expect(form.getByText('The camera app makes big files: keep your video under 1 minute.')).toBeVisible();
     expect(await seriousViolations(p, '[data-testid="evidence-form"]')).toEqual([]);
     await p.goto(workUrl);
     await chooseKind(form, 'Add a video');

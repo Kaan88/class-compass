@@ -4884,15 +4884,18 @@ label:has(> input[type='file']:focus-visible) {
   border-radius: 50%;
   background: var(--cc-danger);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .cc-video-recorder__dot {
-    animation: cc-video-dot 1.6s ease-in-out infinite;
-  }
+/* A steady dot: with the "Recording… m:ss of 3:00" text it is enough, and nothing repeats (header). */
+/* Upload progress under the evidence form (D-193): the words carry the number, the bar shows it. */
+.cc-evidence-progress {
+  gap: 0.25rem;
 }
-@keyframes cc-video-dot {
-  50% {
-    opacity: 0.35;
-  }
+.cc-evidence-progress__text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.cc-evidence-progress .cc-progress {
+  width: 100%;
+  flex: none;
 }
 .cc-link-url {
   overflow-wrap: anywhere;

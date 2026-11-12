@@ -477,7 +477,7 @@ export const tr = {
   'modules.mediaConsent': 'Öğrenci fotoğrafları, fotoğraf kanıtı, ses kanıtı ve video kanıtı, izinler doğrulanana kadar kapalıdır. Bunları ancak okul izinleri ve KVKK durumunu doğruladıktan sonra açın.',
   'modules.disabledUntilConsent': 'İzinler doğrulanana kadar kapalı',
   'modules.documentsHint': 'Metin, bağlantı ve belge kanıtı.',
-  'modules.videoHint': 'Öğrenciler ve öğretmenler en fazla 3 dakikalık ve 150 MB’lık videolar ekler (MP4, MOV, WebM). Videolarda çoğu zaman çocukların yüzleri ve sesleri olur: bunu yalnızca okulun gerektirdiği izinler (KVKK) alındıysa açın. Uygulamada çekilen videolarda konum bilgisi olmaz; başka video dosyalarındaki konum etiketleri, dosya izin verdiği ölçüde silinir.',
+  'modules.videoHint': 'Öğrenciler ve öğretmenler en fazla 3 dakikalık videolar ekler (MP4, MOV, WebM; varsayılan olarak 90 MB, sunucuda ayarlanır). Videolarda çoğu zaman çocukların yüzleri ve sesleri olur: bunu yalnızca okulun gerektirdiği izinler (KVKK) alındıysa açın. Sayfada Kaydı başlat ile çekilen videolarda konum bilgisi olmaz; telefonun kamera uygulaması konum kaydedebilir ve bu dosyalardaki konum etiketleri, dosya izin verdiği ölçüde silinir.',
   'modules.keepsData': 'Bir modülü kapatmak onu gizler ama tüm verilerini korur.',
   'students.name': 'Ad soyad',
   'students.number': 'Öğrenci numarası',

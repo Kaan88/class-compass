@@ -107,7 +107,10 @@ describe('the video parser (D-193)', () => {
       expect(after.includes(Buffer.from('com.apple.quicktime.location'))).toBe(false);
       expect(after.includes(Buffer.from('Fictional Phone'))).toBe(false);
       const again = await inspectVideo(f);
-      expect(again).toMatchObject({ ok: true, container: r.container, durationMs: r.durationMs, metadata: [] });
+      expect(again).toMatchObject({ ok: true, container: r.container, durationMs: r.durationMs });
+      // What is still listed is only padding (`free` boxes, Void elements) whose content is all zero.
+      if (!again.ok) throw new Error('expected a video');
+      for (const sp of again.metadata) expect(after.subarray(sp.start + sp.header, sp.start + sp.size).every((x) => x === 0)).toBe(true);
       // Everything outside the blanked boxes is byte for byte the same (the media data is untouched).
       const tail = b.subarray(b.length - 200);
       expect(after.subarray(after.length - 200).equals(tail) || r.container === 'webm').toBe(true);
@@ -170,10 +173,11 @@ describe('video evidence (S27a, D-193)', () => {
       const before = fileRows();
       // The client's type and name are never trusted.
       for (const [data, name, type, reason] of [
-        [Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\n'), 'trick.mp4', 'video/mp4', 'FILE_TYPE_NOT_ALLOWED'],
-        [mp4Video({ tracks: ['soun'] }), 'song.mp4', 'video/mp4', 'FILE_TYPE_NOT_ALLOWED'],
-        [webmVideo({ docType: 'matroska' }), 'film.webm', 'video/webm', 'FILE_TYPE_NOT_ALLOWED'],
-        [Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'), 'x.webm', 'video/webm', 'FILE_TYPE_NOT_ALLOWED'],
+        // A child-worded reason for every file that is not a video we can use (D-193).
+        [Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\n'), 'trick.mp4', 'video/mp4', 'VIDEO_NOT_VIDEO'],
+        [mp4Video({ tracks: ['soun'] }), 'song.mp4', 'video/mp4', 'VIDEO_NOT_VIDEO'],
+        [webmVideo({ docType: 'matroska' }), 'film.webm', 'video/webm', 'VIDEO_NOT_VIDEO'],
+        [Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'), 'x.webm', 'video/webm', 'VIDEO_NOT_VIDEO'],
         [mp4Video({ noMoov: true }), 'cut.mp4', 'video/mp4', 'VIDEO_UNREADABLE'],
       ] as const) {
         const r = await studentUpload(adaPhone, data, name, type);
@@ -219,7 +223,7 @@ describe('video evidence (S27a, D-193)', () => {
     }
   });
 
-  it('STU-8: Range requests (206, suffix, 416), the right Content-Type, inline, a short private cache; for the owner, the teacher and an admin', async () => {
+  it('STU-8: Range requests (206, suffix, 416), the right Content-Type, inline, never cached; for the owner, the teacher and an admin', async () => {
     try {
       await setMedia(VIDEO, true);
       const data = mp4Video({ seconds: 3, mdat: 2000 });
@@ -234,7 +238,8 @@ describe('video evidence (S27a, D-193)', () => {
         expect(whole.statusCode, url).toBe(200);
         expect(whole.headers['content-type']).toBe('video/mp4');
         expect(whole.headers['accept-ranges']).toBe('bytes');
-        expect(whole.headers['cache-control']).toBe('private, max-age=600');
+        // Never kept by the browser (a shared school computer); seeking works through ranges.
+        expect(whole.headers['cache-control']).toBe('no-store');
         expect(String(whole.headers['content-disposition'])).toMatch(/^inline;/u);
         expect(whole.headers['x-content-type-options']).toBe('nosniff');
         expect(whole.rawPayload.length).toBe(data.length);
@@ -260,6 +265,60 @@ describe('video evidence (S27a, D-193)', () => {
     } finally {
       await setMedia(VIDEO, false);
     }
+  });
+
+  it('D-014, D-193: an MP4 or WebM with a picture track sent as sound is refused while video is off (student and teacher); sound-only files still pass', async () => {
+    const AUDIO = 'media.evidenceAudio';
+    const audioUpload = (c: Client, data: Buffer, name: string, type: string, query: string) => {
+      const m = multipart(data, name, type);
+      return c.req('POST', query, m.body, m.headers);
+    };
+    try {
+      await setMedia(AUDIO, true);
+      const before = fileRows();
+      for (const [data, name, type] of [
+        [mp4Video(), 'voice.m4a', 'audio/mp4'],
+        [mp4Video({ brand: 'M4A ' }), 'voice.m4a', 'audio/mp4'],
+        [webmVideo(), 'voice.webm', 'audio/webm'],
+      ] as const) {
+        const st = await audioUpload(adaPhone, data, name, type, '/api/student/files?kind=audio');
+        expect(st.status, name).toBe(400);
+        expect(st.body.error.details.reason, name).toBe('VIDEO_AS_AUDIO');
+        const te = await audioUpload(s.teacherA, data, name, type, `/api/files?kind=audio&ownerStudentId=${ada.id}&contextId=${s.ctxA.id}`);
+        expect(te.status, name).toBe(400);
+        expect(te.body.error.details.reason, name).toBe('VIDEO_AS_AUDIO');
+      }
+      expect(fileRows()).toBe(before);
+      // Sound-only MP4 and WebM are still voice files.
+      expect(await ok(audioUpload(adaPhone, mp4Video({ tracks: ['soun'] }), 'voice.m4a', 'audio/mp4', '/api/student/files?kind=audio'))).toMatchObject({ kind: 'audio', mime: 'audio/mp4' });
+      expect(await ok(audioUpload(adaPhone, webmVideo({ tracks: [2] }), 'voice.webm', 'audio/webm', '/api/student/files?kind=audio'))).toMatchObject({ kind: 'audio', mime: 'audio/webm' });
+    } finally {
+      await setMedia(AUDIO, false);
+    }
+  });
+
+  it('D-193: a video keeps only its container’s extension, and hidden bytes in its padding are zeroed', async () => {
+    try {
+      await setMedia(VIDEO, true);
+      const page = Buffer.from('<html><script>alert(1)</script></html>');
+      const free = Buffer.concat([Buffer.alloc(4), Buffer.from('free', 'latin1'), page]);
+      free.writeUInt32BE(free.length, 0);
+      const up = await ok(studentUpload(adaPhone, Buffer.concat([mp4Video({ seconds: 2 }), free]), 'my-video.html', 'video/mp4'));
+      expect(up).toMatchObject({ kind: 'video', mime: 'video/mp4', name: 'my-video.mp4' });
+      expect((await storedBytes(up.id)).includes(page)).toBe(false);
+      await ok(adaPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'file', fileId: up.id }));
+      expect(String((await raw(s.teacherA, `/api/files/${up.id}`)).headers['content-disposition'])).toContain('filename="my-video.mp4"');
+      const mov = await ok(teacherUpload(s.teacherA, s.ctxA.id, ada.id, mp4Video({ brand: 'qt  ' }), 'play.zip', 'video/quicktime'));
+      expect(mov.name).toBe('play.mov');
+    } finally {
+      await setMedia(VIDEO, false);
+    }
+  });
+
+  it('STU-8, D-193: the pages carry the largest video that can be added now (90 MB by default, less when the space is nearly full)', async () => {
+    const MB = 1024 * 1024;
+    expect((await ok(adaPhone.get('/api/student/page'))).media.videoMaxBytes).toBe(90 * MB);
+    expect((await ok(s.teacherA.get(`/api/teacher/contexts/${s.ctxA.id}/students/${ada.id}/goals`))).media.videoMaxBytes).toBe(90 * MB);
   });
 
   it('STU-4, ACC-10 (IDOR): another student, a teacher of another class and a student guessing ids get 404; nobody attaches someone else’s video', async () => {
@@ -314,13 +373,33 @@ describe('video quota (S27a, D-193)', () => {
   beforeEach(() => setup({ UPLOAD_STUDENT_QUOTA_MB: 1 }));
   afterEach(teardown);
 
-  it('STU-8: a video that would fill the student’s space is refused (QUOTA_STUDENT)', async () => {
+  it('STU-8: a video that would fill the student’s space is refused (QUOTA_STUDENT); the page says how much is left', async () => {
     try {
       await setMedia(VIDEO, true);
-      await ok(studentUpload(adaPhone, mp4Video({ mdat: 600 * 1024 })));
+      expect((await ok(adaPhone.get('/api/student/page'))).media.videoMaxBytes).toBe(1024 * 1024);
+      const first = await ok(studentUpload(adaPhone, mp4Video({ mdat: 600 * 1024 })));
+      expect((await ok(adaPhone.get('/api/student/page'))).media.videoMaxBytes).toBe(1024 * 1024 - first.size);
       const r = await studentUpload(adaPhone, mp4Video({ mdat: 600 * 1024 }));
       expect(r.status).toBe(409);
       expect(r.body.error.details.reason).toBe('QUOTA_STUDENT');
+    } finally {
+      await setMedia(VIDEO, false);
+    }
+  });
+});
+
+describe('video upload limit (S27a, D-193)', () => {
+  beforeEach(() => setup({ UPLOAD_VIDEO_MAX_MB: 1 }));
+  afterEach(teardown);
+
+  it('STU-8: UPLOAD_VIDEO_MAX_MB lowers the video limit (behind Cloudflare it stays under 100 MB); the page names it', async () => {
+    try {
+      await setMedia(VIDEO, true);
+      expect((await ok(adaPhone.get('/api/student/page'))).media.videoMaxBytes).toBe(1024 * 1024);
+      const big = await studentUpload(adaPhone, mp4Video({ mdat: 1100 * 1024 }));
+      expect(big.status).toBe(400);
+      expect(big.body.error.details).toMatchObject({ reason: 'FILE_TOO_LARGE', limitBytes: 1024 * 1024 });
+      await ok(studentUpload(adaPhone, mp4Video({ mdat: 900 * 1024 })));
     } finally {
       await setMedia(VIDEO, false);
     }

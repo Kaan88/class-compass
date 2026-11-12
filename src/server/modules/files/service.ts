@@ -5,7 +5,8 @@
  * kind's hard size limit → sniff the bytes against the kind's allow-list (client type and name are
  * ignored) → re-encode images (EXIF/GPS stripped, evidence ≤ 2048 px, others ≤ 2560 px, thumbnail),
  * strip audio tags (D-119); videos (D-193): container checked by its own bytes, duration capped,
- * location and device tags blanked in place, never re-encoded → move into place under a
+ * location and device tags blanked in place, never re-encoded; an MP4 or WebM sent as sound must hold
+ * no picture track; a video's name keeps only its container's extension → move into place under a
  * random key → quotas checked in the SAME transaction that inserts the files row.
  *
  * Access: a file is only ever served by `sendFile` after `assertCanReadFile` (owner scope): admins
@@ -32,7 +33,7 @@ import { neutralStudentFileName } from '../textChecks/service.ts';
 import { AudioMetaError, stripAudioMetadata } from './audioMeta.ts';
 import { MAX_IMAGE_EDGE, reencodeImage } from './image.ts';
 import { sniffFile } from './sniff.ts';
-import { inspectVideo, neutraliseVideoMetadata } from './video.ts';
+import { inspectVideo, neutraliseVideoMetadata, videoTrackIn } from './video.ts';
 import { newStorageKey, newTempPath, removeKey, removeQuietly, sha256File, storeBuffer, storeTemp, storagePath } from './storage.ts';
 
 export type FileRow = typeof files.$inferSelect;
@@ -95,6 +96,25 @@ function usedBytes(db: Db, ownerStudentId: string | null): number {
   return Number(r?.total ?? 0);
 }
 
+/** Free upload space of one student in bytes (0 when full). */
+export function studentSpaceLeft(ctx: RequestContext, studentId: string): number {
+  return Math.max(0, ctx.config.UPLOAD_STUDENT_QUOTA_MB * MB - usedBytes(ctx.db, studentId));
+}
+
+/** The largest video one upload may be (D-193): the 150 MB hard limit, lowered by `UPLOAD_VIDEO_MAX_MB`. */
+export function videoUploadLimit(config: RequestContext['config']): number {
+  return Math.min(UPLOAD_LIMITS.video, config.UPLOAD_VIDEO_MAX_MB * MB);
+}
+
+/**
+ * The largest video that can be added for this student right now (D-193): the upload limit, or less
+ * when the student's space is nearly full. Sent with the media flags, so the device refuses a video
+ * that could never be saved before it is uploaded, and its hint names the real number.
+ */
+export function videoMaxBytesFor(ctx: RequestContext, studentId: string): number {
+  return Math.min(videoUploadLimit(ctx.config), studentSpaceLeft(ctx, studentId));
+}
+
 /** Quotas (STU-8). Must run inside the transaction that inserts the files row. */
 function assertQuota(ctx: RequestContext, ownerStudentId: string | null, bytes: number): void {
   if (ownerStudentId) {
@@ -115,7 +135,7 @@ export interface IngestOptions {
 /** Read the single multipart file part into a temp file, enforcing the kind's size limit. */
 async function receiveToTemp(ctx: RequestContext, req: FastifyRequest, kind: FileKind): Promise<{ tmp: string; filename: string | null }> {
   if (!req.isMultipart()) throw invalid('Send the file as multipart form data', { reason: 'NOT_MULTIPART' });
-  const limit = UPLOAD_LIMITS[kind];
+  const limit = kind === 'video' ? videoUploadLimit(ctx.config) : UPLOAD_LIMITS[kind];
   const part = await req.file({ limits: { fileSize: limit, files: 1 } });
   if (!part) throw invalid('No file received', { reason: 'NO_FILE' });
   const tmp = await newTempPath(ctx.config);
@@ -148,11 +168,12 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
       const v = await inspectVideo(tmp);
       if (!v.ok) {
         if (v.reason === 'VIDEO_UNREADABLE') throw invalid('The video could not be read', { reason: 'VIDEO_UNREADABLE' });
-        throw invalid(v.reason === 'FILE_EMPTY' ? 'The file is empty' : 'This type of file is not accepted', { reason: v.reason });
+        // A child-worded reason (D-193): the file is not a video we can use.
+        throw invalid(v.reason === 'FILE_EMPTY' ? 'The file is empty' : 'This file is not an accepted video', { reason: v.reason === 'FILE_EMPTY' ? 'FILE_EMPTY' : 'VIDEO_NOT_VIDEO' });
       }
       const limit = MAX_VIDEO_MS + VIDEO_DURATION_GRACE_MS;
       if ((v.durationMs ?? 0) > limit || v.atLeastMs > limit) throw invalid('The video is longer than the limit', { reason: 'VIDEO_TOO_LONG', maxSeconds: MAX_VIDEO_MS / 1000 });
-      if (!ALLOWED_MIME.video.includes(v.mime)) throw invalid('This type of file is not accepted', { reason: 'FILE_TYPE_NOT_ALLOWED' });
+      if (!ALLOWED_MIME.video.includes(v.mime)) throw invalid('This file is not an accepted video', { reason: 'VIDEO_NOT_VIDEO' });
       // Location, device and software tags are blanked in place (no re-encoding; every offset stays valid).
       await neutraliseVideoMetadata(tmp, v.container, v.metadata);
       videoDurationMs = v.durationMs;
@@ -162,6 +183,13 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
     if (sniff && !sniff.ok) {
       if (sniff.detected === 'image/heic' || sniff.detected === 'image/heif') throw invalid('HEIC pictures cannot be read here', { reason: 'IMAGE_HEIC' });
       throw invalid(sniff.reason === 'FILE_EMPTY' ? 'The file is empty' : 'This type of file is not accepted', { reason: sniff.reason });
+    }
+    // An MP4 or WebM sent as sound (voice evidence, a teacher's clip) must hold no picture track (D-193):
+    // otherwise a video could be added while the video switch is off, past the 3-minute cap.
+    if (sniff && (sniff.mime === 'audio/mp4' || sniff.mime === 'audio/webm')) {
+      const pictures = await videoTrackIn(tmp);
+      if (pictures === true) throw invalid('This sound file holds a video', { reason: 'VIDEO_AS_AUDIO' });
+      if (pictures === null) throw invalid('The sound file could not be read', { reason: 'AUDIO_UNREADABLE' });
     }
     const key = newStorageKey();
     let mime = sniff ? sniff.mime : videoMime;
@@ -215,7 +243,8 @@ export async function ingestUpload(ctx: RequestContext, req: FastifyRequest, opt
       sniffedMime: mime,
       kind: opts.kind,
       // A student's file name is shown back to them and to teachers: one with a blocked word gets a neutral name (D-123).
-      originalName: ctx.actor.type === 'student' ? neutralStudentFileName(ctx.db, filename) : filename,
+      // A video's name always ends with its container's extension (D-193): a video is never saved as `x.html`.
+      originalName: nameForMime(ctx.actor.type === 'student' ? neutralStudentFileName(ctx.db, filename) : filename, opts.kind === 'video' ? mime : null),
       ownerStudentId: opts.ownerStudentId,
       uploadedByType: actorUserId(ctx.actor) ? 'user' : ctx.actor.type === 'student' ? 'student' : 'system',
       uploadedById: actorUserId(ctx.actor) ?? ctx.actor.id,
@@ -266,43 +295,57 @@ export function assertCanReadFile(ctx: RequestContext, fileId: string): FileRow 
   throw notFound('File');
 }
 
-/** RFC 6266 attachment name with an ASCII fallback. */
-function disposition(type: 'inline' | 'attachment', name: string | null, fallbackExt: string): string {
-  const n = name ?? `file${fallbackExt}`;
+/**
+ * A file name that ends with an extension of `mime` (D-193): any other extension is replaced by the
+ * type's own, so a saved copy never opens as something else (a video named `x.html` becomes `x.mp4`).
+ * Types without a known extension (and `mime` null) keep the name.
+ */
+export function nameForMime(name: string | null, mime: string | null): string | null {
+  const exts = mime ? EXTS[mime] : undefined;
+  if (!name || !exts) return name;
+  const m = /\.[^.\s]{1,10}$/u.exec(name);
+  const ext = m ? m[0].toLowerCase() : '';
+  if (exts.includes(ext)) return name;
+  const base = (m ? name.slice(0, m.index) : name).slice(0, 120 - exts[0]!.length) || 'file';
+  return `${base}${exts[0]}`;
+}
+
+/** RFC 6266 attachment name with an ASCII fallback; the name always ends with an extension of `mime`. */
+function disposition(type: 'inline' | 'attachment', name: string | null, mime: string): string {
+  const n = nameForMime(name, mime) ?? `file${EXTS[mime]?.[0] ?? ''}`;
   const ascii = n.replace(/[^\x20-\x7e]/gu, '_').replace(/["\\]/gu, '_');
   return `${type}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(n)}`;
 }
 
-/** How long a browser may keep a video it was allowed to see (D-193): short, private, never shared. */
-export const VIDEO_CACHE_SECONDS = 600;
-
-const EXT: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'application/pdf': '.pdf',
-  'text/plain': '.txt',
-  'audio/webm': '.webm',
-  'audio/ogg': '.ogg',
-  'audio/mp4': '.m4a',
-  'audio/mpeg': '.mp3',
-  'application/vnd.ms-excel': '.xls',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
-  'application/vnd.oasis.opendocument.text': '.odt',
-  'audio/wav': '.wav',
-  'video/mp4': '.mp4',
-  'video/quicktime': '.mov',
-  'video/webm': '.webm',
+/** The extensions of each stored type; the first is the one a name gets when its own does not fit. */
+const EXTS: Record<string, readonly string[]> = {
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+  'image/webp': ['.webp'],
+  'application/pdf': ['.pdf'],
+  'text/plain': ['.txt', '.csv', '.tsv'],
+  'audio/webm': ['.webm', '.weba'],
+  'audio/ogg': ['.ogg', '.oga', '.opus'],
+  'audio/mp4': ['.m4a', '.mp4', '.aac'],
+  'audio/mpeg': ['.mp3'],
+  'application/vnd.ms-excel': ['.xls'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+  'application/vnd.oasis.opendocument.text': ['.odt'],
+  'audio/wav': ['.wav'],
+  'video/mp4': ['.mp4', '.m4v'],
+  'video/quicktime': ['.mov', '.qt'],
+  'video/webm': ['.webm'],
 };
 
 /**
  * Send a file that passed the policy check. Uploaded content can never run in the app's origin:
  * `Content-Security-Policy: sandbox`, `nosniff`, `no-store`, and anything that is not an image,
  * audio or video is an attachment. Audio and video support single byte ranges (206; seeking in the
- * player). Video (D-193) gets a short private cache instead of `no-store`, so seeking and playing it
- * again do not download it again; a file id never changes its content, and no shared cache keeps it.
+ * player, so no cache is needed). Every file, video included (D-193), is `private, no-store`: a
+ * browser keeps no copy on a shared school computer, and each play passes the access check again.
+ * The name in Content-Disposition always ends with an extension of the stored type.
  */
 export async function sendFile(ctx: RequestContext, req: FastifyRequest, reply: FastifyReply, f: FileRow, opts: { thumb?: boolean } = {}) {
   const useThumb = Boolean(opts.thumb && f.thumbStorageKey);
@@ -320,9 +363,9 @@ export async function sendFile(ctx: RequestContext, req: FastifyRequest, reply: 
   reply.header('Content-Type', mime === 'text/plain' ? 'text/plain; charset=utf-8' : mime);
   reply.header('X-Content-Type-Options', 'nosniff');
   reply.header('Content-Security-Policy', "sandbox; default-src 'none'");
-  reply.header('Cache-Control', mime.startsWith('video/') ? `private, max-age=${VIDEO_CACHE_SECONDS}` : 'private, no-store');
+  reply.header('Cache-Control', 'private, no-store');
   reply.header('Cross-Origin-Resource-Policy', 'same-origin');
-  reply.header('Content-Disposition', disposition(inline ? 'inline' : 'attachment', f.originalName, EXT[mime] ?? ''));
+  reply.header('Content-Disposition', disposition(inline ? 'inline' : 'attachment', f.originalName, mime));
   reply.header('Accept-Ranges', media ? 'bytes' : 'none');
   const range = media ? req.headers.range : undefined;
   if (typeof range === 'string') {

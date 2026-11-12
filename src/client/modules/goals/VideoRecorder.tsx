@@ -7,7 +7,10 @@
  * back → Record again or Use this video. Switch camera when the device has more than one. The camera
  * and the microphone are released as soon as the recording stops, after "Use this video" and when
  * the panel closes. Nothing is uploaded here: the video joins the evidence form's list and is sent
- * when the student saves. The recording dot pulses only without reduced motion (app.css).
+ * when the student saves. The recording dot is steady (nothing repeats, app.css).
+ * The live preview and the recorded clip are two different `<video>` elements (keys `live` / `clip`):
+ * a camera stream assigned to `srcObject` wins over `src`, so reusing one element would replay the
+ * stopped camera instead of the clip. `release()` also clears `srcObject`.
  * Shown only while the admin turned `media.evidenceVideo` on; the server checks it again.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -57,6 +60,7 @@ export default function VideoRecorder({ onVideo }: { onVideo: (video: Blob, name
   const release = () => {
     stream.current?.getTracks().forEach((tr) => tr.stop());
     stream.current = null;
+    if (live.current) live.current.srcObject = null;
   };
   const clearTimer = () => {
     if (timer.current) clearInterval(timer.current);
@@ -172,9 +176,9 @@ export default function VideoRecorder({ onVideo }: { onVideo: (video: Blob, name
   return (
     <div className="cc-stack cc-camera cc-video-recorder" data-testid="video-recorder" data-phase={phase}>
       {phase === 'recorded' && clip && clipUrl ? (
-        <video className="cc-camera__view" src={clipUrl} controls playsInline preload="metadata" aria-label={t('evidence.video.preview')} />
+        <video key="clip" className="cc-camera__view" src={clipUrl} controls playsInline preload="metadata" aria-label={t('evidence.video.preview')} />
       ) : (
-        <video ref={live} className="cc-camera__view" playsInline muted aria-label={t('evidence.cameraView')} />
+        <video key="live" ref={live} className="cc-camera__view" playsInline muted aria-label={t('evidence.cameraView')} />
       )}
       {recording ? (
         <p className="cc-video-recorder__timer" data-testid="video-timer" role="timer">

@@ -103,6 +103,14 @@ export function clearSensitiveToasts() {
   emit();
 }
 
+/** A new try (Save pressed again): drop the error toasts of earlier tries, so none covers the form. */
+export function clearErrorToasts() {
+  if (!toasts.some((t) => t.kind === 'error')) return;
+  for (const t of toasts) if (t.kind === 'error') forget(t.id);
+  toasts = toasts.filter((t) => t.kind !== 'error');
+  emit();
+}
+
 /** Sign-out: drop everything. */
 export function clearAllToasts() {
   clearManualCopy();

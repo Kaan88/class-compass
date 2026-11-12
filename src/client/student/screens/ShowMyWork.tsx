@@ -32,7 +32,7 @@ export function ShowMyWork({ data, subjectId, media, nav, go, finish }: ScreenPr
           idPrefix={`evidence-${subjectId}`}
           goals={live.map((g) => ({ id: g.id, label: goalText(g, locale) }))}
           media={media}
-          upload={(kind, file, name) => upload(G.studentUploadFile, { kind }, file, name)}
+          upload={(kind, file, name, onProgress) => upload(G.studentUploadFile, { kind }, file, name, onProgress)}
           add={(input) => call(G.studentAddEvidence, { subjectId, ...input })}
           run={(fn, success) => run(fn, success)}
           check={check}

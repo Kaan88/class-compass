@@ -11,7 +11,12 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_VIDEO_MS, UPLOAD_LIMITS } from '../../src/shared/contracts/files.ts';
 import type { Evidence } from '../../src/shared/contracts/goals.ts';
+import { ApiError, upload as apiUpload } from '../../src/client/lib/api.ts';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
+import { currentToasts, showToast } from '../../src/client/lib/toast.ts';
+import { useRun } from '../../src/client/lib/useRun.ts';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as G from '../../src/shared/contracts/goals.ts';
 import { EvidenceAdder, evidenceModes, type NewEvidence, type UploadKind } from '../../src/client/modules/goals/EvidenceAdder.tsx';
 import { EvidenceView } from '../../src/client/modules/goals/shared.tsx';
 import VideoRecorder, { videoName } from '../../src/client/modules/goals/VideoRecorder.tsx';
@@ -94,10 +99,18 @@ describe('the in-page video recorder (S27a, D-193)', () => {
     expect(FakeRecorder.instances[0]!.options).toMatchObject({ mimeType: 'video/webm;codecs=vp8,opus', videoBitsPerSecond: 1_200_000 });
     expect(screen.getByTestId('video-timer').textContent).toContain('of 3:00');
 
+    const liveEl = screen.getByLabelText(en['evidence.cameraView']) as HTMLVideoElement;
+    expect(liveEl.srcObject).toBeTruthy();
     fireEvent.click(button(en['student.audio.stop']));
     expect(recorder.getAttribute('data-phase')).toBe('recorded');
     expect(streams[0]!.tracks.every((t) => t.stopped)).toBe(true);
-    expect(screen.getByLabelText(en['evidence.video.preview']).tagName).toBe('VIDEO');
+    // The clip plays in its own element: no camera stream on it (it would win over src), the clip's address as src.
+    const clipEl = screen.getByLabelText(en['evidence.video.preview']) as HTMLVideoElement;
+    expect(clipEl.tagName).toBe('VIDEO');
+    expect(clipEl).not.toBe(liveEl);
+    expect(clipEl.srcObject ?? null).toBeNull();
+    expect(clipEl.getAttribute('src')).toMatch(/^blob:fake-/u);
+    expect(liveEl.srcObject).toBeNull();
 
     fireEvent.click(button(en['evidence.video.retake']));
     await waitFor(() => expect(recorder.getAttribute('data-phase')).toBe('ready'));
@@ -151,6 +164,56 @@ describe('the in-page video recorder (S27a, D-193)', () => {
   });
 });
 
+describe('upload with progress (D-193)', () => {
+  /** A fake XMLHttpRequest that reports progress and then answers. */
+  class FakeXhr {
+    static last: FakeXhr | null = null;
+    static answer: { status: number; body: string } = { status: 200, body: '{"id":"f1"}' };
+    upload: { onprogress: ((e: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = { onprogress: null };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    withCredentials = false;
+    headers: Record<string, string> = {};
+    method = '';
+    url = '';
+    status = 0;
+    statusText = '';
+    responseText = '';
+    open(method: string, url: string) {
+      this.method = method;
+      this.url = url;
+    }
+    setRequestHeader(k: string, v: string) {
+      this.headers[k] = v;
+    }
+    send() {
+      FakeXhr.last = this;
+      this.upload.onprogress?.({ lengthComputable: true, loaded: 50, total: 100 });
+      this.status = FakeXhr.answer.status;
+      this.responseText = FakeXhr.answer.body;
+      this.onload?.();
+    }
+  }
+  beforeEach(() => {
+    (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = FakeXhr;
+  });
+
+  it('reports progress, sends the CSRF header, and maps a proxy 413 (no JSON) to FILE_TOO_LARGE', async () => {
+    const seen: number[] = [];
+    FakeXhr.answer = { status: 200, body: '{"id":"f1","kind":"video"}' };
+    const r = await apiUpload(G.studentUploadFile, { kind: 'video' }, new Blob(['v']), 'v.webm', (f) => seen.push(f));
+    expect(r).toMatchObject({ id: 'f1' });
+    expect(seen).toEqual([0.5]);
+    expect(FakeXhr.last!.headers['x-cc-csrf']).toBe('1');
+    expect(FakeXhr.last!.url).toBe('/api/student/files?kind=video');
+    FakeXhr.answer = { status: 413, body: '<html>413 Request Entity Too Large</html>' };
+    const err = await apiUpload(G.studentUploadFile, { kind: 'video' }, new Blob(['v']), 'v.webm', () => undefined).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).details).toMatchObject({ reason: 'FILE_TOO_LARGE' });
+  });
+});
+
 describe('video choices in the evidence form (S27a, D-193)', () => {
   const media = { photos: false, audio: false, documents: true, video: true };
 
@@ -182,23 +245,116 @@ describe('video choices in the evidence form (S27a, D-193)', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: en['student.addEvidence'] }));
     });
-    expect(upload).toHaveBeenCalledWith('video', expect.any(File), 'our-play.mp4');
+    expect(upload).toHaveBeenCalledWith('video', expect.any(File), 'our-play.mp4', expect.any(Function));
     expect(add).toHaveBeenCalledWith({ kind: 'file', fileId: 'file-v' });
   });
 
-  it('Record a video loads the in-page recorder on a computer, and the system camera in video mode on a phone', async () => {
+  it('Record a video: the in-page recorder on a computer; on a phone the recorder too (3:00 stop, small files) with the camera app as a second choice; the camera app alone where the browser cannot record', async () => {
     const noop = async () => ({ id: 'x' });
     const { unmount } = render(wrap(<EvidenceAdder idPrefix="t" goals={[]} media={media} upload={noop} add={noop} run={(fn) => fn()} />));
     fireEvent.click(button(en['evidence.mode.video']));
     expect(await screen.findByTestId('video-recorder')).toBeTruthy();
+    expect(screen.queryByLabelText(en['evidence.useCameraApp'])).toBeNull();
     unmount();
     window.matchMedia = ((q: string) => ({ matches: q.includes('coarse'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
-    render(wrap(<EvidenceAdder idPrefix="p" goals={[]} media={media} upload={noop} add={noop} run={(fn) => fn()} />));
+    const phone = render(wrap(<EvidenceAdder idPrefix="p" goals={[]} media={media} upload={noop} add={noop} run={(fn) => fn()} />));
     fireEvent.click(button(en['evidence.mode.video']));
-    const input = screen.getByLabelText(en['evidence.openVideoCamera']) as HTMLInputElement;
+    expect(await screen.findByTestId('video-recorder')).toBeTruthy();
+    const input = screen.getByLabelText(en['evidence.useCameraApp']) as HTMLInputElement;
     expect(input.getAttribute('accept')).toBe('video/*');
     expect(input.getAttribute('capture')).toBe('environment');
+    expect(screen.getByText(en['evidence.cameraAppBig'])).toBeTruthy();
+    phone.unmount();
+    delete (window as unknown as { MediaRecorder?: unknown }).MediaRecorder;
+    render(wrap(<EvidenceAdder idPrefix="q" goals={[]} media={media} upload={noop} add={noop} run={(fn) => fn()} />));
+    fireEvent.click(button(en['evidence.mode.video']));
+    expect(screen.getByLabelText(en['evidence.openVideoCamera']).getAttribute('capture')).toBe('environment');
     expect(screen.queryByTestId('video-recorder')).toBeNull();
+  });
+
+  it('the hint and the device check use the real limit for this student (videoMaxBytes); a full space says so', async () => {
+    const MB = 1024 * 1024;
+    const noop = async () => ({ id: 'x' });
+    const { unmount } = render(wrap(<EvidenceAdder idPrefix="t" goals={[]} media={{ ...media, videoMaxBytes: 90 * MB }} upload={noop} add={noop} run={(fn) => fn()} />));
+    fireEvent.click(button(en['evidence.mode.videoFile']));
+    expect(screen.getByText(en['evidence.videoHint'].replace('{minutes}', '3').replace('{mb}', '90'))).toBeTruthy();
+    const big = new File(['x'], 'trip.mp4', { type: 'video/mp4' });
+    Object.defineProperty(big, 'size', { value: 95 * MB });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(en['evidence.chooseVideo']), { target: { files: [big] } });
+    });
+    expect(screen.getByText(en['evidence.videoTooBig'].replace('{mb}', '90'))).toBeTruthy();
+    expect(screen.queryByTestId('evidence-pending')).toBeNull();
+    unmount();
+    render(wrap(<EvidenceAdder layout="steps" idPrefix="s" goals={[]} media={{ ...media, videoMaxBytes: 1000 }} upload={noop} add={noop} run={(fn) => fn()} />));
+    fireEvent.click(button(en['evidence.mode.videoFile']));
+    expect(screen.getByText(en['evidence.videoNoSpace'])).toBeTruthy();
+    expect(screen.queryByLabelText(en['evidence.chooseVideo'])).toBeNull();
+  });
+
+  it('a video upload shows how far it is (role=status, a progress bar, Sending… on the button) and clears an old error toast', async () => {
+    let report: ((f: number) => void) | undefined;
+    let finish: (v: { id: string }) => void = () => undefined;
+    const upload = vi.fn((_k: UploadKind, _f: Blob, _n: string, onProgress?: (f: number) => void) => {
+      report = onProgress;
+      return new Promise<{ id: string }>((r) => (finish = r));
+    });
+    const add = vi.fn(async () => ({}));
+    showToast({ message: 'an older error', kind: 'error' });
+    render(wrap(<EvidenceAdder idPrefix="t" goals={[]} media={media} upload={upload} add={add} run={(fn) => fn()} />));
+    fireEvent.click(button(en['evidence.mode.videoFile']));
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(en['evidence.chooseVideo']), { target: { files: [new File([new Uint8Array([0, 0, 0, 24])], 'trip.mp4', { type: 'video/mp4' })] } });
+    });
+    await waitFor(() => expect(screen.getByTestId('evidence-pending')).toBeTruthy());
+    await act(async () => {
+      fireEvent.click(button(en['student.addEvidence']));
+    });
+    expect(currentToasts().some((x) => x.kind === 'error')).toBe(false);
+    expect(screen.getByRole('button', { name: en['evidence.sending'] })).toBeTruthy();
+    act(() => report!(0.47));
+    const status = screen.getByTestId('evidence-progress');
+    expect(status.getAttribute('role')).toBe('status');
+    expect(status.textContent).toContain(en['evidence.sendingVideo'].replace('{percent}', '45'));
+    expect((screen.getByLabelText(en['evidence.sendingProgress']) as HTMLProgressElement).getAttribute('value')).toBe('45');
+    await act(async () => finish({ id: 'f1' }));
+    await waitFor(() => expect(add).toHaveBeenCalledWith({ kind: 'file', fileId: 'f1' }));
+    expect(screen.queryByTestId('evidence-progress')).toBeNull();
+  });
+
+  it('a video the server refuses for its content leaves the list; too big and a full space get child words on the student page', async () => {
+    const qc = new QueryClient();
+    const Harness = ({ upload }: { upload: (k: UploadKind, f: Blob, n: string) => Promise<{ id: string }> }) => {
+      const run = useRun();
+      return <EvidenceAdder layout="steps" idPrefix="s" goals={[]} media={media} upload={upload} add={async () => ({})} run={(fn, success) => run(fn, { success })} />;
+    };
+    const tryWith = async (err: ApiError) => {
+      const view = render(
+        <QueryClientProvider client={qc}>
+          {wrap(<Harness upload={async () => Promise.reject(err)} />)}
+        </QueryClientProvider>,
+      );
+      fireEvent.click(button(en['evidence.mode.videoFile']));
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(en['evidence.chooseVideo']), { target: { files: [new File([new Uint8Array([1, 2, 3, 4])], 'clip.mp4', { type: 'video/mp4' })] } });
+      });
+      await waitFor(() => expect(screen.getByTestId('evidence-pending')).toBeTruthy());
+      await act(async () => {
+        fireEvent.click(button(en['student.work.save']));
+      });
+      const last = currentToasts().at(-1)?.message;
+      const pending = screen.queryByTestId('evidence-pending');
+      view.unmount();
+      return { last, pending };
+    };
+    const notVideo = await tryWith(new ApiError(400, 'VALIDATION', 'x', { reason: 'VIDEO_NOT_VIDEO' }));
+    expect(notVideo.last).toBe(en['error.VIDEO_NOT_VIDEO']);
+    expect(notVideo.pending).toBeNull();
+    const tooBig = await tryWith(new ApiError(413, 'VALIDATION', 'x', { reason: 'FILE_TOO_LARGE' }));
+    expect(tooBig.last).toBe(en['error.VIDEO_TOO_BIG']);
+    const full = await tryWith(new ApiError(409, 'CONFLICT', 'x', { reason: 'QUOTA_STUDENT' }));
+    expect(full.last).toBe(en['error.QUOTA_STUDENT_OWN']);
+    expect(full.pending).not.toBeNull(); // nothing wrong with the video itself: it stays for a later try
   });
 
   it('the evidence list plays a video with controls and preload="metadata"', () => {

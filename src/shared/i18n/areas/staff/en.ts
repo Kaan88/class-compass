@@ -480,7 +480,7 @@ export const en = {
   'modules.mediaConsent': 'Student photos, photo evidence, audio evidence and video evidence are disabled until consent is confirmed. Turn them on only after the school has confirmed consent and its KVKK position.',
   'modules.disabledUntilConsent': 'Disabled until consent is confirmed',
   'modules.documentsHint': 'Text, links and document evidence.',
-  'modules.videoHint': 'Students and teachers add videos of up to 3 minutes and 150 MB (MP4, MOV, WebM). Videos usually show children’s faces and voices: turn this on only with the consent the school needs (KVKK). Videos recorded in the app carry no location; location tags in other video files are removed where the file allows it.',
+  'modules.videoHint': 'Students and teachers add videos of up to 3 minutes (MP4, MOV, WebM; 90 MB by default, set on the server). Videos usually show children’s faces and voices: turn this on only with the consent the school needs (KVKK). Videos recorded with Start recording in the page carry no location; a phone’s camera app may store one, and location tags in such files are removed where the file allows it.',
   'modules.keepsData': 'Turning a module off hides it but keeps all of its data.',
   'students.name': 'Name',
   'students.number': 'Student number',

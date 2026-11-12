@@ -45,7 +45,9 @@ function buildRequest<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, 
   return { url, init };
 }
 
-function failure(ep: Endpoint, res: Response, body: any): ApiError {
+function failure(ep: Endpoint, res: { status: number; statusText: string }, body: any): ApiError {
+  // A proxy in front of the app (Cloudflare's 100 MB limit) refuses a big upload with its own 413 page.
+  if (res.status === 413 && !body?.error) return new ApiError(413, 'VALIDATION', 'The file is too large', { reason: 'FILE_TOO_LARGE' });
   const code: string = body?.error?.code ?? 'INTERNAL';
   // A 401 with a business reason (WRONG_PIN, WRONG_PASSWORD) is a form error, not a sign-out.
   const reason: unknown = body?.error?.details?.reason;
@@ -88,12 +90,42 @@ export async function callConditional<I extends z.ZodType, O extends z.ZodType>(
   return { notModified: false, data: body as z.infer<O>, etag: res.headers.get('etag'), receivedAt: Date.now() };
 }
 
+/** How far an upload is: 0 to 1. */
+export type UploadProgress = (fraction: number) => void;
+
+/** Send a form with XMLHttpRequest, the only browser API that reports upload progress. */
+function sendWithProgress(method: string, url: string, form: FormData, onProgress: UploadProgress): Promise<{ status: number; statusText: string; body: unknown }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('x-cc-csrf', '1');
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) onProgress(Math.min(1, e.loaded / e.total));
+    };
+    xhr.onload = () => {
+      let body: unknown = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        body = null;
+      }
+      resolve({ status: xhr.status, statusText: xhr.statusText, body });
+    };
+    // A network failure: the same error `fetch` gives, so it reads as "no connection".
+    xhr.onerror = () => reject(new TypeError('Network request failed'));
+    xhr.onabort = () => reject(new TypeError('Network request aborted'));
+    xhr.send(form);
+  });
+}
+
 /**
  * Upload one file to a multipart contract endpoint (S9, `rawRoute` on the server): the declared
  * input goes into the path and query string, the file into the multipart field `file`. The browser
  * sets the multipart content type; the server sniffs the content and never trusts the file name.
+ * With `onProgress` (a large video, D-193) the upload reports how far it is.
  */
-export async function upload<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, O>, input: z.input<I>, file: Blob, fileName?: string): Promise<z.infer<O>> {
+export async function upload<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, O>, input: z.input<I>, file: Blob, fileName?: string, onProgress?: UploadProgress): Promise<z.infer<O>> {
   const rest: Record<string, unknown> = { ...(input as Record<string, unknown>) };
   const path = ep.path.replace(/:([A-Za-z0-9_]+)/g, (_m, k: string) => {
     const v = rest[k];
@@ -104,7 +136,13 @@ export async function upload<I extends z.ZodType, O extends z.ZodType>(ep: Endpo
   for (const [k, v] of Object.entries(rest)) if (v !== undefined && v !== null) qs.set(k, String(v));
   const form = new FormData();
   form.append('file', file, fileName ?? (file instanceof File ? file.name : 'upload'));
-  const res = await fetch([...qs].length ? `${path}?${qs}` : path, { method: ep.method, credentials: 'same-origin', headers: { 'x-cc-csrf': '1' }, body: form });
+  const url = [...qs].length ? `${path}?${qs}` : path;
+  if (onProgress && typeof XMLHttpRequest !== 'undefined') {
+    const r = await sendWithProgress(ep.method, url, form, onProgress);
+    if (r.status < 200 || r.status >= 300) throw failure(ep as unknown as Endpoint, r, r.body);
+    return r.body as z.infer<O>;
+  }
+  const res = await fetch(url, { method: ep.method, credentials: 'same-origin', headers: { 'x-cc-csrf': '1' }, body: form });
   const body = await res.json().catch(() => null);
   if (!res.ok) throw failure(ep as unknown as Endpoint, res, body);
   return body as z.infer<O>;

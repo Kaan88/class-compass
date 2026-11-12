@@ -19,7 +19,9 @@
  * boxes (top level, in `moov` and in each `trak`) and an XMP `uuid` box become `free` boxes of the
  * same size with zeroed content (`©xyz` and `com.apple.quicktime.location.ISO6709` live there); in
  * WebM a Tags element becomes a Void element of the same size with zeroed content. Creation times in
- * `mvhd`/`tkhd`/`mdhd` stay (dates, not places).
+ * `mvhd`/`tkhd`/`mdhd` stay (dates, not places). Padding that could carry other bytes is zeroed the
+ * same way (top-level `free`/`skip` boxes, Void elements in the WebM Segment), so no hidden page or
+ * archive rides along in a video's padding.
  */
 import type { FileHandle } from 'node:fs/promises';
 import fsp from 'node:fs/promises';
@@ -127,10 +129,13 @@ function timeOf(buf: Buffer, p: number, end: number): { timescale: number; durat
 }
 const msOf = (t: { timescale: number; duration: number | null } | null) => (t && t.timescale > 0 && t.duration !== null && t.duration > 0 ? (t.duration * 1000) / t.timescale : 0);
 
-async function inspectMp4(r: Reader): Promise<VideoInspection> {
+/** `tracksOnly`: decide by the tracks alone (audio brands and other doc types are not refused first). */
+type Opts = { tracksOnly?: boolean };
+
+async function inspectMp4(r: Reader, opts: Opts = {}): Promise<VideoInspection> {
   const head = await r.peek(0, 12);
   const major = head.toString('latin1', 8, 12);
-  if (AUDIO_BRANDS.has(major)) return { ok: false, reason: 'FILE_TYPE_NOT_ALLOWED' };
+  if (AUDIO_BRANDS.has(major) && !opts.tracksOnly) return { ok: false, reason: 'FILE_TYPE_NOT_ALLOWED' };
   const container: VideoContainer = major === 'qt  ' ? 'quicktime' : 'mp4';
   const metadata: Span[] = [];
   let moov: Box | null = null;
@@ -153,7 +158,7 @@ async function inspectMp4(r: Reader): Promise<VideoInspection> {
     if (box.type === 'moov') {
       if (moov) throw new Unreadable();
       moov = box;
-    } else if (box.type === 'udta' || box.type === 'meta') metadata.push(box);
+    } else if (box.type === 'udta' || box.type === 'meta' || box.type === 'free' || box.type === 'skip') metadata.push(box);
     else if (box.type === 'uuid' && box.size >= 24 && (await r.bytes(pos + 8, 16)).equals(XMP_UUID)) metadata.push(box);
     pos += box.size;
   }
@@ -271,12 +276,12 @@ async function sizedData(r: Reader, e: El): Promise<Buffer> {
   return r.bytes(e.data, e.size);
 }
 
-async function inspectWebm(r: Reader): Promise<VideoInspection> {
+async function inspectWebm(r: Reader, opts: Opts = {}): Promise<VideoInspection> {
   const ebml = await elementAt(r, 0);
   if (!ebml || ebml.id !== ID.EBML) throw new Unreadable();
   let docType = '';
   for (const c of sizedChildren(await sizedData(r, ebml))) if (c.id === ID.DocType) docType = c.data.toString('latin1').replace(/\0+$/u, '');
-  if (docType !== 'webm') return { ok: false, reason: 'FILE_TYPE_NOT_ALLOWED' };
+  if (docType !== 'webm' && !opts.tracksOnly) return { ok: false, reason: 'FILE_TYPE_NOT_ALLOWED' };
 
   let pos = ebml.data + ebml.size!;
   let seg = await elementAt(r, pos);
@@ -338,7 +343,7 @@ async function inspectWebm(r: Reader): Promise<VideoInspection> {
       const tn = b[0];
       const tnLen = tn ? Math.clz32(tn) - 23 : 9;
       if (tnLen <= 8 && b.length >= tnLen + 2) maxTc = Math.max(maxTc, clusterTc + b.readInt16BE(tnLen));
-    } else if (e.id === ID.Tags) metadata.push({ start: e.start, size: e.idLen + e.sizeLen + e.size, header: e.idLen + e.sizeLen, idLen: e.idLen, sizeLen: e.sizeLen });
+    } else if (e.id === ID.Tags || e.id === ID.Void) metadata.push({ start: e.start, size: e.idLen + e.sizeLen + e.size, header: e.idLen + e.sizeLen, idLen: e.idLen, sizeLen: e.sizeLen });
     pos = e.data + e.size;
   }
   if (!tracksSeen) throw new Unreadable();
@@ -353,7 +358,7 @@ async function inspectWebm(r: Reader): Promise<VideoInspection> {
 // ---------------------------------------------------------------- entry points
 
 /** Decide whether `file` is an accepted video (by its bytes) and read its duration and metadata boxes. */
-export async function inspectVideo(file: string): Promise<VideoInspection> {
+export async function inspectVideo(file: string, opts: Opts = {}): Promise<VideoInspection> {
   const fh = await fsp.open(file, 'r');
   try {
     const size = (await fh.stat()).size;
@@ -361,8 +366,8 @@ export async function inspectVideo(file: string): Promise<VideoInspection> {
     const r = new Reader(fh, size);
     const head = await r.peek(0, 12);
     try {
-      if (head.length >= 12 && head.toString('latin1', 4, 8) === 'ftyp') return await inspectMp4(r);
-      if (head.length >= 4 && head.readUInt32BE(0) === ID.EBML) return await inspectWebm(r);
+      if (head.length >= 12 && head.toString('latin1', 4, 8) === 'ftyp') return await inspectMp4(r, opts);
+      if (head.length >= 4 && head.readUInt32BE(0) === ID.EBML) return await inspectWebm(r, opts);
     } catch (err) {
       if (err instanceof Unreadable || err instanceof RangeError) return { ok: false, reason: 'VIDEO_UNREADABLE' };
       throw err;
@@ -371,6 +376,16 @@ export async function inspectVideo(file: string): Promise<VideoInspection> {
   } finally {
     await fh.close();
   }
+}
+
+/**
+ * Does an MP4 or WebM/Matroska file hold a picture track (D-193)? Used for files sent as sound: true
+ * (a video), false (sound only), or null when its structure cannot be followed.
+ */
+export async function videoTrackIn(file: string): Promise<boolean | null> {
+  const r = await inspectVideo(file, { tracksOnly: true });
+  if (r.ok) return true;
+  return r.reason === 'VIDEO_UNREADABLE' ? null : false;
 }
 
 /** An EBML size field of exactly `len` bytes holding `value`. */

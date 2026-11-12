@@ -217,7 +217,7 @@ describe('media flags (D-014, STU-8)', () => {
     expect((await adaPhone.post('/api/student/evidence', { subjectId: s.english.id, kind: 'audio', fileId: doc.id })).body.error.details.reason).toBe('EVIDENCE_FILE_KIND');
     expect(goalsSection(await ok(adaPhone.get('/api/student/page'))).evidence).toHaveLength(1);
     const page = await ok(adaPhone.get('/api/student/page'));
-    expect(page.media).toEqual({ photos: false, audio: false, documents: true, video: false });
+    expect(page.media).toEqual({ photos: false, audio: false, documents: true, video: false, videoMaxBytes: expect.any(Number) });
   });
 
   it('with the flags on photos and audio work, and attaching is refused again once a flag is switched off', async () => {

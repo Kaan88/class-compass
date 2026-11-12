@@ -202,6 +202,13 @@ export const goalsOverview = endpoint({
   mcp: { scope: 'goals:read', tool: 'goals_overview', readOnly: true, description: 'Goals of every student of one class+subject as counts: active and achieved goals, evidence items, the latest self-assessment (1–5, null = not recorded) and the latest activity time. No goal text.' },
 });
 
+/**
+ * The admin media flags for adding evidence (D-014, D-193) and `videoMaxBytes`: the largest video
+ * that can be added for this student now (the video upload limit, or less when the student's space
+ * is nearly full), so the device refuses a video that could never be saved before uploading it.
+ */
+export const EvidenceMediaFlags = z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean(), video: z.boolean(), videoMaxBytes: z.number().int().nonnegative().optional() });
+
 export const TeacherStudentGoals = z.object({
   student: StudentSummary,
   subjectId: z.string(),
@@ -211,7 +218,7 @@ export const TeacherStudentGoals = z.object({
   /** The signed-in teacher's own private notes (GOL-6). Never part of any student response. */
   privateNotes: z.array(PrivateNote).meta(pii('note')),
   library: GoalLibrary,
-  media: z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean(), video: z.boolean() }),
+  media: EvidenceMediaFlags,
 });
 export type TeacherStudentGoals = z.infer<typeof TeacherStudentGoals>;
 export const teacherStudentGoals = endpoint({
@@ -446,7 +453,7 @@ export const StudentPage = z.object({
   theme: Theme,
   /** The class language mode (S13a, D-099): the page is shown in it; the switch only when there are two. */
   language: z.object({ mainLanguage: z.enum(['en', 'tr']), secondLanguageEnabled: z.boolean() }),
-  media: z.object({ photos: z.boolean(), audio: z.boolean(), documents: z.boolean(), video: z.boolean() }),
+  media: EvidenceMediaFlags,
   subjects: z.array(z.object({ subjectId: z.string(), name: LocalizedText, sections: z.array(StudentPageSection) })),
   /** S13c (D-124): the student's avatar, the class lock and the unlocks earned. */
   avatar: StudentAvatarInfo,

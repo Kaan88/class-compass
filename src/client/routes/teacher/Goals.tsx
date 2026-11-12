@@ -322,7 +322,7 @@ function StudentGoals({ contextId, studentId, onBack }: { contextId: string; stu
           media={d.media}
           goalId={evidenceGoal}
           onGoalChange={setEvidenceGoal}
-          upload={(kind, file, name) => upload(Files.uploadFile, { kind, ownerStudentId: studentId, contextId }, file, name)}
+          upload={(kind, file, name, onProgress) => upload(Files.uploadFile, { kind, ownerStudentId: studentId, contextId }, file, name, onProgress)}
           add={(input) => call(G.teacherAddEvidence, { contextId, studentId, ...input })}
           run={(fn, success) => run(fn, { success, invalidate: [ALL] })}
         />

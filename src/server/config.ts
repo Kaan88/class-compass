@@ -50,6 +50,12 @@ const EnvSchema = z.object({
   /** Upload quotas in MB (STU-8): all files of one student, and all files on the server. */
   UPLOAD_STUDENT_QUOTA_MB: z.coerce.number().int().min(1).max(100_000).default(100),
   UPLOAD_GLOBAL_QUOTA_MB: z.coerce.number().int().min(1).max(10_000_000).default(10_240),
+  /**
+   * The largest video one upload may be (S27a, D-193), in MiB, at most the 150 MB hard limit. The
+   * default stays under Cloudflare's 100 MB request limit (Free and Pro plans), which would otherwise
+   * refuse a bigger upload with its own 413; raise it only where no such proxy is in front.
+   */
+  UPLOAD_VIDEO_MAX_MB: z.coerce.number().int().min(1).max(150).default(90),
   /** Local OCR (D-011): maximum time for one image before the OCR worker is stopped. */
   OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(90_000),
   /** Workbook, Word and PDF parsing (worker thread): maximum time for one file before the thread is stopped. */

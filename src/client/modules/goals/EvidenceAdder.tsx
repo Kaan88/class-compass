@@ -4,9 +4,14 @@
  * Add a document (several) · Record my voice · Add a voice file · Record a video · Add a video. Picture,
  * voice and video choices appear only when the admin media flags allow them (D-014, D-193), documents
  * only while `media.evidenceDocuments` is on; the server checks every flag again.
- * Videos (S27a, D-193): a phone or tablet records with its own camera app (capture input in video
- * mode); elsewhere the in-page recorder (`VideoRecorder`, a lazy chunk). A chosen video is checked on
- * the device first (size, and the length where the browser can read it); the server checks again.
+ * Videos (S27a, D-193): "Record a video" uses the in-page recorder (`VideoRecorder`, a lazy chunk:
+ * a modest bit rate and the 3:00 stop) wherever the browser can record, phones and tablets included;
+ * a phone or tablet also offers its own camera app (capture input in video mode) as a second choice,
+ * with a note that it makes big files, and a browser that cannot record only that. A chosen video is
+ * checked on the device first against `media.videoMaxBytes` (the server's real limit for this
+ * student) and the length where the browser can read it; the server checks again. Uploads show how
+ * far they are (`<progress>`, role=status); an item the server refuses for its content leaves the
+ * list, and the student page gets child-worded messages for a full space and a video too big.
  * Pictures are scaled down to 2048 px and re-encoded as JPEG on the device first (`lib/images.ts`).
  * A picture chosen under "Add a document" is sent as a picture, so it follows the photo flag and gets
  * the server's metadata removal. Each file becomes its own evidence item with the same caption.
@@ -26,7 +31,10 @@ import { lazy, Suspense, useEffect, useRef, useState, type ReactNode, type RefOb
 import { ACCEPT_HINT, MAX_VIDEO_MS, UPLOAD_LIMITS, VIDEO_DURATION_GRACE_MS } from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
 import type { EvidenceKind } from '../../../shared/contracts/goals.ts';
+import { ApiError } from '../../lib/api.ts';
+import { reasonOf } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
+import { clearErrorToasts } from '../../lib/toast.ts';
 import { formatBytes, jpegName, looksLikeImage, prepareImage, preparePicture } from '../../lib/images.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
@@ -42,13 +50,22 @@ const VideoRecorder = lazy(() => import('./VideoRecorder.tsx'));
 
 export type EvidenceMode = 'text' | 'link' | 'picture' | 'camera' | 'document' | 'voice' | 'voiceFile' | 'video' | 'videoFile';
 export type UploadKind = 'image' | 'document' | 'audio' | 'video';
-export type EvidenceMedia = { photos: boolean; audio: boolean; documents: boolean; video: boolean };
+/** The media flags (D-014); `videoMaxBytes` is the largest video this student can add now (D-193). */
+export type EvidenceMedia = { photos: boolean; audio: boolean; documents: boolean; video: boolean; videoMaxBytes?: number | undefined };
 /** What a live hint checks: evidence words, a caption / link title, or a link's address (language check only). */
 export type EvidenceHintKind = 'evidenceText' | 'linkTitle' | 'url';
 export type NewEvidence = { kind: EvidenceKind; goalId?: string; body?: string; url?: string; fileId?: string };
 
-/** The video size limit in MB, for the hints. */
-const VIDEO_MB = Math.round(UPLOAD_LIMITS.video / (1024 * 1024));
+const MB = 1024 * 1024;
+
+/** Can this browser record video in the page (MediaRecorder and a camera)? */
+const canRecordVideo = () => typeof window !== 'undefined' && 'MediaRecorder' in window && typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
+
+/** Server reasons that refuse a file for what it is: the item leaves the list, trying again cannot help. */
+const REFUSED = new Set(['FILE_TYPE_NOT_ALLOWED', 'FILE_EMPTY', 'FILE_TOO_LARGE', 'IMAGE_HEIC', 'IMAGE_UNREADABLE', 'AUDIO_UNREADABLE', 'VIDEO_NOT_VIDEO', 'VIDEO_UNREADABLE', 'VIDEO_TOO_LONG', 'VIDEO_AS_AUDIO']);
+
+/** The same error with another reason (a message that fits who reads it). */
+const withReason = (err: unknown, reason: string) => (err instanceof ApiError ? new ApiError(err.status, err.code, err.message, { ...((err.details as object | undefined) ?? {}), reason }) : err);
 
 /** Most files added in one go. */
 export const MAX_FILES_AT_ONCE = 10;
@@ -136,7 +153,8 @@ export function EvidenceAdder({
   goals: Array<{ id: string; label: string }>;
   media: EvidenceMedia;
   idPrefix: string;
-  upload: (kind: UploadKind, file: Blob, name: string) => Promise<{ id: string }>;
+  /** Upload one file; `onProgress` (0 to 1) is passed for videos and other large files. */
+  upload: (kind: UploadKind, file: Blob, name: string, onProgress?: (fraction: number) => void) => Promise<{ id: string }>;
   add: (input: NewEvidence) => Promise<unknown>;
   /** Runs the save with the caller's toast and refresh; resolves to a falsy value on failure. */
   run: (fn: () => Promise<unknown>, success: string) => Promise<unknown>;
@@ -167,6 +185,7 @@ export function EvidenceAdder({
   const [recording, setRecording] = useState<Blob | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ name: string; video: boolean; percent: number } | null>(null);
   const [hints, setHints] = useState<{ body?: string; url?: string }>({});
   const words = useRef<HTMLTextAreaElement>(null);
   const nextKey = useRef(1);
@@ -178,8 +197,12 @@ export function EvidenceAdder({
     [],
   );
   const current = modes.includes(mode) ? mode : 'text';
-  // Phones and tablets (and browsers that cannot record) use the system camera app in video mode.
-  const systemVideo = prefersSystemCamera() || typeof window === 'undefined' || !('MediaRecorder' in window) || !navigator.mediaDevices?.getUserMedia;
+  // The in-page recorder wherever the browser can record; phones and tablets also offer the camera app.
+  const recorderOk = canRecordVideo();
+  const touch = prefersSystemCamera();
+  const videoMax = Math.min(media.videoMaxBytes ?? UPLOAD_LIMITS.video, UPLOAD_LIMITS.video);
+  const videoMb = Math.floor(videoMax / MB);
+  const noVideoSpace = videoMax < MB;
 
   // ---- steps (student page): 1 how → 2 which goal (only when there are goals) → last: the work.
   const [localStep, setLocalStep] = useState(1);
@@ -258,8 +281,12 @@ export function EvidenceAdder({
       setNotice(t('evidence.videoNotVideo'));
       return false;
     }
-    if (f.size > UPLOAD_LIMITS.video) {
-      setNotice(t('evidence.videoTooBig', { mb: VIDEO_MB }));
+    if (noVideoSpace) {
+      setNotice(steps ? t('evidence.videoNoSpace') : t('error.QUOTA_STUDENT'));
+      return false;
+    }
+    if (f.size > videoMax) {
+      setNotice(t('evidence.videoTooBig', { mb: videoMb }));
       return false;
     }
     const ms = await videoDurationMs(f);
@@ -296,6 +323,8 @@ export function EvidenceAdder({
       if (b && !b.send) words.current?.focus();
       if ((b && !b.send) || (u && !u.send)) return;
     }
+    clearErrorToasts();
+    setNotice(null);
     setBusy(true);
     try {
       const ok = await run(async () => {
@@ -307,7 +336,26 @@ export function EvidenceAdder({
         }
         // One evidence item per file; finished items leave the list, so a failure can be retried.
         for (const it of pending) {
-          const up = await upload(it.kind, it.blob, it.name);
+          const big = it.kind === 'video' || it.blob.size > 2 * MB;
+          if (big) setProgress({ name: it.name, video: it.kind === 'video', percent: 0 });
+          let up: { id: string };
+          try {
+            up = big
+              ? await upload(it.kind, it.blob, it.name, (f) => setProgress({ name: it.name, video: it.kind === 'video', percent: Math.floor(f * 20) * 5 }))
+              : await upload(it.kind, it.blob, it.name);
+          } catch (err) {
+            const reason = reasonOf(err);
+            // Refused for what the file is: it leaves the list, so Save does not repeat the same error.
+            if (reason && REFUSED.has(reason)) {
+              drop(it.key);
+              setNotice(t('evidence.refused', { name: it.name }));
+            }
+            if (it.kind === 'video' && reason === 'FILE_TOO_LARGE') throw withReason(err, 'VIDEO_TOO_BIG');
+            if (steps && reason === 'QUOTA_STUDENT') throw withReason(err, 'QUOTA_STUDENT_OWN');
+            throw err;
+          } finally {
+            setProgress(null);
+          }
           await add({ ...common, kind: it.kind === 'audio' ? 'audio' : 'file', fileId: up.id });
           drop(it.key);
         }
@@ -446,17 +494,36 @@ export function EvidenceAdder({
       {current === 'document' ? <p className="cc-muted">{t('evidence.documentsHint')}</p> : null}
       {current === 'voiceFile' ? fileInput('voiceFile', t('evidence.chooseVoiceFile'), ACCEPT_HINT.audio, false) : null}
       {current === 'voice' ? <VoiceRecorder value={recording} onChange={setRecording} /> : null}
-      {current === 'video' ? (
-        systemVideo ? (
-          <FilePick id={`${idPrefix}-video`} label={t('evidence.openVideoCamera')} icon={<IconVideo />} accept="video/*" capture="environment" onFiles={(files) => void takeVideo(files[0])} />
+      {current === 'video' && !noVideoSpace ? (
+        <>
+          {recorderOk ? (
+            <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
+              <VideoRecorder onVideo={(blob, name) => push([{ blob, name, kind: 'video' }])} />
+            </Suspense>
+          ) : null}
+          {!recorderOk || touch ? (
+            <>
+              <FilePick
+                id={`${idPrefix}-video`}
+                label={recorderOk ? t('evidence.useCameraApp') : t('evidence.openVideoCamera')}
+                icon={<IconVideo />}
+                accept="video/*"
+                capture="environment"
+                onFiles={(files) => void takeVideo(files[0])}
+              />
+              <p className="cc-muted">{t('evidence.cameraAppBig')}</p>
+            </>
+          ) : null}
+        </>
+      ) : null}
+      {current === 'videoFile' && !noVideoSpace ? fileInput('videoFile', t('evidence.chooseVideo'), ACCEPT_HINT.video, false) : null}
+      {current === 'video' || current === 'videoFile' ? (
+        noVideoSpace ? (
+          <Alert kind="warning">{steps ? t('evidence.videoNoSpace') : t('error.QUOTA_STUDENT')}</Alert>
         ) : (
-          <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
-            <VideoRecorder onVideo={(blob, name) => push([{ blob, name, kind: 'video' }])} />
-          </Suspense>
+          <p className="cc-muted">{t('evidence.videoHint', { minutes: MAX_VIDEO_MS / 60000, mb: videoMb })}</p>
         )
       ) : null}
-      {current === 'videoFile' ? fileInput('videoFile', t('evidence.chooseVideo'), ACCEPT_HINT.video, false) : null}
-      {current === 'video' || current === 'videoFile' ? <p className="cc-muted">{t('evidence.videoHint', { minutes: MAX_VIDEO_MS / 60000, mb: VIDEO_MB })}</p> : null}
       {notice ? <Alert kind="warning">{notice}</Alert> : null}
       {fileMode && pending.length ? (
         <ul className="cc-evidence-pending" aria-label={t('evidence.ready')} data-testid="evidence-pending">
@@ -497,10 +564,16 @@ export function EvidenceAdder({
         errorMessage={hints.body}
         inputRef={words}
       />
+      {busy && progress ? (
+        <div className="cc-stack cc-evidence-progress" role="status" data-testid="evidence-progress">
+          <p className="cc-evidence-progress__text">{progress.video ? t('evidence.sendingVideo', { percent: progress.percent }) : t('evidence.sendingFile', { name: progress.name, percent: progress.percent })}</p>
+          <progress className="cc-progress" max={100} value={progress.percent} aria-label={t('evidence.sendingProgress')} />
+        </div>
+      ) : null}
       <div>
         <Button variant="primary" size={steps ? 'big' : 'md'} isDisabled={!valid || busy} onPress={() => void save()}>
           <IconPlus />
-          {fileMode && pending.length > 1 ? t('evidence.addMany', { count: pending.length }) : steps ? t('student.work.save') : t('student.addEvidence')}
+          {busy ? t('evidence.sending') : fileMode && pending.length > 1 ? t('evidence.addMany', { count: pending.length }) : steps ? t('student.work.save') : t('student.addEvidence')}
         </Button>
       </div>
     </div>
