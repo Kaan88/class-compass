@@ -13,6 +13,8 @@ import { looksLikeHtmlTable, MIME, sniffFile } from '../../src/server/modules/fi
 import { extractFile } from '../../src/server/modules/import/parsers/index.ts';
 import { decodeEntities, MAX_HTML_CELL_CHARS, MAX_HTML_TABLES, parseHtmlTables } from '../../src/server/modules/import/parsers/html.ts';
 import { ALLOWED_MIME } from '../../src/shared/contracts/files.ts';
+import { en as enMain } from '../../src/shared/i18n/en.ts';
+import { tr as trMain } from '../../src/shared/i18n/tr.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
 import { HOSTILE_MARKER, hostileHtmlXls, htmlTableXls, hugeHtmlXls, MULTI_CLASS_STUDENTS, multipart } from '../import-fixtures.ts';
@@ -54,22 +56,63 @@ describe('HTML-table .xls: parser (D-171)', () => {
     expect(text).not.toMatch(/javascript|example\.org|alert|onerror|<|>/u);
     expect(text).not.toMatch(/9999|8888|7777/u);
     const st = students(res.rows);
-    expect(st.map((r) => r.parsed.fullName)).toEqual(['Ece Kurgu', 'Kaan Örnek', 'Ada Deneme', 'Mert Taslak', 'Son Satır']);
+    // An unknown reference stays as written (audit finding 3); invalid numeric ones are left out.
+    expect(st.map((r) => r.parsed.fullName)).toEqual(['Ece Kurgu', 'Kaan Örnek', 'Ada Deneme&bogus;', 'Mert Taslak', 'Son Satır']);
     expect(st.map((r) => r.parsed.studentNumber)).toEqual(['6101', '6102', '6103', '6104', '6105']);
   });
 
-  it('limits: rows, columns, characters per cell and the number of tables are capped (huge table)', () => {
+  it('limits: rows, columns and characters per cell are capped (huge table)', () => {
     const res = parseHtmlTables(hugeHtmlXls());
     expect(res.truncated).toBe(true);
     expect(res.rows.length).toBeLessThanOrEqual(2100);
     expect(res.rows.reduce((m, r) => Math.max(m, r.cells.length), 0)).toBeLessThanOrEqual(60);
     expect(res.rows.reduce((m, r) => Math.max(m, ...r.cells.map((c) => c.length)), 0)).toBeLessThanOrEqual(MAX_HTML_CELL_CHARS);
-    const many = Buffer.from(Array.from({ length: MAX_HTML_TABLES + 5 }, (_, i) => `<table><tr><td>T${i}</td><td><table><tr><td>N${i}</td></tr></table></td></tr></table>`).join(''));
-    const capped = parseHtmlTables(many);
-    expect(capped.tables).toBe(MAX_HTML_TABLES);
-    const cells = capped.rows.flatMap((r) => r.cells);
-    expect(cells).not.toContain(`T${MAX_HTML_TABLES}`);
-    expect(cells).not.toContain(`N${MAX_HTML_TABLES}`);
+  });
+
+  it('audit finding 1: tables past the 20th are never dropped silently; the page is refused with a reason (D-079)', async () => {
+    const tablesHtml = (count: number) => Buffer.from(Array.from({ length: count }, (_, i) => `<table><tr><td>Ada Kurgu${i}</td><td>${6100 + i}</td></tr></table>`).join(''));
+    // Exactly the limit is read in full.
+    const atLimit = parseHtmlTables(tablesHtml(MAX_HTML_TABLES));
+    expect(atLimit).toMatchObject({ tables: MAX_HTML_TABLES, tooManyTables: false });
+    expect(atLimit.rows).toHaveLength(MAX_HTML_TABLES);
+    // One more table (top level or nested) stops the reading and says so.
+    expect(parseHtmlTables(tablesHtml(MAX_HTML_TABLES + 1)).tooManyTables).toBe(true);
+    const nested = Buffer.from(Array.from({ length: MAX_HTML_TABLES }, (_, i) => `<table><tr><td>T${i}</td><td><table><tr><td>N${i}</td></tr></table></td></tr></table>`).join(''));
+    expect(parseHtmlTables(nested).tooManyTables).toBe(true);
+    // The importer refuses such a file with its own reason instead of importing part of it.
+    await expect(withFile(tablesHtml(MAX_HTML_TABLES + 1), (p) => extractFile(cfg, { path: p, mime: MIME.htmlTable, name: 'liste.xls' }))).rejects.toMatchObject({
+      details: { reason: 'IMPORT_HTML_TOO_MANY_TABLES', max: MAX_HTML_TABLES },
+    });
+    // The message names the same limit in both languages.
+    expect(enMain['error.IMPORT_HTML_TOO_MANY_TABLES']).toContain(String(MAX_HTML_TABLES));
+    expect(trMain['error.IMPORT_HTML_TOO_MANY_TABLES']).toContain(String(MAX_HTML_TABLES));
+  });
+
+  it('audit finding 2: a rowspan past the span limit covers the rest of the table, so later rows never shift one column left', () => {
+    const rows = Array.from({ length: 60 }, (_, i) => `<tr><td>${7000 + i}</td>${i === 0 ? '<td rowspan="100">3/A</td>' : ''}<td>Ela Kurgu${i}</td></tr>`).join('');
+    const out = parseHtmlTables(Buffer.from(`<table>${rows}</table>`)).rows.map((r) => r.cells);
+    expect(out).toHaveLength(60);
+    expect(out[0]).toEqual(['7000', '3/A', 'Ela Kurgu0']);
+    // Row 55 is past the 50-row span limit: its name is still in the third column.
+    expect(out[55]).toEqual(['7055', '', 'Ela Kurgu55']);
+    expect(out.every((r, i) => r[0] === String(7000 + i) && r[2] === `Ela Kurgu${i}`)).toBe(true);
+    // A span within the limit still ends where it says.
+    const short = parseHtmlTables(Buffer.from('<table><tr><td rowspan="2">3/A</td><td>Ada</td></tr><tr><td>Can</td></tr><tr><td>3/B</td><td>Ece</td></tr></table>')).rows.map((r) => r.cells);
+    expect(short).toEqual([
+      ['3/A', 'Ada'],
+      ['', 'Can'],
+      ['3/B', 'Ece'],
+    ]);
+  });
+
+  it('audit finding 3: an unknown named character reference stays as written; the letters used in names are decoded', () => {
+    expect(decodeEntities('Ay&bogus;e')).toBe('Ay&bogus;e');
+    expect(decodeEntities('&Ccedil;a&gbreve;r&inodot; &Ouml;z&uuml;m &Scedil;eker &Idot;pek &Uuml;mit &scedil;&ouml;&ccedil;&Gbreve;')).toBe('Çağrı Özüm Şeker İpek Ümit şöçĞ');
+    expect(decodeEntities('Ren&eacute;e M&uuml;ller Jos&eacute; Pe&ntilde;a Bj&ouml;rn &Aring;sa')).toBe('Renée Müller José Peña Björn Åsa');
+    // Inherited object keys are not references.
+    expect(decodeEntities('&constructor; &toString;')).toBe('&constructor; &toString;');
+    const res = parseHtmlTables(Buffer.from('<table><tr><td>Ay&xyzzy;e Kurgu</td><td>&Ccedil;&inodot;nar</td></tr></table>'));
+    expect(res.rows[0]!.cells).toEqual(['Ay&xyzzy;e Kurgu', 'Çınar']);
   });
 
   it('rowspan and colspan keep later columns in place; nested layout tables do not leak into outer cells', () => {
@@ -82,7 +125,7 @@ describe('HTML-table .xls: parser (D-171)', () => {
       ['2', 'Can Örnek', ''],
       ['Toplam', '', '2'],
     ]);
-    expect(decodeEntities('&Ccedil;a&#287;r&#x131; &amp; &bogus; A&Bc &#0;')).toBe('Çağrı &  A&Bc ');
+    expect(decodeEntities('&Ccedil;a&#287;r&#x131; &amp; &bogus; A&Bc &#0;')).toBe('Çağrı & &bogus; A&Bc ');
   });
 
   it('extractFile runs it in the parser worker with the time limit, and says the list came from a web page', async () => {
@@ -146,7 +189,7 @@ describe('HTML-table .xls over HTTP (D-171)', () => {
     expect(b.rows.filter((r: { flags: string[] }) => !r.flags.includes('heading_ignored')).map((r: { parsed: { fullName: string } }) => r.parsed.fullName)).toEqual([
       'Ece Kurgu',
       'Kaan Örnek',
-      'Ada Deneme',
+      'Ada Deneme&bogus;',
       'Mert Taslak',
       'Son Satır',
     ]);

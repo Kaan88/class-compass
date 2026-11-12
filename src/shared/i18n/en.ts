@@ -194,6 +194,7 @@ export const en = {
   'error.IMPORT_NO_CLASS_COLUMN': 'No class column was found in this list. Turn off “This list has several classes” to import it into one class.',
   'error.IMPORT_SPLIT_CHANGED': 'The classes in this list have changed. Read the list again.',
   'error.IMPORT_SPLIT_NOTHING': 'Choose a class for at least one group of rows.',
+  'error.IMPORT_HTML_TOO_MANY_TABLES': 'This web-page list has more than 20 tables, so it cannot be read in full. Open it in Excel, save it as an Excel workbook (.xlsx) and upload that file.',
   'error.IMPORT_SPLIT_TOO_MANY_ROWS': 'This list is too long to split into classes (more than 5000 rows). Save it as smaller files, for example one per grade, and import them one by one.',
   'error.IMPORT_SPLIT_CLASS_TOO_BIG': 'One class in this list has more than 2000 rows. Check that the class column is right.',
   'error.IMPORT_BAD_MAPPING': 'This column choice is not valid.',

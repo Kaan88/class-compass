@@ -16,7 +16,9 @@
  *   a split id kept in the batch's mapping JSON with the file's class labels for that class, and the
  *   rows that are also listed under another class of the file (`crossClass`, flagged on every check).
  *   A split list is read up to MAX_SPLIT_ROWS rows and refused when it is longer; each class made from
- *   it has at most MAX_IMPORT_ROWS rows (never a class cut short without saying so).
+ *   it has at most MAX_IMPORT_ROWS rows (never a class cut short without saying so). Once the batches
+ *   are made the uploaded file's bytes are deleted (each batch keeps its own rows): the file names
+ *   children of skipped classes, whom student erasure could not find through any batch row.
  */
 import { and, eq, gte, inArray, or } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -53,7 +55,7 @@ import { requireUser } from '../../lib/context.ts';
 import { newId } from '../../lib/crypto.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { hasPictureSince } from '../avatars/pictures.ts';
-import { assertCanReadFile } from '../files/service.ts';
+import { assertCanReadFile, deleteFileRow, getFileRow } from '../files/service.ts';
 import { storagePath } from '../files/storage.ts';
 import { assertClassWritable, assertTeachesClass, defaultEnrolmentDate, getClass, isClassWritable, todayFor, type ClassRow } from '../school/policy.ts';
 import { taughtClassIds } from '../school/service.ts';
@@ -606,7 +608,8 @@ export async function previewSplit(ctx: RequestContext, input: In<typeof C.previ
 /**
  * One draft batch per chosen class, all in one transaction (all or none). Each keeps the rows above
  * the header (so the header row stays where the mapping says) and its own classes' rows in file
- * order. Audited per batch (`import.create` with the split id) and once for the split.
+ * order. Audited per batch (`import.create` with the split id) and once for the split. The uploaded
+ * source file is then deleted (`file.delete`; its row and name stay for the history).
  */
 export async function createSplit(ctx: RequestContext, input: In<typeof C.createImportSplit>) {
   const plan = await planSplit(ctx, input);
@@ -641,7 +644,7 @@ export async function createSplit(ctx: RequestContext, input: In<typeof C.create
   for (const [id, { rows }] of byClass) for (const i of rows) classOfRow.set(i, id);
   const cross = crossClassOf(plan.source, plan.mapping, (i) => classOfRow.get(i) ?? null);
   const splitId = newId();
-  return tx(ctx.db, () => {
+  const made = tx(ctx.db, () => {
     const pool = buildPool(ctx);
     const ids: string[] = [];
     for (const { cls, rows, labels } of byClass.values()) {
@@ -659,6 +662,14 @@ export async function createSplit(ctx: RequestContext, input: In<typeof C.create
     const batches = ids.map((id) => summaryOf(ctx.db, ctx.db.select().from(importBatches).where(eq(importBatches.id, id)).get()!));
     return { splitId, batches, skippedRows };
   });
+  // Each batch now holds its own rows; the uploaded whole-school file is not kept (audit fix): it
+  // names children of classes that were skipped or not chosen, whom no batch row (and so no erasure,
+  // D-109) could ever find. The file row stays without its bytes, so the history keeps its name.
+  if (plan.fileId) {
+    const f = getFileRow(ctx.db, plan.fileId);
+    if (f && f.deletedAt === null) await deleteFileRow(ctx, f);
+  }
+  return made;
 }
 
 /** Sheet picker (S13b): the sheets of an uploaded workbook, read in the parser worker. */

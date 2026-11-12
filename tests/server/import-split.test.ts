@@ -10,7 +10,8 @@ import fsp from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { auditEvents } from '../../src/server/db/schema.ts';
+import { auditEvents, files } from '../../src/server/db/schema.ts';
+import { storagePath } from '../../src/server/modules/files/storage.ts';
 import { makeEnv, type Client, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
 import { htmlTableXls, multiClassCsv, multiClassRows, multiClassXlsx, multipart } from '../import-fixtures.ts';
@@ -267,6 +268,29 @@ describe('several classes in one file (IMP-2, D-171)', () => {
     // Skipped: the header row and the later copy of Nehir.
     expect(cb.counts).toMatchObject({ added: 2, skipped: 2, failed: 0 });
     for (const id of [idOf('3-A'), idOf('3-B')]) await ok(s.admin.post(`/api/import/batches/${id}/revert`, { confirm: true }));
+  });
+
+  it('audit finding 4: the uploaded whole-school file is deleted once the split batches are made, so children of skipped classes are not kept in it (D-109)', async () => {
+    const fileId = await uploadList(s.admin, multiClassXlsx(), 'okul-listesi.xlsx', 'application/octet-stream');
+    const stored = env.db.select().from(files).where(eq(files.id, fileId)).get()!;
+    const abs = storagePath(env.config, stored.storageKey);
+    await fsp.access(abs);
+    // 5/C and the row without a class are skipped: no batch row names those children.
+    const made = await ok(s.admin.post('/api/import/split', { fileId, assign: [] }));
+    expect(made.skippedRows).toBe(3);
+    const after = env.db.select().from(files).where(eq(files.id, fileId)).get()!;
+    expect(after.deletedAt).not.toBeNull();
+    await expect(fsp.access(abs)).rejects.toThrow();
+    expect((await s.admin.req('GET', `/api/files/${fileId}`)).status).toBe(404);
+    expect(env.db.select().from(auditEvents).where(eq(auditEvents.entityId, fileId)).all().map((e) => e.action)).toContain('file.delete');
+    // Each batch keeps its own rows and the history still shows the file's name.
+    for (const b of made.batches as Summary[]) {
+      const batch = (await ok(s.admin.get(`/api/import/batches/${b.id}`))) as Batch & { fileName: string | null };
+      expect(batch.fileName).toBe('okul-listesi.xlsx');
+      expect(studentRows(batch).length).toBeGreaterThan(0);
+    }
+    // The same file cannot be read again: it is gone.
+    expect((await s.admin.post('/api/import/split/preview', { fileId })).status).toBe(404);
   });
 
   it('admin wording and same-named classes: "3-A" in two open school years is ambiguous, with both classes and their years (D-171)', async () => {

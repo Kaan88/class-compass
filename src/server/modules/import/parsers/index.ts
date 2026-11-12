@@ -89,7 +89,9 @@ export async function extractFile(
       }
       case MIME.htmlTable: {
         // An HTML table with a .xls name (S20c, D-171): table text only, read in the parser worker.
-        const { rows, truncated } = await runParser('htmlTable', buf, config.PARSE_TIMEOUT_MS, maxRows);
+        const { rows, tables, truncated, tooManyTables } = await runParser('htmlTable', buf, config.PARSE_TIMEOUT_MS, maxRows);
+        // More tables than are read (`tables` is then the limit): refused, never cut (D-079).
+        if (tooManyTables) throw new AppError('VALIDATION', 'This page has too many tables', { reason: 'IMPORT_HTML_TOO_MANY_TABLES', max: tables });
         notices.push('HTML_TABLE');
         if (truncated) notices.push('TOO_MANY_ROWS');
         if (!rows.some((r) => r.cells.some((c) => c.trim()))) throw fail('IMPORT_NO_ROWS', 'No names were found');

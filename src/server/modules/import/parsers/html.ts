@@ -9,11 +9,15 @@
  *   table belongs to the nested table's own rows, never to the outer cell (layout tables around a data
  *   table become blank rows, which the importer drops).
  * - `colspan` keeps later columns in place (the value stays in the first column, like merged cells
- *   in a workbook); `rowspan` leaves the spanned cells of the next rows empty.
+ *   in a workbook); `rowspan` leaves the spanned cells of the next rows empty. A rowspan past
+ *   `MAX_SPAN` covers the rest of the table (audit fix: never a later row shifted one column left).
  * - The content of `script`, `style`, `template`, `textarea`, `title`, `xml`, `noscript`, `noembed`,
  *   `noframes`, `iframe`, `object`, `svg` and `math` elements and of comments is skipped entirely.
  * - Limits: rows (`MAX_SHEET_ROWS`, then `truncated`), columns (`MAX_SHEET_COLS`), tables
- *   (`MAX_HTML_TABLES`), characters per cell (`MAX_HTML_CELL_CHARS`), spans (`MAX_SPAN`).
+ *   (`MAX_HTML_TABLES`: a page with more stops with `tooManyTables` and the import is refused, never
+ *   cut, D-079), characters per cell (`MAX_HTML_CELL_CHARS`), spans (`MAX_SPAN`).
+ * - Character references: numeric ones and the common named ones are decoded; an unknown `&name;`
+ *   stays as it was written (never a letter cut out of a name).
  */
 import type { SourceRow } from '../../../../domain/importing.ts';
 import { MAX_SHEET_COLS, MAX_SHEET_ROWS, SHEET_ROW_MARGIN } from './spreadsheet.ts';
@@ -49,6 +53,73 @@ const NAMED: Record<string, string> = {
   inodot: 'ı',
   imath: 'ı',
   Idot: 'İ',
+  // Other letters that turn up in names (Latin-1 and Latin Extended-A).
+  auml: 'ä',
+  Auml: 'Ä',
+  aacute: 'á',
+  Aacute: 'Á',
+  agrave: 'à',
+  Agrave: 'À',
+  aring: 'å',
+  Aring: 'Å',
+  atilde: 'ã',
+  Atilde: 'Ã',
+  eacute: 'é',
+  Eacute: 'É',
+  egrave: 'è',
+  Egrave: 'È',
+  ecirc: 'ê',
+  Ecirc: 'Ê',
+  euml: 'ë',
+  Euml: 'Ë',
+  iacute: 'í',
+  Iacute: 'Í',
+  igrave: 'ì',
+  Igrave: 'Ì',
+  iuml: 'ï',
+  Iuml: 'Ï',
+  oacute: 'ó',
+  Oacute: 'Ó',
+  ograve: 'ò',
+  Ograve: 'Ò',
+  ocirc: 'ô',
+  Ocirc: 'Ô',
+  otilde: 'õ',
+  Otilde: 'Õ',
+  oslash: 'ø',
+  Oslash: 'Ø',
+  uacute: 'ú',
+  Uacute: 'Ú',
+  ugrave: 'ù',
+  Ugrave: 'Ù',
+  yacute: 'ý',
+  Yacute: 'Ý',
+  yuml: 'ÿ',
+  ntilde: 'ñ',
+  Ntilde: 'Ñ',
+  szlig: 'ß',
+  aelig: 'æ',
+  AElig: 'Æ',
+  oelig: 'œ',
+  OElig: 'Œ',
+  scaron: 'š',
+  Scaron: 'Š',
+  zcaron: 'ž',
+  Zcaron: 'Ž',
+  ccaron: 'č',
+  Ccaron: 'Č',
+  cacute: 'ć',
+  Cacute: 'Ć',
+  lstrok: 'ł',
+  Lstrok: 'Ł',
+  dstrok: 'đ',
+  Dstrok: 'Đ',
+  shy: '',
+  ndash: '–',
+  mdash: '—',
+  rsquo: '’',
+  lsquo: '‘',
+  middot: '·',
   acirc: 'â',
   Acirc: 'Â',
   icirc: 'î',
@@ -57,7 +128,10 @@ const NAMED: Record<string, string> = {
   Ucirc: 'Û',
 };
 
-/** Character references → text; an unknown `&name;` or an invalid character is left out. */
+/**
+ * Character references → text. An unknown `&name;` stays as written (audit fix: deleting it cut
+ * letters out of names); an invalid numeric reference is left out.
+ */
 export function decodeEntities(s: string): string {
   if (!s.includes('&')) return s;
   return s.replace(/&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z]{2,8});?/gu, (m, ref: string) => {
@@ -67,8 +141,8 @@ export function decodeEntities(s: string): string {
       if (code < 32 && code !== 9 && code !== 10 && code !== 13) return '';
       return String.fromCodePoint(code);
     }
-    // An unknown name with its ";" is a reference we cannot read (left out); without one it is text ("A&Bc").
-    return NAMED[ref] ?? (m.endsWith(';') ? '' : m);
+    // An unknown name is kept as its literal text ("&bogus;", "A&Bc"), so no letters disappear.
+    return Object.hasOwn(NAMED, ref) ? NAMED[ref]! : m;
   });
 }
 
@@ -85,9 +159,14 @@ interface TableState {
 
 const SPAN_ATTR = { colspan: /(?:^|\s)colspan\s*=\s*["']?(\d{1,4})/iu, rowspan: /(?:^|\s)rowspan\s*=\s*["']?(\d{1,4})/iu } as const;
 
+/**
+ * A span value, clamped to 1..MAX_SPAN. A rowspan past MAX_SPAN covers the rest of the table
+ * (`Infinity`) instead of being cut at MAX_SPAN, so the rows below it never shift one column left.
+ */
 function attr(attrs: string, name: keyof typeof SPAN_ATTR): number {
   const m = SPAN_ATTR[name].exec(attrs);
   const n = m ? Number(m[1]) : 1;
+  if (name === 'rowspan' && Number.isFinite(n) && n > MAX_SPAN) return Infinity;
   return Math.max(1, Math.min(MAX_SPAN, Number.isFinite(n) ? n : 1));
 }
 
@@ -109,6 +188,8 @@ export interface HtmlTableResult {
   rows: SourceRow[];
   tables: number;
   truncated: boolean;
+  /** More than MAX_HTML_TABLES tables: reading stopped, and the import is refused (never cut, D-079). */
+  tooManyTables: boolean;
 }
 
 /** The rows of the tables of an HTML document (see the file comment for the rules and limits). */
@@ -119,7 +200,7 @@ export function parseHtmlTables(buf: Buffer, maxRows?: number): HtmlTableResult 
   const stack: TableState[] = [];
   let tables = 0;
   let truncated = false;
-  let ignoredDepth = 0;
+  let tooManyTables = false;
 
   const top = () => stack[stack.length - 1];
   const addText = (text: string) => {
@@ -175,10 +256,10 @@ export function parseHtmlTables(buf: Buffer, maxRows?: number): HtmlTableResult 
 
   let i = 0;
   const n = s.length;
-  while (i < n && !truncated) {
+  while (i < n && !truncated && !tooManyTables) {
     const lt = s.indexOf('<', i);
     const textEnd = lt < 0 ? n : lt;
-    if (textEnd > i && ignoredDepth === 0) addText(s.slice(i, textEnd));
+    if (textEnd > i) addText(s.slice(i, textEnd));
     if (lt < 0) break;
     if (s.startsWith('<!--', lt)) {
       const e = s.indexOf('-->', lt + 4);
@@ -196,7 +277,7 @@ export function parseHtmlTables(buf: Buffer, maxRows?: number): HtmlTableResult 
     while (nameEnd < n && /[A-Za-z0-9:-]/u.test(s[nameEnd]!)) nameEnd++;
     if (nameEnd === nameStart) {
       // A lone "<" in text.
-      if (ignoredDepth === 0) addText('<');
+      addText('<');
       i = lt + 1;
       continue;
     }
@@ -222,14 +303,11 @@ export function parseHtmlTables(buf: Buffer, maxRows?: number): HtmlTableResult 
     }
     if (name === 'table') {
       if (closing) {
-        if (ignoredDepth > 0) ignoredDepth--;
-        else {
-          const t = stack.pop();
-          if (t) endRow(t);
-        }
-      } else if (ignoredDepth > 0 || tables >= MAX_HTML_TABLES) {
-        // Tables past the limit (and everything inside them) are skipped, at any depth.
-        ignoredDepth++;
+        const t = stack.pop();
+        if (t) endRow(t);
+      } else if (tables >= MAX_HTML_TABLES) {
+        // One table past the limit, at any depth: stop; the caller refuses the file (never cut silently).
+        tooManyTables = true;
       } else {
         tables++;
         stack.push({ rows: [], row: null, carry: [], covered: new Set(), col: 0, cell: null });
@@ -237,7 +315,7 @@ export function parseHtmlTables(buf: Buffer, maxRows?: number): HtmlTableResult 
       continue;
     }
     const t = top();
-    if (!t || ignoredDepth > 0) continue;
+    if (!t) continue;
     if (name === 'tr') {
       if (closing) endRow(t);
       else startRow(t);
@@ -247,5 +325,5 @@ export function parseHtmlTables(buf: Buffer, maxRows?: number): HtmlTableResult 
     } else if (BREAKS.has(name)) addText(' ');
   }
   while (stack.length) endRow(stack.pop()!);
-  return { rows: out, tables, truncated };
+  return { rows: out, tables, truncated, tooManyTables };
 }

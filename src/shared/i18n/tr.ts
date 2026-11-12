@@ -187,6 +187,7 @@ export const tr = {
   'error.IMPORT_NO_CLASS_COLUMN': 'Bu listede sınıf sütunu bulunamadı. Tek bir sınıfa aktarmak için “Bu listede birden fazla sınıf var” seçeneğini kapatın.',
   'error.IMPORT_SPLIT_CHANGED': 'Bu listedeki sınıflar değişmiş. Listeyi yeniden okuyun.',
   'error.IMPORT_SPLIT_NOTHING': 'En az bir satır grubu için bir sınıf seçin.',
+  'error.IMPORT_HTML_TOO_MANY_TABLES': 'Bu web sayfası biçimindeki listede 20’den fazla tablo var, bu yüzden tamamı okunamıyor. Dosyayı Excel’de açın, Excel çalışma kitabı (.xlsx) olarak kaydedin ve o dosyayı yükleyin.',
   'error.IMPORT_SPLIT_TOO_MANY_ROWS': 'Bu liste sınıflara bölünemeyecek kadar uzun (5000 satırdan fazla). Listeyi daha küçük dosyalar hâlinde kaydedin, örneğin her sınıf düzeyi için ayrı bir dosya, ve tek tek aktarın.',
   'error.IMPORT_SPLIT_CLASS_TOO_BIG': 'Bu listedeki bir sınıfta 2000’den fazla satır var. Sınıf sütununun doğru olduğunu kontrol edin.',
   'error.IMPORT_BAD_MAPPING': 'Bu sütun seçimi geçerli değil.',
