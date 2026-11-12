@@ -78,6 +78,10 @@ Yalnızca cümle başı yetmez: **Cümleni bitir: ___ olan yere kendi sözcükle
 2. **Hangi hedef için?** Bir hedefe dokun ya da **Tüm öğrendiklerim için**'i seç.
 3. Çalışmanı anlat ya da dosyayı seç; istersen **Birkaç sözcük** ekle. **Çalışmamı kaydet**'e bas.
 
+![Okul videolara izin veriyorsa Video çek ve Video ekle ile Çalışmamı göster](../img/tr/student-video.png)
+
+![Video çek: kameranın gördüğü, süre ve Durdur](../img/tr/student-video-recorder.png)
+
 **Kaydedildi!** yazısını ve **Çalışmalarım** listesini görürsün. Kendi çalışmalarını orada silebilirsin: sayfa **Silinsin mi? Sonra geri getiremezsin.** diye sorar. **Evet, sil** ya da **Hayır, kalsın**'ı seç.
 
 ## Hedeflerim
@@ -91,6 +95,10 @@ Yalnızca cümle başı yetmez: **Cümleni bitir: ___ olan yere kendi sözcükle
 - Hedefini başardığında **Başardım!**'a bas. Aferin!
 - **Sözlerimi değiştir** ile yazdıklarını değiştirebilirsin: hedefini ya da onun hakkında yazdıklarını. Sözlerini değiştir ve **Sözlerimi kaydet**'e bas (ya da **Vazgeç**). Yalnızca kendi yazdıklarını değiştirebilirsin.
 - **Hedefi sil** de önce sorar.
+
+![Bir hedefin altında Çalışmamı ekle](../img/tr/student-goal-add.png)
+
+![Çalışmamı ekle: hedef zaten seçili](../img/tr/student-goal-add-work.png)
 
 ## Nazik sözler
 

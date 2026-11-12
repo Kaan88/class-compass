@@ -542,7 +542,7 @@ Decision D-193; no migration. Owner request 2026-11-12 ("for the students page, 
 - [ ] Real devices: the in-page recorder on an iPad and an Android phone (Safari's MP4 recorder, the front and back camera), upload progress on school Wi-Fi
 - [ ] Real devices: recording and playback on an iPhone (MOV/HEVC, Safari's MP4 recorder), an Android phone, a classroom laptop's webcam, and a large phone video through the Cloudflare tunnel on the test site
 - [ ] Owner decision: the per-student upload space on the server (`UPLOAD_STUDENT_QUOTA_MB`, 100 MB today) before videos are switched on for real classes, and the KVKK sign-off for videos
-- [ ] Guide screenshots of the video choices and the recorder (the later `npm run docs:screenshots` pass)
+- [x] Guide screenshots of the video choices and the recorder (S27 screenshot pass, 2026-11-12: `student-video` and `student-video-recorder` in EN and TR, on a phone with Chromium's fake camera, the switch on only for the pictures; in the student guide)
 
 ## S27b Add work from the student's My goals (wave S27, owner 2026-11-12)
 Decision D-194; no migration.
@@ -551,7 +551,7 @@ Decision D-194; no migration.
 - [x] Teacher Goals page checked: "Add evidence" on each goal card already opens the form for that goal (S20b, D-170)
 - [x] EN/TR words in the main dictionary, student guide EN/TR; no new imports on the student page (size budget)
 - [x] Tests: `tests/client/student-goal-work.test.tsx`, `e2e/student-goal-work.spec.ts` (text and picture from My goals at 375 px, axe)
-- [ ] Guide screenshot of My goals with the new button (the later screenshot pass)
+- [x] Guide screenshot of My goals with the new button (S27 screenshot pass, 2026-11-12: `student-goal-add` and the steps it opens, `student-goal-add-work`, in EN and TR; in the student guide)
 - [ ] Checked by children on a real phone and tablet
 
 ## S27c One default card size on the classroom screen (owner 2026-11-12)
@@ -575,7 +575,7 @@ Decision D-196; migration 0033 (review fixes: attachments kept for the theme too
 - [x] EN/TR strings; teacher, admin and AI tools guides EN/TR; THEMING, EXTENDING and CONVENTIONS notes
 - [x] Tests: `tests/server/assistant-chat-themes.test.ts`, `tests/client/assistant-markdown.test.tsx`, scope and privacy tests updated; `e2e/assistant-theme-drafts.spec.ts` with the scripted fake model
 - [ ] Try theme drafts and attachments with a real provider and on a teacher's own device (needs a person)
-- [ ] Guide screenshots of Admin → Assistant and a "Proposed by" draft (not taken in this stage)
+- [x] Guide screenshots of Admin → Assistant and a "Proposed by" draft (S27 screenshot pass, 2026-11-12: `admin-assistant`, a Markdown answer from the scripted fake model, and `admin-theme-draft`, a fictional draft proposed through the teacher endpoint and deleted afterwards, in EN and TR; in the admin guide)
 
 ## Open points noted with the owner (2026-11-09)
 A summary of what is still open after S14, S15a and the move to the Oracle server, so nothing is lost. The detailed boxes stay in their stages above; this list only groups them.
@@ -598,10 +598,10 @@ Markdown guides in `docs/guides/en/` and `docs/guides/tr/`, shown read-only in t
 - [x] Super Speakers (EN, TR): administrator guide, one-page scorer guide (Android and iPhone install, pairing code, undo, offline), one-page board-screen setup guide
 - [x] Student and parent guide (EN, TR): child-level page guide and a KVKK-aware privacy part for parents, only what the app does
 - [x] Index (`docs/guides/README.md`) and a one-page quick start per role (teacher, administrator, student; the scorer guide is the scorer's quick start)
-- [x] Screenshots from the fictional demo school with demo history, EN and TR (44 each since S14i, 58 since S25-verify, palette PNG), made by a separate Playwright script: `npm run docs:screenshots` (not part of `npx playwright test`)
+- [x] Screenshots from the fictional demo school with demo history, EN and TR (44 each since S14i, 58 since S25-verify, 64 since the S27 screenshot pass, palette PNG), made by a separate Playwright script: `npm run docs:screenshots` (not part of `npx playwright test`)
 - [x] In-app Help: Help link in the teacher menu and nav, the admin top bar, the student page and the scorer app; opens the guide in the interface language with an EN/TR switch; rendered by a small Markdown subset renderer without HTML (no innerHTML, no remote images or links), bundled at build time
 - [x] Tests: every guide in both languages, every guide link, anchor and image exists, every screenshot used and small (`tests/docs`); Help renders EN and TR for teacher, admin and student and passes axe (`e2e/help.spec.ts`)
 - [ ] Read through by the owner and a Turkish-speaking teacher (wording, anything unclear for colleagues)
 - [x] Administrators set their Maintenance PIN in Profile (asked by "Back up now" and "Verify the latest backup"); the admin guide is updated (D-138)
 - [x] The sign-in pages have an English | Türkçe switch, remembered per device; without a choice they follow a Turkish browser, then the school's language for new accounts; the Turkish teacher guide quotes the Turkish labels (D-142)
-- [ ] Re-run `npm run docs:screenshots` after visible UI changes (standing rule, no automatic check that the pictures are current; last full run S25-verify, 2026-11-11 on main after S22–S25: 12 new pictures per language (58 each); of the 46 existing, 7 per language had real UI changes and were committed, the rest differed only by run data or a 1 px shift and were put back; S27-verify, 2026-11-12 on main after S26b, S26c and S27a–d: only Admin → Photos and media changed for real (the Video evidence switch, S27a), committed in both languages, 39 others per language differed by run data and were put back; the script now opens a student who has a goal for `goals-student` (the demo history gives goals by chance); no picture yet of the video recorder, My goals' "Add my work" or Admin → Assistant, see the S27a, S27b and S27d boxes)
+- [ ] Re-run `npm run docs:screenshots` after visible UI changes (standing rule, no automatic check that the pictures are current; last full run S25-verify, 2026-11-11 on main after S22–S25: 12 new pictures per language (58 each); of the 46 existing, 7 per language had real UI changes and were committed, the rest differed only by run data or a 1 px shift and were put back; S27-verify, 2026-11-12 on main after S26b, S26c and S27a–d: only Admin → Photos and media changed for real (the Video evidence switch, S27a), committed in both languages, 39 others per language differed by run data and were put back; the script now opens a student who has a goal for `goals-student` (the demo history gives goals by chance); S27 screenshot pass, 2026-11-12: 6 new pictures per language (64 each: the video choices and recorder, My goals' "Add my work" and its steps, Admin → Assistant, a teacher's theme draft); existing pictures that changed differed only by run data and were put back)

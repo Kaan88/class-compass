@@ -78,6 +78,10 @@ A starter alone is not enough: if you see **Finish your sentence: write your own
 2. **Which goal is it for?** Tap a goal, or **For all my learning**.
 3. Write about your work, or choose the file, and add **A few words** if you like. Press **Save my work**.
 
+![Show my work with Record a video and Add a video, when the school allows videos](../img/en/student-video.png)
+
+![Record a video: what the camera sees, the timer and Stop](../img/en/student-video-recorder.png)
+
 You see **Saved!** and the list of **My work**. You can delete your own work there: the page asks **Delete this? You cannot get it back.** Choose **Yes, delete** or **No, keep it**.
 
 ## My goals
@@ -91,6 +95,10 @@ You see **Saved!** and the list of **My work**. You can delete your own work the
 - When you have done it, press **I did it!** Well done!
 - **Change my words** lets you change what you wrote: your goal or what you wrote about it. Change the words and press **Save my words** (or **Cancel**). Only your own words can be changed.
 - **Delete goal** asks first, like above.
+
+![Add my work under a goal](../img/en/student-goal-add.png)
+
+![Add my work: the goal is already chosen](../img/en/student-goal-add-work.png)
 
 ## Kind words
 

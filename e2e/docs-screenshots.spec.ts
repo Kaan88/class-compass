@@ -168,6 +168,10 @@ for (const lang of ['en', 'tr'] as const) {
     let pictureStudent: string | null = null;
     let picturesOn = false;
     let notifyBefore: { categories: Record<string, boolean>; digest: unknown } | null = null;
+    // S27a, S27d: the video switch and a teacher's theme draft, undone in `finally`.
+    let videoOn = false;
+    let draftKey: string | null = null;
+    let adminChatId: string | null = null;
 
     try {
       // ---------------------------------------------------------------- teacher area
@@ -365,6 +369,35 @@ for (const lang of ['en', 'tr'] as const) {
         await tp.waitForTimeout(400);
         await shot(tp, lang, 'assistant', { from: 'main h1' });
         await tp.setViewportSize({ width: 1280, height: 900 });
+
+        // S27d (D-196): Admin → Assistant with a formatted (Markdown) answer. The question needs no school
+        // data; the scripted answer only restates the steps the admin guide gives.
+        const how =
+          lang === 'tr'
+            ? {
+                ask: 'Bir öğretmenin tema taslağını nasıl açarım?',
+                answer:
+                  '## Bir tema taslağını açmak\n\nTaslak hiçbir sınıfa kendiliğinden verilmez. Siz karar verirsiniz:\n\n1. **Temalar** sayfasını açın.\n2. Taslağın yanındaki **Önizleme** ile renklere ve seslere bakın.\n3. Gerekirse öneren öğretmenle konuşun.\n4. **Etkinleştir** ya da **Sil** seçin.\n\n| Kim | Ne yapabilir |\n|---|---|\n| Öğretmen | Taslak önerir (en çok 5) |\n| Yönetici | Önizler, etkinleştirir, siler |\n\n*Bunu ben yapamam:* bir temayı etkinleştirmek her zaman sizin adımınızdır.',
+              }
+            : {
+                ask: 'How do I enable a teacher’s theme draft?',
+                answer:
+                  '## Enabling a theme draft\n\nA draft is never given to a class by itself. You decide:\n\n1. Open **Themes**.\n2. Press **Preview** next to the draft and look at the colours and sounds.\n3. Talk to the teacher who proposed it, if needed.\n4. Choose **Enable** or **Delete**.\n\n| Who | What they can do |\n|---|---|\n| Teacher | Proposes a draft (up to 5) |\n| Administrator | Previews, enables, deletes |\n\n*I cannot do this for you:* enabling a theme is always your step.',
+              };
+        script(fake, [() => ({ text: how.answer })]);
+        await ap.goto('/admin/ai-assistant');
+        await ap.getByTestId('assistant-new-chat').click();
+        await ap.waitForURL(/[?&]chat=/u);
+        adminChatId = new URL(ap.url()).searchParams.get('chat');
+        await ap.getByLabel(T('assistantChat.composer' as MessageKey)).fill(how.ask);
+        await ap.getByTestId('assistant-send').click();
+        const adminAnswer = ap.getByTestId('assistant-message-assistant').last();
+        await expect(adminAnswer.getByRole('table')).toBeVisible();
+        await expect(ap.getByTestId('assistant-stop')).toBeHidden();
+        await ap.setViewportSize({ width: 1280, height: 1100 });
+        await ap.waitForTimeout(400);
+        await shot(ap, lang, 'admin-assistant', { from: 'main h1' });
+        await ap.setViewportSize({ width: 1280, height: 900 });
       }
 
       await tp.goto('/teacher/import');
@@ -528,6 +561,18 @@ for (const lang of ['en', 'tr'] as const) {
       await expect(ap.getByTestId('theme-package-preview')).toBeVisible();
       await ap.waitForTimeout(600);
       await shot(ap, lang, 'admin-themes', { from: '[data-testid="theme-report"]' });
+      // S27d (D-196): a teacher's theme draft ("Proposed by"), proposed through the teacher's normal
+      // endpoint with a fictional package made from the worked example; deleted in `finally`.
+      {
+        const ocean = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../docs/examples/ocean.theme.json'), 'utf8')) as Record<string, unknown>;
+        const key = 'autumn-leaves-draft';
+        const proposed = await api(tp, 'POST', '/api/teacher/themes/drafts', { source: JSON.stringify({ ...ocean, key, name: { en: 'Autumn Leaves', tr: 'Sonbahar Yaprakları' } }) });
+        expect(proposed.status).toBe(200);
+        draftKey = key;
+        await ap.goto('/admin/themes');
+        await expect(ap.getByTestId(`theme-proposed-${key}`)).toBeVisible();
+        await shot(ap, lang, 'admin-theme-draft', { clipTo: 'section[aria-labelledby="custom-themes-title"]' });
+      }
       await ap.goto('/admin/super-speakers');
       await expect(ap.getByTestId('speakers-admin')).toBeVisible();
       await shot(ap, lang, 'speakers-admin', { from: 'main h1' });
@@ -593,7 +638,16 @@ for (const lang of ['en', 'tr'] as const) {
         await page.getByTestId('student-tile-goals').click();
         await expect(page.getByTestId('student-goals')).toBeVisible();
         await shot(page, lang, 'student-goals', { from: '#student-screen-title' });
-        await page.getByTestId('student-back').click();
+        // S27b (D-194): "Add my work" on a goal, and the steps it opens (for that goal, no goal step).
+        const addWork = page.locator('[data-add-work-for]').first();
+        await expect(addWork).toBeVisible();
+        await shot(page, lang, 'student-goal-add', { center: '[data-add-work-for]' });
+        await addWork.click();
+        const goalForm = page.getByTestId('evidence-form');
+        await expect(goalForm).toHaveAttribute('data-step', 'how');
+        await expect(goalForm.getByTestId('evidence-for-goal')).toBeVisible();
+        await shot(page, lang, 'student-goal-add-work', { from: '#student-screen-title' });
+        await page.goto(new URL(page.url()).pathname);
         // New goal → a category → "My own words" with a sentence starter tapped.
         await page.getByTestId('student-tile-newGoal').click();
         await page.locator('.cc-student-choices .cc-student-choice').first().click();
@@ -678,10 +732,48 @@ for (const lang of ['en', 'tr'] as const) {
         await ap.waitForTimeout(500);
         await shot(ap, lang, 'admin-media', { from: 'main h1' });
         await ap.setViewportSize({ width: 1280, height: 900 });
+
+        // S27a (D-193): "Record a video" and "Add a video" on Show my work, and the in-page recorder with
+        // Chromium's fake camera (a test pattern). The school switch is on only here (off in `finally`);
+        // nothing is recorded to the server: the clip is never used.
+        expect((await api(ap, 'PUT', '/api/admin/module-policies/media.evidenceVideo', { availability: 'enabled' })).status).toBe(200);
+        videoOn = true;
+        {
+          const camPhone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true, permissions: ['camera', 'microphone'] });
+          await camPhone.addInitScript((l) => localStorage.setItem('cc.studentLocale', l), lang);
+          const vp = await camPhone.newPage();
+          await vp.goto(url);
+          await expect(vp.getByTestId('student-page')).toBeVisible();
+          await vp.getByTestId('student-tile-showMyWork').click();
+          const form = vp.getByTestId('evidence-form');
+          await expect(form).toHaveAttribute('data-step', 'how');
+          const record = form.getByRole('button', { name: T('evidence.mode.video'), exact: true });
+          await expect(record).toBeVisible();
+          await expect(form.getByRole('button', { name: T('evidence.mode.videoFile'), exact: true })).toBeVisible();
+          // Tall enough for every choice, the video ones included.
+          await vp.setViewportSize({ width: 390, height: 1300 });
+          await shot(vp, lang, 'student-video', { until: '[data-testid="evidence-form"]' });
+          await vp.setViewportSize({ width: 390, height: 844 });
+          await record.click();
+          if ((await form.getAttribute('data-step')) === 'goal') await form.getByRole('button', { name: T('student.work.all'), exact: true }).click();
+          const recorder = form.getByTestId('video-recorder');
+          const startRec = recorder.getByRole('button', { name: T('evidence.video.start'), exact: true });
+          await expect(startRec).toBeEnabled();
+          await startRec.click();
+          await expect(recorder.getByTestId('video-timer')).toBeVisible();
+          await vp.waitForTimeout(2300);
+          await shot(vp, lang, 'student-video-recorder', { from: '#student-screen-title' });
+          await recorder.getByRole('button', { name: T('student.audio.stop'), exact: true }).click();
+          await expect(recorder).toHaveAttribute('data-phase', 'recorded');
+          await camPhone.close();
+        }
       }
     } finally {
       // AI tools are off in the demo school; switching them off also ends the example connection (D-160).
       if (chatId) await api(tp, 'DELETE', `/api/teacher/assistant-chat/chats/${chatId}`);
+      if (adminChatId) await api(ap, 'DELETE', `/api/teacher/assistant-chat/chats/${adminChatId}`);
+      if (draftKey) await api(ap, 'DELETE', `/api/admin/themes/${draftKey}`, { confirm: draftKey });
+      if (videoOn) await api(ap, 'PUT', '/api/admin/module-policies/media.evidenceVideo', { availability: 'disabled' });
       if (connectionId) {
         await api(ap, 'PUT', '/api/admin/assistant-chat', { enabled: false });
         await api(ap, 'PUT', '/api/admin/ai-connection-settings', { defaultConnectionId: null, defaultModel: null });

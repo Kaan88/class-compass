@@ -23,7 +23,8 @@ export default defineConfig({
   projects: [
     {
       name: 'docs',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, hasTouch: true },
+      // Chromium's fake camera (a moving test pattern, nothing personal) for the video recorder picture (S27a).
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, hasTouch: true, launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } },
     },
   ],
   webServer: {

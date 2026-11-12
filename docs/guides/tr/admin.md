@@ -129,6 +129,8 @@ Bazı temalar ayrıca bir **sahne** (bütün sınıf ekranının arkasında bir 
 
 **Öğretmenlerden gelen tema taslakları.** Bir öğretmen asistanından bir tema tasarlamasını ve onu taslak olarak kaydetmesini isteyebilir ([Asistan sohbeti](#asistan-sohbeti)). Böyle bir taslak listede **Öneren** ve öğretmenin adıyla görünür. Kendiliğinden hiçbir zaman açılmaz ya da bir sınıfa verilmez: **Önizle**'ye bakın, gerekirse öğretmenle konuşun, sonra **Aç** ya da **Sil**'e basın. Bir öğretmenin en çok 5 taslağı, tüm öğretmenlerin toplamda en çok 10 taslağı bekleyebilir; öğretmenlerin bekleyen taslakları sizin içe aktarabileceğiniz tema sayısından düşülmez.
 
+![Öneren öğretmenin adıyla bir tema taslağı](../img/tr/admin-theme-draft.png)
+
 Listede: **Kapat** temayı yeni seçimlerden kaldırır (onu kullanan sınıflar seçimlerini korur ve tema yeniden açılınca tekrar gösterir), **Dışa aktar** paketini paylaşmak ya da değiştirmek için indirir, **Sil** bir onaydan sonra temayı kaldırır; onu kullanan sınıflar ve pano varsayılan temaya geçer. En çok 30 tema içe aktarılabilir. Her değişiklik denetim kaydına geçer.
 
 Teknik ayrıntıların hepsi (her renk, sınırlar, çizim kuralları, örnek bir tema) depodaki `docs/THEMING.md` dosyasındadır; yapay zekâ araçları da onu okuyabilir ([Yapay zekâ araçları](ai-tools.md)).
@@ -173,6 +175,8 @@ Bir ChatGPT hesabı henüz bağlanamaz: önce OpenAI'ın Sınıf Pusulası'nı "
 - **Bir sohbeti son mesajından sonra sil**: başlangıçta bir öğretim yılı (365 gün); 30 gün ile iki yıl arasında seçilebilir. Eski sohbetler her saat silinir.
 - **Asistanı siz de kullanabilirsiniz**: sohbet açıkken yönetim menüsündeki **Asistan** sayfasında okul ayarları, sınıflar, raporlar ve modüllerin kullanımı hakkında sorun ya da bir tema tasarlayın. Asistan yönetici yetkilerinizle okur; değişiklikler (okul ayarları, modüllerin kullanımı, tema taslağı kaydetme) bir kartta sizin **Evet**'inizi bekler. Yanıtlar biçimlendirilmiş gelir, en fazla 200 KB'lık bir .json, .txt ya da .md dosyası eklenebilir ve bir yanıttaki tema paketi dosya olarak indirilebilir. Bir temayı açmak, **Temalar** sayfasında sizin atacağınız bir adım olarak kalır.
 - Yalnızca kaç sohbet olduğunu ve kaç hesabın sohbeti olduğunu görürsünüz. Sohbetler özeldir: onları okuyamazsınız ve okulun tam dışa aktarımında yer almazlar (yedeklerde vardır). Her öğretmen kendi sohbetlerini indirebilir. Bir öğrenciyi silmek, adını kayıtlı sohbetlerden de kaldırır. Devre dışı bırakılan bir öğretmenin sohbetleri, devre dışı bırakıldıktan 30 gün sonra silinir (hesap bu süre dolmadan yeniden etkinleştirilirse sohbetler kalır).
+
+![Yönetim → Asistan: başlık, numaralı liste ve tablo ile biçimlendirilmiş bir yanıt](../img/tr/admin-assistant.png)
 
 ## Hava durumu
 

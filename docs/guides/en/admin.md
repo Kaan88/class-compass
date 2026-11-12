@@ -129,6 +129,8 @@ The three built-in themes have their own scene, frames and sound too: **Explorer
 
 **Theme drafts from teachers.** A teacher can ask their assistant to design a theme and save it as a draft (see [Assistant chat](#assistant-chat)). Such a draft appears in the list with **Proposed by** and the teacher's name. It is never enabled or given to a class by itself: look at **Preview**, talk to the teacher if needed, then **Enable** or **Delete** it. A teacher can have up to 5 drafts waiting, and all teachers together up to 10; teachers' waiting drafts never count against your own limit of imported themes.
 
+![A teacher's theme draft with Proposed by and the teacher's name](../img/en/admin-theme-draft.png)
+
 In the list: **Disable** hides a theme from new choices (classes that use it keep their choice and show it again when you enable it), **Export** downloads its package to share or change, and **Delete** removes it after a confirmation; classes and the board that used it move to the default theme. Up to 30 imported themes. Every change is in the audit log.
 
 The full technical description (every colour, the limits, the drawing rules, a worked example) is `docs/THEMING.md` in the repository; the AI tools can read it too ([AI tools](ai-tools.md)).
@@ -173,6 +175,8 @@ A ChatGPT account cannot be connected yet: OpenAI must first approve Class Compa
 - **Delete a chat after its last message**: one school year (365 days) by default; 30 days to two years can be chosen. Old chats are deleted every hour.
 - **You can use the assistant too**, on **Assistant** in the administration menu, once the chat is switched on: ask about school settings, classes, reports and module availability, or design a theme. It reads with your administrator permissions; changes (school settings, module availability, saving a theme draft) wait for your **Yes** on a card. Answers are formatted, a .json, .txt or .md file up to 200 KB can be attached, and a theme package in an answer can be downloaded as a file. Enabling a theme stays a step you take yourself on **Themes**.
 - You see only how many chats there are and how many accounts have one. Chats are private: you cannot read them, and they are not in the school's full export (they are in backups). Each teacher can download their own. Erasing a student also removes their name from stored chats. The chats of a deactivated teacher are deleted 30 days after the deactivation (activating the account again before then keeps them).
+
+![Admin → Assistant with a formatted answer: a heading, a numbered list and a table](../img/en/admin-assistant.png)
 
 ## Weather
 
