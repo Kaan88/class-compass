@@ -39,6 +39,8 @@ const HolidaysPage = lazyRouteComponent(() => import('./routes/admin/Holidays.ts
 const AuditPage = lazyRouteComponent(() => import('./routes/admin/Audit.tsx'), 'AuditPage');
 const ThemesPage = lazyRouteComponent(() => import('./routes/admin/Themes.tsx'), 'ThemesPage');
 const AiToolsAdminPage = lazyRouteComponent(() => import('./routes/admin/AiToolsAdmin.tsx'), 'AiToolsAdminPage');
+// The Assistant for administrators (S27d, D-196): the teacher's page in the admin area.
+const AdminAssistantPage = lazyRouteComponent(() => import('./routes/admin/AdminAssistant.tsx'), 'AdminAssistantPage');
 const MaintenancePage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'MaintenancePage');
 const AdminReportsPage = lazyRouteComponent(() => import('./routes/admin/Maintenance.tsx'), 'AdminReportsPage');
 const CatalogPage = lazyRouteComponent(() => import('./dev/Catalog.tsx'), 'CatalogPage');
@@ -147,6 +149,12 @@ const adminSpeakers = createRoute({ getParentRoute: () => adminRoute, path: 'sup
 const adminAudit = createRoute({ getParentRoute: () => adminRoute, path: 'audit', component: AuditPage });
 const adminThemes = createRoute({ getParentRoute: () => adminRoute, path: 'themes', component: ThemesPage });
 const adminAiTools = createRoute({ getParentRoute: () => adminRoute, path: 'ai-tools', component: AiToolsAdminPage });
+const adminAssistant = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'ai-assistant',
+  validateSearch: (s: Record<string, unknown>): { chat?: string | undefined } => ({ chat: typeof s.chat === 'string' ? s.chat : undefined }),
+  component: AdminAssistantPage,
+});
 const adminReports = createRoute({
   getParentRoute: () => adminRoute,
   path: 'reports',
@@ -224,7 +232,7 @@ const routeTree = rootRoute.addChildren([
   changePasswordRoute,
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),
-  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminHolidays, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminImport, adminReports, adminSpeakers, adminThemes, adminAiTools, adminMaintenance, adminAudit, adminProfile]),
+  adminRoute.addChildren([adminIndex, adminUsers, adminSettings, adminYears, adminHolidays, adminSubjects, adminClasses, adminAssignments, adminModules, adminStudents, adminImport, adminReports, adminSpeakers, adminThemes, adminAiTools, adminAssistant, adminMaintenance, adminAudit, adminProfile]),
   helpRoute,
   oauthConsentRoute,
   aiConnectionReturnRoute,

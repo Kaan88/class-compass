@@ -90,10 +90,98 @@
   background: var(--cc-accent-soft);
   border-color: var(--cc-accent);
 }
-.cc-assistant__text {
-  white-space: pre-wrap;
+/* Answers as Markdown (S27d, D-196): content of any width stays inside the bubble (tables and code scroll in their own box). */
+.cc-md {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
   overflow-wrap: anywhere;
   line-height: 1.5;
+}
+.cc-md > *,
+.cc-md li > ul,
+.cc-md li > ol {
+  margin: 0;
+}
+.cc-md ul,
+.cc-md ol {
+  padding-inline-start: 1.5rem;
+}
+.cc-md li + li {
+  margin-top: 0.2rem;
+}
+.cc-md__h {
+  font-size: 1.05em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.cc-md blockquote {
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  border-inline-start: 4px solid var(--cc-border-strong);
+  color: var(--cc-text);
+}
+.cc-md hr {
+  width: 100%;
+  border: 0;
+  border-top: var(--cc-border-width) solid var(--cc-border);
+}
+.cc-md :not(pre) > code {
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface-2);
+  font-size: 0.95em;
+}
+.cc-md a {
+  text-decoration: underline;
+}
+.cc-md__plain {
+  white-space: pre-wrap;
+}
+.cc-md__table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.cc-md__table:focus-visible,
+.cc-md__code pre:focus-visible {
+  outline: 3px solid var(--cc-focus);
+  outline-offset: 2px;
+}
+.cc-md__code {
+  margin: 0;
+  min-width: 0;
+  border-radius: var(--cc-radius-sm);
+  border: var(--cc-border-width) solid var(--cc-border);
+  background: var(--cc-surface-2);
+}
+.cc-md__code-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-bottom: var(--cc-border-width) solid var(--cc-border);
+}
+.cc-md__code-actions {
+  gap: 0.25rem;
+}
+/* A long file (an attached theme package) scrolls inside its box instead of stretching the chat. */
+.cc-md__code pre {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+.cc-assistant__attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 .cc-assistant__activity,
 .cc-assistant__note {

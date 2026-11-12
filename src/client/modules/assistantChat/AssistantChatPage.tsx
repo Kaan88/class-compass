@@ -6,11 +6,17 @@
  * (drafts for parents are copied, never sent from the app), and the model picker limited to the
  * connections the teacher may use. Every query is `['sensitive', …]`; the texts carry real names, which
  * the server put back (the provider may have seen pseudonyms).
+ *
+ * S27d (D-196): answers are drawn as a safe Markdown subset (`ChatMarkdown`), a .json, .txt or .md file
+ * up to 200 KB can be attached to a message (sent as text), and administrators use the same page on
+ * Admin → Assistant (`area="admin"`: the admin route, intro and suggestions).
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -21,7 +27,12 @@ import {
 import "../../../shared/i18n/areas/aiConnections.ts";
 import "../../../shared/i18n/areas/assistantChat.ts";
 import { AI_FAILURES } from "../../../shared/aiConnections.ts";
-import { ASSISTANT_MESSAGE_MAX } from "../../../shared/assistantChat.ts";
+import {
+  ASSISTANT_ATTACHMENT_MAX_BYTES,
+  ASSISTANT_MESSAGE_MAX,
+  attachmentLanguage,
+  utf8Bytes,
+} from "../../../shared/assistantChat.ts";
 import * as C from "../../../shared/contracts/assistantChat.ts";
 import type {
   AssistantCallView,
@@ -45,12 +56,14 @@ import { useRun } from "../../lib/useRun.ts";
 import { Button, buttonClass } from "../../ui/Button.tsx";
 import { Alert, EmptyState } from "../../ui/Feedback.tsx";
 import { Select, TextArea, TextField, Toggle } from "../../ui/Fields.tsx";
+import { FilePick } from "../../ui/FilePick.tsx";
 import { InlineConfirmButton } from "../../ui/InlineConfirm.tsx";
 import {
   IconArchive,
   IconBack,
   IconCheck,
   IconCopy,
+  IconFile,
   IconPencil,
   IconPlus,
   IconStop,
@@ -59,12 +72,42 @@ import {
 } from "../../ui/icons.tsx";
 import type { TeacherPageSearch } from "../types.ts";
 import "./assistantChat.css";
+import { ChatMarkdown, UserText } from "./ChatMarkdown.tsx";
 
 const BASE = ["sensitive", "assistant-chat"] as const;
 const STATUS_KEY = [...BASE, "status"] as const;
 const LIST_KEY = [...BASE, "list"] as const;
 const chatKey = (id: string) => [...BASE, "chat", id] as const;
 const PAGE = "ai-assistant";
+
+/** Where the page is shown: the teacher area (`/teacher/ai-assistant`) or the admin area (`/admin/ai-assistant`, S27d). */
+export type AssistantArea = "teacher" | "admin";
+const AreaContext = createContext<AssistantArea>("teacher");
+
+/** A file waiting to be sent with the next message (S27d): text only, checked here and again on the server. */
+interface Attachment {
+  name: string;
+  text: string;
+  bytes: number;
+}
+
+/** Reads a chosen file as an attachment, or says why it cannot be attached. */
+export async function readAttachment(
+  file: File,
+): Promise<
+  | { ok: true; attachment: Attachment }
+  | { ok: false; reason: "wrongType" | "tooBig" | "notText" }
+> {
+  if (!attachmentLanguage(file.name)) return { ok: false, reason: "wrongType" };
+  if (file.size > ASSISTANT_ATTACHMENT_MAX_BYTES)
+    return { ok: false, reason: "tooBig" };
+  const text = await file.text();
+  // A binary file renamed to .txt: NUL or replacement characters mean it is not text.
+  if (/[\u0000\uFFFD]/u.test(text)) return { ok: false, reason: "notText" };
+  const bytes = utf8Bytes(text);
+  if (bytes > ASSISTANT_ATTACHMENT_MAX_BYTES) return { ok: false, reason: "tooBig" };
+  return { ok: true, attachment: { name: file.name, text, bytes } };
+}
 const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 type T = ReturnType<typeof useI18n>["t"];
@@ -154,8 +197,10 @@ export async function readRun(
 
 export default function AssistantChatPage({
   search,
+  area = "teacher",
 }: {
   search: TeacherPageSearch;
+  area?: AssistantArea;
 }) {
   const { t } = useI18n();
   const status = useQuery({
@@ -164,13 +209,16 @@ export default function AssistantChatPage({
   });
   const chatId = search.chat ?? null;
   return (
+    <AreaContext.Provider value={area}>
     <main
       className="cc-page cc-page--wide cc-stack"
       data-testid="assistant-chat-page"
     >
       <h1 className="cc-h1">{t("assistantChat.title")}</h1>
       <p className="cc-muted" style={{ margin: 0 }}>
-        {t("assistantChat.intro")}
+        {area === "admin"
+          ? t("assistantChat.introAdmin")
+          : t("assistantChat.intro")}
       </p>
       {status.error ? <Alert>{errorText(t, status.error)}</Alert> : null}
       {status.data ? (
@@ -220,21 +268,29 @@ export default function AssistantChatPage({
         {t("assistantChat.exportHint")}
       </p>
     </main>
+    </AreaContext.Provider>
   );
 }
 
 function useOpenChat() {
   const navigate = useNavigate();
+  const area = useContext(AreaContext);
   // Opening a chat keeps the scroll position, so the chat can bring its newest message into view itself.
   return useCallback(
     (id: string | null) =>
-      void navigate({
-        to: "/teacher/$page",
-        params: { page: PAGE },
-        search: id ? { chat: id } : {},
-        resetScroll: !id,
-      }),
-    [navigate],
+      void (area === "admin"
+        ? navigate({
+            to: "/admin/ai-assistant",
+            search: id ? { chat: id } : {},
+            resetScroll: !id,
+          })
+        : navigate({
+            to: "/teacher/$page",
+            params: { page: PAGE },
+            search: id ? { chat: id } : {},
+            resetScroll: !id,
+          })),
+    [navigate, area],
   );
 }
 
@@ -380,6 +436,8 @@ function ChatView({
     reason: string | null;
   } | null>(null);
   const [text, setText] = useState("");
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const liveRef = useRef<Live | null>(null);
   liveRef.current = live;
@@ -491,14 +549,34 @@ function ChatView({
   const send = async (e?: FormEvent) => {
     e?.preventDefault();
     const body = text.trim();
-    if (!body || busy) return;
+    if ((!body && !attachment) || busy) return;
     const r = await run(
-      () => call(C.sendAssistantMessage, { chatId, text: body }),
+      () =>
+        call(C.sendAssistantMessage, {
+          chatId,
+          text: body,
+          ...(attachment
+            ? { attachment: { name: attachment.name, text: attachment.text } }
+            : {}),
+        }),
       { invalidate: [chatKey(chatId), LIST_KEY] },
     );
     if (!r) return;
     setText("");
+    setAttachment(null);
     void follow(r.runId);
+  };
+  const attach = async (files: File[]) => {
+    const file = files[0];
+    if (!file) return;
+    const r = await readAttachment(file);
+    if (r.ok) {
+      setAttachment(r.attachment);
+      setAttachError(null);
+    } else {
+      setAttachment(null);
+      setAttachError(t(`assistantChat.attach.${r.reason}`));
+    }
   };
   const stop = () => {
     if (!live) return;
@@ -620,11 +698,46 @@ function ChatView({
           rows={3}
           maxLength={ASSISTANT_MESSAGE_MAX}
         />
+        <div className="cc-assistant__attach">
+          <FilePick
+            id={`assistant-attach-${chatId}`}
+            label={t("assistantChat.attach.button")}
+            icon={<IconFile />}
+            accept=".json,.txt,.md,application/json,text/plain,text/markdown"
+            testId="assistant-attach"
+            onFiles={(files) => void attach(files)}
+          />
+          {attachment ? (
+            <p className="cc-muted" style={{ margin: 0 }} data-testid="assistant-attached">
+              {t("assistantChat.attach.chosen", {
+                name: attachment.name,
+                size: Math.max(1, Math.round(attachment.bytes / 1024)),
+              })}{" "}
+              <Button
+                size="small"
+                variant="ghost"
+                onPress={() => setAttachment(null)}
+                data-testid="assistant-attach-remove"
+              >
+                <IconX />
+                <span>{t("assistantChat.attach.remove")}</span>
+              </Button>
+            </p>
+          ) : null}
+        </div>
+        <p className="cc-muted" style={{ margin: 0 }}>
+          {t("assistantChat.attach.hint")}
+        </p>
+        {attachError ? (
+          <Alert>
+            <span data-testid="assistant-attach-error">{attachError}</span>
+          </Alert>
+        ) : null}
         <div className="cc-row">
           <Button
             type="submit"
             variant="primary"
-            isDisabled={busy || !text.trim()}
+            isDisabled={busy || (!text.trim() && !attachment)}
             data-testid="assistant-send"
           >
             {t("assistantChat.send")}
@@ -849,9 +962,11 @@ function MessageItem({
         {mine ? t("assistantChat.you") : t("assistantChat.assistant")}
       </span>
       {message.text ? (
-        <div className="cc-assistant__text" data-testid="assistant-text">
-          {message.text}
-        </div>
+        mine ? (
+          <UserText text={message.text} />
+        ) : (
+          <ChatMarkdown text={message.text} streaming={streaming} />
+        )
       ) : null}
       {calls.map((c) =>
         c.readOnly || c.state === "refused" ? (
@@ -1036,11 +1151,16 @@ function ChangeCard({
 
 function Suggestions({ onPick }: { onPick: (text: string) => void }) {
   const { t } = useI18n();
-  const keys = [
-    "assistantChat.suggest.homework",
-    "assistantChat.suggest.goals",
-    "assistantChat.suggest.parents",
-  ] as const;
+  const area = useContext(AreaContext);
+  const keys =
+    area === "admin"
+      ? (["assistantChat.suggest.settings", "assistantChat.suggest.themeAdmin"] as const)
+      : ([
+          "assistantChat.suggest.homework",
+          "assistantChat.suggest.goals",
+          "assistantChat.suggest.parents",
+          "assistantChat.suggest.theme",
+        ] as const);
   return (
     <div className="cc-stack" data-testid="assistant-suggestions">
       <h3 className="cc-h3" style={{ margin: 0 }}>

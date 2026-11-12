@@ -672,7 +672,21 @@ export function ThemesPage() {
           columns={[
             { key: 'name', header: t('themes.col.name'), stackRole: 'title', render: (r) => r.name[locale], sortValue: (r) => r.name[locale] },
             { key: 'key', header: t('themes.col.key'), render: (r) => <code>{r.key}</code> },
-            { key: 'status', header: t('themes.col.status'), render: (r) => <StatusWord status={r.status} /> },
+            {
+              key: 'status',
+              header: t('themes.col.status'),
+              render: (r) => (
+                <>
+                  <StatusWord status={r.status} />
+                  {/* A teacher's proposal (S27d, D-196): who suggested it, so the administrator can ask before enabling. */}
+                  {r.proposedBy ? (
+                    <span className="cc-muted" style={{ display: 'block' }} data-testid={`theme-proposed-${r.key}`}>
+                      {t('themes.proposedBy', { name: r.proposedBy.name })}
+                    </span>
+                  ) : null}
+                </>
+              ),
+            },
             {
               key: 'used',
               header: t('themes.col.usedBy'),

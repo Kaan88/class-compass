@@ -7,6 +7,10 @@
  * Safety: the result is a plain data tree that the Help screen renders with React elements, so raw
  * HTML in a guide is shown as text and never executed (no innerHTML). Link and image targets are
  * classified here; the renderer loads only bundled images and follows only guide links.
+ *
+ * The assistant chat (S27d, D-196) renders AI answers with the same parser (`assistantChat/ChatMarkdown.tsx`):
+ * fences keep their language word, a longer fence can hold ``` lines, and a fence not closed yet (an
+ * answer still streaming) is marked `open`.
  */
 
 export type Inline =
@@ -30,7 +34,8 @@ export type Block =
   | { kind: 'table'; head: Inline[][]; rows: Inline[][][] }
   | { kind: 'figure'; src: string; alt: string }
   | { kind: 'rule' }
-  | { kind: 'code'; text: string };
+  /** `lang`: the fence's language word (`json`), lower case; `open`: no closing fence yet (an answer still streaming, S27d). */
+  | { kind: 'code'; text: string; lang?: string; open?: true };
 
 /**
  * Heading anchors, GitHub style: lower case, punctuation removed, spaces become hyphens; letters of
@@ -121,6 +126,7 @@ export function parseInline(src: string): Inline[] {
 }
 
 const HEADING = /^(#{1,4})\s+(.*)$/u;
+const FENCE = /^\s*(`{3,})([^`]*)$/u;
 const BULLET = /^(\s*)[-*]\s+(.*)$/u;
 const NUMBERED = /^(\s*)\d+[.)]\s+(.*)$/u;
 const ALONE_IMAGE = /^!\[((?:[^\]\\]|\\.)*)\]\(([^)\s]+)\)$/u;
@@ -184,10 +190,14 @@ export function parseMarkdown(source: string): Block[] {
       i += 1;
       continue;
     }
-    if (line.trim().startsWith('```')) {
-      const end = lines.findIndex((l, j) => j > i && l.trim().startsWith('```'));
+    const fence = FENCE.exec(line);
+    if (fence) {
+      // Closed by a line of at least as many backticks (CommonMark), so a longer fence can hold ``` lines.
+      const run = fence[1]!.length;
+      const end = lines.findIndex((l, j) => j > i && /^\s*`{3,}\s*$/u.test(l) && l.trim().length >= run);
       const stop = end === -1 ? lines.length : end;
-      blocks.push({ kind: 'code', text: lines.slice(i + 1, stop).join('\n') });
+      const lang = /^[A-Za-z0-9_+.-]{1,20}/u.exec(fence[2]!.trim())?.[0].toLowerCase();
+      blocks.push({ kind: 'code', text: lines.slice(i + 1, stop).join('\n'), ...(lang ? { lang } : {}), ...(end === -1 ? { open: true } : {}) });
       i = stop + 1;
       continue;
     }
