@@ -5,9 +5,7 @@
 import { useEffect, useRef } from 'react';
 import * as C from '../../../shared/contracts/displayInfo.ts';
 import { call } from '../../lib/api.ts';
-import { readDensity } from '../../lib/classroomPrefs.ts';
 import { getDisplay } from '../../lib/display.ts';
-import { useMe } from '../../lib/session.ts';
 import type { BoardWatcherProps } from '../types.ts';
 import { readSample } from './sample.ts';
 
@@ -21,9 +19,8 @@ export const MIN_GAP_MS = 60_000;
 type Props = BoardWatcherProps;
 
 export function DisplayReporter({ layoutSource }: Props) {
-  const me = useMe();
-  const latest = useRef({ layoutSource, userId: me?.id ?? null });
-  latest.current = { layoutSource, userId: me?.id ?? null };
+  const latest = useRef({ layoutSource });
+  latest.current = { layoutSource };
 
   useEffect(() => {
     let lastSent = 0;
@@ -31,7 +28,7 @@ export function DisplayReporter({ layoutSource }: Props) {
     const send = () => {
       timer = null;
       const d = getDisplay();
-      const sample = readSample({ density: readDensity(latest.current.userId), theme: d.theme, layout: latest.current.layoutSource, textScale: d.textScale });
+      const sample = readSample({ theme: d.theme, layout: latest.current.layoutSource, textScale: d.textScale });
       lastSent = Date.now();
       if (sample) void call(C.reportDisplay, sample).catch(() => undefined);
     };

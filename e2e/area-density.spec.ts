@@ -80,7 +80,7 @@ test('teacher: Spacing follows the account into the teacher area but not onto th
     // Stored for the account: a reload keeps it.
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-area-density', 'compact');
-    // The classroom screen has its own per-device size (D-103) and never carries the area density.
+    // The classroom screen sizes its own cards (D-177, D-195) and never carries the area density.
     await page.goto('/classroom');
     await expect(page.getByTestId('classroom-shell')).toBeVisible();
     await expect(page.locator('html')).not.toHaveAttribute('data-area-density', /./u);

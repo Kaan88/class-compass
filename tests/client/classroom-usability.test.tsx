@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
  * Classroom usability pass (November 2026 audit, D-139). Fictional data only.
- * - The device settings (size, class language, sounds) are behind one "Display" button in the top bar.
+ * - The device settings (class language, sounds) are behind one "Display" button in the top bar; the
+ *   Compact / Normal / Large card size is gone (S27c, D-195: the board sizes the cards itself).
  * - The attendance count line reads as a sentence in Turkish ("Bugün: 19 Var").
  * - The homework check names the attendance day in words, never as an ISO date.
  * - Panel headers keep the icon and the title on one line, with the actions beside them.
@@ -33,8 +34,7 @@ const context = {
 };
 
 describe('classroom top bar (D-139)', () => {
-  it('keeps size, class language and sounds in the Display popover, not in the bar', () => {
-    let density = 'normal';
+  it('keeps class language and sounds in the Display popover, not in the bar, and offers no card size', () => {
     withLocale(
       'en',
       <ClassroomTopBar
@@ -42,8 +42,6 @@ describe('classroom top bar (D-139)', () => {
         dayLabel="Sunday"
         dateLabel="8 November 2026"
         timeLabel="09:00"
-        density="normal"
-        onDensity={(d) => (density = d)}
         onLocale={() => undefined}
         settings={<span data-testid="sounds-setting">sounds</span>}
         tools={<span data-testid="tools">tools</span>}
@@ -53,16 +51,14 @@ describe('classroom top bar (D-139)', () => {
     expect(screen.queryByTestId('class-language-switch')).toBeNull();
     expect(screen.queryByTestId('sounds-setting')).toBeNull();
     fireEvent.click(screen.getByTestId('classroom-settings'));
-    const size = screen.getByTestId('density-control');
-    expect(size.textContent).toContain(en['classroom.size.compact']);
     expect(screen.getByTestId('class-language-switch')).toBeTruthy();
     expect(screen.getByTestId('sounds-setting')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: en['classroom.size.large'] }));
-    expect(density).toBe('large');
-  });
-
-  it('calls Compact "Küçük" in Turkish (pairs with Büyük)', () => {
-    expect(tr['classroom.size.compact']).toBe('Küçük');
+    // S27c (D-195): removed by the owner; no size choice in the popover, in any wording.
+    expect(screen.queryByTestId('density-control')).toBeNull();
+    const popover = screen.getByTestId('classroom-settings-popover');
+    for (const word of ['Compact', 'Large']) expect(popover.textContent).not.toContain(word);
+    expect(Object.keys(en).filter((k) => k.startsWith('classroom.size'))).toEqual([]);
+    expect(Object.keys(tr).filter((k) => k.startsWith('classroom.size'))).toEqual([]);
   });
 });
 

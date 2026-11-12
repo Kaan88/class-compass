@@ -1,18 +1,15 @@
 /**
- * Per-device classroom preferences (S13a):
- * - density (Compact / Normal / Large, D-103): remembered per device AND teacher, so two teachers
- *   sharing a board each keep their own; applied as `data-density` on the classroom shell, where CSS
- *   sizes the student cards, the side rail and the timer (auto-fit per screen on top of it);
- * - the language a class is shown in when its second language is on (D-099): remembered per device
- *   and class; without a second language the class's main language is always used.
- * Browser storage only holds conveniences; an empty or blocked storage falls back to the defaults.
+ * Per-device classroom preferences (S13a): the language a class is shown in when its second language
+ * is on (D-099), remembered per device and class; without a second language the class's main language
+ * is always used. Browser storage only holds conveniences; an empty or blocked storage falls back to
+ * the defaults.
+ *
+ * The Compact / Normal / Large card size of D-103 (`cc.density.<userId>`) was removed in S27c (D-195):
+ * the board sizes the cards itself (D-177). A value stored by an older version is never read again.
  */
 import { useCallback, useSyncExternalStore } from 'react';
 import type { Locale } from '../../shared/i18n/index.ts';
 import { displayLocale, type ClassLanguage } from '../../shared/classLanguage.ts';
-
-export const DENSITIES = ['compact', 'normal', 'large'] as const;
-export type Density = (typeof DENSITIES)[number];
 
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
@@ -39,18 +36,6 @@ function write(key: string, value: string) {
   emit();
 }
 const get = (key: string) => memory.get(key) ?? read(key);
-
-const densityKey = (userId: string | null | undefined) => `cc.density.${userId ?? 'anon'}`;
-export const readDensity = (userId: string | null | undefined): Density => {
-  const v = get(densityKey(userId));
-  return (DENSITIES as readonly string[]).includes(v ?? '') ? (v as Density) : 'normal';
-};
-
-export function useDensity(userId: string | null | undefined): [Density, (d: Density) => void] {
-  const value = useSyncExternalStore(subscribe, () => readDensity(userId), () => 'normal' as Density);
-  const set = useCallback((d: Density) => write(densityKey(userId), d), [userId]);
-  return [value, set];
-}
 
 const langKey = (classId: string) => `cc.classLang.${classId}`;
 

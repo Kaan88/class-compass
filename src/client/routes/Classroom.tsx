@@ -9,8 +9,8 @@
  * S13a: the screen is shown in the class's language (D-099: main language, or the second one when it
  * is on and picked on this device), with a top bar naming the class on the left, a quote-of-the-day
  * slot in the centre and the date/time + a weather slot on the right (S13b fills the slots; empty
- * slots are not rendered), and a Compact / Normal / Large size control remembered per device and
- * teacher (D-103).
+ * slots are not rendered). The Compact / Normal / Large size control of D-103 was removed in S27c
+ * (D-195): the board sizes the student cards itself (D-177).
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
@@ -20,7 +20,7 @@ import * as School from '../../shared/contracts/school.ts';
 import { DEFAULT_THEME } from '../../shared/themes.ts';
 import { formatDate, pickText, type MessageKey } from '../../shared/i18n/index.ts';
 import { call } from '../lib/api.ts';
-import { useClassLocale, useDensity } from '../lib/classroomPrefs.ts';
+import { useClassLocale } from '../lib/classroomPrefs.ts';
 import { setDisplay, useDisplay } from '../lib/display.ts';
 import { I18nProvider, useI18n } from '../lib/i18n.tsx';
 import { useOutboxStatus } from '../lib/outbox-client.ts';
@@ -139,7 +139,6 @@ function ClassroomScreen({
   const display = useDisplay();
   const now = useNow();
   const qc = useQueryClient();
-  const [density, setDensity] = useDensity(me?.id);
 
   const activeLessons = useActiveLessons(Boolean(me?.hasPin));
   const inProgress = useMemo(() => new Set((activeLessons.data?.lessons ?? []).map((l) => l.contextId)), [activeLessons.data]);
@@ -280,14 +279,12 @@ function ClassroomScreen({
   );
 
   return (
-    <div data-testid="classroom-shell" className="cc-classroom" data-density={density} lang={locale}>
+    <div data-testid="classroom-shell" className="cc-classroom" lang={locale}>
       <ClassroomTopBar
         context={active}
         dayLabel={active ? formatDate(now, locale, active.timezone, { weekday: 'long' }) : ''}
         dateLabel={active ? formatDate(now, locale, active.timezone, { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
         timeLabel={active ? formatDate(now, locale, active.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : ''}
-        density={density}
-        onDensity={setDensity}
         onLocale={onLocale}
         settings={<Toggle label={t('classroom.sounds')} isSelected={display.deviceSounds} onChange={(v) => setDisplay({ deviceSounds: v })} />}
         // Customise layout (S14b, D-148): only while the board of a running lesson is on screen.

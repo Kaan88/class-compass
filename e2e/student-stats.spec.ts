@@ -144,20 +144,19 @@ test('a name on the classroom screen opens the positive-only card, apart from th
     await dialog.getByTestId('dialog-close').click();
     await expect(dialog).toHaveCount(0);
 
-    // A long fictional Turkish name on the narrowest board card (compact density, 10rem), at 100% and
+    // A long fictional Turkish name on a narrow board card (10rem, the old Compact width; S27c removed
+    // the density, D-195), at 100% and
     // 200% text scale: the name wraps inside its own button and its text never runs under the + button.
     // (Comparing the two boxes alone cannot catch this: the text can spill out of the name's box.)
     const spill = await page.evaluate(() => {
-      const shell = document.querySelector<HTMLElement>('[data-testid="classroom-shell"]')!;
       const art = document.querySelector<HTMLElement>('article.cc-student-card')!;
       const btn = art.querySelector<HTMLElement>('.cc-student-card__name-btn')!;
       const add = art.querySelector<HTMLElement>('.cc-student-card__add');
       const walker = document.createTreeWalker(btn, NodeFilter.SHOW_TEXT);
       const text = walker.nextNode() as Text;
-      const before = { density: shell.dataset.density, width: art.style.width, text: text.data, root: document.documentElement.style.fontSize };
+      const before = { width: art.style.width, text: text.data, root: document.documentElement.style.fontSize };
       const problems: string[] = [];
-      shell.dataset.density = 'compact';
-      art.style.width = 'var(--cc-card-min)';
+      art.style.width = '10rem';
       text.data = 'Mustafa Çelikkayaoğulları';
       for (const scale of ['100%', '200%']) {
         document.documentElement.style.fontSize = scale;
@@ -167,12 +166,11 @@ test('a name on the classroom screen opens the positive-only card, apart from th
         const textRight = Math.max(...lines.map((r) => r.right));
         if (btn.scrollWidth > btn.clientWidth + 1) problems.push(`${scale}: name scrolls (${btn.scrollWidth} > ${btn.clientWidth})`);
         if (textRight > btn.getBoundingClientRect().right + 1) problems.push(`${scale}: text leaves the name button`);
-        // Compact board cards put the + button on the line under the name (S14i review), so a line of
+        // Narrow board cards may put the + button on the line under the name (S14i review), so a line of
         // text is a problem only where it really meets the button.
         const a = add?.getBoundingClientRect();
         if (a && lines.some((r) => r.right > a.left && r.left < a.right && r.bottom > a.top && r.top < a.bottom)) problems.push(`${scale}: text runs under the + button`);
       }
-      shell.dataset.density = before.density ?? '';
       art.style.width = before.width;
       text.data = before.text;
       document.documentElement.style.fontSize = before.root;

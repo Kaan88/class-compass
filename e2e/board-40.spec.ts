@@ -1,52 +1,73 @@
 /**
- * Student cards on the classroom board for small and large classes (S20a; S22c, D-177; D-037, UX-1,
- * UX-6, DSH-1, CRD-1..3).
+ * Student cards on the classroom board for small and large classes (S20a; S22c, D-177; S27c, D-195;
+ * D-037, UX-1, UX-6, DSH-1, CRD-1..3).
  *
- * Classes of 8, 19, 28 and 40 (fictional names, some of them long) are made for the test through the
- * admin API and erased afterwards (lessons ended, assignments ended, students deactivated and erased,
- * classes archived). Each is shown on the board at the measured classroom display, 1536×703 at device
- * scale 1.25 with touch (ROADMAP S16c "Classroom display"), the same display in full screen
- * (1536×864 at 1.25), 1920×1080 and 1366×768, with the default layout. Everywhere:
+ * Classes of 8, 16, 24, 32 and 40 (fictional names, some of them long) are made for the test through
+ * the admin API and erased afterwards (lessons ended, assignments ended, students deactivated and
+ * erased, classes archived). Each is shown on the board with the default layout (the routine, the timer
+ * and the class counter above the students, the dock under them, as in a normal lesson) at the real
+ * classroom display in its window, 1536×703 at device scale 1.25 with touch (ROADMAP S16c "Classroom
+ * display"), the same display in full screen (1536×864 at 1.25), Sare's MacBook (1440×787 at 2) and
+ * 1280×720. S27c (D-195): there is one automatic card size (the Compact / Normal / Large choice was
+ * removed by the owner), so every board is checked once. Everywhere:
  * - the page never scrolls sideways and no card reaches past the screen;
  * - every name is readable (its text box has room, stays inside its card, is not cut off, clipped or
  *   ellipsed) and a word of a name breaks over two lines only when it is wider than the card beside
  *   the avatar (S14i);
  * - the + button is at least a touch target (`--cc-touch`);
- * - the cards fit the Students box (D-177): when every card is on screen, the box does not scroll and
- *   no "more students" cue shows; a class of 8 grows above the Normal size where there is free height;
- *   a class of 40 shows at least two full rows at every size (the S16c box: one row at 1536×703
- *   before); when a row is cut, "N more students below" says how many and scrolls until the last card
- *   is in view.
- * The 40-student class is also checked at Compact and Large display density. Then this lesson's
- * achievements and the group numbers (card marks from the achievements and grouping add-ons) are
- * given in the 19, 28 and 40 classes: they show with their accessible names, never overlap the name,
- * the + button or the chips at any density, and disappear when the module is switched off. With room
- * to spare (a class of 8) a Compact card is never taller than a Large one (S22c review: Compact kept
- * the name across the card and grew taller). On a phone (375×812, where the page scrolls and the fit
- * does not size the cards) the classes of 8 and 19 (with marks) keep names whole and the + button a
- * touch target (S22c review); S23b (D-183): with the small mark pills a phone card stays under 120 px
- * (before: about 164 px) and the short displays (1536×703@1.25, 1366×768) show at least 16 whole
- * cards with marks (before: 14). S25a (D-185): in the narrowest layout (`tight`, checked at
- * 1536×703@1.25 with 40 students) every mark sits on the count's line (icon and number only), also
- * on the cards of Late students (whose Late chip goes after the marks; such a card is no taller than
- * the others), and a class of 40 with marks passes the phone checks at 375 px. Axe on the student grid. Screenshots for review in `test-results/s22c/` (CC_SHOTS_DIR to change it).
+ * - the cards fit the Students box (D-177): every card of a class is on screen without scrolling where
+ *   the box can hold them (`ALL_FIT`), the box does not scroll then and no "more students" cue shows;
+ *   a class of 8 grows above the middle size into the free height; a larger class shows at least
+ *   `FLOOR` whole cards in at least two full rows, and "N more students below" says how many and
+ *   scrolls until the last card is in view. What the box can hold is limited by the + button: a card is
+ *   never lower than a touch target, so the Students box of 1536×703 (about 238 px under the routine,
+ *   the timer and the counter) has room for two rows of cards (D-195).
+ * Then this lesson's achievements and the group numbers (card marks from the achievements and grouping
+ * add-ons) are given in the 24 and 40 classes: they show with their accessible names, never overlap the
+ * name, the + button or the chips, and disappear when the module is switched off. On a phone (375×812,
+ * where the page scrolls and the fit does not size the cards) the classes of 8, 24 and 40 (with marks)
+ * keep names whole and the + button a touch target (S22c review); S23b (D-183): with the small mark
+ * pills a phone card stays under 120 px. S25a (D-185): in the narrowest layout (`tight`, checked at
+ * 1536×703@1.25 with 40 students) every mark sits on the count's line (icon and number only), also on
+ * the cards of Late students (whose Late chip goes after the marks; such a card is no taller than the
+ * others). Axe on the student grid. Screenshots for review in `test-results/s27c/` (CC_SHOTS_DIR to
+ * change it).
  */
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { api, ensurePin, login } from './helpers.ts';
 
-const SHOTS = process.env.CC_SHOTS_DIR ?? 'test-results/s22c';
+const SHOTS = process.env.CC_SHOTS_DIR ?? 'test-results/s27c';
 
 const SIZES = [
   { width: 1536, height: 703, scale: 1.25, name: '1536x703@1.25' },
   { width: 1536, height: 864, scale: 1.25, name: '1536x864@1.25' },
-  { width: 1920, height: 1080, scale: 1, name: '1920x1080' },
-  { width: 1366, height: 768, scale: 1, name: '1366x768' },
+  { width: 1440, height: 787, scale: 2, name: '1440x787@2' },
+  { width: 1280, height: 720, scale: 1, name: '1280x720' },
 ] as const;
 type Size = (typeof SIZES)[number];
 
-const CLASS_SIZES = [8, 19, 28, 40] as const;
+const CLASS_SIZES = [8, 16, 24, 32, 40] as const;
+
+type Round = 'plain' | 'marks';
+/**
+ * The largest class (of the ones tested) whose every card shows without scrolling, per display, without
+ * and with the card marks (measured for S27c, D-195, with the default layout and these fictional names).
+ */
+const ALL_FIT: Record<Size['name'], Record<Round, number>> = {
+  '1536x703@1.25': { plain: 16, marks: 16 },
+  '1536x864@1.25': { plain: 24, marks: 16 },
+  '1440x787@2': { plain: 16, marks: 16 },
+  '1280x720': { plain: 16, marks: 16 },
+};
+/** Whole cards a larger class shows at least (two full rows or more), without and with the card marks. */
+const FLOOR: Record<Size['name'], Record<Round, number>> = {
+  '1536x703@1.25': { plain: 18, marks: 16 },
+  '1536x864@1.25': { plain: 24, marks: 21 },
+  '1440x787@2': { plain: 18, marks: 16 },
+  '1280x720': { plain: 14, marks: 14 },
+};
 
 const GIVEN = ['Ada', 'Bora', 'Ceren', 'Deniz', 'Ece', 'Furkan', 'Gökçe Nur', 'Harun', 'Irmak', 'İlkay', 'Kerem', 'Lale', 'Mert', 'Nehir', 'Oğuz', 'Öykü', 'Rüzgar', 'Selin', 'Şahin', 'Tuana'];
 const FAMILY = ['Kurgu', 'Örnekçi', 'Deneme', 'Karaağaçlıoğlu', 'Yıldırımkaya', 'Uydurma', 'Masalcı', 'Hayaloğlu'];
@@ -260,7 +281,7 @@ async function checkPhone(browser: Browser, cls: TestClass, label: string) {
 /** The scroll position of the student box (the element "N more students below" scrolls). */
 const studentsScrollTop = (page: Page) => page.evaluate((sel) => document.querySelector(sel)!.scrollTop, BOX);
 const fitStep = (page: Page) => page.locator('.cc-student-grid').getAttribute('data-fit');
-/** The step's place on the ladder: tight < s0 < … < s2 (Normal) < … < s3 (Large). */
+/** The step's place on the ladder: tight < s0 < … < s2 (where the fit starts) < … < s3 (the largest). */
 const stepValue = (step: string | null) => (step === 'tight' ? -1 : step ? Number(step.slice(1)) : Number.NaN);
 
 async function settle(p: Page) {
@@ -282,15 +303,6 @@ async function showClass(p: Page, cls: TestClass) {
   await expect(p.getByTestId('lesson-dashboard')).toBeVisible();
   await expect(p.locator('.cc-student-card')).toHaveCount(cls.size);
   await expect(p.locator('.cc-student-grid')).toHaveAttribute('data-fit', /.+/u);
-  await settle(p);
-}
-
-async function setDensity(p: Page, density: 'Compact' | 'Normal' | 'Large') {
-  if ((await p.getByTestId('classroom-shell').getAttribute('data-density')) === density.toLowerCase()) return;
-  if (!(await p.getByTestId('density-control').isVisible())) await p.getByTestId('classroom-settings').click();
-  await p.getByTestId('density-control').getByRole('button', { name: density, exact: true }).click();
-  await p.keyboard.press('Escape');
-  await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', density.toLowerCase());
   await settle(p);
 }
 
@@ -373,7 +385,7 @@ async function giveMarks(teacher: Page, cls: TestClass) {
   expect(applied.body.results[0].ok, JSON.stringify(applied.body.results[0])).toBe(true);
 }
 
-/** The marks given by `giveMarks` on the board, at one density, with every board check. */
+/** The marks given by `giveMarks` on the board, with every board check. */
 async function checkMarks(p: Page, cls: TestClass, label: string) {
   const card = (i: number) => p.locator('.cc-student-card').filter({ has: p.getByRole('button', { name: cls.students[i]!.fullName, exact: true }) });
   await expect(card(0).locator('[data-mark="achievements"]')).toHaveAttribute('aria-label', '2 achievements this lesson');
@@ -431,8 +443,8 @@ async function checkLate(p: Page, teacher: Page, cls: TestClass, label: string) 
  * as on a real teacher's board (four extra tabs would wrap and take height from the board).
  */
 for (const classSize of CLASS_SIZES) {
-  test(`a class of ${classSize} on the board at 1536×703 and 1536×864 (scale 1.25), 1920×1080 and 1366×768`, async ({ page, browser }) => {
-    test.setTimeout(classSize >= 19 ? 420_000 : 240_000);
+  test(`a class of ${classSize} on the board at 1536×703 and 1536×864 (scale 1.25), 1440×787 (scale 2) and 1280×720`, async ({ page, browser }) => {
+    test.setTimeout(classSize >= 24 ? 420_000 : 240_000);
     await login(page, 'admin');
     const years = (await api(page, 'GET', '/api/admin/years')).body.years as Array<{ id: string; archived: boolean; startsOn: string }>;
     const year = years.filter((y) => !y.archived).sort((a, b) => b.startsOn.localeCompare(a.startsOn))[0]!;
@@ -464,63 +476,34 @@ for (const classSize of CLASS_SIZES) {
       const active = (await api(teacher, 'GET', '/api/classroom/lessons/active')).body.lessons as Array<{ contextId: string; lessonId: string }>;
       cls.lessonId = active.find((l) => l.contextId === cls.contextId)!.lessonId;
 
-      const withMarks = classSize >= 19;
+      const withMarks = classSize === 24 || classSize === 40;
       for (const round of withMarks ? (['plain', 'marks'] as const) : (['plain'] as const)) {
         if (round === 'marks') await giveMarks(teacher, cls);
         for (const size of SIZES) {
           const { ctx, p } = await openDisplay(browser, size);
           try {
-            await setDensity(p, 'Normal');
             await showClass(p, cls);
-            if (round === 'marks') {
-              for (const density of ['Normal', 'Compact', 'Large'] as const) {
-                await setDensity(p, density);
-                const label = `${size.name} ${classSize} ${density} marks`;
-                const seen = await checkMarks(p, cls, label);
-                if (classSize === 40) expect(seen.rows, `${label}: full rows of cards on screen`).toBeGreaterThanOrEqual(2);
-                // S23b (D-183): the small pills join the count's line, so the marks cost no row on the
-                // short displays (16 whole cards as without marks; 14 before).
-                if (size.name === '1536x703@1.25' || size.name === '1366x768') expect(seen.visible, `${label}: whole cards with marks`).toBeGreaterThanOrEqual(16);
-                // S25a (D-185): the measured classroom display shows a class of 40 in `tight`, where the marks share the count's line.
-                if (classSize === 40 && size.name === '1536x703@1.25') expect(seen.step, `${label}: the narrowest layout`).toBe('tight');
-              }
-              await setDensity(p, 'Normal');
-              if (classSize === 40 && size === SIZES[0]) await checkLate(p, teacher, cls, `${size.name} 40 Normal marks late`);
-              if ((classSize === 19 || classSize === 40) && size === SIZES[0]) await checkPhone(browser, cls, `${PHONE.name} ${classSize} marks`);
-              continue;
-            }
-            const label = `${size.name} ${classSize} Normal`;
-            const seen = await checkBoard(p, cls, label);
-            if (classSize === 8) {
-              // A small class grows into the free height: every card on screen, above the Normal size.
-              expect(seen.visible, `${label}: every card on screen`).toBe(8);
-              expect(stepValue(seen.step), `${label}: cards grown above Normal (step ${seen.step})`).toBeGreaterThan(2);
-              // Compact never gives taller cards than Large where every card fits (S22c review).
-              const heights: Record<string, number> = {};
-              for (const density of ['Compact', 'Large'] as const) {
-                await setDensity(p, density);
-                const l = `${size.name} 8 ${density}`;
-                const s = await checkBoard(p, cls, l);
-                expect(s.visible, `${l}: every card on screen`).toBe(8);
-                heights[density] = await cardHeight(p);
-              }
-              expect(heights.Compact!, `${label}: a Compact card is not taller than a Large one`).toBeLessThanOrEqual(heights.Large! + 1);
-              await setDensity(p, 'Normal');
-              if (size === SIZES[0]) await checkPhone(browser, cls, `${PHONE.name} 8 Normal`);
-            }
-            if (classSize === 40) {
-              // At least two full rows of a class of 40 at every size (the S16c box).
+            // S27c (D-195): one automatic size, no Compact / Normal / Large on the shell.
+            await expect(p.getByTestId('classroom-shell')).not.toHaveAttribute('data-density', /./u);
+            const label = `${size.name} ${classSize}${round === 'marks' ? ' marks' : ''}`;
+            const seen = round === 'marks' ? await checkMarks(p, cls, label) : await checkBoard(p, cls, label);
+            if (classSize <= ALL_FIT[size.name][round]) {
+              // Every student on screen without scrolling, at the largest size that fits.
+              expect(seen.visible, `${label}: every card on screen`).toBe(classSize);
+            } else {
+              expect(seen.visible, `${label}: whole cards on screen`).toBeGreaterThanOrEqual(FLOOR[size.name][round]);
               expect(seen.rows, `${label}: full rows of cards on screen`).toBeGreaterThanOrEqual(2);
-              await checkMoreCue(p, label);
-              for (const density of ['Compact', 'Large'] as const) {
-                await setDensity(p, density);
-                const l = `${size.name} 40 ${density}`;
-                const s = await checkBoard(p, cls, l);
-                expect(s.rows, `${l}: full rows of cards on screen`).toBeGreaterThanOrEqual(2);
-              }
-              await setDensity(p, 'Normal');
+              if (round === 'plain' && classSize === 40) await checkMoreCue(p, label);
             }
-            if (size.name === '1536x703@1.25') {
+            // A small class grows into the free height: above the middle size where the fit starts.
+            if (classSize === 8) expect(stepValue(seen.step), `${label}: cards grown above the middle size (step ${seen.step})`).toBeGreaterThan(2);
+            // S25a (D-185): the measured classroom display shows a class of 40 in `tight`, where the marks share the count's line.
+            if (round === 'marks' && classSize === 40 && size === SIZES[0]) {
+              expect(seen.step, `${label}: the narrowest layout`).toBe('tight');
+              await checkLate(p, teacher, cls, `${label} late`);
+            }
+            if (size === SIZES[0] && (classSize === 8 || round === 'marks')) await checkPhone(browser, cls, `${PHONE.name} ${classSize}${round === 'marks' ? ' marks' : ''}`);
+            if (size === SIZES[0] && round === 'plain') {
               const r = await new AxeBuilder({ page: p }).include('[data-box="core.students"]').analyze();
               expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(', ')}`)).toEqual([]);
             }
@@ -530,7 +513,7 @@ for (const classSize of CLASS_SIZES) {
         }
       }
 
-      if (classSize === 28) {
+      if (classSize === 24) {
         // Switched off, a module's marks are gone (and come back when it is on again).
         const { ctx, p } = await openDisplay(browser, SIZES[0]);
         try {

@@ -187,7 +187,7 @@ export const Frame = z
     trimColors: z.array(tokenName).min(FRAME_LIMITS.trimColors[0]).max(FRAME_LIMITS.trimColors[1]).optional().describe('Colour tokens of the trim (default per trim, e.g. accent and surface for candyStripe).'),
     cornerColors: z.array(tokenName).min(FRAME_LIMITS.cornerColors[0]).max(FRAME_LIMITS.cornerColors[1]).optional().describe('Colour tokens of the corners (default per corner preset).'),
   })
-  .describe('App-drawn frames from presets only (no SVG in the package). Colours are token names. Phones and compact density get the edge only.');
+  .describe('App-drawn frames from presets only (no SVG in the package). Colours are token names. Phones get the edge only.');
 
 export const Ambient = z
   .strictObject({

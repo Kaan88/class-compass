@@ -620,7 +620,7 @@ test('classroom', async ({ browser }) => {
             await expect(page.getByTestId('lesson-dashboard')).toBeVisible();
             await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
             await page.waitForTimeout(800);
-            await shot(page, { area: 'classroom', page: 'dashboard', state: 'density-normal', dev, lang: l });
+            await shot(page, { area: 'classroom', page: 'dashboard', state: 'default', dev, lang: l });
           } finally {
             await context.close();
           }
@@ -683,24 +683,9 @@ async function classroomFlow(browser: Browser, tp: Page, dev: Device, lang: Loca
     const dashboard = d.getByTestId('lesson-dashboard');
     await expect(dashboard).toBeVisible();
     await d.waitForTimeout(1000);
-    await S('dashboard', 'density-normal');
+    await S('dashboard', 'default');
 
-    await step(`classroom density ${where}`, async () => {
-      // Size is in the top bar's Display popover (D-139); the popover closes on a click outside.
-      const control = d.getByTestId('density-control');
-      const pick = async (name: string) => {
-        if (!(await control.isVisible())) await d.getByTestId('classroom-settings').click();
-        await control.getByRole('button', { name: nm(name) }).click();
-        await d.keyboard.press('Escape');
-      };
-      await pick('Compact');
-      await S('dashboard', 'density-compact');
-      await pick('Large');
-      await S('dashboard', 'density-large');
-      await pick('Normal');
-    });
-
-    // S14a (D-145): the Display popover with the size, Customise layout and the Sound check.
+    // S14a (D-145): the Display popover with Customise layout and the Sound check (no card size since S27c, D-195).
     await step(`classroom display popover and sound check ${where}`, async () => {
       await d.getByTestId('classroom-settings').click();
       await expect(d.getByTestId('sound-check')).toBeVisible();
@@ -1590,7 +1575,7 @@ test('S14 screens at 200 % text', async ({ browser }) => {
           await openClass(page);
           await expect(page.getByTestId('lesson-dashboard')).toBeVisible();
           await page.waitForTimeout(800);
-          await shot(page, { area: 'classroom', page: 'dashboard', state: 'density-normal-text-200', dev: DEV.laptop, lang });
+          await shot(page, { area: 'classroom', page: 'dashboard', state: 'default-text-200', dev: DEV.laptop, lang });
           await page.getByTestId('student-card-name').nth(2).click();
           await expect(page.getByTestId('classroom-student-card')).toBeVisible();
           await page.waitForTimeout(600);

@@ -1,6 +1,6 @@
 /**
  * The classroom board (S14b, D-148; replaces the S13a rail of D-103/D-139). Fictional demo data only;
- * every setting this file changes (modules, class theme, class language, density, layouts) is put back.
+ * every setting this file changes (modules, class theme, class language, layouts) is put back.
  * 1. Module combinations x themes (13 x 3) at 1920x1080: facts over the board's boxes (`[data-box]`):
  *    no horizontal page scroll, no two boxes overlap, no empty or overflowing box, and a module that
  *    is off has neither a box nor a dock button. Screenshots go to test-results/layout/.
@@ -12,11 +12,11 @@
  * 2a. Lesson goals on (S25d review, D-188) at 1536x703 and 1536x864 (1.25), English and Turkish: with no
  *    goal and with a 140-character goal, as many whole student cards as with the module off.
  * 2b. Short displays (S14i review) at 1280x720, 1366x768 and 1920x1080, English and Turkish: no name
- *    is split inside a word at Compact, Normal or Large; when the student grid cuts a row, "N more
+ *    is split inside a word; when the student grid cuts a row, "N more
  *    students below" is shown and scrolls to them; at 1280x720 the layout editor's handles and "Move to
  *    lesson tools" buttons above the grid are not hidden under the lesson tools tray.
- * 3. Compact / Normal / Large on this device; the timer keypad; the assistant panel in the dock (hide
- *    and show for this lesson); the class language mode.
+ * 3. No card size choice on the board (S27c, D-195: one automatic size); the timer keypad; the
+ *    assistant panel in the dock (hide and show for this lesson); the class language mode.
  * 4. Customise layout: PIN dialog, keyboard and mouse edits, "Put in dock" / "Show as a box", resize,
  *    save for this class (kept after a reload, the other classes unchanged), the teacher area locked
  *    again after saving (423), "All my classes", Reset; axe on edit mode and on every dock view.
@@ -251,7 +251,7 @@ test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Nor
         const { ctx: c, p } = await onDevice(browser, page, vp);
         try {
           await openClassroom(p);
-          await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'normal');
+          await expect(p.getByTestId('classroom-shell')).not.toHaveAttribute('data-density', /./u);
           await expect(p.getByRole('button', { name: L.end, exact: true })).toBeVisible();
           await expect(p.locator('.cc-student-card')).toHaveCount(19);
           if (boxes) await expect(p.locator('.cc-student-card__add').first()).toBeVisible();
@@ -283,33 +283,30 @@ test('fit (D-103, D-139 with D-143): with the reminder boxes on, 19 cards at Nor
     await setReminderBoxes(office, ctx.id, true);
     expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: 'en', secondLanguageEnabled: false })).status).toBe(200);
 
-    // Compact / Normal / Large on this device: the choice survives a reload. On the board the density is
-    // where the cards' fit starts (S22c, D-177): a class whose cards all fit grows them into the free
-    // height at any density, so Large is never smaller than Normal and Compact never larger.
+    // S27c (D-195): one automatic card size. The Display popover offers no size, and a Compact / Large
+    // value an older version stored on this device changes nothing: the cards are as large as before.
     const { ctx: c, p } = await onDevice(browser, page, VIEWPORTS[3]!);
     try {
       await openClassroom(p);
-      const size = () => p.locator('.cc-student-card').first().evaluate((e) => e.getBoundingClientRect().width * e.getBoundingClientRect().height);
-      const normal = await size();
-      const control = p.getByTestId('density-control');
-      const openSettings = async () => {
-        if (!(await control.isVisible())) await p.getByTestId('classroom-settings').click();
-      };
-      await openSettings();
-      await control.getByRole('button', { name: 'Large' }).click();
-      await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'large');
       await expect(p.locator('.cc-student-grid')).toHaveAttribute('data-fit', /.+/u);
-      await expect.poll(size).toBeGreaterThanOrEqual(normal);
+      const size = () => p.locator('.cc-student-card').first().evaluate((e) => Math.round(e.getBoundingClientRect().width * e.getBoundingClientRect().height));
+      const before = await size();
+      await p.getByTestId('classroom-settings').click();
+      await expect(p.getByTestId('classroom-settings-popover')).toBeVisible();
+      await expect(p.getByTestId('density-control')).toHaveCount(0);
+      await expect(p.getByTestId('classroom-settings-popover').getByRole('button', { name: /^(Compact|Large)$/u })).toHaveCount(0);
+      await p.keyboard.press('Escape');
+      const userId = (await api(p, 'GET', '/api/auth/me')).body.id as string;
+      await p.evaluate((id) => localStorage.setItem(`cc.density.${id}`, 'compact'), userId);
       await p.reload();
-      await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'large');
-      await openSettings();
-      await control.getByRole('button', { name: 'Compact' }).click();
-      await expect(p.getByTestId('classroom-shell')).toHaveAttribute('data-density', 'compact');
-      await expect.poll(size).toBeLessThanOrEqual(normal);
+      await expect(p.locator('.cc-student-card')).toHaveCount(19);
+      await expect(p.locator('.cc-student-grid')).toHaveAttribute('data-fit', /.+/u);
+      await expect(p.getByTestId('classroom-shell')).not.toHaveAttribute('data-density', /./u);
+      await expect.poll(size).toBe(before);
       expect((await layoutFacts(p)).hScroll).toBe(false);
-      await openSettings();
-      await control.getByRole('button', { name: 'Normal' }).click();
-      await expect(control.getByRole('button', { name: 'Normal' })).toHaveAttribute('aria-pressed', 'true');
+      await p.evaluate(() => {
+        for (const k of Object.keys(localStorage)) if (k.startsWith('cc.density.')) localStorage.removeItem(k);
+      });
     } finally {
       await c.close();
     }
@@ -434,14 +431,9 @@ test('short displays (S14i review): names never split inside a word at any size,
         try {
           await openClassroom(p);
           await expect(p.locator('.cc-student-card')).toHaveCount(19);
-          for (const size of [/^(Compact|Küçük)$/u, /^(Large|Büyük)$/u, /^Normal$/u]) {
-            if (!(await p.getByTestId('density-control').isVisible())) await p.getByTestId('classroom-settings').click();
-            await p.getByTestId('density-control').getByRole('button', { name: size }).click();
-            await p.keyboard.press('Escape');
-            await p.waitForTimeout(300);
-            expect(await splitNames(p), `${vp.name} ${lang} ${size}`).toEqual([]);
-          }
-          // Normal: when a row is cut, the cue says how many children are below and scrolls to them.
+          await p.waitForTimeout(300);
+          expect(await splitNames(p), `${vp.name} ${lang}`).toEqual([]);
+          // When a row is cut, the cue says how many children are below and scrolls to them.
           const visible = await cardsOnScreen(p);
           const more = p.getByTestId('students-more');
           if (visible < 19) {

@@ -1836,7 +1836,7 @@
         "edge"
       ],
       "additionalProperties": false,
-      "description": "App-drawn frames from presets only (no SVG in the package). Colours are token names. Phones and compact density get the edge only."
+      "description": "App-drawn frames from presets only (no SVG in the package). Colours are token names. Phones get the edge only."
     },
     "ambient": {
       "type": "object",

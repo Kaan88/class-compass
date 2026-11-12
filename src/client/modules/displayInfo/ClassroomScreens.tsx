@@ -43,7 +43,6 @@ export function ClassroomScreens() {
             header: t('displayInfo.col.board'),
             render: (r) =>
               [
-                r.last.density ? t(`displayInfo.density.${r.last.density}`) : null,
                 r.last.layout ? t(`displayInfo.layout.${r.last.layout}`) : null,
                 r.last.theme,
                 r.last.reducedMotion ? t('displayInfo.reducedMotion') : null,

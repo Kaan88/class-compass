@@ -3,10 +3,12 @@
  * grows the cards into free height" and acts on the S16c box "a class of 40 at 1536×703").
  *
  * On the lesson board the Students box has a fixed height (its row takes what the other rows leave)
- * and scrolls inside. The grid picks one size from a ladder of card sizes, measured in the real box:
- * - when every card fits at the size of the chosen display density (Compact / Normal / Large), the
- *   cards grow step by step while every card still fits, up to the Large size (a small class fills the
- *   free height instead of leaving it empty);
+ * and scrolls inside. The grid picks one size from a ladder of card sizes, measured in the real box,
+ * so the board shows every student at the largest size that fits (S27c, D-195: one automatic size; the
+ * Compact / Normal / Large choice that used to say where the fit starts was removed by the owner):
+ * - when every card fits at the middle size (`FIT_START`, the old Normal), the cards grow step by step
+ *   while every card still fits, up to the largest size (a small class fills the free height instead
+ *   of leaving it empty);
  * - when they do not, the cards shrink step by step to the largest size at which every card fits;
  * - when no size fits them all (a class of 40 on a short display), the size that shows the most whole
  *   cards, never below the readable minimum (`tight`: the name across the whole card on its own line,
@@ -19,19 +21,19 @@
  * The size is written as CSS variables on the grid (`--cc-card-*`, tokens of the board's card rules)
  * with `data-fit` naming the step, straight on the element before paint (no React render), like the
  * toaster's dock measurement (D-174). Where the box does not scroll (below 64rem the page scrolls) the
- * variables are removed and the density's sizes apply unchanged.
+ * variables are removed and the board's own card sizes apply unchanged.
  */
 import { useLayoutEffect, type RefObject } from 'react';
 
 export interface FitStep {
-  /** `tight`, or `s<t>` with t from 0 (small) over 1 (Compact), 2 (Normal) to 3 (Large). */
+  /** `tight`, or `s<t>` with t from 0 (smallest) to 3 (largest); the fit starts at 2. */
   key: string;
   /** The readable-minimum layout: the name on its own line across the card. */
   tight: boolean;
   vars: Readonly<Record<string, string>>;
 }
 
-/** Card sizes (rem) at t = 0 (small), 1 (Compact), 2 (Normal) and 3 (Large); the board's values for 1–3. */
+/** Card sizes (rem) at t = 0, 1, 2 and 3 (the board's former Compact, Normal and Large sizes for 1–3). */
 const ANCHORS = [
   { min: 9.5, h: 3.2, avatar: 1.85, name: 0.88, padY: 0.2, padX: 0.4, rowGap: 0.1, gap: 0.3, add: 0 },
   { min: 10, h: 3.8, avatar: 2, name: 0.92, padY: 0.35, padX: 0.5, rowGap: 0.15, gap: 0.45, add: 0 },
@@ -56,7 +58,7 @@ function varsAt(t: number): Record<string, string> {
     '--cc-card-pad-x': rem(mix('padX')),
     '--cc-card-row-gap': rem(mix('rowGap')),
     '--cc-card-gap': rem(mix('gap')),
-    // The + button is never smaller than a touch target; it grows a little towards Large.
+    // The + button is never smaller than a touch target; it grows a little towards the largest size.
     '--cc-card-add': `calc(var(--cc-touch) + ${rem(mix('add'))})`,
   };
 }
@@ -67,11 +69,8 @@ export const FIT_STEPS: readonly FitStep[] = [
   ...[0, 0.5, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3].map((t) => ({ key: `s${t}`, tight: false, vars: varsAt(t) })),
 ];
 
-/** The step of a display density (where the fit starts). */
-export function baseStepOf(density: string | null | undefined): number {
-  const key = density === 'compact' ? 's1' : density === 'large' ? 's3' : 's2';
-  return FIT_STEPS.findIndex((s) => s.key === key);
-}
+/** Where the fit starts: the middle size (the board's Normal size before S27c). */
+export const FIT_START = FIT_STEPS.findIndex((s) => s.key === 's2');
 
 export interface FitMeasure {
   /** Every card is whole inside the box. */
@@ -81,7 +80,7 @@ export interface FitMeasure {
 }
 
 /**
- * The step to use (pure, unit-tested): grow from the base while every card fits, else shrink to the
+ * The step to use (pure, unit-tested): grow from the start while every card fits, else shrink to the
  * largest step where every card fits, else the step with the most whole cards (ties: the larger).
  * `measure` is called at most once per step.
  */
@@ -220,14 +219,13 @@ export function fitCards(section: HTMLElement): void {
     apply(grid, null);
     return;
   }
-  const base = baseStepOf(section.closest('.cc-classroom')?.getAttribute('data-density'));
   const count = grid.children.length;
   const variants = new Map<number, Variant>();
   // The avatars and frames are drawn in SVG, which is slow to lay out again at every size tried: while
   // measuring they are hidden (their boxes keep their size) and transitions are off (a size read in
   // the middle of one is the old size), and they are drawn once at the chosen size.
   grid.dataset.fitMeasuring = '';
-  const pick = chooseFitStep(base, FIT_STEPS.length, (i) => {
+  const pick = chooseFitStep(FIT_START, FIT_STEPS.length, (i) => {
     const r = measureStep(scroller, grid, FIT_STEPS[i]!, count);
     variants.set(i, r.v);
     return r;
@@ -250,9 +248,8 @@ const nameSizes = (section: HTMLElement) =>
 
 /**
  * Runs `fitCards` before paint whenever `deps` change (number of students, the grid opened, what the
- * cards carry, a header line of an add-on), when the box changes size (window, text size, the other rows), when a
- * name changes size without the fit (content that arrives later) and when the display density changes.
- * The fit's own changes never run it again (the box and the names are compared with what the last fit
+ * cards carry, a header line of an add-on), when the box changes size (window, text size, the other
+ * rows) and when a name changes size without the fit (content that arrives later). The fit's own changes never run it again (the box and the names are compared with what the last fit
  * left), so it cannot loop.
  */
 export function useCardFit(sectionRef: RefObject<HTMLElement | null>, deps: readonly unknown[]): void {
@@ -274,13 +271,7 @@ export function useCardFit(sectionRef: RefObject<HTMLElement | null>, deps: read
       for (const e of section!.querySelectorAll('.cc-student-card__name-text')) ro.observe(e);
     }
     run();
-    const shell = section.closest('.cc-classroom');
-    const mo = shell && typeof MutationObserver === 'function' ? new MutationObserver(run) : null;
-    if (shell) mo?.observe(shell, { attributes: true, attributeFilter: ['data-density'] });
-    return () => {
-      ro?.disconnect();
-      mo?.disconnect();
-    };
+    return () => ro?.disconnect();
     // The caller lists what the cards depend on.
   }, [sectionRef, ...deps]);
 }

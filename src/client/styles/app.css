@@ -1792,10 +1792,8 @@ html[data-scene] .cc-lesson-box[data-box='core.students'] .cc-students-box__head
 .cc-modal > .cc-frame__corner--top-right {
   right: 2px;
 }
-/* Compact density and phones: the edge only (trims and corners are detail). */
-.cc-classroom[data-density='compact'] .cc-frame--detail {
-  display: none;
-}
+/* Phones: the edge only (trims and corners are detail). The classroom screen's Compact density did
+   the same until S27c removed it (D-195). */
 @media (max-width: 40rem) {
   .cc-frame--detail {
     display: none;
@@ -2152,30 +2150,20 @@ html[data-frame-cards='torn'] .cc-card:not(.cc-lesson-box .cc-card)::before {
 /*
  * Classroom layout (S13a, D-103). Auto-fit: in the classroom the root size follows the screen (width
  * and height), so 1280×800 … 2560×1440 (and 4K at 150–200 % scaling) show the same amount; the
- * teacher's text size still multiplies it. Density (Compact / Normal / Large, per device + teacher)
- * then sets the student card size (S14b: the board replaced the rail, D-148).
+ * teacher's text size still multiplies it. One card size follows (S27c, D-195: the Compact / Normal /
+ * Large choice of D-103 was removed); on the lesson board the fit sizes the cards (D-177).
  */
 html:has(.cc-classroom) {
   font-size: calc(clamp(15px, min(0.6vw + 8px, 1.1vh + 7px), 22px) * var(--cc-text-scale));
 }
+/* One card size on the classroom screen (S27c, D-195: the Compact / Normal / Large choice was removed
+   by the owner); on the lesson board the fit (D-177) sizes the cards from these. */
 .cc-classroom {
   --cc-card-min: 13.5rem;
   --cc-card-h: 4.4rem;
   --cc-card-avatar: 2.6rem;
   --cc-card-name: 1rem;
   overflow-x: clip;
-}
-.cc-classroom[data-density='compact'] {
-  --cc-card-min: 12.5rem;
-  --cc-card-h: 3.8rem;
-  --cc-card-avatar: 2.2rem;
-  --cc-card-name: 0.92rem;
-}
-.cc-classroom[data-density='large'] {
-  --cc-card-min: 17.5rem;
-  --cc-card-h: 5.5rem;
-  --cc-card-avatar: 3.4rem;
-  --cc-card-name: 1.2rem;
 }
 .cc-classroom__main.cc-page {
   padding: 0.75rem 1rem 5rem;
@@ -2204,10 +2192,6 @@ html:has(.cc-classroom) {
   min-height: var(--cc-touch);
   padding: 0;
   font-size: 1.5rem;
-}
-.cc-classroom[data-density='large'] .cc-student-card__add {
-  min-width: 4rem;
-  min-height: 4rem;
 }
 .cc-student-grid .cc-student-card:has(> .cc-student-card__meta:empty) {
   grid-template-areas: 'avatar name add';
@@ -2915,24 +2899,15 @@ html:has(.cc-classroom) {
   --cc-card-min: 11.25rem;
   --cc-card-avatar: 2.3rem;
 }
-.cc-classroom[data-density='compact'] .cc-lesson-board {
-  --cc-card-min: 10rem;
-  --cc-card-avatar: 2rem;
-}
 /* Cards the fit does not size (below 64rem the page scrolls, D-177: a phone or a narrow window) can be
    too narrow for a name beside both the avatar and the + button ("Şimşe / k" at 1280×720, S14i
    review; "Kurg / u" on a phone, S22c review): the name takes the whole first line next to the avatar,
    the + button sits beside the count and the marks under it, so a name breaks only between words.
-   Fitted cards choose this layout themselves (`data-fit-name="across"`) only where a name needs it, so
-   the Compact density no longer forces it there (it made Compact cards taller than Large, S22c review). */
+   Fitted cards choose this layout themselves (`data-fit-name="across"`) only where a name needs it. */
 .cc-lesson-board .cc-student-grid:not([data-fit]) .cc-student-card {
   grid-template-areas:
     'avatar name name'
     'meta meta add';
-}
-.cc-classroom[data-density='large'] .cc-lesson-board {
-  --cc-card-min: 15rem;
-  --cc-card-avatar: 3rem;
 }
 .cc-lesson-board .cc-student-grid {
   gap: var(--cc-card-gap, 0.45rem);
@@ -3024,9 +2999,6 @@ html:has(.cc-classroom) {
 .cc-lesson-board .cc-student-grid .cc-student-card__add {
   min-width: var(--cc-touch);
   padding-inline: 0;
-}
-.cc-classroom[data-density='large'] .cc-lesson-board .cc-student-grid:not([data-fit]) .cc-student-card__add {
-  min-width: 4rem;
 }
 /* The class switcher above the board is a little lower, so the board keeps that height. */
 .cc-classroom .cc-class-switcher .cc-btn {

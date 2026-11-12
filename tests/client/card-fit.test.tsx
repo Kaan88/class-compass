@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * S22c (D-177): the classroom student cards. The fit's choice of size (CRD-3 compact density that grows
+ * S22c (D-177), S27c (D-195): the classroom student cards. The fit's choice of size (CRD-3: grows
  * into free height, DSH-1 the board), the card marks (this lesson's achievements and the group number:
  * an icon and a number with a spoken name, never colour only, UX-6/UX-7), and the add-ons that give
  * them: nothing while a module is off or has nothing to show. Fictional data only.
@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
 import { achievementsCardAddon, achievementsKey } from '../../src/client/modules/achievements/AchievementsPanel.tsx';
 import { groupsCardAddon } from '../../src/client/modules/grouping/GroupsPanel.tsx';
-import { FIT_STEPS, baseStepOf, chooseFitStep, type FitMeasure } from '../../src/client/modules/lessons/board/cardFit.ts';
+import { FIT_START, FIT_STEPS, chooseFitStep, type FitMeasure } from '../../src/client/modules/lessons/board/cardFit.ts';
 import { lessonKey } from '../../src/client/modules/lessons/lessonClient.ts';
 import type { ClassroomContext } from '../../src/client/modules/types.ts';
 import { StudentCard } from '../../src/client/ui/Students.tsx';
@@ -33,39 +33,41 @@ describe('chooseFitStep (CRD-3, DSH-1)', () => {
     return { measure, asked };
   };
 
-  it('grows from the density step while every card fits, up to Large', () => {
-    const base = baseStepOf('normal');
+  // S27c (D-195): one automatic size; the fit always starts at the middle step and ends at the largest
+  // step where every card fits.
+  const base = FIT_START;
+
+  it('grows from the start while every card fits, up to the largest step', () => {
     expect(chooseFitStep(base, N, ladder(base + 3).measure)).toBe(base + 3);
     expect(chooseFitStep(base, N, ladder(N - 1).measure)).toBe(N - 1);
   });
 
-  it('stays at the density step when the next one does not fit', () => {
-    const base = baseStepOf('compact');
+  it('stays at the start when the next step does not fit', () => {
     expect(chooseFitStep(base, N, ladder(base).measure)).toBe(base);
   });
 
   it('shrinks to the largest step where every card fits', () => {
-    const base = baseStepOf('large');
     const { measure, asked } = ladder(3);
     expect(chooseFitStep(base, N, measure)).toBe(3);
-    // Measured once per step, from the density step down.
+    // Measured once per step, from the start down.
     expect(new Set(asked).size).toBe(asked.length);
     expect(asked[0]).toBe(base);
   });
 
+  it('ends at the largest step where every card fits, wherever that is on the ladder', () => {
+    for (let fits = 0; fits < N; fits += 1) expect(chooseFitStep(base, N, ladder(fits).measure), `fits up to ${fits}`).toBe(fits);
+  });
+
   it('when no step fits every card, takes the one with the most whole cards, a tie going to the larger', () => {
-    const base = baseStepOf('normal');
     expect(chooseFitStep(base, N, ladder(-1, (s) => (s === 0 ? 16 : 8)).measure)).toBe(0);
     expect(chooseFitStep(base, N, ladder(-1, () => 8).measure)).toBe(base);
     // A step that breaks a name inside a word (full -1) is never chosen over one that does not.
     expect(chooseFitStep(base, N, ladder(-1, (s) => (s === base ? -1 : 6)).measure)).toBe(base - 1);
   });
 
-  it('starts at Compact, Normal and Large for the three densities, with the readable minimum below them all', () => {
-    expect(FIT_STEPS[baseStepOf('compact')]!.key).toBe('s1');
-    expect(FIT_STEPS[baseStepOf('normal')]!.key).toBe('s2');
-    expect(FIT_STEPS[baseStepOf(undefined)]!.key).toBe('s2');
-    expect(FIT_STEPS[baseStepOf('large')]!.key).toBe('s3');
+  it('starts at the middle step (the old Normal size), with the readable minimum at the bottom', () => {
+    expect(FIT_STEPS[FIT_START]!.key).toBe('s2');
+    expect(FIT_STEPS.at(-1)!.key).toBe('s3');
     expect(FIT_STEPS[0]).toMatchObject({ key: 'tight', tight: true });
   });
 

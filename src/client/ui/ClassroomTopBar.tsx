@@ -4,9 +4,9 @@
  * right; then the save state, a "Display" button and Teacher area. The quote and weather slots are
  * filled by S13b (`registerTopBarSlot`); while nothing is registered they are not rendered at all.
  *
- * Usability pass (D-139): the device settings (class language when the class has two, Compact /
- * Normal / Large, sounds on this device) are in one popover behind "Display", so the bar fits on one
- * row also in Turkish and on 1280×720 displays.
+ * Usability pass (D-139): the device settings (class language when the class has two, sounds on this
+ * device) are in one popover behind "Display", so the bar fits on one row also in Turkish and on
+ * 1280×720 displays. There is no card size there since S27c (D-195: one automatic size, D-177).
  *
  * Sound (S14a, D-145): while the browser still waits for a tap before it plays sound (or this
  * device's sounds are off) the bar shows a chip "Sound is off · Turn sound on"; tapping it is the
@@ -22,7 +22,6 @@ import { Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import { pickText } from '../../shared/i18n/index.ts';
 import { classLocales } from '../../shared/classLanguage.ts';
 import { copyText, showManualCopy } from '../lib/clipboard.ts';
-import { DENSITIES, type Density } from '../lib/classroomPrefs.ts';
 import { getDisplay, setDisplay } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { topBarSlots, type TopBarSlotKey } from '../modules/classroomHooks.ts';
@@ -34,8 +33,6 @@ import { lockNow } from '../lib/session.ts';
 import { isWideEnough, setLayoutEditing, useWideEnough } from '../modules/lessons/board/layoutClient.ts';
 import { IconCopy, IconLayout, IconSettings, IconSound, IconSoundOff } from './icons.tsx';
 import { PinDialog } from './PinDialog.tsx';
-
-const SIZE_KEYS = { compact: 'classroom.size.compact', normal: 'classroom.size.normal', large: 'classroom.size.large' } as const;
 
 function Slot({ slot, context }: { slot: TopBarSlotKey; context: ClassroomContext }) {
   const { locale } = useI18n();
@@ -160,8 +157,6 @@ export function ClassroomTopBar({
   dayLabel,
   dateLabel,
   timeLabel,
-  density,
-  onDensity,
   onLocale,
   settings,
   tools,
@@ -171,8 +166,6 @@ export function ClassroomTopBar({
   dayLabel: string;
   dateLabel: string;
   timeLabel: string;
-  density: Density;
-  onDensity: (d: Density) => void;
   onLocale: (l: 'en' | 'tr') => void;
   /** More device settings shown in the Display popover (the sounds switch). */
   settings?: ReactNode;
@@ -255,18 +248,6 @@ export function ClassroomTopBar({
                   </div>
                 </div>
               ) : null}
-              <div className="cc-stack cc-popover__group">
-                <span className="cc-field__label" id="cc-settings-size">
-                  {t('classroom.size')}
-                </span>
-                <div className="cc-row cc-segmented" role="group" aria-labelledby="cc-settings-size" data-testid="density-control">
-                  {DENSITIES.map((d) => (
-                    <Button key={d} size="small" aria-pressed={d === density} onPress={() => onDensity(d)}>
-                      {t(SIZE_KEYS[d])}
-                    </Button>
-                  ))}
-                </div>
-              </div>
               {settings}
               {canCustomise ? (
                 <div className="cc-stack cc-popover__group">

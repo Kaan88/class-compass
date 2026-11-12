@@ -113,8 +113,10 @@ describe('parseUserAgent (S16c)', () => {
   });
 
   it('builds a sample the contract accepts, without the user agent', () => {
-    const s = readSample({ density: 'large', theme: 'explorer', layout: null, textScale: 125 });
+    const s = readSample({ theme: 'explorer', layout: null, textScale: 125 });
     expect(s).not.toBeNull();
+    // S27c (D-195): no card size on the classroom screen any more, so nothing to report.
+    expect(s!.density).toBeNull();
     expect(JSON.stringify(s)).not.toContain('Mozilla');
   });
 });

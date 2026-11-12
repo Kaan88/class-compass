@@ -25,6 +25,10 @@ export const DisplaySample = z
     screenWidth: px,
     screenHeight: px,
     pixelRatio: z.number().min(0.25).max(8),
+    /**
+     * The classroom screen's Compact / Normal / Large until S27c. Removed by the owner (D-195): the board
+     * sends null; kept so samples stored before and pages still open with the old code parse.
+     */
     density: z.enum(DISPLAY_DENSITIES).nullable(),
     /** The theme key shown (built-in key or an imported theme's slug). */
     theme: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/).nullable(),

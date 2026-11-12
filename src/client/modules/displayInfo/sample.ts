@@ -3,7 +3,7 @@
  * short browser/OS text parsed here (never the full user agent), and display preferences. Nothing about
  * students.
  */
-import { DISPLAY_DENSITIES, DisplaySample, type DISPLAY_OS } from '../../../shared/contracts/displayInfo.ts';
+import { DisplaySample, type DISPLAY_OS } from '../../../shared/contracts/displayInfo.ts';
 
 type Os = (typeof DISPLAY_OS)[number];
 
@@ -34,7 +34,6 @@ export function parseUserAgent(ua: string): { browser: string; os: Os } {
 const clampInt = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(Number.isFinite(v) ? v : lo)));
 
 export interface SampleInputs {
-  density: string | null;
   theme: string | null;
   layout: 'default' | 'class' | 'all' | null;
   textScale: number;
@@ -50,7 +49,8 @@ export function readSample(inputs: SampleInputs, w: Window = window): DisplaySam
     screenWidth: clampInt(w.screen?.width ?? w.innerWidth, 100, 16384),
     screenHeight: clampInt(w.screen?.height ?? w.innerHeight, 100, 16384),
     pixelRatio: Math.min(8, Math.max(0.25, Math.round((w.devicePixelRatio || 1) * 100) / 100)),
-    density: (DISPLAY_DENSITIES as readonly string[]).includes(inputs.density ?? '') ? (inputs.density as DisplaySample['density']) : null,
+    // S27c (D-195): the classroom screen has no Compact / Normal / Large any more; always null.
+    density: null,
     theme: inputs.theme && /^[a-z0-9][a-z0-9-]{0,39}$/.test(inputs.theme) ? inputs.theme : null,
     layout: inputs.layout,
     browser,
