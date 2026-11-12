@@ -114,6 +114,7 @@ export const en = {
   'error.WRONG_LESSON': 'This action was meant for another lesson or class, so it was not saved.',
   'error.LESSON_ENDED': 'This lesson has already ended, so the action was not saved.',
   'error.LESSON_ALREADY_ACTIVE': 'A lesson is already running in this class. It has been resumed.',
+  'error.START_STALE': 'This lesson start was saved on an earlier day and reached the server too late, so no lesson was started and its attendance was not recorded for today.',
   'error.STAGE_OUT_OF_RANGE': 'This routine has no such stage.',
   'error.STUDENT_NOT_IN_CLASS': 'This student is not in the class on this day.',
   'error.ROUTINE_NOT_USABLE': 'This routine cannot be used for this class.',

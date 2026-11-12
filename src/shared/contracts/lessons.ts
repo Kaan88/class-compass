@@ -191,6 +191,12 @@ const Stages = z.array(z.object({ id: z.string().max(64).optional(), name: Requi
 export const LessonCommands = {
   'lesson.start': z.object({
     contextId: Id,
+    /**
+     * The class's local day the start screen was filled in on (AUDIT, D-190 offline start). A start
+     * that reaches the server on a later day is refused (`START_STALE`): its attendance and duty ticks
+     * belong to that day. Omitted by older clients = today, as before.
+     */
+    localDate: IsoDate.optional(),
     /** A template id, DEFAULT_ROUTINE_ID, or omitted for the context default. */
     routineTemplateId: z.string().max(64).optional(),
     /**

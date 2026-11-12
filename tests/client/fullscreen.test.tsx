@@ -19,10 +19,12 @@ vi.mock('../../src/client/modules/registry.ts', async (importOriginal) => ({
   endStepUis: () => [],
 }));
 const sent: string[] = [];
+const payloads: unknown[] = [];
 vi.mock('../../src/client/modules/lessons/lessonClient.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/client/modules/lessons/lessonClient.ts')>()),
-  sendLessonCommand: (type: string) => {
+  sendLessonCommand: (type: string, payload: unknown) => {
     sent.push(type);
+    payloads.push(payload);
     return Promise.resolve('op-1');
   },
   awaitCommand: () => Promise.resolve(null),
@@ -80,6 +82,7 @@ const press = async (name: string) => {
 describe('full screen during lessons (S18, D-167)', () => {
   beforeEach(() => {
     sent.length = 0;
+    payloads.length = 0;
   });
   afterEach(() => {
     cleanup();
@@ -100,6 +103,14 @@ describe('full screen during lessons (S18, D-167)', () => {
     expect(fs.request).toHaveBeenCalledTimes(1);
     expect(sentAtRequest).toEqual([]);
     expect(sent).toEqual(['lesson.start']);
+  });
+
+  it('AUDIT lesson.start replay: the start carries the class local day it was made on (D-190)', async () => {
+    stubFullscreen(false);
+    start(false);
+    await press('Begin lesson');
+    const { localDate } = await import('../../src/domain/dates.ts');
+    expect(payloads).toEqual([{ contextId: 'ctx1', localDate: localDate(Date.now(), 'Europe/Istanbul') }]);
   });
 
   it('uses the default (off, owner 2026-11-12) before the preference is loaded', async () => {

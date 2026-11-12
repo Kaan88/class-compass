@@ -282,7 +282,9 @@ function replaceIfAway(ctx: RequestContext, context: ContextRow, cls: ClassRow, 
     return { ...row, ...patch };
   }
 
-  // 1) Carry forward: the earliest later planned assistant who is in class today swaps turns.
+  // 1) Carry forward: the earliest later planned assistant who is in class today swaps turns. A day
+  // the school is closed keeps its (hidden) row but has no assistant, so it never takes the turn (AUDIT).
+  const closed = closedDatesOfYear(ctx.db, cls.schoolYearId);
   const later = ctx.db
     .select()
     .from(assistantAssignments)
@@ -291,7 +293,7 @@ function replaceIfAway(ctx: RequestContext, context: ContextRow, cls: ClassRow, 
     .all()
     .find((a) => {
       const id = effective(a);
-      return id !== null && id !== who && pool.some((st) => st.id === id) && enrolledOn(ctx.db, cls.id, a.localDate).has(who);
+      return id !== null && id !== who && !closed.has(a.localDate) && pool.some((st) => st.id === id) && enrolledOn(ctx.db, cls.id, a.localDate).has(who);
     });
   let replacement: string | null;
   if (later) {

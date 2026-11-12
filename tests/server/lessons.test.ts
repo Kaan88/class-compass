@@ -439,4 +439,26 @@ describe('local day boundaries (DSH-2)', () => {
     await ok(s.admin.post(`/api/admin/teaching-contexts/${s.ctxA.id}/end`));
     expect((await s.teacherA.get(`/api/classroom/lessons/${fresh.lessonId}/summary`)).status).toBe(404);
   });
+
+  it('AUDIT lesson.start replay: a start queued offline yesterday and sent today is refused, writes no stale attendance (D-190)', async () => {
+    // Filled in on Monday 9 November (offline), sent on Tuesday when the connection returns.
+    const queued = { contextId: s.ctxA.id, localDate: '2026-11-09', attendance: [{ studentId: studentsA[0]!.id, status: 'absent' }], othersPresent: true };
+    env.clock.advance(24 * 3600_000);
+    await signInAgain();
+    const r = await cmd(s.teacherA, 'lesson.start', queued, { contextId: s.ctxA.id });
+    expect(r).toMatchObject({ ok: false, error: { code: 'CONFLICT', reason: 'START_STALE' } });
+    expect((await state(s.teacherA, s.ctxA.id)).lesson).toBeNull();
+    const ro = await roster(s.teacherA, s.ctxA.id);
+    expect(ro.localDate).toBe('2026-11-10');
+    expect(ro.students.map((x: any) => x.daily)).toEqual(studentsA.map(() => null));
+    // Today's own start (with today's date), and an old client without the field, still start as before.
+    const today = await start(s.teacherA, s.ctxA.id, { localDate: '2026-11-10', attendance: [{ studentId: studentsA[1]!.id, status: 'absent' }] });
+    expect(today.started).toBe(true);
+    const legacy = await start(s.teacherA, s.ctxA.id);
+    expect(legacy).toMatchObject({ started: false, reason: 'LESSON_ALREADY_ACTIVE', lessonId: today.lessonId });
+    // A stale start does not touch a running lesson's day either (no resume with yesterday's attendance).
+    const again = await cmd(s.teacherA, 'lesson.start', queued, { contextId: s.ctxA.id });
+    expect(again.error?.reason).toBe('START_STALE');
+    expect((await roster(s.teacherA, s.ctxA.id)).students.find((x: any) => x.id === studentsA[0]!.id)?.daily ?? null).toBeNull();
+  });
 });

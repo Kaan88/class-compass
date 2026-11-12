@@ -18,7 +18,8 @@ import { IconCheck, IconCloudOff, IconNext, IconPlay, IconPrev, IconSync } from 
 import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { playEvent } from '../../themes/index.tsx';
-import { awaitCommand, awaitOrQueued, sendLessonCommand } from './lessonClient.ts';
+import { awaitCommand, awaitOrQueued, sendLessonCommand, serverNow } from './lessonClient.ts';
+import { localDate } from '../../../domain/dates.ts';
 import { enterLessonFullscreen, useLessonPrefs } from './fullscreen.tsx';
 import { initialStartValues, startStepsFor, useStartContributions, useStartWarmup, type ClassroomContext } from '../registry.ts';
 
@@ -144,7 +145,8 @@ export function StartLessonFlow({
     setError(null);
     playEvent('lessonStart');
     try {
-      const opId = await sendLessonCommand('lesson.start', { ...contribution.input, contextId: context.id });
+      // The class's day it was made on: a start sent on a later day is refused, never applied to that day.
+      const opId = await sendLessonCommand('lesson.start', { ...contribution.input, contextId: context.id, localDate: localDate(serverNow(), context.timezone) });
       // Offline (D-190): the start waits in the outbox and the classroom shows it as saved.
       const outcome = await awaitOrQueued(opId);
       if (outcome.queued) {

@@ -153,6 +153,20 @@ describe('absence (AST-4, AST-5, D-065)', () => {
   });
 });
 
+describe('AUDIT carry-forward skips closure days (AST-4, D-065)', () => {
+  it("an absent assistant's turn never moves onto a day the school is closed (its hidden row stays planned)", async () => {
+    await lessonState(s.teacherA, ctxId()); // plan the week: Can, Çağla, Ilgaz, Işıl, İrem
+    // Tuesday becomes a closure after the plan was made: its assignment row stays, hidden.
+    await ok(s.admin.post(`/api/admin/years/${s.year.id}/closures`, { name: { en: 'Fictional Day', tr: 'Hayali Gün' }, startsOn: '2026-11-10', endsOn: '2026-11-10' }));
+    await startLesson(s.teacherA, ctxId(), { attendance: [{ studentId: by['Can Uslu'], status: 'absent' }], othersPresent: true });
+    // Ilgaz (Wednesday) takes today's turn and Can takes Wednesday; closed Tuesday is untouched.
+    expect((await lessonState(s.teacherA, ctxId())).assistant.assistant.fullName).toBe('Ilgaz Ok');
+    const rows = env.db.$client.prepare('select local_date d, status, reason, actual_student_id a from assistant_assignments where context_id = ? order by local_date').all(ctxId()) as Array<{ d: string; status: string; reason: string | null; a: string | null }>;
+    expect(rows.find((r) => r.d === '2026-11-10')).toMatchObject({ status: 'planned', a: null });
+    expect(rows.find((r) => r.d === '2026-11-11')).toMatchObject({ status: 'swapped', reason: 'carry_forward', a: by['Can Uslu'] });
+  });
+});
+
 describe('swaps and overrides (AST-3, AST-5)', () => {
   it('records planned vs actual and refuses past days', async () => {
     await ok(s.teacherA.post(`/api/teacher/contexts/${ctxId()}/assistant/plan`, {}));

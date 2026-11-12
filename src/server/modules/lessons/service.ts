@@ -256,6 +256,10 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
   assertClassWritable(ctx.db, cls);
   const now = ctx.now();
   const today = todayFor(ctx, cls);
+  // A start queued offline and sent on a later day (D-190): its attendance and duty ticks are that
+  // day's, so it neither starts a lesson today nor writes them onto today (AUDIT). Old clients send no
+  // date; a later date can only be a device clock running ahead and is today for the teacher.
+  if (p.localDate !== undefined && p.localDate < today) throw new AppError('CONFLICT', 'This start was made on another day', { reason: 'START_STALE' });
   const existing = getActiveLesson(ctx.db, context.id);
   if (existing) {
     // LES-2: never a second lesson. The client resumes the running one. The attendance the teacher
