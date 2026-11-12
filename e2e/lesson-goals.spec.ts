@@ -124,8 +124,8 @@ const DISPLAYS_125 = [
   { name: '1536x864@1.25', width: 1536, height: 864, scale: 1.25 },
 ];
 
-async function onDevice(browser: Browser, page: Page, vp: (typeof DISPLAYS_125)[number]) {
-  const c = await browser.newContext({ storageState: await page.context().storageState(), viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.scale, hasTouch: true });
+async function onDevice(browser: Browser, page: Page, vp: (typeof DISPLAYS_125)[number], reducedMotion: 'reduce' | 'no-preference' = 'no-preference') {
+  const c = await browser.newContext({ storageState: await page.context().storageState(), viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.scale, hasTouch: true, reducedMotion });
   return { c, p: await c.newPage() };
 }
 
@@ -214,7 +214,20 @@ const stepperFacts = (page: Page) =>
         }
     }
     const current = list.querySelector<HTMLElement>('[aria-current="step"] .cc-stepper__name');
+    // Every chip shows its number on screen in the compact fit, done chips too (S29 review): done
+    // chips must not all look the same.
+    const unnumbered =
+      list.dataset.fit !== 'compact'
+        ? []
+        : [...list.querySelectorAll<HTMLElement>(':scope > li')].flatMap((li, i) => {
+            const num = li.querySelector<HTMLElement>('.cc-stepper__done-num') ?? li.querySelector<HTMLElement>('.cc-stepper__num');
+            const shown = num && num.getBoundingClientRect().width > 0 && (num.textContent ?? '').trim() === String(i + 1);
+            return li.hasAttribute('aria-current') || shown ? [] : [li.querySelector('.cc-stepper__name')?.textContent ?? ''];
+          });
+    const box = list.closest<HTMLElement>('.cc-lesson-box__body')!;
     return {
+      unnumbered,
+      boxScrolls: box.scrollHeight > box.clientHeight + 1,
       fit: list.dataset.fit ?? null,
       chipLines: tops.size,
       overflow: list.scrollWidth > list.clientWidth + 1,
@@ -231,8 +244,22 @@ const focusFacts = (page: Page) =>
     if (!box) return null;
     const visible = [...box.querySelectorAll<HTMLElement>('.cc-focus__topic')].filter((li) => li.getBoundingClientRect().width > 1);
     const more = box.querySelector<HTMLElement>('[data-testid="focus-more"]');
+    // Lines of each topic's own text (a topic that wraps inside its item is still one item top), and
+    // items drawn over each other (S29 review: with reduced motion the first topic was read at 0 px).
+    const textLines = Math.max(
+      0,
+      ...visible.map((li) => {
+        const r = document.createRange();
+        r.selectNodeContents(li.querySelector('span')!);
+        return new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size;
+      }),
+    );
+    const shown = [...visible, ...(more && more.getBoundingClientRect().width > 0 ? [more] : [])].map((e) => e.getBoundingClientRect()).sort((a, b) => a.left - b.left);
+    const overlap = shown.some((r, i) => i > 0 && r.left < shown[i - 1]!.right - 0.5);
     return {
       lines: new Set(visible.map((li) => Math.round(li.getBoundingClientRect().top))).size,
+      textLines,
+      overlap,
       visible: visible.length,
       listed: box.querySelectorAll('.cc-focus__topic').length,
       more: more && more.getBoundingClientRect().width > 0 ? (more.textContent ?? '') : null,
@@ -324,7 +351,7 @@ test('the goal on the Learning goal stage fits the routine box in whole words at
             expect(m.stepper.overflow, `${run} ${shot}: the chips stay inside the box`).toBe(false);
             expect(m.stepper.chipLines, `${run} ${shot}: one line of chips`).toBe(1);
             expect(m.stepper.shown, `${run} ${shot}: the default routine names every stage`).toBe(6);
-            expect(m.box, `${run} ${shot}: today's focus`).toMatchObject({ lines: 1, listed: nTopics, cut: false });
+            expect(m.box, `${run} ${shot}: today's focus`).toMatchObject({ lines: 1, textLines: 1, overlap: false, listed: nTopics, cut: false });
             if (nTopics === 1) expect(m.box?.more, `${run} ${shot}: no +N with one topic`).toBeNull();
             else expect(m.box!.visible + Number((m.box!.more ?? '+0').slice(1)), `${run} ${shot}: shown topics and +N add up`).toBe(nTopics);
           }
@@ -391,8 +418,8 @@ test('every stage name of the default routine is whole in English and Turkish at
     expect(r.body.results[0].ok, type).toBe(true);
     return r.body.results[0].result;
   };
-  const open = async (vp: (typeof ALL_DISPLAYS)[number]) => {
-    const { c, p } = await onDevice(browser, page, vp);
+  const open = async (vp: (typeof ALL_DISPLAYS)[number], reducedMotion: 'reduce' | 'no-preference' = 'no-preference') => {
+    const { c, p } = await onDevice(browser, page, vp, reducedMotion);
     await p.goto('/classroom');
     await p.getByRole('button', { name: /3-A · (English|İngilizce)/u }).first().click();
     await expect(p.getByTestId('lesson-dashboard')).toBeVisible();
@@ -409,7 +436,10 @@ test('every stage name of the default routine is whole in English and Turkish at
     for (const lang of ['en', 'tr'] as const) {
       expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
       for (const vp of ALL_DISPLAYS) {
-        for (const stageIndex of vp.name.startsWith('1536x703') ? [0, 1, 2, 3, 4, 5] : [0, 3]) {
+        // The routine box's height on each stage of this run: the same on every stage, so the student
+        // grid does not jump between stages (S29 review: "Tarih ve hava durumu" took two lines at 1280).
+        const heights: number[] = [];
+        for (const stageIndex of vp.name.startsWith('1536x703') ? [0, 1, 2, 3, 4, 5] : [0, 1, 3]) {
           await cmd('lesson.setStage', { lessonId, stageIndex });
           const { c, p } = await open(vp);
           try {
@@ -423,10 +453,59 @@ test('every stage name of the default routine is whole in English and Turkish at
             expect(s.shown, `${run}: every stage named on screen`).toBe(6);
             // A box at least 40rem wide keeps the chips to one line; a phone wraps them.
             if (vp.width >= 1024) expect(s.chipLines, `${run}: one line of chips`).toBe(1);
+            if (vp.width >= 1024) {
+              // Today's focus with three topics and the student grid at every classroom display, not
+              // only at the two 1.25 displays (S29 review).
+              const f = await focusFacts(p);
+              expect(f, `${run}: today's focus`).toMatchObject({ lines: 1, textLines: 1, overlap: false, listed: 3, cut: false });
+              expect(f!.visible + Number((f!.more ?? '+0').slice(1)), `${run}: shown topics and +N add up`).toBe(3);
+              const cards = await cardsOnScreen(p);
+              test.info().annotations.push({ type: 'cards on screen', description: `${run}: ${cards.cards} (${cards.perRow} a row)` });
+              expect(cards.cards, `${run}: a whole row of cards`).toBeGreaterThanOrEqual(cards.perRow);
+              // Stage 4 (Learning goal) shows the topics in the head; the other stages share one height.
+              if (stageIndex !== 3) heights.push(await p.locator('[data-box="routine"]').evaluate((e) => Math.round(e.getBoundingClientRect().height)));
+            }
             if (stageIndex === 3 && vp.name.startsWith('1536x703')) {
               await axe(p, '[data-box="routine"]');
               await axe(p, '[data-box="focus"]');
             }
+          } finally {
+            await c.close();
+          }
+        }
+        if (heights.length) expect(Math.max(...heights) - Math.min(...heights), `${vp.name} ${lang}: the routine box keeps its height from stage to stage (${heights.join(', ')})`).toBeLessThanOrEqual(1);
+      }
+      // Reduced motion (Windows "Animation effects" off, common on classroom PCs): the fits measure with
+      // transitions off, so Today's focus still keeps to one line with "+N" and nothing drawn over
+      // anything (S29 review: every topic was shown, the first squeezed under the next).
+      for (const vp of [DISPLAYS_125[0]!, ALL_DISPLAYS[3]!]) {
+        for (const stageIndex of [0, 3]) {
+          await cmd('lesson.setStage', { lessonId, stageIndex });
+          const { c, p } = await open(vp, 'reduce');
+          try {
+            const run = `${vp.name} ${lang} stage ${stageIndex + 1}, reduced motion`;
+            await p.screenshot({ path: `test-results/fit/reduced-motion-${vp.name}-${lang}-${stageIndex + 1}.png` });
+            const f = await focusFacts(p);
+            expect(f, `${run}: today's focus`).toMatchObject({ lines: 1, textLines: 1, overlap: false, listed: 3, cut: false });
+            expect(f!.visible + Number((f!.more ?? '+0').slice(1)), `${run}: shown topics and +N add up`).toBe(3);
+            const s = await stepperFacts(p);
+            expect(s.problems, run).toEqual([]);
+            expect(s.chipLines, `${run}: one line of chips`).toBe(1);
+            // A larger text size set while the board is open, at the same width: the fits run again
+            // (S29 review). The names stay whole and the routine box does not scroll.
+            await p.evaluate(() => {
+              document.documentElement.style.setProperty('--cc-text-scale', '1.5');
+              document.documentElement.dataset.text = 'large';
+            });
+            await p.waitForTimeout(300);
+            const big = await stepperFacts(p);
+            test.info().annotations.push({ type: 'stage chips', description: `${run}, text 150 %: ${big.fit}, ${big.chipLines} line(s), ${big.shown} named` });
+            await p.screenshot({ path: `test-results/fit/text-150-${vp.name}-${lang}-${stageIndex + 1}.png` });
+            expect(big.problems, `${run}, text 150 %`).toEqual([]);
+            expect(big.overflow, `${run}, text 150 %: no sideways strip`).toBe(false);
+            expect(big.unnumbered, `${run}, text 150 %: every compact chip numbered`).toEqual([]);
+            const fb = await focusFacts(p);
+            expect(fb, `${run}, text 150 %: today's focus`).toMatchObject({ lines: 1, overlap: false, cut: false });
           } finally {
             await c.close();
           }
@@ -455,6 +534,8 @@ test('every stage name of the default routine is whole in English and Turkish at
             expect(s.fit, run).toBe('compact');
             expect(s.currentShown, `${run}: the current stage is named`).toBe(true);
             expect(s.chipLines, `${run}: at most two lines of chips`).toBeLessThanOrEqual(2);
+            // Done chips keep their number (with a tick badge), so they can be told apart (S29 review).
+            expect(s.unnumbered, `${run}: every chip shows its number`).toEqual([]);
             if (stageIndex === 12 && vp === DISPLAYS_125[0]) await axe(p, '[data-box="routine"]');
           } finally {
             await c.close();

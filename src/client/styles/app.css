@@ -2753,7 +2753,27 @@ html:has(.cc-classroom) {
   grid-area: goal;
 }
 .cc-routine__head .cc-routine__now-name {
-  font-size: clamp(1.4rem, 4.5cqi, 2.4rem);
+  --cc-now-size: clamp(1.4rem, 4.5cqi, 2.4rem);
+  font-size: var(--cc-now-size);
+}
+/* A long stage name that would take two lines is set smaller on the same line height, so the routine
+   box keeps its height on every stage and the student grid does not jump (S29 review; `fitStageName`
+   in RoutineClassroom.tsx). A name that needs two lines even at the smallest size keeps the big size. */
+.cc-routine__head .cc-routine__now-name[data-fit] {
+  line-height: calc(var(--cc-now-size) * 1.1);
+}
+.cc-routine__head .cc-routine__now-name[data-fit='small'] {
+  font-size: calc(var(--cc-now-size) * 0.85);
+}
+.cc-routine__head .cc-routine__now-name[data-fit='smaller'] {
+  font-size: calc(var(--cc-now-size) * 0.72);
+}
+/* Sizes measured by a fit are the sizes themselves, never a step of a transition (as for the dock and
+   the card fit: the reduced-motion rule gives every property a tiny one; S29 review). */
+.cc-routine__now-name[data-fitting],
+.cc-stepper[data-fitting],
+.cc-stepper[data-fitting] * {
+  transition: none !important;
 }
 .cc-routine__nav {
   display: flex;
@@ -2785,9 +2805,12 @@ html:has(.cc-classroom) {
    - `one`: every name on one line;
    - `two`: the chips share the line, each at least as wide as its longest word, and a longer name takes
      two balanced lines inside its chip (two lines fit in the touch height, so the chip is no taller);
-   - `compact`: the chips other than the current one show only their number (the name stays their
-     accessible name; the stage now is in big type above and its chip keeps its name); a routine with
-     very many stages may then wrap its number chips.
+   - `wrap`: as `two`, but the chips wrap onto further lines; chosen only when the routine box already
+     has the room below the chips (it neither grows nor scrolls), e.g. with a larger text size (S29 review);
+   - `compact`: the chips other than the current one show only their number (a done chip its number
+     with a tick badge; the name stays their accessible name; the stage now is in big type above and its
+     chip keeps its name); a routine of more than about 14 stages then wraps its number chips onto a
+     second line, which can take a card row (an accepted limit, D-200, left to the owner on the display).
    So longer stage names (a Turkish class) never add a chip line that takes a card row from the student
    grid. In a box under 60rem (the default board up to about 1500 px) the chips are a little tighter and
    the "now" word gives way to the current chip's frame (the head says which stage is now). In a box
@@ -2813,14 +2836,14 @@ html:has(.cc-classroom) {
     line-height: 1.2;
     white-space: nowrap;
   }
-  .cc-lesson-box .cc-stepper:is([data-fit='two'], [data-fit='compact']) .cc-stepper__name {
+  .cc-lesson-box .cc-stepper:is([data-fit='two'], [data-fit='wrap'], [data-fit='compact']) .cc-stepper__name {
     white-space: normal;
     overflow-wrap: normal;
     word-break: normal;
     hyphens: manual;
     text-wrap: balance;
   }
-  .cc-lesson-box .cc-stepper[data-fit='compact'] {
+  .cc-lesson-box .cc-stepper:is([data-fit='wrap'], [data-fit='compact']) {
     flex-wrap: wrap;
   }
   .cc-lesson-box .cc-stepper[data-fit='compact'] > li:not([data-state='current']) {
@@ -2837,6 +2860,25 @@ html:has(.cc-classroom) {
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
+  }
+  /* A done compact chip keeps its number, with the tick as a small badge on the circle's corner, so
+     done stages can be told apart (S29 review); the chip is no wider than a number chip. */
+  .cc-lesson-box .cc-stepper[data-fit='compact'] > li[data-state='done'] .cc-stepper__num {
+    position: relative;
+  }
+  .cc-lesson-box .cc-stepper[data-fit='compact'] > li[data-state='done'] .cc-stepper__done-num {
+    display: inline;
+  }
+  .cc-lesson-box .cc-stepper[data-fit='compact'] > li[data-state='done'] .cc-stepper__tick {
+    position: absolute;
+    top: -0.5em;
+    right: -0.6em;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    border: var(--cc-border-width) solid currentColor;
+    background: var(--cc-surface);
+    font-size: 0.62em;
   }
 }
 @container (min-width: 40rem) and (max-width: 60rem) {
@@ -3169,6 +3211,13 @@ html:has(.cc-classroom) {
 }
 .cc-focus__list[data-measuring] > .cc-focus__more[data-unused] {
   display: inline-flex;
+}
+/* Measured widths are the widths themselves, never a step of a transition: the reduced-motion rule
+   gives every property a tiny one, and the first topic, shrunk on the line, was read at 0 px, so all
+   three topics were shown on top of each other (S29 review; as for the dock and the card fit). */
+.cc-focus__list[data-measuring],
+.cc-focus__list[data-measuring] * {
+  transition: none !important;
 }
 .cc-focus__change.cc-btn {
   flex: none;
@@ -3629,6 +3678,13 @@ html:has(.cc-classroom) {
   border: var(--cc-border-width) solid currentColor;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+/* A done chip shows the tick; its number only in the compact fit (S29 review). */
+.cc-stepper__tick {
+  display: contents;
+}
+.cc-stepper__done-num {
+  display: none;
 }
 .cc-stepper li[data-state='done'] .cc-btn {
   color: var(--cc-text-muted);

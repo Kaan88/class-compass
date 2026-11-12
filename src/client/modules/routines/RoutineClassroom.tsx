@@ -7,13 +7,14 @@
  * fills only while Lesson goals is on for the class+subject: this module reads no other module's data
  * and imports nothing from it.
  */
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_ROUTINE_ID, LEARNING_GOAL_STAGE_ID } from '../../../domain/routines.ts';
 import type { LessonState } from '../../../shared/contracts/lessons.ts';
 import { pickText } from '../../../shared/i18n/index.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { Button } from '../../ui/Button.tsx';
+import { useLayoutFit } from '../../ui/useLayoutFit.ts';
 import { IconCheck, IconList, IconNext, IconPrev, IconTarget } from '../../ui/icons.tsx';
 import { lessonQueryOptions, patchLesson, sendLessonCommand, useRoutines } from '../lessons/lessonClient.ts';
 import { FocusTopics } from '../lessons/TopicsClassroom.tsx';
@@ -72,16 +73,20 @@ function revealIn(el: HTMLElement | null, item: Element) {
   else if (r.bottom > box.bottom) el.scrollTop += r.bottom - box.bottom + 8;
 }
 
-/** How the stage chips fit one line (S29, D-200): names on one line, names on two lines, or compact. */
-export const STEPPER_FITS = ['one', 'two', 'compact'] as const;
+/**
+ * How the stage chips fit (S29, D-200): names on one line, names on two lines, the chips with their
+ * names on more than one line of chips when the box has room for that below them (larger text, S29
+ * review), or compact.
+ */
+export const STEPPER_FITS = ['one', 'two', 'wrap', 'compact'] as const;
 export type StepperFit = (typeof STEPPER_FITS)[number];
 
-/** Do the chips of `list`, as laid out now, fit: one line of chips, no name over `maxLines` lines? */
+/** Do the chips of `list`, as laid out now, fit: one line of chips (unless `wrap`), no name over `maxLines` lines? */
 function stepperFits(list: HTMLElement, maxLines: number): boolean {
   if (list.scrollWidth > list.clientWidth + 1) return false;
   for (const name of list.querySelectorAll<HTMLElement>('.cc-stepper__name')) {
     const box = name.getBoundingClientRect();
-    if (box.width === 0) continue; // hidden (compact)
+    if (box.width <= 1) continue; // hidden (compact)
     if (name.scrollWidth > name.clientWidth + 1) return false;
     const line = parseFloat(getComputedStyle(name).lineHeight);
     if (Number.isFinite(line) && box.height > maxLines * line + 1) return false;
@@ -91,17 +96,60 @@ function stepperFits(list: HTMLElement, maxLines: number): boolean {
 
 /**
  * Choose the first fit at which every chip shows its whole name in whole words (S29, D-200): one line
- * of names, then names on up to two balanced lines (the chips keep the touch height), and otherwise
- * `compact`, where the chips other than the current one show only their number (the name stays their
- * accessible name) and the current chip and the stage name above it are shown in full. Sets
- * `data-fit` on the list; in a box narrower than 40rem the chips wrap and every fit looks the same.
+ * of names, then names on up to two balanced lines (the chips keep the touch height); when neither fits
+ * on one line of chips, the chips with their names wrapped onto further lines (`wrap`) if the routine
+ * box has room for them as it is, without growing or scrolling (larger text in a box the board made
+ * high enough, S29 review), and otherwise `compact`, where the chips other than the current one show
+ * only their number (the name stays their accessible name) and the current chip and the stage name
+ * above it are shown in full. Sets `data-fit` on the list; in a box narrower than 40rem the chips wrap
+ * and every fit looks the same. While it measures, `data-fitting` turns transitions off, so no size is
+ * read in the middle of one (the reduced-motion rule gives every property a tiny one; S29 review).
  */
 export function fitStepper(list: HTMLElement): StepperFit {
-  for (const fit of STEPPER_FITS) {
-    list.dataset.fit = fit;
-    if (fit === 'compact' || stepperFits(list, fit === 'one' ? 1 : 2)) return fit;
+  list.dataset.fitting = '';
+  try {
+    for (const fit of ['one', 'two'] as const) {
+      list.dataset.fit = fit;
+      if (stepperFits(list, fit === 'one' ? 1 : 2)) return fit;
+    }
+    list.dataset.fit = 'compact';
+    const box = list.closest<HTMLElement>('.cc-lesson-box');
+    const body = list.closest<HTMLElement>('.cc-lesson-box__body');
+    if (!box || !body) return 'compact';
+    const height = box.getBoundingClientRect().height;
+    const scrolls = body.scrollHeight > body.clientHeight + 1;
+    list.dataset.fit = 'wrap';
+    if (!scrolls && stepperFits(list, 2) && box.getBoundingClientRect().height <= height + 0.5 && body.scrollHeight <= body.clientHeight + 1) return 'wrap';
+    list.dataset.fit = 'compact';
+    return 'compact';
+  } finally {
+    delete list.dataset.fitting;
   }
-  return 'compact';
+}
+
+/** Head stage-name sizes: the big size, then two smaller ones on the same line height (S29 review). */
+const STAGE_NAME_FITS = ['', 'small', 'smaller'] as const;
+
+/**
+ * Keep the big stage name above the chips to one line when a smaller size on the same line height
+ * does it (S29 review): a long Turkish name ("Tarih ve hava durumu" at 1280×720) used to take two
+ * lines, so the routine box grew on that stage only and the student grid lost a row of cards and jumped
+ * back on the next stage. A name that needs two lines even at the smallest size keeps the big size.
+ */
+export function fitStageName(name: HTMLElement): void {
+  name.dataset.fitting = '';
+  try {
+    for (const fit of STAGE_NAME_FITS) {
+      if (fit) name.dataset.fit = fit;
+      else delete name.dataset.fit;
+      const line = parseFloat(getComputedStyle(name).lineHeight);
+      const height = name.getBoundingClientRect().height;
+      if (!Number.isFinite(line) || height <= line * 1.5) return;
+    }
+    delete name.dataset.fit;
+  } finally {
+    delete name.dataset.fitting;
+  }
 }
 
 /**
@@ -119,31 +167,10 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
   const stages = lesson.routine.stages;
   const idx = lesson.stageIndex;
   const stageNames = stages.map((s) => pickText(s.name, locale)).join('\n');
-  // The fit runs before paint, again when the list's width changes and once the fonts have loaded.
-  useLayoutEffect(() => {
-    const list = listRef.current;
-    if (!list) return;
-    fitStepper(list);
-    let width = list.clientWidth;
-    let alive = true;
-    void document.fonts?.ready.then(() => {
-      if (alive) fitStepper(list);
-    });
-    if (typeof ResizeObserver === 'undefined')
-      return () => {
-        alive = false;
-      };
-    const ro = new ResizeObserver(() => {
-      if (list.clientWidth === width) return;
-      width = list.clientWidth;
-      fitStepper(list);
-    });
-    ro.observe(list);
-    return () => {
-      alive = false;
-      ro.disconnect();
-    };
-  }, [idx, stageNames]);
+  const nameRef = useRef<HTMLSpanElement | null>(null);
+  // The fits run before paint and again when the width, the fonts or the display settings change.
+  useLayoutFit(listRef, fitStepper, [idx, stageNames]);
+  useLayoutFit(nameRef, fitStageName, [idx, stageNames]);
   // Read from the lesson state the board already polls (no fetch of its own): null while Lesson goals is off.
   const goalText = useQuery({ ...lessonQueryOptions(lesson.contextId), enabled: false, refetchInterval: false, refetchOnWindowFocus: false, select: (q) => q.data.lessonGoal?.text ?? null }).data ?? null;
   useEffect(() => {
@@ -176,7 +203,7 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
             {pickText(lesson.routine.name, locale) || t('routine.title')}
           </h2>
           <span className="cc-routine__now-label">{t('routine.now', { n: idx + 1, total: stages.length })}</span>
-          <span className="cc-routine__now-name">{current ? pickText(current.name, locale) : ''}</span>
+          <span ref={nameRef} className="cc-routine__now-name">{current ? pickText(current.name, locale) : ''}</span>
           {goalStage && lesson.topics.length ? (
             <div className="cc-routine__focus" data-testid="stage-focus">
               <span className="cc-routine__now-label">{t('lesson.topic.todaysFocus')}</span>
@@ -214,7 +241,11 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
                 <span className="cc-stepper__num">
                   {state === 'done' ? (
                     <>
-                      <IconCheck />
+                      {/* A compact chip shows the number with the tick as a badge (S29 review), so done stages stay apart. */}
+                      <span className="cc-stepper__tick">
+                        <IconCheck />
+                      </span>
+                      <span className="cc-stepper__done-num">{i + 1}</span>
                       <span className="cc-visually-hidden">{t('routine.stageDone')}</span>
                     </>
                   ) : (

@@ -10,7 +10,7 @@
  * first are hidden on screen behind "+N" (still read by screen readers) and Change is an icon button,
  * so three topics no longer take a second line from the student grid.
  */
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as L from '../../../shared/contracts/lessons.ts';
 import type { LessonTopic } from '../../../shared/contracts/lessons.ts';
@@ -22,6 +22,7 @@ import { Button, IconButton } from '../../ui/Button.tsx';
 import { DialogActions, Modal } from '../../ui/Dialog.tsx';
 import { IconBook, IconCheck, IconPencil } from '../../ui/icons.tsx';
 import { TopicPicto } from '../../ui/pictos.tsx';
+import { useLayoutFit } from '../../ui/useLayoutFit.ts';
 import { startStep, type ClassroomContext, type DashboardSlot, type DashboardSlotProps, type StartStepProps } from '../types.ts';
 import { patchLesson, sendLessonCommand } from './lessonClient.ts';
 
@@ -165,32 +166,26 @@ export function FocusTopics({ topics, size = '1.8em', oneLine = false }: { topic
   const ref = useRef<HTMLUListElement | null>(null);
   const [shown, setShown] = useState(topics.length);
   const names = topics.map((tp) => pickText(tp.name, locale)).join('\n');
-  useLayoutEffect(() => {
-    const list = ref.current;
-    if (!oneLine || !list) {
-      setShown(topics.length);
-      return;
-    }
-    const fit = () => {
-      // Measure every topic and the marker at their natural width, then hide what does not fit.
+  // Before paint, and again when the width, the fonts or the display settings change (S29 review).
+  useLayoutFit(
+    ref,
+    (list) => {
+      if (!oneLine) {
+        setShown(topics.length);
+        return;
+      }
+      // Measure every topic and the marker at their natural width (no transition: `data-measuring`
+      // turns them off, so reduced motion cannot hand over a size in the middle of one), then hide
+      // what does not fit.
       list.dataset.measuring = '';
       const widths = [...list.querySelectorAll<HTMLElement>(':scope > .cc-focus__topic')].map((li) => li.getBoundingClientRect().width);
       const more = list.querySelector<HTMLElement>(':scope > .cc-focus__more')?.getBoundingClientRect().width ?? 0;
       delete list.dataset.measuring;
       const gap = parseFloat(getComputedStyle(list).columnGap) || 0;
       setShown(topicsThatFit(widths, gap, more, list.clientWidth));
-    };
-    fit();
-    if (typeof ResizeObserver === 'undefined') return;
-    let width = list.clientWidth;
-    const ro = new ResizeObserver(() => {
-      if (list.clientWidth === width) return;
-      width = list.clientWidth;
-      fit();
-    });
-    ro.observe(list);
-    return () => ro.disconnect();
-  }, [oneLine, names, topics.length]);
+    },
+    [oneLine, names, topics.length],
+  );
   const hidden = oneLine ? topics.length - Math.min(shown, topics.length) : 0;
   return (
     <ul ref={ref} className="cc-focus__list" data-one-line={oneLine ? '' : undefined}>
