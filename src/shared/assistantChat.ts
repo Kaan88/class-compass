@@ -57,8 +57,8 @@ export const ASSISTANT_DEACTIVATED_GRACE_DAYS = 30;
 export const ASSISTANT_UNAVAILABLE = ['OFF', 'AI_TOOLS_OFF', 'NO_CONNECTION'] as const;
 export type AssistantUnavailable = (typeof ASSISTANT_UNAVAILABLE)[number];
 
-/** How an answer ended: complete, waiting for the teacher's Yes/No, stopped by the teacher, failed, or stopped by the screen lock. */
-export const ASSISTANT_RUN_ENDS = ['complete', 'awaiting', 'cancelled', 'error', 'locked'] as const;
+/** How an answer ended: complete, waiting for the teacher's Yes/No, stopped by the teacher, or failed. A PIN lock does not end it (D-204). */
+export const ASSISTANT_RUN_ENDS = ['complete', 'awaiting', 'cancelled', 'error'] as const;
 export type AssistantRunEnd = (typeof ASSISTANT_RUN_ENDS)[number];
 
 /**

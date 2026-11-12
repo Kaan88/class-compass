@@ -407,6 +407,14 @@ function PickChat({ status }: { status: AssistantStatus }) {
   );
 }
 
+/**
+ * Runs whose event stream broke before their end (a PIN lock closes it, D-204), by chat: the run goes
+ * on behind the lock, and after the unlock the page reads the events it missed, so an end that is only
+ * an event (the round limit, a switch turned off, a connection over budget) still gets its note.
+ * Module-level because the lock screen unmounts the chat.
+ */
+const brokenRuns = new Map<string, { runId: string; seq: number }>();
+
 /** What is streaming now: text and calls per assistant message, until the stored chat catches up. */
 interface Live {
   runId: string;
@@ -445,19 +453,22 @@ function ChatView({
   const listRef = useRef<HTMLOListElement | null>(null);
 
   const follow = useCallback(
-    async (runId: string) => {
+    async (runId: string, after = 0, resumed = false) => {
       abort.current?.abort();
       const ctl = new AbortController();
       abort.current = ctl;
       setNote(null);
-      const state: Live = { runId, seq: 0, texts: {}, order: [], calls: {} };
+      brokenRuns.delete(chatId);
+      const state: Live = { runId, seq: after, texts: {}, order: [], calls: {} };
+      let seen = after;
       setLive(state);
       let end: Extract<AssistantRunEvent, { type: "end" }> | null = null;
       try {
         await readRun(
           runId,
-          0,
+          after,
           (e) => {
+            seen = Math.max(seen, e.seq);
             setLive((prev) => {
               const cur = prev && prev.runId === runId ? prev : state;
               if (e.seq <= cur.seq) return cur;
@@ -499,6 +510,9 @@ function ChatView({
         // The stream broke (network, lock, Stop): the stored chat below is the truth.
       }
       if (ctl.signal.aborted && abort.current !== ctl) return;
+      // Broken before its end (the server closed it on a lock, the network, or the lock screen unmounted
+      // the chat; Stop still ends with an end event): read the rest once the chat shows again.
+      if (!end && !resumed) brokenRuns.set(chatId, { runId, seq: seen });
       await Promise.all([
         qc.invalidateQueries({ queryKey: chatKey(chatId) }),
         qc.invalidateQueries({ queryKey: LIST_KEY }),
@@ -519,6 +533,13 @@ function ChatView({
   useEffect(() => {
     if (runId && !liveRef.current) void follow(runId);
   }, [runId, follow]);
+  // A run whose stream broke (the screen locked) and that has ended since: read the events it missed
+  // once, for its end note (the server keeps a finished run's events for a while; a 404 shows nothing).
+  const loaded = !!q.data;
+  useEffect(() => {
+    const broken = brokenRuns.get(chatId);
+    if (loaded && !runId && broken && !liveRef.current) void follow(broken.runId, broken.seq, true);
+  }, [loaded, runId, chatId, follow]);
   useEffect(() => () => abort.current?.abort(), []);
 
   const detail = q.data;

@@ -1,8 +1,8 @@
 /**
  * The assistant's agent loop (S19b, D-180). One run writes one answer:
  *
- * 1. Before every model request: the teacher's session is still signed in and unlocked (a locked
- *    classroom device stops the run), the connection is still usable (paused, over budget), and the
+ * 1. Before every model request: the teacher's session is still signed in (a signed-out or ended
+ *    session stops the run; a PIN lock does not, the run finishes behind it, D-204), the connection is still usable (paused, over budget), and the
  *    chat is compacted when it would not fit (`maybeCompact`).
  * 2. The model gets the system prompt, the chat as stored (pseudonyms while the student-data switch is
  *    off) and the tools this teacher may use (`assistantTools`), through `streamChat` (D-179).
@@ -405,8 +405,9 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
   try {
     for (let round = 0; ; round += 1) {
       if (run.abort.signal.aborted) return finish('cancelled');
-      const gate = sessionGate(ctx, ctx.session?.id ?? null, user.id);
-      if (gate !== 'ok') return finish(gate === 'locked' ? 'locked' : 'error', gate === 'locked' ? 'PIN_REQUIRED' : 'SESSION_ENDED');
+      // A PIN lock does not stop the run (D-204): it goes on behind the lock (the stream sends nothing
+      // while locked, a change still waits for the teacher's Yes); a signed-out or ended session does.
+      if (sessionGate(ctx, ctx.session?.id ?? null, user.id) === 'gone') return finish('error', 'SESSION_ENDED');
       if (round >= ASSISTANT_MAX_ROUNDS) return finish('complete', 'ASSISTANT_MAX_ROUNDS');
       // An administrator switched the assistant, AI tools or student data off (or on) since: stop here.
       const stop = stopReason(ctx, user, p);
@@ -559,7 +560,7 @@ export async function runAgent(a: AgentEnv, s: RunInput): Promise<void> {
           continue;
         }
         if (run.abort.signal.aborted) break;
-        if (sessionGate(ctx, ctx.session?.id ?? null, user.id) !== 'ok') break;
+        if (sessionGate(ctx, ctx.session?.id ?? null, user.id) === 'gone') break;
         if (stopReason(ctx, user, p)) break;
         a.registry.emit(run, { type: 'tool', messageId, call: callView(p, look, c, undefined, s.chatId) });
         const resolved = resolveAttachmentArgs(db, s.chatId, tool.name, c.arguments);

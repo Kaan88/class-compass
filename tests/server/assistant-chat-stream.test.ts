@@ -5,16 +5,17 @@
  * once, and a failed thinking reply still counts its reasoning; `insufficient_system_resource` after
  * text fails and keeps the text; the reasoning goes back with a tool-call message during the same run
  * for OpenAI-compatible and OpenRouter connections only, and is never stored; the server's warn line for
- * a failed provider call holds facts only, never chat content (AI-1, PRIV-1).
+ * a failed provider call holds facts only, never chat content (AI-1, PRIV-1). D-204: a PIN lock during the answer
+ * no longer ends the run (read tools run, changes wait for the Yes, nothing shown while locked; PIN-7).
  */
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { aiConnectionUsage, assistantMessages } from '../../src/server/db/schema.ts';
+import { aiConnectionUsage, assistantMessages, homeworkAssignments, sessions } from '../../src/server/db/schema.ts';
 import { settleRuns } from '../../src/server/modules/assistantChat/routes.ts';
 import { FAKE_KEYS, FakeProvider } from '../ai-fake.ts';
 import { script, type Turn } from '../assistant-fake.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
-import { setAi } from '../mcp-helpers.ts';
+import { PASSWORD, setAi } from '../mcp-helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 
 const API = '/api/teacher/assistant-chat';
@@ -215,6 +216,100 @@ describe('D-203: the failure log line', () => {
       const all = logs.join('\n');
       for (const secret of [SECRET_QUESTION, 'volcano', 'volcanoes', SECRET_REASONING, 'Defne', 'Yıldız', 'Student 1', 'assistant inside Class Compass', FAKE_KEYS.compatible, FAKE_KEYS.openai, 'must never be shown']) {
         expect(all, secret).not.toContain(secret);
+      }
+    });
+  });
+});
+
+describe('D-204: a PIN lock during the answer', () => {
+  /** A classroom device of teacher A (ayse.teacher), unlocked with its PIN. */
+  async function classroomDevice() {
+    const t = new Client(env);
+    await t.login('ayse.teacher');
+    await ok(t.post('/api/auth/pin', { currentPassword: PASSWORD, pin: '2468' }));
+    await ok(t.post('/api/classroom/enter'));
+    await ok(t.post('/api/auth/pin/unlock', { pin: '2468' }));
+    return t;
+  }
+  /** What the device's 5-minute unlock running out does: the session is locked, nothing else changes. */
+  const lockDevice = () => env.db.update(sessions).set({ pinUnlockedUntil: 0 }).where(eq(sessions.classroomMode, true)).run();
+
+  it('lets the answer finish behind the lock: the read tool runs, the stream sends nothing while locked, the finished answer is there after unlocking', async () => {
+    await withAssistant(async () => {
+      const t = await classroomDevice();
+      try {
+        const seen = script(fake, [
+          () => {
+            // The model thinks longer than the unlock lasts (the 2026-11-12 report): the device locks before the tool step.
+            lockDevice();
+            return { reasoning: 'r'.repeat(400), text: 'Let me look.', calls: [{ name: 'class_roster', args: { contextId: s.ctxA.id } }] };
+          },
+          () => ({ text: 'Three students in 3-A.' }),
+        ]);
+        const chat = await ok(t.post(`${API}/chats`, { connectionId: conn.openaiCompatible, model: 'deepseek-v4-pro' }));
+        const { runId } = await ok(t.post(`${API}/chats/${chat.id}/messages`, { text: 'Who is in 3-A?' }));
+        await settleRuns(env.app);
+        // Locked: the stream and the chat answer 423, so nothing of the answer reaches the locked screen.
+        expect((await t.get(`${API}/runs/${runId}/events?after=0`)).status).toBe(423);
+        expect((await t.get(`${API}/chats/${chat.id}`)).status).toBe(423);
+        expect(seen).toHaveLength(2);
+        await ok(t.post('/api/auth/pin/unlock', { pin: '2468' }));
+        const d = await ok(t.get(`${API}/chats/${chat.id}`));
+        expect(d.runId ?? null).toBeNull();
+        expect(d.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'assistant']);
+        expect(d.messages[1].calls).toEqual([expect.objectContaining({ tool: 'class_roster', state: 'auto', failed: false })]);
+        expect(d.messages[2]).toMatchObject({ text: 'Three students in 3-A.', errorCode: null });
+      } finally {
+        await settleRuns(env.app);
+        await t.post('/api/classroom/leave', {});
+      }
+    });
+  });
+
+  it('a change still waits for the Yes: behind the lock the card stays pending and nothing is written', async () => {
+    await withAssistant(async () => {
+      const t = await classroomDevice();
+      try {
+        script(fake, [
+          () => {
+            lockDevice();
+            return { text: 'I can set it.', calls: [{ name: 'create_homework', args: { contextId: s.ctxA.id, title: 'Locked screen homework', dueOn: '2026-11-20' } }] };
+          },
+        ]);
+        const chat = await ok(t.post(`${API}/chats`, { connectionId: conn.openaiCompatible, model: 'deepseek-v4-pro' }));
+        await ok(t.post(`${API}/chats/${chat.id}/messages`, { text: 'Set homework' }));
+        await settleRuns(env.app);
+        expect(env.db.select().from(homeworkAssignments).where(eq(homeworkAssignments.title, 'Locked screen homework')).all()).toEqual([]);
+        await ok(t.post('/api/auth/pin/unlock', { pin: '2468' }));
+        const d = await ok(t.get(`${API}/chats/${chat.id}`));
+        expect(d.messages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
+        expect(d.messages[1].calls).toEqual([expect.objectContaining({ tool: 'create_homework', state: 'pending' })]);
+      } finally {
+        await settleRuns(env.app);
+        await t.post('/api/classroom/leave', {});
+      }
+    });
+  });
+
+  it('a signed-out session still ends the run before the tool step (SESSION_ENDED)', async () => {
+    await withAssistant(async () => {
+      const t = await classroomDevice();
+      try {
+        const seen = script(fake, [
+          () => {
+            env.db.update(sessions).set({ revokedAt: 1 }).where(eq(sessions.classroomMode, true)).run();
+            return { text: 'Let me look.', calls: [{ name: 'class_roster', args: { contextId: s.ctxA.id } }] };
+          },
+          () => ({ text: 'Never asked.' }),
+        ]);
+        const chat = await ok(t.post(`${API}/chats`, { connectionId: conn.openaiCompatible, model: 'deepseek-v4-pro' }));
+        await ok(t.post(`${API}/chats/${chat.id}/messages`, { text: 'Who is in 3-A?' }));
+        await settleRuns(env.app);
+        expect(seen).toHaveLength(1);
+        const rows = env.db.select().from(assistantMessages).where(eq(assistantMessages.chatId, chat.id)).all();
+        expect(rows.map((r) => r.role)).toEqual(['user', 'assistant']);
+      } finally {
+        await settleRuns(env.app);
       }
     });
   });

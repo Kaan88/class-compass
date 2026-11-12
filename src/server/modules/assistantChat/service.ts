@@ -127,7 +127,7 @@ export function sendMessage(a: AgentEnv, ctx: RequestContext, input: z.infer<typ
 }
 
 function start(a: AgentEnv, ctx: RequestContext, chatId: string, run: Run, used: { row: Parameters<typeof runAgent>[1]['connection']; model: string }, p: AssistantPrivacy) {
-  // The run outlives the request; it ends on its own, on Stop, or when the session locks or ends.
+  // The run outlives the request; it ends on its own, on Stop, or when the session ends (a PIN lock does not end it, D-204).
   void runAgent(a, { ctx, chatId, run, connection: used.row, model: used.model, privacy: p });
 }
 

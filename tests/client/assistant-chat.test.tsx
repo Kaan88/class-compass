@@ -276,6 +276,30 @@ describe('assistant page (S19b, D-180)', () => {
     expect(failureText((k) => translate('en', k), 'something the provider said')).toBe(translate('en', 'common.error'));
   });
 
+  it('D-204: a stream broken by the PIN lock is read on from where it broke once the chat shows again, so an end that is only an event gets its note', async () => {
+    answers['GET /api/teacher/assistant-chat/chats/:chatId'] = detail({ messages: [], runId: RUN });
+    const urls: string[] = [];
+    const fetch = vi.fn(async (url: string) => {
+      urls.push(url);
+      if (urls.length === 1) {
+        // The lock closes the stream after one piece; behind it the run ends with only an end event.
+        answers['GET /api/teacher/assistant-chat/chats/:chatId'] = detail({ messages: [], runId: null });
+        return new Response(`data: ${JSON.stringify({ type: 'text', seq: 1, messageId: BOT_MSG, text: 'Let me' })}
+
+`, { status: 200 });
+      }
+      return new Response(`data: ${JSON.stringify({ type: 'end', seq: 2, end: 'error', reason: 'AI_DAILY_LIMIT' })}
+
+`, { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetch);
+    wrap(<AssistantChatPage search={{ chat: CHAT }} />);
+    expect(await screen.findByText(/You have reached today’s message limit for this connection/)).toBeTruthy();
+    expect(urls).toHaveLength(2);
+    expect(urls[1]).toContain(`/runs/${RUN}/events`);
+    expect(urls[1]).toContain('after=1');
+  });
+
   it('readRun stops at the end event and skips blocks that are not data', async () => {
     vi.stubGlobal('fetch', sse([': heartbeat\n\n', { type: 'text', seq: 1, messageId: BOT_MSG, text: 'a' }, { type: 'end', seq: 2, end: 'awaiting', reason: null }, { type: 'text', seq: 3, messageId: BOT_MSG, text: 'late' }]));
     const seen: unknown[] = [];
