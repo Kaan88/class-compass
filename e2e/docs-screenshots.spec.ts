@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Page, type Response } from '@playwright/test';
 import { translate, type Locale, type MessageKey } from '../src/shared/i18n/index.ts';
 // Every dictionary registered, staff strings included (S23a, D-182).
 import '../tests/messages.ts';
@@ -24,6 +24,9 @@ import '../src/shared/i18n/areas/assistantChat.ts';
 import { FAKE_KEYS, FakeProvider } from '../tests/ai-fake.ts';
 import { lastToolResult, script } from '../tests/assistant-fake.ts';
 import { api, ensurePin, login, openDock, PASSWORD, PIN, studentLinkUrl } from './helpers.ts';
+
+/** The POST that "New chat" sends (its response carries the new chat's id). */
+const isCreateChat = (r: Response) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/teacher/assistant-chat/chats';
 
 const IMG_ROOT = path.resolve(import.meta.dirname, '../docs/guides/img');
 
@@ -172,6 +175,7 @@ for (const lang of ['en', 'tr'] as const) {
     let videoOn = false;
     let draftKey: string | null = null;
     let adminChatId: string | null = null;
+    let camPhone: BrowserContext | null = null;
 
     try {
       // ---------------------------------------------------------------- teacher area
@@ -351,9 +355,11 @@ for (const lang of ['en', 'tr'] as const) {
           },
         ]);
         await tp.goto('/teacher/ai-assistant');
+        // The id comes from the create response, so `finally` deletes the chat even if a later step fails.
+        const teacherCreated = tp.waitForResponse(isCreateChat);
         await tp.getByTestId('assistant-new-chat').click();
+        chatId = ((await (await teacherCreated).json()) as { id: string }).id;
         await expect(tp.getByTestId('assistant-suggestions')).toBeVisible();
-        chatId = new URL(tp.url()).searchParams.get('chat');
         const composer = tp.getByLabel(T('assistantChat.composer' as MessageKey));
         await composer.fill(text.ask);
         await tp.getByTestId('assistant-send').click();
@@ -377,7 +383,7 @@ for (const lang of ['en', 'tr'] as const) {
             ? {
                 ask: 'Bir öğretmenin tema taslağını nasıl açarım?',
                 answer:
-                  '## Bir tema taslağını açmak\n\nTaslak hiçbir sınıfa kendiliğinden verilmez. Siz karar verirsiniz:\n\n1. **Temalar** sayfasını açın.\n2. Taslağın yanındaki **Önizleme** ile renklere ve seslere bakın.\n3. Gerekirse öneren öğretmenle konuşun.\n4. **Etkinleştir** ya da **Sil** seçin.\n\n| Kim | Ne yapabilir |\n|---|---|\n| Öğretmen | Taslak önerir (en çok 5) |\n| Yönetici | Önizler, etkinleştirir, siler |\n\n*Bunu ben yapamam:* bir temayı etkinleştirmek her zaman sizin adımınızdır.',
+                  '## Bir tema taslağını açmak\n\nTaslak hiçbir sınıfa kendiliğinden verilmez. Siz karar verirsiniz:\n\n1. **Temalar** sayfasını açın.\n2. Taslağın yanındaki **Önizle** ile renklere ve seslere bakın.\n3. Gerekirse öneren öğretmenle konuşun.\n4. **Aç** ya da **Sil**\'e basın.\n\n| Kim | Ne yapabilir |\n|---|---|\n| Öğretmen | Taslak önerir (en çok 5) |\n| Yönetici | Önizler, açar, siler |\n\n*Bunu ben yapamam:* bir temayı açmak her zaman sizin adımınızdır.',
               }
             : {
                 ask: 'How do I enable a teacher’s theme draft?',
@@ -386,9 +392,10 @@ for (const lang of ['en', 'tr'] as const) {
               };
         script(fake, [() => ({ text: how.answer })]);
         await ap.goto('/admin/ai-assistant');
+        const adminCreated = ap.waitForResponse(isCreateChat);
         await ap.getByTestId('assistant-new-chat').click();
+        adminChatId = ((await (await adminCreated).json()) as { id: string }).id;
         await ap.waitForURL(/[?&]chat=/u);
-        adminChatId = new URL(ap.url()).searchParams.get('chat');
         await ap.getByLabel(T('assistantChat.composer' as MessageKey)).fill(how.ask);
         await ap.getByTestId('assistant-send').click();
         const adminAnswer = ap.getByTestId('assistant-message-assistant').last();
@@ -739,7 +746,8 @@ for (const lang of ['en', 'tr'] as const) {
         expect((await api(ap, 'PUT', '/api/admin/module-policies/media.evidenceVideo', { availability: 'enabled' })).status).toBe(200);
         videoOn = true;
         {
-          const camPhone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true, permissions: ['camera', 'microphone'] });
+          // Closed in `finally` too, so a failed step does not leave the fake camera open.
+          camPhone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true, permissions: ['camera', 'microphone'] });
           await camPhone.addInitScript((l) => localStorage.setItem('cc.studentLocale', l), lang);
           const vp = await camPhone.newPage();
           await vp.goto(url);
@@ -766,9 +774,11 @@ for (const lang of ['en', 'tr'] as const) {
           await recorder.getByRole('button', { name: T('student.audio.stop'), exact: true }).click();
           await expect(recorder).toHaveAttribute('data-phase', 'recorded');
           await camPhone.close();
+          camPhone = null;
         }
       }
     } finally {
+      await camPhone?.close();
       // AI tools are off in the demo school; switching them off also ends the example connection (D-160).
       if (chatId) await api(tp, 'DELETE', `/api/teacher/assistant-chat/chats/${chatId}`);
       if (adminChatId) await api(ap, 'DELETE', `/api/teacher/assistant-chat/chats/${adminChatId}`);
