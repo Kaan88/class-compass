@@ -197,6 +197,27 @@ describe('OpenAI-compatible addresses', () => {
     await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
   });
 
+  it('review of the audit fixes (point 4): a test request that fails after the provider reported usage still records it', async () => {
+    const v = await okBody(create(s.admin, { type: 'openaiCompatible', name: 'Breaks midway', baseUrl: `${base}/v1`, localNetwork: true, apiKey: FAKE_KEYS.compatible, models: ['local-breaks'] }));
+    // The usage chunk arrives, then the connection breaks before the reply ends.
+    fake.override = (r, res) => {
+      if (!r.path.endsWith('/chat/completions')) return false;
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: 're' } }], usage: { prompt_tokens: 31, completion_tokens: 2 } })}\n\n`);
+      setTimeout(() => res.socket?.destroy(), 30);
+      return true;
+    };
+    try {
+      const t = await okBody(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'local-breaks' }));
+      expect(t).toMatchObject({ ok: false, text: false, tools: false });
+    } finally {
+      fake.override = null;
+    }
+    const after = (await okBody(s.admin.get('/api/admin/ai-connections'))).connections.find((c: any) => c.id === v.id);
+    expect(after.usage).toMatchObject({ monthInputTokens: 31, monthOutputTokens: 2 });
+    await okBody(s.admin.del(`/api/admin/ai-connections/${v.id}`));
+  });
+
   it('a rejected key is reported as such, without the provider’s text', async () => {
     const v = await okBody(create(s.admin, { type: 'openai', name: 'OpenAI', apiKey: 'sk-wrong-fake-key-S19A-0000' }));
     const t = await okBody(s.admin.post(`/api/admin/ai-connections/${v.id}/test`, { model: 'fake-model' }));

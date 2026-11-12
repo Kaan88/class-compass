@@ -69,6 +69,10 @@ export const anthropicAdapter: Adapter = async function* (req) {
   let stop: StopReason = 'other';
   let blocked = false;
   let finished = false;
+  // The stop reason as sent, and whether anything was written (an abnormal empty end is a failure).
+  let reason: string | null = null;
+  let wrote = false;
+  let called = false;
   for await (const ev of sseEvents(res.body)) {
     let d: any;
     try {
@@ -85,10 +89,16 @@ export const anthropicAdapter: Adapter = async function* (req) {
     } else if (type === 'content_block_start') {
       const b = d.content_block ?? {};
       if (b.type === 'tool_use') blocks.set(Number(d.index), { id: String(b.id ?? `call_${d.index}`), name: String(b.name ?? ''), json: '' });
-      else if (b.type === 'text' && typeof b.text === 'string' && b.text) yield { type: 'text', text: b.text };
+      else if (b.type === 'text' && typeof b.text === 'string' && b.text) {
+        wrote = true;
+        yield { type: 'text', text: b.text };
+      }
     } else if (type === 'content_block_delta') {
       const delta = d.delta ?? {};
-      if (delta.type === 'text_delta' && typeof delta.text === 'string') yield { type: 'text', text: delta.text };
+      if (delta.type === 'text_delta' && typeof delta.text === 'string') {
+        if (delta.text) wrote = true;
+        yield { type: 'text', text: delta.text };
+      }
       else if (delta.type === 'input_json_delta') {
         const b = blocks.get(Number(d.index));
         if (b) b.json += String(delta.partial_json ?? '');
@@ -97,6 +107,7 @@ export const anthropicAdapter: Adapter = async function* (req) {
       const b = blocks.get(Number(d.index));
       if (b) {
         blocks.delete(Number(d.index));
+        called = true;
         yield { type: 'toolCall', call: toolCall(b.id, b.name, b.json) };
       }
     } else if (type === 'message_delta') {
@@ -105,7 +116,8 @@ export const anthropicAdapter: Adapter = async function* (req) {
         yield { type: 'usage', inputTokens: input, outputTokens: output };
       }
       if (d.delta?.stop_reason) {
-        stop = STOP[String(d.delta.stop_reason)] ?? 'other';
+        reason = String(d.delta.stop_reason);
+        stop = STOP[reason] ?? 'other';
         blocked = BLOCKED.has(String(d.delta.stop_reason));
       }
     } else if (type === 'message_stop') {
@@ -117,5 +129,8 @@ export const anthropicAdapter: Adapter = async function* (req) {
   }
   if (!finished) throw new AiCallError('BAD_RESPONSE');
   if (blocked) throw new AiCallError('BLOCKED');
+  // Another stop reason (pause_turn, model_context_window_exceeded, an unknown one, none) with neither
+  // text nor tool calls is a failure, not an empty finished answer (as in the OpenAI and Gemini adapters).
+  if (!wrote && !called && (reason === null || STOP[reason] === undefined)) throw new AiCallError('PROVIDER_ERROR');
   yield { type: 'done', stop };
 };

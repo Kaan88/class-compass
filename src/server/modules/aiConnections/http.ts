@@ -30,11 +30,18 @@ export const AI_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 export class AiCallError extends Error {
   readonly failure: AiFailure;
   readonly httpStatus: number | null;
-  constructor(failure: AiFailure, httpStatus: number | null = null) {
+  /**
+   * Whether the request may have reached the provider: false when it failed before a connection was
+   * made (refused address, unreachable host, stopped before sending) or before any provider request
+   * (no key, a token that could not be refreshed). Token counting uses it: nothing sent counts nothing.
+   */
+  readonly sent: boolean;
+  constructor(failure: AiFailure, httpStatus: number | null = null, sent = true) {
     super(`AI provider call failed: ${failure}${httpStatus ? ` (HTTP ${httpStatus})` : ''}`);
     this.name = 'AiCallError';
     this.failure = failure;
     this.httpStatus = httpStatus;
+    this.sent = sent;
   }
 }
 
@@ -78,16 +85,18 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
     try {
       u = new URL(req.url);
     } catch {
-      return reject(new AiCallError('URL_NOT_ALLOWED'));
+      return reject(new AiCallError('URL_NOT_ALLOWED', null, false));
     }
-    if ((u.protocol !== 'https:' && u.protocol !== 'http:') || u.username || u.password) return reject(new AiCallError('URL_NOT_ALLOWED'));
-    if (u.protocol === 'http:' && req.policy !== 'local') return reject(new AiCallError('URL_NOT_ALLOWED'));
+    if ((u.protocol !== 'https:' && u.protocol !== 'http:') || u.username || u.password) return reject(new AiCallError('URL_NOT_ALLOWED', null, false));
+    if (u.protocol === 'http:' && req.policy !== 'local') return reject(new AiCallError('URL_NOT_ALLOWED', null, false));
     const host = u.hostname.replace(/^\[|\]$/gu, '');
     // A literal address never goes through `lookup`, so it is checked here.
-    if (net.isIP(host) && !addressAllowed(host, req.policy)) return reject(new AiCallError('URL_NOT_ALLOWED'));
-    if (req.signal?.aborted) return reject(new AiCallError('TIMEOUT'));
+    if (net.isIP(host) && !addressAllowed(host, req.policy)) return reject(new AiCallError('URL_NOT_ALLOWED', null, false));
+    if (req.signal?.aborted) return reject(new AiCallError('TIMEOUT', null, false));
     const lib = u.protocol === 'https:' ? https : http;
     let settled = false;
+    // Set once the socket is connected (and TLS is set up): a failure before it never reached the provider.
+    let connected = false;
     const connectMs = req.connectTimeoutMs ?? AI_CONNECT_TIMEOUT_MS;
     let connecting: ReturnType<typeof setTimeout> | undefined;
     const fail = (e: unknown) => {
@@ -95,7 +104,8 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
       clearTimeout(connecting);
       if (settled) return;
       settled = true;
-      reject(e instanceof AiCallError ? e : (e as Error)?.name === 'AddressRefused' || e instanceof AddressRefused ? new AiCallError('URL_NOT_ALLOWED') : new AiCallError('UNREACHABLE'));
+      const failure: AiFailure = e instanceof AiCallError ? e.failure : (e as Error)?.name === 'AddressRefused' || e instanceof AddressRefused ? 'URL_NOT_ALLOWED' : 'UNREACHABLE';
+      reject(e instanceof AiCallError && connected ? e : new AiCallError(failure, e instanceof AiCallError ? e.httpStatus : null, connected));
     };
     const r = lib.request(
       u,
@@ -142,8 +152,13 @@ export function aiRequest(req: AiHttpRequest): Promise<AiHttpResponse> {
     if (req.chat) {
       // Only connecting (TCP, and TLS for https) has the short limit.
       connecting = setTimeout(() => r.destroy(new AiCallError('TIMEOUT')), connectMs);
-      r.once('socket', (socket) => socket.once(u.protocol === 'https:' ? 'secureConnect' : 'connect', () => clearTimeout(connecting)));
     }
+    r.once('socket', (socket) =>
+      socket.once(u.protocol === 'https:' ? 'secureConnect' : 'connect', () => {
+        connected = true;
+        clearTimeout(connecting);
+      }),
+    );
     r.on('timeout', () => r.destroy(new AiCallError('TIMEOUT')));
     r.on('error', fail);
     req.signal?.addEventListener('abort', () => r.destroy(new AiCallError('TIMEOUT')), { once: true });

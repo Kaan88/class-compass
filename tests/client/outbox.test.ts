@@ -6,7 +6,9 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CommandEnvelope, CommandResult } from '../../src/shared/contracts/commands.ts';
-import { backoffDelay, classifyFailure, createOutbox, isRetryable, saveStateOf, type Outbox, type OutboxOptions } from '../../src/client/lib/outbox.ts';
+import { en as enMain } from '../../src/shared/i18n/en.ts';
+import { tr as trMain } from '../../src/shared/i18n/tr.ts';
+import { backoffDelay,classifyFailure, createOutbox, isRetryable, saveStateOf, type Outbox, type OutboxOptions } from '../../src/client/lib/outbox.ts';
 
 /** Fake /api/commands: idempotent by opId, records what was applied. */
 class FakeServer {
@@ -355,6 +357,18 @@ describe('command outbox', () => {
     expect((await box.all()).map((o) => o.state)).toEqual(['rejected']);
     await box.dismiss(opId);
     expect(await box.all()).toEqual([]);
+  });
+
+  it('review of the audit fixes (point 7): a lesson start refused as START_STALE is dismiss-only, with its own EN/TR explanation', () => {
+    const op = (reason: string) => ({ opId: 'op-1', type: 'lesson.start', payload: {}, state: 'rejected', error: { code: 'CONFLICT', message: 'x', reason } }) as unknown as Parameters<typeof isRetryable>[0];
+    expect(isRetryable(op('START_STALE'))).toBe(false);
+    expect(isRetryable(op('OP_ID_REUSED'))).toBe(false);
+    expect(isRetryable(op('UNKNOWN_COMMAND'))).toBe(false);
+    // Another refusal can still be retried.
+    expect(isRetryable(op('CLASS_ARCHIVED'))).toBe(true);
+    expect(enMain['error.START_STALE']).toBeTruthy();
+    expect(trMain['error.START_STALE']).toBeTruthy();
+    expect(trMain['error.START_STALE']).not.toBe(enMain['error.START_STALE']);
   });
 
   it('classifies failures by HTTP status', () => {

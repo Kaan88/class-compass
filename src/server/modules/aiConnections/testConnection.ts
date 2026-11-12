@@ -36,18 +36,26 @@ export const TEST_TOOL: ToolDefinition = {
 };
 const SYSTEM = 'This is an automatic connection test from a school app. Follow the instruction exactly and keep the answer very short.';
 
-async function collect(gen: AsyncGenerator<ChatEvent>) {
+/**
+ * Reads one test reply. The provider's latest usage is recorded on every path, also when the reply
+ * fails after it arrived (a failed request still counts what the provider reported).
+ */
+async function collect(gen: AsyncGenerator<ChatEvent>, record: (usage: { inputTokens: number; outputTokens: number }) => void) {
   let text = '';
   const calls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
-  let usage = { inputTokens: 0, outputTokens: 0 };
+  let usage: { inputTokens: number; outputTokens: number } | null = null;
   let stop: StopReason = 'other';
-  for await (const ev of gen) {
-    if (ev.type === 'text') text += ev.text;
-    else if (ev.type === 'toolCall') calls.push(ev.call);
-    else if (ev.type === 'usage') usage = ev;
-    else if (ev.type === 'done') stop = ev.stop;
+  try {
+    for await (const ev of gen) {
+      if (ev.type === 'text') text += ev.text;
+      else if (ev.type === 'toolCall') calls.push(ev.call);
+      else if (ev.type === 'usage') usage = { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
+      else if (ev.type === 'done') stop = ev.stop;
+    }
+  } finally {
+    if (usage) record(usage);
   }
-  return { text, calls, usage, stop };
+  return { text, calls, stop };
 }
 
 export async function testConnection(ctx: RequestContext, row: ConnectionRow, model: string): Promise<z.infer<typeof AiTestResult>> {
@@ -68,15 +76,15 @@ export async function testConnection(ctx: RequestContext, row: ConnectionRow, mo
   let tools = false;
   let failure: AiFailure | null = null;
   const timeoutMs = ctx.aiTestTimeoutMs ?? TEST_TIMEOUT_MS;
+  const record = (usage: { inputTokens: number; outputTokens: number }) => recordTokens(ctx, row.id, user.id, usage);
   try {
-    const a = await collect(streamChat(ctx, { connection: row, model, system: SYSTEM, messages: [{ role: 'user', content: `Reply with the single word: ${AI_TEST_WORD}` }], tools: [], maxTokens: TEST_MAX_TOKENS, timeoutMs }));
-    recordTokens(ctx, row.id, user.id, a.usage);
+    const a = await collect(streamChat(ctx, { connection: row, model, system: SYSTEM, messages: [{ role: 'user', content: `Reply with the single word: ${AI_TEST_WORD}` }], tools: [], maxTokens: TEST_MAX_TOKENS, timeoutMs }), record);
     text = a.text.trim().length > 0;
     if (!text && a.stop === 'length') failure = 'OUT_OF_TOKENS';
     const b = await collect(
       streamChat(ctx, { connection: row, model, system: SYSTEM, messages: [{ role: 'user', content: `Call the ${AI_TEST_TOOL} tool with the word "${AI_TEST_WORD}". Do not write anything else.` }], tools: [TEST_TOOL], maxTokens: TEST_MAX_TOKENS, timeoutMs }),
+      record,
     );
-    recordTokens(ctx, row.id, user.id, b.usage);
     tools = b.calls.some((c) => c.name === AI_TEST_TOOL && typeof c.arguments.word === 'string');
     if (!tools && !b.calls.length && b.stop === 'length') failure ??= 'OUT_OF_TOKENS';
     recordTest(ctx.db, row, model, { text, tools }, ctx.now());

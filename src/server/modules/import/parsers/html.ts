@@ -15,7 +15,7 @@
  *   `noframes`, `iframe`, `object`, `svg` and `math` elements and of comments is skipped entirely.
  * - Limits: rows (`MAX_SHEET_ROWS`, then `truncated`), columns (`MAX_SHEET_COLS`), tables
  *   (`MAX_HTML_TABLES`: a page with more stops with `tooManyTables` and the import is refused, never
- *   cut, D-079), characters per cell (`MAX_HTML_CELL_CHARS`), colspans (`MAX_SPAN`).
+ *   cut, D-079), characters per cell (`MAX_HTML_CELL_CHARS`). Spans are never clamped (see `attr`).
  * - Character references: numeric ones and the common named ones are decoded; an unknown `&name;`
  *   stays as it was written (never a letter cut out of a name).
  */
@@ -25,7 +25,6 @@ import { decodeText } from './text.ts';
 
 export const MAX_HTML_TABLES = 20;
 export const MAX_HTML_CELL_CHARS = 500;
-const MAX_SPAN = 50;
 /** Longest tag (with its attributes) the scanner reads; a longer one is skipped as text-less markup. */
 const MAX_TAG_CHARS = 8192;
 
@@ -160,16 +159,18 @@ interface TableState {
 const SPAN_ATTR = { colspan: /(?:^|\s)colspan\s*=\s*["']?(\d{1,4})/iu, rowspan: /(?:^|\s)rowspan\s*=\s*["']?(\d{1,4})/iu } as const;
 
 /**
- * A span value of at least 1. A colspan is clamped to MAX_SPAN; a rowspan keeps its real value (at
- * most 9999 by the pattern; it costs one counter per column), so the rows below it, and the rows
- * after it ends, keep their columns (audit fix: a clamp shifted them one column left, a span "to the
- * table end" one column right).
+ * A span value of at least 1, never clamped (at most 9999 by the pattern). A rowspan costs one counter
+ * per column, so the rows below it, and the rows after it ends, keep their columns (audit fix: a clamp
+ * shifted them one column left, a span "to the table end" one column right). A colspan keeps its real
+ * width too, so the cells after it keep their columns; one that reaches past `MAX_SHEET_COLS` covers
+ * the row to the column limit, and the cells after it are beyond the limit (dropped like any column
+ * there). Writing stops at the limit, so a wide span costs nothing more.
  */
 function attr(attrs: string, name: keyof typeof SPAN_ATTR): number {
   const m = SPAN_ATTR[name].exec(attrs);
   const n = m ? Number(m[1]) : 1;
   if (!Number.isFinite(n)) return 1;
-  return name === 'rowspan' ? Math.max(1, n) : Math.max(1, Math.min(MAX_SPAN, n));
+  return Math.max(1, n);
 }
 
 /** The index of the `>` that ends the tag starting at `from` (quotes respected), or -1. */

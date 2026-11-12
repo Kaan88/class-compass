@@ -120,6 +120,20 @@ describe('HTML-table .xls: parser (D-171)', () => {
     expect(out.every((r, i) => r.length === 3 && r[1] === `Ela Kurgu${i}` && r[2] === String(7000 + i))).toBe(true);
   });
 
+  it('review of the audit fixes (point 6): a colspan up to the column limit keeps its width, so the next cell stays in its column; a wider one covers the row to the limit', () => {
+    // A heading spanning 55 columns (above the old span limit of 50, below MAX_SHEET_COLS = 60), then a cell.
+    const wide = parseHtmlTables(Buffer.from('<table><tr><td colspan="55">Liste</td><td>Sonra</td></tr><tr><td>1</td></tr></table>')).rows.map((r) => r.cells);
+    expect(wide[0]![0]).toBe('Liste');
+    expect(wide[0]![55]).toBe('Sonra');
+    expect(wide[0]!.slice(1, 55).every((c) => c === '')).toBe(true);
+    expect(wide[0]).toHaveLength(56);
+    // Past the limit: the span covers the row to column 60, and the next cell is beyond it (never shifted in).
+    const past = parseHtmlTables(Buffer.from('<table><tr><td colspan="70">Liste</td><td>Sonra</td></tr></table>')).rows.map((r) => r.cells);
+    expect(past[0]).toHaveLength(60);
+    expect(past[0]![0]).toBe('Liste');
+    expect(past[0]!.includes('Sonra')).toBe(false);
+  });
+
   it('audit finding 3: an unknown named character reference stays as written; the letters used in names are decoded', () => {
     expect(decodeEntities('Ay&bogus;e')).toBe('Ay&bogus;e');
     expect(decodeEntities('&Ccedil;a&gbreve;r&inodot; &Ouml;z&uuml;m &Scedil;eker &Idot;pek &Uuml;mit &scedil;&ouml;&ccedil;&Gbreve;')).toBe('Çağrı Özüm Şeker İpek Ümit şöçĞ');

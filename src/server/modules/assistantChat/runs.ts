@@ -60,11 +60,17 @@ export class RunRegistry {
   /**
    * Gives back the slot of a run taken by `start` that never began (the send or answer it was taken for
    * was refused or needs no answer): the slot is taken first, so a refused request has no side effects.
+   * A stream already open on it gets the end of a stopped run.
    */
   discard(run: Run) {
     if (run.events.length || run.done) return;
     this.runs.delete(run.id);
+    // A page may already follow it (`answerCall` holds the slot while a tool runs and the chat shows the
+    // run): it ends like a stopped run, with an `end` event, so open streams close.
+    this.emit(run, { type: 'end', end: 'cancelled', reason: null });
     run.done = true;
+    run.end = 'cancelled';
+    for (const l of run.listeners) l();
     run.resolveFinished();
   }
 

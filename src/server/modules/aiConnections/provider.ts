@@ -4,7 +4,7 @@
  * providers' fixed https APIs, public addresses only) or from the administrator's base URL (local
  * addresses only when ticked). `streamChat` is the entry point for the assistant's agent loop (S19b).
  */
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { WIRE_FORMAT, type AiConnectionType } from '../../../shared/aiConnections.ts';
 import { chatgptAvailable } from '../../config.ts';
 import { aiConnections } from '../../db/schema.ts';
@@ -85,7 +85,15 @@ async function chatgptAccessToken(deps: AppDeps, row: ConnectionRow): Promise<st
   if (!tokens.refreshToken) throw new AiCallError('KEY_REJECTED');
   const fresh = await chatgptTokenRequest(deps, { grant_type: 'refresh_token', refresh_token: tokens.refreshToken });
   const next = { ...fresh, refreshToken: fresh.refreshToken ?? tokens.refreshToken };
-  deps.db.update(aiConnections).set({ secretCipher: sealChatgptTokens(deps, row.id, next), updatedAt: deps.now() }).where(eq(aiConnections.id, row.id)).run();
+  // The connection may have been deleted while the token was refreshed: the new token is then
+  // discarded, never written to the deleted row and never used (like `finishOAuth`).
+  const written = deps.db
+    .update(aiConnections)
+    .set({ secretCipher: sealChatgptTokens(deps, row.id, next), updatedAt: deps.now() })
+    .where(and(eq(aiConnections.id, row.id), isNull(aiConnections.deletedAt)))
+    .returning({ id: aiConnections.id })
+    .get();
+  if (!written) throw new AiCallError('NEEDS_KEY');
   return next.accessToken;
 }
 
@@ -139,6 +147,12 @@ export interface ChatRequest {
  * `beginAssistantMessage` and records the `usage` event with `recordTokens`). Errors are `AiCallError`s.
  */
 export async function* streamChat(deps: AppDeps, req: ChatRequest): AsyncGenerator<ChatEvent> {
-  const target = await targetOf(deps, req.connection);
+  let target: ProviderTarget;
+  try {
+    target = await targetOf(deps, req.connection);
+  } catch (e) {
+    // No chat request was made (no key, an address refused, a token refresh that failed).
+    throw e instanceof AiCallError ? new AiCallError(e.failure, e.httpStatus, false) : e;
+  }
   yield* ADAPTERS[WIRE_FORMAT[req.connection.type]]({ target, model: req.model, system: req.system, messages: req.messages, tools: req.tools, maxTokens: req.maxTokens ?? DEFAULT_MAX_TOKENS, signal: req.signal, timeoutMs: req.timeoutMs });
 }

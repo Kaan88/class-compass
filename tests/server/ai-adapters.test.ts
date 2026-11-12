@@ -13,6 +13,7 @@ import { openAiAdapter, openAiCallId, openAiMessages } from '../../src/server/mo
 import { newCallId, type Adapter, type ChatEvent, type ChatMessage, type ProviderTarget, type ToolDefinition } from '../../src/server/modules/aiConnections/adapters/types.ts';
 import { AiCallError, aiRequest, sseEvents } from '../../src/server/modules/aiConnections/http.ts';
 import { toolDefinitions } from '../../src/server/modules/aiConnections/tools.ts';
+import { mayHaveProcessed, usageOrEstimate } from '../../src/server/modules/assistantChat/agent.ts';
 import { allTools } from '../../src/server/modules/mcp/registry.ts';
 import { FAKE_KEYS, FakeProvider, openAiStream, startStallingServer } from '../ai-fake.ts';
 import { makeEnv, type TestEnv } from '../helpers.ts';
@@ -500,5 +501,84 @@ describe('audit findings 2 and 3: a chat request waits for a model that thinks s
       for (const sock of sockets) sock.destroy();
       await new Promise<void>((resolve) => silent.close(() => resolve()));
     }
+  });
+});
+
+describe('review of the audit fixes: an abnormal empty Anthropic end is a failure', () => {
+  const start = { type: 'message_start', message: { usage: { input_tokens: 5, output_tokens: 1 } } };
+  const ending = (reason: string | null) => [start, { type: 'message_delta', delta: reason === null ? {} : { stop_reason: reason }, usage: { output_tokens: 1 } }, { type: 'message_stop' }];
+
+  it('pause_turn, model_context_window_exceeded, an unknown or no stop reason with nothing written is PROVIDER_ERROR', async () => {
+    for (const reason of ['pause_turn', 'model_context_window_exceeded', 'something_new', null]) {
+      const r = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) => sseOf(res, ending(reason)));
+      expect(r.error, String(reason)).toMatchObject({ failure: 'PROVIDER_ERROR' });
+      expect(r.events.some((e) => e.type === 'done')).toBe(false);
+    }
+  });
+
+  it('max_tokens stays the length stop; a normal end (also empty) and an unusual end with text still finish', async () => {
+    const length = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) => sseOf(res, ending('max_tokens')));
+    expect(length.error).toBeNull();
+    expect(length.events.pop()).toEqual({ type: 'done', stop: 'length' });
+    const empty = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) => sseOf(res, ending('end_turn')));
+    expect(empty.events.pop()).toEqual({ type: 'done', stop: 'end' });
+    const written = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) =>
+      sseOf(res, [
+        start,
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+        { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Part' } },
+        { type: 'message_delta', delta: { stop_reason: 'pause_turn' } },
+        { type: 'message_stop' },
+      ]),
+    );
+    expect(written.error).toBeNull();
+    expect(written.events.pop()).toEqual({ type: 'done', stop: 'other' });
+  });
+});
+
+describe('review of the audit fixes: tokens are estimated only for a request the provider may have processed', () => {
+  const sent = { system: 'Be brief.', messages: [{ role: 'user' as const, content: 'x'.repeat(400) }] };
+
+  it('a request that never connected is marked as not sent (unreachable, refused address, stopped before sending)', async () => {
+    const s = http.createServer();
+    await new Promise<void>((resolve) => s.listen(0, '127.0.0.1', () => resolve()));
+    const port = (s.address() as { port: number }).port;
+    await new Promise<void>((resolve) => s.close(() => resolve()));
+    await expect(aiRequest({ url: `http://127.0.0.1:${port}/v1/messages`, headers: {}, body: '{}', policy: 'local' })).rejects.toMatchObject({ failure: 'UNREACHABLE', sent: false });
+    await expect(aiRequest({ url: 'http://169.254.169.254/x', headers: {}, body: '{}', policy: 'local' })).rejects.toMatchObject({ failure: 'URL_NOT_ALLOWED', sent: false });
+    const stopped = new AbortController();
+    stopped.abort();
+    await expect(aiRequest({ url: `${base}/v1/messages`, headers: {}, body: '{}', policy: 'local', signal: stopped.signal })).rejects.toMatchObject({ failure: 'TIMEOUT', sent: false });
+  });
+
+  it('a request cut off after it reached the provider is marked as sent', async () => {
+    const r = await runWith(anthropicAdapter, target(FAKE_KEYS.anthropic), (res) => cutAfter(res, []));
+    expect(r.error).toMatchObject({ sent: true });
+  });
+
+  it('refusals (401/403/404/429) and failures before sending count 0; other failures are estimated', () => {
+    const none = { inputTokens: 0, outputTokens: 0 };
+    const refused = [
+      new AiCallError('KEY_REJECTED', 401),
+      new AiCallError('KEY_REJECTED', 403),
+      new AiCallError('RATE_LIMITED', 429),
+      new AiCallError('MODEL_NOT_FOUND', 404),
+      new AiCallError('NEEDS_KEY', null, false),
+      new AiCallError('URL_NOT_ALLOWED', null, false),
+      new AiCallError('UNREACHABLE', null, false),
+      new AiCallError('TIMEOUT', null, false),
+    ];
+    for (const e of refused) {
+      expect(usageOrEstimate(null, sent, { text: '' }, e), e.message).toEqual(none);
+      expect(mayHaveProcessed(e)).toBe(false);
+    }
+    for (const e of [new AiCallError('PROVIDER_ERROR', 500), new AiCallError('UNREACHABLE'), new AiCallError('TIMEOUT'), new AiCallError('BAD_RESPONSE'), new Error('boom')]) {
+      expect(usageOrEstimate(null, sent, { text: '' }, e).inputTokens).toBeGreaterThan(100);
+    }
+    // Text already written, or the provider's own usage, always counts.
+    expect(usageOrEstimate(null, sent, { text: 'abcdefgh' }, new AiCallError('RATE_LIMITED')).outputTokens).toBe(2);
+    expect(usageOrEstimate({ inputTokens: 3, outputTokens: 4 }, sent, { text: '' }, new AiCallError('KEY_REJECTED', 401))).toEqual({ inputTokens: 3, outputTokens: 4 });
+    // No failure (a finished reply without a usage event): estimated as before.
+    expect(usageOrEstimate(null, sent, { text: '' }).inputTokens).toBeGreaterThan(100);
   });
 });

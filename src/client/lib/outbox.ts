@@ -51,12 +51,16 @@ export interface OutboxError {
   reason?: string | undefined;
 }
 
+/** Refusals a retry can never change: the command can only be dismissed. */
+const FINAL_REASONS = new Set(['OP_ID_REUSED', 'UNKNOWN_COMMAND', 'START_STALE']);
+
 /**
  * Retry re-sends under a NEW opId (D-035). That is only safe when the server definitely did not apply
  * the original: an opId conflict means it may have been applied already (possibly under another
- * account), so those commands can only be dismissed.
+ * account), so those commands can only be dismissed. A lesson start made on an earlier day
+ * (`START_STALE`) is refused again on every retry (its day never comes back), so it is dismiss-only too.
  */
-export const isRetryable = (op: OutboxOp) => op.error?.reason !== 'OP_ID_REUSED' && op.error?.reason !== 'UNKNOWN_COMMAND';
+export const isRetryable = (op: OutboxOp) => !FINAL_REASONS.has(op.error?.reason ?? '');
 
 export interface OutboxStatus {
   /** Commands waiting to be sent (not counting rejected ones). */
