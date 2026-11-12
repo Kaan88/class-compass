@@ -43,8 +43,11 @@ export async function makeEnv(
   overrides: Partial<Config> = {},
   extra: { mailer?: Mailer | null; logStream?: { write: (line: string) => void }; weatherFetch?: WeatherFetch; clientMetadataFetch?: (url: string) => Promise<unknown>; aiProviderUrls?: AppDeps['aiProviderUrls'] } = {},
 ): Promise<TestEnv> {
+  // A test that gives its own DATA_DIR gets every path under it (database, exports, backups), not only
+  // the overridden field: the folders derived from DATA_DIR were shared by parallel test files, so one
+  // file's full export left a snapshot in the exports folder another file was checking (flaky).
   const config = loadConfig(
-    { NODE_ENV: 'test', SECRET_PEPPER: 'test-pepper-0123456789abcdef', PUBLIC_ORIGIN: TEST_ORIGIN, DATA_DIR: './data-test' },
+    { NODE_ENV: 'test', SECRET_PEPPER: 'test-pepper-0123456789abcdef', PUBLIC_ORIGIN: TEST_ORIGIN, DATA_DIR: overrides.DATA_DIR ?? './data-test' },
     overrides,
   );
   const db = openDatabase(':memory:');

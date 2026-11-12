@@ -6,7 +6,7 @@
  */
 import http from 'node:http';
 import net from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { anthropicAdapter, anthropicMessages } from '../../src/server/modules/aiConnections/adapters/anthropic.ts';
 import { geminiAdapter, geminiContents, geminiSchema } from '../../src/server/modules/aiConnections/adapters/gemini.ts';
 import { openAiAdapter, openAiCallId, openAiMessages } from '../../src/server/modules/aiConnections/adapters/openai.ts';
@@ -313,8 +313,9 @@ describe('outgoing request rules', () => {
       // The socket is never quiet (a 100 Continue every 50 ms), so only the total limit can end it.
       await expect(aiRequest({ url: `${stall.base}/v1/chat/completions`, headers: {}, body: '{}', policy: 'local', totalTimeoutMs: 400 })).rejects.toMatchObject({ failure: 'TIMEOUT' });
       expect(Date.now() - started).toBeLessThan(3000);
-      await new Promise((r) => setTimeout(r, 100));
-      expect(stall.open()).toBe(0);
+      // The client destroyed its socket; the server sees the close a moment later (later under load,
+      // which made a fixed 100 ms wait flaky).
+      await vi.waitFor(() => expect(stall.open()).toBe(0), { timeout: 2000, interval: 20 });
     } finally {
       await stall.close();
     }
