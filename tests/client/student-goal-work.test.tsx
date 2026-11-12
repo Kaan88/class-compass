@@ -70,7 +70,7 @@ const section = (over: Partial<StudentGoalsSection> = {}): StudentGoalsSection =
   starters: [],
   ...over,
 });
-const media = { photos: true, audio: false, documents: true };
+const media = { photos: true, audio: false, documents: true, video: false };
 
 /** My goals with the page navigation in memory; `finish` goes to its target like the real page. */
 function Harness({ data, start, onGo }: { data: StudentGoalsSection; start: StudentNav; onGo?: (n: StudentNav, replace: boolean) => void }) {
