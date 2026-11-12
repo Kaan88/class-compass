@@ -1,6 +1,7 @@
 /**
  * ENG-5 integration report (D-199): the report exists, is linked from ROADMAP, OPERATIONS and AGENTS.md,
- * every relative link in it resolves, and it carries no IP address (only hostnames already in the docs).
+ * every relative link and every repository path it names in backticks exists, and it carries no IP
+ * address (only hostnames already in the docs).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,6 +26,14 @@ describe('ENG-5 integration report (D-199)', () => {
       const file = target.split('#')[0] ?? '';
       expect(fs.existsSync(path.resolve(path.dirname(reportPath), file)), target).toBe(true);
     }
+  });
+
+  it('every repository path named in backticks exists', () => {
+    const text = read(reportPath);
+    const pattern = /`((?:docs|tests|e2e|src|scripts|drizzle)\/[^`\s<>*]*|playwright\.config\.ts)`/g;
+    const paths = [...text.matchAll(pattern)].map((m) => m[1] ?? '');
+    expect(paths.length).toBeGreaterThan(5);
+    for (const p of paths) expect(fs.existsSync(path.join(repo, p)), p).toBe(true);
   });
 
   it('contains no IP address', () => {

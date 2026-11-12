@@ -5,8 +5,8 @@ tested and limitations honestly." Decision **D-199** (where this report lives an
 
 This report is put together **only from the records in this repository** (`docs/OPERATIONS.md`,
 `docs/ROADMAP.md`, `docs/DECISIONS.md`, the commit history, the e2e and visual suites). Nothing in it
-was re-checked on a server while writing it, and production was not read. Where the records are thin,
-the report says so instead of filling the gap.
+was re-checked on a server while writing it, and production was not read for it. Where the records
+are thin, the report says so instead of filling the gap.
 
 **Status at the time of writing (2026-11-12):** the app has been installed and exercised on three
 machines (a Debian test VM, the owner's mini PC and the owner's Oracle ARM server). The test site
@@ -18,18 +18,20 @@ services are still open (section 5).
 | Environment | Dates | Operating system and Docker | What ran there | Status now |
 |---|---|---|---|---|
 | **Test VM** (D-096) | 2026-11-08 | DietPi (Debian based), Docker 29.9, Compose 5.7, Debian's buildx 0.13; LAN only, not reachable from the internet | An isolated Compose project with the fictional demo school (`seed:demo`, then `seed:demo-history`), reached through an SSH tunnel | Retired; the test site moved on |
-| **Owner's mini PC** | 2026-11-09 (one day) | Not recorded in the repository (x86; the ROADMAP says the image ran on "x86 and ARM") | `test.sareteacher.com` behind the owner's own Cloudflare tunnel; the S14i redeploy (`6c1c2f3`) was built here | Removed the same day on the owner's request (copy, images and route deleted) |
+| **Owner's mini PC** | 2026-11-09 (one day) | Not recorded in the repository: operating system, architecture and Docker version were not written down | `test.sareteacher.com` behind the owner's own Cloudflare tunnel; the S14i redeploy (`6c1c2f3`) was built here | Removed the same day on the owner's request (copy, images and route deleted) |
 | **Oracle Cloud ARM server** | since 2026-11-09 | **Ubuntu 24.04, not Debian**; 2 cores, 11 GB RAM, Docker 27, buildx 0.16; shared with the owner's other services, which the app does not touch | Two stacks: `test/` (`test.sareteacher.com`, fictional demo school, shifted school-day clock) and `prod/` (`sareteacher.com`, the real school) | Test site in use for every deploy; production see section 4 |
 | **Development machine** | throughout | Windows 11, Node 26; **no Docker** | `npm run check`, `npm run build`, the Playwright e2e suite, the visual baseline | Every stage |
 
 **Debian, honestly.** ENG-5 names a Debian VM. The test VM of 2026-11-08 was Debian based (DietPi),
 so the first install and the first restore drill did run on Debian. Every later integration check ran
 on the Oracle server, which is **Ubuntu 24.04**. Inside the container the app always runs on the
-image's base, `node:26-bookworm-slim`, which is **Debian 12 (bookworm)** (D-093): the app's own
-runtime, native modules (sharp, `node:sqlite`) and OCR were therefore tested on Debian userland on
-both x86 and ARM, while the host side (Docker, systemd, cron, cloudflared) was tested on DietPi and
-Ubuntu. A clean Debian 12 VPS install along OPERATIONS section "Deployment on a VPS" has not been
-done.
+image's base, `node:26-bookworm-slim`, which is **Debian 12 (bookworm)** (D-093). The native
+modules (sharp, `node:sqlite`) and OCR were verified on Debian userland in the **ARM** image on the
+Oracle server (2026-11-09). The ROADMAP records that the image was also built and run on x86 ("the
+test VM, the mini PC and the Oracle server (x86 and ARM)"), but it does not say which machine was x86,
+and no OCR or sharp check is recorded on an x86 image. The host side that was actually used (Docker,
+cron, the host's cloudflared) ran on DietPi and Ubuntu; the systemd timers were not used (section 5).
+A clean Debian 12 VPS install along OPERATIONS section "Deployment on a VPS" has not been done.
 
 ## 2. What was tested, how and with what result
 
@@ -69,9 +71,10 @@ done.
 
 Each deploy follows OPERATIONS → "Oracle server" → "Upgrade": unpack the commit into `src-<sha>`,
 `docker build`, a `backup:create` in the stack, set `APP_TAG`, `docker compose up -d --no-build app`;
-the app takes a pre-migration snapshot and migrates at start-up. Checks after each: `/healthz` inside
-the container, migration count against `drizzle/`, the log, both addresses answering with the
-Cloudflare Access sign-in.
+the app takes a pre-migration snapshot and migrates at start-up. The procedure prescribes checks
+after each deploy (`/healthz` inside the container, migration count against `drizzle/`, the log, both
+addresses answering with the Cloudflare Access sign-in). The records do **not** list those checks one
+by one: for each deploy they state only "healthy", with the backup and migration details shown below.
 
 | Date | Commit | Sites | Migrations | Recorded result |
 |---|---|---|---|---|
@@ -109,9 +112,11 @@ has not been needed and has not been rehearsed on a server.
 
 ### 2.4 Health, security headers and access
 
-- `/healthz` and the container healthcheck after every deploy (table above).
-- Security headers checked on the test VM; both sites answer with the Cloudflare Access sign-in after
-  each deploy. The endpoint permission matrix (`tests/server/permissions.test.ts`) and the PIN lock
+- "Healthy" is recorded after every deploy (table above); the records do not say more than that.
+- Security headers were checked on the test VM. The Access sign-in in front of the sites is set up and
+  described in OPERATIONS → "Tunnel and Access"; checking it after a deploy is part of the upgrade
+  procedure, but it is not recorded per deploy, and from `d0a2cce` on the deploys touched the test
+  site only. The endpoint permission matrix (`tests/server/permissions.test.ts`) and the PIN lock
   (`e2e/pin-lock.spec.ts`) are covered by the automated suites, not re-run against a server.
 
 ### 2.5 Mail
@@ -127,7 +132,8 @@ has not been needed and has not been rehearsed on a server.
 
 - `seed:demo-history` (D-136) switches the module on in the demo school with one scorer link and one
   board link and fills points for every school day; the test site carries that data.
-- Automated: the S12 e2e (an admin creates links, a phone scorer searches, gives +1 and undoes, the
+- Automated: the S12 e2e in Chromium (an admin creates links, a "phone" scorer, which is Chromium's
+  Pixel 7 emulation, searches, gives +1 and undoes, the
   1920×1080 board updates live without a reload, the weekly rollover) and the board fitting checks.
 - **Not checked through the real Cloudflare tunnel**: the board's live updates (Server-Sent Events) on
   `test.sareteacher.com`; scorer app installed and paired on a real iPhone and Android phone; the
@@ -174,7 +180,25 @@ has not been needed and has not been rehearsed on a server.
   `6c1c2f3`; later full runs are not recorded with counts).
 - Visual baseline (D-189): 17 screens in two sizes against `e2e/visual-baselines/win32/`; Windows
   baselines only.
-- These run on Windows only for now: **CI is switched off until 2026-12-01**.
+- **Chromium only.** The e2e and visual suites run in Chromium alone (D-037, `playwright.config.ts`):
+  a 1920×1080 touch "classroom display" project on desktop Chrome and a Pixel 7 emulation for the
+  phone tests. Safari / WebKit (the teacher's MacBook, iPads, iPhones) and Firefox have never been
+  exercised by the suites.
+- **Windows only since CI was paused.** GitHub Actions on Ubuntu ran the check job from S0 until the
+  Actions budget ran out (D-082, 2026-11-07); the CI workflow has been off since then and stays off
+  until 2026-12-01 (D-095).
+
+### 2.11 Real devices (recorded by people, not by the suites)
+
+- **Sound on the test site** (`6c1c2f3`, 2026-11-09): confirmed working by the owner (ROADMAP S14).
+  The device and speakers are not recorded.
+- **Classroom display size reading** (2026-11-10, ROADMAP S16c, D-165, commit `f9ba110`): the screen
+  sample the board sends was read on production through Admin → Maintenance → Classroom screens and
+  recorded: Windows, Chrome, touch screen, pixel ratio 1.25 (a 1920×1080 panel at 125 %), board window
+  1536×703 with the browser bars visible; the teacher's MacBook (1440×900 CSS px) appeared the same
+  morning. It was a size reading, not a functional test; it led to the 1536×703 size in the e2e set.
+- **Production in classroom use since 2026-11-10** (OPERATIONS, the owner, 2026-11-11). This is the
+  owner's report of real use, not a recorded check.
 
 ## 3. How to repeat the checks
 
@@ -188,9 +212,12 @@ write production.
 
 `sareteacher.com` was installed empty on 2026-11-09 behind Cloudflare Access and was deployed together
 with the test site up to `4a770f2` (2026-11-09). OPERATIONS records that the English teacher has used
-it in the classroom since 2026-11-10 (owner, 2026-11-11). **This report contains no check made on
-production**: the restore drill used the test site's backup, the performance figures come from
-fictional schools, and no tool read production data. The ROADMAP box "Production go-live only with
+it in the classroom since 2026-11-10 (owner, 2026-11-11); that real use is the owner's report, not a
+check made by a tool. The only reading taken from production that the records hold is the classroom
+display's screen sample of 2026-11-10 (section 2.11: screen and window size, browser, touch; no
+student data; commit `f9ba110`). Apart from that, **no check in this report was made on production**:
+the restore drill used the test site's backup, the performance figures come from fictional schools,
+and the deploy checks after `4a770f2` were made on the test site only. The ROADMAP box "Production go-live only with
 explicit owner authorisation" stays open (opening the site to the school, KVKK sign-off before real
 students are added).
 
@@ -207,11 +234,15 @@ students are added).
   fictional data. A rollback to an older image after a migration has not been rehearsed.
 - **Mail**: Outlook / Hotmail delivery fails; the daily digest has not been checked in a real mailbox
   (EN, TR); production has no mail settings yet.
-- **Real devices and people**: the classroom display and touch panel, the 1280×720 projector, the
-  owner's and the teacher's laptops, iPad and Android tablets, the student page on a low-end Android
-  phone and an iPhone, the scorer app on real phones, the hall screen, video recording and upload
-  through the tunnel, classroom speakers and sound switches, a full lesson day, guides read by
-  colleagues. All open in the ROADMAP ("Open points noted with the owner" lists them).
+- **Real devices and people** (beyond the sound confirmation and the display size reading in
+  section 2.11): a full lesson day on the classroom display, the touch panel tested by a person, the
+  classroom speakers and the sound switches there, the iPad silent switch, the 1280×720 projector, the
+  teacher's MacBook in Safari and Chrome, iPad and Android tablets, the student page on a low-end
+  Android phone and an iPhone, the scorer app on real phones, the hall screen, video recording and
+  upload through the tunnel, guides read by colleagues. All open in the ROADMAP ("Open points noted
+  with the owner" lists them).
+- **Browsers**: every automated browser check ran in Chromium (desktop Chrome and a Pixel 7
+  emulation). Safari / WebKit and Firefox were never exercised by the suites.
 - **Through the tunnel**: the Super Speakers board's live updates; a large video upload (Cloudflare's
   100 MB body limit is documented, not tried); the separate Super Speakers hostname.
 - **Outside services**: the weather was not tried against the live Open-Meteo service from a server;
@@ -219,9 +250,12 @@ students are added).
   "Sign in with ChatGPT" waits for OpenAI.
 - **AI tools end to end** with Claude Code, claude.ai and Claude Desktop: not done (only ChatGPT
   connected once, on 2026-11-09).
-- **CI**: off until 2026-12-01; no Linux run of the suites, no Linux visual baselines.
+- **CI**: Ubuntu CI ran the check job in the early stages and has been paused since about 2026-11-07
+  (D-082, D-095), off until 2026-12-01. There has been no Linux run since then, the e2e suite has never
+  been confirmed reliable on Ubuntu (its ROADMAP box in S3 is still open), and no Linux visual baselines exist.
 - **Load**: measured with fictional schools and scripts, not with a class of real users at once.
-- **The mini PC**: its operating system and Docker versions were not written down.
+- **The mini PC**: its operating system, architecture and Docker version were not written down.
+- **x86 image**: built and run, but no OCR, sharp or `node:sqlite` check is recorded on it.
 - **Security review of the deployed site** (for example an outside scan) has not been done; headers
   were checked by hand once on the test VM and by the automated tests.
 
