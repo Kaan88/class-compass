@@ -114,7 +114,7 @@ Press **End lesson**. Depending on the modules, you go through:
 - **Our goal**: only when the lesson has a goal. **Did we reach our goal?** **Yes, we did!**, **Partly** or **Not yet**. Answering is optional; tap the chosen answer again to clear it.
 - **Reflection**: **How did the lesson go?** (Tough, Okay, Good, Great) and an optional note for yourself.
 
-Press **Save and end lesson**. The summary **Lesson saved** shows the time, the routine stages reached and attendance. **Back to the lesson** cancels the end and returns to the running lesson.
+Press **Save and end lesson**. The summary **Lesson saved** shows the time, the routine stages reached and attendance, and with Lesson goals on, **Our goal**: today's goal with the class's answer (or "Not answered"). **Back to the lesson** cancels the end and returns to the running lesson.
 
 ![End lesson](../img/en/end-lesson.png)
 
@@ -167,7 +167,8 @@ Tap a student's **name** on their card to open a small card for the class to see
 
 - **Start lesson** has a **Today's goal** step with one optional sentence.
 - The board shows **Today's goal** next to **Today's focus**, above the student cards, with a pencil button **Change** (type a new sentence, **Save goal**, or **Remove goal**). A long goal is shown a little smaller, so the student cards keep their room. Without a goal only a small **Set a goal** button stays. Like any box, you can move it or put it in the **Lesson tools** row with **Customise layout**.
-- **End lesson** asks **Did we reach our goal?** (only when the lesson had a goal).
+- On the routine's **Learning goal** stage the routine box shows the goal too, under today's focus, so the class can read it while you talk about it.
+- **End lesson** asks **Did we reach our goal?** (only when the lesson had a goal), and the **Lesson saved** summary shows the goal with the answer.
 - **Reports** has a **Lesson goals** section: each lesson's goal with the answer, and how many goals were reached, partly reached or not yet reached out of the goals that were answered. A goal nobody answered shows "not recorded".
 
 The goal is shown to the class, so write it for the children. Switching the module off hides the step, the box and the report section; the goals already saved are kept.

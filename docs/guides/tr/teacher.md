@@ -114,7 +114,7 @@ Sınıf ekranını bir bilgisayarda daha önce (son 7 gün içinde) açtıysanı
 - **Hedefimiz**: yalnızca dersin bir hedefi varsa. **Hedefimize ulaştık mı?** **Evet, ulaştık!**, **Kısmen** ya da **Henüz değil**. Cevaplamak isteğe bağlıdır; seçimi kaldırmak için aynı cevaba yeniden dokunun.
 - **Değerlendirme**: **Ders nasıl geçti?** (Zordu, İdare eder, İyi, Harika) ve kendiniz için isteğe bağlı bir not.
 
-**Kaydet ve dersi bitir**'e basın. **Ders kaydedildi** özeti süreyi, ulaşılan rutin aşamalarını ve yoklamayı gösterir. **Derse dön** bitirmeyi iptal eder ve süren derse geri götürür.
+**Kaydet ve dersi bitir**'e basın. **Ders kaydedildi** özeti süreyi, ulaşılan rutin aşamalarını ve yoklamayı, Ders hedefleri açıksa **Hedefimiz** satırında bugünün hedefini ve sınıfın cevabını (ya da "Cevaplanmadı") gösterir. **Derse dön** bitirmeyi iptal eder ve süren derse geri götürür.
 
 ![Dersi bitir](../img/tr/end-lesson.png)
 
@@ -167,7 +167,8 @@ Kaydettiğiniz ya da vazgeçtiğiniz anda öğretmen alanı yeniden kilitlenir. 
 
 - **Dersi başlat**'ta isteğe bağlı tek bir cümlelik **Bugünün hedefi** adımı vardır.
 - Pano **Bugünkü hedefimiz**'i öğrenci kartlarının üstünde, **Bugünün odağı**'nın yanında, kalem simgeli **Değiştir** düğmesiyle gösterir (yeni cümleyi yazıp **Hedefi kaydet** ya da **Hedefi kaldır**). Uzun bir hedef biraz daha küçük yazılır, böylece öğrenci kartlarının yeri daralmaz. Hedef yoksa yalnızca küçük bir **Hedef koy** düğmesi kalır. Her kutu gibi **Yerleşimi düzenle** ile taşınabilir ya da **Ders araçları** satırına alınabilir.
-- **Dersi bitir**, dersin hedefi varsa **Hedefimize ulaştık mı?** diye sorar.
+- Rutinin **Öğrenme hedefi** aşamasında rutin kutusu da hedefi bugünün odağının altında gösterir; siz hedefi anlatırken sınıf okuyabilir.
+- **Dersi bitir**, dersin hedefi varsa **Hedefimize ulaştık mı?** diye sorar; **Ders kaydedildi** özeti hedefi ve cevabı gösterir.
 - **Raporlar**'da bir **Ders hedefleri** bölümü vardır: her dersin hedefi ve cevabı, cevaplanan hedeflerden kaçına ulaşıldığı, kısmen ulaşıldığı ya da henüz ulaşılmadığı. Kimsenin cevaplamadığı bir hedef "kaydedilmedi" olarak görünür.
 
 Hedef sınıfa gösterilir; çocuklar için yazın. Modülü kapatmak adımı, kutuyu ve rapor bölümünü gizler; kaydedilmiş hedefler saklanır.
