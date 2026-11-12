@@ -2,10 +2,11 @@
  * Lesson goals (S25d, D-188; LES-1, LES-3, DSH-4, RPT-1, CFG-1): the teacher turns Lesson goals on for
  * 3-A English, starts a lesson with a goal, the board shows it to the class and it is changed during the
  * lesson, End Lesson asks "Did we reach our goal?", and the report lists the goal with the answer.
- * S28a (D-197): the routine's "Learning goal" stage shows the goal under the topics, and the "Lesson
- * saved" summary shows the goal with the class's answer (axe on both); a 140-character goal on that stage
- * stays inside the routine box in whole words at 1536x703 and 1536x864 (1.25), English and Turkish, and
- * costs the student grid at most one row of cards on that stage only.
+ * S28a (D-197): the routine's "Learning goal" stage shows the goal (the topics move up beside the stage
+ * name while it is shown), and the "Lesson saved" summary shows the goal with the class's answer (axe on
+ * both); a 140-character goal on that stage stays inside the routine box in whole words at 1536x703 and
+ * 1536x864 (1.25), English and Turkish, with one topic and with three, and costs the student grid at
+ * most one row of cards on that stage only (a whole row stays wherever the stage had one without it).
  * The module is switched off again in `finally` (the e2e suite shares one database). Fictional data only.
  */
 import { randomUUID } from 'node:crypto';
@@ -160,7 +161,11 @@ const routineFacts = (page: Page) =>
       }
     }
     const g = goal?.getBoundingClientRect();
+    const name = document.querySelector('[data-box="routine"] .cc-routine__now-name')?.getBoundingClientRect();
+    const focus = document.querySelector('[data-testid="stage-focus"]')?.getBoundingClientRect();
     return {
+      // With the goal shown the topics sit beside the stage name (review of D-197), not on a line of their own.
+      focusBesideName: name && focus ? focus.top < name.bottom - 1 && focus.left >= name.right - 0.5 : null,
       scrolls: box.scrollHeight > box.clientHeight + 1 || box.scrollWidth > box.clientWidth + 1,
       goalInside: g ? g.top >= b.top - 0.5 && g.bottom <= b.bottom + 0.5 && g.left >= b.left - 0.5 && g.right <= b.right + 0.5 : null,
       split,
@@ -168,8 +173,8 @@ const routineFacts = (page: Page) =>
     };
   });
 
-test('the goal on the Learning goal stage fits the routine box in whole words at 1536x703 and 1536x864 (1.25), English and Turkish (S28a, D-197)', async ({ page, browser }) => {
-  test.setTimeout(240_000);
+test('the goal on the Learning goal stage fits the routine box in whole words at 1536x703 and 1536x864 (1.25), English and Turkish, with one and three topics (S28a, D-197)', async ({ page, browser }) => {
+  test.setTimeout(480_000);
   mkdirSync('test-results/fit', { recursive: true });
   await login(page, 'english');
   await ensurePin(page);
@@ -196,49 +201,56 @@ test('the goal on the Learning goal stage fits the routine box in whole words at
     const stageIndex = (state.lesson.routine.stages as Array<{ id: string }>).findIndex((st) => st.id === 'learning-goal');
     expect(stageIndex).toBeGreaterThanOrEqual(0);
     await cmd('lesson.setStage', { lessonId, stageIndex });
-    // The topics stay on the stage with the goal (a lesson usually has one).
+    // The topics stay on the stage with the goal: one topic (the usual lesson) and three (review of D-197:
+    // several topics must not push the last whole row of cards off the screen).
     const topics = (await api(page, 'GET', `/api/classroom/contexts/${ctx.id}/topics`)).body.topics as Array<{ id: string }>;
-    await cmd('lesson.setTopics', { lessonId, topicIds: topics.slice(0, 1).map((t) => t.id) });
+    expect(topics.length).toBeGreaterThanOrEqual(3);
 
-    for (const lang of ['en', 'tr'] as const) {
-      expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
-      for (const vp of DISPLAYS_125) {
-        const run = `${vp.name} ${lang}`;
-        const measure = async (shot: string) => {
-          const { c, p } = await onDevice(browser, page, vp);
-          try {
-            await p.goto('/classroom');
-            await p.getByRole('button', { name: /3-A · (English|İngilizce)/u }).first().click();
-            await expect(p.getByTestId('lesson-dashboard')).toBeVisible();
-            await expect(p.locator('.cc-student-card').first()).toBeVisible();
-            await p.waitForTimeout(300);
-            await p.screenshot({ path: `test-results/fit/stage-goal-${vp.name}-${lang}-${shot}.png` });
-            return { ...(await cardsOnScreen(p)), ...(await routineFacts(p)), goal: await p.getByTestId('stage-goal').count() };
-          } finally {
-            await c.close();
-          }
-        };
-        await cmd('lessonGoals.set', { lessonId, text: '' });
-        const none = await measure('no-goal');
-        await cmd('lessonGoals.set', { lessonId, text: LONG[lang] });
-        const long = await measure('long-goal');
-        // Another stage with the same goal: the routine box shows no goal and the board loses nothing.
-        await cmd('lesson.setStage', { lessonId, stageIndex: 0 });
-        const other = await measure('other-stage');
-        await cmd('lesson.setStage', { lessonId, stageIndex });
-        test.info().annotations.push({ type: 'cards on screen', description: `${run}: Learning goal stage without a goal ${none.cards}, with a 140-character goal ${long.cards} (${long.perRow} a row); another stage ${other.cards}` });
-        expect(none.goal, run).toBe(0);
-        expect(other.goal, run).toBe(0);
-        expect(long.goal, run).toBe(1);
-        expect(long.focus, `${run}: the topics are still shown`).toBe(1);
-        expect(long.scrolls, `${run}: the routine box does not scroll`).toBe(false);
-        expect(long.goalInside, `${run}: the whole goal is inside the routine box`).toBe(true);
-        expect(long.split, `${run}: whole words`).toEqual([]);
-        // While the class reads the goal the student grid gives up at most one row of cards and keeps at
-        // least one whole row on screen; on every other stage the goal costs nothing.
-        expect(long.cards, `${run}: at most one row less`).toBeGreaterThanOrEqual(none.cards - long.perRow);
-        expect(long.cards, `${run}: a whole row of cards stays`).toBeGreaterThanOrEqual(long.perRow);
-        expect(other.cards, `${run}: another stage`).toBeGreaterThanOrEqual(none.cards);
+    for (const nTopics of [1, 3]) {
+      await cmd('lesson.setTopics', { lessonId, topicIds: topics.slice(0, nTopics).map((t) => t.id) });
+      for (const lang of ['en', 'tr'] as const) {
+        expect((await api(office, 'PUT', `/api/teacher/classes/${ctx.classId}/language`, { mainLanguage: lang, secondLanguageEnabled: false })).status).toBe(200);
+        for (const vp of DISPLAYS_125) {
+          const run = `${vp.name} ${lang} ${nTopics} topic(s)`;
+          const measure = async (shot: string) => {
+            const { c, p } = await onDevice(browser, page, vp);
+            try {
+              await p.goto('/classroom');
+              await p.getByRole('button', { name: /3-A · (English|İngilizce)/u }).first().click();
+              await expect(p.getByTestId('lesson-dashboard')).toBeVisible();
+              await expect(p.locator('.cc-student-card').first()).toBeVisible();
+              await p.waitForTimeout(300);
+              await p.screenshot({ path: `test-results/fit/stage-goal-${vp.name}-${lang}-${nTopics}t-${shot}.png` });
+              return { ...(await cardsOnScreen(p)), ...(await routineFacts(p)), goal: await p.getByTestId('stage-goal').count() };
+            } finally {
+              await c.close();
+            }
+          };
+          await cmd('lessonGoals.set', { lessonId, text: '' });
+          const none = await measure('no-goal');
+          await cmd('lessonGoals.set', { lessonId, text: LONG[lang] });
+          const long = await measure('long-goal');
+          // Another stage with the same goal: the routine box shows no goal and the board loses nothing.
+          await cmd('lesson.setStage', { lessonId, stageIndex: 0 });
+          const other = await measure('other-stage');
+          await cmd('lesson.setStage', { lessonId, stageIndex });
+          test.info().annotations.push({ type: 'cards on screen', description: `${run}: Learning goal stage without a goal ${none.cards}, with a 140-character goal ${long.cards} (${long.perRow} a row); another stage ${other.cards}` });
+          expect(none.goal, run).toBe(0);
+          expect(other.goal, run).toBe(0);
+          expect(long.goal, run).toBe(1);
+          expect(long.focus, `${run}: the topics are still shown`).toBe(1);
+          expect(long.scrolls, `${run}: the routine box does not scroll`).toBe(false);
+          expect(long.goalInside, `${run}: the whole goal is inside the routine box`).toBe(true);
+          expect(long.split, `${run}: whole words`).toEqual([]);
+          expect(long.focusBesideName, `${run}: the topics move up beside the stage name`).toBe(true);
+          // While the class reads the goal the student grid gives up at most one row of cards and keeps a
+          // whole row on screen whenever the same stage had one without the goal; on every other stage the
+          // goal costs nothing. (With three topics at 1536x703 the stage has no whole row even without a
+          // goal: the board's own Today's focus box takes two lines there; D-197 and ROADMAP record it.)
+          expect(long.cards, `${run}: at most one row less`).toBeGreaterThanOrEqual(none.cards - long.perRow);
+          expect(long.cards, `${run}: a whole row of cards stays`).toBeGreaterThanOrEqual(Math.min(none.cards, long.perRow));
+          expect(other.cards, `${run}: another stage`).toBeGreaterThanOrEqual(none.cards);
+        }
       }
     }
   } finally {

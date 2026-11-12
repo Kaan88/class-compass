@@ -167,7 +167,7 @@ Kaydettiğiniz ya da vazgeçtiğiniz anda öğretmen alanı yeniden kilitlenir. 
 
 - **Dersi başlat**'ta isteğe bağlı tek bir cümlelik **Bugünün hedefi** adımı vardır.
 - Pano **Bugünkü hedefimiz**'i öğrenci kartlarının üstünde, **Bugünün odağı**'nın yanında, kalem simgeli **Değiştir** düğmesiyle gösterir (yeni cümleyi yazıp **Hedefi kaydet** ya da **Hedefi kaldır**). Uzun bir hedef biraz daha küçük yazılır, böylece öğrenci kartlarının yeri daralmaz. Hedef yoksa yalnızca küçük bir **Hedef koy** düğmesi kalır. Her kutu gibi **Yerleşimi düzenle** ile taşınabilir ya da **Ders araçları** satırına alınabilir.
-- Rutinin **Öğrenme hedefi** aşamasında rutin kutusu da hedefi bugünün odağının altında gösterir; siz hedefi anlatırken sınıf okuyabilir.
+- Rutinin **Öğrenme hedefi** aşamasında rutin kutusu da hedefi aşamanın altında kendi satırında gösterir (bugünün odağı aşama adının yanına geçer); siz hedefi anlatırken sınıf okuyabilir.
 - **Dersi bitir**, dersin hedefi varsa **Hedefimize ulaştık mı?** diye sorar; **Ders kaydedildi** özeti hedefi ve cevabı gösterir.
 - **Raporlar**'da bir **Ders hedefleri** bölümü vardır: her dersin hedefi ve cevabı, cevaplanan hedeflerden kaçına ulaşıldığı, kısmen ulaşıldığı ya da henüz ulaşılmadığı. Kimsenin cevaplamadığı bir hedef "kaydedilmedi" olarak görünür.
 

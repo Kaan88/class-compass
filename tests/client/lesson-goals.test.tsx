@@ -169,6 +169,28 @@ describe('the goal on the routine\'s "Learning goal" stage (S28a, D-197; RTN-1)'
     expect(screen.getByTestId('stage-goal').getAttribute('data-length')).toBe('long');
   });
 
+  it('lays the head out for the goal: topics beside the stage name, Previous / Next beside the goal when there are several topics (review of D-197)', () => {
+    const head = () => screen.getByTestId('current-stage').parentElement!;
+    const reading = { id: 'topic-fictional-2', name: { en: 'Reading', tr: 'Okuma' }, icon: 'book' as const };
+    const writing = { id: 'topic-fictional-3', name: { en: 'Writing', tr: 'Yazma' }, icon: 'pen' as const };
+    const one = onStage(learningGoal);
+    seed({ text: LONG, outcome: null }, one);
+    wrap(<Stepper context={context} lesson={one} presentation="box" />);
+    expect(head().getAttribute('data-goal')).toBe('one');
+    // The goal is a line of the head of its own (not inside the "now" box), before Previous / Next.
+    expect(screen.getByTestId('stage-goal').parentElement).toBe(head());
+    expect(screen.getByTestId('current-stage').contains(screen.getByTestId('stage-goal'))).toBe(false);
+    cleanup();
+    const three = onStage(learningGoal, [listening, reading, writing]);
+    seed({ text: LONG, outcome: null }, three);
+    wrap(<Stepper context={context} lesson={three} presentation="box" />);
+    expect(head().getAttribute('data-goal')).toBe('many');
+    cleanup();
+    seed({ text: null, outcome: null }, three);
+    wrap(<Stepper context={context} lesson={three} presentation="box" />);
+    expect(head().getAttribute('data-goal')).toBeNull();
+  });
+
   it('shows the goal without topics too, and nothing on another stage, without a goal or with the module off', () => {
     const noTopics = onStage(learningGoal, []);
     seed({ text: 'We can count to twenty.', outcome: null }, noTopics);

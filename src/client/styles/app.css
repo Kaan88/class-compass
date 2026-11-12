@@ -2727,8 +2727,7 @@ html:has(.cc-classroom) {
   grid-template-areas:
     'title name'
     'label name'
-    'focus focus'
-    'goal goal';
+    'focus focus';
   align-items: center;
   column-gap: 0.9rem;
   row-gap: 0;
@@ -5511,6 +5510,57 @@ li > .cc-admin-list {
 }
 .cc-routine__goal[data-length='long'] .cc-routine__goal-text {
   font-size: 1.05rem;
+}
+/* Today's goal is a line of its own under the head (a sibling of the "now" box), so in a narrow box it
+   wraps under the stage and Previous / Next follow it. In a routine box at least 40rem wide (review of
+   D-197) the head is a grid while the goal is shown: the topics move up beside the stage name (a little
+   smaller, label inline), so the goal takes the line the topics had. With one topic Previous / Next stay
+   beside the stage ('one'); with two or more they move down beside the goal ('many'), so the topics get
+   the whole width for one line. The goal then costs the routine box little height over the same stage
+   without a goal (e2e/lesson-goals.spec.ts measures one and three topics). */
+.cc-routine__head > .cc-routine__goal {
+  flex: 1 1 100%;
+  margin: 0;
+  padding-inline: 0.8rem;
+}
+@container (min-width: 40rem) {
+  .cc-routine__head[data-goal] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.4rem 0.75rem;
+  }
+  .cc-routine__head[data-goal='one'] {
+    grid-template-areas:
+      'now nav'
+      'goal goal';
+  }
+  .cc-routine__head[data-goal='many'] {
+    grid-template-areas:
+      'now now'
+      'goal nav';
+  }
+  .cc-routine__head[data-goal] > .cc-routine__now {
+    grid-area: now;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'title name focus'
+      'label name focus';
+  }
+  .cc-routine__head[data-goal] > .cc-routine__nav {
+    grid-area: nav;
+  }
+  .cc-routine__head[data-goal] .cc-routine__focus {
+    margin-top: 0;
+    gap: 0.1rem 0.6rem;
+  }
+  .cc-routine__head[data-goal] .cc-focus__list {
+    gap: 0.1rem 0.8rem;
+  }
+  .cc-routine__head[data-goal] .cc-focus__topic {
+    font-size: 1.15rem;
+    gap: 0.35rem;
+  }
 }
 
 /* ------------------------------------------------------------------ S13b: celebration, reveal show (D-110) */

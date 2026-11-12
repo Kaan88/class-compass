@@ -105,9 +105,13 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
   const goalStage = current?.id === LEARNING_GOAL_STAGE_ID;
   // A longer sentence is set smaller (like the board's goal box), so 140 characters stay in the box.
   const goalLength = goalText && goalText.length > 90 ? 'long' : goalText && goalText.length > 45 ? 'mid' : undefined;
+  // While the goal is shown the topics move up beside the stage name and the goal gets a line of its own
+  // under the head; with two or more topics Previous / Next move down beside the goal, so the topics have
+  // the whole width for one line (app.css; review of D-197: the goal must not take the last card row).
+  const goalLayout = goalStage && goalText ? (lesson.topics.length > 1 ? 'many' : 'one') : undefined;
   return (
     <section className="cc-card cc-routine" aria-labelledby="cc-routine-title">
-      <div className="cc-routine__head">
+      <div className="cc-routine__head" data-goal={goalLayout}>
         <div className="cc-routine__now" data-testid="current-stage">
           <h2 id="cc-routine-title" className="cc-routine__title">
             {pickText(lesson.routine.name, locale) || t('routine.title')}
@@ -120,15 +124,15 @@ function RoutineStepper({ lesson }: DashboardSlotProps) {
               <FocusTopics topics={lesson.topics} />
             </div>
           ) : null}
-          {goalStage && goalText ? (
-            <p className="cc-routine__goal" data-testid="stage-goal" data-length={goalLength}>
-              <IconTarget />
-              <span className="cc-routine__goal-body">
-                <span className="cc-routine__now-label cc-routine__goal-label">{t('lessonGoals.title')}</span> <span className="cc-routine__goal-text">{goalText}</span>
-              </span>
-            </p>
-          ) : null}
         </div>
+        {goalStage && goalText ? (
+          <p className="cc-routine__goal" data-testid="stage-goal" data-length={goalLength}>
+            <IconTarget />
+            <span className="cc-routine__goal-body">
+              <span className="cc-routine__now-label cc-routine__goal-label">{t('lessonGoals.title')}</span> <span className="cc-routine__goal-text">{goalText}</span>
+            </span>
+          </p>
+        ) : null}
         <div className="cc-routine__nav">
           {/* Short words on screen, the full name for screen readers (the visible word is part of it). */}
           <Button onPress={() => go(idx - 1)} isDisabled={idx === 0} aria-label={t('routine.prev')}>
