@@ -9,12 +9,18 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_GOAL_OUTCOMES, type Evidence, type Goal, type StudentGoalsSection } from '../../src/shared/contracts/goals.ts';
 import { en, tr } from '../messages.ts';
 import { I18nProvider } from '../../src/client/lib/i18n.tsx';
 import { HOME, type NavApi, type StudentNav } from '../../src/client/student/nav.ts';
-import { ADD_WORK_FIRST_STEP, MyGoals } from '../../src/client/student/screens/MyGoals.tsx';
+import { ADD_WORK_FIRST_STEP, MyGoals, preloadAddWork } from '../../src/client/student/screens/MyGoals.tsx';
+
+// The steps are a lazy chunk (S26c, D-191) that the page preloads after its first render; once it is
+// here they open at once, with no "Loading…" (the getByTestId right after the click below checks that).
+beforeAll(async () => {
+  await preloadAddWork();
+});
 
 afterEach(() => {
   cleanup();

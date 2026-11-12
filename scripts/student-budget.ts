@@ -25,7 +25,7 @@ import { gzipSync } from 'node:zlib';
  * only the strings it can show (EN+TR 119.5 kB → 22.2 kB gzip; the rest is the staff dictionary), so
  * the page is at 362.7 kB, about 97 kB under the unchanged budget.
  * S26c (D-191): shared code it never used split off and the writing screens lazy: 368.6 → 345.1 kB, entry
- * 21.3 → 10.2 kB (`tests/scripts/student-imports.test.ts` keeps it that way). This counts what loads before
+ * 21.3 → 10.2 kB (346.7 / 10.7 kB after the rebase on S26b and S27a–d; `tests/scripts/student-imports.test.ts` keeps it so). This counts what loads before
  * the first render; the page preloads the writing screens right after it, so a visit still transfers about
  * the same in total (366.6 kB, 374.3 kB with an imported theme's lazy chunk).
  */

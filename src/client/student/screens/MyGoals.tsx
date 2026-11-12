@@ -14,21 +14,26 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import * as G from '../../../shared/contracts/goals.ts';
 import type { GoalEntry, StudentGoalsSection } from '../../../shared/contracts/goals.ts';
-import { call, upload } from '../../lib/api.ts';
+import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
-import { EvidenceAdder } from '../../modules/goals/EvidenceAdder.tsx';
 import { EntryLine, EvidenceView, FeedbackLine, GoalSummary, goalText } from '../../modules/goals/shared.tsx';
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
 import { IconCheck, IconFace, IconPencil, IconPlus, IconTrash, IconUpload } from '../../ui/icons.tsx';
 import { InlineConfirmButton } from '../../ui/InlineConfirm.tsx';
-import { startersOf, useSaveCheck } from '../common.tsx';
+import { preloadable } from '../preloadable.ts';
 import { useStudentRun } from '../run.ts';
-import { SentenceStarters } from '../SentenceStarters.tsx';
 import type { ScreenProps } from '../sections.tsx';
 
 /** The editor is loaded only when a child opens it (student page size budget, D-151). */
 const EditWords = lazy(() => import('./EditWords.tsx'));
+/**
+ * "Add my work" (S27b, D-194) with the text checks and sentence starters is a lazy chunk like the writing
+ * screens (S26c, D-191), preloaded with them after the page's first render (`preloadWritingScreens`).
+ */
+const addWork = preloadable(() => import('./GoalAddWork.tsx').then((m) => m.GoalAddWork));
+const GoalAddWork = addWork.Screen;
+export const preloadAddWork = addWork.preload;
 
 /** What a student wrote about a goal: its text check and its sentence starters (as when it was written). */
 const ENTRY_KINDS = { reflection: 'reflection', note: 'note', self_assessment: 'selfAssessment', progress: 'note' } as const satisfies Record<GoalEntry['kind'], string>;
@@ -39,7 +44,6 @@ export const ADD_WORK_FIRST_STEP = 2;
 export function MyGoals({ data, subjectId, media, nav, go, finish }: ScreenProps<StudentGoalsSection>) {
   const { t, locale } = useI18n();
   const run = useStudentRun();
-  const check = useSaveCheck(data);
   /** The goal the child is adding work to (from the page address), while it can still take work. */
   const addingTo = data.canWrite && nav.goal && nav.step >= ADD_WORK_FIRST_STEP ? data.goals.find((g) => g.id === nav.goal && g.status !== 'archived') : undefined;
   /** The goal that has just been given work (a calm note there until the child leaves the screen). */
@@ -75,33 +79,23 @@ export function MyGoals({ data, subjectId, media, nav, go, finish }: ScreenProps
     if (r) stopEditing(id);
     return Boolean(r);
   };
-  if (addingTo) {
-    const label = goalText(addingTo, locale);
+  if (addingTo)
     return (
-      <div className="cc-stack" data-testid="student-goal-add-work">
-        <EvidenceAdder
-          layout="steps"
-          step={nav.step - 1}
-          onStep={(n, replace) => go({ screen: 'goals', subject: subjectId, goal: addingTo.id, step: n + 1 }, { replace })}
+      <Suspense fallback={<p className="cc-muted">{t('common.loading')}</p>}>
+        <GoalAddWork
+          data={data}
+          goal={addingTo}
+          subjectId={subjectId}
+          media={media}
+          nav={nav}
+          go={go}
           onDone={() => {
             setJustAdded(addingTo.id);
             finish({ screen: 'goals', subject: subjectId });
           }}
-          idPrefix={`goal-work-${addingTo.id}`}
-          goals={[]}
-          fixedGoal={{ id: addingTo.id, label }}
-          media={media}
-          upload={(kind, file, name) => upload(G.studentUploadFile, { kind }, file, name)}
-          add={(input) => call(G.studentAddEvidence, { subjectId, ...input })}
-          run={(fn, success) => run(fn, success)}
-          check={check}
-          starters={({ kind, value, onChange, target }) => (
-            <SentenceStarters starters={startersOf(data, kind, locale, addingTo.category.id)} value={value} onChange={onChange} target={target} />
-          )}
         />
-      </div>
+      </Suspense>
     );
-  }
   return (
     <div className="cc-stack" data-testid="student-goals">
       {!data.canWrite ? <p className="cc-card cc-muted">{t('student.readOnly')}</p> : null}

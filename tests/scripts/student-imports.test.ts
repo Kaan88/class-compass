@@ -31,6 +31,9 @@ describe('student page imports (S26c, D-191)', () => {
       'src/client/student/screens/NewGoal.tsx',
       'src/client/student/screens/HowIsItGoing.tsx',
       'src/client/student/screens/ShowMyWork.tsx',
+      'src/client/student/screens/GoalAddWork.tsx', // My goals' "Add my work" (S27b, D-194)
+      'src/client/modules/goals/EvidenceAdder.tsx',
+      'src/client/student/SentenceStarters.tsx',
       'src/client/student/common.tsx',
       'src/shared/text/textQuality.ts',
     ]) {
