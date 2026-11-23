@@ -364,7 +364,7 @@ export function ProfilePage() {
           <ChangePasswordForm />
         </section>
       ) : null}
-      <SignInMethodSection me={me} emailLinkEnabled={signInInfo.data?.emailLinkEnabled ?? false} />
+      <SignInMethodSection me={me} emailLinkEnabled={signInInfo.data?.emailLinkEnabled ?? false} teacherEmailLinkOnly={signInInfo.data?.teacherEmailLinkOnly ?? false} />
       {/* Personal tokens for AI tools (S14h1, D-160): behind the PIN gate, with re-authentication. */}
       <AiToolsSection me={me} />
       {/* The assistant's connections: the school default and, when allowed, the teacher's own (S19a, D-179). */}

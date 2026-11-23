@@ -73,6 +73,33 @@ export const resetUserPassword = endpoint({
 });
 export const clearUserPin = endpoint({ method: 'POST', path: '/api/admin/users/:userId/clear-pin', access: 'admin', input: z.object({ userId: Id }), output: Ok });
 
+// ---------------------------------------------------------------- sign-in policy (S30, D-207)
+/**
+ * "Teachers sign in with email links only". `emailReady`: the school's email is set up (needed to
+ * switch it on). `teachersWithPassword`: teacher accounts whose password switching it on removes.
+ * `teachersWithoutEmail`: active teachers who could not sign in then; it cannot be switched on while
+ * there are any.
+ */
+export const SignInPolicy = z.object({
+  teacherEmailLinkOnly: z.boolean(),
+  emailReady: z.boolean(),
+  teachersWithPassword: z.number().int(),
+  teachersWithoutEmail: z.array(z.object({ id: z.string(), displayName: z.string() })),
+});
+export const getSignInPolicy = endpoint({ method: 'GET', path: '/api/admin/sign-in-policy', access: 'admin', input: Empty, output: SignInPolicy });
+/**
+ * Switching it on removes every teacher's password in the same step (they sign in with an emailed
+ * link or code from then on; sessions that are open stay open). Switching it off gives no password
+ * back: a teacher can choose one in the profile, or an administrator resets it.
+ */
+export const setSignInPolicy = endpoint({
+  method: 'PUT',
+  path: '/api/admin/sign-in-policy',
+  access: 'admin',
+  input: z.object({ teacherEmailLinkOnly: z.boolean() }),
+  output: SignInPolicy,
+});
+
 // ---------------------------------------------------------------- audit log
 export const AuditItem = z.object({
   id: z.string(),

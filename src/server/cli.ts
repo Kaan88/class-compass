@@ -25,6 +25,7 @@ import { audit } from './lib/audit.ts';
 import { hashPassword, useSeededIds } from './lib/crypto.ts';
 import { offsetClock } from './lib/testClock.ts';
 import { createUser, normaliseLogin, revokeAllUserMcpTokens, revokeAllUserSessions } from './modules/auth/service.ts';
+import { passwordBlocked } from './modules/auth/signInPolicy.ts';
 import { backupNow, errorSummary, listBackups, migrateWithSnapshot, recordRun, resolveBackupFile, restoreBackup, RestoreRefused, verifyBackup, type RunRecord } from './ops/backup.ts';
 import { offsiteBackup, offsiteCheck, offsiteInit, offsiteProblems, offsiteSnapshots, tail } from './ops/restic.ts';
 import { appVersion, hasAppTables, levelText, migrationLevel } from './ops/version.ts';
@@ -89,6 +90,8 @@ switch (cmd) {
     if (!values.login) throw new Error('--login is required');
     const u = db().select().from(users).where(eq(users.login, normaliseLogin(values.login))).get();
     if (!u) throw new Error('No such user');
+    // D-207: a teacher's password would not be accepted while the school allows teachers email links only.
+    if (passwordBlocked(db(), u)) throw new Error('Teachers sign in with email links only at this school: an administrator switches that off first (Admin -> Accounts)');
     const password = await readSecret('New password (min 10 chars): ');
     if (password.length < 10) throw new Error('Password too short');
     const now = Date.now();

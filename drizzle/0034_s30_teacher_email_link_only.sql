@@ -1,0 +1,1 @@
+ALTER TABLE `school_settings` ADD `teacher_email_link_only` integer DEFAULT false NOT NULL;

@@ -17,6 +17,8 @@ Your administrator creates your account. Usually you receive an **invite link** 
 - **With a password**: you type your username and a password you choose (at least 10 characters).
 - **With email sign-in links**: you have no password. Each time, press **Email me a sign-in link** on the sign-in page and type your email address. A link and a 6-digit code arrive within a minute. Open the link and press **Sign in**, or type the code on the device where you asked for the email. Both work once, for 15 minutes. The page repeats the address you typed, so you can spot a typo; **Use a different email** lets you type it again. This choice is only offered when the school has set up email.
 
+Some schools switch passwords off for teachers. The invite then offers email sign-in links only, the sign-in page says so, and your profile has no **Use a password instead**.
+
 If your administrator gave you a **temporary password** instead, you must choose your own password the first time you sign in.
 
 Forgot your password? If the school has set up email, use **Forgot your password?** on the sign-in page; the reset link works for one hour. Otherwise ask your administrator to reset it. If a sign-in or reset link has expired, its page offers **Email me a new sign-in link** or **Ask for a new reset link**, and **Back to sign-in**. You can switch between password and email links later in **Profile and PIN** → **How you sign in**.

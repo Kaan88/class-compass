@@ -70,8 +70,10 @@ export function LoginPage() {
       ) : (
         <p className="cc-muted">{t('auth.forgotAskAdmin')}</p>
       )}
+      {/* D-207: while teachers have no password, the email link is their way in and gets the note and the stronger button. */}
+      {resetInfo.data?.emailLinkEnabled && resetInfo.data.teacherEmailLinkOnly ? <p className="cc-muted">{t('signin.teachersUseEmail')}</p> : null}
       {resetInfo.data?.emailLinkEnabled ? (
-        <Button variant="ghost" onPress={() => setByEmail(true)}>
+        <Button variant={resetInfo.data.teacherEmailLinkOnly ? 'secondary' : 'ghost'} onPress={() => setByEmail(true)}>
           {t('signin.emailMe')}
         </Button>
       ) : null}

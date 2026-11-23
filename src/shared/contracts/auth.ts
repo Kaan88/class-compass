@@ -126,8 +126,10 @@ export const passwordResetAvailable = endpoint({
   /**
    * `emailLinkEnabled`: email-link sign-in is offered (SMTP configured, S13b). `defaultLocale`: the
    * school's language for new accounts (D-025), the sign-in pages' language until the device picks one.
+   * `teacherEmailLinkOnly`: the school lets teachers sign in with email links only (S30, D-207), so the
+   * sign-in page says so and the profile offers no way back to a password.
    */
-  output: z.object({ emailResetEnabled: z.boolean(), emailLinkEnabled: z.boolean(), defaultLocale: Locale }),
+  output: z.object({ emailResetEnabled: z.boolean(), emailLinkEnabled: z.boolean(), teacherEmailLinkOnly: z.boolean(), defaultLocale: Locale }),
 });
 
 /** Always answers `{ ok: true }` so the response never reveals whether an account exists. */
@@ -162,6 +164,8 @@ export const inspectInvite = endpoint({
     login: z.string(),
     role: z.enum(['admin', 'teacher']),
     locale: Locale,
+    /** False for a teacher while the school allows teachers email links only (S30, D-207): no password choice. */
+    passwordAllowed: z.boolean(),
     /** Email-link sign-in is offered to teachers (always shown; disabled with a reason when SMTP is not configured or the account has no email). */
     emailLinkAllowed: z.boolean(),
     emailLinkAvailable: z.boolean(),

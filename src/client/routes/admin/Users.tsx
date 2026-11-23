@@ -25,6 +25,53 @@ import { ADMIN } from './Admin.tsx';
 type AdminUser = z.infer<typeof Admin.AdminUser>;
 type Invite = z.infer<typeof Admin.InviteOut> & { name: string };
 const USERS = [...ADMIN, 'users'];
+const POLICY = [...ADMIN, 'sign-in-policy'];
+
+/**
+ * "How teachers sign in" (S30, D-207): one school-wide rule. Switching passwords off for teachers
+ * removes their passwords, so the step is confirmed with what it does; it is not offered while the
+ * school's email is not set up or an active teacher has no address (they would be locked out).
+ */
+function SignInPolicySection() {
+  const { t } = useI18n();
+  const run = useRun();
+  const policy = useQuery({ queryKey: POLICY, queryFn: () => call(Admin.getSignInPolicy, {}) });
+  const [confirming, setConfirming] = useState(false);
+  const p = policy.data;
+  if (!p) return null;
+  const on = p.teacherEmailLinkOnly;
+  const blocked = !on && (!p.emailReady || p.teachersWithoutEmail.length > 0);
+  return (
+    <section className="cc-card cc-stack" aria-labelledby="signin-policy-title" data-testid="signin-policy">
+      <h2 id="signin-policy-title" className="cc-h2">
+        {t('users.policyTitle')}
+      </h2>
+      <p>{on ? t('users.policyOn') : t('users.policyOff')}</p>
+      {!on && !p.emailReady ? <Alert kind="warning">{t('users.policyNeedsEmail')}</Alert> : null}
+      {!on && p.emailReady && p.teachersWithoutEmail.length > 0 ? <Alert kind="warning">{t('users.policyMissing', { names: p.teachersWithoutEmail.map((u) => u.displayName).join(', ') })}</Alert> : null}
+      <div>
+        <Button isDisabled={blocked} onPress={() => setConfirming(true)}>
+          {on ? t('users.policyTurnOff') : t('users.policyTurnOn')}
+        </Button>
+      </div>
+      <Modal isOpen={confirming} onOpenChange={setConfirming} title={on ? t('users.policyTurnOff') : t('users.policyTurnOn')}>
+        <p>{on ? t('users.policyConfirmOff') : t('users.policyConfirmOn', { count: p.teachersWithPassword })}</p>
+        <DialogActions>
+          <Button onPress={() => setConfirming(false)}>{t('common.cancel')}</Button>
+          <Button
+            variant={on ? 'primary' : 'danger'}
+            onPress={async () => {
+              await run(() => call(Admin.setSignInPolicy, { teacherEmailLinkOnly: !on }), { success: on ? t('users.policyChangedOff') : t('users.policyChangedOn'), invalidate: [POLICY, USERS, ['public', 'reset-available']] });
+              setConfirming(false);
+            }}
+          >
+            {on ? t('users.policyTurnOff') : t('users.policyTurnOn')}
+          </Button>
+        </DialogActions>
+      </Modal>
+    </section>
+  );
+}
 
 /** Shows a temporary password exactly once, with a copy button. */
 function TempPasswordDialog({ value, onClose }: { value: { login: string; password: string } | null; onClose: () => void }) {
@@ -110,7 +157,17 @@ const LOCALE_ITEMS = (t: ReturnType<typeof useI18n>['t']) => [
   { id: 'tr', label: t('language.tr') },
 ];
 
-function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean; onOpenChange: (v: boolean) => void; onCreated: (r: z.infer<typeof Admin.createUserByAdmin.output>) => void }) {
+function CreateUserDialog({
+  isOpen,
+  onOpenChange,
+  onCreated,
+  teacherEmailLinkOnly,
+}: {
+  isOpen: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCreated: (r: z.infer<typeof Admin.createUserByAdmin.output>) => void;
+  teacherEmailLinkOnly: boolean;
+}) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const [login, setLogin] = useState('');
@@ -121,6 +178,8 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
   const [locale, setLocale] = useState<'en' | 'tr'>('en');
   const [setup, setSetup] = useState<'invite' | 'temporary_password'>('invite');
   const [error, setError] = useState<string | null>(null);
+  // D-207: a new teacher gets an invite and needs an address while teachers sign in with email links only.
+  const emailOnly = teacherEmailLinkOnly && role === 'teacher';
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange} title={t('users.create')}>
       <form
@@ -129,7 +188,7 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
           e.preventDefault();
           setError(null);
           try {
-            const r = await call(Admin.createUserByAdmin, { login, displayName: name, email: email.trim() || null, role, locale, setup });
+            const r = await call(Admin.createUserByAdmin, { login, displayName: name, email: email.trim() || null, role, locale, setup: emailOnly ? 'invite' : setup });
             void qc.invalidateQueries({ queryKey: USERS });
             setLogin('');
             setName('');
@@ -145,7 +204,11 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
       >
         <TextField label={t('users.login')} description={t('users.loginHint')} value={login} onChange={setLogin} isRequired autoFocus />
         <TextField label={t('users.displayName')} value={name} onChange={setName} isRequired />
-        <TextField label={t('users.emailOptional')} type="email" value={email} onChange={setEmail} />
+        {emailOnly ? (
+          <TextField label={t('auth.email')} description={t('users.emailNeeded')} type="email" value={email} onChange={setEmail} isRequired />
+        ) : (
+          <TextField label={t('users.emailOptional')} type="email" value={email} onChange={setEmail} />
+        )}
         <Select
           label={t('users.role')}
           value={role}
@@ -156,16 +219,20 @@ function CreateUserDialog({ isOpen, onOpenChange, onCreated }: { isOpen: boolean
           ]}
         />
         <Select label={t('users.locale')} description={t('users.localeHint')} value={locale} onChange={(v) => setLocale(v === 'tr' ? 'tr' : 'en')} items={LOCALE_ITEMS(t)} />
-        <Select
-          label={t('users.setup')}
-          description={setup === 'invite' ? t('users.setupInviteHint') : t('users.setupTempHint')}
-          value={setup}
-          onChange={(v) => setSetup(v === 'temporary_password' ? 'temporary_password' : 'invite')}
-          items={[
-            { id: 'invite', label: t('users.setupInvite') },
-            { id: 'temporary_password', label: t('users.setupTemp') },
-          ]}
-        />
+        {emailOnly ? (
+          <Select label={t('users.setup')} description={t('users.setupInviteOnlyHint')} value="invite" onChange={() => undefined} items={[{ id: 'invite', label: t('users.setupInvite') }]} />
+        ) : (
+          <Select
+            label={t('users.setup')}
+            description={setup === 'invite' ? t('users.setupInviteHint') : t('users.setupTempHint')}
+            value={setup}
+            onChange={(v) => setSetup(v === 'temporary_password' ? 'temporary_password' : 'invite')}
+            items={[
+              { id: 'invite', label: t('users.setupInvite') },
+              { id: 'temporary_password', label: t('users.setupTemp') },
+            ]}
+          />
+        )}
         {error ? <Alert>{error}</Alert> : null}
         <DialogActions>
           <Button onPress={() => onOpenChange(false)}>{t('common.cancel')}</Button>
@@ -240,6 +307,8 @@ export function UsersPage() {
   const run = useRun();
   const qc = useQueryClient();
   const users = useQuery({ queryKey: USERS, queryFn: () => call(Admin.listUsers, {}) });
+  // Shares the query of the section below: while teachers have no password, their rows offer no password reset.
+  const emailOnly = useQuery({ queryKey: POLICY, queryFn: () => call(Admin.getSignInPolicy, {}) }).data?.teacherEmailLinkOnly ?? false;
   const [creating, setCreating] = useState(false);
   const [temp, setTemp] = useState<{ login: string; password: string } | null>(null);
   const [invite, setInvite] = useState<Invite | null>(null);
@@ -259,6 +328,7 @@ export function UsersPage() {
           {t('users.create')}
         </Button>
       </div>
+      <SignInPolicySection />
       <DataTable
         stack
         caption={t('users.caption')}
@@ -312,7 +382,7 @@ export function UsersPage() {
                 <Button size="small" onPress={() => setEditing(u)}>
                   {t('common.edit')}
                 </Button>
-                {u.id !== me?.id ? (
+                {u.id !== me?.id && !(emailOnly && u.role === 'teacher') ? (
                   <Button size="small" onPress={() => setResetting(u)}>
                     {t('users.resetPassword')}
                   </Button>
@@ -354,6 +424,7 @@ export function UsersPage() {
       />
       <CreateUserDialog
         isOpen={creating}
+        teacherEmailLinkOnly={emailOnly}
         onOpenChange={setCreating}
         onCreated={(r) => {
           if (r.invite) setInvite({ ...r.invite, name: r.user.displayName });

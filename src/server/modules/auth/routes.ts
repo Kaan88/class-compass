@@ -95,7 +95,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     return freshMe(ctx);
   });
 
-  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx), defaultLocale: getSchoolSettings(ctx.db).defaultLocale }));
+  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx), teacherEmailLinkOnly: getSchoolSettings(ctx.db).teacherEmailLinkOnly, defaultLocale: getSchoolSettings(ctx.db).defaultLocale }));
   route(
     app,
     deps,

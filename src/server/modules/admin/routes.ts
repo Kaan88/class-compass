@@ -17,6 +17,8 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AppDeps) {
     svc.clearPinByAdmin(ctx, input.userId);
     return { ok: true as const };
   });
+  route(app, deps, C.getSignInPolicy, (ctx) => svc.signInPolicy(ctx));
+  route(app, deps, C.setSignInPolicy, (ctx, input) => svc.setTeacherEmailLinkOnly(ctx, input.teacherEmailLinkOnly));
   route(app, deps, C.queryAudit, (ctx, input) => svc.queryAudit(ctx.db, input));
   route(app, deps, C.auditCodes, (ctx) => svc.auditCodes(ctx.db));
 }

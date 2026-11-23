@@ -48,6 +48,12 @@ export const schoolSettings = sqliteTable('school_settings', {
    * Document) may use; loopback addresses are always allowed. Edited on Admin → AI tools (audited).
    */
   oauthRedirectHostsJson: text('oauth_redirect_hosts_json', { mode: 'json' }).$type<string[]>().notNull().default(sql`'["claude.ai"]'`),
+  /**
+   * Sign-in policy (S30, D-207): while on, teacher accounts have no password and sign in with email
+   * links only (administrators always keep a password). Off by default; switched on Admin → Accounts
+   * (audited), which removes the teachers' passwords in the same step.
+   */
+  teacherEmailLinkOnly: integer('teacher_email_link_only', { mode: 'boolean' }).notNull().default(false),
   updatedAt: integer('updated_at').notNull(),
 });
 

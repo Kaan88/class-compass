@@ -46,6 +46,16 @@ Listede her hesabın durumu (**Etkin**, davet kullanılana kadar **Davet bekliyo
 - **Devre dışı bırak** / **Yeniden etkinleştir**: devre dışı bir kişi giriş yapamaz; kayıtları korunur. Kendinizi devre dışı bırakamazsınız ve en az bir etkin yönetici kalmalıdır.
 - **Düzenle**: ad, e-posta, arayüz dili. E-postayı değiştirmek açık davetleri ve giriş bağlantılarını iptal eder.
 
+### Öğretmenler nasıl giriş yapar
+
+Listenin üstündeki **Öğretmenler nasıl giriş yapar** bölümünde bütün okul için tek bir kural vardır. Normalde her öğretmen şifre ile e-posta giriş bağlantıları arasında kendisi seçim yapar. **Öğretmenler için şifreyi kapat** dediğinizde tek yol e-posta bağlantısı olur: öğretmen giriş sayfasına e-posta adresini yazar; kendisine 15 dakika geçerli, tek kullanımlık bir bağlantı ve 6 haneli bir kod gelir. Olmayan bir şifre tahmin edilemez, başka yerde kullanılamaz, başkasına verilemez.
+
+- Bunu ancak okulun e-postası ayarlıysa ve **etkin her öğretmen hesabının e-posta adresi varsa** açabilirsiniz; sayfa, adresi eksik olan öğretmenlerin adını gösterir.
+- Açtığınız anda **bütün öğretmen hesaplarının şifresi silinir**. Bu geri alınamaz. Oturumu açık olan öğretmenlerin oturumu açık kalır; süren bir ders kesilmez.
+- Açıkken yeni öğretmen için e-posta adresi zorunludur ve her zaman davet bağlantısı verilir, davet şifre seçeneği sunmaz, öğretmenler için **Şifreyi sıfırla** görünmez (bunun yerine **Yeni davet bağlantısı** gönderin) ve öğretmenin e-posta adresi silinemez.
+- Yönetici hesapları etkilenmez: yöneticiler her zaman şifreyle giriş yapar.
+- **Okulun e-postası çalışmazsa öğretmenler giriş yapamaz.** **Öğretmenlere yeniden şifre izni ver**'e basın, sonra gereken öğretmenlere **Şifreyi sıfırla** ile geçici şifre verin. Hiç kimseye eski şifresi geri verilmez.
+
 ## E-posta (SMTP)
 
 Sınıf Pusulası davetler, e-posta giriş bağlantıları ve şifre sıfırlama için e-posta gönderir. E-posta tarayıcıdan değil, bilgi işlem sorumlusu tarafından sunucuda ayarlanır: sunucunun ayar dosyasında `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` ve `SMTP_FROM` (bkz. `docs/OPERATIONS.md`).

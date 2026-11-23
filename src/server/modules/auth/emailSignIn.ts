@@ -18,6 +18,8 @@
  *   cannot be used later (D-015); an email change also clears the "verified" mark.
  * - Switching method: to email-link needs the current password and a code emailed to the address;
  *   back to password needs a fresh email sign-in. Administrators always keep passwords.
+ * - School policy (S30, D-207): while "teachers sign in with email links only" is on, a teacher's
+ *   invite offers no password and nobody can switch a teacher back to one (`signInPolicy.ts`).
  * Tokens and codes are stored as HMAC hashes with the server pepper; nothing secret is audited.
  */
 import crypto from 'node:crypto';
@@ -30,6 +32,7 @@ import type { Actor, AppDeps, SessionRow, UserRow } from '../../lib/context.ts';
 import { hashPassword, newId, randomToken, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
+import { emailLinkRequired, passwordBlocked } from './signInPolicy.ts';
 import { actorFor, createSession, invalidateResetTokens, revokeAllUserMcpTokens, revokeAllUserSessions, SESSION_ABSOLUTE_MS, toMe } from './service.ts';
 
 export const INVITE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -172,7 +175,8 @@ function findInvite(deps: AppDeps, token: string) {
 function emailLinkState(deps: AppDeps, user: UserRow) {
   const allowed = user.role === 'teacher';
   const reason = !emailLinkEnabled(deps) ? ('SMTP_NOT_CONFIGURED' as const) : !user.email ? ('NO_EMAIL' as const) : null;
-  return { emailLinkAllowed: allowed, emailLinkAvailable: allowed && reason === null, emailLinkUnavailableReason: allowed ? reason : null };
+  // D-207: while teachers sign in with email links only, a teacher's invite offers no password.
+  return { passwordAllowed: !passwordBlocked(deps.db, user), emailLinkAllowed: allowed, emailLinkAvailable: allowed && reason === null, emailLinkUnavailableReason: allowed ? reason : null };
 }
 
 export function inspectInvite(deps: AppDeps, token: string) {
@@ -186,11 +190,13 @@ export async function acceptInvite(deps: AppDeps, ip: string, input: { token: st
     const st = emailLinkState(deps, first.user);
     if (!st.emailLinkAllowed) throw new AppError('FORBIDDEN', 'Administrator accounts sign in with a password', { reason: 'ADMIN_PASSWORD_REQUIRED' });
     if (!st.emailLinkAvailable) throw invalid('Email sign-in is not available', { reason: st.emailLinkUnavailableReason ?? 'SMTP_NOT_CONFIGURED' });
-  } else if (!input.password) throw invalid('Choose a password', { reason: 'PASSWORD_REQUIRED' });
+  } else if (passwordBlocked(deps.db, first.user)) throw emailLinkRequired();
+  else if (!input.password) throw invalid('Choose a password', { reason: 'PASSWORD_REQUIRED' });
   const passwordHash = input.method === 'password' ? await hashPassword(input.password!) : '';
   const now = deps.now();
   const result = tx(deps.db, () => {
     const { row, user } = findInvite(deps, input.token); // single use, also under races
+    if (input.method === 'password' && passwordBlocked(deps.db, user)) throw emailLinkRequired(); // the policy was switched on meanwhile
     deps.db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, row.id)).run();
     const verified = row.sentByEmail ? now : user.emailVerifiedAt;
     deps.db
@@ -378,6 +384,7 @@ export function confirmEmailLinkMethod(deps: AppDeps, user: UserRow, session: Se
 
 export async function switchToPassword(deps: AppDeps, user: UserRow, session: SessionRow, newPassword: string, fresh: boolean) {
   if (user.signInMethod !== 'email_link') throw invalid('This account already uses a password', { reason: 'ALREADY_PASSWORD' });
+  if (passwordBlocked(deps.db, user)) throw emailLinkRequired();
   if (!fresh) throw new AppError('UNAUTHENTICATED', 'Sign in again with a fresh email link first', { reason: 'REAUTH_REQUIRED' });
   const passwordHash = await hashPassword(newPassword);
   const now = deps.now();

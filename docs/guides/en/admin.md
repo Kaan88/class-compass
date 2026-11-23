@@ -46,6 +46,16 @@ The list shows each account's status (**Active**, **Invite pending** until the i
 - **Deactivate** / **Reactivate**: a deactivated person cannot sign in; their records stay. You cannot deactivate yourself, and at least one active administrator must remain.
 - **Edit**: name, email, interface language. Changing the email revokes open invites and sign-in links.
 
+### How teachers sign in
+
+Above the list, **How teachers sign in** holds one rule for the whole school. Normally each teacher chooses between a password and email sign-in links. **Switch off passwords for teachers** makes email links the only way: a teacher types their email address on the sign-in page and gets a link and a 6-digit code that work once, for 15 minutes. Nobody can guess, reuse or give away a password that does not exist.
+
+- You can switch it on only when the school's email is set up and **every active teacher account has an email address**; the page names the teachers who still need one.
+- Switching it on **removes the password of every teacher account** at once. This cannot be undone. Teachers who are signed in stay signed in, so a lesson that is running is not interrupted.
+- While it is on, a new teacher needs an email address and always gets an invite link, the invite offers no password, **Reset password** is not offered for teachers (send a **New invite link** instead) and a teacher's email address cannot be removed.
+- Administrator accounts are not affected: they always sign in with a password.
+- **If the school's email stops working, teachers cannot sign in.** Press **Allow passwords for teachers again**, then give the teachers who need one a temporary password with **Reset password**. Nobody gets an old password back.
+
 ## Email (SMTP)
 
 Class Compass sends email for invites, email sign-in links and password resets. Email is configured by the IT person on the server, not in the browser: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` in the server's settings file (see `docs/OPERATIONS.md`).

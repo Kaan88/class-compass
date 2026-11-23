@@ -242,7 +242,8 @@ function InviteState({ loading }: { loading: boolean }) {
 function InviteForm({ token, info }: { token: string; info: z.infer<typeof Auth.inspectInvite.output> }) {
   const { t } = useI18n();
   const signedIn = useSignedIn();
-  const [method, setMethod] = useState<'password' | 'email_link'>('password');
+  // D-207: a teacher's invite offers no password while the school allows teachers email links only.
+  const [method, setMethod] = useState<'password' | 'email_link'>(info.passwordAllowed ? 'password' : 'email_link');
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -288,7 +289,8 @@ function InviteForm({ token, info }: { token: string; info: z.infer<typeof Auth.
           }
         }}
       >
-        <fieldset className="cc-choices">
+        {info.passwordAllowed ? null : <p>{info.emailLinkAvailable ? t('invite.emailOnly') : unavailable}</p>}
+        <fieldset className="cc-choices" hidden={!info.passwordAllowed}>
           <legend className="cc-field__label">{t('invite.how')}</legend>
           <label className="cc-choice">
             <input type="radio" name="method" value="password" checked={method === 'password'} onChange={() => setMethod('password')} />
@@ -317,7 +319,7 @@ function InviteForm({ token, info }: { token: string; info: z.infer<typeof Auth.
         ) : null}
         <p className="cc-muted">{t('invite.pinNext')}</p>
         {error ? <Alert>{error}</Alert> : null}
-        <Button type="submit" variant="primary" size="big" isDisabled={busy}>
+        <Button type="submit" variant="primary" size="big" isDisabled={busy || (!info.passwordAllowed && !info.emailLinkAvailable)}>
           {t('invite.accept')}
         </Button>
       </form>
@@ -326,7 +328,7 @@ function InviteForm({ token, info }: { token: string; info: z.infer<typeof Auth.
 }
 
 /** Profile: how this account signs in, and switching (with re-authentication). Teachers only may use email links. */
-export function SignInMethodSection({ me, emailLinkEnabled }: { me: Me; emailLinkEnabled: boolean }) {
+export function SignInMethodSection({ me, emailLinkEnabled, teacherEmailLinkOnly = false }: { me: Me; emailLinkEnabled: boolean; teacherEmailLinkOnly?: boolean }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const [password, setPassword] = useState('');
@@ -351,7 +353,9 @@ export function SignInMethodSection({ me, emailLinkEnabled }: { me: Me; emailLin
         {t('signin.methodTitle')}
       </h2>
       <p>{me.signInMethod === 'email_link' ? t('signin.methodIsEmail') : t('signin.methodIsPassword')}</p>
-      {me.signInMethod === 'email_link' ? (
+      {me.signInMethod === 'email_link' && me.role === 'teacher' && teacherEmailLinkOnly ? (
+        <p className="cc-muted">{t('signin.policyEmailOnly')}</p>
+      ) : me.signInMethod === 'email_link' ? (
         <form
           className="cc-stack"
           onSubmit={async (e) => {

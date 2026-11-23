@@ -13,6 +13,7 @@ import { hashPassword, hashPin, newId, randomToken, tokenHash, verifyPassword, v
 import { AppError } from '../../lib/errors.ts';
 import { isPinUnlocked, PIN_UNLOCK_MS } from '../../lib/http.ts';
 import { getUserSetting } from '../../lib/userSettings.ts';
+import { passwordBlocked } from './signInPolicy.ts';
 
 export const SESSION_ABSOLUTE_MS = 14 * 24 * 60 * 60 * 1000;
 const LOGIN_FREE_FAILURES = 5;
@@ -96,7 +97,9 @@ export async function login(deps: AppDeps, ip: string, loginName: string, passwo
   const hasPassword = Boolean(user?.passwordHash);
   const ok = (await verifyPassword(hasPassword ? user!.passwordHash : DUMMY_HASH, password)) && hasPassword;
   const now = deps.now();
-  if (!user || !ok || user.disabledAt) {
+  // While teachers sign in with email links only (D-207) a teacher's password is never accepted, with
+  // the same answer and timing as a wrong one.
+  if (!user || !ok || user.disabledAt || passwordBlocked(db, user)) {
     recordFailure(db, ipKey, now, IP_MAX_FAILURES);
     if (userKey) recordFailure(db, userKey, now, LOGIN_FREE_FAILURES);
     throw new AppError('UNAUTHENTICATED', 'Incorrect sign-in details');
@@ -348,8 +351,9 @@ export function requestPasswordReset(deps: AppDeps, emailInput: string): void {
     .from(users)
     .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.disabledAt)))
     .all()
-    // Email-link accounts have no password to reset (D-108); they sign in with a link instead.
-    .filter((u) => u.signInMethod === 'password');
+    // Email-link accounts have no password to reset (D-108); they sign in with a link instead. The same
+    // goes for every teacher while the school allows them email links only (D-207).
+    .filter((u) => u.signInMethod === 'password' && !passwordBlocked(db, u));
   for (const user of matches) {
     const token = randomToken();
     const sent = tx(db, () => {
@@ -402,7 +406,7 @@ export async function completePasswordReset(deps: AppDeps, token: string, newPas
     const fresh = find(); // re-check inside the transaction: single use even under races
     if (!fresh) throw invalidLink();
     const user = db.select().from(users).where(eq(users.id, fresh.userId)).get();
-    if (!user || user.disabledAt) throw invalidLink();
+    if (!user || user.disabledAt || passwordBlocked(db, user)) throw invalidLink();
     const now = deps.now();
     db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, fresh.id)).run();
     db.update(users).set({ passwordHash, mustChangePassword: false, signInMethod: 'password', updatedAt: now }).where(eq(users.id, user.id)).run();

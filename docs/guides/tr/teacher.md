@@ -17,6 +17,8 @@ Hesabınızı okul yöneticiniz açar. Genellikle size bir **davet bağlantısı
 - **Şifreyle**: kullanıcı adınızı ve kendi belirlediğiniz şifreyi (en az 10 karakter) yazarsınız.
 - **E-posta giriş bağlantılarıyla**: şifreniz olmaz. Her girişte giriş sayfasında **Bana e-postayla giriş bağlantısı gönder** düğmesine basıp e-posta adresinizi yazarsınız. Bir dakika içinde bir bağlantı ve 6 haneli bir kod gelir. Bağlantıyı açıp **Giriş yap**'a basın ya da kodu e-postayı istediğiniz cihaza yazın. İkisi de yalnızca bir kez ve 15 dakika boyunca çalışır. Sayfa yazdığınız adresi tekrar gösterir, böylece yazım hatasını görebilirsiniz; **Başka bir e-posta adresi kullan** ile adresi yeniden yazabilirsiniz. Bu seçenek yalnızca okulda e-posta gönderimi ayarlanmışsa görünür.
 
+Bazı okullar öğretmenler için şifreyi kapatır. O zaman davet yalnızca e-posta giriş bağlantılarını sunar, giriş sayfası bunu söyler ve profilinizde **Bunun yerine şifre kullan** bulunmaz.
+
 Yöneticiniz size davet yerine **geçici şifre** verdiyse ilk girişte kendi şifrenizi belirlemeniz gerekir.
 
 Şifrenizi mi unuttunuz? Okulda e-posta ayarlanmışsa giriş sayfasındaki **Şifrenizi mi unuttunuz?** bağlantısını kullanın; sıfırlama bağlantısı bir saat geçerlidir. Değilse yöneticinizden şifrenizi sıfırlamasını isteyin. Bir giriş ya da sıfırlama bağlantısının süresi dolduysa sayfası **Bana yeni bir giriş bağlantısı gönder** ya da **Yeni bir sıfırlama bağlantısı iste** ve **Giriş sayfasına dön** düğmelerini gösterir. Şifre ile e-posta bağlantısı arasında daha sonra **Profil ve PIN** → **Nasıl giriş yapıyorsunuz** bölümünden geçiş yapabilirsiniz.

@@ -239,6 +239,13 @@
       "when": 1794455949275,
       "tag": "0033_s27d_assistant_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1795473783875,
+      "tag": "0034_s30_teacher_email_link_only",
+      "breakpoints": true
     }
   ]
 }

@@ -7,14 +7,15 @@ import type { z } from 'zod';
 import type * as C from '../../../shared/contracts/admin.ts';
 import { compareNames, normaliseName } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { auditEvents, users } from '../../db/schema.ts';
+import { auditEvents, schoolSettings, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { RequestContext, UserRow } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { hashPassword, randomToken } from '../../lib/crypto.ts';
 import { conflict, invalid, notFound } from '../../lib/errors.ts';
 import { createUser, insertUser, invalidateResetTokens, revokeAllUserMcpTokens, revokeAllUserSessions } from '../auth/service.ts';
-import { inviteStatus, issueInvite, revokeEmailLinks, revokeInvite } from '../auth/emailSignIn.ts';
+import { emailLinkEnabled, inviteStatus, issueInvite, revokeEmailLinks, revokeInvite } from '../auth/emailSignIn.ts';
+import { emailLinkRequired, passwordBlocked, teacherEmailLinkOnly } from '../auth/signInPolicy.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
@@ -61,6 +62,11 @@ export async function createUserByAdmin(ctx: RequestContext, input: In<typeof C.
   // The admin chooses the new account's interface language (S13a, D-099), English by default.
   const locale = input.locale;
   const base = { login: input.login, displayName: normaliseName(input.displayName), role: input.role, email: input.email ?? null, locale };
+  // D-207: while teachers sign in with email links only, a new teacher needs an address and gets an invite, never a password.
+  if (passwordBlocked(ctx.db, base)) {
+    if (input.setup === 'temporary_password') throw emailLinkRequired();
+    if (!base.email) throw invalid('A teacher needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
+  }
   if (input.setup === 'temporary_password') {
     const password = temporaryPassword();
     const u = await createUser(ctx.db, { ...base, password, mustChangePassword: true }, ctx.actor, ctx.now());
@@ -91,6 +97,8 @@ export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.update
     if (input.displayName !== undefined) patch.displayName = normaliseName(input.displayName);
     if (input.email !== undefined) patch.email = input.email?.trim().toLowerCase() || null;
     if (input.locale !== undefined) patch.locale = input.locale;
+    // D-207: without an address a teacher could not sign in at all.
+    if (patch.email === null && u.email !== null && passwordBlocked(ctx.db, u)) throw invalid('A teacher needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
     const emailChanged = patch.email !== undefined && patch.email !== u.email;
     // A new address is not verified until a mail to it is used (an invite or a sign-in link).
     ctx.db.update(users).set({ ...patch, ...(emailChanged ? { emailVerifiedAt: null } : {}), updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
@@ -143,6 +151,7 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
 export async function resetPasswordByAdmin(ctx: RequestContext, userId: string) {
   const u = getUser(ctx.db, userId);
   if (u.id === requireUser(ctx).id) throw invalid('Use “change password” for your own account', { reason: 'OWN_PASSWORD' });
+  if (passwordBlocked(ctx.db, u)) throw emailLinkRequired(); // D-207: send a new invite instead
   const password = temporaryPassword();
   const passwordHash = await hashPassword(password);
   tx(ctx.db, () => {
@@ -169,6 +178,54 @@ export function clearPinByAdmin(ctx: RequestContext, userId: string) {
     ctx.db.update(users).set({ pinHash: null, updatedAt: now }).where(eq(users.id, u.id)).run();
     revokeAllUserSessions(ctx.db, u.id, now);
     audit(ctx.db, ctx.actor, { action: 'auth.pin_cleared_admin', entity: 'user', entityId: u.id }, now);
+  });
+}
+
+// ---------------------------------------------------------------- sign-in policy (S30, D-207)
+const hasPassword = (u: UserRow) => u.signInMethod === 'password' && u.passwordHash !== '';
+
+export function signInPolicy(ctx: RequestContext) {
+  const teachers = ctx.db.select().from(users).where(eq(users.role, 'teacher')).all();
+  return {
+    teacherEmailLinkOnly: teacherEmailLinkOnly(ctx.db),
+    emailReady: emailLinkEnabled(ctx),
+    teachersWithPassword: teachers.filter(hasPassword).length,
+    teachersWithoutEmail: teachers
+      .filter((u) => u.disabledAt === null && !u.email)
+      .sort((a, b) => compareNames(a.displayName, b.displayName))
+      .map((u) => ({ id: u.id, displayName: u.displayName })),
+  };
+}
+
+/**
+ * "Teachers sign in with email links only" (D-207). Switching it on needs working email and an address
+ * on every active teacher account (otherwise they would be locked out), and in the same transaction
+ * removes every teacher's password: the account becomes an email-link account, its reset links and AI
+ * tool tokens stop (as for any change of sign-in method), and each change is audited. Open sessions
+ * stay open, so a lesson that is running is not interrupted. Switching it off changes no account.
+ */
+export function setTeacherEmailLinkOnly(ctx: RequestContext, on: boolean) {
+  return tx(ctx.db, () => {
+    const before = teacherEmailLinkOnly(ctx.db);
+    if (on === before) return signInPolicy(ctx);
+    const now = ctx.now();
+    let converted = 0;
+    if (on) {
+      if (!emailLinkEnabled(ctx)) throw invalid('Email is not set up', { reason: 'SMTP_NOT_CONFIGURED' });
+      const teachers = ctx.db.select().from(users).where(eq(users.role, 'teacher')).all();
+      if (teachers.some((u) => u.disabledAt === null && !u.email)) throw conflict('Every active teacher needs an email address first', { reason: 'TEACHERS_WITHOUT_EMAIL' });
+      for (const u of teachers) {
+        invalidateResetTokens(ctx.db, u.id, now);
+        if (!hasPassword(u)) continue; // an email-link account already, or an invite that is still open
+        ctx.db.update(users).set({ signInMethod: 'email_link', passwordHash: '', mustChangePassword: false, updatedAt: now }).where(eq(users.id, u.id)).run();
+        revokeAllUserMcpTokens(ctx.db, ctx.actor, u.id, now, 'method_change');
+        audit(ctx.db, ctx.actor, { action: 'auth.method_change', entity: 'user', entityId: u.id, before: { method: 'password' }, after: { method: 'email_link', reason: 'school_policy' } }, now);
+        converted += 1;
+      }
+    }
+    ctx.db.update(schoolSettings).set({ teacherEmailLinkOnly: on, updatedAt: now }).where(eq(schoolSettings.id, 1)).run();
+    audit(ctx.db, ctx.actor, { action: 'school.sign_in_policy', entity: 'school', before: { teacherEmailLinkOnly: before }, after: { teacherEmailLinkOnly: on, ...(on ? { passwordsRemoved: converted } : {}) } }, now);
+    return signInPolicy(ctx);
   });
 }
 

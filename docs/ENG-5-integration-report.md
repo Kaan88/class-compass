@@ -229,9 +229,12 @@ check made by a tool. The only reading taken from production that the records ho
 display's screen sample of 2026-11-10 (section 2.11: screen and window size, browser, touch; no
 student data; commit `f9ba110`). Apart from that, **no check in this report was made on production**:
 the restore drill used the test site's backup, the performance figures come from fictional schools,
-and the deploy checks after `4a770f2` were made on the test site only. The ROADMAP box "Production go-live only with
-explicit owner authorisation" stays open (opening the site to the school, KVKK sign-off before real
-students are added).
+and the deploy checks after `4a770f2` were made on the test site only. On 2026-11-24 the owner had
+the site opened to visitors in Turkey (an Access Bypass by country, test site first; the admin area
+stays behind Access; the owner states the KVKK sign-off is fine). The check then made on production
+was from outside only: the page, `/healthz` and the password-reset availability answer 200 from an
+address in Turkey, and the admin paths still redirect to the Access sign-in (OPERATIONS → "Open to
+visitors in Turkey").
 
 ## 5. Limitations and what was NOT tested
 
