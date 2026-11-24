@@ -665,6 +665,8 @@ A summary of what is still open after S14, S15a and the move to the Oracle serve
   - [ ] "Sign out everywhere" for a person's own sessions, and a list of them in Profile (longer sessions make this worth having)
   - [ ] The guide screenshot of the Google button is from before the mark (`npm run docs:screenshots`)
   - [ ] Idea, not decided: sign in on a classroom screen by scanning a QR code with a phone that is already signed in, and approving there (a short code on both screens against a swapped QR code)
+- [x] S36 (D-216): an account chooser after a Google or sign-in server sign-in when the proven address belongs to several accounts (a person's teacher and administrator accounts); provider ids are no longer unique (migration `0037`, indexes only); an address match always needs this sign-in's proof (an Opus worker, two Fable review rounds; `tests/server/google-signin.test.ts`, `tests/server/sso-signin.test.ts`, `tests/client/account-chooser.test.tsx`)
+  - [ ] A real try with two accounts on one address (Google and the sign-in server): a person's check
 - [ ] A password together with an authenticator code (TOTP), only if still wanted once Google and passkeys exist: the rule is "no password on its own" (owner, 2026-11-24)
 - [ ] Not planned: sign-in for student links through a parent's Google or Apple account (a link already needs no typing and keeps the device signed in; parent identities would be new personal data). If a leaked link is the worry: the "link opened on a new device" notification exists, and a link could be limited to a few devices
 - [ ] A daily line or notification for administrators about lockouts and failed sign-ins; a Cloudflare alert on the rate-limit and challenge rules

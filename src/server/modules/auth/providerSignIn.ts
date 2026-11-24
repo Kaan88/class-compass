@@ -85,10 +85,6 @@ interface PendingChoice {
 }
 
 /**
- * The addresses (lower case) by which an account without this provider's id may be this person: the
- * stored addresses of the active accounts that carry the id, or the proven address while none does.
- */
-/**
  * May an unlinked account be matched by the proven address? Yes while no active account carries the
  * id; otherwise only when the proven address is the stored address of one of those accounts.
  */
