@@ -136,6 +136,8 @@ Sınıf ekranını bir bilgisayarda daha önce (son 7 gün içinde) açtıysanı
 
 **Kaydet ve dersi bitir**'e basın. **Ders kaydedildi** özeti süreyi, ulaşılan rutin aşamalarını ve yoklamayı, Ders hedefleri açıksa **Hedefimiz** satırında bugünün hedefini ve sınıfın cevabını (ya da "Cevaplanmadı") gösterir. **Derse dön** bitirmeyi iptal eder ve süren derse geri götürür.
 
+**Dersi bitirmeyi unutursanız.** Dersin başlamasından bir buçuk saat sonra öğretmen menüsünün en üstünde **… dersiniz hâlâ sürüyor** yazısı, **Dersi bitir** düğmesi (o sınıfın Dersi bitir ekranını açar) ve dersin kendiliğinden biteceği saat görünür; panoda **Dersi bitir** düğmesinin yanında kısa bir not çıkar, zil simgesine de bir bildirim gelir. Başlangıçtan iki saat sonra ders kendiliğinden biter. Sizin yerinize hiçbir şey doldurulmaz: değerlendirme, gizli öğrencilerin açıklanması, hedef cevabı ve yardımcıya teşekkür boş kalır (raporlarda "kaydedilmedi"), dersin bitiş saati de iki saatin dolduğu andır. Ardından öğretmen menüsünde, siz **Tamam**'a basana kadar (hangi cihazda olursa olsun) **… dersi (…) saat … itibarıyla kendiliğinden bitirildi** yazısı görünür. Sonraki **Derse başla** her zamanki gibi çalışır. Raporlar böyle bir dersi yapılmış sayar ve kaçının kendiliğinden bittiğini gösterir.
+
 ![Dersi bitir](../img/tr/end-lesson.png)
 
 ## Sınıf ekranı

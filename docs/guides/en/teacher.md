@@ -136,6 +136,8 @@ Press **End lesson**. Depending on the modules, you go through:
 
 Press **Save and end lesson**. The summary **Lesson saved** shows the time, the routine stages reached and attendance, and with Lesson goals on, **Our goal**: today's goal with the class's answer (or "Not answered"). **Back to the lesson** cancels the end and returns to the running lesson.
 
+**If you forget to end a lesson.** An hour and a half after the start, the teacher menu shows **Your lesson in … is still running since …** at the top, with **End lesson** (it opens End lesson for that class) and the time it ends by itself; the board shows a short note beside its **End lesson** button, and the bell has a notification. Two hours after the start the lesson ends by itself. Nothing is filled in for you: the reflection, the secret students' reveal, the goal answer and the thanks to the assistant stay empty ("not recorded" in reports), and the lesson's end time is the two-hour mark. The teacher menu then shows **The lesson in … on … was ended automatically at …** until you press **Got it** (on any device). The next **Begin lesson** works as usual. Reports count such a lesson as held and show how many ended by themselves.
+
 ![End lesson](../img/en/end-lesson.png)
 
 ## The classroom screen
