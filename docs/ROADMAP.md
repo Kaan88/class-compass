@@ -647,6 +647,10 @@ A summary of what is still open after S14, S15a and the move to the Oracle serve
   - [x] An offer to add a passkey right after a sign-in by email or Google (one card, "Not now" for a month on that device, "Don't ask again" for the account; silent on a classroom display)
   - [ ] Passkey autofill in the username field
   - [ ] Guide screenshots of Profile → Passkeys and the sign-in page with the passkey button
+- [x] S34 (D-213): one sign-in server of the operator's own (any OpenID Connect provider), set in the server's settings; an icon-only button at the end of the sign-in card with its name for screen readers; every role may use it; never makes an account; not shown on a classroom display (`tests/server/sso-signin.test.ts` with a fake provider, `tests/client/sso-signin.test.tsx`)
+  - [ ] A real sign-in through the owner's provider on the test site (owner)
+  - [ ] The icon and its place on the real sign-in page, seen by the owner on a phone and a laptop
+  - [ ] An admin-list mark for accounts that have used it; more than one provider, if ever needed
 - [ ] A password together with an authenticator code (TOTP), only if still wanted once Google and passkeys exist: the rule is "no password on its own" (owner, 2026-11-24)
 - [ ] Not planned: sign-in for student links through a parent's Google or Apple account (a link already needs no typing and keeps the device signed in; parent identities would be new personal data). If a leaked link is the worry: the "link opened on a new device" notification exists, and a link could be limited to a few devices
 - [ ] A daily line or notification for administrators about lockouts and failed sign-ins; a Cloudflare alert on the rate-limit and challenge rules

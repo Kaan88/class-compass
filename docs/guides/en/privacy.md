@@ -34,6 +34,7 @@ The site keeps no grades from other systems, no home addresses, no phone numbers
   - Your email address and Google's ID are stored with your school account and are not shared with anyone. Google's ID is removed when the school changes the address on your account.
   - Google learns that you signed in to this site and when. Google's own privacy policy applies to that.
   - A Google sign-in leaves your Google account open in the browser you used. Use it only on your own device.
+- **With the school's own sign-in server**, where the school has connected one (a small icon on the sign-in page). That server tells the site your email address and its own ID for your account, which the site uses only to find your school account and sign you in. The site asks for nothing else and keeps no token from it. The ID is stored with your school account and removed when the school changes the address on it.
 - **Students** do not have accounts or passwords. A student opens their page with a link or card from the teacher; the link is the key, so keep it private.
 
 ## Cookies

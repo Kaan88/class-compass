@@ -14,6 +14,7 @@ import { TextField } from '../ui/Fields.tsx';
 import { AuthCard } from './AuthCard.tsx';
 import { GoogleSignIn } from './GoogleSignIn.tsx';
 import { PasskeySignIn } from './Passkeys.tsx';
+import { SsoSignIn } from './SsoSignIn.tsx';
 import { EmailLinkRequest, LinkDeadEnd, useFragmentToken } from './SignIn.tsx';
 import { homeFor, safeNext } from './guards.ts';
 import { SensitiveGate } from './Lock.tsx';
@@ -55,6 +56,18 @@ export function LoginPage() {
 
   if (forgot && resetInfo.data?.emailResetEnabled !== false) return <ForgotPassword onBack={back(() => setForgot(false))} />;
   if (byEmail && resetInfo.data?.emailLinkEnabled !== false) return <EmailLinkRequest onBack={back(() => setByEmail(false))} />;
+  // Until the page knows how this school signs in, it draws no form: otherwise the password form shows
+  // for a moment and is then taken away where passwords are off. If the answer cannot be had (no
+  // connection), the form below is the fallback.
+  if (resetInfo.isLoading) {
+    return (
+      <AuthCard title={t('auth.signIn')}>
+        <p className="cc-muted" role="status">
+          {t('common.loading')}
+        </p>
+      </AuthCard>
+    );
+  }
   // D-207: while the school has switched passwords off there is no password to type, so the page is the
   // email link (and Google) only. Without working email the form stays: the server's way back needs it.
   if (resetInfo.data?.passwordsOff && resetInfo.data.emailLinkEnabled) {
@@ -66,6 +79,7 @@ export function LoginPage() {
         </Button>
         {resetInfo.data.passkeysEnabled ? <PasskeySignIn /> : null}
         {resetInfo.data.googleSignInEnabled ? <GoogleSignIn /> : null}
+        {resetInfo.data.sso ? <SsoSignIn sso={resetInfo.data.sso} /> : null}
       </AuthCard>
     );
   }
@@ -93,6 +107,7 @@ export function LoginPage() {
       ) : null}
       {resetInfo.data?.passkeysEnabled ? <PasskeySignIn /> : null}
       {resetInfo.data?.googleSignInEnabled ? <GoogleSignIn /> : null}
+      {resetInfo.data?.sso ? <SsoSignIn sso={resetInfo.data.sso} /> : null}
     </AuthCard>
   );
 }

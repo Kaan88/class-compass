@@ -131,7 +131,16 @@ export const passwordResetAvailable = endpoint({
    * server has a Google client, so the sign-in page offers "Sign in with Google" (S31, D-208).
    * `passkeysEnabled`: passkeys can work on this address (S33, D-210; not on a bare IP address).
    */
-  output: z.object({ emailResetEnabled: z.boolean(), emailLinkEnabled: z.boolean(), passwordsOff: z.boolean(), googleSignInEnabled: z.boolean(), passkeysEnabled: z.boolean(), defaultLocale: Locale }),
+  output: z.object({
+    emailResetEnabled: z.boolean(),
+    emailLinkEnabled: z.boolean(),
+    passwordsOff: z.boolean(),
+    googleSignInEnabled: z.boolean(),
+    passkeysEnabled: z.boolean(),
+    /** S34 (D-213): the operator's own sign-in server, when set up: the button's name and whether it has an icon. */
+    sso: z.object({ name: z.string(), hasIcon: z.boolean() }).nullable(),
+    defaultLocale: Locale,
+  }),
 });
 
 /** Always answers `{ ok: true }` so the response never reveals whether an account exists. */
@@ -237,6 +246,28 @@ export const completeGoogleSignIn = endpoint({
   input: z.object({ state: z.string().min(20).max(200), code: z.string().min(1).max(2000) }),
   output: Me,
 });
+
+// ---------------------------------------------------------------- the operator's own sign-in server (S34, D-213)
+/** Where to send the browser; sets the short-lived HttpOnly cookie that binds the answer to this browser. Any role. */
+export const startSsoSignIn = endpoint({
+  method: 'POST',
+  path: '/api/auth/sso/start',
+  access: 'public',
+  input: Empty,
+  output: z.object({ authorizeUrl: z.string() }),
+});
+
+/** The `state` and `code` the provider sent back to `/signin-sso`, posted by that page (a GET never uses a code). */
+export const completeSsoSignIn = endpoint({
+  method: 'POST',
+  path: '/api/auth/sso/complete',
+  access: 'public',
+  input: z.object({ state: z.string().min(20).max(200), code: z.string().min(1).max(4000) }),
+  output: Me,
+});
+
+/** The button's icon (a small image file the operator put in the data folder); 404 when there is none. */
+export const ssoIcon = endpoint({ method: 'GET', path: '/api/auth/sso/icon', access: 'public', input: Empty, output: z.unknown() });
 
 // ---------------------------------------------------------------- passkeys (S33, D-210)
 /** WebAuthn options and answers are JSON objects defined by the standard; the server library checks them. */

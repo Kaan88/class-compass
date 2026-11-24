@@ -97,6 +97,15 @@ When the IT person has set it up on the server, the sign-in page also offers **S
 
 The site's address followed by `/privacy` opens the [Privacy](privacy.md) guide without an account, in English or Turkish. It says what Class Compass keeps, who sees it and what each way of signing in sends (for Google: only the email address and Google's id for the account). Point parents to it, and give this address as the privacy policy link when the IT person registers Sign in with Google. It names no school: questions go to the school.
 
+### A sign-in server of your own
+
+The IT person can connect one sign-in server of the school's own (any OpenID Connect provider, for example the school's mail server) in the server's settings. The sign-in page then shows it as a **small icon in the corner of the sign-in card**, without words; its name appears when you point at it, and screen readers read it.
+
+- It never makes an account: the server only confirms that the person owns the email address you put on their account.
+- Unlike Google, **administrators can use it too**, whether passwords are on or off, because the school itself runs this server.
+- The icon is not shown on a computer that has been used as a classroom display, for the same reason as Google: signing in would leave that account open in the browser.
+- Changing an account's email address means the next sign-in this way must match the new address.
+
 ## Email (SMTP)
 
 Class Compass sends email for invites, email sign-in links and password resets. Email is configured by the IT person on the server, not in the browser: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` in the server's settings file (see `docs/OPERATIONS.md`).

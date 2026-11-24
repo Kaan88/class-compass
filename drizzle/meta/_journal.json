@@ -253,6 +253,13 @@
       "when": 1795508935385,
       "tag": "0035_sec_level_audit_values",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1795510781575,
+      "tag": "0036_s34_sso_sub",
+      "breakpoints": true
     }
   ]
 }

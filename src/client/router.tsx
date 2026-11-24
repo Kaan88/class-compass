@@ -12,6 +12,7 @@ import { ChangePasswordPage, LoginPage, ResetPasswordPage } from './routes/Auth.
 import { ClassroomPage } from './routes/Classroom.tsx';
 import { InvitePage, SignInLinkPage } from './routes/SignIn.tsx';
 import { GoogleReturnPage } from './routes/GoogleSignIn.tsx';
+import { SsoReturnPage } from './routes/SsoSignIn.tsx';
 import { PrivacyPage } from './help/PrivacyPage.tsx';
 import { OAuthConsentPage, type ConsentSearch } from './routes/OAuthConsent.tsx';
 import { AiConnectionReturnPage } from './routes/AiConnections.tsx';
@@ -196,6 +197,21 @@ const helpRoute = createRoute({
   component: HelpPage,
 });
 
+/** Where the operator's own sign-in server sends the browser back (S34, D-213). */
+const ssoReturnRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/signin-sso',
+  validateSearch: (s: Record<string, unknown>): { state?: string | undefined; code?: string | undefined; error?: string | undefined } => ({
+    state: typeof s.state === 'string' ? s.state : undefined,
+    code: typeof s.code === 'string' ? s.code : undefined,
+    error: typeof s.error === 'string' ? s.error : undefined,
+  }),
+  component: function SsoReturnRoute() {
+    const search = ssoReturnRoute.useSearch();
+    return <SsoReturnPage state={search.state} code={search.code} denied={search.error !== undefined} />;
+  },
+});
+
 /** The privacy page (S32, D-209): public, no account needed; the same text as the Privacy guide in Help. */
 const privacyRoute = createRoute({ getParentRoute: () => rootRoute, path: '/privacy', component: PrivacyPage });
 
@@ -249,6 +265,7 @@ const routeTree = rootRoute.addChildren([
   inviteRoute,
   signInLinkRoute,
   googleReturnRoute,
+  ssoReturnRoute,
   privacyRoute,
   changePasswordRoute,
   classroomRoute,

@@ -34,6 +34,7 @@ Sitede başka sistemlerden gelen sınav ya da karne notları, ev adresleri, tele
   - E-posta adresiniz ve Google'ın kimlik numarası okul hesabınızla birlikte saklanır, kimseyle paylaşılmaz. Okul hesabınızdaki adresi değiştirdiğinde Google'ın kimlik numarası silinir.
   - Google, bu siteye ne zaman giriş yaptığınızı öğrenir. Bu konuda Google'ın kendi gizlilik politikası geçerlidir.
   - Google ile giriş, Google hesabınızı kullandığınız tarayıcıda açık bırakır. Yalnızca kendi cihazınızda kullanın.
+- **Okulun kendi giriş sunucusuyla**, okul böyle bir sunucu bağladıysa (giriş sayfasındaki küçük simge). Bu sunucu siteye e-posta adresinizi ve hesabınız için kullandığı kendi kimlik numarasını bildirir; site bunları yalnızca okul hesabınızı bulup giriş yapmanızı sağlamak için kullanır. Site başka hiçbir şey istemez ve bu sunucudan aldığı hiçbir anahtarı saklamaz. Kimlik numarası okul hesabınızla birlikte saklanır ve okul hesabınızdaki adresi değiştirdiğinde silinir.
 - **Öğrencilerin** hesabı ya da şifresi yoktur. Öğrenci sayfasını öğretmenin verdiği bağlantı ya da kartla açar; bağlantı anahtardır, kimseyle paylaşmayın.
 
 ## Çerezler

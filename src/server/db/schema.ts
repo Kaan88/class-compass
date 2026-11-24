@@ -230,11 +230,13 @@ export const users = sqliteTable(
      * null = never signed in with Google.
      */
     googleSub: text('google_sub'),
+    /** The operator's own sign-in server (S34, D-213): its permanent id of the person, kept the same way. Any role. */
+    ssoSub: text('sso_sub'),
     disabledAt: integer('disabled_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [uniqueIndex('users_login_uq').on(t.login), uniqueIndex('users_google_sub_uq').on(t.googleSub)],
+  (t) => [uniqueIndex('users_login_uq').on(t.login), uniqueIndex('users_google_sub_uq').on(t.googleSub), uniqueIndex('users_sso_sub_uq').on(t.ssoSub)],
 );
 
 export const SESSION_KINDS = ['user', 'student', 'scorer', 'display'] as const;
@@ -257,7 +259,7 @@ export const sessions = sqliteTable(
     pinFailures: integer('pin_failures').notNull().default(0),
     pinLockedUntil: integer('pin_locked_until'),
     /** How the session was signed in (S13b, D-108): a fresh email-link/invite session counts as re-authentication for 15 minutes. */
-    authMethod: text('auth_method', { enum: ['password', 'email_link', 'invite', 'google', 'passkey', 'student_link', 'scorer_link', 'scorer_pairing', 'display_link'] }),
+    authMethod: text('auth_method', { enum: ['password', 'email_link', 'invite', 'google', 'passkey', 'sso', 'student_link', 'scorer_link', 'scorer_pairing', 'display_link'] }),
     createdAt: integer('created_at').notNull(),
     lastSeenAt: integer('last_seen_at').notNull(),
     expiresAt: integer('expires_at').notNull(),

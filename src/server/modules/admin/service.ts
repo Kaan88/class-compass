@@ -101,8 +101,8 @@ export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.update
     if (patch.email === null && u.email !== null && passwordBlocked(ctx.db)) throw invalid('The account needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
     const emailChanged = patch.email !== undefined && patch.email !== u.email;
     // A new address is not verified until a mail to it is used (an invite or a sign-in link).
-    // The Google id belonged to the previous address (D-208): the new one must be proven again.
-    ctx.db.update(users).set({ ...patch, ...(emailChanged ? { emailVerifiedAt: null, googleSub: null } : {}), updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
+    // The Google id and the id of the operator's sign-in server belonged to the previous address (D-208, D-213): the new one must be proven again.
+    ctx.db.update(users).set({ ...patch, ...(emailChanged ? { emailVerifiedAt: null, googleSub: null, ssoSub: null } : {}), updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
     // Reset links, invites and sign-in links already mailed to the previous address must stop working (D-015, D-108).
     if (emailChanged) {
       invalidateResetTokens(ctx.db, u.id, ctx.now());

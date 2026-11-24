@@ -66,6 +66,17 @@ describe('sign-in page while passwords are off (S30, D-207)', () => {
     expect(screen.getByText(tr['signin.noPasswords'])).toBeTruthy();
   });
 
+  it('draws no form before it knows how the school signs in, so the password form never flashes', async () => {
+    // The first answer has not arrived: a request that never finishes.
+    vi.stubGlobal('fetch', () => new Promise(() => undefined));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(ME_KEY, null);
+    render(wrap(<LoginPage />, qc));
+    expect(screen.getByRole('status').textContent).toBe(en['common.loading']);
+    expect(document.querySelector('input')).toBeNull();
+    expect(screen.queryByRole('button', { name: en['auth.signIn'] })).toBeNull();
+  });
+
   it('keeps the password form while passwords are allowed, and when email is not set up', () => {
     render(wrap(<LoginPage />, client([[INFO, info]])));
     expect(document.querySelector('input[type="password"]')).not.toBeNull();

@@ -93,6 +93,12 @@ export interface AppDeps {
    * returns the parsed JSON answer. Tests inject a fake; production uses `exchangeWithGoogle`.
    */
   googleTokenExchange?: (params: URLSearchParams) => Promise<unknown>;
+  /**
+   * The operator's own sign-in server (S34, D-213): one HTTPS request to it (a GET of the discovery
+   * document, or a form POST to the token endpoint) that returns the parsed JSON answer. Tests inject
+   * a fake; production uses `ssoHttp` in `modules/auth/sso.ts`.
+   */
+  ssoHttp?: (url: string, form?: URLSearchParams) => Promise<unknown>;
   /** Tests only: a shorter total limit for "Test connection" requests; production uses `TEST_TIMEOUT_MS`. */
   aiTestTimeoutMs?: number;
 }

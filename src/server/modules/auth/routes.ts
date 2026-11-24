@@ -7,14 +7,16 @@ import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { executeCommand } from '../../lib/commands.ts';
 import { AppError } from '../../lib/errors.ts';
-import { route, sessionCookieName } from '../../lib/http.ts';
+import { rawRoute, route, sessionCookieName } from '../../lib/http.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
 import { setUserSetting } from '../../lib/userSettings.ts';
 import { getSchoolSettings } from '../school/policy.ts';
+import { notFound } from '../../lib/errors.ts';
 import * as svc from './service.ts';
 import * as email from './emailSignIn.ts';
 import * as google from './google.ts';
 import * as passkey from './passkeys.ts';
+import * as sso from './sso.ts';
 
 function setSessionCookie(deps: AppDeps, reply: FastifyReply, token: string, maxAgeMs: number) {
   reply.setCookie(sessionCookieName(deps), token, {
@@ -97,7 +99,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     return freshMe(ctx);
   });
 
-  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx), passwordsOff: getSchoolSettings(ctx.db).passwordsOff, googleSignInEnabled: google.googleSignInEnabled(ctx), passkeysEnabled: passkey.passkeysEnabled(ctx), defaultLocale: getSchoolSettings(ctx.db).defaultLocale }));
+  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx), passwordsOff: getSchoolSettings(ctx.db).passwordsOff, googleSignInEnabled: google.googleSignInEnabled(ctx), passkeysEnabled: passkey.passkeysEnabled(ctx), sso: sso.ssoPublicInfo(ctx), defaultLocale: getSchoolSettings(ctx.db).defaultLocale }));
   route(
     app,
     deps,
@@ -180,6 +182,40 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     },
     { rateLimit: { max: 20, timeWindow: '15 minutes' } },
   );
+  // The operator's own sign-in server (S34, D-213): the same shape as Google's two steps.
+  const ssoCookie = { path: sso.SSO_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'lax' as const };
+  route(
+    app,
+    deps,
+    C.startSsoSignIn,
+    async (ctx, _i, { reply }) => {
+      const started = await sso.startSsoSignIn(ctx);
+      reply.setCookie(sso.SSO_COOKIE, started.cookie, { ...ssoCookie, maxAge: Math.floor(sso.SSO_STATE_TTL_MS / 1000) });
+      return { authorizeUrl: started.authorizeUrl };
+    },
+    { rateLimit: { max: 20, timeWindow: '15 minutes' } },
+  );
+  route(
+    app,
+    deps,
+    C.completeSsoSignIn,
+    async (ctx, input, { req, reply }) => {
+      reply.clearCookie(sso.SSO_COOKIE, ssoCookie);
+      return signedIn(ctx, reply, await sso.completeSsoSignIn(ctx, req.cookies?.[sso.SSO_COOKIE], input));
+    },
+    { rateLimit: { max: 20, timeWindow: '15 minutes' } },
+  );
+  // An image only: never run as a page, never guessed to be another type, and cached for a short time.
+  rawRoute(app, deps, C.ssoIcon, (ctx, _i, { reply }) => {
+    const icon = sso.ssoIcon(ctx);
+    if (!icon) throw notFound('Icon');
+    return reply
+      .header('Content-Type', icon.type)
+      .header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+      .header('X-Content-Type-Options', 'nosniff')
+      .header('Cache-Control', 'public, max-age=3600')
+      .send(icon.body);
+  });
   // Passkeys (S33, D-210): the challenge of each step lives in a sealed cookie, for one try.
   const passkeyCookie = { path: passkey.PASSKEY_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'strict' as const };
   const passkeyMaxAge = Math.floor(passkey.PASSKEY_CHALLENGE_TTL_MS / 1000);

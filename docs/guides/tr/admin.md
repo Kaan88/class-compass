@@ -97,6 +97,15 @@ Bilgi işlem sorumlusu sunucuda ayarladıysa giriş sayfasında **Google ile gir
 
 Sitenin adresinin sonuna `/privacy` eklendiğinde [Gizlilik](privacy.md) kılavuzu hesap gerekmeden, Türkçe ya da İngilizce açılır. Sınıf Pusulası'nın neleri sakladığını, bunları kimin gördüğünü ve her giriş yolunun neleri gönderdiğini anlatır (Google için: yalnızca e-posta adresi ve Google'ın hesaba verdiği kimlik). Velileri bu sayfaya yönlendirin; bilgi işlem sorumlusu Google ile girişi kaydederken gizlilik politikası bağlantısı olarak bu adres verilmelidir. Sayfada hiçbir okulun adı geçmez: sorular okula yöneltilir.
 
+### Okulun kendi giriş sunucusu
+
+Bilgi işlem sorumlusu, sunucu ayarlarında okula ait bir giriş sunucusunu (herhangi bir OpenID Connect sağlayıcısı, örneğin okulun e-posta sunucusu) bağlayabilir. Giriş sayfası bunu **giriş kartının köşesinde küçük bir simge** olarak, yazısız gösterir; üzerine gelindiğinde adı görünür, ekran okuyucular da adını okur.
+
+- Hesap açmaz: sunucu yalnızca kişinin, hesabına yazdığınız e-posta adresinin sahibi olduğunu doğrular.
+- Google'dan farklı olarak, **yöneticiler de kullanabilir**; şifreler açık da olsa kapalı da olsa. Çünkü bu sunucuyu okulun kendisi işletir.
+- Simge, sınıf ekranı olarak kullanılmış bir bilgisayarda gösterilmez; nedeni Google ile aynıdır: giriş yapmak o hesabı tarayıcıda açık bırakır.
+- Bir hesabın e-posta adresini değiştirirseniz bu yolla yapılacak sonraki giriş yeni adresle eşleşmelidir.
+
 ## E-posta (SMTP)
 
 Sınıf Pusulası davetler, e-posta giriş bağlantıları ve şifre sıfırlama için e-posta gönderir. E-posta tarayıcıdan değil, bilgi işlem sorumlusu tarafından sunucuda ayarlanır: sunucunun ayar dosyasında `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` ve `SMTP_FROM` (bkz. `docs/OPERATIONS.md`).

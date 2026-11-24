@@ -114,6 +114,23 @@ const EnvSchema = z.object({
    */
   GOOGLE_SIGNIN_CLIENT_ID: z.string().optional().default(''),
   GOOGLE_SIGNIN_CLIENT_SECRET: z.string().optional().default(''),
+  /**
+   * Sign in with the operator's own sign-in server (S34, D-213): one OpenID Connect provider, offered
+   * when `SSO_ISSUER` (an https address) and `SSO_CLIENT_ID` are set. `SSO_CLIENT_SECRET` is optional
+   * (without it the client is public and PKCE carries the proof). `SSO_NAME` is the button's name for
+   * the tooltip and screen readers. `SSO_ICON_FILE` is a .png, .webp or .svg file name in DATA_DIR,
+   * shown as the button. `SSO_TRUST_EMAIL=true` accepts the address the provider names without an
+   * `email_verified` claim: only for a provider that names nothing but addresses it owns.
+   */
+  SSO_ISSUER: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().startsWith('https://').optional()),
+  SSO_CLIENT_ID: z.string().optional().default(''),
+  SSO_CLIENT_SECRET: z.string().optional().default(''),
+  SSO_NAME: z.string().max(60).optional().default(''),
+  SSO_ICON_FILE: z.string().max(120).optional().default(''),
+  SSO_TRUST_EMAIL: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 /** "Sign in with ChatGPT" can be offered: the switch is on and every value it needs is set (D-179). */

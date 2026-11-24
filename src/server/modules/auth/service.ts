@@ -27,8 +27,8 @@ export const normaliseLogin = (login: string) => foldForSearch(login.trim());
 /** How long a session made by an email link, code or invite counts as re-authentication (S13b, D-108). */
 export const FRESH_SIGN_IN_MS = 15 * 60 * 1000;
 
-/** A session signed in with an email link, code, invite, Google or a passkey within FRESH_SIGN_IN_MS (re-authentication for email-link accounts). */
-const FRESH_METHODS: ReadonlyArray<SessionRow['authMethod']> = ['email_link', 'invite', 'google', 'passkey'];
+/** A session signed in with an email link, code, invite, Google, a passkey or the operator's sign-in server within FRESH_SIGN_IN_MS (re-authentication for email-link accounts). */
+const FRESH_METHODS: ReadonlyArray<SessionRow['authMethod']> = ['email_link', 'invite', 'google', 'passkey', 'sso'];
 export const isFreshEmailSession = (session: SessionRow, now: number) => FRESH_METHODS.includes(session.authMethod) && now - session.createdAt <= FRESH_SIGN_IN_MS;
 
 export function toMe(db: Db, user: UserRow, session: SessionRow, now: number): Me {
@@ -321,6 +321,7 @@ export function insertUser(db: Db, input: NewUserInput, passwordHash: string, ac
     signInMethod: 'password',
     emailVerifiedAt: null,
     googleSub: null,
+    ssoSub: null,
     timeUpClipFileId: null,
     disabledAt: null,
     createdAt: now,

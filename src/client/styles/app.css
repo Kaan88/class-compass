@@ -1468,6 +1468,33 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
   position: relative;
   z-index: 1;
 }
+/* The operator's own sign-in server (S34, D-213): one small icon-only button at the end of the sign-in
+   card. Quiet, not hidden: a full touch target, a name for screen readers, full strength on hover and focus. */
+.cc-sso {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.cc-sso__button {
+  min-width: var(--cc-touch);
+  min-height: var(--cc-touch);
+  padding: 0.25rem;
+  opacity: 0.7;
+}
+.cc-sso__button:hover,
+.cc-sso__button:focus-visible {
+  opacity: 1;
+}
+.cc-sso__icon {
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.4rem;
+}
+.cc-sso__letter {
+  font-weight: 700;
+}
 /* The invite page shows the new username on its own, in a box that is easy to read and copy. */
 .cc-auth__username {
   display: flex;
