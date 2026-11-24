@@ -71,7 +71,7 @@ function wrap(node: ReactNode, fullscreenPref: boolean | null = true) {
 const start = (pref: boolean | null = true) =>
   wrap(<StartLessonFlow context={context} draft={emptyStartDraft()} onDraft={() => undefined} onCancel={() => undefined} onStarted={() => undefined} onQueued={() => undefined} />, pref);
 const end = (pref: boolean | null = true) =>
-  wrap(<EndLessonFlow context={context} lesson={lesson} draft={null} onDraft={() => ({})} onCancel={() => undefined} onEnded={() => undefined} onQueued={() => undefined} />, pref);
+  wrap(<EndLessonFlow context={context} lesson={lesson} live={false} draft={null} onDraft={() => ({})} onCancel={() => undefined} onEnded={() => undefined} onQueued={() => undefined} />, pref);
 const press = async (name: string) => {
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name }));

@@ -7742,3 +7742,33 @@ html[data-cursor='off'] * {
 .cc-lesson-notice__sub {
   font-weight: 400;
 }
+/* S37 (D-218): the board's "still running" note floats above the dock at the right (the toaster's
+   notes are at the left), so the student grid keeps its height; `useAboveDock` measures the dock. */
+.cc-overdue-note {
+  position: fixed;
+  z-index: 55;
+  right: 1rem;
+  bottom: 5.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  width: min(26rem, calc(100% - 2rem));
+  padding: 0.75rem 1rem;
+  border: var(--cc-border-width-strong) solid var(--cc-border-strong);
+  border-radius: var(--cc-radius);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  box-shadow: var(--cc-shadow);
+}
+.cc-overdue-note[data-above-dock] {
+  bottom: var(--cc-dock-clear, 5.5rem);
+}
+.cc-overdue-note > svg {
+  flex: none;
+}
+.cc-overdue-note__text {
+  flex: 1 1 12em;
+  min-width: 0;
+  overflow-wrap: break-word;
+}

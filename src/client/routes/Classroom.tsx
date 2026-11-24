@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { LessonSummary } from '../../shared/contracts/lessons.ts';
+import type { LessonState, LessonSummary } from '../../shared/contracts/lessons.ts';
 import * as School from '../../shared/contracts/school.ts';
 import { DEFAULT_THEME } from '../../shared/themes.ts';
 import { formatDate, pickText, type MessageKey } from '../../shared/i18n/index.ts';
@@ -28,6 +28,7 @@ import { useMe } from '../lib/session.ts';
 import { LessonBoard } from '../modules/lessons/board/Board.tsx';
 import { classLabel } from '../modules/lessons/labels.ts';
 import { EndLessonFlow, LessonSummaryView, QueuedEndCard, type EndDraft } from '../modules/lessons/EndLesson.tsx';
+import { OverdueNote } from '../modules/lessons/OverdueNote.tsx';
 import { serverNow, useActiveLessons, useLessonState, useQueuedEnd, useQueuedStart, useServerOffset } from '../modules/lessons/lessonClient.ts';
 import { emptyStartDraft, QueuedStartCard, StartLessonFlow, StartWarmup, type StartDraft } from '../modules/lessons/StartLesson.tsx';
 import { useClassroomScreen } from '../lib/appWorker.ts';
@@ -37,7 +38,7 @@ import { preloadTimeUp } from '../modules/lessons/timeUp.ts';
 import { BigButton, Button, buttonClass } from '../ui/Button.tsx';
 import { EmptyState, OutboxAttentionTray, OutboxSaveBadge, registerCommandDescription } from '../ui/Feedback.tsx';
 import { Toggle } from '../ui/Fields.tsx';
-import { IconCalendar, IconClock, IconCloudOff, IconLock, IconPlay } from '../ui/icons.tsx';
+import { IconCalendar, IconCloudOff, IconLock, IconPlay } from '../ui/icons.tsx';
 import { ClassSwitcher } from '../ui/Layout.tsx';
 import { ClassroomTopBar } from '../ui/ClassroomTopBar.tsx';
 
@@ -89,6 +90,7 @@ const COMMAND_TEXT: Record<string, MessageKey> = {
   'grouping.saveToOption': 'command.grouping.saveToOption',
   'lesson.setTopics': 'command.lesson.setTopics',
   'lesson.setDisplay': 'command.lesson.setDisplay',
+  'lesson.stillTeaching': 'command.lesson.stillTeaching',
   'assistant.checkDuty': 'command.assistant.checkDuty',
   'lessonGoals.set': 'command.lessonGoals.set',
 };
@@ -101,10 +103,24 @@ const COMMAND_TEXT: Record<string, MessageKey> = {
 type Mode =
   | { kind: 'idle' }
   | { kind: 'starting'; draft: StartDraft }
-  | { kind: 'ending'; lessonId: string; draft: EndDraft | null }
+  /** `lesson`: as it was when End Lesson opened; the flow stays with its draft if the lesson ends underneath (S37). */
+  | { kind: 'ending'; lessonId: string; lesson: LessonState; draft: EndDraft | null }
   | { kind: 'summary'; lessonId: string; summary: LessonSummary | null };
 
 export const classroomContextsKey = ['classroom', 'contexts'] as const;
+
+/**
+ * What `?endLesson=<contextId>` asks for now (S37, D-218: the teacher home's "still running" notice):
+ * an id that is not one of this teacher's class+subjects is dropped; otherwise switch to it, wait for
+ * its lesson to be read, then open End Lesson for the running lesson; a lesson that ended meanwhile
+ * just shows that class (its start screen).
+ */
+export function endLessonTarget(a: { wanted: string; ids: readonly string[]; activeId: string | null; lessonLoaded: boolean; lessonId: string | null }): 'clear' | 'switch' | 'wait' | 'open' {
+  if (!a.ids.includes(a.wanted)) return 'clear';
+  if (a.activeId !== a.wanted) return 'switch';
+  if (!a.lessonLoaded) return 'wait';
+  return a.lessonId ? 'open' : 'clear';
+}
 
 export function ClassroomPage() {
   const me = useMe();
@@ -212,12 +228,11 @@ function ClassroomScreen({
   const lessonId = lesson?.id ?? null;
   useEffect(() => {
     if (!wanted || !listReady) return;
-    const clear = () => void navigate({ to: '/classroom', search: {}, replace: true });
-    if (!list.some((c) => c.id === wanted)) return clear();
-    if (active?.id !== wanted) return switchTo(wanted);
-    if (!lessonLoaded) return;
-    if (lessonId) setMode(wanted, { kind: 'ending', lessonId, draft: null });
-    clear();
+    const step = endLessonTarget({ wanted, ids: list.map((c) => c.id), activeId: active?.id ?? null, lessonLoaded, lessonId });
+    if (step === 'switch') return switchTo(wanted);
+    if (step === 'wait') return;
+    if (step === 'open' && lesson) setMode(wanted, { kind: 'ending', lessonId: lesson.id, lesson, draft: null });
+    void navigate({ to: '/classroom', search: {}, replace: true });
   }, [wanted, listReady, list, active?.id, lessonLoaded, lessonId]);
 
   if (!me) return null;
@@ -243,17 +258,21 @@ function ClassroomScreen({
       return <LessonSummaryView lessonId={mode.lessonId} timezone={active.timezone} initial={mode.summary} onDone={() => setMode(active.id, { kind: 'idle' })} />;
     }
     if (lessonQ.isLoading) return <p>{t('common.loading')}</p>;
-    if (lesson && mode.kind === 'ending') {
+    // End Lesson stays open with its draft even when the lesson ended underneath (S37, D-218): the
+    // teacher's answers are never dropped silently; Save still keeps them (a late End Lesson).
+    if (mode.kind === 'ending' && (!lesson || lesson.id === mode.lessonId)) {
       const contextId = active.id;
+      const shown = lesson ?? mode.lesson;
       return (
         <EndLessonFlow
-          key={`${contextId}:${lesson.id}`}
+          key={`${contextId}:${shown.id}`}
           context={active}
-          lesson={lesson}
-          draft={mode.lessonId === lesson.id ? mode.draft : null}
-          onDraft={(fn) => updateMode(contextId, (m) => (m.kind === 'ending' && m.lessonId === lesson.id ? { ...m, draft: fn(m.draft) } : m))}
+          lesson={shown}
+          live={lesson?.id === shown.id && lesson.status === 'active'}
+          draft={mode.draft}
+          onDraft={(fn) => updateMode(contextId, (m) => (m.kind === 'ending' && m.lessonId === shown.id ? { ...m, draft: fn(m.draft) } : m))}
           onCancel={() => setMode(active.id, { kind: 'idle' })}
-          onEnded={(summary) => setMode(active.id, { kind: 'summary', lessonId: lesson.id, summary })}
+          onEnded={(summary) => setMode(active.id, { kind: 'summary', lessonId: shown.id, summary })}
           onQueued={() => setMode(contextId, { kind: 'idle' })}
         />
       );
@@ -274,7 +293,7 @@ function ClassroomScreen({
         />
       );
     }
-    if (lesson) return <LessonBoard key={active.id} context={active} lesson={lesson} onEnd={() => setMode(active.id, { kind: 'ending', lessonId: lesson.id, draft: null })} />;
+    if (lesson) return <LessonBoard key={active.id} context={active} lesson={lesson} onEnd={() => setMode(active.id, { kind: 'ending', lessonId: lesson.id, lesson, draft: null })} />;
     // The start screen waits for its own start while it can be sent; a start that waits (offline, or
     // after a reload) is shown here.
     if (queuedStart && mode.kind !== 'starting') return <QueuedStartCard key={queuedStart.opId} context={active} opId={queuedStart.opId} onStarted={startedFromQueue(active.id)} />;
@@ -360,13 +379,8 @@ function ClassroomScreen({
                 <span>{t('classroom.offlineNote')}</span>
               </p>
             )}
-            {/* S37 (D-218): past the point the lesson should be over; the dock's End lesson ends it. */}
-            {lesson?.overdue && lessonRunning && mode.kind !== 'ending' ? (
-              <p className="cc-offline-note cc-lesson-overdue" role="status" data-testid="lesson-overdue-note">
-                <IconClock />
-                <span>{t('lessonNotice.board', { time: formatDate(lesson.autoEndAt, locale, active.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) })}</span>
-              </p>
-            ) : null}
+            {/* S37 (D-218): a lesson that may be forgotten; floats above the dock, takes no height from the board. */}
+            {lesson?.overdue && lessonRunning && mode.kind !== 'ending' ? <OverdueNote lesson={lesson} timezone={active.timezone} /> : null}
             {body()}
           </>
         ) : null}

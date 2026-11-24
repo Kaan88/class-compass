@@ -1,12 +1,13 @@
 /**
  * The teacher home's notices about forgotten lessons (S37, D-218), at the top of the page:
  *
- * - a lesson still running past the point it should be over: "Your lesson in 3-A English is still
- *   running since 10:05", when it ends by itself, and End lesson (opens End Lesson for that class in
- *   the classroom);
- * - a lesson the server ended because nobody did: "… was ended automatically at 12:05. Anything you did
- *   not finish in End Lesson was left empty." with Got it, which dismisses it for good (stored per lesson
- *   on the server, so on every device).
+ * - a lesson that may be forgotten (old enough and quiet for a while): "Your lesson in 3-A English is
+ *   still running since 10:05", when it ends by itself if nothing happens in it, End lesson (opens End
+ *   Lesson for that class in the classroom) and Still teaching (a classroom command that counts as
+ *   activity; the banner goes at once and comes back only after another quiet spell);
+ * - a lesson that ended by itself: "… ended by itself … Anything you did not finish in End Lesson was
+ *   left empty." with Got it, which dismisses it for good (stored per lesson on the server, so on
+ *   every device).
  *
  * Words and an icon carry the state, never colour alone; buttons are touch targets; nothing moves.
  * Times are shown in the class's timezone.
@@ -16,6 +17,7 @@ import { Link } from '@tanstack/react-router';
 import * as L from '../../../shared/contracts/lessons.ts';
 import { formatDate } from '../../../shared/i18n/index.ts';
 import { call } from '../../lib/api.ts';
+import { getOutbox } from '../../lib/outbox-client.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { useRun } from '../../lib/useRun.ts';
 import { Button, buttonClass } from '../../ui/Button.tsx';
@@ -41,10 +43,18 @@ export function LessonNotices() {
           <div className="cc-stack cc-lesson-notice__body">
             <p className="cc-lesson-notice__text">{t('lessonNotice.running', { cls: classLabel(n, locale), time: time(n.startedAt, n.timezone) })}</p>
             <p className="cc-lesson-notice__sub">{t('lessonNotice.runningAutoEnd', { time: time(n.autoEndAt, n.timezone) })}</p>
-            <div>
+            <div className="cc-row">
               <Link to="/classroom" search={{ endLesson: n.contextId }} className={buttonClass('primary')}>
                 {t('lessonNotice.endNow')}
               </Link>
+              <Button
+                onPress={() => {
+                  void getOutbox().enqueue('lesson.stillTeaching', { contextId: n.contextId, lessonId: n.lessonId }, { contextId: n.contextId, lessonId: n.lessonId });
+                  qc.setQueryData<L.LessonNotices>(LESSON_NOTICES_KEY, (d) => (d ? { ...d, running: d.running.filter((x) => x.lessonId !== n.lessonId) } : d));
+                }}
+              >
+                {t('lessonNotice.stillTeaching')}
+              </Button>
             </div>
           </div>
         </div>

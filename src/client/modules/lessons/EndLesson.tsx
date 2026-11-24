@@ -26,6 +26,9 @@ import { endStepUis, type ClassroomContext } from '../registry.ts';
 import type { ReflectionValue } from './ReflectionStep.tsx';
 
 
+/** How often an open End Lesson says "Still teaching" (well inside LESSON_IDLE_BEFORE_AUTO_END_MS). */
+export const END_LESSON_KEEPALIVE_MS = 10 * 60_000;
+
 /** Values typed into the End Lesson steps so far; kept by the classroom page per class and lesson (LES-4). */
 export type EndDraft = Record<string, unknown>;
 
@@ -37,9 +40,17 @@ export function EndLessonFlow({
   onCancel,
   onEnded,
   onQueued,
+  live,
 }: {
   context: ClassroomContext;
+  /** The lesson as it was when End Lesson opened (kept on screen if it ends underneath, S37). */
   lesson: LessonState;
+  /**
+   * The lesson is still running (S37, D-218). While it is, End Lesson open counts as activity: "Still
+   * teaching" on opening and every few minutes, so a lesson is never ended by itself under an open
+   * End Lesson. Once it is not, the draft stays and a note says Save still keeps it.
+   */
+  live: boolean;
   /** null = nothing typed yet (each step starts from its initial value). */
   draft: EndDraft | null;
   onDraft: (update: (d: EndDraft | null) => EndDraft) => void;
@@ -57,6 +68,13 @@ export function EndLessonFlow({
   const [error, setError] = useState<string | null>(null);
   const label = classLabel(context, locale);
   const prefs = useLessonPrefs();
+  useEffect(() => {
+    if (!live) return;
+    const ping = () => void sendLessonCommand('lesson.stillTeaching', { contextId: context.id, lessonId: lesson.id });
+    ping();
+    const id = window.setInterval(ping, END_LESSON_KEEPALIVE_MS);
+    return () => window.clearInterval(id);
+  }, [live, context.id, lesson.id]);
 
   const finish = async () => {
     // S18 (D-167): Save and end leaves full screen (Back to lesson keeps it).
@@ -97,6 +115,12 @@ export function EndLessonFlow({
           <Component lesson={lesson} value={values[key]} onChange={(v) => setValues((s) => ({ ...s, [key]: v }))} />
         </section>
       ))}
+      {live ? null : (
+        <p className="cc-offline-note" role="status" data-testid="end-lesson-ended-underneath">
+          <IconClock />
+          <span>{t('lesson.endedUnderneath')}</span>
+        </p>
+      )}
       {error ? <Alert>{error}</Alert> : null}
       {busy && !error ? (
         <p role="status" className="cc-muted">
@@ -210,6 +234,13 @@ export function LessonSummaryView({ lessonId, timezone, initial, onDone }: { les
           <span>{t('summary.autoEndedNote')}</span>
         </p>
       ) : null}
+      {s?.notApplied?.length ? (
+        // S37 (D-218): a late End Lesson saved everything it could; these steps could not be saved any more.
+        <p className="cc-offline-note" role="status" data-testid="summary-not-applied">
+          <IconClock />
+          <span>{t('summary.notApplied', { steps: endStepUis(s.notApplied).map((u) => t(u.title)).join(', ') })}</span>
+        </p>
+      ) : null}
       {s ? (
         <dl className="cc-summary">
           <dt>{t('summary.class')}</dt>
@@ -218,7 +249,7 @@ export function LessonSummaryView({ lessonId, timezone, initial, onDone }: { les
           <dd>
             {formatDate(s.startedAt, locale, timezone, { weekday: 'long', day: 'numeric', month: 'long' })} · {formatDate(s.startedAt, locale, timezone, { hour: '2-digit', minute: '2-digit' })}
             {s.endedAt && s.autoEnded
-              ? // S37 (D-218): the limit, not a length the class was taught: no minutes.
+              ? // S37 (D-218): the last activity, not a length anyone chose: no minutes.
                 ` (${t('summary.autoEnded', { time: formatDate(s.endedAt, locale, timezone, { hour: '2-digit', minute: '2-digit' }) })})`
               : s.endedAt
                 ? `–${formatDate(s.endedAt, locale, timezone, { hour: '2-digit', minute: '2-digit' })} (${t('summary.minutes', { count: Math.max(1, Math.round((s.endedAt - s.startedAt) / 60_000)) })})`

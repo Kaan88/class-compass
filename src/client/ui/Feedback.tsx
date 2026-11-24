@@ -60,7 +60,7 @@ const DOCK_GAP_PX = 8;
  * scroll. The clearance is written straight on the toaster (a CSS variable, no React render), so the
  * note moves before the next paint. Without a dock in view the CSS placement applies unchanged.
  */
-function useAboveDock(ref: RefObject<HTMLDivElement | null>, active: boolean) {
+export function useAboveDock(ref: RefObject<HTMLElement | null>, active: boolean) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!active || !el) return;

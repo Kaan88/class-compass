@@ -53,6 +53,8 @@ export interface OutboxError {
 
 /** Refusals a retry can never change: the command can only be dismissed. */
 const FINAL_REASONS = new Set(['OP_ID_REUSED', 'UNKNOWN_COMMAND', 'START_STALE']);
+/** Signals whose refusal needs nobody (S37, D-218: "Still teaching" for a lesson that has ended): dropped, never in Needs attention. */
+const DROP_WHEN_REFUSED = new Set(['lesson.stillTeaching']);
 
 /**
  * Retry re-sends under a NEW opId (D-035). That is only safe when the server definitely did not apply
@@ -285,6 +287,8 @@ export function createOutbox(opts: OutboxOptions): Outbox {
               /* a listener must never break the queue */
             }
           });
+        } else if (DROP_WHEN_REFUSED.has(op.type)) {
+          await db.ops.delete(op.seq!);
         } else {
           await db.ops.update(op.seq!, { state: 'rejected', error: r.error ?? { code: 'REJECTED', message: 'Rejected' }, attempts: op.attempts + 1 });
         }

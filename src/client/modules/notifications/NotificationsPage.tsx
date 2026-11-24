@@ -189,8 +189,9 @@ function NotificationLine({ item, onOpen }: { item: NotificationItem; onOpen: ()
           <Link to="/teacher/$page" params={{ page: link.page }} search={link.search} className={buttonClass('secondary', 'small')} onClick={onOpen}>
             {t('notifications.open')}
           </Link>
-        ) : item.category === 'lessonStillRunning' && item.context ? (
-          // S37 (D-218): straight to End lesson for that class+subject (nothing happens if it has ended since).
+        ) : item.category === 'lessonStillRunning' && item.context && !item.read ? (
+          // S37 (D-218): straight to End lesson for that class+subject. A lesson that has ended marks
+          // this row read (the server), so the link is only on a lesson that may still run.
           <Link to="/classroom" search={{ endLesson: item.context.id }} className={buttonClass('secondary', 'small')} onClick={onOpen}>
             {t('lessonNotice.endNow')}
           </Link>
