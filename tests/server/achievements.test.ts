@@ -180,6 +180,32 @@ describe('"seen" marks only the award rows the page celebrated (D-122)', () => {
     await ok(seen({ awardIds: [badgeOf(after, SUNSHINE).awardId] }));
     expect(badgeOf(section(await ok(adaPhone.get('/api/student/page'))), SUNSHINE).isNew).toBe(false);
   });
+
+  it('a badge held in two classes of one subject is seen as one: revoking the newer row does not make it new again; a later award of it is new', async () => {
+    // Mehmet also teaches English to 3-A: Ada has the badge from both teachers; the page shows the newest.
+    const ctx2 = await ok(s.admin.post('/api/admin/teaching-contexts', { teacherId: s.mehmet.id, classId: s.c3a.id, subjectId: s.english.id }));
+    const award = async (teacher: Client, contextId: string) => {
+      await ok(teacher.post(`/api/teacher/contexts/${contextId}/achievements/award`, { achievementId: KIND, studentIds: [ada.id] }));
+      return (await ok(teacher.get(`/api/teacher/contexts/${contextId}/students/${ada.id}/achievements`))).awards.find((a: any) => a.achievementId === KIND && !a.revokedAt).id as string;
+    };
+    const older = await award(s.teacherA, s.ctxA.id);
+    env.clock.advance(60_000);
+    const newer = await award(s.teacherB, ctx2.id);
+    const shown = section(await ok(adaPhone.get('/api/student/page'))).earned.filter((e: any) => e.id === KIND);
+    expect(shown).toMatchObject([{ awardId: newer, isNew: true }]);
+    await ok(seen({ awardIds: [newer] }));
+    // The newer row is revoked: the older one shows, and it is not new.
+    env.clock.advance(60_000);
+    await ok(s.teacherB.post(`/api/teacher/awards/${newer}/revoke`, { reason: 'Given by mistake' }));
+    expect(section(await ok(adaPhone.get('/api/student/page'))).earned.filter((e: any) => e.id === KIND)).toMatchObject([{ awardId: older, isNew: false }]);
+    // Given again after the report: a new award, still celebrated.
+    env.clock.advance(60_000);
+    const again = await award(s.teacherB, ctx2.id);
+    expect(section(await ok(adaPhone.get('/api/student/page'))).earned.filter((e: any) => e.id === KIND)).toMatchObject([{ awardId: again, isNew: true }]);
+    // Reporting the older row never marks a row awarded after it.
+    await ok(seen({ awardIds: [older] }));
+    expect(badgeOf(section(await ok(adaPhone.get('/api/student/page'))), KIND)).toMatchObject({ awardId: again, isNew: true });
+  });
 });
 
 describe('manual badges in class and in the teacher area (items 4, 5)', () => {

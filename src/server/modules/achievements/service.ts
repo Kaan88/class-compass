@@ -13,7 +13,7 @@
  *   outbox (no PIN), with undo within 10 minutes; later a PIN-gated revoke with a reason.
  * - Nothing is ranked or compared: counts are per student, the level path is private.
  */
-import { and, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lte, or, type SQL } from 'drizzle-orm';
 import type { z } from 'zod';
 import { ruleProgress, ruleReached } from '../../../domain/achievements.ts';
 import { CLASSROOM_UNDO_MS, INACTIVE_EVENTS, TIER_POINTS, levelFor, type AchievementRule } from '../../../shared/achievements.ts';
@@ -21,7 +21,7 @@ import type * as C from '../../../shared/contracts/achievements.ts';
 import type { AchievementDef, AchievementSettings, Award, StudentAchievementsSection } from '../../../shared/contracts/achievements.ts';
 import { initials } from '../../../shared/text/turkish.ts';
 import { tx, type Db } from '../../db/client.ts';
-import { achievementDefinitions, defaultItemArchives, lessons, studentAchievements, students, users } from '../../db/schema.ts';
+import { achievementDefinitions, defaultItemArchives, lessons, studentAchievements, students, teachingContexts, users } from '../../db/schema.ts';
 import type { StudentActivity } from '../../lib/activity.ts';
 import { audit } from '../../lib/audit.ts';
 import { notify } from '../../lib/notify.ts';
@@ -524,18 +524,37 @@ export function studentSection(ctx: RequestContext, input: StudentPageInput): St
 
 /**
  * Marks the award rows the page celebrated as seen: only rows of the signed-in student (another
- * student's id, an unknown or already seen one is skipped without a word, so the answer tells nothing),
- * never a badge awarded after the page was fetched. `{}` from an older page marks nothing.
+ * student's id or an unknown one is skipped without a word, so the answer tells nothing). `{}` from an
+ * older page marks nothing.
+ * The page shows one row per badge and subject (the newest live one, `section` above): the student's
+ * other unseen rows of the same badge in classes of the same subject, awarded at or before the named
+ * row, are the same badge to the child and are seen too, or one would surface as "new" when the newer
+ * row is revoked or its class switches achievements off. A row awarded after the named one stays new
+ * (a badge awarded after the page was fetched is still celebrated).
  */
 export function markSeen(ctx: RequestContext, awardIds: readonly string[]) {
   const { studentId } = requireStudent(ctx);
-  if (awardIds.length)
-    ctx.db
-      .update(studentAchievements)
-      .set({ seenAt: ctx.now() })
-      .where(and(eq(studentAchievements.studentId, studentId), inArray(studentAchievements.id, [...new Set(awardIds)]), isNull(studentAchievements.seenAt)))
-      .run();
-  return { ok: true as const };
+  if (!awardIds.length) return { ok: true as const };
+  return tx(ctx.db, (db) => {
+    const now = ctx.now();
+    const named = db
+      .select({ id: studentAchievements.id, achievementId: studentAchievements.achievementId, contextId: studentAchievements.contextId, awardedAt: studentAchievements.awardedAt })
+      .from(studentAchievements)
+      .where(and(eq(studentAchievements.studentId, studentId), inArray(studentAchievements.id, [...new Set(awardIds)])))
+      .all();
+    const unseen = (...cond: SQL[]) => and(eq(studentAchievements.studentId, studentId), isNull(studentAchievements.seenAt), ...cond);
+    for (const row of named) {
+      db.update(studentAchievements).set({ seenAt: now }).where(unseen(eq(studentAchievements.id, row.id))).run();
+      const subjectId = row.contextId ? db.select({ subjectId: teachingContexts.subjectId }).from(teachingContexts).where(eq(teachingContexts.id, row.contextId)).get()?.subjectId : undefined;
+      if (!subjectId) continue;
+      const sameSubject = db.select({ id: teachingContexts.id }).from(teachingContexts).where(eq(teachingContexts.subjectId, subjectId));
+      db.update(studentAchievements)
+        .set({ seenAt: now })
+        .where(unseen(eq(studentAchievements.achievementId, row.achievementId), lte(studentAchievements.awardedAt, row.awardedAt), inArray(studentAchievements.contextId, sameSubject)))
+        .run();
+    }
+    return { ok: true as const };
+  });
 }
 
 /** End Lesson "Well done!" (item 7): only a moment on the display; nothing is written. */

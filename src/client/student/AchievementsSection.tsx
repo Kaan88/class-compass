@@ -57,6 +57,8 @@ const queue = new Set<string>();
 let sending = false;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let failures = 0;
+/** Bumped by the test reset: an answer to a request sent before it is ignored. */
+let generation = 0;
 let afterSeen: () => void = () => undefined;
 
 function retryable(e: unknown): boolean {
@@ -66,6 +68,7 @@ function retryable(e: unknown): boolean {
 function flushSeen(): void {
   if (sending || retryTimer !== null || queue.size === 0) return;
   sending = true;
+  const gen = generation;
   const batch = [...queue].slice(0, SEEN_MAX_AWARDS);
   const done = () => {
     sending = false;
@@ -74,11 +77,13 @@ function flushSeen(): void {
   };
   call(studentSeenAchievements, { awardIds: batch }).then(
     () => {
+      if (gen !== generation) return;
       done();
       afterSeen();
       flushSeen();
     },
     (e: unknown) => {
+      if (gen !== generation) return;
       const wait = SEEN_RETRY_MS[failures];
       if (wait === undefined || !retryable(e)) {
         done();
@@ -93,6 +98,22 @@ function flushSeen(): void {
       }, wait);
     },
   );
+}
+
+/**
+ * Tests only: empties the queue and forgets the celebrations of this "visit", so a test that ends with a
+ * request running or a retry waiting (fake timers) does not leave the queue stuck for the next test. A
+ * request still running when this is called is ignored when it answers.
+ */
+export function resetSeenQueueForTests(): void {
+  if (retryTimer !== null) clearTimeout(retryTimer);
+  retryTimer = null;
+  sending = false;
+  failures = 0;
+  generation += 1;
+  queue.clear();
+  celebrated.clear();
+  afterSeen = () => undefined;
 }
 
 /** Reports award rows as seen (queued; see above). `onSeen` runs after each successful request. */

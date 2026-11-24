@@ -22,7 +22,7 @@ import { preloadWritingScreens, tilesOf } from '../../src/client/student/section
 import { MyGoals } from '../../src/client/student/screens/MyGoals.tsx';
 import { NewGoal } from '../../src/client/student/screens/NewGoal.tsx';
 import { openLink, StudentApp, type OpenResult } from '../../src/client/student/StudentApp.tsx';
-import { queueSeen, SEEN_RETRY_MS } from '../../src/client/student/AchievementsSection.tsx';
+import { queueSeen, resetSeenQueueForTests, SEEN_RETRY_MS } from '../../src/client/student/AchievementsSection.tsx';
 import { CELEBRATION_MS } from '../../src/client/themes/Celebration.tsx';
 import { sounds, themeOf } from '../../src/client/themes/index.tsx';
 import { getDisplay, setDisplay } from '../../src/client/lib/display.ts';
@@ -31,6 +31,8 @@ import { generatedAvatar } from '../../src/shared/avatarDefaults.ts';
 
 afterEach(() => {
   cleanup();
+  // The "seen" queue and the visit's celebrations are module state: a test that ends with a retry waiting must not leave them stuck.
+  resetSeenQueueForTests();
   vi.unstubAllGlobals();
 });
 
@@ -274,8 +276,8 @@ describe('sentence starters (D-152)', () => {
 });
 
 describe('new achievement celebration in the class language (D-099, D-122)', () => {
-  // `celebrated` in AchievementsSection.tsx is module-level on purpose (one visit = one page load), so an
-  // award celebrated by one test is never celebrated again in this file: every test takes fresh ids.
+  // `celebrated` in AchievementsSection.tsx is module-level on purpose (one visit = one page load); the
+  // file's cleanup resets it, and every test still takes fresh ids so none depends on the reset.
   let next = 0;
   const badge = (name = { en: 'Kind helper', tr: 'Nazik yardımcı' }) => ({
     id: `badge-${++next}`,
@@ -526,6 +528,31 @@ describe('the "seen" queue: one request at a time, one retry chain (D-122)', () 
     expect(seen).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(120_000);
     expect(bodies).toHaveLength(6);
+  });
+
+  it('the test reset clears a waiting retry and ignores a request still running', async () => {
+    vi.useFakeTimers();
+    const { bodies, answer } = manual();
+    const [a, b, c, d] = [id(), id(), id(), id()];
+    const seen = vi.fn();
+    queueSeen([a], seen);
+    await answer(busy()); // a retry now waits
+    resetSeenQueueForTests();
+    queueSeen([b], seen);
+    expect(bodies).toEqual([[a], [b]]); // at once, not after the wait
+    resetSeenQueueForTests(); // b still running
+    queueSeen([c], seen);
+    expect(bodies).toEqual([[a], [b], [c]]);
+    await answer(json({ ok: true })); // b's late answer: ignored
+    expect(seen).not.toHaveBeenCalled();
+    queueSeen([d], seen); // c still running: d waits for it
+    expect(bodies).toHaveLength(3);
+    await answer(json({ ok: true }));
+    expect(bodies[3]).toEqual([d]);
+    await answer(json({ ok: true }));
+    expect(seen).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(bodies).toHaveLength(4);
   });
 
   it('a refused request is given up at once, and the queue keeps working', async () => {
