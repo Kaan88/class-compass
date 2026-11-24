@@ -14,7 +14,7 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { localDate } from '../../../domain/dates.ts';
 import { CATEGORY_MODULE, categoryOn, isAggregate } from '../../../shared/notifications.ts';
-import { notifications, users } from '../../db/schema.ts';
+import { classes, notifications, subjects, teachingContexts, users } from '../../db/schema.ts';
 import { newId } from '../../lib/crypto.ts';
 import type { NotifyDeps, NotifyEvent } from '../../lib/notify.ts';
 import { getUserSetting } from '../../lib/userSettings.ts';
@@ -25,6 +25,21 @@ import { getSchoolSettings } from '../school/policy.ts';
 /** The class+subject each recipient teacher gets the event in (one per teacher). */
 export function recipientsOf(deps: NotifyDeps, e: Pick<NotifyEvent, 'category' | 'studentId' | 'subjectId' | 'contextId' | 'actorUserId'>): Map<string, ScopeContext> {
   const out = new Map<string, ScopeContext>();
+  if (e.studentId === null) {
+    // A notice about a lesson (S37, D-218): the teacher of its class+subject, while it is theirs (the
+    // one who can end its lessons, `assertOwnsContext`).
+    if (!e.contextId) return out;
+    const row = deps.db
+      .select({ context: teachingContexts, cls: classes, subject: subjects })
+      .from(teachingContexts)
+      .innerJoin(classes, eq(classes.id, teachingContexts.classId))
+      .innerJoin(subjects, eq(subjects.id, teachingContexts.subjectId))
+      .innerJoin(users, eq(users.id, teachingContexts.teacherId))
+      .where(and(eq(teachingContexts.id, e.contextId), isNull(teachingContexts.endedAt), eq(users.role, 'teacher'), isNull(users.disabledAt)))
+      .get();
+    if (row && row.context.teacherId !== e.actorUserId) out.set(row.context.teacherId, row);
+    return out;
+  }
   let scope;
   try {
     scope = studentScope(deps, e.studentId);
@@ -61,7 +76,7 @@ export function writeNotifications(deps: NotifyDeps, e: NotifyEvent): void {
   const add = Math.max(1, Math.floor(e.count ?? 1));
   for (const [userId, c] of recipients) {
     if (!categoryOn(getUserSetting(deps.db, userId, 'notifications.settings'), e.category)) continue;
-    const existing = isAggregate(e.category)
+    const existing = isAggregate(e.category) && e.studentId !== null
       ? deps.db
           .select()
           .from(notifications)

@@ -5,6 +5,12 @@
  * refused with WRONG_LESSON otherwise, so a queued tap can never land on another class (LES-4).
  * A lesson left active past the end of its local day is abandoned (not ended, data kept) when the
  * next lesson starts in that context.
+ *
+ * Forgotten lessons (S37, D-218): a lesson still running LESSON_AUTO_END_AFTER_MS after its start is
+ * ended by the server (`settleLesson`, called by every read of lesson state and by the sweep in
+ * main.ts), with the system as actor. Only what needs no person is done: the lesson is closed, its
+ * timer stopped, the close hooks run. No End Lesson step runs, so the reflection, the Secret Student
+ * reveal, the goal answer and the assistant's thank-you stay "not recorded".
  */
 import { and, eq, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -17,11 +23,13 @@ import type { GroupingLessonState } from '../../../shared/contracts/grouping.ts'
 import type { LessonGoalState } from '../../../shared/contracts/lessonGoals.ts';
 import type { SecretLessonState } from '../../../shared/contracts/secret.ts';
 import type { LessonCommands, LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
+import { AUTO_END_NOTICE_MS, autoEndAt, reminderAt } from '../../../shared/lessonLimits.ts';
 import { lessons, subjects, teachingContexts } from '../../db/schema.ts';
-import type { Db } from '../../db/client.ts';
+import { tx, type Db } from '../../db/client.ts';
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
-import { requireUser, type RequestContext } from '../../lib/context.ts';
+import { requireUser, type Actor, type AppDeps, type RequestContext } from '../../lib/context.ts';
+import { notify } from '../../lib/notify.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { attendanceStamp, dailyFor, lessonAttendanceCounts, markAllPresentCore, rosterWithAttendance, setDailyCore } from '../attendance/service.ts';
 import { closureOn } from '../school/closures.ts';
@@ -62,6 +70,8 @@ export function lessonDto(db: Db, l: LessonRow): LessonState {
     topics: l.topicsJson.map((t) => ({ id: t.id, name: t.name, icon: (t.icon as LessonState['topics'][number]['icon']) ?? null })),
     display: { assistantVisible: l.displayJson.assistantVisible ?? null },
     endSteps: endStepsFor(db, l.contextId, l).map((s) => s.key),
+    overdue: l.status === 'active' && l.remindedAt !== null,
+    autoEndAt: autoEndAt(l.startedAt),
   };
 }
 
@@ -147,6 +157,58 @@ export function registerLessonCloseHook(fn: LessonCloseHook) {
 }
 const runCloseHooks = (ctx: RequestContext, lesson: LessonRow, outcome: 'ended' | 'abandoned') => closeHooks.forEach((h) => h(ctx, lesson, outcome));
 
+// ---------------------------------------------------------------- forgotten lessons (S37, D-218)
+const SYSTEM: Actor = { type: 'system', id: null };
+
+/** A context for work the server does by itself (the automatic end): the system is the actor. */
+export const systemContext = (deps: AppDeps): RequestContext => ({ ...deps, ip: 'system', session: null, user: null, student: null, actor: SYSTEM });
+
+/** The timer as End Lesson leaves it: stopped at `at`, with the time it had left then. */
+function stoppedTimer(t: TimerState, at: number): TimerState {
+  return { ...t, running: false, startedAt: null, remainingMs: t.running ? Math.max(0, t.remainingMs - Math.max(0, at - (t.startedAt ?? at))) : t.remainingMs };
+}
+
+/**
+ * Brings one lesson up to date with the clock (S37, D-218): past its limit it is ended by the server,
+ * past the reminder point the reminder goes out once. Returns the lesson as it is afterwards. Its own
+ * transaction (a savepoint inside a command), reading the row again inside it, so a sweep, a poll and a
+ * teacher's End Lesson never end a lesson twice: whoever comes second sees it closed.
+ */
+export function settleLesson(deps: AppDeps, lessonId: string): LessonRow | null {
+  return tx(deps.db, () => {
+    const lesson = deps.db.select().from(lessons).where(eq(lessons.id, lessonId)).get();
+    if (!lesson || lesson.status !== 'active') return lesson ?? null;
+    const now = deps.now();
+    const ctx = systemContext(deps);
+    const endAt = autoEndAt(lesson.startedAt);
+    if (now >= endAt) {
+      // Nothing that needs a person is done: no End Lesson step runs, so what they record stays empty.
+      const skipped = endStepsFor(deps.db, lesson.contextId, lesson).map((s) => s.key);
+      const ended = updateLesson(ctx, lesson, { status: 'ended', endedAt: endAt, autoEndedAt: now, timerJson: stoppedTimer(lesson.timerJson, endAt) });
+      runCloseHooks(ctx, ended, 'ended');
+      audit(deps.db, SYSTEM, { action: 'lesson.auto_end', entity: 'lesson', entityId: lesson.id, after: { contextId: lesson.contextId, localDate: lesson.localDate, endedAt: endAt, stageReached: ended.stageIndex, skippedSteps: skipped } }, now);
+      // A lesson forgotten long before this rule existed is closed quietly (still audited).
+      if (now - endAt <= AUTO_END_NOTICE_MS) notify(deps, { category: 'lessonAutoEnded', studentId: null, subjectId: null, contextId: lesson.contextId, entity: 'lesson', entityId: lesson.id });
+      return ended;
+    }
+    if (now >= reminderAt(lesson.startedAt) && lesson.remindedAt === null) {
+      // The version bump changes the ETag, so a polling board shows its note at once.
+      const reminded = updateLesson(ctx, lesson, { remindedAt: now });
+      notify(deps, { category: 'lessonStillRunning', studentId: null, subjectId: null, contextId: lesson.contextId, entity: 'lesson', entityId: lesson.id });
+      return reminded;
+    }
+    return lesson;
+  });
+}
+
+/** The context's running lesson after `settleLesson` (undefined when there is none, or it just ended). */
+function activeSettled(deps: AppDeps, contextId: string): LessonRow | undefined {
+  const active = getActiveLesson(deps.db, contextId);
+  if (!active) return undefined;
+  const settled = settleLesson(deps, active.id);
+  return settled?.status === 'active' ? settled : undefined;
+}
+
 // ---------------------------------------------------------------- reads
 export function lessonState(ctx: RequestContext, contextId: string) {
   const context = assertOwnsContext(ctx, contextId);
@@ -154,7 +216,8 @@ export function lessonState(ctx: RequestContext, contextId: string) {
   const tz = effectiveTimezone(ctx.db, cls);
   const now = ctx.now();
   const today = localDate(now, tz);
-  const active = getActiveLesson(ctx.db, context.id);
+  // A lesson past its limit is ended here, so a board that has been polling shows the end (S37, D-218).
+  const active = activeSettled(ctx, context.id);
   const lesson = active && active.localDate >= today ? active : null;
   const stamp = isModuleEnabled(ctx.db, context.id, 'attendance') ? attendanceStamp(ctx.db, cls.id, lesson?.localDate ?? today, lesson?.id ?? null) : 'off';
   const extra = contributors.map((c) => c.stamp(ctx, context, lesson)).join('.');
@@ -187,7 +250,8 @@ export function activeLessons(ctx: RequestContext) {
     .all();
   return {
     lessons: rows
-      .filter(({ lesson }) => isCurrent(ctx, lesson, getClass(ctx.db, lesson.classId)))
+      .map(({ lesson }) => ({ lesson: settleLesson(ctx, lesson.id) ?? lesson }))
+      .filter(({ lesson }) => lesson.status === 'active' && isCurrent(ctx, lesson, getClass(ctx.db, lesson.classId)))
       .map(({ lesson }) => ({ contextId: lesson.contextId, lessonId: lesson.id, startedAt: lesson.startedAt, stageIndex: lesson.stageIndex, stageCount: lesson.routineSnapshotJson.length })),
   };
 }
@@ -229,6 +293,7 @@ export function summaryOf(db: Db, l: LessonRow): LessonSummary {
     attendance: isModuleEnabled(db, l.contextId, 'attendance') ? lessonAttendanceCounts(db, l) : null,
     reflection: l.reflectionJson ?? null,
     lessonGoal: (extra.lessonGoal ?? null) as LessonGoalState | null,
+    autoEnded: l.autoEndedAt !== null,
   };
 }
 
@@ -260,7 +325,8 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
   // day's, so it neither starts a lesson today nor writes them onto today (AUDIT). Old clients send no
   // date; a later date can only be a device clock running ahead and is today for the teacher.
   if (p.localDate !== undefined && p.localDate < today) throw new AppError('CONFLICT', 'This start was made on another day', { reason: 'START_STALE' });
-  const existing = getActiveLesson(ctx.db, context.id);
+  // A forgotten lesson past its limit is ended first (S37, D-218), so the next start is a normal one.
+  const existing = activeSettled(ctx, context.id);
   if (existing) {
     // LES-2: never a second lesson. The client resumes the running one. The attendance the teacher
     // just confirmed is shared daily data for today and is still applied (D-053), never dropped.
@@ -303,6 +369,9 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
     classNameSnapshot: cls.name,
     subjectNameSnapshot: subject?.name ?? {},
     updatedAt: now,
+    autoEndedAt: null,
+    remindedAt: null,
+    autoEndSeenAt: null,
   };
   ctx.db.insert(lessons).values(row).run();
   const attendanceKept = applyStartAttendance(ctx, context.id, cls, today, p, meta.opId);
@@ -376,6 +445,13 @@ export function changeTimer(ctx: RequestContext, p: { contextId: string; lessonI
 }
 
 export function endLesson(ctx: RequestContext, p: P<'lesson.end'>, meta: CommandMeta) {
+  // The server ended it first (S37, D-218): the teacher's End Lesson is not an error and changes
+  // nothing (no step runs on a closed lesson); the summary says it ended by itself.
+  const auto = ctx.db.select().from(lessons).where(eq(lessons.id, p.lessonId)).get();
+  if (auto && auto.autoEndedAt !== null && auto.contextId === p.contextId && (!meta.lessonId || meta.lessonId === p.lessonId) && (!meta.contextId || meta.contextId === p.contextId)) {
+    assertOwnsContext(ctx, p.contextId);
+    return summaryOf(ctx.db, auto);
+  }
   const { lesson } = lessonForCommand(ctx, p, meta);
   // Module steps first (S7: Secret Student reveal/outcomes, assistant thanks), then the core reflection (LES-3).
   for (const step of endStepsFor(ctx.db, lesson.contextId, lesson)) {
@@ -385,11 +461,7 @@ export function endLesson(ctx: RequestContext, p: P<'lesson.end'>, meta: Command
   }
   const now = ctx.now();
   const fresh = ctx.db.select().from(lessons).where(eq(lessons.id, lesson.id)).get()!;
-  const ended = updateLesson(ctx, fresh, {
-    status: 'ended',
-    endedAt: now,
-    timerJson: { ...fresh.timerJson, running: false, startedAt: null, remainingMs: fresh.timerJson.running ? Math.max(0, fresh.timerJson.remainingMs - (now - (fresh.timerJson.startedAt ?? now))) : fresh.timerJson.remainingMs },
-  });
+  const ended = updateLesson(ctx, fresh, { status: 'ended', endedAt: now, timerJson: stoppedTimer(fresh.timerJson, now) });
   runCloseHooks(ctx, ended, 'ended');
   audit(ctx.db, ctx.actor, { action: 'lesson.end', entity: 'lesson', entityId: lesson.id, after: { stageReached: ended.stageIndex, reflection: ended.reflectionJson?.rating ?? null }, opId: meta.opId }, now);
   return summaryOf(ctx.db, ended);

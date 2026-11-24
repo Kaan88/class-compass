@@ -7726,3 +7726,19 @@ html[data-cursor='off'] * {
     max-width: 100%;
   }
 }
+
+/* S37 (D-218): the teacher home's notices about forgotten lessons (words and an icon; nothing moves). */
+.cc-lesson-notices {
+  gap: var(--cc-area-row-gap);
+}
+.cc-lesson-notice__body {
+  gap: 0.4rem;
+  min-width: 0;
+}
+.cc-lesson-notice__text,
+.cc-lesson-notice__sub {
+  margin: 0;
+}
+.cc-lesson-notice__sub {
+  font-weight: 400;
+}

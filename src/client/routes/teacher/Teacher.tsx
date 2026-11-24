@@ -23,6 +23,7 @@ import { PasskeyOffer, PasskeysSection } from '../Passkeys.tsx';
 import { EmailChangeSection } from '../EmailChange.tsx';
 import { TimeUpClipSection } from './ClassDisplay.tsx';
 import { FullscreenButton, LessonPrefsSection } from '../../modules/lessons/fullscreen.tsx';
+import { LessonNotices } from '../../modules/lessons/LessonNotices.tsx';
 import * as School from '../../../shared/contracts/school.ts';
 import { SensitiveGate } from '../Lock.tsx';
 import { StudentStatsProvider } from '../../ui/StudentName.tsx';
@@ -223,6 +224,8 @@ export function TeacherMenu() {
   if (!me) return null;
   return (
     <main className="cc-page cc-stack" data-testid="teacher-menu">
+      {/* S37 (D-218): a lesson still running, or one that ended by itself, comes first. */}
+      <LessonNotices />
       <div className="cc-row">
         <Mascot size={80} />
         <div>

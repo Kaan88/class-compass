@@ -157,7 +157,8 @@ describe('seed:demo-history', () => {
       expect(l.startedAt).toBeLessThan(env.clock.now());
     }
     expect(all.filter((l) => l.status === 'active')).toEqual([]);
-    expect(all.some((l) => l.status === 'abandoned')).toBe(true);
+    // The rare forgotten lesson ended by itself (S37, D-218), with no reflection.
+    expect(all.some((l) => l.status === 'ended' && l.autoEndedAt !== null && l.reflectionJson === null)).toBe(true);
     const latest = env.db.$client.prepare(`select max(at) as t from audit_events where action <> 'demo.seed_history'`).get() as { t: number };
     expect(latest.t).toBeLessThanOrEqual(env.clock.now());
 

@@ -73,9 +73,10 @@ export interface TeacherStudentScope {
  * gives, with the same rules (classes the student is in today in the class timezone, fromDate <=
  * today < toDate; deactivated students see nothing; active contexts only, oldest first), but in three
  * queries for the whole request instead of several per student. `scopeOf` answers null for a student
- * who is in none of the teacher's current classes (or does not exist).
+ * who is in none of the teacher's current classes (or does not exist). `contextOf` answers one of the
+ * teacher's active contexts by id, null otherwise (S37, D-218: notices about a lesson).
  */
-export function teacherStudentScopes(deps: Pick<AppDeps, 'db' | 'now'>, teacherId: string): { scopeOf(studentId: string): TeacherStudentScope | null } {
+export function teacherStudentScopes(deps: Pick<AppDeps, 'db' | 'now'>, teacherId: string): { scopeOf(studentId: string): TeacherStudentScope | null; contextOf(contextId: string): ScopeContext | null } {
   const ctxRows = deps.db
     .select({ context: teachingContexts, subject: subjects, cls: classes })
     .from(teachingContexts)
@@ -118,6 +119,10 @@ export function teacherStudentScopes(deps: Pick<AppDeps, 'db' | 'now'>, teacherI
       const scope = student && inClasses ? { student, contexts: ctxRows.filter((r) => inClasses.has(r.context.classId)).map((r) => ({ context: r.context, subject: r.subject, cls: r.cls })) } : null;
       memo.set(studentId, scope);
       return scope;
+    },
+    contextOf(contextId) {
+      const r = ctxRows.find((x) => x.context.id === contextId);
+      return r ? { context: r.context, subject: r.subject, cls: r.cls } : null;
     },
   };
 }

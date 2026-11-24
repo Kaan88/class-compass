@@ -31,6 +31,8 @@ export function overviewSection(ctx: RequestContext, scope: ReportScope): Report
       { key: 'lessons', label: key('report.overview.lessonsHeld'), cell: n(scope.lessons.length) },
       { key: 'days', label: key('report.overview.lessonDays'), cell: n(days.size) },
       { key: 'abandoned', label: key('report.overview.abandoned'), cell: n(abandoned) },
+      // S37 (D-218): held lessons the server ended because nobody did (their reflection is "not recorded").
+      { key: 'autoEnded', label: key('report.overview.autoEnded'), cell: n(scope.lessons.filter((l) => l.autoEndedAt !== null).length, scope.lessons.length) },
       { key: 'students', label: scope.studentId ? key('report.overview.student') : key('report.overview.students'), cell: n(scope.students.length) },
     ],
     tables: [

@@ -58,7 +58,7 @@ export interface LessonRun {
   /** n-th lesson of this context in the history (0-based) and whether it is the last one. */
   index: number;
   isLast: boolean;
-  /** False for the rare lesson the teacher forgets to end (abandoned when the next one starts). */
+  /** False for the rare lesson the teacher forgets to end (it ends by itself at the limit, S37, D-218). */
   ends: boolean;
   scratch: Record<string, unknown>;
 }

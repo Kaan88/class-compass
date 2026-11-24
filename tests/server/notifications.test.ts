@@ -51,6 +51,7 @@ function perStudentVisible(deps: Pick<AppDeps, 'db' | 'now'>, userId: string, ro
   const scopes = new Map<string, StudentScope | null>();
   const out: Array<{ row: NotificationRow; sc: ScopeContext; fullName: string }> = [];
   for (const row of rows) {
+    if (row.studentId === null) continue; // lesson notices (S37) are checked in lesson-auto-end.test.ts
     if (!scopes.has(row.studentId)) {
       let scope: StudentScope | null = null;
       try {
@@ -128,6 +129,7 @@ describe('categories and defaults (D-155)', () => {
       'evidenceVideo', // S27a (D-193)
       'achievementEarned',
       'avatarPicture', // S24 (D-184)
+      'lessonStillRunning', 'lessonAutoEnded', // S37 (D-218): the teacher asked for them
     ]);
     expect((await s.teacherA.put('/api/teacher/notification-settings', { categories: { nope: true }, digest: st.digest })).status).toBe(400);
     expect((await s.teacherA.put('/api/teacher/notification-settings', { categories: {}, digest: { ...st.digest, hour: 24 } })).status).toBe(400);

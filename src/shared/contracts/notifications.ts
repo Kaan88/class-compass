@@ -15,7 +15,8 @@ import { Id } from './school.ts';
 export const NotificationItem = z.object({
   id: z.string(),
   category: NotificationCategory,
-  student: z.object({ id: z.string(), fullName: z.string() }),
+  /** Null for a notice about the teacher's own lesson (S37, D-218: `lessonStillRunning`, `lessonAutoEnded`). */
+  student: z.object({ id: z.string(), fullName: z.string() }).nullable(),
   /** The teacher's own class+subject for the student (deep links), when there is one. */
   context: z.object({ id: z.string(), classId: z.string(), className: z.string(), subjectName: LocalizedText }).nullable(),
   entity: z.enum(NOTIFICATION_ENTITIES),

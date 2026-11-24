@@ -147,7 +147,7 @@ switch (cmd) {
     await migrate();
     try {
       const r = seedDemoHistory({ db: db(), config, now: Date.now }, values.weeks === undefined ? {} : { weeks: Number(values.weeks) });
-      console.log(`Demo history created (fictional data): ${r.from} to ${r.to}, ${r.weeks} weeks, ${r.schoolDays} school days, ${r.lessons} lessons in ${r.contexts} classes and subjects (${r.abandoned} left running and abandoned), in ${(r.elapsedMs / 1000).toFixed(1)} s.`);
+      console.log(`Demo history created (fictional data): ${r.from} to ${r.to}, ${r.weeks} weeks, ${r.schoolDays} school days, ${r.lessons} lessons in ${r.contexts} classes and subjects (${r.forgotten} left running and ended automatically), in ${(r.elapsedMs / 1000).toFixed(1)} s.`);
       for (const [key, what] of Object.entries(r.counts)) console.log(`  ${key}: ${Object.entries(what).map(([k, n]) => `${n} ${k}`).join(', ')}`);
       // Link tokens are secrets (D-128): never printed; the administrator copies them in the app.
       if (r.counts.superSpeakers) console.log('Super Speakers is on. Copy the scorer and board links in Admin → Super Speakers (they are not printed here).');

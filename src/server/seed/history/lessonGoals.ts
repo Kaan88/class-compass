@@ -8,7 +8,7 @@
  * Where it is on, a little over half of the lessons get a goal at Start Lesson (start step
  * `lessonGoal`) and some more on the board during the lesson ('lessonGoals.set'), now and then
  * reworded. Most goals are answered at End Lesson (Yes, we did! / Partly / Not yet); some are left
- * unanswered, and an abandoned lesson's goal stays unanswered, so the report shows "not recorded" too.
+ * unanswered, and a forgotten lesson's goal stays unanswered (it ends by itself, S37), so the report shows "not recorded" too.
  * Fictional text only.
  */
 import { setContextModule as setContextModuleEp } from '../../../shared/contracts/school.ts';

@@ -33,6 +33,8 @@ export const NOTIFICATION_CATEGORIES = [
   'textBlocked',
   'linkNewDevice',
   'speakersPoints',
+  'lessonStillRunning',
+  'lessonAutoEnded',
 ] as const;
 export const NotificationCategory = z.enum(NOTIFICATION_CATEGORIES);
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -59,6 +61,9 @@ export const DEFAULT_ON: Readonly<Record<NotificationCategory, boolean>> = {
   textBlocked: false,
   linkNewDevice: false,
   speakersPoints: false,
+  /** S37 (D-218): about the teacher's own lesson, not a student (`studentId` null); on, the teacher asked for them. */
+  lessonStillRunning: true,
+  lessonAutoEnded: true,
 };
 
 /** One row per teacher, student, category and local day, with a count (unique partial index). */
@@ -85,6 +90,8 @@ export const CATEGORY_MODULE: Readonly<Record<NotificationCategory, PolicyKey | 
   textBlocked: null,
   linkNewDevice: null,
   speakersPoints: 'superSpeakers',
+  lessonStillRunning: null,
+  lessonAutoEnded: null,
 };
 
 /** Groups for the page's filter and the settings screen, in display order. */
@@ -93,14 +100,19 @@ export const NOTIFICATION_GROUPS = {
   evidence: ['evidenceText', 'evidenceLink', 'evidencePicture', 'evidenceDocument', 'evidenceVoice', 'evidenceVideo'],
   achievements: ['achievementEarned', 'speakersPoints'],
   other: ['avatarChanged', 'avatarPicture', 'textBlocked', 'linkNewDevice'],
+  lessons: ['lessonStillRunning', 'lessonAutoEnded'],
 } as const satisfies Record<string, readonly NotificationCategory[]>;
 export type NotificationGroup = keyof typeof NOTIFICATION_GROUPS;
 export const NOTIFICATION_GROUP_KEYS = Object.keys(NOTIFICATION_GROUPS) as NotificationGroup[];
-export const NotificationGroup = z.enum(['goals', 'evidence', 'achievements', 'other']);
+export const NotificationGroup = z.enum(['goals', 'evidence', 'achievements', 'other', 'lessons']);
 export const groupOf = (c: NotificationCategory): NotificationGroup => NOTIFICATION_GROUP_KEYS.find((g) => (NOTIFICATION_GROUPS[g] as readonly string[]).includes(c))!;
 
 /** What a row is about (`notifications.entity`). */
-export const NOTIFICATION_ENTITIES = ['goal', 'goal_entry', 'evidence', 'student_achievement', 'student', 'student_link', 'text_check', 'point_event'] as const;
+export const NOTIFICATION_ENTITIES = ['goal', 'goal_entry', 'evidence', 'student_achievement', 'student', 'student_link', 'text_check', 'point_event', 'lesson'] as const;
+
+/** Categories about the teacher's own lesson rather than a student (S37, D-218): rows without a student. */
+export const LESSON_CATEGORIES = ['lessonStillRunning', 'lessonAutoEnded'] as const satisfies readonly NotificationCategory[];
+export const isLessonCategory = (c: NotificationCategory) => (LESSON_CATEGORIES as readonly string[]).includes(c);
 export type NotificationEntity = (typeof NOTIFICATION_ENTITIES)[number];
 
 /** Longest snippet of student text on the notifications page (characters, then "…"). */

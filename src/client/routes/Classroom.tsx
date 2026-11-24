@@ -13,7 +13,7 @@
  * (D-195): the board sizes the student cards itself (D-177).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LessonSummary } from '../../shared/contracts/lessons.ts';
 import * as School from '../../shared/contracts/school.ts';
@@ -37,7 +37,7 @@ import { preloadTimeUp } from '../modules/lessons/timeUp.ts';
 import { BigButton, Button, buttonClass } from '../ui/Button.tsx';
 import { EmptyState, OutboxAttentionTray, OutboxSaveBadge, registerCommandDescription } from '../ui/Feedback.tsx';
 import { Toggle } from '../ui/Fields.tsx';
-import { IconCalendar, IconCloudOff, IconLock, IconPlay } from '../ui/icons.tsx';
+import { IconCalendar, IconClock, IconCloudOff, IconLock, IconPlay } from '../ui/icons.tsx';
 import { ClassSwitcher } from '../ui/Layout.tsx';
 import { ClassroomTopBar } from '../ui/ClassroomTopBar.tsx';
 
@@ -204,6 +204,22 @@ function ClassroomScreen({
     }
   };
 
+  // `?endLesson=<contextId>` (S37, D-218: the teacher home's "still running" notice): switch to that
+  // class+subject and open End Lesson once its lesson is read; without a running lesson, just the class.
+  const wanted = (useSearch({ strict: false }) as { endLesson?: string }).endLesson;
+  const listReady = contexts.isSuccess;
+  const lessonLoaded = Boolean(lessonQ.data) && !lessonQ.isFetching;
+  const lessonId = lesson?.id ?? null;
+  useEffect(() => {
+    if (!wanted || !listReady) return;
+    const clear = () => void navigate({ to: '/classroom', search: {}, replace: true });
+    if (!list.some((c) => c.id === wanted)) return clear();
+    if (active?.id !== wanted) return switchTo(wanted);
+    if (!lessonLoaded) return;
+    if (lessonId) setMode(wanted, { kind: 'ending', lessonId, draft: null });
+    clear();
+  }, [wanted, listReady, list, active?.id, lessonLoaded, lessonId]);
+
   if (!me) return null;
   if (!me.hasPin) {
     return (
@@ -344,6 +360,13 @@ function ClassroomScreen({
                 <span>{t('classroom.offlineNote')}</span>
               </p>
             )}
+            {/* S37 (D-218): past the point the lesson should be over; the dock's End lesson ends it. */}
+            {lesson?.overdue && lessonRunning && mode.kind !== 'ending' ? (
+              <p className="cc-offline-note cc-lesson-overdue" role="status" data-testid="lesson-overdue-note">
+                <IconClock />
+                <span>{t('lessonNotice.board', { time: formatDate(lesson.autoEndAt, locale, active.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) })}</span>
+              </p>
+            ) : null}
             {body()}
           </>
         ) : null}

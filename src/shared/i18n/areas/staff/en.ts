@@ -2911,6 +2911,7 @@ export const en = {
   'audit.action.import.revert': 'Student list import undone',
   'audit.action.import.split': 'List with several classes split into classes',
   'audit.action.lesson.abandon': 'Lesson cancelled',
+  'audit.action.lesson.auto_end': 'Lesson ended automatically',
   'audit.action.lesson.end': 'Lesson ended',
   'audit.action.lesson.start': 'Lesson started',
   'audit.action.lesson.topic_plan': 'Lesson topics planned',
@@ -3394,6 +3395,23 @@ export const en = {
   'report.lessonGoals.col.goal': 'Goal',
   'report.lessonGoals.col.outcome': 'Did we reach it?',
   'report.lessonGoals.col.lessons': 'Lessons',
+  // S37 (D-218): forgotten lessons.
+  'notifications.group.lessons': 'Your lessons',
+  'notifications.category.lessonStillRunning': 'A lesson of yours is still running (once a lesson)',
+  'notifications.category.lessonAutoEnded': 'A lesson of yours was ended automatically',
+  'notifications.item.lessonStillRunning': 'The lesson is still running',
+  'notifications.item.lessonAutoEnded': 'The lesson was ended automatically',
+  'notifications.lessonsHeading': 'Your lessons',
+  'lessonNotice.region': 'Lessons that need you',
+  'lessonNotice.running': 'Your lesson in {cls} is still running since {time}.',
+  'lessonNotice.runningAutoEnd': 'If you do not end it, it ends by itself at {time}.',
+  'lessonNotice.endNow': 'End lesson',
+  'lessonNotice.autoEnded': 'The lesson in {cls} on {date} was ended automatically at {time}. Anything you did not finish in End Lesson was left empty.',
+  'lessonNotice.gotIt': 'Got it',
+  'lessonNotice.board': 'This lesson is still running. Press End lesson when it is over; it ends by itself at {time}.',
+  'summary.autoEnded': 'ended automatically at {time}',
+  'summary.autoEndedNote': 'Nobody ended this lesson, so it ended by itself. What End Lesson asks was left empty.',
+  'report.overview.autoEnded': 'Lessons ended automatically',
 } as const;
 
 export type StaffMessages = Record<keyof typeof en, string>;

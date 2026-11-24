@@ -3,6 +3,8 @@
  * (each name opens the statistics drawer through `StudentName`, D-154), newest first, with filters
  * (new only, kind, class), "Open" deep links (which mark the line read), mark read per student, all
  * (or, with a filter on, only the lines shown), and a Settings tab (categories, the daily email). Every query is `['sensitive', …]`.
+ * Notices about the teacher's own lessons (S37, D-218) have no student: they come first, as one group
+ * "Your lessons", and a "still running" line opens End lesson in the classroom.
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
@@ -30,7 +32,7 @@ const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /** The teacher page a line opens (with the class+subject and the student preselected where the page reads them). */
 export function deepLink(item: NotificationItem): { page: string; search: Record<string, string> } | null {
-  if (item.gone) return null;
+  if (item.gone || !item.student) return null;
   const base: Record<string, string> = { ...(item.context ? { contextId: item.context.id } : {}), studentId: item.student.id };
   // Class pages (avatars, student links) take the class; the student's row is marked there (S14i).
   const byClass: Record<string, string> = { ...(item.context ? { classId: item.context.classId } : {}), studentId: item.student.id };
@@ -88,7 +90,9 @@ function NotificationList() {
   const items = q.data?.items ?? [];
   const byStudent = useMemo(() => {
     const out = new Map<string, NotificationItem[]>();
-    for (const i of items) out.set(i.student.id, [...(out.get(i.student.id) ?? []), i]);
+    // Lesson notices (no student) first, as one group.
+    for (const i of items.filter((x) => !x.student)) out.set('', [...(out.get('') ?? []), i]);
+    for (const i of items) if (i.student) out.set(i.student.id, [...(out.get(i.student.id) ?? []), i]);
     return [...out.values()];
   }, [items]);
   const markRead = (ids: string[]) => run(() => call(C.markNotificationsRead, { ids }), { success: t('notifications.toast.read'), invalidate: [NOTIFICATIONS_KEY] });
@@ -135,17 +139,16 @@ function NotificationList() {
       {q.isSuccess && !items.length ? <EmptyState title={filtered ? t('notifications.emptyFiltered') : t('notifications.empty')} body={filtered ? undefined : t('notifications.emptyBody')} /> : null}
       {byStudent.map((list) => {
         const first = list[0]!;
+        const student = first.student;
         const unreadIds = list.filter((i) => !i.read).map((i) => i.id);
         return (
-          <section key={first.student.id} className="cc-card cc-stack cc-notifications__student" data-testid="notification-student">
+          <section key={student?.id ?? 'lessons'} className="cc-card cc-stack cc-notifications__student" data-testid={student ? 'notification-student' : 'notification-lessons'}>
             <div className="cc-row cc-notifications__head">
-              <h2 className="cc-h3 cc-notifications__name">
-                <StudentName id={first.student.id} name={first.student.fullName} contextId={first.context?.id} />
-              </h2>
+              <h2 className="cc-h3 cc-notifications__name">{student ? <StudentName id={student.id} name={student.fullName} contextId={first.context?.id} /> : t('notifications.lessonsHeading')}</h2>
               {unreadIds.length ? (
                 <Button size="small" onPress={() => void markRead(unreadIds)}>
                   {t('notifications.markStudentRead')}
-                  <span className="cc-visually-hidden">{t('notifications.markStudentReadFor', { name: first.student.fullName })}</span>
+                  <span className="cc-visually-hidden">{student ? t('notifications.markStudentReadFor', { name: student.fullName }) : t('notifications.lessonsHeading')}</span>
                 </Button>
               ) : null}
             </div>
@@ -185,6 +188,11 @@ function NotificationLine({ item, onOpen }: { item: NotificationItem; onOpen: ()
         {link ? (
           <Link to="/teacher/$page" params={{ page: link.page }} search={link.search} className={buttonClass('secondary', 'small')} onClick={onOpen}>
             {t('notifications.open')}
+          </Link>
+        ) : item.category === 'lessonStillRunning' && item.context ? (
+          // S37 (D-218): straight to End lesson for that class+subject (nothing happens if it has ended since).
+          <Link to="/classroom" search={{ endLesson: item.context.id }} className={buttonClass('secondary', 'small')} onClick={onOpen}>
+            {t('lessonNotice.endNow')}
           </Link>
         ) : null}
       </div>

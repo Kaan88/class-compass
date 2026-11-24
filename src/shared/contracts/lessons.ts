@@ -45,6 +45,14 @@ export const LessonState = z.object({
   display: z.object({ assistantVisible: z.boolean().nullable() }),
   /** End Lesson steps contributed by the enabled modules, in order (LES-3). 'reflection' is core. */
   endSteps: z.array(z.string()),
+  /**
+   * S37 (D-218): the lesson runs past the point it should be over (LESSON_REMINDER_AFTER_MS after the
+   * start): the board shows a short "still running" note beside its End lesson button. Set once, with
+   * the reminder, so it changes the version (and the ETag) only once.
+   */
+  overdue: z.boolean(),
+  /** When the server ends the lesson by itself if nobody does (S37, D-218). */
+  autoEndAt: z.number(),
 });
 export type LessonState = z.infer<typeof LessonState>;
 
@@ -155,6 +163,12 @@ export const LessonSummary = z.object({
   reflection: Reflection.nullable(),
   /** Today's goal and the class's answer (S28a, D-197): null without a goal or while Lesson goals is off. */
   lessonGoal: LessonGoalState.nullable(),
+  /**
+   * The server ended the lesson because nobody did (S37, D-218): `endedAt` is the limit, not a time a
+   * teacher chose, and every End Lesson step that needs a person (reflection, reveal, goal answer,
+   * thank-you) was left empty ("not recorded").
+   */
+  autoEnded: z.boolean(),
 });
 export type LessonSummary = z.infer<typeof LessonSummary>;
 export const lessonSummary = endpoint({
@@ -165,6 +179,26 @@ export const lessonSummary = endpoint({
   output: LessonSummary,
   mcp: { scope: 'reports:read', tool: 'lesson_summary', readOnly: true, description: 'One lesson of yours: class, subject, date, routine and how far it got, attendance counts, your own end-of-lesson reflection (rating and note) and, when Lesson goals is on, the goal sentence of the lesson with the answer of the class. Counts only for students.' },
 });
+
+// ---------------------------------------------------------------- forgotten lessons (S37, D-218)
+
+/**
+ * The teacher home's notices about lessons (S37, D-218): lessons of the teacher's own current
+ * class+subjects that run past the point they should be over (with when they end by themselves), and
+ * lessons the server ended because nobody did that the teacher has not dismissed yet (the last
+ * AUTO_END_NOTICE_MS). Reading it ends a lesson whose limit has passed (lazily, like the classroom
+ * poll). `teacher` (behind the PIN gate); polled in the background, so it never keeps an unlock alive.
+ * Class names only, no student data. No `mcp` field.
+ */
+const NoticeLesson = { lessonId: z.string(), contextId: z.string(), className: z.string(), subjectName: LocalizedText, localDate: z.string(), startedAt: z.number() };
+export const LessonNotices = z.object({
+  running: z.array(z.object({ ...NoticeLesson, autoEndAt: z.number(), timezone: z.string() })),
+  autoEnded: z.array(z.object({ ...NoticeLesson, endedAt: z.number(), timezone: z.string() })),
+});
+export type LessonNotices = z.infer<typeof LessonNotices>;
+export const lessonNotices = endpoint({ method: 'GET', path: '/api/teacher/lesson-notices', access: 'teacher', background: true, input: z.object({}), output: LessonNotices });
+/** "Got it" on an "ended automatically" notice: gone for good, on every device (per lesson, so per teacher: one teacher holds a class+subject). */
+export const dismissLessonNotice = endpoint({ method: 'POST', path: '/api/teacher/lesson-notices/:lessonId/seen', access: 'teacher', input: z.object({ lessonId: Id }), output: Ok });
 
 // ---------------------------------------------------------------- lesson preferences (S18, D-167)
 

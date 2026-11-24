@@ -2,6 +2,7 @@
  * Lesson lifecycle, routines and attendance (S5): LES-1..4, DSH-2, RTN-1..3, ATT-1/2, ACC-8/9,
  * CFG-1/2, UX-11. Fictional names only.
  */
+import { LESSON_AUTO_END_AFTER_MS } from '../../src/shared/lessonLimits.ts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { v7 } from 'uuid';
 import { DEFAULT_ROUTINE_ID } from '../../src/domain/routines.ts';
@@ -415,7 +416,10 @@ describe('local day boundaries (DSH-2)', () => {
     expect((await state(s.teacherB, s.ctxB.id)).today).toMatchObject({ localDate: '2026-11-09', weekday: 1, timezone: 'Europe/London' });
   });
 
-  it('abandons a lesson left running overnight when the next lesson starts (not ended, data kept)', async () => {
+  // S37 (D-218): a lesson left running overnight has ended by itself LESSON_AUTO_END_AFTER_MS after its
+  // start (before S37 it was abandoned at the next start; that still happens to a lesson the local day
+  // ends under before its limit, tests/server/lesson-auto-end.test.ts).
+  it('a lesson left running overnight has ended by itself; nothing is resumed and its data is kept', async () => {
     const old = await start(s.teacherA, s.ctxA.id, { attendance: [{ studentId: studentsA[0]!.id, status: 'absent' }] });
     await cmd(s.teacherA, 'lesson.setStage', { contextId: s.ctxA.id, lessonId: old.lessonId, stageIndex: 2 });
     env.clock.advance(24 * 3600_000);
@@ -427,7 +431,7 @@ describe('local day boundaries (DSH-2)', () => {
     expect(fresh.started).toBe(true);
     expect(fresh.lessonId).not.toBe(old.lessonId);
     const prev = await ok(s.teacherA.get(`/api/classroom/lessons/${old.lessonId}/summary`));
-    expect(prev).toMatchObject({ status: 'abandoned', endedAt: null, stageReached: 3, localDate: '2026-11-09' });
+    expect(prev).toMatchObject({ status: 'ended', endedAt: prev.startedAt + LESSON_AUTO_END_AFTER_MS, autoEnded: true, reflection: null, stageReached: 3, localDate: '2026-11-09' });
     expect(prev.attendance.absent).toBe(1);
     expect((await state(s.teacherA, s.ctxA.id)).lesson).toMatchObject({ id: fresh.lessonId, localDate: '2026-11-10', stageIndex: 0 });
     // An earlier day's private reflection note is not readable through the classroom endpoint (PIN-1/PIN-8).

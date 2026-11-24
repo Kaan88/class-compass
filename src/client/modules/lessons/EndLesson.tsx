@@ -15,7 +15,7 @@ import { getOutbox, useOutboxStatus } from '../../lib/outbox-client.ts';
 import { showToast } from '../../lib/toast.ts';
 import { Button } from '../../ui/Button.tsx';
 import { Alert } from '../../ui/Feedback.tsx';
-import { IconCheck, IconCloudOff, IconFace, IconFlag, IconPrev, IconSync, IconTarget, IconUp } from '../../ui/icons.tsx';
+import { IconCheck, IconClock, IconCloudOff, IconFace, IconFlag, IconPrev, IconSync, IconTarget, IconUp } from '../../ui/icons.tsx';
 import { MetricCell } from '../../ui/Students.tsx';
 import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
@@ -204,6 +204,12 @@ export function LessonSummaryView({ lessonId, timezone, initial, onDone }: { les
       <h2 id="cc-summary-title" className="cc-h1">
         {t('summary.title')}
       </h2>
+      {s?.autoEnded ? (
+        <p className="cc-offline-note" role="status" data-testid="summary-auto-ended">
+          <IconClock />
+          <span>{t('summary.autoEndedNote')}</span>
+        </p>
+      ) : null}
       {s ? (
         <dl className="cc-summary">
           <dt>{t('summary.class')}</dt>
@@ -211,9 +217,12 @@ export function LessonSummaryView({ lessonId, timezone, initial, onDone }: { les
           <dt>{t('summary.time')}</dt>
           <dd>
             {formatDate(s.startedAt, locale, timezone, { weekday: 'long', day: 'numeric', month: 'long' })} · {formatDate(s.startedAt, locale, timezone, { hour: '2-digit', minute: '2-digit' })}
-            {s.endedAt
-              ? `–${formatDate(s.endedAt, locale, timezone, { hour: '2-digit', minute: '2-digit' })} (${t('summary.minutes', { count: Math.max(1, Math.round((s.endedAt - s.startedAt) / 60_000)) })})`
-              : ''}
+            {s.endedAt && s.autoEnded
+              ? // S37 (D-218): the limit, not a length the class was taught: no minutes.
+                ` (${t('summary.autoEnded', { time: formatDate(s.endedAt, locale, timezone, { hour: '2-digit', minute: '2-digit' }) })})`
+              : s.endedAt
+                ? `–${formatDate(s.endedAt, locale, timezone, { hour: '2-digit', minute: '2-digit' })} (${t('summary.minutes', { count: Math.max(1, Math.round((s.endedAt - s.startedAt) / 60_000)) })})`
+                : ''}
           </dd>
           {s.stageCount > 0 ? (
             <>

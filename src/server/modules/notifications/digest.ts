@@ -87,9 +87,12 @@ export function digestContent(deps: Pick<AppDeps, 'db' | 'now'>, userId: string,
     if (fresh <= 0) continue;
     covered.push({ id: row.id, count: row.count });
     byCategory[row.category] = (byCategory[row.category] ?? 0) + fresh;
-    const s = students.get(row.studentId) ?? { fullName, count: 0 };
-    s.count += fresh;
-    students.set(row.studentId, s);
+    // Lesson notices (S37, D-218) count by kind only: they are about no student.
+    if (row.studentId !== null && fullName !== null) {
+      const s = students.get(row.studentId) ?? { fullName, count: 0 };
+      s.count += fresh;
+      students.set(row.studentId, s);
+    }
     total += fresh;
   }
   return { total, byCategory, byStudent: sortByName([...students.values()], (s) => s.fullName), covered };

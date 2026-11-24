@@ -7,6 +7,7 @@ import { purgeOldChats, RETENTION_TICK_MS } from './modules/assistantChat/retent
 import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
 import { PICTURE_SWEEP_MS, sweepAvatarPictures } from './modules/avatars/pictures.ts';
 import { SOURCE_SWEEP_MS, sweepUnusedImportSources } from './modules/import/sweep.ts';
+import { LESSON_SWEEP_MS, sweepForgottenLessons } from './modules/lessons/autoEnd.ts';
 import { runNotificationTick, TICK_MS as NOTIFICATION_TICK_MS } from './modules/notifications/digest.ts';
 import { migrateWithSnapshot, writeServerLock } from './ops/backup.ts';
 
@@ -58,6 +59,18 @@ const importSourceSweep = () => void sweepUnusedImportSources({ db, config, now 
 importSourceSweep();
 const importSourceSweepTimer = setInterval(importSourceSweep, SOURCE_SWEEP_MS);
 importSourceSweepTimer.unref();
+// Forgotten lessons (S37, D-218): the "still running" reminder, and the end LESSON_AUTO_END_AFTER_MS
+// after the start; at start-up and every 5 minutes. Every read of lesson state does the same lazily.
+const lessonSweep = () => {
+  try {
+    sweepForgottenLessons({ db, config, now, mailer });
+  } catch (err: unknown) {
+    app.log.warn({ err }, 'forgotten lesson sweep failed');
+  }
+};
+lessonSweep();
+const lessonSweepTimer = setInterval(lessonSweep, LESSON_SWEEP_MS);
+lessonSweepTimer.unref();
 
 const shutdown = async () => {
   clearInterval(exportSweep);
@@ -65,6 +78,7 @@ const shutdown = async () => {
   clearInterval(chatRetentionTimer);
   clearInterval(pictureSweepTimer);
   clearInterval(importSourceSweepTimer);
+  clearInterval(lessonSweepTimer);
   await app.close();
   db.$client.close();
   releaseLock();

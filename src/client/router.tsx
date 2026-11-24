@@ -105,6 +105,9 @@ const changePasswordRoute = createRoute({ getParentRoute: () => rootRoute, path:
 const classroomRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/classroom',
+  // `?endLesson=<contextId>` opens End Lesson for that class+subject's running lesson (S37, D-218: the
+  // teacher home's "still running" notice).
+  validateSearch: (s: Record<string, unknown>): { endLesson?: string | undefined } => ({ endLesson: typeof s.endLesson === 'string' ? s.endLesson : undefined }),
   beforeLoad: async ({ context, location }) => {
     const { me, offline } = await requireClassroomSession({ context, location });
     if (me.role === 'admin') throw redirect({ to: '/admin' });

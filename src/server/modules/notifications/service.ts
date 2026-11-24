@@ -37,8 +37,8 @@ const SCAN_MAX = 2000;
  * The rows the teacher may see now, each with the class+subject it is shown in (the row's own when
  * it is still active, otherwise the teacher's first current one for the student in that subject).
  */
-export function visibleRows(deps: Pick<AppDeps, 'db' | 'now'>, userId: string, rows: readonly NotificationRow[]): Array<{ row: NotificationRow; sc: ScopeContext; fullName: string }> {
-  const out: Array<{ row: NotificationRow; sc: ScopeContext; fullName: string }> = [];
+export function visibleRows(deps: Pick<AppDeps, 'db' | 'now'>, userId: string, rows: readonly NotificationRow[]): Array<{ row: NotificationRow; sc: ScopeContext; fullName: string | null }> {
+  const out: Array<{ row: NotificationRow; sc: ScopeContext; fullName: string | null }> = [];
   if (!rows.length) return out;
   // The teacher's current access is read once per call (S15a, D-162): their active class+subjects,
   // who is in those classes today and the module switches, a few queries in all. The rules are the
@@ -47,9 +47,15 @@ export function visibleRows(deps: Pick<AppDeps, 'db' | 'now'>, userId: string, r
   const moduleOn = moduleEnabledLookup(
     deps.db,
     // Only the contexts a row can be shown in need their switches.
-    [...new Set(rows.flatMap((r) => (access.scopeOf(r.studentId)?.contexts ?? []).map((c) => c.context.id)))],
+    [...new Set(rows.flatMap((r) => (r.studentId === null ? [] : (access.scopeOf(r.studentId)?.contexts ?? [])).map((c) => c.context.id)))],
   );
   for (const row of rows) {
+    if (row.studentId === null) {
+      // A notice about a lesson (S37, D-218): shown while the class+subject is still the teacher's.
+      const sc = row.contextId ? access.contextOf(row.contextId) : null;
+      if (sc) out.push({ row, sc, fullName: null });
+      continue;
+    }
     const scope = access.scopeOf(row.studentId);
     if (!scope) continue;
     const module = CATEGORY_MODULE[row.category];
@@ -149,7 +155,7 @@ export function listNotifications(ctx: RequestContext, input: In<typeof C.notifi
     return {
       id: row.id,
       category: row.category,
-      student: { id: row.studentId, fullName },
+      student: row.studentId !== null && fullName !== null ? { id: row.studentId, fullName } : null,
       context: { id: sc.context.id, classId: sc.cls.id, className: sc.cls.name, subjectName: sc.subject.name },
       entity: row.entity,
       goalId: d.goalId,

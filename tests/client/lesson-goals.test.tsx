@@ -229,6 +229,7 @@ describe('the goal on the "Lesson saved" summary (S28a, D-197; LES-3)', () => {
     attendance: null,
     reflection: null,
     lessonGoal,
+    autoEnded: false,
   });
   const show = (lessonGoal: LessonGoalState | null) =>
     wrap(<LessonSummaryView lessonId={`lesson-${Math.random()}`} timezone="Europe/Istanbul" initial={summary(lessonGoal)} onDone={() => {}} />);

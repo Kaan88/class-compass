@@ -503,6 +503,15 @@ export const lessons = sqliteTable(
     classNameSnapshot: text('class_name_snapshot').notNull(),
     subjectNameSnapshot: text('subject_name_snapshot', { mode: 'json' }).$type<LocalizedText>().notNull(),
     updatedAt: integer('updated_at').notNull(),
+    /**
+     * S37 (D-218): a forgotten lesson is ended by the server at `startedAt + LESSON_AUTO_END_AFTER_MS`
+     * (`endedAt` is that moment); this is when the server wrote it (null = ended by a teacher, or not ended).
+     */
+    autoEndedAt: integer('auto_ended_at'),
+    /** S37: when the "still running" reminder went out (once per lesson). */
+    remindedAt: integer('reminded_at'),
+    /** S37: when the lesson's teacher dismissed the "ended automatically" notice with Got it. */
+    autoEndSeenAt: integer('auto_end_seen_at'),
   },
   (t) => [
     uniqueIndex('lessons_one_active_uq').on(t.contextId).where(sql`status = 'active'`),
@@ -1743,7 +1752,8 @@ export const notifications = sqliteTable(
   {
     id: text('id').primaryKey(),
     userId: text('user_id').notNull().references(() => users.id),
-    studentId: text('student_id').notNull().references(() => students.id),
+    /** Null for a notice about a lesson (S37, D-218: `lessonStillRunning`, `lessonAutoEnded`; `contextId` is then set). */
+    studentId: text('student_id').references(() => students.id),
     subjectId: text('subject_id').references(() => subjects.id),
     contextId: text('context_id').references(() => teachingContexts.id),
     category: text('category', { enum: NOTIFICATION_CATEGORIES }).notNull(),

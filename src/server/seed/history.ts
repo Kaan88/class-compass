@@ -66,7 +66,8 @@ export interface HistoryResult {
   weeks: number;
   schoolDays: number;
   lessons: number;
-  abandoned: number;
+  /** Lessons the teacher forgot to end: they end by themselves at the limit (S37, D-218). */
+  forgotten: number;
   contexts: number;
   /** Per generator key: what it created. */
   counts: Record<string, Record<string, number>>;
@@ -324,7 +325,7 @@ export function seedDemoHistory(deps: AppDeps, opts: HistoryOptions = {}): Histo
 
     const lessonIndex = new Map<string, number>();
     let lessonCount = 0;
-    let abandoned = 0;
+    let forgotten = 0;
     for (const week of weeks) {
       for (const plan of plans) for (const g of generatorsFor(plan.context.id)) g.startOfWeek?.(h, plan, week);
       const slots = plans
@@ -366,7 +367,7 @@ export function seedDemoHistory(deps: AppDeps, opts: HistoryOptions = {}): Histo
           const steps: Record<string, unknown> = {};
           for (const g of gens) Object.assign(steps, g.endSteps?.(h, lesson));
           h.command(plan.ctx, 'lesson.end', { contextId: plan.context.id, lessonId: lesson.lessonId, steps });
-        } else abandoned++;
+        } else forgotten++; // ends by itself (S37, D-218) when the next start or read finds it past its limit
         h.setTime(Math.max(lesson.endAt, clock) + 2 * 60_000);
         for (const g of gens) g.afterLesson?.(h, lesson);
         lessonCount++;
@@ -375,7 +376,7 @@ export function seedDemoHistory(deps: AppDeps, opts: HistoryOptions = {}): Histo
       for (const g of schoolGenerators) g.endOfSchoolWeek?.(h, week);
     }
     for (const g of schoolGenerators) g.finish?.(h);
-    // An abandoned last lesson cannot happen (the last one always ends), so nothing is left running.
+    // A forgotten last lesson cannot happen (the last one always ends), so nothing is left running.
     clock = realNow;
     audit(deps.db, { type: 'system', id: null }, { action: 'demo.seed_history', entity: 'school', after: { from: h.from, to: h.to, lessons: lessonCount } }, realNow);
     return {
@@ -384,7 +385,7 @@ export function seedDemoHistory(deps: AppDeps, opts: HistoryOptions = {}): Histo
       weeks: weeks.length,
       schoolDays: days.length,
       lessons: lessonCount,
-      abandoned,
+      forgotten,
       contexts: plans.length,
       counts,
       elapsedMs: Date.now() - started,

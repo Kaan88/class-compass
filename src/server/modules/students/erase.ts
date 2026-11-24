@@ -36,6 +36,14 @@ import { quarantineKeysOf, removeQuarantined } from '../avatars/pictures.ts';
 
 type Row = Record<string, unknown>;
 const STUDENT_COLUMNS = new Set(['student_id', 'owner_student_id', 'student_a', 'student_b', 'planned_student_id', 'actual_student_id', 'matched_student_id', 'created_student_id']);
+/**
+ * Tables whose student column may be null for rows about nobody (S37, D-218: a notification about a
+ * teacher's lesson) but whose rows about a student are about that student only: deleted, never cleared
+ * (a cleared notification would turn into a notice about a lesson).
+ */
+const NULLABLE_BUT_OWNED = new Set(['notifications']);
+/** Is this column the student's (rows deleted with the student), not a nullable reference (cleared)? */
+const ownsRow = (table: string, c: { notnull: number }) => Boolean(c.notnull) || NULLABLE_BUT_OWNED.has(table);
 /** Tables handled by their own step (owning module, JSON lists, files, the student row). */
 const SPECIAL = new Set(['students', 'files', 'import_rows', 'sessions', 'audit_events', 'command_log', PRIVATE_NOTES_TABLE, SELECTIONS_TABLE_NAME]);
 const q = (s: string) => `"${s.replace(/"/gu, '""')}"`;
@@ -89,8 +97,8 @@ function planFor(db: Db, sid: string, fullName: string, photoFileId: string | nu
     if (SPECIAL.has(t)) continue;
     const cols = columnsOf(db, t);
     const studentCols = cols.filter((c) => STUDENT_COLUMNS.has(c.name));
-    const required = studentCols.filter((c) => c.notnull);
-    const optional = studentCols.filter((c) => !c.notnull);
+    const required = studentCols.filter((c) => ownsRow(t, c));
+    const optional = studentCols.filter((c) => !ownsRow(t, c));
     let n = 0;
     if (required.length) n += count(db, `${q(t)} where ${required.map((c) => `${q(c.name)} = ?`).join(' or ')}`, ...required.map(() => sid));
     if (!required.length && goalIds.length && cols.some((c) => c.name === 'goal_id')) n += count(db, `${q(t)} where goal_id in (${goalIds.map(() => '?').join(',')})`, ...goalIds);
@@ -211,14 +219,14 @@ export async function eraseStudent(ctx: RequestContext, studentId: string, confi
     for (const t of ordered) {
       if (!plan.deletes.has(t)) continue;
       const cols = columnsOf(db, t);
-      const required = cols.filter((c) => c.notnull && STUDENT_COLUMNS.has(c.name));
+      const required = cols.filter((c) => ownsRow(t, c) && STUDENT_COLUMNS.has(c.name));
       if (required.length) del(t, required.map((c) => `${q(c.name)} = ?`).join(' or '), ...required.map(() => sid));
       else if (plan.goalIds.length) del(t, `goal_id in (${plan.goalIds.map(() => '?').join(',')})`, ...plan.goalIds);
     }
     // Nullable references: cleared, the rows stay (class totals, other students' history).
     let cleared = 0;
     for (const t of plan.nulls.keys()) {
-      for (const c of columnsOf(db, t).filter((x) => !x.notnull && STUDENT_COLUMNS.has(x.name))) {
+      for (const c of columnsOf(db, t).filter((x) => !ownsRow(t, x) && STUDENT_COLUMNS.has(x.name))) {
         cleared += db.$client.prepare(`update ${q(t)} set ${q(c.name)} = null where ${q(c.name)} = ?`).run(sid).changes;
       }
     }

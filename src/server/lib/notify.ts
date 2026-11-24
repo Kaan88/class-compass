@@ -9,7 +9,9 @@
  * module, so it cannot recurse.
  *
  * Events carry ids only (no text): the student, the subject (null = about the student as a whole,
- * e.g. their avatar), optionally the class+subject, and the record it is about. The sink writes only
+ * e.g. their avatar), optionally the class+subject, and the record it is about. A notice about a
+ * lesson (S37, D-218: `lessonStillRunning`, `lessonAutoEnded`) has no student: `studentId` is null and
+ * `contextId` names the class+subject, whose teacher (the one who can end its lessons) gets it. The sink writes only
  * for the student's current teachers of that subject, with the category's module on and the category
  * switched on in the teacher's settings, and never for `actorUserId` (the teacher who caused it).
  */
@@ -18,7 +20,8 @@ import type { AppDeps } from './context.ts';
 
 export interface NotifyEvent {
   category: NotificationCategory;
-  studentId: string;
+  /** Null only for the lesson categories (`isLessonCategory`), which name their class+subject in `contextId`. */
+  studentId: string | null;
   /** The subject the event belongs to; null = the student as a whole (every current teacher). */
   subjectId: string | null;
   /** The class+subject it happened in, when there is one (achievements). */
