@@ -3,7 +3,7 @@
  * S30 (D-207) and S31 (D-208): what the screens show while the school has switched passwords off, and
  * Sign in with Google with its warning about shared computers (ACC-2, ACC-12). Fictional data only.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -75,6 +75,23 @@ describe('sign-in page while passwords are off (S30, D-207)', () => {
     expect(screen.getByRole('status').textContent).toBe(en['common.loading']);
     expect(document.querySelector('input')).toBeNull();
     expect(screen.queryByRole('button', { name: en['auth.signIn'] })).toBeNull();
+  });
+
+  it('stops waiting after a few seconds: a server that does not answer still gets the password form', () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal('fetch', () => new Promise(() => undefined));
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      qc.setQueryData(ME_KEY, null);
+      render(wrap(<LoginPage />, qc));
+      expect(document.querySelector('input[type="password"]')).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(4100);
+      });
+      expect(document.querySelector('input[type="password"]')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the password form while passwords are allowed, and when email is not set up', () => {

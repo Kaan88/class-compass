@@ -104,7 +104,7 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     expect(reason(await new Client(env).post('/api/auth/sso/start'))).toBe('SSO_SIGNIN_FAILED');
     expect(plain.fake.calls).toEqual([]); // nothing was sent over plain http
     await env.app.close();
-    for (const odd of ['https://user:pw@mail.demo.example', 'https://mail.demo.example?x=1']) {
+    for (const odd of ['https://user:pw@mail.demo.example', 'https://mail.demo.example?x=1', 'https://mail.demo.example?', 'https://mail.demo.example#']) {
       const o = await school({ ...SSO, SSO_ISSUER: odd });
       expect(reason(await new Client(env).post('/api/auth/sso/start')), odd).toBe('SSO_SIGNIN_FAILED');
       expect(o.fake.calls, odd).toEqual([]);

@@ -149,7 +149,7 @@ async function endpointsOf(deps: AppDeps): Promise<Endpoints> {
   if (known && now - known.at < DISCOVERY_TTL_MS && now >= known.at) return known.endpoints;
   const base = new URL(issuer);
   // Checked before anything is sent: a plain-http issuer, or one carrying a user name, a query or a fragment, is never asked.
-  if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash) throw failed();
+  if (base.protocol !== 'https:' || base.username || base.password || /[?#]/u.test(issuer)) throw failed();
   let doc: Record<string, unknown>;
   try {
     doc = (await (deps.ssoHttp ?? ssoHttp)(`${issuer}/.well-known/openid-configuration`)) as Record<string, unknown>;

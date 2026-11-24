@@ -204,6 +204,9 @@ describe('Sign in with Google (S31, D-208)', () => {
     expect(env.db.select().from(users).where(eq(users.id, s.ayse.id)).get()!.googleSub).toBeNull();
     expect(reason((await googleSignIn(standard('ayse@school.example', 'g-ayse'))).r)).toBe('GOOGLE_NO_ACCOUNT');
     expect((await googleSignIn(standard('ayse.new@school.example', 'g-ayse-new'))).r.body.id).toBe(s.ayse.id);
+    // A deactivated account lets go of the id too, so an old link cannot shut out a new account with the address.
+    await ok(s.admin.post(`/api/admin/users/${s.ayse.id}/deactivate`));
+    expect(env.db.select().from(users).where(eq(users.id, s.ayse.id)).get()!.googleSub).toBeNull();
   });
 
   it('administrators sign in with Google once the school has switched passwords off (D-207)', async () => {

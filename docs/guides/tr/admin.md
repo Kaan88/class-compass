@@ -86,7 +86,7 @@ Listenin üstündeki **Şifreler** bölümünde bütün okul için tek bir kural
 Bilgi işlem sorumlusu sunucuda ayarladıysa giriş sayfasında **Google ile giriş yap** düğmesi de görünür. E-posta bağlantılarının yanında ikinci bir giriş yoludur; hesap açmaz: Google yalnızca kişinin, hesabına yazdığınız e-posta adresinin sahibi olduğunu doğrular. Öğretmenler her zaman kullanabilir; yöneticiler yalnızca hesaplarının şifresi yokken (şifreler kapalıyken ya da şifrelere yeniden izin verildikten sonra e-posta bağlantılarıyla girmeyi sürdürüyorlarsa).
 
 - Hesaptaki adres kişinin Google adresi olmalıdır. Adresi başka olan kişi e-posta bağlantılarını kullanmayı sürdürür.
-- Bu yolla giriş yapılmış hesapta listede **Google ile giriş kullanıldı** yazar. Hesabın e-posta adresini değiştirirseniz sonraki Google girişi yeni adresle eşleşmelidir.
+- Bu yolla giriş yapılmış hesapta listede **Google ile giriş kullanıldı** yazar. Hesabın e-posta adresini değiştirirseniz ya da hesabı devre dışı bırakırsanız bu bağ kalkar: sonraki Google girişi yeniden hesaptaki adresle eşleşmelidir.
 - Davet edilen bir öğretmen daveti açmadan **Google ile giriş yap**'a basabilir: davet kullanılmış sayılır ve hesabın şifresi olmaz.
 - Google, kişinin bu siteye ne zaman giriş yaptığını öğrenir. Google'a hiçbir öğrenci verisi gitmez.
 - **Ortak bilgisayarda kullanılmaz.** Google ile giriş, o Google hesabını e-postalarıyla birlikte tarayıcıda açık bırakır. Giriş sayfası bunu düğmenin altında söyler; sınıf ekranı olarak kullanılmış bir bilgisayarda ise düğmeyi geri tutar ve e-posta kodunu önerir (**Bu benim kendi bilgisayarım: Google ile girişi göster** düğmeyi yeniden gösterir).

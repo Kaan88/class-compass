@@ -651,6 +651,9 @@ A summary of what is still open after S14, S15a and the move to the Oracle serve
   - [ ] A real sign-in through the owner's provider on the test site (owner)
   - [ ] The icon and its place on the real sign-in page, seen by the owner on a phone and a laptop
   - [ ] An admin-list mark for accounts that have used it; more than one provider, if ever needed
+  - [x] Reviewed by Fable in two rounds (2026-11-24); its findings fixed (D-213, "After the Fable review")
+  - [ ] From that review, not built: an administrator who was invited and first signs in this way while passwords are on has no password yet, so setting a PIN or anything that asks for the current password answers "wrong password" until they open their invite; a line that says so would help
+  - [ ] On the test site: registered as the client `class-compass` in the owner's mail server (no secret, no mail scopes), settings and icon in place; the app reaches the provider only through a host mapping in the stack's compose override, because the provider runs on the same host (OPERATIONS)
 - [ ] A password together with an authenticator code (TOTP), only if still wanted once Google and passkeys exist: the rule is "no password on its own" (owner, 2026-11-24)
 - [ ] Not planned: sign-in for student links through a parent's Google or Apple account (a link already needs no typing and keeps the device signed in; parent identities would be new personal data). If a leaked link is the worry: the "link opened on a new device" notification exists, and a link could be limited to a few devices
 - [ ] A daily line or notification for administrators about lockouts and failed sign-ins; a Cloudflare alert on the rate-limit and challenge rules

@@ -86,7 +86,7 @@ Teachers and administrators can add **passkeys** under **Profile and PIN** → *
 When the IT person has set it up on the server, the sign-in page also offers **Sign in with Google**. It is a second way in beside email links, never a way to make an account: Google only confirms that the person owns the email address you put on their account. Teachers can always use it; administrators only while their account has no password (while passwords are switched off, or if they kept email links after passwords were allowed again).
 
 - The address on the account must be the person's Google address. Someone with another address keeps using email links.
-- The list shows **Google sign-in used** on an account that has signed in this way. If you change the account's email address, the next Google sign-in must match the new address.
+- The list shows **Google sign-in used** on an account that has signed in this way. If you change the account's email address or deactivate the account, that link is dropped: the next Google sign-in must match the address on the account again.
 - An invited teacher may press **Sign in with Google** without opening the invite first: the invite then counts as used, and the account has no password.
 - Google learns that the person signed in to this site and when. No student data goes to Google.
 - **Not on a shared computer.** A Google sign-in leaves that Google account, with its mail, open in the browser. The sign-in page says so under the button, and on a computer that has been used as a classroom display it holds the button back and points to the email code instead (**It is my own computer: show Google sign-in** brings it back).
