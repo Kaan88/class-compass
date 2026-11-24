@@ -121,7 +121,9 @@ describe('teacher home notices (S37, D-218)', () => {
       expect(end.getAttribute('href')).toBe('/classroom');
       expect(JSON.parse(end.getAttribute('data-search')!)).toEqual({ endLesson: 'ctx-3a' });
       fireEvent.click(screen.getByRole('button', { name: m['lessonNotice.stillTeaching'] }));
-      expect(queued).toEqual([{ type: 'lesson.stillTeaching', payload: { contextId: 'ctx-3a', lessonId: 'lesson-run' }, meta: { contextId: 'ctx-3a', lessonId: 'lesson-run' } }]);
+      // Sent now, straight to the server, never queued (S37, D-218).
+      await waitFor(() => expect(pings()).toBe(1));
+      expect(queued).toEqual([]);
       await waitFor(() => expect(screen.queryByTestId('lesson-notice-running')).toBeNull());
       act(() => queryClient.setQueryData(LESSON_NOTICES_KEY, notices));
 
@@ -134,7 +136,7 @@ describe('teacher home notices (S37, D-218)', () => {
       expect(fillIn.className).toContain('primary');
       fireEvent.click(screen.getByRole('button', { name: m['lessonNotice.gotIt'] }));
       await waitFor(() => expect(screen.queryByTestId('lesson-notice-auto-ended')).toBeNull());
-      expect(calls).toEqual([{ path: '/api/teacher/lesson-notices/:lessonId/seen', input: { lessonId: 'lesson-auto' } }]);
+      expect(calls.filter((c) => c.path !== '/api/commands')).toEqual([{ path: '/api/teacher/lesson-notices/:lessonId/seen', input: { lessonId: 'lesson-auto' } }]);
       expect(screen.getByTestId('lesson-notice-running')).toBeTruthy();
     });
   }
@@ -187,13 +189,15 @@ describe('the board and End Lesson keep a lesson in use alive (S37, D-218)', () 
     ['en', en],
     ['tr', tr],
   ] as const) {
-    it(`the board note says when it ends by itself and Still teaching sends the command (${locale})`, () => {
+    it(`the board note says when it ends by itself and Still teaching sends the command (${locale})`, async () => {
       wrap(locale, <OverdueNote lesson={live} timezone={tz} />);
       const note = screen.getByTestId('lesson-overdue-note');
       expect(note.getAttribute('role')).toBe('status');
       expect(note.textContent).toContain(fill(m['lessonNotice.board'], { time: '12:35' }));
       fireEvent.click(screen.getByRole('button', { name: m['lessonNotice.stillTeaching'] }));
-      expect(queued.map((q) => [q.type, q.payload])).toEqual([['lesson.stillTeaching', { contextId: 'ctx-3a', lessonId: 'lesson-run' }]]);
+      await waitFor(() => expect(pings()).toBe(1));
+      expect(calls.find((c) => c.path === '/api/commands')!.input).toEqual({ commands: [expect.objectContaining({ type: 'lesson.stillTeaching', payload: { contextId: 'ctx-3a', lessonId: 'lesson-run' } })] });
+      expect(queued).toEqual([]);
     });
   }
 
@@ -274,20 +278,47 @@ describe('the board and End Lesson keep a lesson in use alive (S37, D-218)', () 
     });
   }
 
-  it('offline the Still teaching buttons are disabled: nothing is queued to be replayed later', () => {
-    box.status = { ...box.status, online: false };
-    queryClient.setQueryData(LESSON_NOTICES_KEY, notices);
-    wrap('en', <LessonNotices />);
-    const home = screen.getByRole('button', { name: en['lessonNotice.stillTeaching'] });
-    expect(home.hasAttribute('disabled') || home.getAttribute('aria-disabled') === 'true').toBe(true);
-    fireEvent.click(home);
-    cleanup();
-    wrap('en', <OverdueNote lesson={live} timezone={tz} />);
-    const board = screen.getByRole('button', { name: en['lessonNotice.stillTeaching'] });
-    expect(board.hasAttribute('disabled') || board.getAttribute('aria-disabled') === 'true').toBe(true);
-    fireEvent.click(board);
-    expect(queued).toEqual([]);
-  });
+  for (const [locale, m] of [
+    ['en', en],
+    ['tr', tr],
+  ] as const) {
+    it(`offline the Still teaching buttons are disabled with the reason beside them, and nothing is queued (${locale})`, () => {
+      box.status = { ...box.status, online: false };
+      const check = () => {
+        const button = screen.getByRole('button', { name: m['lessonNotice.stillTeaching'] });
+        expect(button.hasAttribute('disabled')).toBe(true);
+        const note = screen.getByTestId('still-teaching-note');
+        expect(note.textContent).toBe(m['lessonNotice.offline']);
+        expect(button.getAttribute('aria-describedby')).toBe(note.id);
+        fireEvent.click(button);
+      };
+      queryClient.setQueryData(LESSON_NOTICES_KEY, notices);
+      wrap(locale, <LessonNotices />);
+      check();
+      cleanup();
+      wrap(locale, <OverdueNote lesson={live} timezone={tz} />);
+      check();
+      expect(queued).toEqual([]);
+      expect(pings()).toBe(0);
+    });
+  }
+
+  for (const [failure, key] of [
+    ['network', 'error.NETWORK'],
+    ['refused', 'error.LESSON_ENDED'],
+  ] as const) {
+    it(`a Still teaching press that fails (${failure}) says why and keeps the reminder; nothing is queued`, async () => {
+      box.direct = failure;
+      queryClient.setQueryData(LESSON_NOTICES_KEY, notices);
+      wrap('en', <LessonNotices />);
+      const button = screen.getByRole('button', { name: en['lessonNotice.stillTeaching'] });
+      fireEvent.click(button);
+      await waitFor(() => expect(screen.getByTestId('still-teaching-note').textContent).toBe(en[key]));
+      expect(button.getAttribute('aria-describedby')).toBe(screen.getByTestId('still-teaching-note').id);
+      expect(screen.getByTestId('lesson-notice-running')).toBeTruthy();
+      expect(queued).toEqual([]);
+    });
+  }
 
   it('a late End Lesson summary names the steps it could not save', () => {
     const late = { id: 'lesson-auto', contextId: 'ctx-3a', status: 'ended', className: '3-A', subjectName: { en: 'English', tr: 'İngilizce' }, localDate: '2026-11-09', startedAt, endedAt: startedAt + 3600_000, routineName: { en: 'Default', tr: 'Varsayılan' }, stageCount: 0, stageReached: 0, attendance: null, reflection: { rating: 4, note: null }, lessonGoal: null, autoEnded: false, notApplied: ['secretStudents'] } satisfies LessonSummary;
@@ -332,6 +363,8 @@ describe('filling in End Lesson for a lesson that ended by itself (S37, D-218)',
       expect(screen.getByTestId('end-step-not-available').textContent).toBe(fill(m['summary.notApplied'], { steps: title }));
       expect(screen.getByRole('heading', { name: m['reflection.title'] })).toBeTruthy();
       expect(screen.getByRole('button', { name: m['lesson.saveAndEnd'] })).toBeTruthy();
+      // Opened by ?fillIn=: focus is on the flow's heading.
+      expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2 }));
       // Not a running lesson: no "Still teaching" pings, no "ended underneath" note.
       expect(queued).toEqual([]);
       expect(screen.queryByTestId('end-lesson-ended-underneath')).toBeNull();

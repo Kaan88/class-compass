@@ -3,8 +3,9 @@
  *
  * - a lesson that may be forgotten (old enough and quiet for a while): "Your lesson in 3-A English is
  *   still running since 10:05", when it ends by itself if nothing happens in it, End lesson (opens End
- *   Lesson for that class in the classroom) and Still teaching (a classroom command that counts as
- *   activity; the banner goes at once and comes back only after another quiet spell);
+ *   Lesson for that class in the classroom) and Still teaching (`StillTeachingButton`: sent now or not
+ *   at all, disabled with a reason offline; on success the banner goes and comes back only after
+ *   another quiet spell);
  * - a lesson that ended by itself: "… ended by itself at 11:00 … you can still fill in End Lesson until
  *   the end of Monday, 9 November" with Fill in End Lesson (`?fillIn=<lessonId>`: the End Lesson flow
  *   for that lesson right here, `LateEndLesson`) and Got it, which hides the notice (stored per lesson
@@ -19,7 +20,6 @@ import { Link } from '@tanstack/react-router';
 import * as L from '../../../shared/contracts/lessons.ts';
 import { formatDate } from '../../../shared/i18n/index.ts';
 import { call } from '../../lib/api.ts';
-import { getOutbox, useOutboxStatus } from '../../lib/outbox-client.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { useRun } from '../../lib/useRun.ts';
 import { Button, buttonClass } from '../../ui/Button.tsx';
@@ -27,6 +27,7 @@ import { IconClock, IconStop } from '../../ui/icons.tsx';
 import { NOTIFICATIONS_KEY } from '../notifications/Bell.tsx';
 import { fillInDay } from './EndLesson.tsx';
 import { LateEndLesson } from './LateEndLesson.tsx';
+import { StillTeachingButton } from './StillTeachingButton.tsx';
 import { classLabel } from './labels.ts';
 
 export const LESSON_NOTICES_KEY = ['sensitive', 'lessonNotices'] as const;
@@ -36,8 +37,6 @@ export function LessonNotices({ fillIn, onCloseFillIn = () => undefined }: { fil
   const { t, locale } = useI18n();
   const run = useRun();
   const qc = useQueryClient();
-  // Offline "Still teaching" is disabled: it is never queued to be replayed later (S37, D-218).
-  const { online } = useOutboxStatus();
   // A background poll (never keeps an unlock alive): the reminder appears while the page stays open.
   const q = useQuery({ queryKey: LESSON_NOTICES_KEY, queryFn: () => call(L.lessonNotices, {}), refetchInterval: 60_000 });
   const data = q.data;
@@ -68,15 +67,11 @@ export function LessonNotices({ fillIn, onCloseFillIn = () => undefined }: { fil
               <Link to="/classroom" search={{ endLesson: n.contextId }} className={buttonClass('primary')}>
                 {t('lessonNotice.endNow')}
               </Link>
-              <Button
-                isDisabled={!online}
-                onPress={() => {
-                  void getOutbox().enqueue('lesson.stillTeaching', { contextId: n.contextId, lessonId: n.lessonId }, { contextId: n.contextId, lessonId: n.lessonId });
-                  qc.setQueryData<L.LessonNotices>(LESSON_NOTICES_KEY, (d) => (d ? { ...d, running: d.running.filter((x) => x.lessonId !== n.lessonId) } : d));
-                }}
-              >
-                {t('lessonNotice.stillTeaching')}
-              </Button>
+              <StillTeachingButton
+                contextId={n.contextId}
+                lessonId={n.lessonId}
+                onDone={() => qc.setQueryData<L.LessonNotices>(LESSON_NOTICES_KEY, (d) => (d ? { ...d, running: d.running.filter((x) => x.lessonId !== n.lessonId) } : d))}
+              />
             </div>
           </div>
         </div>

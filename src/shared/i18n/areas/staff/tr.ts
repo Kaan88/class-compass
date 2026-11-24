@@ -3403,6 +3403,7 @@ export const tr = {
   'lessonNotice.running': '{cls} dersiniz hâlâ sürüyor (başlangıç: {time}).',
   'lessonNotice.runningAutoEnd': 'Derste hiçbir şey olmazsa saat {time} olunca kendiliğinden biter.',
   'lessonNotice.stillTeaching': 'Ders sürüyor',
+  'lessonNotice.offline': 'Bağlantı yok: bağlantı gelince yeniden deneyin.',
   'lessonNotice.endNow': 'Dersi bitir',
   'lessonNotice.autoEnded': '{cls} dersi ({date}) kimse bitirmediği için kendiliğinden bitti; ders, son etkinliğin olduğu saat {time} itibarıyla bitmiş sayılır. Dersi bitirme adımlarını {until} gününün sonuna kadar hâlâ doldurabilirsiniz; sonrasında doldurulmayanlar kaydedilmemiş olarak kalır.',
   'lessonNotice.gotIt': 'Tamam',

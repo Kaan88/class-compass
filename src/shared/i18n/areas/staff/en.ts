@@ -3407,6 +3407,7 @@ export const en = {
   'lessonNotice.running': 'Your lesson in {cls} is still running since {time}.',
   'lessonNotice.runningAutoEnd': 'If nothing happens in it, it ends by itself at {time}.',
   'lessonNotice.stillTeaching': 'Still teaching',
+  'lessonNotice.offline': 'Not connected: try again when the connection is back.',
   'lessonNotice.endNow': 'End lesson',
   'lessonNotice.autoEnded': 'The lesson in {cls} on {date} ended by itself at {time} (its last activity), because nobody ended it. You can still fill in End Lesson until the end of {until}; after that, anything not filled in stays not recorded.',
   'lessonNotice.gotIt': 'Got it',

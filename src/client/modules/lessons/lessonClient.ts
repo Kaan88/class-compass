@@ -165,12 +165,25 @@ export async function sendLessonCommand<T extends LessonCommandType>(type: T, pa
  * the lesson's end was queued. Resolves true when the server accepted it.
  */
 export async function sendKeepAlive(p: { contextId: string; lessonId: string }): Promise<boolean> {
-  if (!getOutbox().getStatus().online) return false;
+  return (await sendStillTeachingNow(p)).ok;
+}
+
+/** What a direct "Still teaching" got: accepted, refused (with the server's error), or not sent / no answer (`network`). */
+export type StillTeachingOutcome = { ok: true } | { ok: false; network: true } | { ok: false; network: false; error: { code: string; reason?: string | undefined } | undefined };
+
+/**
+ * "Still teaching" sent now or not at all (S37, D-218): straight to the command endpoint while online,
+ * never through the outbox (it only means something at this moment, so it is never queued or replayed).
+ * The same command and server checks as a queued one.
+ */
+export async function sendStillTeachingNow(p: { contextId: string; lessonId: string }): Promise<StillTeachingOutcome> {
+  if (!getOutbox().getStatus().online) return { ok: false, network: true };
   try {
     const r = await call(submitCommands, { commands: [{ opId: uuidv7(), type: 'lesson.stillTeaching', payload: p, contextId: p.contextId, lessonId: p.lessonId, clientTime: Date.now() }] });
-    return r.results[0]?.ok === true;
+    const res = r.results[0];
+    return res?.ok ? { ok: true } : { ok: false, network: false, error: res?.error };
   } catch {
-    return false;
+    return { ok: false, network: true };
   }
 }
 
