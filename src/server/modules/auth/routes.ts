@@ -36,6 +36,9 @@ function freshMe(ctx: RequestContext) {
 }
 
 export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
+  // The cookies of Google (S31, D-208) and of the sign-in server (S34, D-213) that bind a provider's answer to the browser that asked, and the lists to choose from (D-216).
+  const googleCookie = { path: google.GOOGLE_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'lax' as const };
+  const ssoCookie = { path: sso.SSO_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'lax' as const };
   route(
     app,
     deps,
@@ -51,6 +54,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.logout, (ctx, _i, { reply }) => {
     svc.revokeSession(ctx.db, ctx.session!.id, ctx.now());
     reply.clearCookie(sessionCookieName(deps), { path: '/' });
+    // A list of accounts to choose from (D-216) does not outlive the sign-out on this browser.
+    reply.clearCookie(google.GOOGLE_CHOICE_COOKIE, googleCookie);
+    reply.clearCookie(sso.SSO_CHOICE_COOKIE, ssoCookie);
     return { ok: true as const };
   });
 
@@ -199,13 +205,14 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     { rateLimit: { max: 10, timeWindow: '15 minutes' } },
   );
   // Sign in with Google (S31, D-208): the cookie binds Google's answer to the browser that asked.
-  const googleCookie = { path: google.GOOGLE_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'lax' as const };
   route(
     app,
     deps,
     C.startGoogleSignIn,
     (ctx, _i, { reply }) => {
       const started = google.startGoogleSignIn(ctx);
+      // A list left from an earlier try is not this one's (D-216).
+      reply.clearCookie(google.GOOGLE_CHOICE_COOKIE, googleCookie);
       reply.setCookie(google.GOOGLE_COOKIE, started.cookie, { ...googleCookie, maxAge: Math.floor(google.GOOGLE_STATE_TTL_MS / 1000) });
       return { authorizeUrl: started.authorizeUrl };
     },
@@ -235,13 +242,13 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     { rateLimit: { max: 20, timeWindow: '15 minutes' } },
   );
   // The operator's own sign-in server (S34, D-213): the same shape as Google's two steps.
-  const ssoCookie = { path: sso.SSO_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'lax' as const };
   route(
     app,
     deps,
     C.startSsoSignIn,
     async (ctx, _i, { reply }) => {
       const started = await sso.startSsoSignIn(ctx);
+      reply.clearCookie(sso.SSO_CHOICE_COOKIE, ssoCookie);
       reply.setCookie(sso.SSO_COOKIE, started.cookie, { ...ssoCookie, maxAge: Math.floor(sso.SSO_STATE_TTL_MS / 1000) });
       return { authorizeUrl: started.authorizeUrl };
     },

@@ -237,7 +237,10 @@ export const completeEmailCode = endpoint({
  * name, no address.
  */
 export const ChooseAccount = z.object({
-  choose: z.array(z.object({ id: z.string(), displayName: z.string(), role: z.enum(['admin', 'teacher']) })).min(2),
+  choose: z
+    .array(z.object({ id: z.string(), displayName: z.string(), role: z.enum(['admin', 'teacher']) }))
+    .min(2)
+    .max(10),
 });
 /** A finished provider sign-in: signed in, or the accounts to choose from. */
 export const ProviderSignInResult = z.union([ChooseAccount, Me]);
@@ -258,7 +261,7 @@ export const startGoogleSignIn = endpoint({
 
 /**
  * The `state` and `code` Google sent back to `/signin-google`, posted by that page (a GET never uses a
- * code). Several accounts with the proven address: the list to choose from, and a 5-minute cookie (D-216).
+ * code). Several accounts with the proven address (2 to 10): the list to choose from, and a 5-minute cookie (D-216).
  */
 export const completeGoogleSignIn = endpoint({
   method: 'POST',
@@ -268,7 +271,10 @@ export const completeGoogleSignIn = endpoint({
   output: ProviderSignInResult,
 });
 
-/** One of the accounts `completeGoogleSignIn` listed (D-216); works once. */
+/**
+ * One of the accounts `completeGoogleSignIn` listed (D-216). The proof is the list's cookie: it lives 5 minutes and is
+ * cleared after a successful choice, when invalid or expired, on a new start and on sign-out.
+ */
 export const chooseGoogleAccount = endpoint({ method: 'POST', path: '/api/auth/google/choose', access: 'public', input: ChooseInput, output: Me });
 
 // ---------------------------------------------------------------- the operator's own sign-in server (S34, D-213)
@@ -290,7 +296,7 @@ export const completeSsoSignIn = endpoint({
   output: ProviderSignInResult,
 });
 
-/** One of the accounts `completeSsoSignIn` listed (D-216); works once. */
+/** One of the accounts `completeSsoSignIn` listed (D-216); the cookie as for `chooseGoogleAccount`. */
 export const chooseSsoAccount = endpoint({ method: 'POST', path: '/api/auth/sso/choose', access: 'public', input: ChooseInput, output: Me });
 
 /** The button's icon (a small image file the operator put in the data folder); 404 when there is none. */

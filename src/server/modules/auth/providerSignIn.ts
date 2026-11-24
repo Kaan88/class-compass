@@ -5,18 +5,25 @@
  *
  * Candidates (rule 1 of D-216): every active account that may use this provider (`eligible`: Google
  * only for accounts that may be without a password, the sign-in server for any account) and that either
- * already carries the provider's id of this person, or has the proven address (any case) and no id from
- * this provider yet. An account with the address but another id belongs to somebody else's provider
- * account and is not a candidate. Several accounts may share an address (D-108) and may then carry the
- * same id.
+ * already carries the provider's id of this person, or has no id from this provider yet and the address
+ * that identifies the person:
+ * - while no active account carries the id: the proven address (any case);
+ * - once one does: the stored address of an active account that carries the id. The provider's address
+ *   then no longer counts, as before D-216: a linked person whose provider address changes to somebody
+ *   else's never reaches that account.
+ * An account with the address but another id belongs to somebody else's provider account and is not a
+ * candidate. Several accounts may share an address (D-108) and may then carry the same id.
  *
- * One candidate signs in at once. Several: nothing is signed in, the page shows the accounts' names and
- * roles only, and a sealed HttpOnly cookie that lives 5 minutes carries the proof (provider, id,
- * address, the candidates' ids) to the choice, because the provider's code is already spent. Nothing is
- * stored. The choice checks the cookie and checks the chosen account again (it may have been
- * deactivated or given another address in between).
+ * One candidate signs in at once. Several (at most `MAX_CHOICES`): nothing is signed in, the page shows
+ * the accounts' names and roles only, and a sealed HttpOnly cookie that lives 5 minutes carries the
+ * proof (provider, id, address, the candidates' ids) to the choice, because the provider's code is
+ * already spent. Nothing is stored, so nothing marks the cookie as used: it is cleared after a
+ * successful choice, when it is found invalid or expired, on a new start of that provider and on
+ * sign-out, and otherwise stops working when its 5 minutes are over. The choice checks the cookie and
+ * checks the chosen account again with the same rule (it may have been deactivated, given another
+ * address or id, or lost the right to use the provider in between).
  */
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { tx, type Db } from '../../db/client.ts';
 import { oneTimeTokens, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
@@ -28,6 +35,8 @@ import { passwordlessAllowed } from './signInPolicy.ts';
 
 /** How long the list of accounts may be answered. */
 export const CHOICE_TTL_MS = 5 * 60_000;
+/** More accounts than this on one address are refused rather than listed (and the cookie stays small). */
+export const MAX_CHOICES = 10;
 const CHOICE_AAD = 'choice';
 
 export interface ProviderClaims {
@@ -47,6 +56,7 @@ export interface Provider {
   choicePurpose: string;
   noAccount: () => AppError;
   failed: () => AppError;
+  tooMany: () => AppError;
 }
 
 export interface SignedIn {
@@ -71,23 +81,39 @@ interface PendingChoice {
   exp: number;
 }
 
+/**
+ * The addresses (lower case) by which an account without this provider's id may be this person: the
+ * stored addresses of the active accounts that carry the id, or the proven address while none does.
+ */
+function personAddresses(db: Db, provider: Provider, claims: ProviderClaims): string[] {
+  const linked = db
+    .select({ email: users.email })
+    .from(users)
+    .where(and(isNull(users.disabledAt), eq(users[provider.subField], claims.sub)))
+    .all();
+  if (linked.length === 0) return [claims.email];
+  return [...new Set(linked.flatMap((u) => (u.email ? [u.email.toLowerCase()] : [])))];
+}
+
 /** Rule 1 for one account (the choice checks it again). */
-function isCandidate(db: Db, provider: Provider, user: UserRow, claims: ProviderClaims): boolean {
+function isCandidate(db: Db, provider: Provider, user: UserRow, claims: ProviderClaims, addresses: string[]): boolean {
   if (user.disabledAt !== null || !provider.eligible(db, user)) return false;
   const sub = user[provider.subField];
   if (sub !== null) return sub === claims.sub;
-  return user.email?.toLowerCase() === claims.email;
+  return user.email !== null && addresses.includes(user.email.toLowerCase());
 }
 
 function candidatesOf(db: Db, provider: Provider, claims: ProviderClaims): UserRow[] {
   const col = users[provider.subField];
+  const addresses = personAddresses(db, provider, claims);
+  const byAddress = addresses.length ? and(isNull(col), inArray(sql`lower(${users.email})`, addresses)) : undefined;
   return db
     .select()
     .from(users)
-    .where(and(isNull(users.disabledAt), or(eq(col, claims.sub), and(isNull(col), sql`lower(${users.email}) = ${claims.email}`))))
+    .where(and(isNull(users.disabledAt), byAddress ? or(eq(col, claims.sub), byAddress) : eq(col, claims.sub)))
     .orderBy(users.displayName, users.id)
     .all()
-    .filter((u) => isCandidate(db, provider, u, claims));
+    .filter((u) => isCandidate(db, provider, u, claims, addresses));
 }
 
 /**
@@ -119,7 +145,12 @@ function signInAccount(deps: AppDeps, provider: Provider, user: UserRow, claims:
     invalidateResetTokens(deps.db, user.id, now);
     audit(deps.db, actor, { action: 'auth.invite_accept', entity: 'user', entityId: user.id, after: { method: provider.key, emailVerified: true } }, now);
   }
-  if (Object.keys(patch).length) deps.db.update(users).set({ ...patch, updatedAt: now }).where(eq(users.id, user.id)).run();
+  if (Object.keys(patch).length)
+    deps.db
+      .update(users)
+      .set({ ...patch, updatedAt: now })
+      .where(eq(users.id, user.id))
+      .run();
   const s = createSession(deps, { kind: 'user', userId: user.id }, now, SESSION_ABSOLUTE_MS, provider.key);
   audit(deps.db, actor, { action: 'auth.login', entity: 'user', entityId: user.id, after: { method: provider.key } }, now);
   return { user: deps.db.select().from(users).where(eq(users.id, user.id)).get()!, session: s.session, token: s.token };
@@ -131,6 +162,7 @@ export function finishProviderSignIn(deps: AppDeps, provider: Provider, claims: 
     const found = candidatesOf(deps.db, provider, claims);
     if (found.length === 0) throw provider.noAccount();
     if (found.length === 1) return { kind: 'signed_in', signedIn: signInAccount(deps, provider, found[0]!, claims) };
+    if (found.length > MAX_CHOICES) throw provider.tooMany();
     const pending: PendingChoice = { p: provider.key, sub: claims.sub, email: claims.email, ids: found.map((u) => u.id), exp: deps.now() + CHOICE_TTL_MS };
     return {
       kind: 'choose',
@@ -156,8 +188,9 @@ function openChoice(deps: AppDeps, provider: Provider, cookie: string | undefine
 /**
  * The person chose one of the listed accounts. A cookie that is missing, tampered with or too old is
  * spent (`spent()` lets the route clear it; the person starts again); a user id that was not on the
- * list, or an account that is no longer a candidate, leaves it. The route clears it after success too,
- * so a choice works once.
+ * list, or an account that is no longer a candidate, leaves it, so another button still works. The
+ * route clears it after a successful choice too. Nothing is stored, so a copy of the cookie value kept
+ * elsewhere would still work until its 5 minutes are over.
  */
 export function chooseProviderAccount(deps: AppDeps, provider: Provider, cookie: string | undefined, userId: string, spent: () => void): SignedIn {
   const pending = openChoice(deps, provider, cookie);
@@ -170,7 +203,7 @@ export function chooseProviderAccount(deps: AppDeps, provider: Provider, cookie:
   return tx(deps.db, () => {
     const user = deps.db.select().from(users).where(eq(users.id, userId)).get();
     // Deactivated, no longer allowed to use the provider, or given another address or id since the list.
-    if (!user || !isCandidate(deps.db, provider, user, claims)) throw provider.noAccount();
+    if (!user || !isCandidate(deps.db, provider, user, claims, personAddresses(deps.db, provider, claims))) throw provider.noAccount();
     return signInAccount(deps, provider, user, claims);
   });
 }

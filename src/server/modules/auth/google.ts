@@ -59,6 +59,8 @@ const notAvailable = () => new AppError('FEATURE_DISABLED', 'Sign in with Google
 /** The request does not belong to this browser, is too old, or Google did not accept it: start again. */
 const failed = () => new AppError('UNAUTHENTICATED', 'Google sign-in did not work. Try again.', { reason: 'GOOGLE_SIGNIN_FAILED' });
 const noAccount = () => new AppError('UNAUTHENTICATED', 'No account uses this Google address', { reason: 'GOOGLE_NO_ACCOUNT' });
+/** More than `MAX_CHOICES` accounts on the address (D-216): too many to list; email links still work. */
+const tooMany = () => new AppError('UNAUTHENTICATED', 'Too many accounts use this address', { reason: 'GOOGLE_TOO_MANY_ACCOUNTS' });
 
 const GOOGLE: Provider = {
   key: 'google',
@@ -68,6 +70,7 @@ const GOOGLE: Provider = {
   choicePurpose: 'google-choice',
   noAccount,
   failed,
+  tooMany,
 };
 
 const redirectUri = (deps: Pick<AppDeps, 'config'>) => `${deps.config.origins.main}${GOOGLE_RETURN_PATH}`;

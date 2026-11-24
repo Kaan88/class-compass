@@ -371,10 +371,12 @@ describe('one proven address, several accounts: the person chooses (S36, D-216)'
     );
     expect(JSON.stringify(first.r.body)).not.toContain('mail.demo.example');
     expect((await first.c.get('/api/auth/me')).status).toBe(401);
-    const setCookie = String(first.r.headers['set-cookie']);
-    expect(setCookie).toMatch(new RegExp(`${SSO_CHOICE_COOKIE}=[^;]+;[^,]*Max-Age=300`, 'u'));
-    expect(setCookie).toMatch(/HttpOnly/iu);
-    expect(setCookie).toContain('Path=/api/auth/sso');
+    // The choice cookie's own attributes (the answer also clears the start cookie).
+    const choiceCookie = ([first.r.headers['set-cookie']].flat() as string[]).find((h) => h.startsWith(`${SSO_CHOICE_COOKIE}=`))!;
+    expect(choiceCookie).toMatch(/; Max-Age=300(;|$)/u);
+    expect(choiceCookie).toMatch(/; HttpOnly(;|$)/iu);
+    expect(choiceCookie).toMatch(/; SameSite=Lax(;|$)/iu);
+    expect(choiceCookie).toContain('; Path=/api/auth/sso');
 
     const asAdmin = await choose(first.c, s.adminUser.id);
     expect(asAdmin.body).toMatchObject({ id: s.adminUser.id, role: 'admin', signInMethod: 'password', reauthFresh: true });
@@ -438,5 +440,114 @@ describe('one proven address, several accounts: the person chooses (S36, D-216)'
   it('is not offered when the sign-in server is not set up', async () => {
     await school({});
     expect(reason(await new Client(env).post('/api/auth/sso/choose', { userId: 'u-1' }))).toBe('SSO_NOT_AVAILABLE');
+  });
+});
+
+describe('S36 review: whom a linked person may reach, the cookie’s life, and the edges (D-216)', () => {
+  const sub = (id: string) => env.db.select().from(users).where(eq(users.id, id)).get()!.ssoSub;
+  const choose = (c: Client, userId: string) => c.post('/api/auth/sso/choose', { userId });
+  const another = async (s: Awaited<ReturnType<typeof school>>['s'], login: string, role: 'teacher' | 'admin' = 'admin', email = 'ayse@mail.demo.example') =>
+    (await ok(s.admin.post('/api/admin/users', { login, displayName: `Kişi ${login}`, role, email, setup: 'temporary_password' }))).user as { id: string };
+  const link = (id: string, ssoSub: string | null) => env.db.update(users).set({ ssoSub }).where(eq(users.id, id)).run();
+
+  it('a linked teacher and an unlinked administrator with the same stored address are both offered, whatever address the provider names now', async () => {
+    const { s, fake } = await school();
+    const boss = await another(s, 'ayse.admin');
+    link(s.ayse.id, 'acct-ayse');
+    for (const named of ['ayse@mail.demo.example', 'ayse.moved@mail.demo.example']) {
+      const listed = await signIn(fake, standard(named, 'acct-ayse'));
+      expect(listed.r.body.choose.map((a: any) => a.id).sort(), named).toEqual([s.ayse.id, boss.id].sort());
+    }
+  });
+
+  it('a linked teacher whose provider address now is somebody else’s does not reach that account: signed straight in, the other neither listed nor choosable', async () => {
+    const { s, fake } = await school();
+    link(s.ayse.id, 'acct-ayse');
+    const direct = await signIn(fake, standard('root@mail.demo.example', 'acct-ayse'));
+    expect(direct.r.body).toMatchObject({ id: s.ayse.id, role: 'teacher' });
+    expect(direct.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+    expect(sub(s.adminUser.id)).toBeNull();
+    const two = await another(s, 'ayse.second', 'teacher');
+    link(two.id, 'acct-ayse');
+    const listed = await signIn(fake, standard('root@mail.demo.example', 'acct-ayse'));
+    expect(listed.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.ayse.id, two.id].sort());
+    expect(reason(await choose(listed.c, s.adminUser.id))).toBe('SSO_SIGNIN_FAILED');
+    expect(sub(s.adminUser.id)).toBeNull();
+  });
+
+  it('an account that now carries another provider id is refused at the choice; the other stays choosable', async () => {
+    const { s, fake } = await school();
+    const two = await another(s, 'ayse.second', 'teacher');
+    const listed = await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'));
+    expect(listed.r.body.choose).toHaveLength(2);
+    link(two.id, 'acct-somebody-else');
+    expect(reason(await choose(listed.c, two.id))).toBe('SSO_NO_ACCOUNT');
+    expect((await ok(choose(listed.c, s.ayse.id))).id).toBe(s.ayse.id);
+  });
+
+  it('an invited administrator chosen from the list while passwords are on is signed in, keeps the invite, and has no password yet', async () => {
+    const { s, fake, mailer } = await school();
+    const boss = await ok(s.admin.post('/api/admin/users', { login: 'root.invited', displayName: 'Davetli Yönetici', role: 'admin', email: 'root@mail.demo.example' }));
+    const invite = tokenFrom(mailer.sent.at(-1)!.text);
+    const listed = await signIn(fake, standard('root@mail.demo.example', 'acct-17'));
+    expect(listed.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.adminUser.id, boss.user.id].sort());
+    expect(await ok(choose(listed.c, boss.user.id))).toMatchObject({ id: boss.user.id, role: 'admin', signInMethod: 'password', passwordNotSet: true });
+    expect(audits('auth.invite_accept')).toBe(0);
+    await ok(new Client(env).post('/api/auth/invite/inspect', { token: invite }));
+    await ok(new Client(env).post('/api/auth/invite/accept', { token: invite, method: 'password', password: 'chosen-password-123' }));
+    const after = new Client(env);
+    await after.login('root.invited', 'chosen-password-123');
+    expect((await ok(after.get('/api/auth/me'))).passwordNotSet).toBe(false);
+  });
+
+  it('a new start clears the choice cookie; a choice needs the CSRF header', async () => {
+    const { s, fake } = await school();
+    const two = await another(s, 'ayse.second', 'teacher');
+    const listed = await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'));
+    const cookie = `${SSO_CHOICE_COOKIE}=${listed.c.cookies.get(SSO_CHOICE_COOKIE)!}`;
+    const res = await env.app.inject({ method: 'POST', url: '/api/auth/sso/choose', headers: { origin: env.config.origins.main, cookie }, payload: { userId: two.id } });
+    expect(res.statusCode).toBe(403);
+    expect(sub(two.id)).toBeNull();
+    const started = await listed.c.post('/api/auth/sso/start');
+    expect(String(started.headers['set-cookie'])).toMatch(new RegExp(`${SSO_CHOICE_COOKIE}=;[^,]*Path=/api/auth/sso`, 'u'));
+    expect(listed.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+  });
+
+  it('more than ten accounts on one address are refused with their own reason and no cookie', async () => {
+    const { s, fake } = await school();
+    for (let i = 2; i <= 11; i++) await another(s, `ayse.n${i}`, 'teacher');
+    const many = await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'));
+    expect(reason(many.r)).toBe('SSO_TOO_MANY_ACCOUNTS');
+    expect(many.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+    expect(count('select count(*) n from users where sso_sub is not null')).toBe(0);
+  });
+
+  it('a choice cookie of one provider is no proof for the other', async () => {
+    const GOOGLE = { GOOGLE_SIGNIN_CLIENT_ID: 'fictional-client.apps.example', GOOGLE_SIGNIN_CLIENT_SECRET: 'fictional-client-secret' };
+    const { s, fake } = await school({ ...SSO, ...GOOGLE });
+    const two = await another(s, 'ayse.second', 'teacher');
+    // A Google list for Ayşe's address (the fake Google answers like the fake provider, with Google's issuer).
+    const g = new Client(env);
+    const gStart = new URL((await ok(g.post('/api/auth/google/start'))).authorizeUrl);
+    env.deps.googleTokenExchange = async () => ({
+      id_token: idToken({ iss: 'https://accounts.google.com', aud: GOOGLE.GOOGLE_SIGNIN_CLIENT_ID, exp: Math.floor(env.clock.now() / 1000) + 900, nonce: gStart.searchParams.get('nonce'), sub: 'g-ayse', email: 'ayse@mail.demo.example', email_verified: true }),
+    });
+    const googleList = await g.post('/api/auth/google/complete', { state: gStart.searchParams.get('state'), code: 'fictional-code' });
+    expect(googleList.body.choose).toHaveLength(2);
+    const googleValue = g.cookies.get('cc_google_choice')!;
+    // ... and a list from the sign-in server for the same address.
+    const ssoList = await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'));
+    const ssoValue = ssoList.c.cookies.get(SSO_CHOICE_COOKIE)!;
+
+    const asSso = new Client(env);
+    asSso.cookies.set(SSO_CHOICE_COOKIE, googleValue);
+    expect(reason(await choose(asSso, two.id))).toBe('SSO_SIGNIN_FAILED');
+    const asGoogle = new Client(env);
+    asGoogle.cookies.set('cc_google_choice', ssoValue);
+    expect(reason(await asGoogle.post('/api/auth/google/choose', { userId: two.id }))).toBe('GOOGLE_SIGNIN_FAILED');
+    expect(count('select count(*) n from users where sso_sub is not null or google_sub is not null')).toBe(0);
+    // Each under its own name still works.
+    expect((await ok(choose(ssoList.c, two.id))).id).toBe(two.id);
+    expect((await ok(g.post('/api/auth/google/choose', { userId: s.ayse.id }))).id).toBe(s.ayse.id);
   });
 });
