@@ -207,6 +207,7 @@ function Page({ onLanguage, nav }: { onLanguage: (l: ClassLanguage) => void; nav
   // New achievements are celebrated on whichever screen the page opens (D-122).
   useCelebrateNewAchievements(
     (q.data?.subjects ?? []).flatMap((s) => s.sections.flatMap((x) => (x.key === 'achievements' ? [{ subjectId: s.subjectId, data: x.data }] : []))),
+    q.data?.language ?? null,
   );
   // Every screen change (not the first one) starts at the top with the focus on the screen's h1.
   const { screen, step } = nav.nav;

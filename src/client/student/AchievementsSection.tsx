@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AchievementTier } from '../../shared/achievements.ts';
+import { classLocales, type ClassLanguage } from '../../shared/classLanguage.ts';
 import { studentSeenAchievements, type StudentAchievementsSection } from '../../shared/contracts/achievements.ts';
 import { pickText } from '../../shared/i18n/index.ts';
 import { BadgeArt } from '../achievements/icons.tsx';
@@ -40,14 +41,18 @@ const celebrated = new Set<string>();
 /**
  * New achievements are celebrated when the page opens, on any screen (S14d: the achievements are now
  * behind a tile, D-151), once per visit; then the page tells the server they were seen.
+ * `language` is the class language from the page: the message is a fixed string, so it waits until the
+ * page shows a language the class has switched on. On the first render with the page the locale is
+ * still the device's saved one (English by default) and a Turkish-only class would get English text.
  */
-export function useCelebrateNewAchievements(items: ReadonlyArray<{ subjectId: string; data: StudentAchievementsSection }>) {
+export function useCelebrateNewAchievements(items: ReadonlyArray<{ subjectId: string; data: StudentAchievementsSection }>, language: ClassLanguage | null) {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const fresh = items.flatMap(({ subjectId, data }) => data.earned.filter((b) => b.isNew && !celebrated.has(`${subjectId}:${b.id}`)).map((b) => ({ subjectId, b })));
+  const ready = language !== null && classLocales(language).includes(locale);
   const sent = useRef(false);
   useEffect(() => {
-    if (!fresh.length) return;
+    if (!fresh.length || !ready) return;
     for (const { subjectId, b } of fresh) celebrated.add(`${subjectId}:${b.id}`);
     const first = fresh[0]!.b;
     celebrate(fresh.length === 1 ? t('achievements.newBadge', { name: pickText(first.name, locale) }) : t('achievements.newBadges', { count: fresh.length }));
@@ -55,7 +60,7 @@ export function useCelebrateNewAchievements(items: ReadonlyArray<{ subjectId: st
       sent.current = true;
       void call(studentSeenAchievements, {}).then(() => qc.invalidateQueries({ queryKey: STUDENT_PAGE_KEY }));
     }
-  }, [fresh, t, locale, qc]);
+  }, [fresh, ready, t, locale, qc]);
 }
 
 export function AchievementsSection({ data, subjectId, titleId }: { data: StudentAchievementsSection; subjectId: string; titleId?: string }) {

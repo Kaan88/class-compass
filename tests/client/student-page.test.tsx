@@ -22,6 +22,7 @@ import { preloadWritingScreens, tilesOf } from '../../src/client/student/section
 import { MyGoals } from '../../src/client/student/screens/MyGoals.tsx';
 import { NewGoal } from '../../src/client/student/screens/NewGoal.tsx';
 import { openLink, StudentApp, type OpenResult } from '../../src/client/student/StudentApp.tsx';
+import { generatedAvatar } from '../../src/shared/avatarDefaults.ts';
 
 afterEach(() => {
   cleanup();
@@ -264,5 +265,52 @@ describe('sentence starters (D-152)', () => {
     fireEvent.click(screen.getByRole('button', { name: en['student.newGoal.addIdea'] }));
     expect(screen.getByRole('list', { name: en['student.newGoal.ideas'] }).textContent).toContain('Read at bedtime');
     expect(screen.queryByText(en['starters.addWords'], { exact: false })).toBeNull();
+  });
+});
+
+describe('new achievement celebration in the class language (D-099, D-122)', () => {
+  const badge = {
+    id: 'badge-kind',
+    name: { en: 'Kind helper', tr: 'Nazik yardımcı' },
+    description: { en: 'Helped a classmate', tr: 'Bir arkadaşına yardım etti' },
+    icon: 'star',
+    tier: 'none',
+    category: 'teacher',
+    awardedAt: Date.UTC(2026, 10, 20),
+    by: null,
+    isNew: true,
+  };
+  const page = (language: { mainLanguage: 'en' | 'tr'; secondLanguageEnabled: boolean }) => ({
+    student: { fullName: 'Deniz Örnek', initials: 'DÖ', avatarHue: 120 },
+    className: '3-Demo',
+    theme: 'default',
+    language,
+    media: { photos: false, audio: false, documents: false, video: false },
+    subjects: [
+      { subjectId: 'subject-1', name: { en: 'English', tr: 'İngilizce' }, sections: [{ key: 'achievements', data: { earned: [badge], locked: [], level: null } }] },
+    ],
+    avatar: {
+      spec: null,
+      generated: generatedAvatar('student-1'),
+      locked: false,
+      fallback: 'initials',
+      earned: [],
+      picture: { state: 'off', approvedUrl: null, pending: null, refused: null },
+    },
+    textLimits: { minGoalWords: 1, minGoalLetters: 1 },
+  });
+  const serve = (body: unknown) =>
+    vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes('/api/student/page') ? body : { ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+  it('a Turkish-only class celebrates in Turkish even when this device last showed English', async () => {
+    localStorage.clear(); // a fresh device: the saved student locale is English
+    const fetch = serve(page({ mainLanguage: 'tr', secondLanguageEnabled: false }));
+    vi.stubGlobal('fetch', fetch);
+    render(wrap(<StudentApp token={null} />));
+    const shown = await screen.findByTestId('celebration');
+    expect(shown.textContent).toContain(tr['achievements.newBadge'].replace('{name}', 'Nazik yardımcı'));
+    expect(shown.textContent).not.toContain('New achievement');
+    // Seen is reported once.
+    expect(fetch.mock.calls.filter(([u]) => String(u).includes('/achievements/seen'))).toHaveLength(1);
   });
 });

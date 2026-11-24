@@ -9,7 +9,7 @@
  * The overlay never takes clicks (pointer-events: none) and is announced once to screen readers.
  * Anything can call `celebrate()`; the layer is mounted once in the root layout.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDisplay } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Mascot, motionMode, playThemeSound, useTheme } from './index.tsx';
@@ -156,18 +156,26 @@ export function CelebrationLayer() {
   const theme = useTheme();
   const [active, setActive] = useState<{ id: number; message: string | null } | null>(null);
   const mode = motionMode(display);
+  // The listener stays registered for the layer's whole life and reads the current settings: re-adding
+  // it whenever the theme or display changed left a gap in which a celebrate() from a component's effect
+  // in the same commit (the student page's new achievements, once its language and theme arrive) was lost.
+  const current = useRef({ display, theme });
+  useLayoutEffect(() => {
+    current.current = { display, theme };
+  }, [display, theme]);
   useEffect(() => {
     const l: Listener = (e) => {
-      const m = motionMode(display);
+      const { display: d, theme: th } = current.current;
+      const m = motionMode(d);
       for (const cue of celebrationCues(m)) {
-        if (cue.at === 0) playThemeSound(display, theme, cue.event);
-        else setTimeout(() => playThemeSound(display, theme, cue.event), cue.at);
+        if (cue.at === 0) playThemeSound(d, th, cue.event);
+        else setTimeout(() => playThemeSound(d, th, cue.event), cue.at);
       }
       if (m !== 'none') setActive(e);
     };
     listeners.add(l);
     return () => void listeners.delete(l);
-  }, [display, theme]);
+  }, []);
   useEffect(() => {
     if (!active) return;
     const h = setTimeout(() => setActive(null), CELEBRATION_MS);
