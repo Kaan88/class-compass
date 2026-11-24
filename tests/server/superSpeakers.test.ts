@@ -7,7 +7,6 @@
  * class+subject report section, the Super Speakers badges and the token-never-logged check.
  * Fictional data only.
  */
-import type { AddressInfo } from 'node:net';
 import { v7 } from 'uuid';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultAchievementId } from '../../src/shared/achievements.ts';
@@ -16,6 +15,7 @@ import { SERVER_MODULES } from '../../src/server/modules/index.ts';
 import { NEVER_EXPORTED, SECRET_COLUMN } from '../../src/server/modules/maintenance/exports.ts';
 import { MAX_OFFLINE_AGE_MS, PAIRING_GUARD_FAILURES, pairWithCode, tapTime } from '../../src/server/modules/superSpeakers/service.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
+import { fetchablePort } from '../ports.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 
 const tokenOf = (url: string) => url.slice(url.indexOf('#') + 1);
@@ -320,8 +320,9 @@ describe('board events (SSE, D-134)', () => {
   it('sends the version at once, a new version after an award, and heartbeats', async () => {
     const { phone } = await newScorer();
     const { screen } = await newBoard();
-    await env.app.listen({ port: 0, host: '127.0.0.1' });
-    const port = (env.app.server.address() as AddressInfo).port;
+    // A port fetch accepts (listen on 0 once landed on a "bad port" and failed the fetch below).
+    const port = await fetchablePort();
+    await env.app.listen({ port, host: '127.0.0.1' });
     const ctl = new AbortController();
     const res = await fetch(`http://127.0.0.1:${port}/api/board/events`, { headers: { cookie: [...screen.cookies].map(([k, v]) => `${k}=${v}`).join('; ') }, signal: ctl.signal });
     expect(res.status).toBe(200);

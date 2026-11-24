@@ -5,7 +5,6 @@
  * SDK client's own OAuth flow (S14h2) below. Fictional data only.
  */
 import fs from 'node:fs';
-import net, { type AddressInfo } from 'node:net';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { UnauthorizedError, type OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
@@ -16,6 +15,7 @@ import { LATEST_PROTOCOL_VERSION as SDK_LATEST, SUPPORTED_PROTOCOL_VERSIONS as S
 import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from '../../src/server/modules/mcp/transport.ts';
 import { makeEnv, type Client, type TestEnv } from '../helpers.ts';
 import { makeToken, PASSWORD, setAi } from '../mcp-helpers.ts';
+import { fetchablePort } from '../ports.ts';
 import { buildSchool, ok, type School } from '../school-fixture.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -28,8 +28,10 @@ beforeAll(async () => {
   s = await buildSchool(env);
   await setAi(s.admin, { mcpEnabled: true });
   secret = (await makeToken(s.teacherA, { scopes: ['classes:read', 'reports:read', 'goals:read'] })).secret;
-  await env.app.listen({ port: 0, host: '127.0.0.1' });
-  base = `http://127.0.0.1:${(env.app.server.address() as AddressInfo).port}`;
+  // The SDK's transport uses fetch: a port fetch accepts (tests/ports.ts).
+  const port = await fetchablePort();
+  await env.app.listen({ port, host: '127.0.0.1' });
+  base = `http://127.0.0.1:${port}`;
 });
 afterAll(async () => env.app.close());
 
@@ -116,10 +118,7 @@ describe('SDK client OAuth flow (S14h2, D-160)', () => {
   let origin: string;
   const docs: string[] = [];
   beforeAll(async () => {
-    const probe = net.createServer();
-    await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
-    const port = (probe.address() as AddressInfo).port;
-    await new Promise<void>((resolve) => probe.close(() => resolve()));
+    const port = await fetchablePort();
     origin = `http://127.0.0.1:${port}`;
     oenv = await makeEnv(
       { PUBLIC_ORIGIN: origin },
