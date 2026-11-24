@@ -1,7 +1,7 @@
 /**
  * Server-side administration CLI. Run on the server only (never exposed over HTTP).
  *   node src/server/cli.ts migrate                       pending migrations (database snapshot first)
- *   node src/server/cli.ts admin:create --login <login> --name "<Display Name>" [--email x]   (password via stdin)
+ *   node src/server/cli.ts admin:create --login <login> --name "<Display Name>" --email <address>   (password via stdin)
  *   node src/server/cli.ts admin:reset-password --login <login>                                (password via stdin)
  *   node src/server/cli.ts signin:allow-passwords     the way back when passwords are off and nobody can sign in (D-207)
  *   node src/server/cli.ts seed:demo [--force-demo]      fictional demo school (never in production)
@@ -83,7 +83,8 @@ switch (cmd) {
     break;
   case 'admin:create': {
     await migrate();
-    if (!values.login || !values.name) throw new Error('--login and --name are required');
+    // D-212: the address is needed for sign-in links and to switch passwords off later.
+    if (!values.login || !values.name || !values.email) throw new Error('--login, --name and --email are required');
     if (passwordBlocked(db())) throw new Error(PASSWORDS_OFF);
     const password = await readSecret('Password (min 10 chars): ');
     const u = await createUser(db(), { login: values.login, displayName: values.name, role: 'admin', password, email: values.email ?? null }, system, Date.now());

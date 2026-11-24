@@ -21,7 +21,9 @@ describe('account administration (ACC-1/2/3, DAT-3)', () => {
     expect(JSON.stringify(list)).not.toContain('passwordHash');
     const c = new Client(env);
     expect((await c.login('zehra.teacher', r.temporaryPassword)).body.mustChangePassword).toBe(true);
-    expect((await s.admin.post('/api/admin/users', { login: 'zehra.teacher', displayName: 'Dup', role: 'teacher' })).status).toBe(409);
+    expect((await s.admin.post('/api/admin/users', { login: 'zehra.teacher', displayName: 'Dup', role: 'teacher', email: 'dup@school.example' })).status).toBe(409);
+    // An account cannot be made without an address (D-212): invites, sign-in links and resets need it.
+    for (const email of [undefined, null, '', 'not-an-address']) expect((await s.admin.post('/api/admin/users', { login: 'no.address', displayName: 'No Address', role: 'teacher', email })).status).toBe(400);
   });
 
   it('deactivates a teacher: sessions end, sign-in fails, records and audit history remain; reactivation restores access', async () => {
@@ -43,8 +45,8 @@ describe('account administration (ACC-1/2/3, DAT-3)', () => {
   });
 
   it('enforces the forced password change on the server, not only in the client (ACC-2)', async () => {
-    const t = await ok(s.admin.post('/api/admin/users', { login: 'temp.teacher', displayName: 'Geçici Öğretmen', role: 'teacher', setup: 'temporary_password' }));
-    const a = await ok(s.admin.post('/api/admin/users', { login: 'temp.admin', displayName: 'Temp Admin', role: 'admin', setup: 'temporary_password' }));
+    const t = await ok(s.admin.post('/api/admin/users', { login: 'temp.teacher', displayName: 'Geçici Öğretmen', role: 'teacher', email: 'temp.teacher@school.example', setup: 'temporary_password' }));
+    const a = await ok(s.admin.post('/api/admin/users', { login: 'temp.admin', displayName: 'Temp Admin', role: 'admin', email: 'temp.admin@school.example', setup: 'temporary_password' }));
     const teacher = new Client(env);
     await teacher.login('temp.teacher', t.temporaryPassword);
     const admin = new Client(env);

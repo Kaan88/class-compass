@@ -45,7 +45,8 @@ export const createUserByAdmin = endpoint({
   input: z.object({
     login: z.string().trim().min(3).max(64),
     displayName: z.string().trim().min(1).max(120),
-    email: Email.nullable().optional(),
+    /** Required since D-212: invites, email sign-in links, password resets and Google sign-in all need it. */
+    email: Email,
     role: z.enum(['admin', 'teacher']),
     /** Required in the form (default English); the API falls back to English when it is left out. */
     locale: Locale.default('en'),

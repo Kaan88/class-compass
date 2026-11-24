@@ -64,12 +64,9 @@ export function listUsers(deps: Pick<RequestContext, 'db' | 'now'>) {
 export async function createUserByAdmin(ctx: RequestContext, input: In<typeof C.createUserByAdmin>) {
   // The admin chooses the new account's interface language (S13a, D-099), English by default.
   const locale = input.locale;
-  const base = { login: input.login, displayName: normaliseName(input.displayName), role: input.role, email: input.email ?? null, locale };
-  // D-207: while passwords are off, a new account needs an address and gets an invite, never a password.
-  if (passwordBlocked(ctx.db)) {
-    if (input.setup === 'temporary_password') throw emailLinkRequired();
-    if (!base.email) throw invalid('The account needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
-  }
+  const base = { login: input.login, displayName: normaliseName(input.displayName), role: input.role, email: input.email, locale };
+  // D-207: while passwords are off, a new account gets an invite, never a password (the address is always required, D-212).
+  if (passwordBlocked(ctx.db) && input.setup === 'temporary_password') throw emailLinkRequired();
   if (input.setup === 'temporary_password') {
     const password = temporaryPassword();
     const u = await createUser(ctx.db, { ...base, password, mustChangePassword: true }, ctx.actor, ctx.now());

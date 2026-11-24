@@ -257,7 +257,7 @@ function CreateUserDialog({
           e.preventDefault();
           setError(null);
           try {
-            const r = await call(Admin.createUserByAdmin, { login, displayName: name, email: email.trim() || null, role, locale, setup: emailOnly ? 'invite' : setup });
+            const r = await call(Admin.createUserByAdmin, { login, displayName: name, email: email.trim(), role, locale, setup: emailOnly ? 'invite' : setup });
             void qc.invalidateQueries({ queryKey: USERS });
             setLogin('');
             setName('');
@@ -273,11 +273,7 @@ function CreateUserDialog({
       >
         <TextField label={t('users.login')} description={t('users.loginHint')} value={login} onChange={setLogin} isRequired autoFocus />
         <TextField label={t('users.displayName')} value={name} onChange={setName} isRequired />
-        {emailOnly ? (
-          <TextField label={t('auth.email')} description={t('users.emailNeeded')} type="email" value={email} onChange={setEmail} isRequired />
-        ) : (
-          <TextField label={t('users.emailOptional')} type="email" value={email} onChange={setEmail} />
-        )}
+        <TextField label={t('auth.email')} description={emailOnly ? t('users.emailNeeded') : t('users.emailHint')} type="email" value={email} onChange={setEmail} isRequired />
         <Select
           label={t('users.role')}
           value={role}

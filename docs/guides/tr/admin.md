@@ -33,7 +33,7 @@ Yönetici hesapları **şifreyle** giriş yapar; okul şifreleri kapattıysa (He
 
 ![Hesaplar](../img/tr/admin-accounts.png)
 
-**Yeni hesap**: **Kullanıcı adı** (3–64 harf, rakam ya da . _ @ -), **Ad**, **E-posta (isteğe bağlı)**, **Rol** (Öğretmen ya da Yönetici) ve **Arayüz dili** (kişinin giriş yaptıktan sonra gördüğü dil; profilinden değiştirebilir). Sonra **İlk giriş** yöntemini seçin:
+**Yeni hesap**: **Kullanıcı adı** (3–64 harf, rakam ya da . _ @ -), **Ad**, **E-posta**, **Rol** (Öğretmen ya da Yönetici) ve **Arayüz dili** (kişinin giriş yaptıktan sonra gördüğü dil; profilinden değiştirebilir). Sonra **İlk giriş** yöntemini seçin:
 
 - **Davet bağlantısı (önerilen)**: 7 gün geçerli, tek kullanımlık bir bağlantı. Kişi şifre ya da e-posta giriş bağlantıları arasından seçim yapar (yöneticiler şifre kullanır; okul şifreleri kapattıysa herkes e-posta giriş bağlantılarını kullanır); öğretmenler ardından sınıf PIN'ini belirler. Hesabın e-posta adresi varsa ve okulda e-posta ayarlanmışsa davet, hesabın dilinde e-postayla gönderilir; her zaman **Bağlantıyı kopyala** diyebilir ya da QR kodu gösterebilirsiniz.
 - **Geçici şifre**: size yalnızca **bir kez** gösterilir. Kişiye güvenli bir yolla iletin; ilk girişte değiştirmesi gerekir.
@@ -50,19 +50,19 @@ Listede her hesabın durumu (**Etkin**, davet kullanılana kadar **Davet bekliyo
 
 ![Hesaplar sayfasındaki Şifreler bölümü](../img/tr/admin-passwords.png)
 
-Listenin üstündeki **Şifreler** bölümünde bütün okul için tek bir kural vardır. Normalde öğretmenler şifre ile e-posta giriş bağlantıları arasında seçim yapar, yöneticiler şifre kullanır. **Şifreleri kapat** dediğinizde şifreler tümüyle kalkar: yöneticiler dahil herkes giriş sayfasına e-posta adresini yazar; kendisine 15 dakika geçerli, tek kullanımlık bir bağlantı ve 6 haneli bir kod gelir. Olmayan bir şifre tahmin edilemez, başka yerde kullanılamaz, başkasına verilemez.
+Listenin üstündeki **Şifreler** bölümünde bütün okul için tek bir kural vardır. Normalde öğretmenler şifre ile e-posta giriş bağlantıları arasında seçim yapar, yöneticiler şifre kullanır. **Şifreleri herkes için kapat** dediğinizde şifreler tümüyle kalkar: yöneticiler dahil herkes giriş sayfasına e-posta adresini yazar; kendisine 15 dakika geçerli, tek kullanımlık bir bağlantı ve 6 haneli bir kod gelir. Olmayan bir şifre tahmin edilemez, başka yerde kullanılamaz, başkasına verilemez.
 
 - Düğme ancak okulun e-postası ayarlıysa ve sizinki dahil **etkin her hesabın e-posta adresi varsa** çalışır; o zamana kadar bölüm neyin eksik olduğunu söyler ve adresi eksik hesapların adını gösterir.
 - Şifreleri kapattığınız anda sizinki dahil **bütün hesapların şifresi silinir**. Bu geri alınamaz. Oturumu açık olanların oturumu açık kalır; süren bir ders kesilmez.
 
 Şifreleri kapatmak için:
 
-1. **Şifreleri kapat**'a basın. Açılan pencere şu anda kaç hesabın şifresi olduğunu söyler ve okulun e-postası çalışmazsa ne olacağı konusunda uyarır.
+1. **Şifreleri herkes için kapat**'a basın. Açılan pencere şu anda kaç hesabın şifresi olduğunu söyler ve okulun e-postası çalışmazsa ne olacağı konusunda uyarır.
 
 ![1. adım: kod gönderilmeden önceki pencere, Kodu bana e-postayla gönder düğmesiyle](../img/tr/admin-passwords-confirm.png)
 
 2. **Kodu bana e-postayla gönder**'e basın. Kendi adresinize 15 dakika geçerli, 6 haneli bir kod gelir. Kodu yazmanız giriş e-postalarının size ulaştığını gösterir; böylece yanlışlıkla kendinizi dışarıda bırakamazsınız.
-3. Kodu **6 haneli kod** alanına yazın ve penceredeki **Şifreleri kapat**'a basın. **Vazgeç** pencereyi kapatır, hiçbir şeyi değiştirmez.
+3. Kodu **6 haneli kod** alanına yazın ve penceredeki **Şifreleri herkes için kapat**'a basın. **Vazgeç** pencereyi kapatır, hiçbir şeyi değiştirmez.
 
 Şifreler kapalıyken:
 

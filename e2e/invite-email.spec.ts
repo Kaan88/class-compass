@@ -25,7 +25,7 @@ test('invite link → email sign-in links → sign in with the link and with the
     const dialog = admin.getByRole('dialog');
     await dialog.getByLabel('Username').fill(loginName);
     await dialog.getByLabel('Name', { exact: true }).fill('Defne Davet (E2E)');
-    await dialog.getByLabel('Email (optional)').fill(email);
+    await dialog.getByLabel('Email', { exact: true }).fill(email);
     await expect(dialog.getByLabel('First sign-in')).toHaveValue('invite');
     await dialog.getByRole('button', { name: 'New account' }).click();
     const shown = await admin.getByTestId('invite-link').innerText();

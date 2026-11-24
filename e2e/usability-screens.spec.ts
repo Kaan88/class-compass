@@ -278,10 +278,10 @@ test('auth and help pages', async ({ browser }) => {
     const invites: Partial<Record<Locale, string>> = {};
     const temps: Partial<Record<Locale, { login: string; password: string }>> = {};
     for (const lang of ['en', 'tr'] as const) {
-      const inv = await api(ap, 'POST', '/api/admin/users', { login: `ux.invite.${lang}.${stamp}`, displayName: lang === 'tr' ? 'Defne Davetli (UX)' : 'Robin Invited (UX)', role: 'teacher', locale: lang, setup: 'invite' });
+      const inv = await api(ap, 'POST', '/api/admin/users', { login: `ux.invite.${lang}.${stamp}`, displayName: lang === 'tr' ? 'Defne Davetli (UX)' : 'Robin Invited (UX)', role: 'teacher', email: `ux.invite.${lang}.${stamp}@demo.example`, locale: lang, setup: 'invite' });
       if (inv.status === 200 && inv.body.invite?.link) invites[lang] = inv.body.invite.link as string;
       else miss(`auth invite link (${lang}) could not be created`, inv.status);
-      const tmp = await api(ap, 'POST', '/api/admin/users', { login: `ux.temp.${lang}.${stamp}`, displayName: lang === 'tr' ? 'Ece Geçici (UX)' : 'Sam Temporary (UX)', role: 'teacher', locale: lang, setup: 'temporary_password' });
+      const tmp = await api(ap, 'POST', '/api/admin/users', { login: `ux.temp.${lang}.${stamp}`, displayName: lang === 'tr' ? 'Ece Geçici (UX)' : 'Sam Temporary (UX)', role: 'teacher', email: `ux.temp.${lang}.${stamp}@demo.example`, locale: lang, setup: 'temporary_password' });
       if (tmp.status === 200 && tmp.body.temporaryPassword) temps[lang] = { login: `ux.temp.${lang}.${stamp}`, password: tmp.body.temporaryPassword as string };
       else miss(`auth temporary-password account (${lang}) could not be created`, tmp.status);
     }

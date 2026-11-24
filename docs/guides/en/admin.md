@@ -33,7 +33,7 @@ The very first administrator account is created on the server by the IT person (
 
 ![Accounts](../img/en/admin-accounts.png)
 
-**New account**: **Username** (3–64 letters, digits or . _ @ -), **Name**, **Email (optional)**, **Role** (Teacher or Administrator) and **Interface language** (the language the person sees after signing in; they can change it in their profile). Then choose the **First sign-in**:
+**New account**: **Username** (3–64 letters, digits or . _ @ -), **Name**, **Email**, **Role** (Teacher or Administrator) and **Interface language** (the language the person sees after signing in; they can change it in their profile). Then choose the **First sign-in**:
 
 - **Invite link (recommended)**: a single-use link valid for 7 days. The person chooses a password or email sign-in links (administrators a password; while the school has switched passwords off, everyone gets email sign-in links); teachers then set their classroom PIN. When the account has an email address and the school has set up email, the invite is emailed in the account's language; you can always **Copy link** or show the QR code.
 - **Temporary password**: shown to you **once**. Give it to the person safely; they must change it at their first sign-in.
@@ -50,19 +50,19 @@ The list shows each account's status (**Active**, **Invite pending** until the i
 
 ![The Passwords section on Accounts](../img/en/admin-passwords.png)
 
-Above the list, **Passwords** holds one rule for the whole school. Normally teachers choose between a password and email sign-in links, and administrators use a password. **Switch off passwords** removes passwords altogether: everyone, administrators included, types their email address on the sign-in page and gets a link and a 6-digit code that work once, for 15 minutes. Nobody can guess, reuse or give away a password that does not exist.
+Above the list, **Passwords** holds one rule for the whole school. Normally teachers choose between a password and email sign-in links, and administrators use a password. **Switch off passwords for everyone** removes passwords altogether: everyone, administrators included, types their email address on the sign-in page and gets a link and a 6-digit code that work once, for 15 minutes. Nobody can guess, reuse or give away a password that does not exist.
 
 - The button works only when the school's email is set up and **every active account has an email address**, your own too; until then the section says what is missing and names the accounts that still need an address.
 - Switching passwords off **removes the password of every account** at once, yours included. This cannot be undone. People who are signed in stay signed in, so a lesson that is running is not interrupted.
 
 To switch passwords off:
 
-1. Press **Switch off passwords**. The window says how many accounts have a password now and warns what happens if the school's email stops working.
+1. Press **Switch off passwords for everyone**. The window says how many accounts have a password now and warns what happens if the school's email stops working.
 
 ![Step 1: the window before the code is sent, with Email me the code](../img/en/admin-passwords-confirm.png)
 
 2. Press **Email me the code**. A 6-digit code goes to your own address; it works for 15 minutes. Typing it shows that sign-in emails reach you, so you cannot lock yourself out by mistake.
-3. Type the code under **6-digit code** and press **Switch off passwords** in the window. **Cancel** closes it and changes nothing.
+3. Type the code under **6-digit code** and press **Switch off passwords for everyone** in the window. **Cancel** closes it and changes nothing.
 
 While passwords are off:
 

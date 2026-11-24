@@ -158,7 +158,7 @@ describe('account invites (S13b item 9, D-108)', () => {
   it('the temporary-password flow stays available as a fallback', async () => {
     env = await makeEnv();
     const s = await buildSchool(env);
-    const made = await ok(s.admin.post('/api/admin/users', { login: 'temp.teacher', displayName: 'Temp', role: 'teacher', setup: 'temporary_password' }));
+    const made = await ok(s.admin.post('/api/admin/users', { login: 'temp.teacher', displayName: 'Temp', role: 'teacher', email: 'temp@school.example', setup: 'temporary_password' }));
     expect(made.invite).toBeNull();
     expect(typeof made.temporaryPassword).toBe('string');
     expect((await new Client(env).login('temp.teacher', made.temporaryPassword)).body.mustChangePassword).toBe(true);

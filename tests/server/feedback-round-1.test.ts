@@ -315,10 +315,10 @@ describe('per-class language (S13a, D-099)', () => {
   });
 
   it('an account is created with a required interface language that the admin can change later', async () => {
-    const made = await ok(s.admin.post('/api/admin/users', { login: 'zeynep.teacher', displayName: 'Zeynep Ak', role: 'teacher', locale: 'tr', setup: 'temporary_password' }));
+    const made = await ok(s.admin.post('/api/admin/users', { login: 'zeynep.teacher', displayName: 'Zeynep Ak', role: 'teacher', email: 'zeynep@school.example', locale: 'tr', setup: 'temporary_password' }));
     const u = made.user;
     expect(u.locale).toBe('tr');
-    const other = (await ok(s.admin.post('/api/admin/users', { login: 'emre.teacher', displayName: 'Emre Su', role: 'teacher', locale: 'en' }))).user;
+    const other = (await ok(s.admin.post('/api/admin/users', { login: 'emre.teacher', displayName: 'Emre Su', role: 'teacher', email: 'emre@school.example', locale: 'en' }))).user;
     const z = new Client(env);
     await z.login('zeynep.teacher', made.temporaryPassword);
     expect((await ok(z.get('/api/auth/me'))).locale).toBe('tr'); // Turkish on first sign-in
@@ -326,7 +326,7 @@ describe('per-class language (S13a, D-099)', () => {
     expect((await ok(z.get('/api/auth/me'))).locale).toBe('en');
     const list = await ok(s.admin.get('/api/admin/users'));
     expect(list.users.find((x: any) => x.id === other.id).locale).toBe('en'); // changing one user never affects another
-    expect((await s.admin.post('/api/admin/users', { login: 'bad.locale', displayName: 'Bad Locale', role: 'teacher', locale: 'de' })).status).toBe(400);
+    expect((await s.admin.post('/api/admin/users', { login: 'bad.locale', displayName: 'Bad Locale', role: 'teacher', email: 'bad.locale@school.example', locale: 'de' })).status).toBe(400);
   });
 });
 

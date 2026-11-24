@@ -157,7 +157,7 @@ describe('nobody signs in with a password (S30, D-207)', () => {
       const base = { displayName: 'Zehra Öğretmen', role, login: `zehra.${role}` };
       const address = `zehra.${role}@school.example`;
       expect(reason(await s.admin.post('/api/admin/users', { ...base, email: address, setup: 'temporary_password' }))).toBe('EMAIL_LINK_REQUIRED');
-      expect(reason(await s.admin.post('/api/admin/users', base))).toBe('EMAIL_REQUIRED');
+      expect((await s.admin.post('/api/admin/users', base)).status).toBe(400); // an address is always required (D-212)
       const made = await ok(s.admin.post('/api/admin/users', { ...base, email: address }));
       const token = tokenFrom(made.invite.link);
 

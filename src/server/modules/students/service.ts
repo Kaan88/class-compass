@@ -367,7 +367,9 @@ export function setContextLevels(ctx: RequestContext, input: In<typeof C.setCont
           .values({ studentId, subjectId: t.subjectId, level, updatedBy: uid, updatedAt: now })
           .onConflictDoUpdate({ target: [studentSubjectLevels.studentId, studentSubjectLevels.subjectId], set: { level, updatedBy: uid, updatedAt: now } })
           .run();
-      audit(ctx.db, ctx.actor, { action: 'student.level_set', entity: 'student', entityId: studentId, before: { subjectId: t.subjectId, level: before }, after: { subjectId: t.subjectId, level } }, now);
+      // Who changed a level, for which student and subject, and when: never the level itself (D-211). A level is
+      // for the subject's teacher only, and the administrator's Audit log would show it otherwise.
+      audit(ctx.db, ctx.actor, { action: 'student.level_set', entity: 'student', entityId: studentId, after: { subjectId: t.subjectId } }, now);
     }
     return levelsFor(ctx, t.classId, t.subjectId);
   });
