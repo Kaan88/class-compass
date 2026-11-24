@@ -15,6 +15,55 @@ Compass the points system" instead of syncing with ClassDojo.
 
 All names in this file are fictional (the demo school's style).
 
+## Decisions (owner and teacher, 2026-11-25)
+
+The owner's answers after looking at the mockups (`docs/design/class-points-mockups/index.html`).
+Quoted words are the owner's, verbatim. Short **Decided:** notes in the sections below point back here;
+everything that was not decided keeps this brief's proposal.
+
+**Outside the numbered questions:**
+
+- **Board concept** (section 10): "concept 1". → Star paths (10.2): each child's path to their own next target, in name order. The class jar (question 9) is added to it.
+- **Giving screen** (new): "combine the screen with achievements and stars buttong. make a mockup of the page only." → One dock button and one classroom screen to give both stars and achievements, instead of an Achievements button and a Class stars button. Mockup: `docs/design/class-points-mockups/give.html`. This changes an existing feature (the achievements panel and its dialog), so it needs its own decision (proposed D-227, section 7).
+
+**The open questions of section 9, in their order:**
+
+1. **Taking stars away: correction only, or also for behaviour?** "option b".
+   → Option B (section 2): "needs work" reasons with −1 to −3, given only in the teacher area or from her own device, never from the classroom display; never an event on any classroom screen (no line, sound, animation, colour or reason text); a total never goes below 0 or below the last target reached in the period; the student page shows the total only. Stage S37e is part of the first version; AGENTS rule 7 and CONVENTIONS get the Option B sentence (section 7).
+2. **Board: every child's stars, or only the jar and each child's own card?** "Should the board show every child's stars = yes".
+   → Every child's stars on the board in name order with their own next target (`showOnBoard: 'all'`, the default).
+3. **Is a ranking wanted?** "3 no ranking".
+   → No ranking, no top three, no sorting by total, anywhere on a classroom screen. The alternatives table in 4.1 is closed.
+4. **Which targets and which period?** "sensible defaults, and adjustable from teacher screen".
+   → The module ships a default ladder and period, and the teacher changes both (thresholds, names, stickers, period, "a new target every N stars") on her setup page in the teacher area. Defaults to build: 25 / 50 / 100 per term (see To confirm).
+5. **Show and tell: at every target or only some? Who chooses the day?** "first achivement, adjustable".
+   → Read as: a show-and-tell turn is on by default for the **first target** only (Bronze star, 25), and the teacher switches it on or off per target. The day: not answered; the brief's proposal stays (the teacher plans the day; the child can say "not this time" without losing anything). See To confirm.
+6. **PIN to give stars on the smartboard?** "no pin".
+   → No PIN to give stars (and, as today, achievements) on the classroom screen. Editing reasons and targets, removals and Option B deductions stay `teacher` access (PIN-gated in classroom mode). The optional class setting "give stars only from my own devices" was not discussed and stays proposed.
+7. **One star system per class+subject, or one per class shared by its teachers?** "7- per class per teacher".
+   → Not shared between teachers: each teacher has her own reasons, targets, totals and jar for each class she teaches. Built as per class+subject (the teaching context), which is the same thing for a teacher with one subject in a class. See To confirm.
+8. **Names.** "8 recommded names yes".
+   → Class Stars / Sınıf Yıldızları; unit star / yıldız; target / basamak (Goals keep "goal" / "hedef"); sticker / çıkartma (not "stiker").
+9. **A shared class jar with a class reward?** "A shared class jar with a class reward?  = yes".
+   → The jar is on by default, beside the per-child paths, and is in the first version.
+10. **Where is the empty space on her board, and how big should the box be?** Not answered.
+   → Open. Proposal: the Star paths box at L (12 × 4, its own row) where she has room, otherwise M (4 × 3); the box's star button and the combined dock button both open the give screen.
+
+### To confirm
+
+Questions to put to the owner; the reading in brackets is what would be built if there is no answer.
+
+1. **Question 7, "per class per teacher":** if one teacher teaches two subjects in the same class (for example English and Science in 3-A), is that one star system or two? (Two: per class+subject, the existing teaching context. One shared system per teacher and class would need a new scope that no module has today.)
+2. **Question 5, "first achivement, adjustable":** does "first achivement" mean the first **target** (a show-and-tell turn only at the first target, switchable per target), the first time a child reaches **any** target, or that show and tell is tied to an **achievement** (for example the child's first class-stars achievement)? And who chooses the day? (The first target, switchable per target; the teacher plans the day.)
+3. **Question 4, "sensible defaults":** which defaults: 25 / 50 / 100 per term, or small weekly targets such as 5 / 10 / 15? (25 / 50 / 100 per term.)
+4. **Option B switch:** the brief proposed B as a per-class switch that starts off. Does the switch start on now that B was chosen? (It exists per class and starts off; the teacher turns it on in her setup page.)
+5. **Question 2, "yes":** does the class setting "show each child's stars only on their own card" stay as an option? (Yes, as an option; the default shows every child's stars.)
+6. **Option B with every child's stars on the board:** a total that went down between two lessons is visible on the board by name (the cost section 2 describes). Is that accepted with the choice of B? (Yes.)
+7. **The combined give screen:** it replaces today's Achievements button and panel. When only one of the two modules is on for a class, the button and the screen show only that part (and the button keeps that module's name). The achievements panel's list "Achievements given this lesson" becomes one list for stars and achievements. (As described; see give.html.)
+8. **Question 10, the box size:** L or M, and where. (L as its own row, the student grid lowered to 3 rows.)
+9. **A star given from the teacher's phone:** the celebration is played only in the path of an action on the same screen (D-175), so a target reached from her phone celebrates on the phone, not on the smartboard. Should the board celebrate too? (Not in the first version; the board shows the new sticker at its next refresh.)
+
+
 ---
 
 ## 1. What it is
@@ -39,6 +88,8 @@ The word "points" is already used by Super Speakers on the classroom card ("Supe
 week"), and two kinds of "points" on one card would confuse children. Alternatives: **Class Points /
 Sınıf Puanları** (her own word, plainest) and **Star Path / Yıldız Yolu** (fits the path concepts in
 section 10). The code key stays `classPoints` whatever the display name is.
+
+**Decided:** Class Stars / Sınıf Yıldızları, "star" / "yıldız" (question 8).
 
 ---
 
@@ -88,6 +139,10 @@ children like to look at. If the teacher says she needs to take stars away for b
 a per-class switch that starts off. **Do not build C.** If C is truly wanted, it should be a separate
 owner decision that rewrites rule 7 first, not a side effect of this feature.
 
+**Decided: Option B** (question 1), with the limits above: deductions only in the teacher area or on
+her own device, never an event on a classroom screen, floors at 0 and at the last reached target.
+Whether the class switch starts on or off is to confirm.
+
 Section 10 has concepts for A, and one concept that shows B on the board, so the choice is visible.
 
 ---
@@ -101,6 +156,9 @@ achievements: a teacher's stars in her lessons with that class. Another teacher 
 their own reasons, targets and totals. This fits every existing rule (`assertOwnsContext`, module
 switches, reports per class+subject). A class-wide system shared by several teachers is possible
 later but is not proposed (open question 7).
+
+**Decided:** not shared between teachers, "per class per teacher" (question 7); whether one teacher's
+two subjects in one class share a system is to confirm.
 
 The module is opt-in: `defaultAvailability: 'enabled'`, `contextDefault: 'off'` (D-188). The teacher
 turns it on in Class settings.
@@ -148,6 +206,10 @@ classes. The administrator's part is the module's availability switch only.
 Two taps for one child (UX-8). A shortcut for the most common case: tapping a reason first and then
 children gives that reason to each child tapped, until "Done".
 
+**Decided:** the give view and the achievements dialog become **one screen** behind **one dock button**
+("Stars and achievements" / "Yıldız ve başarı"); stars stay two taps for one child. Mockup:
+`docs/design/class-points-mockups/give.html`. Option B deductions are not on this screen.
+
 **From the phone:** the same board works on a phone today (375 px, the dock folds). The give view is
 the same component in its narrow form. Outside a lesson (playground, after marking), the teacher area
 has a "Give stars" page with the same sheet.
@@ -167,6 +229,8 @@ What limits it:
 Everything that is not a plain give (reasons, targets, removing old events, Option B deductions) is
 `teacher` access and PIN-gated.
 
+**Decided:** no PIN to give (question 6).
+
 **Undo and removal.** Undo voids the whole give (all children of that tap) within 10 minutes. Later,
 "Remove" in the teacher area voids single events with a reason, audited. Events are never deleted.
 
@@ -181,6 +245,9 @@ A target has: a number of stars (threshold), a class-facing name (`{ en?, tr? }`
 targets. Optional: "after the last target, a new target every N stars", so the ladder never ends.
 
 Default ladder: **25, 50, 100**, each with a sticker; show and tell on all three.
+**Decided:** defaults the teacher can change on her setup page (question 4); show and tell is on by
+default for the **first** target only and switchable per target (question 5; the exact reading is to
+confirm).
 
 **When a child reaches a target** (their total in the period crosses the threshold through a give):
 
@@ -211,6 +278,8 @@ What carries over a reset: stickers, show-and-tell turns (waiting ones stay in t
 achievements, the history. What starts again: the total and the ladder. "Never reset" is the school
 year (totals end with the archived year anyway).
 
+**Decided:** term by default, changeable by the teacher (question 4).
+
 The period boundaries are computed in the class timezone at write time (`localDate` on each event),
 with the week starting on Monday as elsewhere.
 
@@ -223,6 +292,8 @@ new jar starts.
 
 Why: it is cooperative. A child with few stars still helped fill the jar, and the most visible number
 on the board becomes "ours". It is the best counterweight to comparing individual totals.
+
+**Decided:** yes, on by default, in the first version, shown with the Star paths (question 9).
 
 ### 3.7 Absent, new and leaving children; archived years
 
@@ -273,6 +344,8 @@ totals small, and offers a class setting **"Show each child's stars on the board
 own card"**. With "only on their own card" the board shows the jar, the feed and the celebration, and
 a child's number is seen only when their name is tapped.
 
+**Decided:** every child's stars are on the board (question 2); no ranking of any kind (question 3).
+
 **Alternatives the teacher may prefer, with their cost:**
 
 | Alternative | Cost |
@@ -319,6 +392,7 @@ Recommendation: the collectable now; the printable certificate as a later extra;
 after the first version has been used.
 
 Words: "sticker" / "çıkartma" in the UI (children say "stiker"; the teacher chooses in open question 8).
+**Decided:** "çıkartma" (question 8).
 
 ### 5.2 Achievements
 
@@ -397,6 +471,10 @@ grid (the `e2e/board-40.spec.ts` floors stay). The teacher drags it onto the boa
 editor into the space she has. The box must work at every size from 4×1 up (section 10). If the
 teacher wants it on the board by default, a `nextTo` placement can be added after the mockups show
 which size she likes.
+
+**Decided:** the dock does not get a second button. The `classPoints` dock contribution and the
+achievements one become one combined dock button and screen (D-227, proposed); the Star paths box is
+placed by the teacher (size still open, question 10).
 
 ### 6.2 Tables
 
@@ -524,12 +602,12 @@ Per class+subject, in the manifest `config` (Zod, defaults):
 | Key | Values | Default |
 |---|---|---|
 | `period` | `week`, `month`, `term`, `year` | `term` |
-| `showOnBoard` | `all` (each child's stars on the board), `ownCard` (only on the child's own card) | `all` |
+| `showOnBoard` | `all` (each child's stars on the board), `ownCard` (only on the child's own card) | `all` (**decided**: every child's stars shown; whether `ownCard` stays offered is to confirm) |
 | `announce` | `now`, `endOfLesson`, `quiet` | `now` |
 | `jarEnabled` | boolean | true |
 | `repeatEvery` | null or 5..500 (targets after the last one) | null |
 | `giveFromDisplay` | boolean (false hides the give controls on a browser marked as a classroom display) | true |
-| (Option B) `deductions` | boolean | false |
+| (Option B, **decided**) `deductions` | boolean | false (to confirm) |
 
 Per school: the module's availability (Admin → Modules), nothing else. Per device: nothing new.
 
@@ -583,6 +661,10 @@ Draft DECISIONS entries (numbers are proposals):
 - **D-224 — Class point achievements: category `classPoints`, five rule events, lifetime counts.** Ten defaults; nothing depends on attendance.
 - **D-225 — Class points in reports are counts without a score, and are read-only for AI tools.**
 - **D-226 — Giving stars needs no PIN; a class can hide the give controls on classroom displays.**
+- **D-227 — One classroom screen gives stars and achievements.** One dock button replaces the Achievements button and the Class stars button; the screen keeps the achievement dialog's choices (children, groups, "Celebrate on the display", "Give to N") and adds the star reasons; when one of the two modules is off, only the other part shows.
+
+**Decided (2026-11-25):** D-219 takes the Option B wording; D-223 with `showOnBoard: 'all'` and no podium;
+D-226 as written; D-227 is new.
 
 CONVENTIONS sentences to add:
 
@@ -599,13 +681,14 @@ CONVENTIONS sentences to add:
 
 | Stage | Delivers | Size | The teacher can try it |
 |---|---|---|---|
-| **S37a Stars and reasons** | Module, catalogue line, tables `reasons` and `events`, starter reasons, reasons editor, `give` / `undo` commands, the give view (dock button and box), the card mark, lesson state, the "Give stars" page for the phone, history with removal, demo history, tests. | L | **Yes. This is the smallest first version** (below). |
-| **S37b Targets, stickers, show and tell** | Tables `targets` and `reached`, the ladder editor, the crossing logic, the celebration and its three modes (End Lesson step), the show-and-tell queue and its tile badge, periods, the classroom card item. | L | Yes |
-| **S37c Student page and class jar** | The "My stars" screen with the sticker album and the seen celebration, the jar (table, box, reward tick), `showOnBoard`. | M | Yes |
+| **S37a Stars, reasons and the combined give screen** | Module, catalogue line, tables `reasons` and `events`, starter reasons, reasons editor, `give` / `undo` commands, **the combined "Stars and achievements" screen and its one dock button** (replacing the Achievements dock button; D-227), **the Star paths box** (concept 1) at its sizes, the card mark, lesson state, the "Give stars" page for the phone, history with removal, demo history, tests. | L | Yes (first version) |
+| **S37b Targets, stickers, show and tell** | Tables `targets` and `reached`, the ladder editor (default 25 / 50 / 100 per term, changeable), the crossing logic, the celebration and its three modes (End Lesson step), the show-and-tell queue (on by default for the first target only) and its tile badge, periods, the classroom card item. | L | Yes (first version) |
+| **S37c Class jar, then the student page** | **First version:** the jar (table, its line in the Star paths box and in the give screen, the reward tick, the jar-full celebration). **After:** the "My stars" screen with the sticker album and the seen celebration, `showOnBoard`'s `ownCard` option. | M | Yes (the jar in the first version) |
 | **S37d Achievements and reports** | Category, rule events, facts, ten defaults, "See all" on the classroom card, the report section and timeline, report views, guides in English and Turkish. | M | Yes |
-| **S37e (only if Option B is chosen)** | The `deductions` switch, negative reasons, the `adjust` endpoint, floors, the leak scans, the rule texts. | S–M | Yes |
+| **S37e Option B deductions (decided)** | The `deductions` switch, negative reasons, the `adjust` endpoint (teacher area only, never on the combined classroom screen), floors, the leak scans, the rule texts. | S–M | Yes (first version) |
 
-Order: a → b → c and d in parallel. One migration per stage, generated after the final rebase.
+Order (decided 2026-11-25): a → b → e and the jar of c → the rest of c and d in parallel. One
+migration per stage, generated after the final rebase.
 
 **Hot files** (one stage at a time): `src/shared/modules.ts`, `src/shared/classroomLayout.ts`,
 `src/server/db/schema.ts` and `drizzle/`, `src/server/modules/index.ts`, `src/client/modules/index.ts`,
@@ -615,13 +698,19 @@ Order: a → b → c and d in parallel. One migration per stage, generated after
 `src/shared/reportViews.ts` (d), `en.ts` / `tr.ts`, `areas/staff/en.ts` / `tr.ts`,
 `src/client/styles/app.css`, `src/client/lib/offlineClassroom.ts` (`isOfflineKey`),
 `e2e/classroom-layout.spec.ts`, `e2e/board-40.spec.ts`, `e2e/button-groups.spec.ts`,
-`docs/DECISIONS.md`, `docs/CONVENTIONS.md`, `docs/ROADMAP.md`.
+`src/client/modules/achievements/AchievementsPanel.tsx` and `manifest.tsx` and the achievements e2e
+specs (a: the combined screen), `docs/DECISIONS.md`, `docs/CONVENTIONS.md`, `docs/ROADMAP.md`.
 
-**The smallest first version that would already make her happy (S37a plus one piece of S37b):**
-her own reasons with values; give to one, several or everyone from the board and the phone; Undo;
-each child's stars on their card; and **one** target with the celebration and a simple list "reached
-the target: show and tell owed". No periods (the school year), no jar, no student page, no
-achievements, no reports yet. It can be on the test server for her to try before the rest is built.
+**The first version (decided 2026-11-25): S37a + S37b + S37e + the jar of S37c.** Her own reasons with
+values; one dock button and one screen to give stars or achievements to one, several or everyone, from
+the board and the phone, with no PIN; Undo; the Star paths box with every child's path in name order
+and the class jar; each child's stars on their card; the default ladder 25 / 50 / 100 per term that she
+can change, with the celebration and the show-and-tell queue (first target by default); Option B
+deductions in the teacher area only. Not yet: the student page, class-star achievements, reports. It
+can be on the test server for her to try before the rest is built.
+
+(Before the decisions the smallest first version was S37a plus one target of S37b, with no jar and
+no deductions.)
 
 Real-device checks (a touch panel, her phone, a projector at 1280×720) stay open ROADMAP boxes until
 a person has done them.
@@ -631,6 +720,9 @@ a person has done them.
 ## 9. Open questions
 
 Each has a recommended answer. Turkish follows each question so the teacher can read it herself.
+
+**Answered 2026-11-25:** see "Decisions" at the top (question 10 is still open, and some answers are
+listed there under "To confirm").
 
 1. **Taking stars away: correction only, or also for behaviour?** Recommended: correction only (Option A). Taking away for behaviour can be added later as a quiet, non-public switch (Option B).
    **Yıldız geri almak: sadece yanlışı düzeltmek için mi, yoksa davranış için de mi?** Önerimiz: sadece düzeltme (A seçeneği). Davranış için puan düşürme, sonradan sessiz ve sınıfa gösterilmeyen bir ayar olarak eklenebilir (B seçeneği).
@@ -668,6 +760,9 @@ Each has a recommended answer. Turkish follows each question so the teacher can 
 
 Make static HTML mockups of the concepts below. Nothing here is decided: the mockups are how the
 owner and the teacher choose.
+
+**Decided 2026-11-25:** concept 1, Star paths (10.2), with the class jar of 3.6; see "Decisions" at the
+top.
 
 ### 10.1 Ground rules
 
