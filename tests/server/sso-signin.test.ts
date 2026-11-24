@@ -231,6 +231,22 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     expect((await c.post('/api/auth/pin', { pin: '1357' })).status).toBe(200);
   });
 
+  it('S35 (D-214): a fresh sign-in here is the re-authentication for changing the own address; the change clears the provider’s id', async () => {
+    const { s, fake, mailer } = await school();
+    // Ayşe without a password (as after "no passwords for anyone", D-207).
+    env.db.update(users).set({ signInMethod: 'email_link', passwordHash: '' }).where(eq(users.id, s.ayse.id)).run();
+    const { c, r } = await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'));
+    expect(r.body).toMatchObject({ id: s.ayse.id, signInMethod: 'email_link', reauthFresh: true });
+    await ok(c.post('/api/auth/email/start', { email: 'ayse.new@mail.demo.example' }));
+    expect(mailer.sent.at(-1)!.to).toBe('ayse.new@mail.demo.example');
+    await ok(c.post('/api/auth/email/confirm', { code: /\n(\d{6})\n/u.exec(mailer.sent.at(-1)!.text)![1]! }));
+    expect((await ok(c.get('/api/auth/email'))).email).toBe('ayse.new@mail.demo.example');
+    expect(env.db.select().from(users).where(eq(users.id, s.ayse.id)).get()!.ssoSub).toBeNull();
+    // A stale session is not enough.
+    env.clock.advance(16 * 60_000);
+    expect(reason(await c.post('/api/auth/email/start', { email: 'ayse.other@mail.demo.example' }))).toBe('REAUTH_REQUIRED');
+  });
+
   it('serves the icon as an image only, and only a small file of an allowed kind from the data folder', async () => {
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16"/></svg>';
     fs.writeFileSync(path.join(dataDir, 'sso-icon.svg'), svg);
@@ -303,9 +319,10 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     const boss = await ok(s.admin.post('/api/admin/users', { login: 'new.admin', displayName: 'Yeni Yönetici', role: 'admin', email: 'new.admin@mail.demo.example' }));
     const invite = tokenFrom(mailer.sent.at(-1)!.text);
     const { c, r } = await signIn(fake, standard('new.admin@mail.demo.example', 'acct-boss'));
-    expect(r.body).toMatchObject({ id: boss.user.id, signInMethod: 'password', invitePending: true, email: 'new.admin@mail.demo.example' });
+    expect(r.body).toMatchObject({ id: boss.user.id, signInMethod: 'password', passwordNotSet: true });
+    expect(r.body).not.toHaveProperty('email');
     // Everyone else is not in this state.
-    expect((await ok(s.admin.get('/api/auth/me'))).invitePending).toBe(false);
+    expect((await ok(s.admin.get('/api/auth/me'))).passwordNotSet).toBe(false);
     for (const body of [{}, { currentPassword: 'never-had-one-123' }]) {
       expect(reason(await c.post('/api/auth/pin', { ...body, pin: '2468' }))).toBe('PASSWORD_NOT_SET');
       expect(reason(await c.post('/api/auth/email/start', { ...body, email: 'boss@mail.demo.example' }))).toBe('PASSWORD_NOT_SET');
@@ -316,6 +333,6 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     await ok(new Client(env).post('/api/auth/invite/accept', { token: invite, method: 'password', password: 'chosen-password-123' }));
     const after = new Client(env);
     await after.login('new.admin', 'chosen-password-123');
-    expect((await ok(after.get('/api/auth/me'))).invitePending).toBe(false);
+    expect((await ok(after.get('/api/auth/me'))).passwordNotSet).toBe(false);
   });
 });

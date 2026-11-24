@@ -2,7 +2,9 @@
 /**
  * S35 (D-214): "Email address" in Profile (ACC-2). It shows the account's address, asks for the
  * current password (or a fresh sign-in) and the new address, then the code emailed to the new address;
- * without email on the server it says that the administrator changes addresses. Also the line for an
+ * without email on the server it says that the administrator changes addresses. The address comes from
+ * the PIN-gated `ownEmail`, which also brings the code form back after a reload; Profile draws the
+ * section only once the sign-in info has arrived. Also the line for an
  * account that has no password yet (invited, signed in through the operator's sign-in server), and the
  * administrator's own row in Admin → Accounts → Edit. Fictional data only.
  */
@@ -31,7 +33,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 }));
 
 const { ApiError } = await import('../../src/client/lib/api.ts');
-const { EmailChangeSection } = await import('../../src/client/routes/EmailChange.tsx');
+const { EmailChangeSection, OWN_EMAIL } = await import('../../src/client/routes/EmailChange.tsx');
 const { ProfilePage } = await import('../../src/client/routes/teacher/Teacher.tsx');
 const { UsersPage } = await import('../../src/client/routes/admin/Users.tsx');
 const { I18nProvider } = await import('../../src/client/lib/i18n.tsx');
@@ -49,17 +51,20 @@ const ME: Me = {
   hasPin: true,
   signInMethod: 'password',
   hasEmail: true,
-  email: 'deniz@school.example',
-  invitePending: false,
+  passwordNotSet: false,
   reauthFresh: false,
   classroomMode: false,
   pinUnlockedUntil: null,
   pinUnlocked: true,
 };
 
-function qcWith(me: Me, data: Array<[readonly unknown[], unknown]> = []) {
+const OWN = { email: 'deniz@school.example', pendingTo: null };
+const SIGN_IN_INFO = { emailResetEnabled: true, emailLinkEnabled: true, passwordsOff: false, googleSignInEnabled: false, passkeysEnabled: false, sso: null, defaultLocale: 'en' };
+
+function qcWith(me: Me, data: Array<[readonly unknown[], unknown]> = [], own: unknown = OWN) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, enabled: false } } });
   qc.setQueryData(ME_KEY, me);
+  if (own) qc.setQueryData(OWN_EMAIL, own);
   for (const [k, v] of data) qc.setQueryData(k, v);
   return qc;
 }
@@ -79,7 +84,7 @@ afterEach(() => {
 
 describe('Profile → Email address (S35, D-214)', () => {
   it('shows the address, sends the code to the new one with the current password, then changes it with the code', async () => {
-    answer = (path) => (path.endsWith('/confirm') ? { ...ME, email: 'deniz.new@school.example' } : { ok: true });
+    answer = (path) => (path.endsWith('/confirm') ? ME : { ok: true });
     render(wrap(<EmailChangeSection me={ME} emailEnabled />, qcWith(ME)));
     expect(screen.getByText(en['profile.emailCurrent'].replace('{email}', 'deniz@school.example'))).toBeTruthy();
     type(en['password.current'], 'correct-horse-battery');
@@ -127,27 +132,54 @@ describe('Profile → Email address (S35, D-214)', () => {
 
   it('without email on the server it says the administrator changes addresses, in both languages', () => {
     for (const [locale, dict] of [['en', en], ['tr', tr]] as const) {
-      render(wrap(<EmailChangeSection me={{ ...ME, email: null, hasEmail: false }} emailEnabled={false} />, qcWith(ME), locale));
+      render(wrap(<EmailChangeSection me={{ ...ME, hasEmail: false }} emailEnabled={false} />, qcWith(ME, [], { email: null, pendingTo: null }), locale));
       expect(screen.getByText(dict['profile.emailNoSmtp'])).toBeTruthy();
       expect(screen.getByText(dict['profile.emailNone'])).toBeTruthy();
       expect(screen.queryByRole('button', { name: dict['profile.emailSendCode'] })).toBeNull();
       cleanup();
     }
   });
+
+  it('after a reload the code form comes back while the change still waits in this browser (S35 review)', async () => {
+    render(wrap(<EmailChangeSection me={ME} emailEnabled />, qcWith(ME, [], { email: 'deniz@school.example', pendingTo: 'd***@school.example' })));
+    expect(screen.getByText(en['profile.emailCodeSent'].replace('{email}', 'd***@school.example'))).toBeTruthy();
+    type(en['signin.code'], '123456');
+    fireEvent.click(button(en['profile.emailConfirm']));
+    await waitFor(() => expect(calls.at(-1)).toEqual({ path: '/api/auth/email/confirm', input: { code: '123456' } }));
+    cleanup();
+    // Cancel goes back to the start form.
+    render(wrap(<EmailChangeSection me={ME} emailEnabled />, qcWith(ME, [], { email: 'deniz@school.example', pendingTo: 'd***@school.example' })));
+    fireEvent.click(button(en['common.cancel']));
+    expect(await screen.findByRole('button', { name: en['profile.emailSendCode'] })).toBeTruthy();
+  });
+
+  it('draws nothing until the address has loaded', () => {
+    render(wrap(<EmailChangeSection me={ME} emailEnabled />, qcWith(ME, [], null)));
+    expect(screen.queryByTestId('email-change')).toBeNull();
+  });
+
+  it('Profile draws no "email is not set up" while the sign-in info loads (S35 review)', () => {
+    render(wrap(<ProfilePage />, qcWith(ME)));
+    expect(screen.queryByText(en['profile.emailNoSmtp'])).toBeNull();
+    expect(screen.queryByTestId('email-change')).toBeNull();
+    cleanup();
+    render(wrap(<ProfilePage />, qcWith(ME, [[['public', 'reset-available'], SIGN_IN_INFO]])));
+    expect(screen.getByTestId('email-change')).toBeTruthy();
+  });
 });
 
 describe('Profile: an account without a password yet (S35)', () => {
   it('tells the person to open the invite link, and offers no password form', () => {
     for (const [locale, dict] of [['en', en], ['tr', tr]] as const) {
-      const pending = { ...ME, role: 'admin' as const, locale, invitePending: true };
-      render(wrap(<ProfilePage />, qcWith(pending, [[['public', 'reset-available'], { emailResetEnabled: true, emailLinkEnabled: true, passwordsOff: false, googleSignInEnabled: false, passkeysEnabled: false, sso: null, defaultLocale: 'en' }]]), locale));
-      expect(screen.getByText(dict['profile.invitePending'])).toBeTruthy();
+      const pending = { ...ME, role: 'admin' as const, locale, passwordNotSet: true };
+      render(wrap(<ProfilePage />, qcWith(pending, [[['public', 'reset-available'], SIGN_IN_INFO]]), locale));
+      expect(screen.getByText(dict['profile.passwordNotSet'])).toBeTruthy();
       expect(screen.queryByText(dict['password.changeTitle'])).toBeNull();
       expect(screen.queryByRole('button', { name: dict['profile.emailSendCode'] })).toBeNull();
       cleanup();
     }
-    render(wrap(<ProfilePage />, qcWith(ME)));
-    expect(screen.queryByText(en['profile.invitePending'])).toBeNull();
+    render(wrap(<ProfilePage />, qcWith(ME, [[['public', 'reset-available'], SIGN_IN_INFO]])));
+    expect(screen.queryByText(en['profile.passwordNotSet'])).toBeNull();
     expect(screen.getByTestId('email-change')).toBeTruthy();
   });
 });

@@ -246,6 +246,25 @@ describe('passkeys (S33, D-210)', () => {
     expect(reason(await c.post('/api/auth/passkeys/register/start', {}))).toBe('REAUTH_REQUIRED');
   });
 
+  it('a fresh passkey sign-in is the re-authentication for changing the own address (S35, D-214)', async () => {
+    const { s, mailer } = await school();
+    const teachers = await addPasskey(s.teacherA);
+    for (const [id, email] of [[s.adminUser.id, 'root@school.example'], [s.ayse.id, 'ayse@school.example'], [s.mehmet.id, 'mehmet@school.example']] as const) await ok(s.admin.patch(`/api/admin/users/${id}`, { email }));
+    await ok(s.admin.post('/api/admin/sign-in-policy/code'));
+    await ok(s.admin.put('/api/admin/sign-in-policy', { passwordsOff: true, code: codeFrom(mailer.sent.at(-1)!.text) }));
+    // The old password session is not fresh; a passkey sign-in a moment ago is.
+    expect(reason(await s.teacherA.post('/api/auth/email/start', { email: 'ayse.new@school.example' }))).toBe('REAUTH_REQUIRED');
+    const { c } = await passkeySignIn(teachers.device);
+    await ok(c.post('/api/auth/email/start', { email: 'ayse.new@school.example' }));
+    expect(mailer.sent.at(-1)!.to).toBe('ayse.new@school.example');
+    await ok(c.post('/api/auth/email/confirm', { code: codeFrom(mailer.sent.at(-1)!.text) }));
+    expect((await ok(c.get('/api/auth/email'))).email).toBe('ayse.new@school.example');
+    expect(audits('auth.email_change')).toBe(1);
+    // Fifteen minutes later the same session is not fresh any more.
+    env.clock.advance(16 * 60_000);
+    expect(reason(await c.post('/api/auth/email/start', { email: 'ayse.other@school.example' }))).toBe('REAUTH_REQUIRED');
+  });
+
   it('is offered once right after an email sign-in, until the account has one or says "Don’t ask again"', async () => {
     const { s, mailer } = await school();
     await ok(s.admin.patch(`/api/admin/users/${s.ayse.id}`, { email: 'ayse@school.example' }));

@@ -348,7 +348,7 @@ export const en = {
   'profile.emailConfirm': 'Change address',
   'profile.emailChanged': 'Your address is now {email}. You are still signed in here; your other devices were signed out.',
   'profile.emailNoSmtp': 'Email is not set up on this server, so your administrator changes addresses (Accounts → Edit).',
-  'profile.invitePending': 'Your account has no password yet. Open the invite link in your email to choose one. If the link no longer works, ask your administrator to send a new invite.',
+  'profile.passwordNotSet': 'Your account has no password yet. Open the invite link in your email to choose one. If the link no longer works, ask your administrator to send a new invite.',
   'profile.savePin': 'Save PIN',
   'classroom.activeClass': 'Active class',
   'classroom.switchClass': 'Switch class',

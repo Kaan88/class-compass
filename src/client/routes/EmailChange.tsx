@@ -3,10 +3,12 @@
  * and changes it in two steps: re-authentication (the current password, or a fresh sign-in for accounts
  * without one) and the new address, then the 6-digit code that was emailed to the NEW address. Only the
  * code changes the address; the person's other devices are signed out. Without email on the server the
- * section says that the administrator changes addresses.
+ * section says that the administrator changes addresses. The address comes from the PIN-gated
+ * `ownEmail` (not from `Me`, which a locked classroom screen loads); after a reload it also says
+ * whether a change still waits for its code in this browser, and the code form comes back.
  */
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Auth from '../../shared/contracts/auth.ts';
 import { call } from '../lib/api.ts';
 import { errorText } from '../lib/errors.ts';
@@ -16,9 +18,12 @@ import { Button } from '../ui/Button.tsx';
 import { Alert } from '../ui/Feedback.tsx';
 import { TextField } from '../ui/Fields.tsx';
 
+export const OWN_EMAIL = ['sensitive', 'account', 'email'];
+
 export function EmailChangeSection({ me, emailEnabled }: { me: Me; emailEnabled: boolean }) {
   const { t } = useI18n();
   const qc = useQueryClient();
+  const own = useQuery({ queryKey: OWN_EMAIL, queryFn: () => call(Auth.ownEmail, {}) });
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -28,16 +33,19 @@ export function EmailChangeSection({ me, emailEnabled }: { me: Me; emailEnabled:
   // Email-link accounts have no password: a fresh sign-in (15 minutes) is the re-authentication (D-108).
   const byPassword = me.signInMethod === 'password';
   const canReauth = byPassword || me.reauthFresh;
+  // A change started before a reload: the masked new address from the server (null once used or voided).
+  const waitingFor = sentTo ?? own.data?.pendingTo ?? null;
+  if (!own.data) return null;
   return (
     <section className="cc-card cc-stack" aria-labelledby="email-title" data-testid="email-change">
       <h2 id="email-title" className="cc-h2">
         {t('profile.emailTitle')}
       </h2>
-      <p>{me.email ? t('profile.emailCurrent', { email: me.email }) : t('profile.emailNone')}</p>
+      <p>{own.data.email ? t('profile.emailCurrent', { email: own.data.email }) : t('profile.emailNone')}</p>
       {changed ? <Alert kind="success">{t('profile.emailChanged', { email: changed })}</Alert> : null}
       {!emailEnabled ? (
         <p className="cc-muted">{t('profile.emailNoSmtp')}</p>
-      ) : me.invitePending ? null : sentTo ? (
+      ) : me.passwordNotSet ? null : waitingFor ? (
         <form
           className="cc-stack"
           onSubmit={async (e) => {
@@ -46,17 +54,18 @@ export function EmailChangeSection({ me, emailEnabled }: { me: Me; emailEnabled:
             try {
               const fresh = await call(Auth.confirmEmailChange, { code });
               qc.setQueryData(ME_KEY, fresh);
-              setChanged(sentTo);
+              setChanged(address.trim().toLowerCase() || waitingFor);
               setSentTo(null);
               setCode('');
               setAddress('');
+              await qc.invalidateQueries({ queryKey: OWN_EMAIL });
               await freshMe(qc);
             } catch (err) {
               setError(errorText(t, err));
             }
           }}
         >
-          <Alert kind="success">{t('profile.emailCodeSent', { email: sentTo })}</Alert>
+          <Alert kind="success">{t('profile.emailCodeSent', { email: waitingFor })}</Alert>
           <TextField label={t('signin.code')} inputMode="numeric" autoComplete="one-time-code" maxLength={6} isRequired value={code} onChange={(v) => setCode(v.replace(/\D/gu, ''))} />
           {error ? <Alert>{error}</Alert> : null}
           <div className="cc-row">
@@ -69,6 +78,8 @@ export function EmailChangeSection({ me, emailEnabled }: { me: Me; emailEnabled:
                 setSentTo(null);
                 setCode('');
                 setError(null);
+                // The pending code stays valid on the server until it expires; this browser stops offering it.
+                qc.setQueryData(OWN_EMAIL, { ...own.data, pendingTo: null });
               }}
             >
               {t('common.cancel')}

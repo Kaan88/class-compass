@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Me } from '../../../shared/contracts/auth.ts';
 import { foldForSearch } from '../../../shared/text/turkish.ts';
 import type { Db } from '../../db/client.ts';
@@ -36,7 +36,7 @@ export const isFreshEmailSession = (session: SessionRow, now: number) => FRESH_M
  * invite, through the operator's sign-in server while passwords are on (D-213). Anything that asks for
  * the current password answers PASSWORD_NOT_SET; the person opens the invite link to choose one.
  */
-export const invitePending = (user: UserRow) => user.signInMethod === 'password' && user.passwordHash === '';
+export const passwordNotSet = (user: UserRow) => user.signInMethod === 'password' && user.passwordHash === '';
 const noPasswordYet = () => new AppError('UNAUTHENTICATED', 'This account has no password yet: open the invite link to choose one', { reason: 'PASSWORD_NOT_SET' });
 
 export function toMe(db: Db, user: UserRow, session: SessionRow, now: number): Me {
@@ -52,8 +52,7 @@ export function toMe(db: Db, user: UserRow, session: SessionRow, now: number): M
     hasPin: user.pinHash !== null,
     signInMethod: user.signInMethod,
     hasEmail: user.email !== null,
-    email: user.email,
-    invitePending: invitePending(user),
+    passwordNotSet: passwordNotSet(user),
     reauthFresh: isFreshEmailSession(session, now),
     classroomMode: session.classroomMode,
     pinUnlockedUntil: session.pinUnlockedUntil,
@@ -195,7 +194,7 @@ export function invalidateResetTokens(db: Db, userId: string, now: number) {
 
 export async function changePassword(deps: AppDeps, user: UserRow, session: SessionRow, current: string, next: string) {
   if (user.signInMethod === 'email_link') throw new AppError('CONFLICT', 'This account signs in with email links', { reason: 'EMAIL_LINK_ACCOUNT' });
-  if (invitePending(user)) throw noPasswordYet();
+  if (passwordNotSet(user)) throw noPasswordYet();
   if (!user.passwordHash || !(await verifyPassword(user.passwordHash, current))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
   const passwordHash = await hashPassword(next);
   const now = deps.now();
@@ -218,7 +217,7 @@ export async function assertReauth(deps: AppDeps, user: UserRow, session: Sessio
     if (!isFreshEmailSession(session, deps.now())) throw new AppError('UNAUTHENTICATED', 'Sign in again with a fresh email link first', { reason: 'REAUTH_REQUIRED' });
     return;
   }
-  if (invitePending(user)) throw noPasswordYet();
+  if (passwordNotSet(user)) throw noPasswordYet();
   if (!currentPassword || !user.passwordHash || !(await verifyPassword(user.passwordHash, currentPassword))) {
     throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
   }
@@ -425,6 +424,11 @@ export async function completePasswordReset(deps: AppDeps, token: string, newPas
     db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, fresh.id)).run();
     db.update(users).set({ passwordHash, mustChangePassword: false, signInMethod: 'password', updatedAt: now }).where(eq(users.id, user.id)).run();
     revokeAllUserSessions(db, user.id, now);
+    // Codes asked for in a session (a pending address change, method or policy switch) stop too (D-214).
+    db.update(oneTimeTokens)
+      .set({ usedAt: now })
+      .where(and(eq(oneTimeTokens.userId, user.id), inArray(oneTimeTokens.kind, ['email_method', 'email_policy', 'email_change']), isNull(oneTimeTokens.usedAt)))
+      .run();
     revokeAllUserMcpTokens(db, actorFor(user), user.id, now, 'password_reset');
     clearFailures(db, `login:user:${user.id}`);
     audit(db, actorFor(user), { action: 'auth.password_reset_email', entity: 'user', entityId: user.id }, now);

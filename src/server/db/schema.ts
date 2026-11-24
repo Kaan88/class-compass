@@ -286,8 +286,13 @@ export const authAttempts = sqliteTable(
 
 export const oneTimeTokens = sqliteTable('one_time_tokens', {
   id: text('id').primaryKey(),
-  /** 'invite' (7 days, S13b), 'email_signin' (15 minutes, link + 6-digit code, S13b), 'password_reset'. */
-  kind: text('kind', { enum: ['password_reset', 'invite', 'email_signin'] }).notNull(),
+  /**
+   * 'invite' (7 days, S13b), 'email_signin' (15 minutes, link + 6-digit code of the public sign-in, S13b),
+   * 'password_reset', and the session-bound 6-digit codes, one kind per purpose (S35, D-214):
+   * 'email_method' (switching to email links), 'email_policy' (switching passwords off) and
+   * 'email_change' (changing the own address). A text column: a new value needs no migration.
+   */
+  kind: text('kind', { enum: ['password_reset', 'invite', 'email_signin', 'email_method', 'email_policy', 'email_change'] }).notNull(),
   userId: text('user_id').notNull().references(() => users.id),
   tokenHash: text('token_hash').notNull(),
   expiresAt: integer('expires_at').notNull(),

@@ -174,6 +174,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     },
     { rateLimit: { max: 5, timeWindow: '15 minutes' } },
   );
+  route(app, deps, C.ownEmail, (ctx, _input, { req }) => email.emailChangeStatus(ctx, requireUser(ctx), ctx.session!, req.cookies?.[email.EMAIL_CHANGE_COOKIE]));
   route(
     app,
     deps,

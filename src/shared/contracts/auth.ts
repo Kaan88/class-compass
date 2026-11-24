@@ -35,13 +35,11 @@ export const Me = z.object({
   /** S13b (D-108): password or email-link sign-in; whether the account has an email address. */
   signInMethod: SignInMethod,
   hasEmail: z.boolean(),
-  /** S35 (D-214): the account's own address, shown in Profile where the person can change it. */
-  email: z.string().nullable(),
   /**
    * S35: a password account with no password yet (invited, then signed in through the operator's
    * sign-in server without opening the invite, D-213). Profile tells the person to open the invite.
    */
-  invitePending: z.boolean(),
+  passwordNotSet: z.boolean(),
   /** This session was signed in with an email link, code or invite in the last 15 minutes (re-authentication for email-link accounts). */
   reauthFresh: z.boolean(),
   classroomMode: z.boolean(),
@@ -346,6 +344,20 @@ export const confirmEmailLinkMethod = endpoint({
 // ---------------------------------------------------------------- changing the own address (S35, D-214)
 /** Validated like the administrator's `Email` (contracts/admin.ts). */
 const NewEmail = z.string().trim().toLowerCase().email().max(200);
+
+/**
+ * The own address for Profile, and `pendingTo`: the masked new address of a change that still waits
+ * for its code in this browser (the sealed cookie), so Profile can offer the code form after a reload.
+ * `account` (PIN-gated in classroom mode): the address is not in `Me`, which a locked classroom
+ * screen loads (S35 review).
+ */
+export const ownEmail = endpoint({
+  method: 'GET',
+  path: '/api/auth/email',
+  access: 'account',
+  input: Empty,
+  output: z.object({ email: z.string().nullable(), pendingTo: z.string().nullable() }),
+});
 
 /**
  * Step 1: re-authentication (the password, or a fresh sign-in for accounts without one), then a

@@ -27,7 +27,7 @@
  * Tokens and codes are stored as HMAC hashes with the server pepper; nothing secret is audited.
  */
 import crypto from 'node:crypto';
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { translate } from '../../lib/i18n.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { authAttempts, oneTimeTokens, sessions, users } from '../../db/schema.ts';
@@ -61,36 +61,52 @@ function sendQuietly(deps: AppDeps, to: string, subject: string, text: string) {
   });
 }
 
-function activeTokens(db: Db, kind: 'invite' | 'email_signin', where: ReturnType<typeof eq>, now: number) {
+/**
+ * Emailed 6-digit codes, one kind per purpose (S35 review): the public sign-in ('email_signin', link +
+ * code, bound to the request id of the device that asked), switching to email links ('email_method'),
+ * switching passwords off ('email_policy') and changing the own address ('email_change'); the last
+ * three are bound to the session that asked. Each kind has its own limit of emails, its own "only the
+ * newest works" rule and its own count of wrong codes, so a signed-out request for someone's address
+ * can neither use up, nor cancel, nor lock a code that the person asked for in their own session, and
+ * the public endpoints, which read only 'email_signin', can never match one of the others.
+ */
+export type CodeKind = 'email_signin' | 'email_method' | 'email_policy' | 'email_change';
+const SESSION_CODE_KINDS = ['email_method', 'email_policy', 'email_change'] as const;
+type Mail = 'signin' | 'methodcode' | 'policycode' | 'emailchange';
+const KIND_OF: Record<Mail, CodeKind> = { signin: 'email_signin', methodcode: 'email_method', policycode: 'email_policy', emailchange: 'email_change' };
+
+function activeTokens(db: Db, kind: 'invite' | CodeKind, where: ReturnType<typeof eq>, now: number) {
   return db
     .select()
     .from(oneTimeTokens)
     .where(and(eq(oneTimeTokens.kind, kind), where, isNull(oneTimeTokens.usedAt), isNull(oneTimeTokens.revokedAt), gt(oneTimeTokens.expiresAt, now)));
 }
-function activeToken(db: Db, kind: 'invite' | 'email_signin', where: ReturnType<typeof eq>, now: number) {
+function activeToken(db: Db, kind: 'invite' | CodeKind, where: ReturnType<typeof eq>, now: number) {
   return activeTokens(db, kind, where, now).get();
 }
 
 /**
- * Pending invites and unused email sign-in links/codes of an account stop working. Called when an
- * administrator changes the account's email, deactivates it or resets its password (D-015, D-108).
+ * Pending invites and every unused emailed link or code of the account, of every code kind, stop
+ * working. Called when the address changes (`applyEmailChange`, by the person or an administrator), the
+ * account is deactivated or its password is reset (D-015, D-108, D-214).
  */
 export function revokeEmailLinks(db: Db, userId: string, now: number) {
   revokePendingInvites(db, userId, now);
   db.update(oneTimeTokens)
     .set({ usedAt: now })
-    .where(and(eq(oneTimeTokens.userId, userId), eq(oneTimeTokens.kind, 'email_signin'), isNull(oneTimeTokens.usedAt)))
+    .where(and(eq(oneTimeTokens.userId, userId), inArray(oneTimeTokens.kind, ['email_signin', ...SESSION_CODE_KINDS]), isNull(oneTimeTokens.usedAt)))
     .run();
 }
 
 // ---------------------------------------------------------------- wrong codes per account
-const codeKey = (userId: string) => `emailcode:user:${userId}`;
-function codeLocked(db: Db, userId: string, now: number): boolean {
-  const s = db.select().from(authAttempts).where(eq(authAttempts.key, codeKey(userId))).get();
+/** The public sign-in keeps its key from before S35; the session-bound kinds count on their own. */
+const codeKey = (kind: CodeKind, userId: string) => (kind === 'email_signin' ? `emailcode:user:${userId}` : `emailcode:${kind}:user:${userId}`);
+function codeLocked(db: Db, kind: CodeKind, userId: string, now: number): boolean {
+  const s = db.select().from(authAttempts).where(eq(authAttempts.key, codeKey(kind, userId))).get();
   return Boolean(s?.lockedUntil && s.lockedUntil > now);
 }
-function recordCodeFailure(db: Db, userId: string, now: number) {
-  const key = codeKey(userId);
+function recordCodeFailure(db: Db, kind: CodeKind, userId: string, now: number) {
+  const key = codeKey(kind, userId);
   const cur = db.select().from(authAttempts).where(eq(authAttempts.key, key)).get();
   // The window restarts after a quiet day; within it every wrong code counts, whichever code it was for.
   const failures = cur && now - cur.updatedAt < CODE_LOCK_MS ? cur.failures + 1 : 1;
@@ -227,11 +243,13 @@ export async function acceptInvite(deps: AppDeps, ip: string, input: { token: st
 
 // ---------------------------------------------------------------- email-link sign-in
 /**
- * Issue a sign-in link + code for one account and email it; returns the request id the code is
- * bound to. Older unused links of the account stop working. Null when the per-account limit is hit.
+ * Issue a code (and, for the public sign-in, a link) of the mail's kind for one account and email it;
+ * returns the request id the code is bound to. Older unused rows of the same kind and account stop
+ * working; other kinds are untouched. Null when the per-account limit of that kind is hit.
  */
-function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: string, mail: 'signin' | 'methodcode' | 'policycode' | 'emailchange', to = user.email!): string | null {
+function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: string, mail: Mail, to = user.email!): string | null {
   const withLink = mail === 'signin';
+  const kind = KIND_OF[mail];
   const now = deps.now();
   const token = randomToken();
   const code = newCode();
@@ -240,19 +258,19 @@ function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: s
       deps.db
         .select({ n: sql<number>`count(*)` })
         .from(oneTimeTokens)
-        .where(and(eq(oneTimeTokens.userId, user.id), eq(oneTimeTokens.kind, 'email_signin'), gt(oneTimeTokens.createdAt, now - EMAIL_LINK_MS)))
+        .where(and(eq(oneTimeTokens.userId, user.id), eq(oneTimeTokens.kind, kind), gt(oneTimeTokens.createdAt, now - EMAIL_LINK_MS)))
         .get()?.n ?? 0;
     if (recent >= EMAILS_PER_ACCOUNT) return false;
     deps.db
       .update(oneTimeTokens)
       .set({ usedAt: now })
-      .where(and(eq(oneTimeTokens.userId, user.id), eq(oneTimeTokens.kind, 'email_signin'), isNull(oneTimeTokens.usedAt)))
+      .where(and(eq(oneTimeTokens.userId, user.id), eq(oneTimeTokens.kind, kind), isNull(oneTimeTokens.usedAt)))
       .run();
     deps.db
       .insert(oneTimeTokens)
       .values({
         id: newId(),
-        kind: 'email_signin',
+        kind,
         userId: user.id,
         tokenHash: tokenHash(deps.config.SECRET_PEPPER, token),
         expiresAt: now + EMAIL_LINK_MS,
@@ -305,7 +323,7 @@ function finishEmailSignIn(deps: AppDeps, row: typeof oneTimeTokens.$inferSelect
   if (user.disabledAt || user.signInMethod !== 'email_link') throw signInInvalid();
   deps.db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, row.id)).run();
   // The owner proved the mailbox: the wrong-code count starts again.
-  deps.db.delete(authAttempts).where(eq(authAttempts.key, codeKey(user.id))).run();
+  deps.db.delete(authAttempts).where(eq(authAttempts.key, codeKey('email_signin', user.id))).run();
   if (user.emailVerifiedAt === null) deps.db.update(users).set({ emailVerifiedAt: now, updatedAt: now }).where(eq(users.id, user.id)).run();
   const s = createSession(deps, { kind: 'user', userId: user.id }, now, SESSION_ABSOLUTE_MS, 'email_link');
   audit(deps.db, actorFor(user), { action: 'auth.login', entity: 'user', entityId: user.id, after: { method: 'email_link' } }, now);
@@ -326,11 +344,11 @@ export function completeEmailLink(deps: AppDeps, token: string) {
  * against each of those rows (a code dies after 5) and against each account (the code path closes
  * after CODE_FAILURES_PER_ACCOUNT, see above). Returns the matching token row.
  */
-function checkCode(deps: AppDeps, binding: string, code: string) {
+function checkCode(deps: AppDeps, kind: CodeKind, binding: string, code: string) {
   const now = deps.now();
-  const rows = activeTokens(deps.db, 'email_signin', eq(oneTimeTokens.bindingHash, hashOf(deps, 'bind', binding)), now)
+  const rows = activeTokens(deps.db, kind, eq(oneTimeTokens.bindingHash, hashOf(deps, 'bind', binding)), now)
     .all()
-    .filter((r) => r.codeHash && r.codeAttempts < CODE_MAX_ATTEMPTS && !codeLocked(deps.db, r.userId, now));
+    .filter((r) => r.codeHash && r.codeAttempts < CODE_MAX_ATTEMPTS && !codeLocked(deps.db, kind, r.userId, now));
   if (!rows.length) return { row: null, wrong: false };
   const given = hashOf(deps, 'code', code);
   const match = rows.find((r) => timingSafeEqualStr(r.codeHash!, given));
@@ -343,8 +361,8 @@ function checkCode(deps: AppDeps, binding: string, code: string) {
       .set({ codeAttempts: attempts, ...(attempts >= CODE_MAX_ATTEMPTS ? { usedAt: now } : {}) })
       .where(eq(oneTimeTokens.id, r.id))
       .run();
-    recordCodeFailure(deps.db, r.userId, now);
-    if (!codeLocked(deps.db, r.userId, now)) left = Math.max(left, CODE_MAX_ATTEMPTS - attempts);
+    recordCodeFailure(deps.db, kind, r.userId, now);
+    if (!codeLocked(deps.db, kind, r.userId, now)) left = Math.max(left, CODE_MAX_ATTEMPTS - attempts);
   }
   return { row: null, wrong: true, attemptsLeft: left };
 }
@@ -353,7 +371,7 @@ export function completeEmailCode(deps: AppDeps, requestId: string, code: string
   // The wrong-try count must be stored even though the request fails, so the check runs in its own
   // transaction before the error is thrown.
   const checked = tx(deps.db, () => {
-    const c = checkCode(deps, requestId, code);
+    const c = checkCode(deps, 'email_signin', requestId, code);
     return c.row ? { ok: true as const, result: finishEmailSignIn(deps, c.row) } : { ok: false as const, attemptsLeft: c.attemptsLeft ?? 0 };
   });
   if (!checked.ok) throw new AppError('UNAUTHENTICATED', 'Wrong or expired code', { reason: 'SIGNIN_CODE_INVALID', attemptsLeft: checked.attemptsLeft });
@@ -374,7 +392,7 @@ export function startEmailLinkMethod(deps: AppDeps, user: UserRow, session: Sess
 export function confirmEmailLinkMethod(deps: AppDeps, user: UserRow, session: SessionRow, code: string) {
   const now = deps.now();
   const checked = tx(deps.db, () => {
-    const c = checkCode(deps, sessionBinding(session), code);
+    const c = checkCode(deps, 'email_method', sessionBinding(session), code);
     if (!c.row) return { ok: false as const, attemptsLeft: c.attemptsLeft ?? 0 };
     deps.db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, c.row.id)).run();
     deps.db.update(users).set({ signInMethod: 'email_link', passwordHash: '', emailVerifiedAt: now, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
@@ -419,7 +437,7 @@ export function sendPolicyCode(deps: AppDeps, user: UserRow, session: SessionRow
 
 /** Checks and uses up the code of `sendPolicyCode`. Call inside the transaction that makes the change. */
 export function usePolicyCode(deps: AppDeps, session: SessionRow, code: string): { ok: true } | { ok: false; attemptsLeft: number } {
-  const c = checkCode(deps, policyBinding(session), code);
+  const c = checkCode(deps, 'email_policy', policyBinding(session), code);
   if (!c.row) return { ok: false, attemptsLeft: c.attemptsLeft ?? 0 };
   deps.db.update(oneTimeTokens).set({ usedAt: deps.now() }).where(eq(oneTimeTokens.id, c.row.id)).run();
   return { ok: true };
@@ -463,8 +481,9 @@ export function assertEmailChangeAllowed(deps: AppDeps) {
 /**
  * Step 1 (after re-authentication, done by the route): a 6-digit code goes to the NEW address. The
  * answer is the same whether or not another account uses that address (accounts may share one, D-108).
- * Returns the sealed cookie that holds the pending address. The per-account limit of sign-in emails
- * applies (3 in 15 minutes).
+ * Returns the sealed cookie that holds the pending address. Address-change codes have their own limit
+ * (3 in 15 minutes per account) and a new start stops the previous code; sign-in requests by anyone
+ * else for the account's address touch neither.
  */
 export function startEmailChange(deps: AppDeps, user: UserRow, session: SessionRow, newEmail: string): { cookie: string } {
   assertEmailChangeAllowed(deps);
@@ -498,13 +517,13 @@ export function confirmEmailChange(deps: AppDeps, user: UserRow, session: Sessio
   const now = deps.now();
   const checked = tx(deps.db, () => {
     if (!pending) return { ok: false as const, attemptsLeft: 0 };
-    const c = checkCode(deps, emailChangeBinding(session, pending), code);
+    const c = checkCode(deps, 'email_change', emailChangeBinding(session, pending), code);
     if (!c.row) return { ok: false as const, attemptsLeft: c.attemptsLeft ?? 0 };
     deps.db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, c.row.id)).run();
     const oldEmail = getUser(deps.db, user.id).email;
     applyEmailChange(deps.db, user.id, pending.email, now, now);
     // The owner proved the new mailbox: the wrong-code count starts again.
-    deps.db.delete(authAttempts).where(eq(authAttempts.key, codeKey(user.id))).run();
+    deps.db.delete(authAttempts).where(eq(authAttempts.key, codeKey('email_change', user.id))).run();
     revokeAllUserSessions(deps.db, user.id, now, session.id);
     revokeAllUserMcpTokens(deps.db, actorFor(user), user.id, now, 'email_change');
     audit(deps.db, actorFor(user), { action: 'auth.email_change', entity: 'user', entityId: user.id, before: { email: oldEmail }, after: { email: pending.email, verified: true } }, now);
@@ -513,6 +532,24 @@ export function confirmEmailChange(deps: AppDeps, user: UserRow, session: Sessio
   if (!checked.ok) throw new AppError('UNAUTHENTICATED', 'Wrong or expired code', { reason: 'SIGNIN_CODE_INVALID', attemptsLeft: checked.attemptsLeft });
   if (checked.oldEmail) sendQuietly(deps, checked.oldEmail, translate(user.locale, 'email.emailchanged.subject'), translate(user.locale, 'email.emailchanged.body', { name: user.displayName }));
   return meOf(deps, user.id, session.id);
+}
+
+/** `d***@school.example`: enough for the person to recognise the address they typed. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  return at < 1 ? '***' : `${email[0]}***${email.slice(at)}`;
+}
+
+/**
+ * The own address for Profile, and the masked new address of a change still waiting for its code in
+ * this browser (after a reload, Profile offers the code form again). Only through the PIN-gated
+ * `account` class, so a locked classroom screen never sees the address.
+ */
+export function emailChangeStatus(deps: AppDeps, user: UserRow, session: SessionRow, cookie: string | undefined) {
+  const pending = openPending(deps, user, session, cookie);
+  const live =
+    pending && activeToken(deps.db, 'email_change', eq(oneTimeTokens.bindingHash, hashOf(deps, 'bind', emailChangeBinding(session, pending))), deps.now());
+  return { email: user.email, pendingTo: live && live.userId === user.id && live.codeAttempts < CODE_MAX_ATTEMPTS ? maskEmail(pending.email) : null };
 }
 
 export function meOf(deps: AppDeps, userId: string, sessionId: string) {

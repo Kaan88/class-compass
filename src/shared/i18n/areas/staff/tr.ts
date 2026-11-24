@@ -345,7 +345,7 @@ export const tr = {
   'profile.emailConfirm': 'Adresi değiştir',
   'profile.emailChanged': 'Adresiniz artık {email}. Burada oturumunuz açık kaldı; diğer cihazlarınızda oturum kapatıldı.',
   'profile.emailNoSmtp': 'Bu sunucuda e-posta ayarlanmamış; adresleri yöneticiniz değiştirir (Hesaplar → Düzenle).',
-  'profile.invitePending': 'Hesabınızın henüz şifresi yok. Şifre seçmek için e-postanızdaki davet bağlantısını açın. Bağlantı artık çalışmıyorsa yöneticinizden yeni bir davet göndermesini isteyin.',
+  'profile.passwordNotSet': 'Hesabınızın henüz şifresi yok. Şifre seçmek için e-postanızdaki davet bağlantısını açın. Bağlantı artık çalışmıyorsa yöneticinizden yeni bir davet göndermesini isteyin.',
   'profile.savePin': 'PIN kaydet',
   'classroom.activeClass': 'Etkin sınıf',
   'classroom.switchClass': 'Sınıf değiştir',
