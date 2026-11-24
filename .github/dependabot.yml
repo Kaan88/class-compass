@@ -7,6 +7,12 @@ updates:
     schedule: {interval: weekly, day: monday}
     open-pull-requests-limit: 5
     commit-message: {prefix: deps}
+    ignore:
+      # TypeScript 7: no released typescript-eslint accepts it (8.74.0 peer: typescript >=4.8.4 <6.1.0),
+      # so `npm ci` fails with ERESOLVE. Remove this entry once `npm view typescript-eslint
+      # peerDependencies` includes 7.x, then update both together and run check + build.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
