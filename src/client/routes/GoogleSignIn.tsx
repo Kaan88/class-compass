@@ -93,7 +93,8 @@ export function GoogleReturnPage({ state, code, denied }: { state: string | unde
         <AccountChooser
           accounts={choices}
           endpoint={Auth.chooseGoogleAccount}
-          onError={(err) => {
+          failedReason="GOOGLE_SIGNIN_FAILED"
+          onFailed={(err) => {
             setChoices(null);
             setError(errorText(t, err));
           }}

@@ -88,7 +88,8 @@ export function SsoReturnPage({ state, code, denied }: { state: string | undefin
         <AccountChooser
           accounts={choices}
           endpoint={Auth.chooseSsoAccount}
-          onError={(err) => {
+          failedReason="SSO_SIGNIN_FAILED"
+          onFailed={(err) => {
             setChoices(null);
             setError(errorText(t, err));
           }}

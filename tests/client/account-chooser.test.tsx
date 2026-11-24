@@ -37,16 +37,19 @@ const PAGES = [
   { name: 'the sign-in server', provider: 'sso', Page: SsoReturnPage, failed: 'error.SSO_SIGNIN_FAILED' },
 ] as const;
 
-/** A fake server: the completion answers the list; the choice answers `chosen` (a Me or an error). */
-function server(chosen: { status: number; body: unknown }) {
+type Answer = { status: number; body: unknown } | 'network';
+/** A fake server: the completion answers the list; the choices answer `chosen` in turn (a Me, an error, or no network). */
+function server(...chosen: Answer[]) {
   const sent: Array<{ url: string; body: unknown }> = [];
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
     sent.push({ url, body: JSON.parse(String(init.body)) });
-    const r = url.endsWith('/complete') ? { status: 200, body: { choose } } : chosen;
+    const r = url.endsWith('/complete') ? { status: 200, body: { choose } } : chosen.shift()!;
+    if (r === 'network') throw new TypeError('Failed to fetch');
     return new Response(JSON.stringify(r.body), { status: r.status, headers: { 'content-type': 'application/json' } });
   });
   return sent;
 }
+const refusal = (status: number, code: string, reason?: string) => ({ status, body: { error: { code, message: 'x', details: reason ? { reason } : undefined } } });
 
 function show(node: ReactNode, locale: Locale = 'en') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } });
@@ -101,5 +104,43 @@ describe.each(PAGES)('the account chooser after $name (S36, D-216)', ({ provider
     expect(document.body.textContent).toContain(en['auth.backToSignIn']);
     expect(document.body.textContent).toContain(en['signin.emailMe']);
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('takes the focus to the question when the list replaces "Loading…"', async () => {
+    server();
+    show(<Page state="fictional-state-0000000000" code="fictional-code" denied={false} />, 'tr');
+    await waitFor(() => expect(screen.getByText(tr['signin.chooseAccount'])).toBeTruthy());
+    const prompt = screen.getByText(tr['signin.chooseAccount']);
+    expect(document.activeElement).toBe(prompt);
+    expect(prompt.getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('a rate limit, no network or an account that can no longer be chosen keep the list: the error above it, the buttons usable', async () => {
+    const sent = server(refusal(429, 'RATE_LIMITED'), 'network', refusal(401, 'UNAUTHENTICATED', `${provider.toUpperCase()}_NO_ACCOUNT`), { status: 200, body: me });
+    show(<Page state="fictional-state-0000000000" code="fictional-code" denied={false} />);
+    await waitFor(() => expect(screen.getByText(en['signin.chooseAccount'])).toBeTruthy());
+    const teacher = () => screen.getByRole('button', { name: `Deniz Yıldız, ${en['role.teacher']}` }) as HTMLButtonElement;
+    const adminButton = () => screen.getByRole('button', { name: `Deniz Yıldız, ${en['role.admin']}` }) as HTMLButtonElement;
+
+    fireEvent.click(teacher());
+    await waitFor(() => expect(screen.getByText(en['error.RATE_LIMITED'])).toBeTruthy());
+    expect(screen.getByTestId('account-chooser')).toBeTruthy();
+    expect(teacher().disabled).toBe(false);
+    // The error stands above the buttons, inside the chooser.
+    const alert = screen.getByText(en['error.RATE_LIMITED']);
+    expect(alert.compareDocumentPosition(teacher()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(teacher());
+    await waitFor(() => expect(screen.queryByText(en['error.RATE_LIMITED'])).toBeNull());
+    await waitFor(() => expect(teacher().disabled).toBe(false));
+    expect(screen.getByTestId('account-chooser').querySelector('[role="alert"], .cc-alert')).toBeTruthy();
+
+    fireEvent.click(teacher());
+    await waitFor(() => expect(screen.getByText(en[`error.${provider.toUpperCase()}_NO_ACCOUNT` as keyof typeof en])).toBeTruthy());
+    expect(adminButton().disabled).toBe(false);
+
+    fireEvent.click(adminButton());
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(sent.filter((x) => x.url.endsWith('/choose'))).toHaveLength(4);
   });
 });
