@@ -19,7 +19,7 @@ import type { NotificationItem, NotificationSettingsView } from '../../../shared
 import { CATEGORY_MODULE, groupOf, NOTIFICATIONS_PAGE_MAX, snippetOf, type NotificationCategory, type NotificationSettings } from '../../../shared/notifications.ts';
 import { findRiskyWord } from '../../../shared/text/textQuality.ts';
 import type { Db } from '../../db/client.ts';
-import { evidence, goalEntries, goals, lessons, notifications, studentAchievements } from '../../db/schema.ts';
+import { evidence, goalEntries, goals, lessons, notifications, studentAchievements, teachingContexts } from '../../db/schema.ts';
 import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { getUserSetting, setUserSetting } from '../../lib/userSettings.ts';
@@ -141,9 +141,12 @@ function details(db: Db, rows: readonly NotificationRow[], teacherId: string): M
 }
 
 /** A lesson that ended by itself whose End Lesson can still be filled in now (S37, D-218), or null. */
-function fillInOf(ctx: RequestContext, lessonId: string | null): NotificationItem['fillIn'] {
+function fillInOf(ctx: RequestContext, lessonId: string | null, teacherId: string): NotificationItem['fillIn'] {
   const l = lessonId ? ctx.db.select().from(lessons).where(eq(lessons.id, lessonId)).get() : undefined;
   if (!l || !canFillIn(ctx.db, l, ctx.now())) return null;
+  // Only while the lesson's class+subject is still this teacher's (as the notices and `lessonFillIn`).
+  const owned = ctx.db.select({ id: teachingContexts.id }).from(teachingContexts).where(and(eq(teachingContexts.id, l.contextId), eq(teachingContexts.teacherId, teacherId), isNull(teachingContexts.endedAt))).get();
+  if (!owned) return null;
   return { lessonId: l.id, until: lessonFillInUntil(ctx.db, l) };
 }
 
@@ -175,7 +178,7 @@ export function listNotifications(ctx: RequestContext, input: In<typeof C.notifi
       snippet: d.snippet,
       label: d.label,
       gone: d.gone,
-      fillIn: row.category === 'lessonAutoEnded' ? fillInOf(ctx, row.entityId) : null,
+      fillIn: row.category === 'lessonAutoEnded' ? fillInOf(ctx, row.entityId, uid) : null,
     };
   });
   return { items, unread: unreadCount(ctx, uid), truncated: visible.length > page.length };

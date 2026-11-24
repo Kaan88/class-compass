@@ -12,6 +12,8 @@ export const lessonGoalLessonState: LessonStateContributor = {
   key: 'lessonGoal',
   stamp: (ctx, context, lesson) => (isModuleEnabled(ctx.db, context.id, 'lessonGoals') ? goalStamp(ctx.db, lesson) : 'off'),
   body: (ctx, context, lesson) => (lesson && isModuleEnabled(ctx.db, context.id, 'lessonGoals') ? goalState(ctx.db, lesson) : null),
+  // An ended lesson filled in later (S37, D-218): its goal as stored (a pure read).
+  endedBody: (db, context, lesson) => (isModuleEnabled(db, context.id, 'lessonGoals') ? goalState(db, lesson) : null),
 };
 
 /**

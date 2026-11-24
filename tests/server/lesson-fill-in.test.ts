@@ -68,7 +68,7 @@ describe('the fill-in window: until the end of the next school day (S37, D-218)'
     expect(n.autoEnded).toEqual([expect.objectContaining({ lessonId, fillInUntil: deadline, timezone: 'Europe/Istanbul' })]);
     expect(await lessonItems(s.teacherA)).toEqual([expect.objectContaining({ fillIn: { lessonId, until: deadline } })]);
     const f = await ok(fillIn(s.teacherA, lessonId));
-    expect(f).toMatchObject({ contextId: s.ctxA.id, className: '3-A', fillInUntil: deadline, notAvailable: [], state: { lesson: { id: lessonId, status: 'ended' }, today: { localDate: '2026-11-09' } } });
+    expect(f).toMatchObject({ contextId: s.ctxA.id, className: '3-A', fillInUntil: deadline, notAvailable: ['secretStudents'], state: { lesson: { id: lessonId, status: 'ended' }, today: { localDate: '2026-11-09' } } });
     expect(f.state.lesson.endSteps).toContain('reflection');
   });
 
@@ -150,7 +150,7 @@ describe('the fill-in window: until the end of the next school day (S37, D-218)'
     expect(f.notAvailable).toEqual(['secretStudents']);
     expect(f.state.lesson.endSteps).toContain('secretStudents');
     await at(Date.parse('2026-11-10T08:00:00Z'));
-    expect(await lateEnd(s.teacherA, lessonId)).toMatchObject({ ok: true, result: { notApplied: ['secretStudents'] } });
+    expect(await lateEnd(s.teacherA, lessonId, { secretStudents: {}, reflection: { rating: 3, note: null } })).toMatchObject({ ok: true, result: { notApplied: ['secretStudents'] } });
   });
 
   it('late offline commands keep the lesson’s own day: the next day they are refused although End Lesson is still open', async () => {
@@ -160,4 +160,90 @@ describe('the fill-in window: until the end of the next school day (S37, D-218)'
     expect(await cmd(s.teacherA, 'lesson.setStage', { ...ref(lessonId), stageIndex: 1 }, { ...ref(lessonId), clientTime: before })).toMatchObject({ ok: false, error: { reason: 'LESSON_ENDED' } });
     expect((await fillIn(s.teacherA, lessonId)).status).toBe(200);
   });
+
+  it('an End Lesson saved offline in time is applied when it arrives after the deadline; one saved after it is refused', async () => {
+    const lessonId = await forgotten('2026-11-06'); // Friday: open until Monday ends
+    const other = await forgotten('2026-11-06');
+    await at(Date.parse('2026-11-10T08:00:00Z')); // Tuesday: past the deadline
+    const savedFriday = Date.parse('2026-11-06T12:00:00Z');
+    expect(await cmd(s.teacherA, 'lesson.end', { ...ref(lessonId), steps: { reflection: { rating: 4, note: null } } }, { ...ref(lessonId), clientTime: savedFriday })).toMatchObject({ ok: true, result: { reflection: { rating: 4 } } });
+    const savedTuesday = Date.parse('2026-11-10T07:00:00Z');
+    expect(await cmd(s.teacherA, 'lesson.end', { ...ref(other), steps: {} }, { ...ref(other), clientTime: savedTuesday })).toMatchObject({ ok: false, error: { reason: 'LESSON_FILL_IN_CLOSED' } });
+    // A clientTime in the future or before the lesson is not trusted: the arrival decides.
+    expect(await cmd(s.teacherA, 'lesson.end', { ...ref(other), steps: {} }, { ...ref(other), clientTime: Date.parse('2026-11-01T07:00:00Z') })).toMatchObject({ ok: false, error: { reason: 'LESSON_FILL_IN_CLOSED' } });
+  });
+});
+
+/** Every table's row count and the assistant's rows as they are: a pure read changes none of it. */
+function snapshot() {
+  const tables = (env.db.$client.prepare("select name from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '__drizzle%'").all() as Array<{ name: string }>).map((t) => t.name);
+  const counts = Object.fromEntries(tables.map((t) => [t, (env.db.$client.prepare(`select count(*) as n from "${t}"`).get() as { n: number }).n]));
+  return { counts, assignments: env.db.$client.prepare('select * from assistant_assignments order by id').all(), audits: env.db.$client.prepare('select count(*) as n from audit_events').get() };
+}
+
+describe('the fill-in read is a pure read (S37, D-218)', () => {
+  async function filledInWithAssistant(change: (assistant: { id: string; fullName: string }) => Promise<void> | void) {
+    // The board's poll during the lesson plans the week (the live path), as in class.
+    const lessonId = await forgotten('2026-11-09', async () => {
+      await ok(s.teacherA.get(`/api/classroom/contexts/${s.ctxA.id}/lesson`));
+    });
+    const day = env.db.$client.prepare("select planned_student_id, actual_student_id from assistant_assignments where context_id = ? and local_date = '2026-11-09'").get(s.ctxA.id) as { planned_student_id: string; actual_student_id: string | null };
+    const id = day.actual_student_id ?? day.planned_student_id;
+    const fullName = (env.db.$client.prepare('select full_name from students where id = ?').get(id) as { full_name: string }).full_name;
+    await at(Date.parse('2026-11-10T07:00:00Z'));
+    await change({ id, fullName });
+    const before = snapshot();
+    const f = await ok(fillIn(s.teacherA, lessonId));
+    expect(snapshot()).toEqual(before);
+    return { f, assistant: { id, fullName } };
+  }
+
+  it("shows the lesson day's assistant as stored, no duties, nothing written", async () => {
+    const { f, assistant } = await filledInWithAssistant(() => {});
+    expect(f.state.assistant).toMatchObject({ localDate: '2026-11-09', assistant: { id: assistant.id }, responsibilities: [], checked: [], thanked: false });
+  });
+
+  it('the day’s assistant marked absent afterwards: still that day’s row as it is, nothing replaced', async () => {
+    const { f, assistant } = await filledInWithAssistant(async (a) => {
+      await ok(s.teacherA.put(`/api/teacher/classes/${s.c3a.id}/attendance`, { date: '2026-11-09', studentId: a.id, status: 'absent' }));
+    });
+    expect(f.state.assistant).toMatchObject({ localDate: '2026-11-09', assistant: { id: env.db.$client.prepare("select coalesce(actual_student_id, planned_student_id) as id from assistant_assignments where context_id = ? and local_date = '2026-11-09'").pluck().get(s.ctxA.id) } });
+    expect(assistant.id).toBeTruthy();
+  });
+
+  it('the day’s assistant erased since: no assistant, no thank-you, nothing written', async () => {
+    const { f } = await filledInWithAssistant(async (a) => {
+      await ok(s.admin.post(`/api/admin/students/${a.id}/deactivate`));
+      await ok(s.admin.post(`/api/admin/students/${a.id}/erase`, { confirm: a.fullName }));
+    });
+    expect(f.state.assistant).toMatchObject({ localDate: '2026-11-09', assistant: null });
+  });
+
+  it('a day without an assignment: no assistant (the thank-you is not offered) and none is invented', async () => {
+    const { f } = await filledInWithAssistant(() => {
+      env.db.$client.prepare("delete from assistant_assignments where context_id = ? and local_date = '2026-11-09'").run(s.ctxA.id);
+    });
+    expect(f.state.assistant).toMatchObject({ assistant: null, thanked: false });
+    expect(env.db.$client.prepare("select count(*) as n from assistant_assignments where local_date = '2026-11-09'").get()).toEqual({ n: 0 });
+  });
+});
+
+describe('Secret Students in a late End Lesson: never (S37, D-218)', () => {
+  for (const when of ['the same day', 'the next day'] as const) {
+    it(`a round revealed during the lesson, filled in ${when}: listed as not available, skipped, nothing changed`, async () => {
+      const lessonId = await forgotten('2026-11-09', async (id) => {
+        expect((await cmd(s.teacherA, 'secret.draw', ref(id), ref(id))).ok).toBe(true);
+        expect((await cmd(s.teacherA, 'secret.reveal', ref(id), ref(id))).ok).toBe(true);
+      });
+      if (when === 'the next day') await at(Date.parse('2026-11-10T07:00:00Z'));
+      const f = await ok(fillIn(s.teacherA, lessonId));
+      expect(f.notAvailable).toEqual(['secretStudents']);
+      const selections = () => env.db.$client.prepare('select s.* from secret_selections s join secret_rounds r on r.id = s.round_id where r.lesson_id = ? order by s.id').all(lessonId) as Array<{ id: string }>;
+      const before = selections();
+      expect(before.length).toBeGreaterThan(0);
+      const r = await lateEnd(s.teacherA, lessonId, { secretStudents: { outcomes: before.map((x) => ({ selectionId: x.id, outcome: 'goal_met' })) }, reflection: { rating: 2, note: null } });
+      expect(r).toMatchObject({ ok: true, result: { notApplied: ['secretStudents'], reflection: { rating: 2 } } });
+      expect(selections()).toEqual(before);
+    });
+  }
 });

@@ -458,6 +458,21 @@ export function todayDto(ctx: RequestContext, context: ContextRow): AssistantTod
   };
 }
 
+/**
+ * The assistant of a PAST lesson day as stored (S37, D-218: End Lesson filled in after the lesson ended
+ * by itself). A pure read, the same rows `endStep` uses: the day's assignment (`effective`, not on a
+ * closure day), whether it was thanked. Nothing is planned, replaced or refreshed (unlike `ensureToday`):
+ * a day without an assignment, or whose student was erased since, has no assistant, so no thank-you is
+ * offered. The duties are live commands of a running lesson: none here.
+ */
+export function lessonDayDto(db: Db, context: ContextRow, date: string): AssistantToday {
+  const closed = closedDatesBetween(db, date, date).has(date);
+  const row = closed ? undefined : getAssignment(db, context.id, date);
+  const who = row ? effective(row) : null;
+  const s = who ? studentsById(db, [who]).get(who) : undefined;
+  return { localDate: date, schoolDay: !closed, assistant: s ? studentDto(s) : null, responsibilities: [], thanked: Boolean(row?.thankedAt), checked: [], showPanel: moduleConfig(db, context.id, 'assistant').showPanel !== false };
+}
+
 export function todayAssistant(ctx: RequestContext, contextId: string): AssistantToday {
   const context = assertOwnsContext(ctx, contextId);
   if (!isModuleEnabled(ctx.db, context.id, 'assistant')) throw new AppError('FEATURE_DISABLED', 'Module assistant is turned off', { module: 'assistant' });

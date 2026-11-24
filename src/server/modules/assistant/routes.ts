@@ -12,6 +12,8 @@ export const assistantLessonState: LessonStateContributor = {
   key: 'assistant',
   stamp: (ctx, context) => (isModuleEnabled(ctx.db, context.id, 'assistant') ? svc.assistantStamp(ctx, context) : 'off'),
   body: (ctx, context) => (isModuleEnabled(ctx.db, context.id, 'assistant') ? svc.todayDto(ctx, context) : null),
+  // An ended lesson filled in later (S37, D-218): that day's row as it is, nothing ensured.
+  endedBody: (db, context, lesson) => (isModuleEnabled(db, context.id, 'assistant') ? svc.lessonDayDto(db, context, lesson.localDate) : null),
 };
 
 export function registerAssistantRoutes(app: FastifyInstance, deps: AppDeps) {

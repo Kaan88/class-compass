@@ -393,21 +393,6 @@ export function endStep(ctx: RequestContext, lesson: LessonRow, data: z.infer<ty
 }
 
 /**
- * A late End Lesson (S37, D-218): the reveal can still happen only when the lesson's close did not
- * already close its round unrevealed (`onLessonClose`). The pupils' cards stay unrevealed: revealing
- * them after the class has gone home would not be the moment the game is about.
- */
-export function canRevealLate(db: Db, lesson: LessonRow): boolean {
-  const closed = db
-    .select({ id: secretSelections.id })
-    .from(secretSelections)
-    .innerJoin(secretRounds, eq(secretRounds.id, secretSelections.roundId))
-    .where(and(eq(secretRounds.lessonId, lesson.id), eq(secretSelections.status, 'unrevealed_abandoned')))
-    .get();
-  return closed === undefined;
-}
-
-/**
  * Lesson close hook (D-010): a round that was never revealed (abandoned lesson, or the module was
  * switched off before End Lesson) is closed as `unrevealed_abandoned`. It still counts for the
  * rotation but is never shown as selected.

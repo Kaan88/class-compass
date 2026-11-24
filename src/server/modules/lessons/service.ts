@@ -68,6 +68,7 @@ export const lessonDayEnd = (db: Db, l: LessonRow): number => endOfLocalDay(l.lo
  * own day (`happenedWhileRunning`).
  */
 export function lessonFillInUntil(db: Db, l: LessonRow): number {
+  // Closures of every school year on purpose: a lesson on the last day of a year is followed by the next year's calendar.
   const closed = closedDatesBetween(db, addDays(l.localDate, 1), addDays(l.localDate, NEXT_SCHOOL_DAY_SEARCH_DAYS));
   return endOfLocalDay(nextSchoolDay(l.localDate, closed), effectiveTimezone(db, getClass(db, l.classId)));
 }
@@ -180,6 +181,12 @@ export interface LessonStateContributor {
   key: 'counters' | 'secret' | 'assistant' | 'grouping' | 'lessonGoal';
   stamp: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => string;
   body: (ctx: RequestContext, context: ContextRow, lesson: LessonRow | null) => unknown;
+  /**
+   * Optional (S37, D-218): the body for an ENDED lesson, read by End Lesson's steps when a lesson that
+   * ended by itself is filled in later (`lessonStateOf`). Must be a pure read of that lesson and its own
+   * day: no `ensure…`, no lazy creation, no settle, no audit. Omitted = null (no end step reads it).
+   */
+  endedBody?: (db: Db, context: ContextRow, lesson: LessonRow) => unknown;
 }
 const contributors: LessonStateContributor[] = [];
 export function registerLessonStateContributor(c: LessonStateContributor) {
@@ -355,13 +362,12 @@ export function lessonState(ctx: RequestContext, contextId: string) {
 
 /**
  * The lesson state of an ENDED lesson as End Lesson's steps read it (S37, D-218: filling in a lesson
- * that ended by itself, from the teacher area). The contributors see that lesson and its own day (the
- * clock is set to its end), so the assistant to thank is that day's, not today's; no ETag, no closure.
+ * that ended by itself, from the teacher area). A pure read: only the contributors' `endedBody` (that
+ * lesson and its own day as stored, e.g. the day's assistant row as it is), never their live `body`,
+ * which may create or refresh today's data. No ETag, no closure note.
  */
 export function lessonStateOf(ctx: RequestContext, context: ContextRow, cls: ClassRow, l: LessonRow) {
-  const at = l.endedAt ?? l.startedAt;
-  const dayCtx: RequestContext = { ...ctx, now: () => at };
-  const bodies = Object.fromEntries(contributors.map((c) => [c.key, c.body(dayCtx, context, l)]));
+  const bodies = Object.fromEntries(contributors.map((c) => [c.key, c.endedBody ? c.endedBody(ctx.db, context, l) : null]));
   return {
     lesson: lessonDto(ctx.db, l, ctx.now()),
     today: { localDate: l.localDate, weekday: weekdayOf(l.localDate), timezone: effectiveTimezone(ctx.db, cls), closure: null },
@@ -596,14 +602,20 @@ export function stillTeaching(ctx: RequestContext, p: P<'lesson.stillTeaching'>,
  * hooks already ran) and its "ended automatically" notice is gone.
  */
 function lateEnd(ctx: RequestContext, l: LessonRow, p: P<'lesson.end'>, meta: CommandMeta) {
-  // Until the end of the next school day, then closed for good (`lessonFillInUntil`).
-  if (!canFillIn(ctx.db, l, ctx.now())) throw new AppError('CONFLICT', 'The time to fill in End Lesson for this lesson is over', { reason: 'LESSON_FILL_IN_CLOSED' });
+  // Until the end of the next school day, then closed for good (`lessonFillInUntil`). An End Lesson
+  // saved in time on an offline device counts from when it was saved: its `clientTime`, when that is
+  // trustworthy (not before the lesson started, not in the future); otherwise the arrival time.
+  const at = meta.clientTime;
+  const savedAt = at !== undefined && at >= l.startedAt && at <= ctx.now() ? at : ctx.now();
+  if (!canFillIn(ctx.db, l, savedAt)) throw new AppError('CONFLICT', 'The time to fill in End Lesson for this lesson is over', { reason: 'LESSON_FILL_IN_CLOSED' });
   assertClassWritable(ctx.db, getClass(ctx.db, l.classId));
   const notApplied: string[] = [];
   for (const step of endStepsFor(ctx.db, l.contextId, l)) {
     const parsed = step.input.safeParse(p.steps[step.key] ?? {});
     if (!parsed.success) throw new AppError('VALIDATION', `Invalid input for step ${step.key}`, { reason: 'END_STEP_INVALID', step: step.key });
-    if (step.canApplyLate && !step.canApplyLate(ctx.db, l)) notApplied.push(step.key);
+    if (step.canApplyLate && !step.canApplyLate(ctx.db, l)) {
+      if (p.steps[step.key] !== undefined) notApplied.push(step.key);
+    }
     else step.apply(ctx, l, parsed.data);
   }
   const fresh = ctx.db.select().from(lessons).where(eq(lessons.id, l.id)).get()!;

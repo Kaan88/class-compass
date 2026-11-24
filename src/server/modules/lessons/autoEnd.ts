@@ -8,7 +8,8 @@
  * The notices are for the teacher of the lesson's class+subject (the only account that can end it,
  * `assertOwnsContext`), while that class+subject is still theirs.
  */
-import { and, desc, eq, isNotNull, isNull, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, isNull, type SQL } from 'drizzle-orm';
+import { addDays, localDate } from '../../../domain/dates.ts';
 import { autoEndAt, reminderDue } from '../../../shared/lessonLimits.ts';
 import type { LessonNotices } from '../../../shared/contracts/lessons.ts';
 import { lessons, teachingContexts } from '../../db/schema.ts';
@@ -22,6 +23,9 @@ import { lessonDayEnd, lessonFillInUntil, lessonStateOf, settleForRead, settleLe
 
 /** How often main.ts runs the sweep: a reminder or an end is at most this late while nobody reads. */
 export const LESSON_SWEEP_MS = 5 * 60_000;
+
+/** The notices look at lessons of the last this many days only (the fill-in window is a few days at most). */
+export const NOTICE_LOOKBACK_DAYS = 60;
 
 export interface SweepResult {
   ended: number;
@@ -71,7 +75,9 @@ export function lessonNotices(ctx: RequestContext): LessonNotices {
   }
   // Until Got it, a late End Lesson (which clears the mark) or the end of the fill-in window, whichever
   // comes first (no "Got it" needed then); lessons closed before S37 were abandoned, never marked.
-  const autoEnded = ownLessons(ctx, and(isNotNull(lessons.autoEndedAt), isNull(lessons.autoEndSeenAt)))
+  // Only recent lessons (NOTICE_LOOKBACK_DAYS): an old undismissed one is long closed, and every poll would scan its calendar.
+  const since = addDays(localDate(ctx.now(), 'UTC'), -NOTICE_LOOKBACK_DAYS);
+  const autoEnded = ownLessons(ctx, and(isNotNull(lessons.autoEndedAt), isNull(lessons.autoEndSeenAt), gte(lessons.localDate, since)))
     .orderBy(desc(lessons.endedAt))
     .all()
     .map(({ lesson: l }) => ({ l, fillInUntil: lessonFillInUntil(ctx.db, l) }))
