@@ -122,7 +122,7 @@ describe('the nonsense rules behave as before', () => {
         return !r.ok && r.reason === 'KEYBOARD_MASH';
       });
     expect(mashed).toEqual([]);
-  }, 120_000);
+  }, 60_000);
 
   it('the reasons that depend on the dictionary include mashing; the language check never does', () => {
     expect([...DICTIONARY_REASONS].sort()).toEqual(['FEW_VOWELS', 'KEYBOARD_MASH', 'LONG_WORD', 'UNKNOWN_WORDS']);
