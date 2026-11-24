@@ -8,6 +8,7 @@ import { cleanupExpiredExports } from './modules/maintenance/exports.ts';
 import { PICTURE_SWEEP_MS, sweepAvatarPictures } from './modules/avatars/pictures.ts';
 import { SOURCE_SWEEP_MS, sweepUnusedImportSources } from './modules/import/sweep.ts';
 import { LESSON_SWEEP_MS, sweepForgottenLessons } from './modules/lessons/autoEnd.ts';
+import { setSettleErrorReporter } from './modules/lessons/service.ts';
 import { runNotificationTick, TICK_MS as NOTIFICATION_TICK_MS } from './modules/notifications/digest.ts';
 import { migrateWithSnapshot, writeServerLock } from './ops/backup.ts';
 
@@ -59,11 +60,14 @@ const importSourceSweep = () => void sweepUnusedImportSources({ db, config, now 
 importSourceSweep();
 const importSourceSweepTimer = setInterval(importSourceSweep, SOURCE_SWEEP_MS);
 importSourceSweepTimer.unref();
-// Forgotten lessons (S37, D-218): the "still running" reminder, and the end LESSON_AUTO_END_AFTER_MS
-// after the start; at start-up and every 5 minutes. Every read of lesson state does the same lazily.
+// Forgotten lessons (S37, D-218): the "still running" reminder and the end by itself (shared/lessonLimits.ts),
+// at start-up and every 5 minutes. Every read of lesson state does the same lazily. One lesson that
+// fails is logged and the others are still settled.
+const logSettleError = (err: unknown, lessonId: string) => app.log.warn({ err, lessonId }, 'forgotten lesson settle failed');
+setSettleErrorReporter(logSettleError);
 const lessonSweep = () => {
   try {
-    sweepForgottenLessons({ db, config, now, mailer });
+    sweepForgottenLessons({ db, config, now, mailer }, logSettleError);
   } catch (err: unknown) {
     app.log.warn({ err }, 'forgotten lesson sweep failed');
   }

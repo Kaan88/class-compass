@@ -113,7 +113,7 @@ function markDigested(deps: Pick<AppDeps, 'db'>, covered: DigestContent['covered
 export function digestMail(locale: Locale, name: string, content: DigestContent, includeNames: boolean, link: string) {
   const T = (key: string, vars: Record<string, string | number> = {}) => translate(locale, key, vars);
   const lines = NOTIFICATION_CATEGORIES.filter((c) => content.byCategory[c]).map((c) => `- ${T(`notifications.category.${c}`)}: ${content.byCategory[c]}`);
-  const students = includeNames ? `${T('notifications.digest.byStudent')}\n${content.byStudent.map((s) => `- ${s.fullName}: ${s.count}`).join('\n')}\n\n` : '';
+  const students = includeNames && content.byStudent.length > 0 ? `${T('notifications.digest.byStudent')}\n${content.byStudent.map((s) => `- ${s.fullName}: ${s.count}`).join('\n')}\n\n` : '';
   return {
     subject: T('notifications.digest.subject', { count: content.total }),
     text: T('notifications.digest.body', { name, lines: lines.join('\n'), students, link }),

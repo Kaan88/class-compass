@@ -6,15 +6,16 @@
  * A lesson left active past the end of its local day is abandoned (not ended, data kept) when the
  * next lesson starts in that context.
  *
- * Forgotten lessons (S37, D-218): a lesson still running LESSON_AUTO_END_AFTER_MS after its start is
- * ended by the server (`settleLesson`, called by every read of lesson state and by the sweep in
- * main.ts), with the system as actor. Only what needs no person is done: the lesson is closed, its
- * timer stopped, the close hooks run. No End Lesson step runs, so the reflection, the Secret Student
- * reveal, the goal answer and the assistant's thank-you stay "not recorded".
+ * Forgotten lessons (S37, D-218): a lesson nobody ended ends by itself once it is old enough and has
+ * been quiet long enough, or at the end of its local day (`shared/lessonLimits.ts`). `settleLesson`
+ * does it, called by every read of lesson state and by the sweep in main.ts, with the system as actor.
+ * Only what needs no person is done: the lesson is closed at its last activity, its timer stopped, the
+ * close hooks run. No End Lesson step runs; a teacher's End Lesson that arrives later still applies
+ * its steps (`lateEnd`). Every accepted lesson command marks activity (`lessonForCommand`).
  */
 import { and, eq, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
-import { localDate, weekdayOf } from '../../../domain/dates.ts';
+import { endOfLocalDay, localDate, weekdayOf } from '../../../domain/dates.ts';
 import { clampStage } from '../../../domain/routines.ts';
 import { idleTimer, type TimerState } from '../../../domain/timer.ts';
 import type { AssistantToday } from '../../../shared/contracts/assistant.ts';
@@ -23,13 +24,13 @@ import type { GroupingLessonState } from '../../../shared/contracts/grouping.ts'
 import type { LessonGoalState } from '../../../shared/contracts/lessonGoals.ts';
 import type { SecretLessonState } from '../../../shared/contracts/secret.ts';
 import type { LessonCommands, LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
-import { AUTO_END_NOTICE_MS, autoEndAt, reminderAt } from '../../../shared/lessonLimits.ts';
+import { autoEndAt, lastActivityOf, reminderDue } from '../../../shared/lessonLimits.ts';
 import { lessons, subjects, teachingContexts } from '../../db/schema.ts';
 import { tx, type Db } from '../../db/client.ts';
 import { audit } from '../../lib/audit.ts';
 import type { CommandMeta } from '../../lib/commands.ts';
 import { requireUser, type Actor, type AppDeps, type RequestContext } from '../../lib/context.ts';
-import { notify } from '../../lib/notify.ts';
+import { notify, resolveNotifications } from '../../lib/notify.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { attendanceStamp, dailyFor, lessonAttendanceCounts, markAllPresentCore, rosterWithAttendance, setDailyCore } from '../attendance/service.ts';
 import { closureOn } from '../school/closures.ts';
@@ -53,7 +54,10 @@ export function getActiveLesson(db: Db, contextId: string): LessonRow | undefine
 /** Active, and started on the class's current local day (a lesson from yesterday is not resumed). */
 const isCurrent = (deps: Pick<RequestContext, 'db' | 'now'>, lesson: LessonRow, cls: ClassRow) => lesson.localDate >= todayFor(deps, cls);
 
-export function lessonDto(db: Db, l: LessonRow): LessonState {
+/** The end of the local day a lesson started on, in its class's timezone (the automatic end's cap). */
+export const lessonDayEnd = (db: Db, l: LessonRow): number => endOfLocalDay(l.localDate, effectiveTimezone(db, getClass(db, l.classId)));
+
+export function lessonDto(db: Db, l: LessonRow, now: number): LessonState {
   return {
     id: l.id,
     contextId: l.contextId,
@@ -70,8 +74,8 @@ export function lessonDto(db: Db, l: LessonRow): LessonState {
     topics: l.topicsJson.map((t) => ({ id: t.id, name: t.name, icon: (t.icon as LessonState['topics'][number]['icon']) ?? null })),
     display: { assistantVisible: l.displayJson.assistantVisible ?? null },
     endSteps: endStepsFor(db, l.contextId, l).map((s) => s.key),
-    overdue: l.status === 'active' && l.remindedAt !== null,
-    autoEndAt: autoEndAt(l.startedAt),
+    overdue: l.status === 'active' && reminderDue(l, now),
+    autoEndAt: autoEndAt(l, lessonDayEnd(db, l)),
   };
 }
 
@@ -99,11 +103,41 @@ export function lessonForCommand(ctx: RequestContext, p: { contextId: string; le
   if (!lesson || lesson.id !== p.lessonId) {
     const other = ctx.db.select().from(lessons).where(eq(lessons.id, p.lessonId)).get();
     if (other && other.contextId === context.id && other.status !== 'active') {
+      if (happenedWhileRunning(ctx, other, cls, meta)) return { context, cls, lesson: lateTarget(ctx, other, meta.clientTime!) };
       throw new AppError('CONFLICT', 'This lesson has already ended', { reason: 'LESSON_ENDED' });
     }
     wrongLesson();
   }
-  return { context, cls, lesson };
+  // Something happened in the lesson (S37, D-218): it is in use. No version bump (nothing on screen changes).
+  ctx.db.update(lessons).set({ lastActivityAt: ctx.now() }).where(eq(lessons.id, lesson.id)).run();
+  return { context, cls, lesson: { ...lesson, lastActivityAt: ctx.now() } };
+}
+
+/**
+ * For commands that only make sense while the lesson runs (the Secret Student game, whose round the
+ * close already settled): a late offline command is refused with LESSON_ENDED, as before S37.
+ */
+export function assertLessonRunning(l: LessonRow): void {
+  if (l.status !== 'active') throw new AppError('CONFLICT', 'This lesson has already ended', { reason: 'LESSON_ENDED' });
+}
+
+/**
+ * A command queued on an offline device and sent after the lesson ended (S37, D-218): accepted when
+ * the device made it while the lesson ran (its `clientTime` before the end: for an automatic end, before
+ * the server wrote it, since the server could not know about the device's work), on the lesson's own
+ * local day and not in the future. An abandoned lesson accepts nothing.
+ */
+function happenedWhileRunning(ctx: RequestContext, l: LessonRow, cls: ClassRow, meta: CommandMeta): boolean {
+  const at = meta.clientTime;
+  if (at === undefined || l.status !== 'ended' || l.endedAt === null || at > ctx.now()) return false;
+  const end = l.autoEndedAt ?? l.endedAt;
+  return at < end && localDate(at, effectiveTimezone(ctx.db, cls)) === l.localDate;
+}
+
+/** An automatically ended lesson in which a late command happened ends no earlier than that command. */
+function lateTarget(ctx: RequestContext, l: LessonRow, at: number): LessonRow {
+  if (l.autoEndedAt === null || l.endedAt === null || at <= l.endedAt) return l;
+  return updateLesson(ctx, l, { endedAt: at, lastActivityAt: at });
 }
 
 /** Apply a change to the lesson row and bump its version (ETag for polling). */
@@ -160,6 +194,15 @@ const runCloseHooks = (ctx: RequestContext, lesson: LessonRow, outcome: 'ended' 
 // ---------------------------------------------------------------- forgotten lessons (S37, D-218)
 const SYSTEM: Actor = { type: 'system', id: null };
 
+/** Where a settle that failed is reported (main.ts points it at the server log). */
+let reportSettleError: (err: unknown, lessonId: string) => void = (err, lessonId) => console.error(`lesson ${lessonId}: settle failed`, err);
+export function setSettleErrorReporter(fn: (err: unknown, lessonId: string) => void) {
+  reportSettleError = fn;
+}
+
+/** The notices about a lesson that is closed now are done: the bell keeps them as read (no dead "End lesson" link). */
+const closeLessonNotices = (deps: AppDeps, lessonId: string, categories: Array<'lessonStillRunning' | 'lessonAutoEnded'>) => resolveNotifications(deps, { categories, entityId: lessonId });
+
 /** A context for work the server does by itself (the automatic end): the system is the actor. */
 export const systemContext = (deps: AppDeps): RequestContext => ({ ...deps, ip: 'system', session: null, user: null, student: null, actor: SYSTEM });
 
@@ -168,45 +211,80 @@ function stoppedTimer(t: TimerState, at: number): TimerState {
   return { ...t, running: false, startedAt: null, remainingMs: t.running ? Math.max(0, t.remainingMs - Math.max(0, at - (t.startedAt ?? at))) : t.remainingMs };
 }
 
+type Due = 'abandon' | 'end' | 'remind' | null;
+
+/** What the clock asks of an active lesson now (reads only). */
+function dueFor(db: Db, l: LessonRow, now: number): Due {
+  if (l.status !== 'active') return null;
+  const tz = effectiveTimezone(db, getClass(db, l.classId));
+  // Started before S37 (no activity column) on an earlier day: closed exactly as the old code did at the
+  // next start, abandoned, never a held lesson and never a notice (the first deploy).
+  if (l.lastActivityAt === null && l.localDate < localDate(now, tz)) return 'abandon';
+  if (now >= autoEndAt(l, endOfLocalDay(l.localDate, tz))) return 'end';
+  if (l.remindedAt === null && reminderDue(l, now)) return 'remind';
+  return null;
+}
+
 /**
- * Brings one lesson up to date with the clock (S37, D-218): past its limit it is ended by the server,
- * past the reminder point the reminder goes out once. Returns the lesson as it is afterwards. Its own
- * transaction (a savepoint inside a command), reading the row again inside it, so a sweep, a poll and a
- * teacher's End Lesson never end a lesson twice: whoever comes second sees it closed.
+ * Brings one lesson up to date with the clock (S37, D-218). The row's clock values are checked first
+ * and a write transaction is opened only when something is due (a poll of a lesson in use writes
+ * nothing). Inside it the row is read again, so a sweep, a poll and a teacher's End Lesson never close
+ * a lesson twice: whoever comes second sees it closed. Writes to a lesson of an archived class or year
+ * without `assertClassWritable` on purpose: closing must work there too (DAT-1 is about people's edits).
  */
-export function settleLesson(deps: AppDeps, lessonId: string): LessonRow | null {
+export function settleLesson(deps: AppDeps, row: LessonRow | string): LessonRow | null {
+  const first = typeof row === 'string' ? deps.db.select().from(lessons).where(eq(lessons.id, row)).get() : row;
+  if (!first || !dueFor(deps.db, first, deps.now())) return first ?? null;
   return tx(deps.db, () => {
-    const lesson = deps.db.select().from(lessons).where(eq(lessons.id, lessonId)).get();
-    if (!lesson || lesson.status !== 'active') return lesson ?? null;
+    const lesson = deps.db.select().from(lessons).where(eq(lessons.id, first.id)).get()!;
     const now = deps.now();
+    const due = dueFor(deps.db, lesson, now);
     const ctx = systemContext(deps);
-    const endAt = autoEndAt(lesson.startedAt);
-    if (now >= endAt) {
+    if (due === 'abandon') {
+      const abandoned = updateLesson(ctx, lesson, { status: 'abandoned', timerJson: stoppedTimer(lesson.timerJson, now) });
+      runCloseHooks(ctx, abandoned, 'abandoned');
+      audit(deps.db, SYSTEM, { action: 'lesson.abandon', entity: 'lesson', entityId: lesson.id, after: { localDate: lesson.localDate, reason: 'before_auto_end' } }, now);
+      closeLessonNotices(deps, lesson.id, ['lessonStillRunning']);
+      return abandoned;
+    }
+    if (due === 'end') {
       // Nothing that needs a person is done: no End Lesson step runs, so what they record stays empty.
+      // Ended at the last activity, the honest end of teaching.
+      const endAt = Math.min(now, lastActivityOf(lesson));
       const skipped = endStepsFor(deps.db, lesson.contextId, lesson).map((s) => s.key);
       const ended = updateLesson(ctx, lesson, { status: 'ended', endedAt: endAt, autoEndedAt: now, timerJson: stoppedTimer(lesson.timerJson, endAt) });
       runCloseHooks(ctx, ended, 'ended');
       audit(deps.db, SYSTEM, { action: 'lesson.auto_end', entity: 'lesson', entityId: lesson.id, after: { contextId: lesson.contextId, localDate: lesson.localDate, endedAt: endAt, stageReached: ended.stageIndex, skippedSteps: skipped } }, now);
-      // A lesson forgotten long before this rule existed is closed quietly (still audited).
-      if (now - endAt <= AUTO_END_NOTICE_MS) notify(deps, { category: 'lessonAutoEnded', studentId: null, subjectId: null, contextId: lesson.contextId, entity: 'lesson', entityId: lesson.id });
+      closeLessonNotices(deps, lesson.id, ['lessonStillRunning']);
+      notify(deps, { category: 'lessonAutoEnded', studentId: null, subjectId: null, contextId: lesson.contextId, entity: 'lesson', entityId: lesson.id });
       return ended;
     }
-    if (now >= reminderAt(lesson.startedAt) && lesson.remindedAt === null) {
-      // The version bump changes the ETag, so a polling board shows its note at once.
-      const reminded = updateLesson(ctx, lesson, { remindedAt: now });
+    if (due === 'remind') {
+      // The notification goes out once per lesson; the note on screen follows the clock (in the ETag).
+      deps.db.update(lessons).set({ remindedAt: now }).where(eq(lessons.id, lesson.id)).run();
       notify(deps, { category: 'lessonStillRunning', studentId: null, subjectId: null, contextId: lesson.contextId, entity: 'lesson', entityId: lesson.id });
-      return reminded;
+      return { ...lesson, remindedAt: now };
     }
     return lesson;
   });
 }
 
-/** The context's running lesson after `settleLesson` (undefined when there is none, or it just ended). */
+/** `settleLesson` for a read: a failure is reported and the lesson served as it is, never a 500. */
+export function settleForRead(deps: AppDeps, row: LessonRow): LessonRow {
+  try {
+    return settleLesson(deps, row) ?? row;
+  } catch (err) {
+    reportSettleError(err, row.id);
+    return row;
+  }
+}
+
+/** The context's running lesson after settling (undefined when there is none, or it just closed). */
 function activeSettled(deps: AppDeps, contextId: string): LessonRow | undefined {
   const active = getActiveLesson(deps.db, contextId);
   if (!active) return undefined;
-  const settled = settleLesson(deps, active.id);
-  return settled?.status === 'active' ? settled : undefined;
+  const settled = settleForRead(deps, active);
+  return settled.status === 'active' ? settled : undefined;
 }
 
 // ---------------------------------------------------------------- reads
@@ -223,12 +301,14 @@ export function lessonState(ctx: RequestContext, contextId: string) {
   const extra = contributors.map((c) => c.stamp(ctx, context, lesson)).join('.');
   // Today's closure (holiday calendar, D-186) is in the ETag, so a holiday added for today shows its note.
   const closure = closureOn(ctx.db, cls.schoolYearId, today);
-  const etag = `"${lesson ? `${lesson.id}.${lesson.version}` : 'none'}.${today}.${stamp}.${extra}.${closure ? `c-${closure.id}-${closure.updatedAt}` : 'open'}"`;
+  const dto = lesson ? lessonDto(ctx.db, lesson, now) : null;
+  // The reminder follows the clock and the last activity, not the version (S37, D-218): it is in the ETag.
+  const etag = `"${lesson ? `${lesson.id}.${lesson.version}.${dto!.overdue ? 'o' : 'r'}.${dto!.autoEndAt}` : 'none'}.${today}.${stamp}.${extra}.${closure ? `c-${closure.id}-${closure.updatedAt}` : 'open'}"`;
   const bodies = Object.fromEntries(contributors.map((c) => [c.key, c.body(ctx, context, lesson)]));
   return {
     etag,
     body: {
-      lesson: lesson ? lessonDto(ctx.db, lesson) : null,
+      lesson: dto,
       today: { localDate: today, weekday: weekdayOf(today), timezone: tz, closure: closure ? { name: closure.name } : null },
       serverNow: now,
       attendanceStamp: stamp,
@@ -250,7 +330,7 @@ export function activeLessons(ctx: RequestContext) {
     .all();
   return {
     lessons: rows
-      .map(({ lesson }) => ({ lesson: settleLesson(ctx, lesson.id) ?? lesson }))
+      .map(({ lesson }) => ({ lesson: settleForRead(ctx, lesson) }))
       .filter(({ lesson }) => lesson.status === 'active' && isCurrent(ctx, lesson, getClass(ctx.db, lesson.classId)))
       .map(({ lesson }) => ({ contextId: lesson.contextId, lessonId: lesson.id, startedAt: lesson.startedAt, stageIndex: lesson.stageIndex, stageCount: lesson.routineSnapshotJson.length })),
   };
@@ -339,6 +419,7 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
     // Left running past the end of its day: abandon it (keep its data) and start fresh.
     const abandoned = updateLesson(ctx, existing, { status: 'abandoned', timerJson: { ...existing.timerJson, running: false, startedAt: null } });
     runCloseHooks(ctx, abandoned, 'abandoned');
+    closeLessonNotices(ctx, existing.id, ['lessonStillRunning']);
     audit(ctx.db, ctx.actor, { action: 'lesson.abandon', entity: 'lesson', entityId: existing.id, after: { localDate: existing.localDate, reason: 'next_day' }, opId: meta.opId }, now);
   }
   const tid = requireUser(ctx).id;
@@ -369,6 +450,7 @@ export function startLesson(ctx: RequestContext, p: P<'lesson.start'>, meta: Com
     classNameSnapshot: cls.name,
     subjectNameSnapshot: subject?.name ?? {},
     updatedAt: now,
+    lastActivityAt: now,
     autoEndedAt: null,
     remindedAt: null,
     autoEndSeenAt: null,
@@ -439,20 +521,52 @@ export function setDisplay(ctx: RequestContext, p: P<'lesson.setDisplay'>, meta:
 
 export function changeTimer(ctx: RequestContext, p: { contextId: string; lessonId: string }, meta: CommandMeta, fn: (t: TimerState, now: number) => TimerState) {
   const { lesson } = lessonForCommand(ctx, p, meta);
+  // A timer tap that arrives after the lesson ended (S37, D-218: queued offline) changes nothing.
+  if (lesson.status !== 'active') return { timer: lesson.timerJson, version: lesson.version };
   const timer = fn(lesson.timerJson, ctx.now());
   const next = updateLesson(ctx, lesson, { timerJson: timer });
   return { timer, version: next.version };
 }
 
+/** "Still teaching" (S37, D-218): the reminder's button, and End Lesson while it is open. Activity only. */
+export function stillTeaching(ctx: RequestContext, p: P<'lesson.stillTeaching'>, meta: CommandMeta) {
+  const { lesson } = lessonForCommand(ctx, p, meta);
+  return { active: lesson.status === 'active' };
+}
+
+/**
+ * End Lesson on a lesson the server already ended (S37, D-218): what the teacher answered is kept.
+ * Every step runs where it still can; a step that declares `canApplyLate` and answers false (the Secret
+ * Student round was closed unrevealed) is skipped and named in `notApplied`. The lesson then counts as
+ * ended by the teacher (the automatic mark is cleared, `endedAt` stays the last activity, the close
+ * hooks already ran) and its "ended automatically" notice is gone.
+ */
+function lateEnd(ctx: RequestContext, l: LessonRow, p: P<'lesson.end'>, meta: CommandMeta) {
+  assertClassWritable(ctx.db, getClass(ctx.db, l.classId));
+  const notApplied: string[] = [];
+  for (const step of endStepsFor(ctx.db, l.contextId, l)) {
+    const parsed = step.input.safeParse(p.steps[step.key] ?? {});
+    if (!parsed.success) throw new AppError('VALIDATION', `Invalid input for step ${step.key}`, { reason: 'END_STEP_INVALID', step: step.key });
+    if (step.canApplyLate && !step.canApplyLate(ctx.db, l)) notApplied.push(step.key);
+    else step.apply(ctx, l, parsed.data);
+  }
+  const fresh = ctx.db.select().from(lessons).where(eq(lessons.id, l.id)).get()!;
+  const ended = updateLesson(ctx, fresh, { autoEndedAt: null, autoEndSeenAt: null });
+  audit(ctx.db, ctx.actor, { action: 'lesson.end', entity: 'lesson', entityId: l.id, after: { stageReached: ended.stageIndex, reflection: ended.reflectionJson?.rating ?? null, late: true, autoEndedAt: l.autoEndedAt, notApplied }, opId: meta.opId }, ctx.now());
+  closeLessonNotices(ctx, l.id, ['lessonStillRunning', 'lessonAutoEnded']);
+  return { ...summaryOf(ctx.db, ended), notApplied };
+}
+
 export function endLesson(ctx: RequestContext, p: P<'lesson.end'>, meta: CommandMeta) {
-  // The server ended it first (S37, D-218): the teacher's End Lesson is not an error and changes
-  // nothing (no step runs on a closed lesson); the summary says it ended by itself.
-  const auto = ctx.db.select().from(lessons).where(eq(lessons.id, p.lessonId)).get();
-  if (auto && auto.autoEndedAt !== null && auto.contextId === p.contextId && (!meta.lessonId || meta.lessonId === p.lessonId) && (!meta.contextId || meta.contextId === p.contextId)) {
+  if ((meta.contextId && meta.contextId !== p.contextId) || (meta.lessonId && meta.lessonId !== p.lessonId)) wrongLesson();
+  const prior = ctx.db.select().from(lessons).where(eq(lessons.id, p.lessonId)).get();
+  if (prior && prior.autoEndedAt !== null && prior.contextId === p.contextId) {
     assertOwnsContext(ctx, p.contextId);
-    return summaryOf(ctx.db, auto);
+    return lateEnd(ctx, prior, p, meta);
   }
   const { lesson } = lessonForCommand(ctx, p, meta);
+  // A second End Lesson queued offline for a lesson a teacher already ended keeps its old answer.
+  if (lesson.status !== 'active') throw new AppError('CONFLICT', 'This lesson has already ended', { reason: 'LESSON_ENDED' });
   // Module steps first (S7: Secret Student reveal/outcomes, assistant thanks), then the core reflection (LES-3).
   for (const step of endStepsFor(ctx.db, lesson.contextId, lesson)) {
     const parsed = step.input.safeParse(p.steps[step.key] ?? {});
@@ -464,5 +578,6 @@ export function endLesson(ctx: RequestContext, p: P<'lesson.end'>, meta: Command
   const ended = updateLesson(ctx, fresh, { status: 'ended', endedAt: now, timerJson: stoppedTimer(fresh.timerJson, now) });
   runCloseHooks(ctx, ended, 'ended');
   audit(ctx.db, ctx.actor, { action: 'lesson.end', entity: 'lesson', entityId: lesson.id, after: { stageReached: ended.stageIndex, reflection: ended.reflectionJson?.rating ?? null }, opId: meta.opId }, now);
+  closeLessonNotices(ctx, lesson.id, ['lessonStillRunning']);
   return summaryOf(ctx.db, ended);
 }

@@ -12,6 +12,7 @@
  * about the same record (a student editing one goal five times is one line with a count of 5).
  */
 import { and, eq, inArray, isNull } from 'drizzle-orm';
+import type { NotificationCategory } from '../../../shared/notifications.ts';
 import { localDate } from '../../../domain/dates.ts';
 import { CATEGORY_MODULE, categoryOn, isAggregate } from '../../../shared/notifications.ts';
 import { classes, notifications, subjects, teachingContexts, users } from '../../db/schema.ts';
@@ -120,4 +121,14 @@ export function writeNotifications(deps: NotifyDeps, e: NotifyEvent): void {
       })
       .run();
   }
+}
+
+/** The resolver behind `resolveNotifications` (S37, D-218): unread notices about a closed record become read. */
+export function resolveRows(deps: NotifyDeps, which: { categories: readonly NotificationCategory[]; entityId: string }): void {
+  if (which.categories.length === 0) return;
+  deps.db
+    .update(notifications)
+    .set({ readAt: deps.now() })
+    .where(and(eq(notifications.entityId, which.entityId), inArray(notifications.category, [...which.categories]), isNull(notifications.readAt)))
+    .run();
 }

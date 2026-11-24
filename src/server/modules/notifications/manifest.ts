@@ -6,6 +6,6 @@
  */
 import { defineServerModule } from '../manifest.ts';
 import { registerNotificationRoutes } from './routes.ts';
-import { writeNotifications } from './writer.ts';
+import { resolveRows, writeNotifications } from './writer.ts';
 
-export const notificationsManifest = defineServerModule({ key: 'notifications', policyKey: null, routes: registerNotificationRoutes, notificationSink: writeNotifications });
+export const notificationsManifest = defineServerModule({ key: 'notifications', policyKey: null, routes: registerNotificationRoutes, notificationSink: writeNotifications, notificationResolver: resolveRows });

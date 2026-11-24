@@ -1,22 +1,31 @@
 /**
- * How long a forgotten lesson may run (S37, D-218). A lesson has no planned end or length in the data
- * model (only `startedAt`; the timer is a countdown the teacher sets for a task, not the lesson), so both
- * limits count from the start:
+ * When a forgotten lesson ends itself (S37, D-218). A lesson has no planned end or length in the data
+ * model (only `startedAt`; the timer is a countdown for a task, not the lesson), and a lesson in use must
+ * never be cut off (owner's decision), so the rule combines its age with how long nothing has happened
+ * in it (`lastActivityAt`: every accepted lesson command, "Still teaching", End Lesson open):
  *
- * - after LESSON_REMINDER_AFTER_MS the teacher home and the classroom board say the lesson is still
- *   running, and one "still running" notification goes out. 90 minutes: a double lesson (2 × 40 minutes)
- *   with its short break is over by then, so a lesson that is really being taught is not interrupted;
- * - after LESSON_AUTO_END_AFTER_MS the server ends it (the teacher's request: "within 2 hours"); its
- *   `endedAt` is that moment, whenever the server notices, so its length is never more than the limit.
- *
- * Notices about lessons ended automatically more than AUTO_END_NOTICE_MS ago are not shown or sent
- * (a lesson left running for weeks before this rule existed is closed quietly, still audited).
+ * - reminder: at least LESSON_REMINDER_AFTER_MS old AND quiet for LESSON_REMINDER_QUIET_MS. The teacher
+ *   home and the board then say it is still running (with "Still teaching"); the notification goes out
+ *   once per lesson. 90 minutes: a double lesson (2 × 40 minutes and a break) is over by then;
+ * - automatic end: at least LESSON_AUTO_END_AFTER_MS old AND quiet for LESSON_IDLE_BEFORE_AUTO_END_MS,
+ *   or the end of the local day it started on (the class timezone), whichever comes first. Its
+ *   `endedAt` is the last activity: the honest end of teaching.
  */
 export const LESSON_REMINDER_AFTER_MS = 90 * 60_000;
+export const LESSON_REMINDER_QUIET_MS = 15 * 60_000;
 export const LESSON_AUTO_END_AFTER_MS = 2 * 60 * 60_000;
-export const AUTO_END_NOTICE_MS = 7 * 24 * 60 * 60_000;
+export const LESSON_IDLE_BEFORE_AUTO_END_MS = 30 * 60_000;
 
-/** When a lesson that started at `startedAt` ends by itself. */
-export const autoEndAt = (startedAt: number): number => startedAt + LESSON_AUTO_END_AFTER_MS;
-/** When the teacher is reminded that it is still running. */
-export const reminderAt = (startedAt: number): number => startedAt + LESSON_REMINDER_AFTER_MS;
+export interface LessonClock {
+  startedAt: number;
+  /** Null for a lesson started before S37: read as its start. */
+  lastActivityAt: number | null;
+}
+
+export const lastActivityOf = (l: LessonClock): number => l.lastActivityAt ?? l.startedAt;
+
+/** When the lesson ends by itself if nothing more happens; `dayEnd` = the end of its local day. */
+export const autoEndAt = (l: LessonClock, dayEnd: number): number => Math.min(dayEnd, Math.max(l.startedAt + LESSON_AUTO_END_AFTER_MS, lastActivityOf(l) + LESSON_IDLE_BEFORE_AUTO_END_MS));
+
+/** Is the "still running" reminder shown now? */
+export const reminderDue = (l: LessonClock, now: number): boolean => now >= l.startedAt + LESSON_REMINDER_AFTER_MS && now - lastActivityOf(l) >= LESSON_REMINDER_QUIET_MS;

@@ -41,3 +41,23 @@ export function addDays(date: string, n: number): string {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
+
+const WALL_OPTIONS = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' } as const;
+/** The wall-clock time of `ms` in `tz`, as if it were UTC (for offset arithmetic). */
+function wallClock(ms: number, tz: string): number {
+  const p = Object.fromEntries(dateTimeFormat('en-CA', { timeZone: tz, ...WALL_OPTIONS }).formatToParts(ms).map((x) => [x.type, x.value]));
+  return Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour) % 24, Number(p.minute), Number(p.second));
+}
+
+/** The instant local day `date` ends in `tz` (00:00 of the next local day; S37, D-218). */
+export function endOfLocalDay(date: string, tz: string): number {
+  const [y, m, d] = addDays(date, 1).split('-').map(Number) as [number, number, number];
+  const target = Date.UTC(y, m - 1, d);
+  let t = target;
+  for (let i = 0; i < 3; i += 1) {
+    const diff = wallClock(t, tz) - target;
+    if (diff === 0) break;
+    t -= diff;
+  }
+  return t;
+}

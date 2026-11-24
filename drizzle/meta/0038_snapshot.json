@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7d5004f3-c6b0-4e60-8d64-6ed52c1453e8",
+  "id": "033372fd-0ead-44d6-bcea-4174ed4de12c",
   "prevId": "78731382-2fea-484f-b3aa-81cf017f576d",
   "tables": {
     "achievement_definitions": {
@@ -5710,6 +5710,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "last_activity_at": {
+          "name": "last_activity_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "auto_ended_at": {

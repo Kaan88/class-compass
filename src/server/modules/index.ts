@@ -5,7 +5,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { registerActivityListener } from '../lib/activity.ts';
-import { registerNotificationSink } from '../lib/notify.ts';
+import { registerNotificationResolver, registerNotificationSink } from '../lib/notify.ts';
 import { defineCommand } from '../lib/commands.ts';
 import type { AppDeps } from '../lib/context.ts';
 import type { Db } from '../db/client.ts';
@@ -138,6 +138,7 @@ export function installModules(): void {
     for (const l of m.attendanceListeners ?? []) registerAttendanceListener(l);
     for (const l of m.activityListeners ?? []) registerActivityListener(l);
     if (m.notificationSink) registerNotificationSink(m.notificationSink);
+    if (m.notificationResolver) registerNotificationResolver(m.notificationResolver);
     if (m.config) {
       if (!m.policyKey) throw new Error(`Module ${m.key} has a config but no policy key`);
       // School-wide modules (D-127) keep their settings in their own tables, not per class+subject.

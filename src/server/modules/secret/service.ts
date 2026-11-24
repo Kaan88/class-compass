@@ -34,7 +34,7 @@ import { newId, randomToken } from '../../lib/crypto.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { rosterWithAttendance, type AttendanceChange } from '../attendance/service.ts';
 import type { LessonRow } from '../lessons/endSteps.ts';
-import { lessonForCommand, updateLesson } from '../lessons/service.ts';
+import { assertLessonRunning, lessonForCommand, updateLesson } from '../lessons/service.ts';
 import { assertModuleEnabled, isModuleEnabled, mergeModuleConfig, moduleConfig } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, getClass, todayFor, type ContextRow } from '../school/policy.ts';
 
@@ -201,6 +201,7 @@ const roundAudit = (r: RoundRow) => ({ lessonId: r.lessonId, roundId: r.id, requ
  */
 export function draw(ctx: RequestContext, p: P<'secret.draw'>, meta: CommandMeta): SecretDrawResult {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertLessonRunning(lesson);
   assertModuleEnabled(ctx.db, context.id, 'secretStudents');
   const existing = liveRound(ctx.db, lesson.id);
   if (existing) return drawResult(existing, false);
@@ -213,6 +214,7 @@ export function draw(ctx: RequestContext, p: P<'secret.draw'>, meta: CommandMeta
 /** 'secret.redraw' (explicit + confirmed): withdraw the sealed round (audited) and draw a new one. */
 export function redraw(ctx: RequestContext, p: P<'secret.redraw'>, meta: CommandMeta): SecretDrawResult {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertLessonRunning(lesson);
   assertModuleEnabled(ctx.db, context.id, 'secretStudents');
   const old = liveRound(ctx.db, lesson.id);
   if (old?.revealedAt) throw new AppError('CONFLICT', 'The secret students were already revealed', { reason: 'SECRET_ALREADY_REVEALED' });
@@ -328,6 +330,7 @@ function revealRound(ctx: RequestContext, round: RoundRow, opId: string | null):
 /** 'secret.reveal' (End Lesson, LES-3/SEC-5): reveals the live round of the active lesson and returns the names. */
 export function reveal(ctx: RequestContext, p: P<'secret.reveal'>, meta: CommandMeta): SecretReveal {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertLessonRunning(lesson);
   assertModuleEnabled(ctx.db, context.id, 'secretStudents');
   const round = liveRound(ctx.db, lesson.id);
   if (!round) throw new AppError('CONFLICT', 'No secret students were chosen in this lesson', { reason: 'NO_SECRET_ROUND' });
@@ -371,6 +374,7 @@ export function earnedSecretTurns(db: Db, studentId: string, contextId: string):
 /** 'secret.recordOutcome' (SEC-5): Goal met / Still practising (/ not assessed), optional note and celebration. */
 export function recordOutcome(ctx: RequestContext, p: P<'secret.recordOutcome'>, meta: CommandMeta) {
   const { context, lesson } = lessonForCommand(ctx, p, meta);
+  assertLessonRunning(lesson);
   assertModuleEnabled(ctx.db, context.id, 'secretStudents');
   const round = liveRound(ctx.db, lesson.id);
   if (!round?.revealedAt) throw new AppError('CONFLICT', 'Reveal the secret students first', { reason: 'SECRET_NOT_REVEALED' });
@@ -386,6 +390,21 @@ export function endStep(ctx: RequestContext, lesson: LessonRow, data: z.infer<ty
   if (!round) return;
   const revealed = revealRound(ctx, round, null);
   for (const o of data.outcomes ?? []) applyOutcome(ctx, revealed, o, null);
+}
+
+/**
+ * A late End Lesson (S37, D-218): the reveal can still happen only when the lesson's close did not
+ * already close its round unrevealed (`onLessonClose`). The pupils' cards stay unrevealed: revealing
+ * them after the class has gone home would not be the moment the game is about.
+ */
+export function canRevealLate(db: Db, lesson: LessonRow): boolean {
+  const closed = db
+    .select({ id: secretSelections.id })
+    .from(secretSelections)
+    .innerJoin(secretRounds, eq(secretRounds.id, secretSelections.roundId))
+    .where(and(eq(secretRounds.lessonId, lesson.id), eq(secretSelections.status, 'unrevealed_abandoned')))
+    .get();
+  return closed === undefined;
 }
 
 /**

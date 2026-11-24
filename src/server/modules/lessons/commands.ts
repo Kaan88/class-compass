@@ -5,7 +5,7 @@
 import { pauseTimer, resetTimer, setTimer, startTimer } from '../../../domain/timer.ts';
 import { LessonCommands } from '../../../shared/contracts/lessons.ts';
 import { command } from '../../lib/commands.ts';
-import { changeTimer, endLesson, setDisplay, setStage, setTopics, startLesson } from './service.ts';
+import { changeTimer, endLesson, setDisplay, setStage, setTopics, startLesson, stillTeaching } from './service.ts';
 
 /** Listed in the manifest; registered once by installModules() (D-069). */
 export const lessonCommands = [
@@ -16,6 +16,7 @@ export const lessonCommands = [
   command({ type: 'lesson.timer.reset', payload: LessonCommands['lesson.timer.reset'], handle: (ctx, p, meta) => changeTimer(ctx, p, meta, resetTimer) }),
   command({ type: 'lesson.timer.set', payload: LessonCommands['lesson.timer.set'], handle: (ctx, p, meta) => changeTimer(ctx, p, meta, () => setTimer(p.durationMs)) }),
   command({ type: 'lesson.end', payload: LessonCommands['lesson.end'], handle: (ctx, p, meta) => endLesson(ctx, p, meta) }),
+  command({ type: 'lesson.stillTeaching', payload: LessonCommands['lesson.stillTeaching'], handle: (ctx, p, meta) => stillTeaching(ctx, p, meta) }),
   command({ type: 'lesson.setTopics', payload: LessonCommands['lesson.setTopics'], handle: (ctx, p, meta) => setTopics(ctx, p, meta) }),
   command({ type: 'lesson.setDisplay', payload: LessonCommands['lesson.setDisplay'], handle: (ctx, p, meta) => setDisplay(ctx, p, meta) }),
 ];

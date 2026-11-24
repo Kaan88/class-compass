@@ -34,6 +34,13 @@ export interface EndLessonStep<S extends z.ZodType = z.ZodType> {
    */
   when?: (db: Db, contextId: string, lesson: LessonRow) => boolean;
   apply: (ctx: RequestContext, lesson: LessonRow, data: z.infer<S>) => void;
+  /**
+   * Optional (S37, D-218): for an End Lesson that arrives after the lesson ended by itself (its close
+   * hooks already ran), can the step still be applied? False = skipped and named in `notApplied`
+   * (the Secret Student round was closed unrevealed). Omitted = applied; `apply` must then work on an
+   * ended lesson (write only where nothing is recorded yet, or overwrite with the teacher's answer).
+   */
+  canApplyLate?: (db: Db, lesson: LessonRow) => boolean;
 }
 
 const steps: EndLessonStep[] = [];

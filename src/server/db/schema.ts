@@ -504,8 +504,13 @@ export const lessons = sqliteTable(
     subjectNameSnapshot: text('subject_name_snapshot', { mode: 'json' }).$type<LocalizedText>().notNull(),
     updatedAt: integer('updated_at').notNull(),
     /**
-     * S37 (D-218): a forgotten lesson is ended by the server at `startedAt + LESSON_AUTO_END_AFTER_MS`
-     * (`endedAt` is that moment); this is when the server wrote it (null = ended by a teacher, or not ended).
+     * S37 (D-218): the last thing that happened in the lesson (an accepted lesson command, "Still
+     * teaching", End Lesson open). Null only for lessons started before S37 (read as `startedAt`).
+     */
+    lastActivityAt: integer('last_activity_at'),
+    /**
+     * S37 (D-218): when the server ended a lesson nobody ended (its `endedAt` is then the last activity);
+     * null = ended by a teacher (also after a late End Lesson), or not ended.
      */
     autoEndedAt: integer('auto_ended_at'),
     /** S37: when the "still running" reminder went out (once per lesson). */

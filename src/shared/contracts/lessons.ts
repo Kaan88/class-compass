@@ -46,12 +46,12 @@ export const LessonState = z.object({
   /** End Lesson steps contributed by the enabled modules, in order (LES-3). 'reflection' is core. */
   endSteps: z.array(z.string()),
   /**
-   * S37 (D-218): the lesson runs past the point it should be over (LESSON_REMINDER_AFTER_MS after the
-   * start): the board shows a short "still running" note beside its End lesson button. Set once, with
-   * the reminder, so it changes the version (and the ETag) only once.
+   * S37 (D-218): the lesson may be forgotten (`reminderDue` in shared/lessonLimits.ts: old enough and
+   * quiet for a while): the board shows its "still running" note with Still teaching. It follows the
+   * clock and the last activity, so it is part of the lesson-state ETag.
    */
   overdue: z.boolean(),
-  /** When the server ends the lesson by itself if nobody does (S37, D-218). */
+  /** When the lesson ends by itself if nothing more happens in it (S37, D-218: `autoEndAt` in shared/lessonLimits.ts). */
   autoEndAt: z.number(),
 });
 export type LessonState = z.infer<typeof LessonState>;
@@ -169,6 +169,8 @@ export const LessonSummary = z.object({
    * thank-you) was left empty ("not recorded").
    */
   autoEnded: z.boolean(),
+  /** A late End Lesson (S37, D-218): the end steps (keys) that could no longer be applied. */
+  notApplied: z.array(z.string().max(64).meta(pii('none'))).max(32).optional(),
 });
 export type LessonSummary = z.infer<typeof LessonSummary>;
 export const lessonSummary = endpoint({
@@ -185,8 +187,8 @@ export const lessonSummary = endpoint({
 /**
  * The teacher home's notices about lessons (S37, D-218): lessons of the teacher's own current
  * class+subjects that run past the point they should be over (with when they end by themselves), and
- * lessons the server ended because nobody did that the teacher has not dismissed yet (the last
- * AUTO_END_NOTICE_MS). Reading it ends a lesson whose limit has passed (lazily, like the classroom
+ * lessons that ended by themselves that the teacher has not dismissed yet (a late End Lesson also
+ * clears the notice). Reading it ends a lesson whose time has come (lazily, like the classroom
  * poll). `teacher` (behind the PIN gate); polled in the background, so it never keeps an unlock alive.
  * Class names only, no student data. No `mcp` field.
  */
@@ -255,6 +257,8 @@ export const LessonCommands = {
   'lesson.timer.reset': z.object(LessonRef),
   'lesson.timer.set': z.object({ ...LessonRef, durationMs: z.number().int().min(1000).max(MAX_TIMER_MS) }),
   'lesson.end': z.object({ ...LessonRef, steps: z.record(z.string(), z.unknown()).default({}) }),
+  /** "Still teaching" (S37, D-218): the forgotten-lesson reminder's button, and End Lesson while open. Activity only. */
+  'lesson.stillTeaching': z.object(LessonRef),
   /** Change today's topic(s) during the lesson (S13a, classroom-safe). */
   'lesson.setTopics': z.object({ ...LessonRef, topicIds: TopicIds }),
   /** Per-lesson display choices (S13a): show or hide the assistant panel (null = class default). */

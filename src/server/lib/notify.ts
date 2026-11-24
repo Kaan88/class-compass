@@ -48,3 +48,16 @@ export function registerNotificationSink(s: NotificationSink): void {
 export function notify(deps: NotifyDeps, event: NotifyEvent): void {
   for (const s of sinks) s(deps, event);
 }
+
+/** Marks notifications about a record as read (S37, D-218: a lesson that is closed). Owned by the notifications module. */
+export type NotificationResolver = (deps: NotifyDeps, which: { categories: readonly NotificationCategory[]; entityId: string }) => void;
+const resolvers: NotificationResolver[] = [];
+
+export function registerNotificationResolver(r: NotificationResolver): void {
+  if (!resolvers.includes(r)) resolvers.push(r);
+}
+
+/** Call inside the writing transaction: the notices about `entityId` in these categories are done. */
+export function resolveNotifications(deps: NotifyDeps, which: { categories: readonly NotificationCategory[]; entityId: string }): void {
+  for (const r of resolvers) r(deps, which);
+}

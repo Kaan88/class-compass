@@ -29,6 +29,7 @@ CREATE INDEX `notifications_entity_idx` ON `notifications` (`user_id`,`category`
 CREATE INDEX `notifications_student_idx` ON `notifications` (`student_id`);--> statement-breakpoint
 CREATE INDEX `notifications_created_idx` ON `notifications` (`created_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `notifications_daily_uq` ON `notifications` (`user_id`,`student_id`,`category`,`local_date`) WHERE category in ('textBlocked', 'speakersPoints');--> statement-breakpoint
+ALTER TABLE `lessons` ADD `last_activity_at` integer;--> statement-breakpoint
 ALTER TABLE `lessons` ADD `auto_ended_at` integer;--> statement-breakpoint
 ALTER TABLE `lessons` ADD `reminded_at` integer;--> statement-breakpoint
 ALTER TABLE `lessons` ADD `auto_end_seen_at` integer;
