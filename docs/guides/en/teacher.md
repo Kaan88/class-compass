@@ -17,7 +17,19 @@ Your administrator creates your account. Usually you receive an **invite link** 
 - **With a password**: you type your username and a password you choose (at least 10 characters).
 - **With email sign-in links**: you have no password. Each time, press **Email me a sign-in link** on the sign-in page and type your email address. A link and a 6-digit code arrive within a minute. Open the link and press **Sign in**, or type the code on the device where you asked for the email. Both work once, for 15 minutes. The page repeats the address you typed, so you can spot a typo; **Use a different email** lets you type it again. This choice is only offered when the school has set up email.
 
-Some schools switch passwords off for teachers. The invite then offers email sign-in links only, the sign-in page says so, and your profile has no **Use a password instead**.
+Some schools switch passwords off. The invite then offers email sign-in links only, the sign-in page has no password field, and your profile has no **Use a password instead**.
+
+If the sign-in page shows **Sign in with Google**, you can use it when your account's email address is your Google address. **Use it only on your own device.** On the classroom computer, or any computer you share, use the email code instead: a Google sign-in leaves your Google account, with your mail, open in that browser. On a computer that has been used as a classroom display the page reminds you and holds the Google button back.
+
+### Passkeys
+
+A passkey lets you sign in with your fingerprint, your face or your device's screen lock: no password to type and no email to wait for. Your phone, laptop or password manager keeps the key; the site stores only its public half.
+
+- **The offer:** right after you sign in by email or Google, a card **Sign in faster next time** offers to add a passkey on that device. Press **Add a passkey** only on a device that is yours alone; **Not now** hides the card on that device for a month, **Don't ask again** for good.
+- **Add one yourself:** open **Profile → Passkeys**, give it a name such as "My phone", confirm that it is you (your password, or a sign-in in the last 15 minutes if you have no password) and press **Add a passkey**. Your device asks for your fingerprint, face or screen lock.
+- **Sign in:** on the sign-in page press **Sign in with a passkey**. You do not type a username.
+- **On the classroom computer** do not add a passkey: anyone who can unlock that computer could then sign in as you. Profile holds the button back there and says why. You can still **sign in** on it with the passkey on your phone: press **Sign in with a passkey** and choose the phone or QR code option your browser offers.
+- **Lost a device?** Remove its passkey under **Profile → Passkeys** from another device, or ask your administrator to remove your passkeys. Email sign-in links keep working.
 
 If your administrator gave you a **temporary password** instead, you must choose your own password the first time you sign in.
 

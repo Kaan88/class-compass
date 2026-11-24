@@ -57,7 +57,7 @@ export const EXPORT_TTL_MS = 60 * 60_000;
  * and are never kept in an export or a backup; an approved picture is an ordinary uploaded file.
  */
 export const PENDING_PICTURES_NOTE = 'avatar pictures waiting for a teacher (never kept: only the approved picture is exported, D-184)';
-export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'command_log', 'scorer_pairings', 'oauth_requests', 'oauth_codes', 'oauth_refresh_tokens', 'ai_oauth_states', 'assistant_chats', 'assistant_messages', '__drizzle_migrations'] as const;
+export const NEVER_EXPORTED = ['sessions', 'auth_attempts', 'one_time_tokens', 'passkeys', 'command_log', 'scorer_pairings', 'oauth_requests', 'oauth_codes', 'oauth_refresh_tokens', 'ai_oauth_states', 'assistant_chats', 'assistant_messages', '__drizzle_migrations'] as const;
 /**
  * Columns blanked in every export (sign-in secrets: password/PIN/token/request/code hashes, and every
  * sealed `…_cipher` column: link tokens, AI connection keys since S19a, D-179).

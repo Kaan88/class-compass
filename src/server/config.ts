@@ -107,6 +107,13 @@ const EnvSchema = z.object({
   AI_CHATGPT_TOKEN_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   AI_CHATGPT_API_BASE: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   AI_CHATGPT_SCOPE: z.string().optional().default(''),
+  /**
+   * Sign in with Google for teachers (S31, D-208): offered only when both are set. The values come from
+   * an OAuth client ("Web application") in the school's Google Cloud project whose redirect address is
+   * `<PUBLIC_ORIGIN>/signin-google` (OPERATIONS → "Sign in with Google"). The secret is never logged.
+   */
+  GOOGLE_SIGNIN_CLIENT_ID: z.string().optional().default(''),
+  GOOGLE_SIGNIN_CLIENT_SECRET: z.string().optional().default(''),
 });
 
 /** "Sign in with ChatGPT" can be offered: the switch is on and every value it needs is set (D-179). */

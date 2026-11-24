@@ -19,6 +19,10 @@ export const AdminUser = z.object({
   emailVerified: z.boolean(),
   invitePending: z.boolean(),
   inviteExpiresAt: z.number().nullable(),
+  /** S31 (D-208): the account has signed in with Google (its Google id is stored). */
+  googleLinked: z.boolean(),
+  /** S33 (D-210): how many passkeys the account has. */
+  passkeys: z.number().int(),
   createdAt: z.number(),
 });
 
@@ -71,32 +75,38 @@ export const resetUserPassword = endpoint({
   input: z.object({ userId: Id }),
   output: z.object({ temporaryPassword: z.string() }),
 });
+/** Removes every passkey of an account (a lost or stolen device); the person adds new ones after signing in another way. */
+export const removeUserPasskeys = endpoint({ method: 'POST', path: '/api/admin/users/:userId/passkeys/remove', access: 'admin', input: z.object({ userId: Id }), output: AdminUser });
 export const clearUserPin = endpoint({ method: 'POST', path: '/api/admin/users/:userId/clear-pin', access: 'admin', input: z.object({ userId: Id }), output: Ok });
 
 // ---------------------------------------------------------------- sign-in policy (S30, D-207)
 /**
- * "Teachers sign in with email links only". `emailReady`: the school's email is set up (needed to
- * switch it on). `teachersWithPassword`: teacher accounts whose password switching it on removes.
- * `teachersWithoutEmail`: active teachers who could not sign in then; it cannot be switched on while
- * there are any.
+ * "Nobody signs in with a password". `emailReady`: the school's email is set up (needed to switch it
+ * on). `accountsWithPassword`: accounts whose password switching it on removes, administrators
+ * included. `accountsWithoutEmail`: active accounts that could not sign in then; it cannot be switched
+ * on while there are any. `ownEmail`: where the confirmation code for the administrator goes.
  */
 export const SignInPolicy = z.object({
-  teacherEmailLinkOnly: z.boolean(),
+  passwordsOff: z.boolean(),
   emailReady: z.boolean(),
-  teachersWithPassword: z.number().int(),
-  teachersWithoutEmail: z.array(z.object({ id: z.string(), displayName: z.string() })),
+  accountsWithPassword: z.number().int(),
+  accountsWithoutEmail: z.array(z.object({ id: z.string(), displayName: z.string() })),
+  ownEmail: z.string().nullable(),
 });
 export const getSignInPolicy = endpoint({ method: 'GET', path: '/api/admin/sign-in-policy', access: 'admin', input: Empty, output: SignInPolicy });
+/** Emails the administrator the code that `setSignInPolicy` needs to switch passwords off. */
+export const requestSignInPolicyCode = endpoint({ method: 'POST', path: '/api/admin/sign-in-policy/code', access: 'admin', input: Empty, output: Ok });
 /**
- * Switching it on removes every teacher's password in the same step (they sign in with an emailed
- * link or code from then on; sessions that are open stay open). Switching it off gives no password
- * back: a teacher can choose one in the profile, or an administrator resets it.
+ * Switching passwords off needs the emailed `code` and removes every account's password in the same
+ * step, the administrator's own too (everyone signs in with an emailed link or code, or Google, from
+ * then on; sessions that are open stay open). Switching them on again gives no password back: a
+ * person chooses one in the profile, or an administrator resets it.
  */
 export const setSignInPolicy = endpoint({
   method: 'PUT',
   path: '/api/admin/sign-in-policy',
   access: 'admin',
-  input: z.object({ teacherEmailLinkOnly: z.boolean() }),
+  input: z.object({ passwordsOff: z.boolean(), code: z.string().regex(/^\d{6}$/u).optional() }),
   output: SignInPolicy,
 });
 

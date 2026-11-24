@@ -53,7 +53,7 @@ export const schoolSettings = sqliteTable('school_settings', {
    * links only (administrators always keep a password). Off by default; switched on Admin → Accounts
    * (audited), which removes the teachers' passwords in the same step.
    */
-  teacherEmailLinkOnly: integer('teacher_email_link_only', { mode: 'boolean' }).notNull().default(false),
+  passwordsOff: integer('passwords_off', { mode: 'boolean' }).notNull().default(false),
   updatedAt: integer('updated_at').notNull(),
 });
 
@@ -223,11 +223,17 @@ export const users = sqliteTable(
     emailVerifiedAt: integer('email_verified_at'),
     /** The teacher's recorded time's-up clip (files.kind 'teacher_sound', D-107); null = none. */
     timeUpClipFileId: text('time_up_clip_file_id'),
+    /**
+     * Sign in with Google (S31, D-208): Google's permanent id of the person, stored at the first Google
+     * sign-in that matched the account's address; later sign-ins match on it. Cleared when an
+     * administrator changes the address. Teachers only; null = never signed in with Google.
+     */
+    googleSub: text('google_sub'),
     disabledAt: integer('disabled_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [uniqueIndex('users_login_uq').on(t.login)],
+  (t) => [uniqueIndex('users_login_uq').on(t.login), uniqueIndex('users_google_sub_uq').on(t.googleSub)],
 );
 
 export const SESSION_KINDS = ['user', 'student', 'scorer', 'display'] as const;
@@ -250,7 +256,7 @@ export const sessions = sqliteTable(
     pinFailures: integer('pin_failures').notNull().default(0),
     pinLockedUntil: integer('pin_locked_until'),
     /** How the session was signed in (S13b, D-108): a fresh email-link/invite session counts as re-authentication for 15 minutes. */
-    authMethod: text('auth_method', { enum: ['password', 'email_link', 'invite', 'student_link', 'scorer_link', 'scorer_pairing', 'display_link'] }),
+    authMethod: text('auth_method', { enum: ['password', 'email_link', 'invite', 'google', 'passkey', 'student_link', 'scorer_link', 'scorer_pairing', 'display_link'] }),
     createdAt: integer('created_at').notNull(),
     lastSeenAt: integer('last_seen_at').notNull(),
     expiresAt: integer('expires_at').notNull(),
@@ -294,6 +300,30 @@ export const oneTimeTokens = sqliteTable('one_time_tokens', {
   createdBy: text('created_by'),
   createdAt: integer('created_at').notNull(),
 }, (t) => [uniqueIndex('one_time_tokens_hash_uq').on(t.tokenHash), index('one_time_tokens_user_idx').on(t.userId)]);
+
+/**
+ * Passkeys (S33, D-210): the public half of a key that a person's own device keeps. `credentialId` and
+ * `publicKey` are base64url; `counter` is the authenticator's signature count (0 for most synced
+ * passkeys). The private key never reaches the server. Never exported.
+ */
+export const passkeys = sqliteTable(
+  'passkeys',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id),
+    credentialId: text('credential_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    counter: integer('counter').notNull().default(0),
+    transportsJson: text('transports_json', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    /** The name the person gave it ("My phone"), shown in their profile. */
+    name: text('name').notNull(),
+    /** The authenticator says the key is synced to the person's other devices. */
+    backedUp: integer('backed_up', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at').notNull(),
+    lastUsedAt: integer('last_used_at'),
+  },
+  (t) => [uniqueIndex('passkeys_credential_uq').on(t.credentialId), index('passkeys_user_idx').on(t.userId)],
+);
 
 // ---------------------------------------------------------------- idempotency & audit
 /** Every client command (opId) is recorded with its result in the same transaction as its effect. */

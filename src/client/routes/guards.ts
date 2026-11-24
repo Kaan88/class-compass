@@ -8,7 +8,7 @@ export interface RouterContext {
 }
 
 /** Paths that work without a session (the 401 handler never redirects away from them). */
-export const PUBLIC_PATHS = ['/login', '/reset-password', '/invite', '/signin-link'];
+export const PUBLIC_PATHS = ['/login', '/reset-password', '/invite', '/signin-link', '/signin-google', '/privacy'];
 
 /** Where a signed-in account lands by default. */
 export function homeFor(me: Me): '/admin' | '/classroom' | '/teacher' | '/change-password' {

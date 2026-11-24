@@ -2,7 +2,7 @@
 
 Sınıf Pusulası'nda bir okulu kurmak. Her sayfa [Yönetici kılavuzu](admin.md)'nda ayrıntılı anlatılır.
 
-1. **Hesabınız.** İlk yönetici hesabını bilgi işlem sorumlusu sunucuda oluşturur. Yöneticiler her zaman şifreyle giriş yapar.
+1. **Hesabınız.** İlk yönetici hesabını bilgi işlem sorumlusu sunucuda oluşturur. Yöneticiler şifreyle giriş yapar; okul şifreleri kapattıysa herkes e-postayla gönderilen bağlantı ya da kodla giriş yapar.
 2. **Okul ayarları.** **Okul adı**, **Okul saat dilimi**, **Haftanın ilk günü** ve **Yeni hesapların dili**.
 3. **Eğitim yılı.** **Eğitim yılları ve dönemler** → **Yeni eğitim yılı**, ardından **Dönem ekle**.
 4. **Dersler ve sınıflar.** **Dersler** → **Yeni ders**; **Sınıflar** → **Yeni sınıf** (ad, düzey, sınıf dili).

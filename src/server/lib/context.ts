@@ -88,6 +88,11 @@ export interface AppDeps {
    * public addresses only.
    */
   aiProviderUrls?: Partial<Record<'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'chatgpt' | 'chatgptToken', string>>;
+  /**
+   * Sign in with Google (S31, D-208): exchanges the authorization code at Google's token endpoint and
+   * returns the parsed JSON answer. Tests inject a fake; production uses `exchangeWithGoogle`.
+   */
+  googleTokenExchange?: (params: URLSearchParams) => Promise<unknown>;
   /** Tests only: a shorter total limit for "Test connection" requests; production uses `TEST_TIMEOUT_MS`. */
   aiTestTimeoutMs?: number;
 }

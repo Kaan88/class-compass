@@ -12,6 +12,8 @@ import { Button, buttonClass } from '../ui/Button.tsx';
 import { Alert } from '../ui/Feedback.tsx';
 import { TextField } from '../ui/Fields.tsx';
 import { AuthCard } from './AuthCard.tsx';
+import { GoogleSignIn } from './GoogleSignIn.tsx';
+import { PasskeySignIn } from './Passkeys.tsx';
 import { EmailLinkRequest, LinkDeadEnd, useFragmentToken } from './SignIn.tsx';
 import { homeFor, safeNext } from './guards.ts';
 import { SensitiveGate } from './Lock.tsx';
@@ -53,6 +55,20 @@ export function LoginPage() {
 
   if (forgot && resetInfo.data?.emailResetEnabled !== false) return <ForgotPassword onBack={back(() => setForgot(false))} />;
   if (byEmail && resetInfo.data?.emailLinkEnabled !== false) return <EmailLinkRequest onBack={back(() => setByEmail(false))} />;
+  // D-207: while the school has switched passwords off there is no password to type, so the page is the
+  // email link (and Google) only. Without working email the form stays: the server's way back needs it.
+  if (resetInfo.data?.passwordsOff && resetInfo.data.emailLinkEnabled) {
+    return (
+      <AuthCard title={t('auth.signIn')}>
+        <p>{t('signin.noPasswords')}</p>
+        <Button variant="primary" size="big" onPress={() => setByEmail(true)}>
+          {t('signin.emailMe')}
+        </Button>
+        {resetInfo.data.passkeysEnabled ? <PasskeySignIn /> : null}
+        {resetInfo.data.googleSignInEnabled ? <GoogleSignIn /> : null}
+      </AuthCard>
+    );
+  }
   return (
     <AuthCard title={t('auth.signIn')}>
       <form onSubmit={submit} className="cc-stack">
@@ -70,13 +86,13 @@ export function LoginPage() {
       ) : (
         <p className="cc-muted">{t('auth.forgotAskAdmin')}</p>
       )}
-      {/* D-207: while teachers have no password, the email link is their way in and gets the note and the stronger button. */}
-      {resetInfo.data?.emailLinkEnabled && resetInfo.data.teacherEmailLinkOnly ? <p className="cc-muted">{t('signin.teachersUseEmail')}</p> : null}
       {resetInfo.data?.emailLinkEnabled ? (
-        <Button variant={resetInfo.data.teacherEmailLinkOnly ? 'secondary' : 'ghost'} onPress={() => setByEmail(true)}>
+        <Button variant="ghost" onPress={() => setByEmail(true)}>
           {t('signin.emailMe')}
         </Button>
       ) : null}
+      {resetInfo.data?.passkeysEnabled ? <PasskeySignIn /> : null}
+      {resetInfo.data?.googleSignInEnabled ? <GoogleSignIn /> : null}
     </AuthCard>
   );
 }

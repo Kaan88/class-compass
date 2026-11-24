@@ -3,6 +3,7 @@
  *   node src/server/cli.ts migrate                       pending migrations (database snapshot first)
  *   node src/server/cli.ts admin:create --login <login> --name "<Display Name>" [--email x]   (password via stdin)
  *   node src/server/cli.ts admin:reset-password --login <login>                                (password via stdin)
+ *   node src/server/cli.ts signin:allow-passwords     the way back when passwords are off and nobody can sign in (D-207)
  *   node src/server/cli.ts seed:demo [--force-demo]      fictional demo school (never in production)
  *     CC_DEMO_PASSWORD=<pw> (NODE_ENV=test only) gives every demo account that password — for E2E tests
  *   node src/server/cli.ts seed:demo-history [--weeks 9]   fictional past weeks for the demo school (after seed:demo; test VM only)
@@ -20,7 +21,7 @@ import { parseArgs } from 'node:util';
 import { eq } from 'drizzle-orm';
 import { loadConfig, testClockFile, testIdSeed } from './config.ts';
 import { openDatabase, type Db } from './db/client.ts';
-import { users } from './db/schema.ts';
+import { schoolSettings, users } from './db/schema.ts';
 import { audit } from './lib/audit.ts';
 import { hashPassword, useSeededIds } from './lib/crypto.ts';
 import { offsetClock } from './lib/testClock.ts';
@@ -31,6 +32,8 @@ import { offsiteBackup, offsiteCheck, offsiteInit, offsiteProblems, offsiteSnaps
 import { appVersion, hasAppTables, levelText, migrationLevel } from './ops/version.ts';
 import { SeedRefused, seedDemo } from './seed/demo.ts';
 import { seedDemoHistory } from './seed/history.ts';
+
+const PASSWORDS_OFF = 'Passwords are switched off at this school (Admin -> Accounts). On the server, run signin:allow-passwords first.';
 
 async function readSecret(prompt: string): Promise<string> {
   if (process.env.CC_PASSWORD) return process.env.CC_PASSWORD;
@@ -81,6 +84,7 @@ switch (cmd) {
   case 'admin:create': {
     await migrate();
     if (!values.login || !values.name) throw new Error('--login and --name are required');
+    if (passwordBlocked(db())) throw new Error(PASSWORDS_OFF);
     const password = await readSecret('Password (min 10 chars): ');
     const u = await createUser(db(), { login: values.login, displayName: values.name, role: 'admin', password, email: values.email ?? null }, system, Date.now());
     console.log(`Administrator created: ${u.login}`);
@@ -90,8 +94,7 @@ switch (cmd) {
     if (!values.login) throw new Error('--login is required');
     const u = db().select().from(users).where(eq(users.login, normaliseLogin(values.login))).get();
     if (!u) throw new Error('No such user');
-    // D-207: a teacher's password would not be accepted while the school allows teachers email links only.
-    if (passwordBlocked(db(), u)) throw new Error('Teachers sign in with email links only at this school: an administrator switches that off first (Admin -> Accounts)');
+    if (passwordBlocked(db())) throw new Error(PASSWORDS_OFF);
     const password = await readSecret('New password (min 10 chars): ');
     if (password.length < 10) throw new Error('Password too short');
     const now = Date.now();
@@ -100,6 +103,20 @@ switch (cmd) {
     revokeAllUserMcpTokens(db(), system, u.id, now, 'password_reset');
     audit(db(), system, { action: 'auth.password_reset_cli', entity: 'user', entityId: u.id }, now);
     console.log(`Password reset for ${u.login}; they must change it at next sign-in.`);
+    break;
+  }
+  case 'signin:allow-passwords': {
+    // D-207: the school switched passwords off and nobody can sign in (mail is down, or the only
+    // administrator lost the mailbox). No password comes back: set one with admin:reset-password after.
+    const now = Date.now();
+    if (!passwordBlocked(db())) {
+      console.log('Passwords are already allowed.');
+      break;
+    }
+    db().update(schoolSettings).set({ passwordsOff: false, updatedAt: now }).where(eq(schoolSettings.id, 1)).run();
+    const change = { before: { passwordsOff: true }, after: { passwordsOff: false, via: 'cli' } };
+    audit(db(), system, { action: 'school.sign_in_policy', entity: 'school', ...change }, now);
+    console.log('Passwords are allowed again. Nobody got a password back: run admin:reset-password --login <login> for an administrator.');
     break;
   }
   case 'seed:demo': {
@@ -253,7 +270,7 @@ switch (cmd) {
     break;
   default:
     fail(
-      'Commands: migrate | admin:create | admin:reset-password | seed:demo [--force-demo] | seed:demo-history [--weeks 9] | backup:create | backup:list | backup:verify [file] | backup:restore <file> [--force] | backup:offsite [file] | backup:offsite-init | backup:offsite-check [--read-data-subset 5%] | backup:offsite-snapshots | version',
+      'Commands: migrate | admin:create | admin:reset-password | signin:allow-passwords | seed:demo [--force-demo] | seed:demo-history [--weeks 9] | backup:create | backup:list | backup:verify [file] | backup:restore <file> [--force] | backup:offsite [file] | backup:offsite-init | backup:offsite-check [--read-data-subset 5%] | backup:offsite-snapshots | version',
     );
 }
 (opened as Db | null)?.$client.close();

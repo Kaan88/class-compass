@@ -19,6 +19,7 @@ import { IconBoard, IconSliders } from '../../ui/icons.tsx';
 import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
 import { SignInMethodSection } from '../SignIn.tsx';
+import { PasskeyOffer, PasskeysSection } from '../Passkeys.tsx';
 import { TimeUpClipSection } from './ClassDisplay.tsx';
 import { FullscreenButton, LessonPrefsSection } from '../../modules/lessons/fullscreen.tsx';
 import * as School from '../../../shared/contracts/school.ts';
@@ -52,6 +53,8 @@ export function TeacherLayout() {
         // Every student name below opens the statistics drawer, behind the PIN gate (S14e2, D-154).
         <StudentStatsProvider>
           <TeacherNav />
+          {/* Right after an email or Google sign-in: offer a passkey once (S33, D-210). */}
+          {me ? <PasskeyOffer me={me} /> : null}
           <Outlet />
         </StudentStatsProvider>
       )}
@@ -364,7 +367,9 @@ export function ProfilePage() {
           <ChangePasswordForm />
         </section>
       ) : null}
-      <SignInMethodSection me={me} emailLinkEnabled={signInInfo.data?.emailLinkEnabled ?? false} teacherEmailLinkOnly={signInInfo.data?.teacherEmailLinkOnly ?? false} />
+      <SignInMethodSection me={me} emailLinkEnabled={signInInfo.data?.emailLinkEnabled ?? false} passwordsOff={signInInfo.data?.passwordsOff ?? false} />
+      {/* Passkeys (S33, D-210): for teachers and administrators, where the address allows them. */}
+      {signInInfo.data?.passkeysEnabled ? <PasskeysSection me={me} /> : null}
       {/* Personal tokens for AI tools (S14h1, D-160): behind the PIN gate, with re-authentication. */}
       <AiToolsSection me={me} />
       {/* The assistant's connections: the school default and, when allowed, the teacher's own (S19a, D-179). */}

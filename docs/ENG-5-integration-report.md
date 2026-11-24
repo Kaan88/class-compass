@@ -234,7 +234,8 @@ the site opened to visitors in Turkey (an Access Bypass by country, test site fi
 stays behind Access; the owner states the KVKK sign-off is fine). The check then made on production
 was from outside only: the page, `/healthz` and the password-reset availability answer 200 from an
 address in Turkey, and the admin paths still redirect to the Access sign-in (OPERATIONS → "Open to
-visitors in Turkey").
+visitors in Turkey"). The owner had it closed again the same night: the whole site answers with the
+Access sign-in again.
 
 ## 5. Limitations and what was NOT tested
 

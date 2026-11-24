@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAreaDensity } from '../../lib/areaDensity.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { signOut, useMe } from '../../lib/session.ts';
+import { PasskeyOffer } from '../Passkeys.tsx';
 import { Button, buttonClass } from '../../ui/Button.tsx';
 import { EmptyState } from '../../ui/Feedback.tsx';
 import { Select } from '../../ui/Fields.tsx';
@@ -73,6 +74,7 @@ export function AdminLayout() {
             </Button>
           </nav>
           <AdminSectionNav />
+          {me ? <PasskeyOffer me={me} /> : null}
           <Outlet />
         </>
       )}

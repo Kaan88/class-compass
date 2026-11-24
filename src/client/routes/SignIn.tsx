@@ -68,7 +68,7 @@ export function LinkDeadEnd({ to, label }: { to: 'email-link' | 'forgot' | null;
   );
 }
 
-function useSignedIn() {
+export function useSignedIn() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   return async (me: Me) => {
@@ -242,7 +242,7 @@ function InviteState({ loading }: { loading: boolean }) {
 function InviteForm({ token, info }: { token: string; info: z.infer<typeof Auth.inspectInvite.output> }) {
   const { t } = useI18n();
   const signedIn = useSignedIn();
-  // D-207: a teacher's invite offers no password while the school allows teachers email links only.
+  // D-207: an invite offers no password while the school has switched passwords off.
   const [method, setMethod] = useState<'password' | 'email_link'>(info.passwordAllowed ? 'password' : 'email_link');
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
@@ -328,7 +328,7 @@ function InviteForm({ token, info }: { token: string; info: z.infer<typeof Auth.
 }
 
 /** Profile: how this account signs in, and switching (with re-authentication). Teachers only may use email links. */
-export function SignInMethodSection({ me, emailLinkEnabled, teacherEmailLinkOnly = false }: { me: Me; emailLinkEnabled: boolean; teacherEmailLinkOnly?: boolean }) {
+export function SignInMethodSection({ me, emailLinkEnabled, passwordsOff = false }: { me: Me; emailLinkEnabled: boolean; passwordsOff?: boolean }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const [password, setPassword] = useState('');
@@ -353,7 +353,7 @@ export function SignInMethodSection({ me, emailLinkEnabled, teacherEmailLinkOnly
         {t('signin.methodTitle')}
       </h2>
       <p>{me.signInMethod === 'email_link' ? t('signin.methodIsEmail') : t('signin.methodIsPassword')}</p>
-      {me.signInMethod === 'email_link' && me.role === 'teacher' && teacherEmailLinkOnly ? (
+      {me.signInMethod === 'email_link' && passwordsOff ? (
         <p className="cc-muted">{t('signin.policyEmailOnly')}</p>
       ) : me.signInMethod === 'email_link' ? (
         <form

@@ -13,12 +13,23 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.deactivateUser, (ctx, input) => svc.setUserActive(ctx, input.userId, false));
   route(app, deps, C.reactivateUser, (ctx, input) => svc.setUserActive(ctx, input.userId, true));
   route(app, deps, C.resetUserPassword, (ctx, input) => svc.resetPasswordByAdmin(ctx, input.userId));
+  route(app, deps, C.removeUserPasskeys, (ctx, input) => svc.removePasskeysByAdmin(ctx, input.userId));
   route(app, deps, C.clearUserPin, (ctx, input) => {
     svc.clearPinByAdmin(ctx, input.userId);
     return { ok: true as const };
   });
   route(app, deps, C.getSignInPolicy, (ctx) => svc.signInPolicy(ctx));
-  route(app, deps, C.setSignInPolicy, (ctx, input) => svc.setTeacherEmailLinkOnly(ctx, input.teacherEmailLinkOnly));
+  route(
+    app,
+    deps,
+    C.requestSignInPolicyCode,
+    (ctx) => {
+      svc.requestSignInPolicyCode(ctx);
+      return { ok: true as const };
+    },
+    { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+  );
+  route(app, deps, C.setSignInPolicy, (ctx, input) => svc.setPasswordsOff(ctx, input.passwordsOff, input.code), { rateLimit: { max: 20, timeWindow: '15 minutes' } });
   route(app, deps, C.queryAudit, (ctx, input) => svc.queryAudit(ctx.db, input));
   route(app, deps, C.auditCodes, (ctx) => svc.auditCodes(ctx.db));
 }

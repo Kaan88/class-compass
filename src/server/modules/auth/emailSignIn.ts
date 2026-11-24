@@ -18,8 +18,9 @@
  *   cannot be used later (D-015); an email change also clears the "verified" mark.
  * - Switching method: to email-link needs the current password and a code emailed to the address;
  *   back to password needs a fresh email sign-in. Administrators always keep passwords.
- * - School policy (S30, D-207): while "teachers sign in with email links only" is on, a teacher's
- *   invite offers no password and nobody can switch a teacher back to one (`signInPolicy.ts`).
+ * - School policy (S30, D-207): while the school has switched passwords off, an invite offers no
+ *   password, nobody can switch back to one, and administrators sign in with email links too
+ *   (`signInPolicy.ts`). Switching it on is confirmed with a code emailed to the administrator.
  * Tokens and codes are stored as HMAC hashes with the server pepper; nothing secret is audited.
  */
 import crypto from 'node:crypto';
@@ -32,7 +33,7 @@ import type { Actor, AppDeps, SessionRow, UserRow } from '../../lib/context.ts';
 import { hashPassword, newId, randomToken, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
-import { emailLinkRequired, passwordBlocked } from './signInPolicy.ts';
+import { emailLinkRequired, passwordBlocked, passwordlessAllowed } from './signInPolicy.ts';
 import { actorFor, createSession, invalidateResetTokens, revokeAllUserMcpTokens, revokeAllUserSessions, SESSION_ABSOLUTE_MS, toMe } from './service.ts';
 
 export const INVITE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -173,10 +174,10 @@ function findInvite(deps: AppDeps, token: string) {
 }
 
 function emailLinkState(deps: AppDeps, user: UserRow) {
-  const allowed = user.role === 'teacher';
+  const allowed = passwordlessAllowed(deps.db, user);
   const reason = !emailLinkEnabled(deps) ? ('SMTP_NOT_CONFIGURED' as const) : !user.email ? ('NO_EMAIL' as const) : null;
-  // D-207: while teachers sign in with email links only, a teacher's invite offers no password.
-  return { passwordAllowed: !passwordBlocked(deps.db, user), emailLinkAllowed: allowed, emailLinkAvailable: allowed && reason === null, emailLinkUnavailableReason: allowed ? reason : null };
+  // D-207: while the school has switched passwords off, an invite offers no password.
+  return { passwordAllowed: !passwordBlocked(deps.db), emailLinkAllowed: allowed, emailLinkAvailable: allowed && reason === null, emailLinkUnavailableReason: allowed ? reason : null };
 }
 
 export function inspectInvite(deps: AppDeps, token: string) {
@@ -190,13 +191,13 @@ export async function acceptInvite(deps: AppDeps, ip: string, input: { token: st
     const st = emailLinkState(deps, first.user);
     if (!st.emailLinkAllowed) throw new AppError('FORBIDDEN', 'Administrator accounts sign in with a password', { reason: 'ADMIN_PASSWORD_REQUIRED' });
     if (!st.emailLinkAvailable) throw invalid('Email sign-in is not available', { reason: st.emailLinkUnavailableReason ?? 'SMTP_NOT_CONFIGURED' });
-  } else if (passwordBlocked(deps.db, first.user)) throw emailLinkRequired();
+  } else if (passwordBlocked(deps.db)) throw emailLinkRequired();
   else if (!input.password) throw invalid('Choose a password', { reason: 'PASSWORD_REQUIRED' });
   const passwordHash = input.method === 'password' ? await hashPassword(input.password!) : '';
   const now = deps.now();
   const result = tx(deps.db, () => {
     const { row, user } = findInvite(deps, input.token); // single use, also under races
-    if (input.method === 'password' && passwordBlocked(deps.db, user)) throw emailLinkRequired(); // the policy was switched on meanwhile
+    if (input.method === 'password' && passwordBlocked(deps.db)) throw emailLinkRequired(); // the policy was switched on meanwhile
     deps.db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, row.id)).run();
     const verified = row.sentByEmail ? now : user.emailVerifiedAt;
     deps.db
@@ -226,7 +227,8 @@ export async function acceptInvite(deps: AppDeps, ip: string, input: { token: st
  * Issue a sign-in link + code for one account and email it; returns the request id the code is
  * bound to. Older unused links of the account stop working. Null when the per-account limit is hit.
  */
-function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: string, withLink: boolean): string | null {
+function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: string, mail: 'signin' | 'methodcode' | 'policycode'): string | null {
+  const withLink = mail === 'signin';
   const now = deps.now();
   const token = randomToken();
   const code = newCode();
@@ -263,20 +265,21 @@ function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: s
   });
   if (!ok) return null;
   const link = `${origin(deps)}/signin-link#token=${token}`;
-  const body = withLink
-    ? translate(user.locale, 'email.signin.body', { name: user.displayName, link, code })
-    : translate(user.locale, 'email.methodcode.body', { name: user.displayName, code });
-  sendQuietly(deps, user.email!, translate(user.locale, withLink ? 'email.signin.subject' : 'email.methodcode.subject'), body);
+  const body = withLink ? translate(user.locale, 'email.signin.body', { name: user.displayName, link, code }) : translate(user.locale, `email.${mail}.body`, { name: user.displayName, code });
+  sendQuietly(deps, user.email!, translate(user.locale, `email.${mail}.subject`), body);
   return requestId;
 }
 
 function sendSignInEmail(deps: AppDeps, user: UserRow): string {
   const requestId = randomToken();
-  issueSignIn(deps, user, requestId, requestId, true);
+  issueSignIn(deps, user, requestId, requestId, 'signin');
   return requestId;
 }
 
-/** Always returns a fresh request id; an email is sent only to an active email-link teacher account with this address. */
+/**
+ * Always returns a fresh request id; an email is sent only to an active email-link account with this
+ * address. Administrators are email-link accounts only after the school switched passwords off (D-207).
+ */
 export function requestEmailLink(deps: AppDeps, emailInput: string): { requestId: string } {
   const requestId = randomToken();
   if (!emailLinkEnabled(deps)) return { requestId };
@@ -285,9 +288,9 @@ export function requestEmailLink(deps: AppDeps, emailInput: string): { requestId
   const matches = deps.db
     .select()
     .from(users)
-    .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.disabledAt), eq(users.signInMethod, 'email_link'), eq(users.role, 'teacher')))
+    .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.disabledAt), eq(users.signInMethod, 'email_link')))
     .all();
-  for (const u of matches) issueSignIn(deps, u, requestId, requestId, true);
+  for (const u of matches) issueSignIn(deps, u, requestId, requestId, 'signin');
   return { requestId };
 }
 
@@ -358,11 +361,11 @@ export function completeEmailCode(deps: AppDeps, requestId: string, code: string
 const sessionBinding = (session: SessionRow) => `switch:${session.id}`;
 
 export function startEmailLinkMethod(deps: AppDeps, user: UserRow, session: SessionRow) {
-  if (user.role !== 'teacher') throw new AppError('FORBIDDEN', 'Administrator accounts sign in with a password', { reason: 'ADMIN_PASSWORD_REQUIRED' });
+  if (!passwordlessAllowed(deps.db, user)) throw new AppError('FORBIDDEN', 'Administrator accounts sign in with a password', { reason: 'ADMIN_PASSWORD_REQUIRED' });
   if (user.signInMethod === 'email_link') throw invalid('This account already signs in with email links', { reason: 'ALREADY_EMAIL_LINK' });
   if (!emailLinkEnabled(deps)) throw invalid('Email sign-in is not available', { reason: 'SMTP_NOT_CONFIGURED' });
   if (!user.email) throw invalid('Your account has no email address', { reason: 'NO_EMAIL' });
-  if (issueSignIn(deps, user, '', sessionBinding(session), false) === null) throw new AppError('RATE_LIMITED', 'Too many emails. Try again later.');
+  if (issueSignIn(deps, user, '', sessionBinding(session), 'methodcode') === null) throw new AppError('RATE_LIMITED', 'Too many emails. Try again later.');
 }
 
 export function confirmEmailLinkMethod(deps: AppDeps, user: UserRow, session: SessionRow, code: string) {
@@ -384,7 +387,7 @@ export function confirmEmailLinkMethod(deps: AppDeps, user: UserRow, session: Se
 
 export async function switchToPassword(deps: AppDeps, user: UserRow, session: SessionRow, newPassword: string, fresh: boolean) {
   if (user.signInMethod !== 'email_link') throw invalid('This account already uses a password', { reason: 'ALREADY_PASSWORD' });
-  if (passwordBlocked(deps.db, user)) throw emailLinkRequired();
+  if (passwordBlocked(deps.db)) throw emailLinkRequired();
   if (!fresh) throw new AppError('UNAUTHENTICATED', 'Sign in again with a fresh email link first', { reason: 'REAUTH_REQUIRED' });
   const passwordHash = await hashPassword(newPassword);
   const now = deps.now();
@@ -395,6 +398,28 @@ export async function switchToPassword(deps: AppDeps, user: UserRow, session: Se
     audit(deps.db, actorFor(user), { action: 'auth.method_change', entity: 'user', entityId: user.id, before: { method: 'email_link' }, after: { method: 'password' } }, now);
   });
   return meOf(deps, user.id, session.id);
+}
+
+// ---------------------------------------------------------------- switching passwords off (D-207)
+const policyBinding = (session: SessionRow) => `policy:${session.id}`;
+
+/**
+ * Before an administrator switches passwords off for the school, a code goes to the administrator's own
+ * address: typing it proves that the school's mail arrives and that this administrator can still sign
+ * in afterwards. Bound to the session that asked, 15 minutes, 5 tries.
+ */
+export function sendPolicyCode(deps: AppDeps, user: UserRow, session: SessionRow) {
+  if (!emailLinkEnabled(deps)) throw invalid('Email is not set up', { reason: 'SMTP_NOT_CONFIGURED' });
+  if (!user.email) throw invalid('Your account has no email address', { reason: 'NO_EMAIL' });
+  if (issueSignIn(deps, user, '', policyBinding(session), 'policycode') === null) throw new AppError('RATE_LIMITED', 'Too many emails. Try again later.');
+}
+
+/** Checks and uses up the code of `sendPolicyCode`. Call inside the transaction that makes the change. */
+export function usePolicyCode(deps: AppDeps, session: SessionRow, code: string): { ok: true } | { ok: false; attemptsLeft: number } {
+  const c = checkCode(deps, policyBinding(session), code);
+  if (!c.row) return { ok: false, attemptsLeft: c.attemptsLeft ?? 0 };
+  deps.db.update(oneTimeTokens).set({ usedAt: deps.now() }).where(eq(oneTimeTokens.id, c.row.id)).run();
+  return { ok: true };
 }
 
 export function meOf(deps: AppDeps, userId: string, sessionId: string) {

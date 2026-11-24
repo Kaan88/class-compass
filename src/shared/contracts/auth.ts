@@ -126,10 +126,12 @@ export const passwordResetAvailable = endpoint({
   /**
    * `emailLinkEnabled`: email-link sign-in is offered (SMTP configured, S13b). `defaultLocale`: the
    * school's language for new accounts (D-025), the sign-in pages' language until the device picks one.
-   * `teacherEmailLinkOnly`: the school lets teachers sign in with email links only (S30, D-207), so the
-   * sign-in page says so and the profile offers no way back to a password.
+   * `passwordsOff`: nobody signs in with a password at this school (S30, D-207), so the sign-in page
+   * shows no password form and the profile offers no way back to a password. `googleSignInEnabled`: the
+   * server has a Google client, so the sign-in page offers "Sign in with Google" (S31, D-208).
+   * `passkeysEnabled`: passkeys can work on this address (S33, D-210; not on a bare IP address).
    */
-  output: z.object({ emailResetEnabled: z.boolean(), emailLinkEnabled: z.boolean(), teacherEmailLinkOnly: z.boolean(), defaultLocale: Locale }),
+  output: z.object({ emailResetEnabled: z.boolean(), emailLinkEnabled: z.boolean(), passwordsOff: z.boolean(), googleSignInEnabled: z.boolean(), passkeysEnabled: z.boolean(), defaultLocale: Locale }),
 });
 
 /** Always answers `{ ok: true }` so the response never reveals whether an account exists. */
@@ -164,9 +166,9 @@ export const inspectInvite = endpoint({
     login: z.string(),
     role: z.enum(['admin', 'teacher']),
     locale: Locale,
-    /** False for a teacher while the school allows teachers email links only (S30, D-207): no password choice. */
+    /** False while the school has switched passwords off (S30, D-207): no password choice, for any role. */
     passwordAllowed: z.boolean(),
-    /** Email-link sign-in is offered to teachers (always shown; disabled with a reason when SMTP is not configured or the account has no email). */
+    /** Email-link sign-in is offered to teachers, and to administrators while passwords are off (always shown; disabled with a reason when SMTP is not configured or the account has no email). */
     emailLinkAllowed: z.boolean(),
     emailLinkAvailable: z.boolean(),
     emailLinkUnavailableReason: z.enum(['SMTP_NOT_CONFIGURED', 'NO_EMAIL']).nullable(),
@@ -213,6 +215,77 @@ export const completeEmailCode = endpoint({
   input: z.object({ requestId: TokenString, code: SixDigitCode }),
   output: Me,
 });
+
+// ---------------------------------------------------------------- Sign in with Google (S31, D-208)
+/**
+ * Where to send the browser. Also sets a short-lived HttpOnly cookie that binds Google's answer to this
+ * browser. Teachers only; nothing about any account is revealed.
+ */
+export const startGoogleSignIn = endpoint({
+  method: 'POST',
+  path: '/api/auth/google/start',
+  access: 'public',
+  input: Empty,
+  output: z.object({ authorizeUrl: z.string() }),
+});
+
+/** The `state` and `code` Google sent back to `/signin-google`, posted by that page (a GET never uses a code). */
+export const completeGoogleSignIn = endpoint({
+  method: 'POST',
+  path: '/api/auth/google/complete',
+  access: 'public',
+  input: z.object({ state: z.string().min(20).max(200), code: z.string().min(1).max(2000) }),
+  output: Me,
+});
+
+// ---------------------------------------------------------------- passkeys (S33, D-210)
+/** WebAuthn options and answers are JSON objects defined by the standard; the server library checks them. */
+const WebAuthnJson = z.record(z.string(), z.unknown());
+
+export const Passkey = z.object({
+  id: z.string(),
+  name: z.string(),
+  createdAt: z.number(),
+  lastUsedAt: z.number().nullable(),
+  /** The authenticator says the key is synced to the person's other devices. */
+  backedUp: z.boolean(),
+});
+
+export const listPasskeys = endpoint({ method: 'GET', path: '/api/auth/passkeys', access: 'account', input: Empty, output: z.object({ passkeys: z.array(Passkey) }) });
+
+/** Adding a passkey, step 1: re-authentication (the password, or a fresh email, Google or passkey sign-in), then the options for the browser. */
+export const startPasskeyRegistration = endpoint({
+  method: 'POST',
+  path: '/api/auth/passkeys/register/start',
+  access: 'account',
+  input: z.object({ currentPassword: z.string().min(1).max(200).optional() }),
+  output: z.object({ options: WebAuthnJson }),
+});
+
+/** Step 2: the browser's answer and a name for the passkey ("My phone"). */
+export const finishPasskeyRegistration = endpoint({
+  method: 'POST',
+  path: '/api/auth/passkeys/register/finish',
+  access: 'account',
+  input: z.object({ response: WebAuthnJson, name: z.string().trim().max(60).optional() }),
+  output: Passkey,
+});
+
+export const removePasskey = endpoint({ method: 'DELETE', path: '/api/auth/passkeys/:passkeyId', access: 'account', input: z.object({ passkeyId: z.string().min(1).max(64) }), output: Ok });
+
+/**
+ * Should this session be offered a passkey now (S33, D-210)? True right after a sign-in by email link,
+ * code, invite or Google, while the account has no passkey, passkeys can work on this address and the
+ * person has not said "Don't ask again". The browser adds its own checks (it supports passkeys, it is
+ * not a classroom display, "Not now" on this device).
+ */
+export const passkeyOffer = endpoint({ method: 'GET', path: '/api/auth/passkeys/offer', access: 'account', input: Empty, output: z.object({ offer: z.boolean() }) });
+/** "Don't ask again": no more offers for this account, on any device. */
+export const dismissPasskeyOffer = endpoint({ method: 'POST', path: '/api/auth/passkeys/offer/dismiss', access: 'account', input: Empty, output: Ok });
+
+/** Signing in with a passkey: no username; the browser offers the passkeys it holds for this site. */
+export const startPasskeySignIn = endpoint({ method: 'POST', path: '/api/auth/passkeys/signin/start', access: 'public', input: Empty, output: z.object({ options: WebAuthnJson }) });
+export const finishPasskeySignIn = endpoint({ method: 'POST', path: '/api/auth/passkeys/signin/finish', access: 'public', input: z.object({ response: WebAuthnJson }), output: Me });
 
 /** Switching to email-link sign-in, step 1: current password, then a code is emailed to the account's address. */
 export const startEmailLinkMethod = endpoint({

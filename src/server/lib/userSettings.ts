@@ -39,6 +39,8 @@ export const USER_SETTINGS = {
   'lessons.fullscreen': setting(z.boolean(), false),
   /** S22d (D-178): Compact / Normal / Large in the teacher and admin areas (Normal by default; the classroom screen sizes its cards by itself: the D-177 fit, D-195). */
   'area.density': setting(AreaDensity, DEFAULT_AREA_DENSITY),
+  /** S33 (D-210): after a sign-in without a passkey, offer to add one; "Don't ask again" switches it off for the account. */
+  'passkeys.offer': setting(z.boolean(), true),
 } as const;
 
 export type UserSettingKey = keyof typeof USER_SETTINGS;

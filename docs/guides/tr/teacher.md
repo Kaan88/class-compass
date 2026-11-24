@@ -17,7 +17,19 @@ Hesabınızı okul yöneticiniz açar. Genellikle size bir **davet bağlantısı
 - **Şifreyle**: kullanıcı adınızı ve kendi belirlediğiniz şifreyi (en az 10 karakter) yazarsınız.
 - **E-posta giriş bağlantılarıyla**: şifreniz olmaz. Her girişte giriş sayfasında **Bana e-postayla giriş bağlantısı gönder** düğmesine basıp e-posta adresinizi yazarsınız. Bir dakika içinde bir bağlantı ve 6 haneli bir kod gelir. Bağlantıyı açıp **Giriş yap**'a basın ya da kodu e-postayı istediğiniz cihaza yazın. İkisi de yalnızca bir kez ve 15 dakika boyunca çalışır. Sayfa yazdığınız adresi tekrar gösterir, böylece yazım hatasını görebilirsiniz; **Başka bir e-posta adresi kullan** ile adresi yeniden yazabilirsiniz. Bu seçenek yalnızca okulda e-posta gönderimi ayarlanmışsa görünür.
 
-Bazı okullar öğretmenler için şifreyi kapatır. O zaman davet yalnızca e-posta giriş bağlantılarını sunar, giriş sayfası bunu söyler ve profilinizde **Bunun yerine şifre kullan** bulunmaz.
+Bazı okullar şifreleri kapatır. O zaman davet yalnızca e-posta giriş bağlantılarını sunar, giriş sayfasında şifre alanı bulunmaz ve profilinizde **Bunun yerine şifre kullan** yer almaz.
+
+Giriş sayfasında **Google ile giriş yap** görünüyorsa, hesabınızdaki e-posta adresi Google adresinizse bunu kullanabilirsiniz. **Yalnızca kendi cihazınızda kullanın.** Sınıf bilgisayarında ya da başkalarıyla paylaştığınız bir bilgisayarda bunun yerine e-posta kodunu kullanın: Google ile giriş, Google hesabınızı e-postalarınızla birlikte o tarayıcıda açık bırakır. Sınıf ekranı olarak kullanılmış bir bilgisayarda sayfa bunu hatırlatır ve Google düğmesini geri tutar.
+
+### Geçiş anahtarları
+
+Geçiş anahtarıyla parmak iziniz, yüzünüz ya da cihazınızın ekran kilidiyle giriş yaparsınız: şifre yazmanız ya da e-posta beklemeniz gerekmez. Anahtarı telefonunuz, bilgisayarınız ya da şifre yöneticiniz saklar; sitede yalnızca açık yarısı tutulur.
+
+- **Öneri:** e-posta ya da Google ile giriş yaptıktan hemen sonra **Bir dahaki sefere daha hızlı giriş yapın** kartı, o cihaza geçiş anahtarı eklemeyi önerir. **Geçiş anahtarı ekle**'ye yalnızca size ait bir cihazda basın; **Şimdi değil** kartı o cihazda bir ay gizler, **Bir daha sorma** ise tümüyle kapatır.
+- **Kendiniz eklemek için:** **Profil → Geçiş anahtarları** bölümünü açın, "Telefonum" gibi bir ad verin, kimliğinizi doğrulayın (şifreniz ya da şifreniz yoksa son 15 dakika içinde yapılmış bir giriş) ve **Geçiş anahtarı ekle**'ye basın. Cihazınız parmak izinizi, yüzünüzü ya da ekran kilidinizi ister.
+- **Giriş yapmak için:** giriş sayfasında **Geçiş anahtarıyla giriş yap**'a basın. Kullanıcı adı yazmazsınız.
+- **Sınıf bilgisayarına** geçiş anahtarı eklemeyin: o bilgisayarın kilidini açabilen herkes sizin adınıza giriş yapabilir. Profil orada düğmeyi geri tutar ve nedenini söyler. Yine de o bilgisayarda telefonunuzdaki geçiş anahtarıyla **giriş yapabilirsiniz**: **Geçiş anahtarıyla giriş yap**'a basıp tarayıcının sunduğu telefon ya da QR kod seçeneğini kullanın.
+- **Cihazınızı mı kaybettiniz?** Başka bir cihazdan **Profil → Geçiş anahtarları** altında o anahtarı kaldırın ya da yöneticinizden geçiş anahtarlarınızı kaldırmasını isteyin. E-posta giriş bağlantıları çalışmaya devam eder.
 
 Yöneticiniz size davet yerine **geçici şifre** verdiyse ilk girişte kendi şifrenizi belirlemeniz gerekir.
 

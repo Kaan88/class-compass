@@ -27,9 +27,9 @@ export const normaliseLogin = (login: string) => foldForSearch(login.trim());
 /** How long a session made by an email link, code or invite counts as re-authentication (S13b, D-108). */
 export const FRESH_SIGN_IN_MS = 15 * 60 * 1000;
 
-/** A session signed in with an email link, code or invite within FRESH_SIGN_IN_MS (re-authentication for email-link accounts). */
-export const isFreshEmailSession = (session: SessionRow, now: number) =>
-  (session.authMethod === 'email_link' || session.authMethod === 'invite') && now - session.createdAt <= FRESH_SIGN_IN_MS;
+/** A session signed in with an email link, code, invite, Google or a passkey within FRESH_SIGN_IN_MS (re-authentication for email-link accounts). */
+const FRESH_METHODS: ReadonlyArray<SessionRow['authMethod']> = ['email_link', 'invite', 'google', 'passkey'];
+export const isFreshEmailSession = (session: SessionRow, now: number) => FRESH_METHODS.includes(session.authMethod) && now - session.createdAt <= FRESH_SIGN_IN_MS;
 
 export function toMe(db: Db, user: UserRow, session: SessionRow, now: number): Me {
   return {
@@ -97,9 +97,9 @@ export async function login(deps: AppDeps, ip: string, loginName: string, passwo
   const hasPassword = Boolean(user?.passwordHash);
   const ok = (await verifyPassword(hasPassword ? user!.passwordHash : DUMMY_HASH, password)) && hasPassword;
   const now = deps.now();
-  // While teachers sign in with email links only (D-207) a teacher's password is never accepted, with
-  // the same answer and timing as a wrong one.
-  if (!user || !ok || user.disabledAt || passwordBlocked(db, user)) {
+  // While the school has switched passwords off (D-207) no password is accepted, with the same answer
+  // and timing as a wrong one.
+  if (!user || !ok || user.disabledAt || passwordBlocked(db)) {
     recordFailure(db, ipKey, now, IP_MAX_FAILURES);
     if (userKey) recordFailure(db, userKey, now, LOGIN_FREE_FAILURES);
     throw new AppError('UNAUTHENTICATED', 'Incorrect sign-in details');
@@ -320,6 +320,7 @@ export function insertUser(db: Db, input: NewUserInput, passwordHash: string, ac
     mustChangePassword: input.mustChangePassword ?? false,
     signInMethod: 'password',
     emailVerifiedAt: null,
+    googleSub: null,
     timeUpClipFileId: null,
     disabledAt: null,
     createdAt: now,
@@ -352,8 +353,8 @@ export function requestPasswordReset(deps: AppDeps, emailInput: string): void {
     .where(and(sql`lower(${users.email}) = ${email}`, isNull(users.disabledAt)))
     .all()
     // Email-link accounts have no password to reset (D-108); they sign in with a link instead. The same
-    // goes for every teacher while the school allows them email links only (D-207).
-    .filter((u) => u.signInMethod === 'password' && !passwordBlocked(db, u));
+    // goes for every account while the school has switched passwords off (D-207).
+    .filter((u) => u.signInMethod === 'password' && !passwordBlocked(db));
   for (const user of matches) {
     const token = randomToken();
     const sent = tx(db, () => {
@@ -406,7 +407,7 @@ export async function completePasswordReset(deps: AppDeps, token: string, newPas
     const fresh = find(); // re-check inside the transaction: single use even under races
     if (!fresh) throw invalidLink();
     const user = db.select().from(users).where(eq(users.id, fresh.userId)).get();
-    if (!user || user.disabledAt || passwordBlocked(db, user)) throw invalidLink();
+    if (!user || user.disabledAt || passwordBlocked(db)) throw invalidLink();
     const now = deps.now();
     db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, fresh.id)).run();
     db.update(users).set({ passwordHash, mustChangePassword: false, signInMethod: 'password', updatedAt: now }).where(eq(users.id, user.id)).run();

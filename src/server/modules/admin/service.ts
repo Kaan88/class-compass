@@ -12,22 +12,25 @@ import { audit } from '../../lib/audit.ts';
 import type { RequestContext, UserRow } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
 import { hashPassword, randomToken } from '../../lib/crypto.ts';
-import { conflict, invalid, notFound } from '../../lib/errors.ts';
+import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { createUser, insertUser, invalidateResetTokens, revokeAllUserMcpTokens, revokeAllUserSessions } from '../auth/service.ts';
-import { emailLinkEnabled, inviteStatus, issueInvite, revokeEmailLinks, revokeInvite } from '../auth/emailSignIn.ts';
-import { emailLinkRequired, passwordBlocked, teacherEmailLinkOnly } from '../auth/signInPolicy.ts';
+import { emailLinkEnabled, inviteStatus, issueInvite, revokeEmailLinks, revokeInvite, sendPolicyCode, usePolicyCode } from '../auth/emailSignIn.ts';
+import { emailLinkRequired, passwordBlocked, passwordsOff } from '../auth/signInPolicy.ts';
+import { passkeyCount, removeAllPasskeys } from '../auth/passkeys.ts';
 
 type In<T extends { input: z.ZodType }> = z.infer<T['input']>;
 
 /** 16 URL-safe characters (~96 bits). */
 export const temporaryPassword = () => randomToken(12);
 
-export function adminUserDto(u: UserRow, invite: { pending: boolean; expiresAt: number | null } = { pending: false, expiresAt: null }) {
+export function adminUserDto(u: UserRow, invite: { pending: boolean; expiresAt: number | null } = { pending: false, expiresAt: null }, passkeys = 0) {
   return {
+    passkeys,
     signInMethod: u.signInMethod,
     emailVerified: u.emailVerifiedAt !== null,
     invitePending: invite.pending,
     inviteExpiresAt: invite.expiresAt,
+    googleLinked: u.googleSub !== null,
     id: u.id,
     login: u.login,
     displayName: u.displayName,
@@ -47,7 +50,7 @@ function getUser(db: Db, id: string): UserRow {
   return u;
 }
 
-const dtoOf = (deps: Pick<RequestContext, 'db' | 'now'>, u: UserRow) => adminUserDto(u, inviteStatus(deps.db, u.id, deps.now()));
+const dtoOf = (deps: Pick<RequestContext, 'db' | 'now'>, u: UserRow) => adminUserDto(u, inviteStatus(deps.db, u.id, deps.now()), passkeyCount(deps.db, u.id));
 
 export function listUsers(deps: Pick<RequestContext, 'db' | 'now'>) {
   return deps.db
@@ -62,10 +65,10 @@ export async function createUserByAdmin(ctx: RequestContext, input: In<typeof C.
   // The admin chooses the new account's interface language (S13a, D-099), English by default.
   const locale = input.locale;
   const base = { login: input.login, displayName: normaliseName(input.displayName), role: input.role, email: input.email ?? null, locale };
-  // D-207: while teachers sign in with email links only, a new teacher needs an address and gets an invite, never a password.
-  if (passwordBlocked(ctx.db, base)) {
+  // D-207: while passwords are off, a new account needs an address and gets an invite, never a password.
+  if (passwordBlocked(ctx.db)) {
     if (input.setup === 'temporary_password') throw emailLinkRequired();
-    if (!base.email) throw invalid('A teacher needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
+    if (!base.email) throw invalid('The account needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
   }
   if (input.setup === 'temporary_password') {
     const password = temporaryPassword();
@@ -97,11 +100,12 @@ export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.update
     if (input.displayName !== undefined) patch.displayName = normaliseName(input.displayName);
     if (input.email !== undefined) patch.email = input.email?.trim().toLowerCase() || null;
     if (input.locale !== undefined) patch.locale = input.locale;
-    // D-207: without an address a teacher could not sign in at all.
-    if (patch.email === null && u.email !== null && passwordBlocked(ctx.db, u)) throw invalid('A teacher needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
+    // D-207: without an address the account could not sign in at all.
+    if (patch.email === null && u.email !== null && passwordBlocked(ctx.db)) throw invalid('The account needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
     const emailChanged = patch.email !== undefined && patch.email !== u.email;
     // A new address is not verified until a mail to it is used (an invite or a sign-in link).
-    ctx.db.update(users).set({ ...patch, ...(emailChanged ? { emailVerifiedAt: null } : {}), updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
+    // The Google id belonged to the previous address (D-208): the new one must be proven again.
+    ctx.db.update(users).set({ ...patch, ...(emailChanged ? { emailVerifiedAt: null, googleSub: null } : {}), updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
     // Reset links, invites and sign-in links already mailed to the previous address must stop working (D-015, D-108).
     if (emailChanged) {
       invalidateResetTokens(ctx.db, u.id, ctx.now());
@@ -151,7 +155,7 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
 export async function resetPasswordByAdmin(ctx: RequestContext, userId: string) {
   const u = getUser(ctx.db, userId);
   if (u.id === requireUser(ctx).id) throw invalid('Use “change password” for your own account', { reason: 'OWN_PASSWORD' });
-  if (passwordBlocked(ctx.db, u)) throw emailLinkRequired(); // D-207: send a new invite instead
+  if (passwordBlocked(ctx.db)) throw emailLinkRequired(); // D-207: send a new invite instead
   const password = temporaryPassword();
   const passwordHash = await hashPassword(password);
   tx(ctx.db, () => {
@@ -165,6 +169,16 @@ export async function resetPasswordByAdmin(ctx: RequestContext, userId: string) 
     audit(ctx.db, ctx.actor, { action: 'auth.password_reset_admin', entity: 'user', entityId: u.id }, now);
   });
   return { temporaryPassword: password };
+}
+
+/** A lost or stolen device (D-210): every passkey of the account stops working; its sessions end too. */
+export function removePasskeysByAdmin(ctx: RequestContext, userId: string) {
+  return tx(ctx.db, () => {
+    const u = getUser(ctx.db, userId);
+    const now = ctx.now();
+    if (removeAllPasskeys(ctx.db, ctx.actor, u.id, now)) revokeAllUserSessions(ctx.db, u.id, now);
+    return dtoOf(ctx, u);
+  });
 }
 
 /**
@@ -183,38 +197,55 @@ export function clearPinByAdmin(ctx: RequestContext, userId: string) {
 
 // ---------------------------------------------------------------- sign-in policy (S30, D-207)
 const hasPassword = (u: UserRow) => u.signInMethod === 'password' && u.passwordHash !== '';
+const withoutEmail = (all: UserRow[]) => all.filter((u) => u.disabledAt === null && !u.email);
 
 export function signInPolicy(ctx: RequestContext) {
-  const teachers = ctx.db.select().from(users).where(eq(users.role, 'teacher')).all();
+  const all = ctx.db.select().from(users).all();
   return {
-    teacherEmailLinkOnly: teacherEmailLinkOnly(ctx.db),
+    passwordsOff: passwordsOff(ctx.db),
     emailReady: emailLinkEnabled(ctx),
-    teachersWithPassword: teachers.filter(hasPassword).length,
-    teachersWithoutEmail: teachers
-      .filter((u) => u.disabledAt === null && !u.email)
+    accountsWithPassword: all.filter(hasPassword).length,
+    accountsWithoutEmail: withoutEmail(all)
       .sort((a, b) => compareNames(a.displayName, b.displayName))
       .map((u) => ({ id: u.id, displayName: u.displayName })),
+    ownEmail: requireUser(ctx).email,
   };
 }
 
+/** What must hold before passwords can be switched off: otherwise somebody is locked out. */
+function assertCanSwitchOff(ctx: RequestContext, all: UserRow[]) {
+  if (!emailLinkEnabled(ctx)) throw invalid('Email is not set up', { reason: 'SMTP_NOT_CONFIGURED' });
+  if (withoutEmail(all).length) throw conflict('Every active account needs an email address first', { reason: 'ACCOUNTS_WITHOUT_EMAIL' });
+}
+
+/** Step 1 of switching passwords off: a code to the administrator's own address (it proves mail arrives). */
+export function requestSignInPolicyCode(ctx: RequestContext) {
+  assertCanSwitchOff(ctx, ctx.db.select().from(users).all());
+  sendPolicyCode(ctx, requireUser(ctx), ctx.session!);
+}
+
 /**
- * "Teachers sign in with email links only" (D-207). Switching it on needs working email and an address
- * on every active teacher account (otherwise they would be locked out), and in the same transaction
- * removes every teacher's password: the account becomes an email-link account, its reset links and AI
- * tool tokens stop (as for any change of sign-in method), and each change is audited. Open sessions
- * stay open, so a lesson that is running is not interrupted. Switching it off changes no account.
+ * "Nobody signs in with a password" (D-207). Switching it on needs working email, an address on every
+ * active account and the code emailed to the administrator who asks, and in the same transaction
+ * removes every password, the administrator's own included: each account becomes an email-link
+ * account, its reset links and AI tool tokens stop (as for any change of sign-in method), and each
+ * change is audited. Open sessions stay open, so a lesson that is running is not interrupted and the
+ * administrator stays signed in. Switching it off changes no account.
  */
-export function setTeacherEmailLinkOnly(ctx: RequestContext, on: boolean) {
-  return tx(ctx.db, () => {
-    const before = teacherEmailLinkOnly(ctx.db);
-    if (on === before) return signInPolicy(ctx);
+export function setPasswordsOff(ctx: RequestContext, on: boolean, code: string | undefined) {
+  const done = tx(ctx.db, () => {
+    const before = passwordsOff(ctx.db);
+    if (on === before) return { ok: true as const };
     const now = ctx.now();
     let converted = 0;
     if (on) {
-      if (!emailLinkEnabled(ctx)) throw invalid('Email is not set up', { reason: 'SMTP_NOT_CONFIGURED' });
-      const teachers = ctx.db.select().from(users).where(eq(users.role, 'teacher')).all();
-      if (teachers.some((u) => u.disabledAt === null && !u.email)) throw conflict('Every active teacher needs an email address first', { reason: 'TEACHERS_WITHOUT_EMAIL' });
-      for (const u of teachers) {
+      const all = ctx.db.select().from(users).all();
+      assertCanSwitchOff(ctx, all);
+      if (!code) throw invalid('Type the code from the email', { reason: 'SIGNIN_CODE_INVALID' });
+      const checked = usePolicyCode(ctx, ctx.session!, code);
+      // A wrong try must be counted, so the transaction ends normally and the error follows it.
+      if (!checked.ok) return checked;
+      for (const u of all) {
         invalidateResetTokens(ctx.db, u.id, now);
         if (!hasPassword(u)) continue; // an email-link account already, or an invite that is still open
         ctx.db.update(users).set({ signInMethod: 'email_link', passwordHash: '', mustChangePassword: false, updatedAt: now }).where(eq(users.id, u.id)).run();
@@ -223,10 +254,12 @@ export function setTeacherEmailLinkOnly(ctx: RequestContext, on: boolean) {
         converted += 1;
       }
     }
-    ctx.db.update(schoolSettings).set({ teacherEmailLinkOnly: on, updatedAt: now }).where(eq(schoolSettings.id, 1)).run();
-    audit(ctx.db, ctx.actor, { action: 'school.sign_in_policy', entity: 'school', before: { teacherEmailLinkOnly: before }, after: { teacherEmailLinkOnly: on, ...(on ? { passwordsRemoved: converted } : {}) } }, now);
-    return signInPolicy(ctx);
+    ctx.db.update(schoolSettings).set({ passwordsOff: on, updatedAt: now }).where(eq(schoolSettings.id, 1)).run();
+    audit(ctx.db, ctx.actor, { action: 'school.sign_in_policy', entity: 'school', before: { passwordsOff: before }, after: { passwordsOff: on, ...(on ? { passwordsRemoved: converted } : {}) } }, now);
+    return { ok: true as const };
   });
+  if (!done.ok) throw new AppError('UNAUTHENTICATED', 'Wrong or expired code', { reason: 'SIGNIN_CODE_INVALID', attemptsLeft: done.attemptsLeft });
+  return signInPolicy(ctx);
 }
 
 // ---------------------------------------------------------------- audit log

@@ -1,6 +1,7 @@
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import * as Auth from '../../shared/contracts/auth.ts';
 import { ApiError, call } from './api.ts';
+import { markClassroomDevice } from './classroomDevice.ts';
 import { purgeSensitive, queryClient } from './queryClient.ts';
 import { clearAllToasts, clearSensitiveToasts } from './toast.ts';
 
@@ -106,6 +107,8 @@ export async function enterClassroom(qc: QueryClient = queryClient) {
   purgeSensitive(qc);
   clearSensitiveToasts();
   await call(Auth.enterClassroom, {});
+  // Remembered on the device: the sign-in page keeps Google sign-in away from a classroom display (D-208).
+  markClassroomDevice();
   relockPending = false;
   return freshMe(qc);
 }

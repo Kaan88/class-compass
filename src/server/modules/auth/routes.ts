@@ -13,6 +13,8 @@ import { setUserSetting } from '../../lib/userSettings.ts';
 import { getSchoolSettings } from '../school/policy.ts';
 import * as svc from './service.ts';
 import * as email from './emailSignIn.ts';
+import * as google from './google.ts';
+import * as passkey from './passkeys.ts';
 
 function setSessionCookie(deps: AppDeps, reply: FastifyReply, token: string, maxAgeMs: number) {
   reply.setCookie(sessionCookieName(deps), token, {
@@ -95,7 +97,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     return freshMe(ctx);
   });
 
-  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx), teacherEmailLinkOnly: getSchoolSettings(ctx.db).teacherEmailLinkOnly, defaultLocale: getSchoolSettings(ctx.db).defaultLocale }));
+  route(app, deps, C.passwordResetAvailable, (ctx) => ({ emailResetEnabled: emailResetEnabled(ctx), emailLinkEnabled: emailResetEnabled(ctx), passwordsOff: getSchoolSettings(ctx.db).passwordsOff, googleSignInEnabled: google.googleSignInEnabled(ctx), passkeysEnabled: passkey.passkeysEnabled(ctx), defaultLocale: getSchoolSettings(ctx.db).defaultLocale }));
   route(
     app,
     deps,
@@ -154,6 +156,88 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     { rateLimit: { max: 5, timeWindow: '15 minutes' } },
   );
   route(app, deps, C.confirmEmailLinkMethod, (ctx, input) => email.confirmEmailLinkMethod(ctx, requireUser(ctx), ctx.session!, input.code), { rateLimit: { max: 10, timeWindow: '15 minutes' } });
+  // Sign in with Google (S31, D-208): the cookie binds Google's answer to the browser that asked.
+  const googleCookie = { path: google.GOOGLE_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'lax' as const };
+  route(
+    app,
+    deps,
+    C.startGoogleSignIn,
+    (ctx, _i, { reply }) => {
+      const started = google.startGoogleSignIn(ctx);
+      reply.setCookie(google.GOOGLE_COOKIE, started.cookie, { ...googleCookie, maxAge: Math.floor(google.GOOGLE_STATE_TTL_MS / 1000) });
+      return { authorizeUrl: started.authorizeUrl };
+    },
+    { rateLimit: { max: 20, timeWindow: '15 minutes' } },
+  );
+  route(
+    app,
+    deps,
+    C.completeGoogleSignIn,
+    async (ctx, input, { req, reply }) => {
+      // One try per start: the cookie goes whether or not the sign-in works.
+      reply.clearCookie(google.GOOGLE_COOKIE, googleCookie);
+      return signedIn(ctx, reply, await google.completeGoogleSignIn(ctx, req.cookies?.[google.GOOGLE_COOKIE], input));
+    },
+    { rateLimit: { max: 20, timeWindow: '15 minutes' } },
+  );
+  // Passkeys (S33, D-210): the challenge of each step lives in a sealed cookie, for one try.
+  const passkeyCookie = { path: passkey.PASSKEY_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'strict' as const };
+  const passkeyMaxAge = Math.floor(passkey.PASSKEY_CHALLENGE_TTL_MS / 1000);
+  const passkeyLimit = { rateLimit: { max: 30, timeWindow: '15 minutes' } };
+  route(app, deps, C.passkeyOffer, (ctx) => ({ offer: passkey.shouldOfferPasskey(ctx, requireUser(ctx), ctx.session!) }));
+  route(app, deps, C.dismissPasskeyOffer, (ctx) => {
+    passkey.dismissPasskeyOffer(ctx, requireUser(ctx));
+    return { ok: true as const };
+  });
+  route(app, deps, C.listPasskeys, (ctx) => ({ passkeys: passkey.listPasskeys(ctx.db, requireUser(ctx).id) }));
+  route(
+    app,
+    deps,
+    C.startPasskeyRegistration,
+    async (ctx, input, { reply }) => {
+      const user = requireUser(ctx);
+      await svc.assertReauth(ctx, user, ctx.session!, input.currentPassword);
+      const started = await passkey.startRegistration(ctx, user);
+      reply.setCookie(passkey.PASSKEY_COOKIE, started.cookie, { ...passkeyCookie, maxAge: passkeyMaxAge });
+      return { options: started.options as unknown as Record<string, unknown> };
+    },
+    passkeyLimit,
+  );
+  route(
+    app,
+    deps,
+    C.finishPasskeyRegistration,
+    async (ctx, input, { req, reply }) => {
+      reply.clearCookie(passkey.PASSKEY_COOKIE, passkeyCookie);
+      return passkey.finishRegistration(ctx, requireUser(ctx), req.cookies?.[passkey.PASSKEY_COOKIE], input.response, input.name);
+    },
+    passkeyLimit,
+  );
+  route(app, deps, C.removePasskey, (ctx, input) => {
+    passkey.removePasskey(ctx, requireUser(ctx), input.passkeyId);
+    return { ok: true as const };
+  });
+  route(
+    app,
+    deps,
+    C.startPasskeySignIn,
+    async (ctx, _i, { reply }) => {
+      const started = await passkey.startSignIn(ctx);
+      reply.setCookie(passkey.PASSKEY_COOKIE, started.cookie, { ...passkeyCookie, maxAge: passkeyMaxAge });
+      return { options: started.options as unknown as Record<string, unknown> };
+    },
+    passkeyLimit,
+  );
+  route(
+    app,
+    deps,
+    C.finishPasskeySignIn,
+    async (ctx, input, { req, reply }) => {
+      reply.clearCookie(passkey.PASSKEY_COOKIE, passkeyCookie);
+      return signedIn(ctx, reply, await passkey.finishSignIn(ctx, req.cookies?.[passkey.PASSKEY_COOKIE], input.response));
+    },
+    passkeyLimit,
+  );
   route(app, deps, C.switchToPassword, (ctx, input) =>
     email.switchToPassword(ctx, requireUser(ctx), ctx.session!, input.newPassword, svc.isFreshEmailSession(ctx.session!, ctx.now())),
   );

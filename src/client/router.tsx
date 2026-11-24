@@ -11,6 +11,8 @@ import { AdminHome, AdminLayout } from './routes/admin/Admin.tsx';
 import { ChangePasswordPage, LoginPage, ResetPasswordPage } from './routes/Auth.tsx';
 import { ClassroomPage } from './routes/Classroom.tsx';
 import { InvitePage, SignInLinkPage } from './routes/SignIn.tsx';
+import { GoogleReturnPage } from './routes/GoogleSignIn.tsx';
+import { PrivacyPage } from './help/PrivacyPage.tsx';
 import { OAuthConsentPage, type ConsentSearch } from './routes/OAuthConsent.tsx';
 import { AiConnectionReturnPage } from './routes/AiConnections.tsx';
 import { homeFor, requireClassroomSession, requireSession, type RouterContext } from './routes/guards.ts';
@@ -78,6 +80,20 @@ const resetRoute = createRoute({ getParentRoute: () => rootRoute, path: '/reset-
 
 const inviteRoute = createRoute({ getParentRoute: () => rootRoute, path: '/invite', component: InvitePage });
 const signInLinkRoute = createRoute({ getParentRoute: () => rootRoute, path: '/signin-link', component: SignInLinkPage });
+/** Where Google sends the browser back (S31, D-208): `code` and `state`, or `error` when the person cancelled. */
+const googleReturnRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/signin-google',
+  validateSearch: (s: Record<string, unknown>): { state?: string | undefined; code?: string | undefined; error?: string | undefined } => ({
+    state: typeof s.state === 'string' ? s.state : undefined,
+    code: typeof s.code === 'string' ? s.code : undefined,
+    error: typeof s.error === 'string' ? s.error : undefined,
+  }),
+  component: function GoogleReturnRoute() {
+    const search = googleReturnRoute.useSearch();
+    return <GoogleReturnPage state={search.state} code={search.code} denied={search.error !== undefined} />;
+  },
+});
 
 const changePasswordRoute = createRoute({ getParentRoute: () => rootRoute, path: '/change-password', beforeLoad: requireSession, component: ChangePasswordPage });
 
@@ -180,6 +196,9 @@ const helpRoute = createRoute({
   component: HelpPage,
 });
 
+/** The privacy page (S32, D-209): public, no account needed; the same text as the Privacy guide in Help. */
+const privacyRoute = createRoute({ getParentRoute: () => rootRoute, path: '/privacy', component: PrivacyPage });
+
 /**
  * OAuth consent for AI apps (S14h2, D-160): `?request=<id>` needs a session (sign-in first, then back
  * here through `next`) and the PIN unlock in classroom mode (ConsentGate); `?error=<code>` is the page
@@ -229,6 +248,8 @@ const routeTree = rootRoute.addChildren([
   resetRoute,
   inviteRoute,
   signInLinkRoute,
+  googleReturnRoute,
+  privacyRoute,
   changePasswordRoute,
   classroomRoute,
   teacherRoute.addChildren([teacherIndex, teacherPage]),

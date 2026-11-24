@@ -18,6 +18,7 @@ Bu kılavuzlar Sınıf Pusulası'nı okulda kullananlar içindir. Her kılavuz a
 | Teachers and administrators: AI tools (MCP, personal tokens, what leaves the school) | [AI tools](en/ai-tools.md) | [Yapay zekâ araçları](tr/ai-tools.md) |
 | Students: quick start | [Quick start for students](en/quick-start-student.md) | [Öğrenciler için hızlı başlangıç](tr/quick-start-student.md) |
 | Students and parents | [Students and parents guide](en/student.md) | [Öğrenciler ve veliler kılavuzu](tr/student.md) |
+| Everyone: privacy (also public at `/privacy`, without an account; S32, D-209) | [Privacy](en/privacy.md) | [Gizlilik](tr/privacy.md) |
 
 The IT person's server guide (installation, email, backups, restore) is `docs/OPERATIONS.md`; it is not part of the in-app Help.
 

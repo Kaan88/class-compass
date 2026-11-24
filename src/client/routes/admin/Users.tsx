@@ -6,7 +6,8 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import * as Admin from '../../../shared/contracts/admin.ts';
-import { call } from '../../lib/api.ts';
+import * as Auth from '../../../shared/contracts/auth.ts';
+import { ApiError, call } from '../../lib/api.ts';
 import { copyText } from '../../lib/clipboard.ts';
 import { errorText } from '../../lib/errors.ts';
 import { useI18n } from '../../lib/i18n.tsx';
@@ -28,46 +29,114 @@ const USERS = [...ADMIN, 'users'];
 const POLICY = [...ADMIN, 'sign-in-policy'];
 
 /**
- * "How teachers sign in" (S30, D-207): one school-wide rule. Switching passwords off for teachers
- * removes their passwords, so the step is confirmed with what it does; it is not offered while the
- * school's email is not set up or an active teacher has no address (they would be locked out).
+ * "Passwords" (S30, D-207): one school-wide rule. Switching passwords off removes every password, the
+ * administrator's own included, so the step explains what it does and asks for a code emailed to the
+ * administrator: typing it shows that sign-in emails arrive. It is not offered while the school's email
+ * is not set up or an active account has no address (somebody would be locked out).
  */
-function SignInPolicySection() {
+function SignInPolicySection({ googleEnabled }: { googleEnabled: boolean }) {
   const { t } = useI18n();
   const run = useRun();
+  const qc = useQueryClient();
   const policy = useQuery({ queryKey: POLICY, queryFn: () => call(Admin.getSignInPolicy, {}) });
   const [confirming, setConfirming] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const p = policy.data;
   if (!p) return null;
-  const on = p.teacherEmailLinkOnly;
-  const blocked = !on && (!p.emailReady || p.teachersWithoutEmail.length > 0);
+  const on = p.passwordsOff;
+  const blocked = !on && (!p.emailReady || p.accountsWithoutEmail.length > 0 || !p.ownEmail);
+  const close = () => {
+    setConfirming(false);
+    setCodeSent(false);
+    setCode('');
+    setError(null);
+  };
+  const changed = [POLICY, USERS, ['public', 'reset-available']];
   return (
     <section className="cc-card cc-stack" aria-labelledby="signin-policy-title" data-testid="signin-policy">
       <h2 id="signin-policy-title" className="cc-h2">
         {t('users.policyTitle')}
       </h2>
       <p>{on ? t('users.policyOn') : t('users.policyOff')}</p>
+      {on && googleEnabled ? <p className="cc-muted">{t('users.policyGoogle')}</p> : null}
       {!on && !p.emailReady ? <Alert kind="warning">{t('users.policyNeedsEmail')}</Alert> : null}
-      {!on && p.emailReady && p.teachersWithoutEmail.length > 0 ? <Alert kind="warning">{t('users.policyMissing', { names: p.teachersWithoutEmail.map((u) => u.displayName).join(', ') })}</Alert> : null}
+      {!on && p.emailReady && p.accountsWithoutEmail.length > 0 ? <Alert kind="warning">{t('users.policyMissing', { names: p.accountsWithoutEmail.map((u) => u.displayName).join(', ') })}</Alert> : null}
+      {!on && p.emailReady && p.accountsWithoutEmail.length === 0 && !p.ownEmail ? <Alert kind="warning">{t('users.policyOwnEmail')}</Alert> : null}
       <div>
         <Button isDisabled={blocked} onPress={() => setConfirming(true)}>
           {on ? t('users.policyTurnOff') : t('users.policyTurnOn')}
         </Button>
       </div>
-      <Modal isOpen={confirming} onOpenChange={setConfirming} title={on ? t('users.policyTurnOff') : t('users.policyTurnOn')}>
-        <p>{on ? t('users.policyConfirmOff') : t('users.policyConfirmOn', { count: p.teachersWithPassword })}</p>
-        <DialogActions>
-          <Button onPress={() => setConfirming(false)}>{t('common.cancel')}</Button>
-          <Button
-            variant={on ? 'primary' : 'danger'}
-            onPress={async () => {
-              await run(() => call(Admin.setSignInPolicy, { teacherEmailLinkOnly: !on }), { success: on ? t('users.policyChangedOff') : t('users.policyChangedOn'), invalidate: [POLICY, USERS, ['public', 'reset-available']] });
-              setConfirming(false);
+      <Modal isOpen={confirming} onOpenChange={(o) => !o && close()} title={on ? t('users.policyTurnOff') : t('users.policyTurnOn')}>
+        {on ? (
+          <>
+            <p>{t('users.policyConfirmOff')}</p>
+            <DialogActions>
+              <Button onPress={close}>{t('common.cancel')}</Button>
+              <Button
+                variant="primary"
+                onPress={async () => {
+                  await run(() => call(Admin.setSignInPolicy, { passwordsOff: false }), { success: t('users.policyChangedOff'), invalidate: changed });
+                  close();
+                }}
+              >
+                {t('users.policyTurnOff')}
+              </Button>
+            </DialogActions>
+          </>
+        ) : (
+          <form
+            className="cc-stack"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setError(null);
+              try {
+                await call(Admin.setSignInPolicy, { passwordsOff: true, code: code.trim() });
+                for (const k of changed) void qc.invalidateQueries({ queryKey: k });
+                showToast({ message: t('users.policyChangedOn'), kind: 'success' });
+                close();
+              } catch (err) {
+                const left = err instanceof ApiError ? (err.details as { attemptsLeft?: number } | undefined)?.attemptsLeft : undefined;
+                setError(typeof left === 'number' && left > 0 ? t('signin.codeWrong', { count: left }) : errorText(t, err));
+              }
             }}
           >
-            {on ? t('users.policyTurnOff') : t('users.policyTurnOn')}
-          </Button>
-        </DialogActions>
+            <p>{t('users.policyConfirmOn', { count: p.accountsWithPassword })}</p>
+            <Alert kind="warning">{t('users.policyConfirmMail')}</Alert>
+            {codeSent ? (
+              <>
+                <Alert kind="success">{t('users.policyCodeSent', { email: p.ownEmail ?? '' })}</Alert>
+                <TextField label={t('signin.code')} inputMode="numeric" autoComplete="one-time-code" maxLength={6} isRequired value={code} onChange={(v) => setCode(v.replace(/\D/gu, ''))} autoFocus />
+              </>
+            ) : null}
+            {error ? <Alert>{error}</Alert> : null}
+            <DialogActions>
+              <Button onPress={close}>{t('common.cancel')}</Button>
+              {codeSent ? (
+                <Button type="submit" variant="danger" isDisabled={code.length !== 6}>
+                  {t('users.policyTurnOn')}
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  onPress={async () => {
+                    setError(null);
+                    try {
+                      await call(Admin.requestSignInPolicyCode, {});
+                      setCodeSent(true);
+                    } catch (err) {
+                      setError(err instanceof ApiError && err.code === 'RATE_LIMITED' ? t('auth.tooMany') : errorText(t, err));
+                    }
+                  }}
+                >
+                  {t('users.policySendCode')}
+                </Button>
+              )}
+            </DialogActions>
+          </form>
+        )}
       </Modal>
     </section>
   );
@@ -161,12 +230,12 @@ function CreateUserDialog({
   isOpen,
   onOpenChange,
   onCreated,
-  teacherEmailLinkOnly,
+  passwordsOff,
 }: {
   isOpen: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated: (r: z.infer<typeof Admin.createUserByAdmin.output>) => void;
-  teacherEmailLinkOnly: boolean;
+  passwordsOff: boolean;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -178,8 +247,8 @@ function CreateUserDialog({
   const [locale, setLocale] = useState<'en' | 'tr'>('en');
   const [setup, setSetup] = useState<'invite' | 'temporary_password'>('invite');
   const [error, setError] = useState<string | null>(null);
-  // D-207: a new teacher gets an invite and needs an address while teachers sign in with email links only.
-  const emailOnly = teacherEmailLinkOnly && role === 'teacher';
+  // D-207: while passwords are off a new account gets an invite and needs an address.
+  const emailOnly = passwordsOff;
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange} title={t('users.create')}>
       <form
@@ -307,8 +376,9 @@ export function UsersPage() {
   const run = useRun();
   const qc = useQueryClient();
   const users = useQuery({ queryKey: USERS, queryFn: () => call(Admin.listUsers, {}) });
-  // Shares the query of the section below: while teachers have no password, their rows offer no password reset.
-  const emailOnly = useQuery({ queryKey: POLICY, queryFn: () => call(Admin.getSignInPolicy, {}) }).data?.teacherEmailLinkOnly ?? false;
+  // Shares the query of the section below: while passwords are off, no row offers a password reset.
+  const emailOnly = useQuery({ queryKey: POLICY, queryFn: () => call(Admin.getSignInPolicy, {}) }).data?.passwordsOff ?? false;
+  const googleEnabled = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000 }).data?.googleSignInEnabled ?? false;
   const [creating, setCreating] = useState(false);
   const [temp, setTemp] = useState<{ login: string; password: string } | null>(null);
   const [invite, setInvite] = useState<Invite | null>(null);
@@ -317,6 +387,7 @@ export function UsersPage() {
   const [deactivating, setDeactivating] = useState<AdminUser | null>(null);
   const [clearingPin, setClearingPin] = useState<AdminUser | null>(null);
   const [resetting, setResetting] = useState<AdminUser | null>(null);
+  const [removingPasskeys, setRemovingPasskeys] = useState<AdminUser | null>(null);
   const invalidate = () => qc.invalidateQueries({ queryKey: USERS });
   return (
     <main className="cc-page cc-stack">
@@ -328,7 +399,7 @@ export function UsersPage() {
           {t('users.create')}
         </Button>
       </div>
-      <SignInPolicySection />
+      <SignInPolicySection googleEnabled={googleEnabled} />
       <DataTable
         stack
         caption={t('users.caption')}
@@ -371,6 +442,8 @@ export function UsersPage() {
                 {u.mustChangePassword ? <span className="cc-chip cc-chip--warning">{t('users.mustChange')}</span> : null}
                 {!u.active && u.invitePending ? <span className="cc-chip cc-chip--warning">{t('users.invitePending')}</span> : null}
                 <span className="cc-chip">{u.signInMethod === 'email_link' ? t('users.methodEmail') : t('users.methodPassword')}</span>
+                {u.googleLinked ? <span className="cc-chip">{t('users.methodGoogle')}</span> : null}
+                {u.passkeys > 0 ? <span className="cc-chip">{t('users.passkeys', { count: u.passkeys })}</span> : null}
               </div>
             ),
           },
@@ -382,7 +455,7 @@ export function UsersPage() {
                 <Button size="small" onPress={() => setEditing(u)}>
                   {t('common.edit')}
                 </Button>
-                {u.id !== me?.id && !(emailOnly && u.role === 'teacher') ? (
+                {u.id !== me?.id && !emailOnly ? (
                   <Button size="small" onPress={() => setResetting(u)}>
                     {t('users.resetPassword')}
                   </Button>
@@ -401,6 +474,11 @@ export function UsersPage() {
                 {u.invitePending ? (
                   <Button size="small" onPress={() => setRevoking(u)}>
                     {t('users.revokeInvite')}
+                  </Button>
+                ) : null}
+                {u.passkeys > 0 && u.id !== me?.id ? (
+                  <Button size="small" onPress={() => setRemovingPasskeys(u)}>
+                    {t('users.removePasskeys')}
                   </Button>
                 ) : null}
                 {u.hasPin ? (
@@ -424,7 +502,7 @@ export function UsersPage() {
       />
       <CreateUserDialog
         isOpen={creating}
-        teacherEmailLinkOnly={emailOnly}
+        passwordsOff={emailOnly}
         onOpenChange={setCreating}
         onCreated={(r) => {
           if (r.invite) setInvite({ ...r.invite, name: r.user.displayName });
@@ -478,6 +556,19 @@ export function UsersPage() {
           await call(Admin.deactivateUser, { userId: deactivating!.id });
           await invalidate();
           showToast({ message: t('users.deactivatedToast'), kind: 'success' });
+        }}
+      />
+      <ConfirmDestructive
+        isOpen={removingPasskeys !== null}
+        onOpenChange={(o) => !o && setRemovingPasskeys(null)}
+        title={t('users.removePasskeys')}
+        description={t('users.removePasskeysExplain', { name: removingPasskeys?.displayName ?? '' })}
+        confirmText={removingPasskeys?.login ?? ''}
+        actionLabel={t('users.removePasskeys')}
+        onConfirm={async () => {
+          await call(Admin.removeUserPasskeys, { userId: removingPasskeys!.id });
+          await invalidate();
+          showToast({ message: t('users.passkeysRemoved'), kind: 'success' });
         }}
       />
       <ConfirmDestructive
