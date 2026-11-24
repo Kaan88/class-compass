@@ -101,4 +101,26 @@ describe('CelebrationLayer under reduced motion', () => {
     expect(view.getByTestId('celebration').dataset.mode).toBe('full');
     act(() => setDisplay({ deviceSounds: true }));
   });
+
+  it('class sounds off when it starts: leaving the classroom (switches reset to on) before the clapping plays nothing', () => {
+    stubReducedMotion(false);
+    setDisplay({ theme: 'animals', classAnimations: true, classSounds: false, deviceSounds: true });
+    render(<CelebrationLayer />);
+    act(() => celebrate());
+    act(() => void vi.advanceTimersByTime(300));
+    // What the classroom screen's cleanup does when the teacher leaves it (Classroom.tsx).
+    act(() => setDisplay({ theme: 'classroom', classAnimations: true, classSounds: true, soundVolume: 80, classScreen: false }));
+    act(() => void vi.advanceTimersByTime(1500));
+    expect(played).toEqual([]);
+  });
+
+  it('pending cues are cancelled when the layer unmounts', () => {
+    stubReducedMotion(false);
+    setDisplay({ theme: 'classroom', classAnimations: true, classSounds: true, deviceSounds: true });
+    const view = render(<CelebrationLayer />);
+    act(() => celebrate());
+    view.unmount();
+    act(() => void vi.advanceTimersByTime(1500));
+    expect(eventsPlayed()).toEqual(['fanfare']);
+  });
 });

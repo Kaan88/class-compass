@@ -10,7 +10,7 @@
  * Anything can call `celebrate()`; the layer is mounted once in the root layout.
  */
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { getDisplay, useDisplay } from '../lib/display.ts';
+import { getDisplay, soundsAllowed, useDisplay } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Mascot, motionMode, playThemeSound, ThemeScope, themeOf, useTheme } from './index.tsx';
 import { celebrationCues } from './sequences.ts';
@@ -169,20 +169,35 @@ export function CelebrationLayer() {
     scopeRef.current = scope;
   }, [scope]);
   useEffect(() => {
+    const pending = new Set<ReturnType<typeof setTimeout>>();
     const play = (event: SoundEvent) => {
       const d = getDisplay();
       playThemeSound(d, themeOf(scopeRef.current ?? d.theme), event);
     };
     const l: Listener = (e) => {
-      const m = motionMode(getDisplay());
-      for (const cue of celebrationCues(m)) {
-        if (cue.at === 0) play(cue.event);
-        else setTimeout(() => play(cue.event), cue.at);
-      }
+      const start = getDisplay();
+      const m = motionMode(start);
+      // A cue sounds only when sound was allowed as the celebration started AND still is when the cue
+      // plays: a classroom with sounds off stays silent even when leaving it turns the switches back on
+      // (Classroom.tsx) before the clapping, and sound switched off meanwhile silences the rest.
+      if (soundsAllowed(start))
+        for (const cue of celebrationCues(m)) {
+          if (cue.at === 0) play(cue.event);
+          else {
+            const h = setTimeout(() => {
+              pending.delete(h);
+              play(cue.event);
+            }, cue.at);
+            pending.add(h);
+          }
+        }
       if (m !== 'none') setActive(e);
     };
     listeners.add(l);
-    return () => void listeners.delete(l);
+    return () => {
+      listeners.delete(l);
+      pending.forEach(clearTimeout);
+    };
   }, []);
   useEffect(() => {
     if (!active) return;
