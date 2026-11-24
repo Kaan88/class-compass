@@ -19,6 +19,8 @@ const turkishTeacher: Me = {
   hasPin: false,
   signInMethod: 'password',
   hasEmail: false,
+  email: null,
+  invitePending: false,
   reauthFresh: false,
   classroomMode: false,
   pinUnlockedUntil: null,

@@ -312,6 +312,9 @@ function CreateUserDialog({
 
 function EditUserDialog({ user, onClose }: { user: AdminUser | null; onClose: () => void }) {
   const { t } = useI18n();
+  // S35 (D-214): the administrator's own address changes in Profile, with a code sent to the new address
+  // (a first address for an own account without one can still be added here).
+  const own = useMe()?.id === user?.id && Boolean(user?.email);
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -342,7 +345,7 @@ function EditUserDialog({ user, onClose }: { user: AdminUser | null; onClose: ()
           e.preventDefault();
           if (!user) return;
           try {
-            await call(Admin.updateUserByAdmin, { userId: user.id, displayName: name, email: email.trim() || null, locale });
+            await call(Admin.updateUserByAdmin, { userId: user.id, displayName: name, locale, ...(own ? {} : { email: email.trim() || null }) });
             void qc.invalidateQueries({ queryKey: USERS });
             setLoadedFor(null);
             onClose();
@@ -352,7 +355,17 @@ function EditUserDialog({ user, onClose }: { user: AdminUser | null; onClose: ()
         }}
       >
         <TextField label={t('users.displayName')} value={name} onChange={setName} isRequired />
-        <TextField label={t('users.emailOptional')} type="email" value={email} onChange={setEmail} />
+        {own ? (
+          <div className="cc-stack" data-testid="own-email">
+            <span style={{ fontWeight: 700 }}>{t('auth.email')}</span>
+            <span>{user?.email ?? '—'}</span>
+            <p className="cc-muted" style={{ margin: 0 }}>
+              {t('users.ownEmailInProfile')}
+            </p>
+          </div>
+        ) : (
+          <TextField label={t('users.emailOptional')} type="email" value={email} onChange={setEmail} />
+        )}
         <Select label={t('users.locale')} description={t('users.localeEditHint')} value={locale} onChange={(v) => setLocale(v === 'tr' ? 'tr' : 'en')} items={LOCALE_ITEMS(t)} />
         {error ? <Alert>{error}</Alert> : null}
         <DialogActions>

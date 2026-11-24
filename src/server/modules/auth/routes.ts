@@ -158,6 +158,33 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     { rateLimit: { max: 5, timeWindow: '15 minutes' } },
   );
   route(app, deps, C.confirmEmailLinkMethod, (ctx, input) => email.confirmEmailLinkMethod(ctx, requireUser(ctx), ctx.session!, input.code), { rateLimit: { max: 10, timeWindow: '15 minutes' } });
+  // Changing the own address (S35, D-214): the pending address lives in a sealed cookie of this browser.
+  const emailChangeCookie = { path: email.EMAIL_CHANGE_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'strict' as const };
+  route(
+    app,
+    deps,
+    C.startEmailChange,
+    async (ctx, input, { reply }) => {
+      const user = requireUser(ctx);
+      email.assertEmailChangeAllowed(ctx);
+      await svc.assertReauth(ctx, user, ctx.session!, input.currentPassword);
+      const started = email.startEmailChange(ctx, user, ctx.session!, input.email);
+      reply.setCookie(email.EMAIL_CHANGE_COOKIE, started.cookie, { ...emailChangeCookie, maxAge: Math.floor(email.EMAIL_LINK_MS / 1000) });
+      return { ok: true as const };
+    },
+    { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+  );
+  route(
+    app,
+    deps,
+    C.confirmEmailChange,
+    (ctx, input, { req, reply }) => {
+      const me = email.confirmEmailChange(ctx, requireUser(ctx), ctx.session!, req.cookies?.[email.EMAIL_CHANGE_COOKIE], input.code);
+      reply.clearCookie(email.EMAIL_CHANGE_COOKIE, emailChangeCookie);
+      return me;
+    },
+    { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+  );
   // Sign in with Google (S31, D-208): the cookie binds Google's answer to the browser that asked.
   const googleCookie = { path: google.GOOGLE_COOKIE_PATH, httpOnly: true, secure: deps.config.isProd, sameSite: 'lax' as const };
   route(

@@ -44,6 +44,8 @@ const ME: Me = {
   hasPin: true,
   signInMethod: 'password',
   hasEmail: false,
+  email: null,
+  invitePending: false,
   reauthFresh: false,
   classroomMode: false,
   pinUnlockedUntil: null,

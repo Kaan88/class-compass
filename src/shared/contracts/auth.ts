@@ -35,6 +35,13 @@ export const Me = z.object({
   /** S13b (D-108): password or email-link sign-in; whether the account has an email address. */
   signInMethod: SignInMethod,
   hasEmail: z.boolean(),
+  /** S35 (D-214): the account's own address, shown in Profile where the person can change it. */
+  email: z.string().nullable(),
+  /**
+   * S35: a password account with no password yet (invited, then signed in through the operator's
+   * sign-in server without opening the invite, D-213). Profile tells the person to open the invite.
+   */
+  invitePending: z.boolean(),
   /** This session was signed in with an email link, code or invite in the last 15 minutes (re-authentication for email-link accounts). */
   reauthFresh: z.boolean(),
   classroomMode: z.boolean(),
@@ -331,6 +338,32 @@ export const startEmailLinkMethod = endpoint({
 export const confirmEmailLinkMethod = endpoint({
   method: 'POST',
   path: '/api/auth/sign-in-method/email-link/confirm',
+  access: 'account',
+  input: z.object({ code: SixDigitCode }),
+  output: Me,
+});
+
+// ---------------------------------------------------------------- changing the own address (S35, D-214)
+/** Validated like the administrator's `Email` (contracts/admin.ts). */
+const NewEmail = z.string().trim().toLowerCase().email().max(200);
+
+/**
+ * Step 1: re-authentication (the password, or a fresh sign-in for accounts without one), then a
+ * 6-digit code is emailed to the NEW address. The same answer whether or not another account uses it.
+ * The pending address is kept in a sealed HttpOnly cookie of this browser.
+ */
+export const startEmailChange = endpoint({
+  method: 'POST',
+  path: '/api/auth/email/start',
+  access: 'account',
+  input: z.object({ currentPassword: z.string().min(1).max(200).optional(), email: NewEmail }),
+  output: Ok,
+});
+
+/** Step 2: the code from the new address; only then the address changes. Other sessions end. */
+export const confirmEmailChange = endpoint({
+  method: 'POST',
+  path: '/api/auth/email/confirm',
   access: 'account',
   input: z.object({ code: SixDigitCode }),
   output: Me,

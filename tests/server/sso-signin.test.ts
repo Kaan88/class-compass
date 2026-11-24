@@ -297,4 +297,25 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     expect(reason((await signIn(limited.fake, standard('mehmet@elsewhere.demo.example', 'acct-m'))).r)).toBe('SSO_SIGNIN_FAILED');
     expect(reason((await signIn(limited.fake, standard('mehmet@notmail.demo.example', 'acct-m'))).r)).toBe('SSO_SIGNIN_FAILED');
   });
+
+  it('S35: an invited administrator signed in this way has no password yet: Me says so, and what asks for the password says PASSWORD_NOT_SET', async () => {
+    const { s, fake, mailer } = await school();
+    const boss = await ok(s.admin.post('/api/admin/users', { login: 'new.admin', displayName: 'Yeni Yönetici', role: 'admin', email: 'new.admin@mail.demo.example' }));
+    const invite = tokenFrom(mailer.sent.at(-1)!.text);
+    const { c, r } = await signIn(fake, standard('new.admin@mail.demo.example', 'acct-boss'));
+    expect(r.body).toMatchObject({ id: boss.user.id, signInMethod: 'password', invitePending: true, email: 'new.admin@mail.demo.example' });
+    // Everyone else is not in this state.
+    expect((await ok(s.admin.get('/api/auth/me'))).invitePending).toBe(false);
+    for (const body of [{}, { currentPassword: 'never-had-one-123' }]) {
+      expect(reason(await c.post('/api/auth/pin', { ...body, pin: '2468' }))).toBe('PASSWORD_NOT_SET');
+      expect(reason(await c.post('/api/auth/email/start', { ...body, email: 'boss@mail.demo.example' }))).toBe('PASSWORD_NOT_SET');
+      expect(reason(await c.post('/api/auth/passkeys/register/start', body))).toBe('PASSWORD_NOT_SET');
+    }
+    expect(reason(await c.post('/api/auth/password', { currentPassword: 'never-had-one-123', newPassword: 'a-new-password-123' }))).toBe('PASSWORD_NOT_SET');
+    // Opening the invite and choosing a password ends the state.
+    await ok(new Client(env).post('/api/auth/invite/accept', { token: invite, method: 'password', password: 'chosen-password-123' }));
+    const after = new Client(env);
+    await after.login('new.admin', 'chosen-password-123');
+    expect((await ok(after.get('/api/auth/me'))).invitePending).toBe(false);
+  });
 });

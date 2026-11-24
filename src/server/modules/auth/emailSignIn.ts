@@ -16,6 +16,9 @@
  * - Changing an account's email, deactivating it or an admin password reset revokes its pending
  *   invites and unused sign-in links (`revokeEmailLinks`), so a mail sent to an old or wrong address
  *   cannot be used later (D-015); an email change also clears the "verified" mark.
+ * - Changing the own address (S35, D-214): after re-authentication a code goes to the new address; the
+ *   pending address lives in a sealed HttpOnly cookie; typing the code changes it (`applyEmailChange`,
+ *   shared with the administrator's edit) and a notice goes to the old address.
  * - Switching method: to email-link needs the current password and a code emailed to the address;
  *   back to password needs a fresh email sign-in. Administrators always keep passwords.
  * - School policy (S30, D-207): while the school has switched passwords off, an invite offers no
@@ -30,7 +33,7 @@ import { tx, type Db } from '../../db/client.ts';
 import { authAttempts, oneTimeTokens, sessions, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
 import type { Actor, AppDeps, SessionRow, UserRow } from '../../lib/context.ts';
-import { hashPassword, newId, randomToken, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
+import { hashPassword, newId, openSecret, randomToken, sealSecret, timingSafeEqualStr, tokenHash } from '../../lib/crypto.ts';
 import { AppError, invalid, notFound } from '../../lib/errors.ts';
 import { emailResetEnabled } from '../../lib/mailer.ts';
 import { emailLinkRequired, passwordBlocked, passwordlessAllowed } from './signInPolicy.ts';
@@ -227,7 +230,7 @@ export async function acceptInvite(deps: AppDeps, ip: string, input: { token: st
  * Issue a sign-in link + code for one account and email it; returns the request id the code is
  * bound to. Older unused links of the account stop working. Null when the per-account limit is hit.
  */
-function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: string, mail: 'signin' | 'methodcode' | 'policycode'): string | null {
+function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: string, mail: 'signin' | 'methodcode' | 'policycode' | 'emailchange', to = user.email!): string | null {
   const withLink = mail === 'signin';
   const now = deps.now();
   const token = randomToken();
@@ -266,7 +269,7 @@ function issueSignIn(deps: AppDeps, user: UserRow, requestId: string, binding: s
   if (!ok) return null;
   const link = `${origin(deps)}/signin-link#token=${token}`;
   const body = withLink ? translate(user.locale, 'email.signin.body', { name: user.displayName, link, code }) : translate(user.locale, `email.${mail}.body`, { name: user.displayName, code });
-  sendQuietly(deps, user.email!, translate(user.locale, `email.${mail}.subject`), body);
+  sendQuietly(deps, to, translate(user.locale, `email.${mail}.subject`), body);
   return requestId;
 }
 
@@ -420,6 +423,96 @@ export function usePolicyCode(deps: AppDeps, session: SessionRow, code: string):
   if (!c.row) return { ok: false, attemptsLeft: c.attemptsLeft ?? 0 };
   deps.db.update(oneTimeTokens).set({ usedAt: deps.now() }).where(eq(oneTimeTokens.id, c.row.id)).run();
   return { ok: true };
+}
+
+// ---------------------------------------------------------------- changing the own address (S35, D-214)
+/**
+ * The account's address changes (by the person after proving the new one, or by an administrator for
+ * someone else, D-214). Everything that belonged to the old address stops: reset links, invites and
+ * sign-in links mailed to it (D-015, D-108), and the Google id and the sign-in server id, which were
+ * matched to it (D-208, D-213). `verifiedAt`: now when a code sent to the new address proved it, else
+ * null (proven later by an invite or a sign-in link). Call inside the transaction that makes the change.
+ */
+export function applyEmailChange(db: Db, userId: string, email: string | null, verifiedAt: number | null, now: number) {
+  db.update(users).set({ email, emailVerifiedAt: verifiedAt, googleSub: null, ssoSub: null, updatedAt: now }).where(eq(users.id, userId)).run();
+  invalidateResetTokens(db, userId, now);
+  revokeEmailLinks(db, userId, now);
+}
+
+export const EMAIL_CHANGE_COOKIE = 'cc_email_change';
+export const EMAIL_CHANGE_COOKIE_PATH = '/api/auth/email';
+const EMAIL_CHANGE_PURPOSE = 'email-change';
+interface PendingEmailChange {
+  userId: string;
+  email: string;
+  nonce: string;
+  expiresAt: number;
+}
+/**
+ * The code is bound to the session, to the exact new address and to a random value that exists only in
+ * the sealed HttpOnly cookie of the browser that asked. So a code for one address cannot confirm
+ * another, another session cannot use it, and whoever reads the mail at the new address (perhaps a
+ * stranger, after a typo) cannot turn the code into a sign-in: the email-code sign-in needs the binding.
+ */
+const emailChangeBinding = (session: SessionRow, p: PendingEmailChange) => `emailchange:${session.id}:${p.nonce}:${p.email}`;
+
+export function assertEmailChangeAllowed(deps: AppDeps) {
+  if (!emailLinkEnabled(deps)) throw invalid('Email is not set up', { reason: 'SMTP_NOT_CONFIGURED' });
+}
+
+/**
+ * Step 1 (after re-authentication, done by the route): a 6-digit code goes to the NEW address. The
+ * answer is the same whether or not another account uses that address (accounts may share one, D-108).
+ * Returns the sealed cookie that holds the pending address. The per-account limit of sign-in emails
+ * applies (3 in 15 minutes).
+ */
+export function startEmailChange(deps: AppDeps, user: UserRow, session: SessionRow, newEmail: string): { cookie: string } {
+  assertEmailChangeAllowed(deps);
+  const email = newEmail.trim().toLowerCase();
+  if (email === user.email) throw invalid('This is already the address of your account', { reason: 'EMAIL_UNCHANGED' });
+  const pending: PendingEmailChange = { userId: user.id, email, nonce: randomToken(), expiresAt: deps.now() + EMAIL_LINK_MS };
+  if (issueSignIn(deps, user, '', emailChangeBinding(session, pending), 'emailchange', email) === null) throw new AppError('RATE_LIMITED', 'Too many emails. Try again later.');
+  return { cookie: sealSecret(deps.config.SECRET_PEPPER, EMAIL_CHANGE_PURPOSE, session.id, JSON.stringify(pending)) };
+}
+
+function openPending(deps: AppDeps, user: UserRow, session: SessionRow, cookie: string | undefined): PendingEmailChange | null {
+  const raw = openSecret(deps.config.SECRET_PEPPER, EMAIL_CHANGE_PURPOSE, session.id, cookie);
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw) as PendingEmailChange;
+    return p.userId === user.id && typeof p.email === 'string' && typeof p.nonce === 'string' && p.expiresAt > deps.now() ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Step 2: the code from the new address. Only then the address changes, with everything an
+ * administrator's change does (`applyEmailChange`), the address marked as proven, the person's other
+ * sessions ended (this one stays) and AI tool tokens revoked, as for any change of sign-in details.
+ * Afterwards a short notice goes to the old address (no link, no new address).
+ */
+export function confirmEmailChange(deps: AppDeps, user: UserRow, session: SessionRow, cookie: string | undefined, code: string) {
+  assertEmailChangeAllowed(deps);
+  const pending = openPending(deps, user, session, cookie);
+  const now = deps.now();
+  const checked = tx(deps.db, () => {
+    if (!pending) return { ok: false as const, attemptsLeft: 0 };
+    const c = checkCode(deps, emailChangeBinding(session, pending), code);
+    if (!c.row) return { ok: false as const, attemptsLeft: c.attemptsLeft ?? 0 };
+    deps.db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, c.row.id)).run();
+    const oldEmail = getUser(deps.db, user.id).email;
+    applyEmailChange(deps.db, user.id, pending.email, now, now);
+    // The owner proved the new mailbox: the wrong-code count starts again.
+    deps.db.delete(authAttempts).where(eq(authAttempts.key, codeKey(user.id))).run();
+    revokeAllUserSessions(deps.db, user.id, now, session.id);
+    revokeAllUserMcpTokens(deps.db, actorFor(user), user.id, now, 'email_change');
+    audit(deps.db, actorFor(user), { action: 'auth.email_change', entity: 'user', entityId: user.id, before: { email: oldEmail }, after: { email: pending.email, verified: true } }, now);
+    return { ok: true as const, oldEmail };
+  });
+  if (!checked.ok) throw new AppError('UNAUTHENTICATED', 'Wrong or expired code', { reason: 'SIGNIN_CODE_INVALID', attemptsLeft: checked.attemptsLeft });
+  if (checked.oldEmail) sendQuietly(deps, checked.oldEmail, translate(user.locale, 'email.emailchanged.subject'), translate(user.locale, 'email.emailchanged.body', { name: user.displayName }));
+  return meOf(deps, user.id, session.id);
 }
 
 export function meOf(deps: AppDeps, userId: string, sessionId: string) {

@@ -31,6 +31,14 @@ export const FRESH_SIGN_IN_MS = 15 * 60 * 1000;
 const FRESH_METHODS: ReadonlyArray<SessionRow['authMethod']> = ['email_link', 'invite', 'google', 'passkey', 'sso'];
 export const isFreshEmailSession = (session: SessionRow, now: number) => FRESH_METHODS.includes(session.authMethod) && now - session.createdAt <= FRESH_SIGN_IN_MS;
 
+/**
+ * A password account without a password yet (S35): created by invite and signed in without using the
+ * invite, through the operator's sign-in server while passwords are on (D-213). Anything that asks for
+ * the current password answers PASSWORD_NOT_SET; the person opens the invite link to choose one.
+ */
+export const invitePending = (user: UserRow) => user.signInMethod === 'password' && user.passwordHash === '';
+const noPasswordYet = () => new AppError('UNAUTHENTICATED', 'This account has no password yet: open the invite link to choose one', { reason: 'PASSWORD_NOT_SET' });
+
 export function toMe(db: Db, user: UserRow, session: SessionRow, now: number): Me {
   return {
     kind: 'user',
@@ -44,6 +52,8 @@ export function toMe(db: Db, user: UserRow, session: SessionRow, now: number): M
     hasPin: user.pinHash !== null,
     signInMethod: user.signInMethod,
     hasEmail: user.email !== null,
+    email: user.email,
+    invitePending: invitePending(user),
     reauthFresh: isFreshEmailSession(session, now),
     classroomMode: session.classroomMode,
     pinUnlockedUntil: session.pinUnlockedUntil,
@@ -160,7 +170,7 @@ export function revokeAllUserSessions(db: Db, userId: string, now: number, excep
  * `revokeAllUserSessions`: a token made by someone who knew the password must not outlive the lock-out,
  * and a reactivation must not bring old tokens back. Audited when there was anything to revoke.
  */
-export function revokeAllUserMcpTokens(db: Db, actor: Actor, userId: string, now: number, reason: 'deactivated' | 'password_reset' | 'password_change' | 'method_change') {
+export function revokeAllUserMcpTokens(db: Db, actor: Actor, userId: string, now: number, reason: 'deactivated' | 'password_reset' | 'password_change' | 'method_change' | 'email_change') {
   const live = and(eq(mcpTokens.userId, userId), isNull(mcpTokens.revokedAt), gt(mcpTokens.expiresAt, now));
   const n = db.select({ n: sql<number>`count(*)` }).from(mcpTokens).where(live).get()?.n ?? 0;
   if (n) db.update(mcpTokens).set({ revokedAt: now, revokedBy: null }).where(live).run();
@@ -185,6 +195,7 @@ export function invalidateResetTokens(db: Db, userId: string, now: number) {
 
 export async function changePassword(deps: AppDeps, user: UserRow, session: SessionRow, current: string, next: string) {
   if (user.signInMethod === 'email_link') throw new AppError('CONFLICT', 'This account signs in with email links', { reason: 'EMAIL_LINK_ACCOUNT' });
+  if (invitePending(user)) throw noPasswordYet();
   if (!user.passwordHash || !(await verifyPassword(user.passwordHash, current))) throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
   const passwordHash = await hashPassword(next);
   const now = deps.now();
@@ -207,6 +218,7 @@ export async function assertReauth(deps: AppDeps, user: UserRow, session: Sessio
     if (!isFreshEmailSession(session, deps.now())) throw new AppError('UNAUTHENTICATED', 'Sign in again with a fresh email link first', { reason: 'REAUTH_REQUIRED' });
     return;
   }
+  if (invitePending(user)) throw noPasswordYet();
   if (!currentPassword || !user.passwordHash || !(await verifyPassword(user.passwordHash, currentPassword))) {
     throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });
   }

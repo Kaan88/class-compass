@@ -20,6 +20,7 @@ import { Mascot } from '../../ui/Mascot.tsx';
 import { ChangePasswordForm } from '../Auth.tsx';
 import { SignInMethodSection } from '../SignIn.tsx';
 import { PasskeyOffer, PasskeysSection } from '../Passkeys.tsx';
+import { EmailChangeSection } from '../EmailChange.tsx';
 import { TimeUpClipSection } from './ClassDisplay.tsx';
 import { FullscreenButton, LessonPrefsSection } from '../../modules/lessons/fullscreen.tsx';
 import * as School from '../../../shared/contracts/school.ts';
@@ -315,6 +316,12 @@ export function ProfilePage() {
   return (
     <main className="cc-page cc-stack" data-testid="profile-page">
       <h1 className="cc-h1">{t('profile.title')}</h1>
+      {/* Invited, then signed in through the operator's sign-in server without opening the invite (S35, D-213): no password yet. */}
+      {me.invitePending ? (
+        <Alert kind="warning">
+          {t('profile.invitePending')}
+        </Alert>
+      ) : null}
       <section className="cc-card cc-stack">
         <h2 className="cc-h2">{t('profile.display')}</h2>
         <p className="cc-muted">{t('profile.displayHint')}</p>
@@ -361,12 +368,14 @@ export function ProfilePage() {
       {/* "Full screen during lessons" (S18, D-167): follows the account to every classroom computer. */}
       {me.role === 'teacher' ? <LessonPrefsSection /> : null}
       {me.role === 'teacher' ? <ClipSection /> : null}
-      {me.signInMethod === 'password' ? (
+      {me.signInMethod === 'password' && !me.invitePending ? (
         <section className="cc-card cc-stack">
           <h2 className="cc-h2">{t('password.changeTitle')}</h2>
           <ChangePasswordForm />
         </section>
       ) : null}
+      {/* The own address (S35, D-214): changed only with a code sent to the new address. */}
+      <EmailChangeSection me={me} emailEnabled={signInInfo.data?.emailLinkEnabled ?? false} />
       <SignInMethodSection me={me} emailLinkEnabled={signInInfo.data?.emailLinkEnabled ?? false} passwordsOff={signInInfo.data?.passwordsOff ?? false} />
       {/* Passkeys (S33, D-210): for teachers and administrators, where the address allows them. */}
       {signInInfo.data?.passkeysEnabled ? <PasskeysSection me={me} /> : null}

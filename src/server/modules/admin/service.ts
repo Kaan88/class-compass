@@ -14,7 +14,7 @@ import { requireUser } from '../../lib/context.ts';
 import { hashPassword, randomToken } from '../../lib/crypto.ts';
 import { AppError, conflict, invalid, notFound } from '../../lib/errors.ts';
 import { createUser, insertUser, invalidateResetTokens, revokeAllUserMcpTokens, revokeAllUserSessions } from '../auth/service.ts';
-import { emailLinkEnabled, inviteStatus, issueInvite, revokeEmailLinks, revokeInvite, sendPolicyCode, usePolicyCode } from '../auth/emailSignIn.ts';
+import { applyEmailChange, emailLinkEnabled, inviteStatus, issueInvite, revokeEmailLinks, revokeInvite, sendPolicyCode, usePolicyCode } from '../auth/emailSignIn.ts';
 import { emailLinkRequired, passwordBlocked, passwordsOff } from '../auth/signInPolicy.ts';
 import { passkeyCount, removeAllPasskeys } from '../auth/passkeys.ts';
 
@@ -100,14 +100,16 @@ export function updateUserByAdmin(ctx: RequestContext, input: In<typeof C.update
     // D-207: without an address the account could not sign in at all.
     if (patch.email === null && u.email !== null && passwordBlocked(ctx.db)) throw invalid('The account needs an email address to sign in', { reason: 'EMAIL_REQUIRED' });
     const emailChanged = patch.email !== undefined && patch.email !== u.email;
-    // A new address is not verified until a mail to it is used (an invite or a sign-in link).
-    // The Google id and the id of the operator's sign-in server belonged to the previous address (D-208, D-213): the new one must be proven again.
-    ctx.db.update(users).set({ ...patch, ...(emailChanged ? { emailVerifiedAt: null, googleSub: null, ssoSub: null } : {}), updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
-    // Reset links, invites and sign-in links already mailed to the previous address must stop working (D-015, D-108).
-    if (emailChanged) {
-      invalidateResetTokens(ctx.db, u.id, ctx.now());
-      revokeEmailLinks(ctx.db, u.id, ctx.now());
-    }
+    // S35 (D-214): an administrator's own address changes only in Profile, with a code sent to the new
+    // address. A typo here could lock the school's only administrator out while passwords are off. A
+    // first address for an own account that has none can still be added here: there is nothing to lose
+    // (passwords are on then, since switching them off needs an address on every account and a code to it).
+    if (emailChanged && u.id === requireUser(ctx).id && u.email !== null) throw invalid('Change your own address in your profile', { reason: 'OWN_EMAIL' });
+    const { email, ...rest } = patch;
+    ctx.db.update(users).set({ ...rest, updatedAt: ctx.now() }).where(eq(users.id, u.id)).run();
+    // A new address is not verified until a mail to it is used (an invite or a sign-in link); what
+    // belonged to the previous address stops (`applyEmailChange`: links, invites, Google and sign-in server ids).
+    if (emailChanged) applyEmailChange(ctx.db, u.id, email ?? null, null, ctx.now());
     const before = Object.fromEntries(Object.keys(patch).map((k) => [k, u[k as keyof UserRow]]));
     audit(ctx.db, ctx.actor, { action: 'user.update', entity: 'user', entityId: u.id, before, after: patch }, ctx.now());
     return dtoOf(ctx, getUser(ctx.db, u.id));
