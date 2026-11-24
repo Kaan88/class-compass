@@ -88,6 +88,7 @@ Bilgi işlem sorumlusu sunucuda ayarladıysa giriş sayfasında **Google ile gir
 - Hesaptaki adres kişinin Google adresi olmalıdır. Adresi başka olan kişi e-posta bağlantılarını kullanmayı sürdürür.
 - Bu yolla giriş yapılmış hesapta listede **Google ile giriş kullanıldı** yazar. Hesabın e-posta adresini değiştirirseniz ya da hesabı devre dışı bırakırsanız bu bağ kalkar: sonraki Google girişi yeniden hesaptaki adresle eşleşmelidir.
 - Davet edilen bir öğretmen daveti açmadan **Google ile giriş yap**'a basabilir: davet kullanılmış sayılır ve hesabın şifresi olmaz.
+- **Bir adres, birden fazla hesap.** Bir kişinin aynı adresle iki hesabı varsa (örneğin bir öğretmen hesabı ve bir yönetici hesabı), Google adresi doğruladıktan sonra giriş **hangisiyle** devam edileceğini sorar: her hesap için adını ve rolünü gösteren bir düğme. Yalnızca Google ile giriş yapabilen hesaplar gösterilir (şifresi olan bir yönetici gösterilmez). Seçilen her hesap aynı Google hesabına bağlanır; bu adresi taşıyan ama başka bir Google hesabına bağlı olan bir hesap gösterilmez.
 - Google, kişinin bu siteye ne zaman giriş yaptığını öğrenir. Google'a hiçbir öğrenci verisi gitmez.
 - **Ortak bilgisayarda kullanılmaz.** Google ile giriş, o Google hesabını e-postalarıyla birlikte tarayıcıda açık bırakır. Giriş sayfası bunu düğmenin altında söyler; sınıf ekranı olarak kullanılmış bir bilgisayarda ise düğmeyi geri tutar ve e-posta kodunu önerir (**Bu benim kendi bilgisayarım: Google ile girişi göster** düğmeyi yeniden gösterir).
 
@@ -103,6 +104,7 @@ Bilgi işlem sorumlusu, sunucu ayarlarında okula ait bir giriş sunucusunu (her
 
 - Hesap açmaz: ilk girişte sunucu kişinin, hesabına yazdığınız e-posta adresinin sahibi olduğunu doğrular. Sonrasında site kişiyi o sunucunun ona verdiği kimlik numarasıyla tanır; kişinin o sunucudaki adresi değişse bile. Buradaki hesabın adresini değiştirmek ya da hesabı devre dışı bırakmak bu bağı kaldırır.
 - Google'dan farklı olarak, **yöneticiler de kullanabilir**; şifreler açık da olsa kapalı da olsa. Çünkü bu sunucuyu okulun kendisi işletir.
+- Bir kişinin aynı adresle birden fazla hesabı varsa (bir öğretmen hesabı ve bir yönetici hesabı), sunucu adresi doğruladıktan sonra giriş, Google ile girişte olduğu gibi hangi hesapla devam edileceğini sorar.
 - Simge, sınıf ekranı olarak kullanılmış bir bilgisayarda gösterilmez; nedeni Google ile aynıdır: giriş yapmak o hesabı tarayıcıda açık bırakır.
 - Bir hesabın e-posta adresini değiştirirseniz bu yolla yapılacak sonraki giriş yeni adresle eşleşmelidir.
 

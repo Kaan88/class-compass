@@ -88,6 +88,7 @@ When the IT person has set it up on the server, the sign-in page also offers **S
 - The address on the account must be the person's Google address. Someone with another address keeps using email links.
 - The list shows **Google sign-in used** on an account that has signed in this way. If you change the account's email address or deactivate the account, that link is dropped: the next Google sign-in must match the address on the account again.
 - An invited teacher may press **Sign in with Google** without opening the invite first: the invite then counts as used, and the account has no password.
+- **One address, several accounts.** When one person has two accounts with the same address (for example a teacher account and an administrator account), Google sign-in asks **which one** after Google has confirmed the address: one button per account with its name and role. Only accounts that may use Google are offered (an administrator with a password is not). Each account chosen is linked to the same Google account; an account with that address that is already linked to a different Google account is not offered.
 - Google learns that the person signed in to this site and when. No student data goes to Google.
 - **Not on a shared computer.** A Google sign-in leaves that Google account, with its mail, open in the browser. The sign-in page says so under the button, and on a computer that has been used as a classroom display it holds the button back and points to the email code instead (**It is my own computer: show Google sign-in** brings it back).
 
@@ -103,6 +104,7 @@ The IT person can connect one sign-in server of the school's own (any OpenID Con
 
 - It never makes an account: at the first sign-in the server confirms that the person owns the email address you put on their account. After that the site recognises the person by that server's own ID for them, also if their address on that server changes; changing the address on the account here, or deactivating the account, drops that link.
 - Unlike Google, **administrators can use it too**, whether passwords are on or off, because the school itself runs this server.
+- When one person has several accounts with the same address (a teacher account and an administrator account), the sign-in asks which one after the server has confirmed the address, as Google sign-in does.
 - The icon is not shown on a computer that has been used as a classroom display, for the same reason as Google: signing in would leave that account open in the browser.
 - Changing an account's email address means the next sign-in this way must match the new address.
 
