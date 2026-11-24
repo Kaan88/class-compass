@@ -670,6 +670,8 @@ A summary of what is still open after S14, S15a and the move to the Oracle serve
 - [x] D-217: an administrator who signs in on the open site no longer lands on a broken administration page when the proxy has its own sign-in in front of it: an API call answered with a redirect reloads the page once, so the gate shows its sign-in (`tests/client/api-gate.test.ts`)
   - [ ] Tried against the real proxy on production: a person's check
 - [x] S37 (D-218): a forgotten lesson ends itself without cutting off a lesson in use (2 hours old and 30 quiet minutes, or the end of the local day, ending at the last activity); a reminder with "Still teaching" on the teacher's main page, the board and the bell; an "ended automatically" notice with "Got it"; a late End Lesson keeps the teacher's answers; reports count automatic ends; migration `0038` (an Opus worker, two Fable review rounds)
+  - [x] After an automatic end the teacher can fill in End Lesson until the end of the next school day (the notice says until when; `/teacher?fillIn=`); then it is closed for good (one Fable review round and a re-check; `tests/server/lesson-fill-in.test.ts`)
+  - [ ] Not built: recording Secret Student outcomes in the late flow (the step is shown as not available)
   - [ ] Tried in a real classroom (the board note, the reminder after a quiet 15 minutes, End Lesson from the banner): a person's check
   - [ ] The limits (2 hours, 30 and 15 minutes, the reminder at 90 minutes) are constants; a school or class setting only if they turn out wrong in use
 - [ ] A password together with an authenticator code (TOTP), only if still wanted once Google and passkeys exist: the rule is "no password on its own" (owner, 2026-11-24)
