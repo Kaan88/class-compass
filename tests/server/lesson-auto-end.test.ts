@@ -12,7 +12,7 @@ import { v7 } from 'uuid';
 import { LESSON_AUTO_END_AFTER_MS, LESSON_IDLE_BEFORE_AUTO_END_MS, LESSON_REMINDER_AFTER_MS, LESSON_REMINDER_QUIET_MS } from '../../src/shared/lessonLimits.ts';
 import { sweepForgottenLessons } from '../../src/server/modules/lessons/autoEnd.ts';
 import { allEndSteps } from '../../src/server/modules/lessons/endSteps.ts';
-import { registerLessonCloseHook, setSettleErrorReporter, settleLesson } from '../../src/server/modules/lessons/service.ts';
+import { registerLessonCloseHook, SETTLE_ERROR_LOG_MS, setSettleErrorReporter, settleLesson } from '../../src/server/modules/lessons/service.ts';
 import { digestContent, digestMail } from '../../src/server/modules/notifications/digest.ts';
 import { Client, makeEnv, type TestEnv } from '../helpers.ts';
 import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
@@ -20,11 +20,13 @@ import { addStudent, buildSchool, ok, type School } from '../school-fixture.ts';
 const MIN = 60_000;
 let env: TestEnv;
 let s: School;
+let kids: string[];
 
 beforeEach(async () => {
   env = await makeEnv();
   s = await buildSchool(env);
-  for (const fullName of ['Ece Deniz Kaya', 'Arda Yıldız', 'Işıl Çınar', 'Oliver Clarke']) await addStudent(s.teacherA, s.c3a.id, { fullName });
+  kids = [];
+  for (const fullName of ['Ece Deniz Kaya', 'Arda Yıldız', 'Işıl Çınar', 'Oliver Clarke']) kids.push((await addStudent(s.teacherA, s.c3a.id, { fullName })).id);
 });
 afterEach(async () => env.app.close());
 
@@ -352,19 +354,67 @@ describe('never throw away what the teacher did (S37, D-218)', () => {
     expect(await cmd(s.teacherA, 'secret.draw', ref(lessonId), { ...ref(lessonId), clientTime: t0 + 90 * MIN })).toMatchObject({ ok: false, error: { reason: 'LESSON_ENDED' } });
     expect(row(lessonId)).toMatchObject({ stage_index: 2, ended_at: t0 + 115 * MIN });
 
-    // A lesson the teacher ended: what was done before the end is accepted; the end is not moved.
+    // A lesson the teacher ended herself refuses every late command, as before S37 (even one made earlier).
     const b = await start(s.teacherA, s.ctxA.id);
     const tb = env.clock.t;
     env.clock.advance(10 * MIN);
     await endLesson(b.lessonId);
     env.clock.advance(10 * MIN);
-    expect(await stage(b.lessonId, 1, { clientTime: tb + 5 * MIN })).toMatchObject({ ok: true });
-    expect(row(b.lessonId)).toMatchObject({ stage_index: 1, ended_at: tb + 10 * MIN });
-    expect(await stage(b.lessonId, 2, { clientTime: tb + 15 * MIN })).toMatchObject({ ok: false, error: { reason: 'LESSON_ENDED' } });
+    expect(await stage(b.lessonId, 1, { clientTime: tb + 5 * MIN })).toMatchObject({ ok: false, error: { code: 'CONFLICT', reason: 'LESSON_ENDED' } });
+    expect(row(b.lessonId)).toMatchObject({ stage_index: 0, ended_at: tb + 10 * MIN });
+  });
+
+  it('a late counter tap and daily attendance arriving the same day go to the lesson day and week; the next day they are refused and change nothing', async () => {
+    const { lessonId } = await start(s.teacherA, s.ctxA.id);
+    const t0 = row(lessonId).started_at as number;
+    const counterId = (await state(s.teacherA, s.ctxA.id)).counters.counters[0].id as string;
+    env.clock.t = t0 + LESSON_AUTO_END_AFTER_MS;
+    sweepForgottenLessons(env.deps);
+    expect(row(lessonId).auto_ended_at).toBe(t0 + LESSON_AUTO_END_AFTER_MS);
+    const tap = (clientTime: number) => cmd(s.teacherA, 'counter.tap', { ...ref(lessonId), counterId, studentId: kids[0] }, { ...ref(lessonId), clientTime });
+    const setDaily = (clientTime: number) => cmd(s.teacherA, 'attendance.setDaily', { ...ref(lessonId), studentId: kids[1], status: 'absent' }, { ...ref(lessonId), clientTime });
+    const events = () => env.db.$client.prepare('select lesson_id, local_date, week_start, occurred_at from counter_events where counter_id = ?').all(counterId) as Array<Record<string, unknown>>;
+    const daily = () => env.db.$client.prepare('select local_date, status from attendance_daily where student_id = ?').all(kids[1]) as Array<Record<string, unknown>>;
+    const before = daily();
+
+    // Same day (14:30 in Istanbul): applied. The counter dates its event with the arrival time, which
+    // is the lesson's day only because a late command must arrive on that day.
+    env.clock.t = t0 + 270 * MIN;
+    expect(await tap(t0 + 90 * MIN)).toMatchObject({ ok: true });
+    expect(await setDaily(t0 + 95 * MIN)).toMatchObject({ ok: true });
+    expect(events()).toEqual([{ lesson_id: lessonId, local_date: '2026-11-09', week_start: '2026-11-09', occurred_at: t0 + 270 * MIN }]);
+    expect(daily()).toEqual([{ local_date: '2026-11-09', status: 'absent' }]);
+
+    // The next morning another queued tap and attendance change made during the lesson: refused, nothing changes.
+    env.clock.t = Date.UTC(2026, 10, 10, 6, 0);
+    await signInAgain();
+    expect(await tap(t0 + 100 * MIN)).toMatchObject({ ok: false, error: { code: 'CONFLICT', reason: 'LESSON_ENDED' } });
+    const undo = await cmd(s.teacherA, 'attendance.setDaily', { ...ref(lessonId), studentId: kids[1], status: null }, { ...ref(lessonId), clientTime: t0 + 100 * MIN });
+    expect(undo).toMatchObject({ ok: false, error: { reason: 'LESSON_ENDED' } });
+    expect(events()).toHaveLength(1);
+    expect(daily()).toEqual([{ local_date: '2026-11-09', status: 'absent' }]);
+    expect(before).toEqual([{ local_date: '2026-11-09', status: 'present' }]); // from the start (othersPresent)
   });
 });
 
 describe('the first deploy and robustness (S37, D-218)', () => {
+  it('a lesson in use when S37 is deployed (no activity recorded) counts from its last change, not its start', async () => {
+    const { lessonId } = await start(s.teacherA, s.ctxA.id);
+    const t0 = row(lessonId).started_at as number;
+    // Started three hours ago; the old code last bumped updated_at five minutes ago.
+    env.db.$client.prepare('update lessons set last_activity_at = null, updated_at = ? where id = ?').run(t0 + 175 * MIN, lessonId);
+    env.clock.t = t0 + 180 * MIN;
+    await signInAgain();
+    expect(sweepForgottenLessons(env.deps)).toEqual({ ended: 0, reminded: 0, abandoned: 0, failed: 0 }); // the start-up sweep
+    expect((await state(s.teacherA, s.ctxA.id)).lesson).toMatchObject({ status: 'active', autoEndAt: t0 + 205 * MIN });
+    env.clock.t = t0 + 205 * MIN - 1;
+    sweepForgottenLessons(env.deps);
+    expect(row(lessonId).status).toBe('active');
+    env.clock.t = t0 + 205 * MIN;
+    expect(sweepForgottenLessons(env.deps)).toMatchObject({ ended: 1 });
+    expect(row(lessonId)).toMatchObject({ status: 'ended', ended_at: t0 + 175 * MIN, auto_ended_at: t0 + 205 * MIN });
+  });
+
   it("a lesson left running from before S37 on an earlier day is abandoned, quietly; one from today counts from its start", async () => {
     const old = await start(s.teacherA, s.ctxA.id);
     const today = await start(s.teacherB, s.ctxB.id);
@@ -412,7 +462,12 @@ describe('the first deploy and robustness (S37, D-218)', () => {
       expect(r.status).toBe(200);
       expect(r.body.lesson).toMatchObject({ id: a.lessonId, status: 'active' });
       expect((await s.teacherA.get('/api/teacher/lesson-notices')).status).toBe(200);
-      expect(reported).toContain(a.lessonId);
+      // Logged once, not on every poll; again after SETTLE_ERROR_LOG_MS.
+      for (let i = 0; i < 3; i += 1) await state(s.teacherA, s.ctxA.id);
+      expect(reported).toEqual([a.lessonId]);
+      env.clock.advance(SETTLE_ERROR_LOG_MS);
+      await state(s.teacherA, s.ctxA.id);
+      expect(reported).toEqual([a.lessonId, a.lessonId]);
     } finally {
       broken.clear();
       setSettleErrorReporter(() => {});

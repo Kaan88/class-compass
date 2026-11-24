@@ -18,11 +18,18 @@ export const LESSON_IDLE_BEFORE_AUTO_END_MS = 30 * 60_000;
 
 export interface LessonClock {
   startedAt: number;
-  /** Null for a lesson started before S37: read as its start. */
+  /** Null for a lesson started before S37: read as `updatedAt`. */
   lastActivityAt: number | null;
+  /** Bumped by every lesson command before S37 (and by every change since): the best guess at its last activity. */
+  updatedAt: number;
 }
 
-export const lastActivityOf = (l: LessonClock): number => l.lastActivityAt ?? l.startedAt;
+/**
+ * The last activity. A lesson running when S37 was deployed has none recorded: the old code bumped
+ * `updated_at` on every lesson command, so that is read instead (a lesson in use at the restart is not
+ * ended at once with no length).
+ */
+export const lastActivityOf = (l: LessonClock): number => l.lastActivityAt ?? Math.max(l.startedAt, l.updatedAt);
 
 /** When the lesson ends by itself if nothing more happens; `dayEnd` = the end of its local day. */
 export const autoEndAt = (l: LessonClock, dayEnd: number): number => Math.min(dayEnd, Math.max(l.startedAt + LESSON_AUTO_END_AFTER_MS, lastActivityOf(l) + LESSON_IDLE_BEFORE_AUTO_END_MS));

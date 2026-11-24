@@ -122,16 +122,18 @@ export function assertLessonRunning(l: LessonRow): void {
 }
 
 /**
- * A command queued on an offline device and sent after the lesson ended (S37, D-218): accepted when
- * the device made it while the lesson ran (its `clientTime` before the end: for an automatic end, before
- * the server wrote it, since the server could not know about the device's work), on the lesson's own
- * local day and not in the future. An abandoned lesson accepts nothing.
+ * A command queued on an offline device and sent after the lesson ended by itself (S37, D-218): the
+ * server could not know about the device's work, so it is accepted when all hold: the lesson was ended
+ * AUTOMATICALLY (a lesson a teacher ended, or an abandoned one, refuses everything with LESSON_ENDED as
+ * before S37), the device made it before the server wrote the end (`clientTime` before `autoEndedAt`)
+ * and not in the future, and it ARRIVES on the lesson's own local day. A device that reconnects on a
+ * later day gets LESSON_ENDED for all of it. Because arrival is bound to that day, a module that dates
+ * what it writes with `ctx.now()` (a counter tap, the daily attendance) still writes the lesson's day.
  */
 function happenedWhileRunning(ctx: RequestContext, l: LessonRow, cls: ClassRow, meta: CommandMeta): boolean {
   const at = meta.clientTime;
-  if (at === undefined || l.status !== 'ended' || l.endedAt === null || at > ctx.now()) return false;
-  const end = l.autoEndedAt ?? l.endedAt;
-  return at < end && localDate(at, effectiveTimezone(ctx.db, cls)) === l.localDate;
+  if (at === undefined || l.status !== 'ended' || l.autoEndedAt === null || at >= l.autoEndedAt || at > ctx.now()) return false;
+  return localDate(ctx.now(), effectiveTimezone(ctx.db, cls)) === l.localDate;
 }
 
 /** An automatically ended lesson in which a late command happened ends no earlier than that command. */
@@ -269,12 +271,21 @@ export function settleLesson(deps: AppDeps, row: LessonRow | string): LessonRow 
   });
 }
 
-/** `settleLesson` for a read: a failure is reported and the lesson served as it is, never a 500. */
+/** A lesson whose settle keeps failing is reported at most once in this long (every poll would retry it). */
+export const SETTLE_ERROR_LOG_MS = 10 * 60_000;
+const lastSettleReport = new Map<string, number>();
+
+/** `settleLesson` for a read: a failure is reported (at most once per lesson per SETTLE_ERROR_LOG_MS) and the lesson served as it is, never a 500. */
 export function settleForRead(deps: AppDeps, row: LessonRow): LessonRow {
   try {
     return settleLesson(deps, row) ?? row;
   } catch (err) {
-    reportSettleError(err, row.id);
+    const now = deps.now();
+    const last = lastSettleReport.get(row.id);
+    if (last === undefined || now - last >= SETTLE_ERROR_LOG_MS) {
+      lastSettleReport.set(row.id, now);
+      reportSettleError(err, row.id);
+    }
     return row;
   }
 }

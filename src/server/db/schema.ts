@@ -505,7 +505,7 @@ export const lessons = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
     /**
      * S37 (D-218): the last thing that happened in the lesson (an accepted lesson command, "Still
-     * teaching", End Lesson open). Null only for lessons started before S37 (read as `startedAt`).
+     * teaching", End Lesson open). Null only for lessons started before S37 (read as `updatedAt`).
      */
     lastActivityAt: integer('last_activity_at'),
     /**
