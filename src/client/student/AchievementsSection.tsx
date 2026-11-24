@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AchievementTier } from '../../shared/achievements.ts';
 import { classLocales, type ClassLanguage } from '../../shared/classLanguage.ts';
-import { studentSeenAchievements, type StudentAchievementsSection } from '../../shared/contracts/achievements.ts';
+import { SEEN_MAX_AWARDS, studentSeenAchievements, type StudentAchievementsSection } from '../../shared/contracts/achievements.ts';
 import { pickText } from '../../shared/i18n/index.ts';
 import { BadgeArt } from '../achievements/icons.tsx';
 import { ApiError, call } from '../lib/api.ts';
@@ -36,7 +36,7 @@ export const LOCKED_FIRST = 4;
 export const EARNED_FIRST = 4;
 
 /**
- * Celebrations already shown this visit. Module-level on purpose: a visit is one page load, and
+ * Award rows (`awardId`) celebrated this visit. Module-level on purpose: a visit is one page load, and
  * StrictMode, re-renders and a remount of the page must not repeat a celebration (a reload is a new visit).
  */
 const celebrated = new Set<string>();
@@ -45,45 +45,66 @@ const celebrated = new Set<string>();
 export const SEEN_RETRY_MS = [2000, 10_000, 30_000] as const;
 
 /**
- * Celebrated badges the server has not yet confirmed as seen. Every celebrated badge is reported once:
- * one request at a time; a badge celebrated while a request runs (a later refetch brought it) gets the
- * next one. A failed request is tried again after SEEN_RETRY_MS; after the last try, or when the server
- * refuses the request itself (a 4xx other than 429, e.g. a revoked link), the page gives up quietly and
- * the badge is celebrated again on the next visit, which is better than never.
+ * The "seen" queue: award rows celebrated and not yet reported. One request at a time, one retry timer
+ * and one failure count for the whole queue: a badge celebrated while a request runs or a retry waits
+ * goes into the next request, never into a chain of its own. A failed request (busy server, server
+ * error, no connection) is tried again after SEEN_RETRY_MS; after the last try, or when the server
+ * refuses the request itself (a 4xx other than 429, e.g. a revoked link), that request's rows are given
+ * up quietly (celebrated again on the next visit, which is better than never). After a success or a
+ * give-up the count starts again, and rows queued meanwhile are sent at once.
  */
-const unreported = new Set<string>();
-let reporting = false;
+const queue = new Set<string>();
+let sending = false;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let failures = 0;
+let afterSeen: () => void = () => undefined;
 
 function retryable(e: unknown): boolean {
   return !(e instanceof ApiError) || e.status === 429 || e.status >= 500;
 }
 
-function reportSeen(onSeen: () => void, attempt = 0): void {
-  if (reporting || unreported.size === 0) return;
-  reporting = true;
-  const batch = [...unreported];
-  call(studentSeenAchievements, {}).then(
+function flushSeen(): void {
+  if (sending || retryTimer !== null || queue.size === 0) return;
+  sending = true;
+  const batch = [...queue].slice(0, SEEN_MAX_AWARDS);
+  const done = () => {
+    sending = false;
+    failures = 0;
+    for (const id of batch) queue.delete(id);
+  };
+  call(studentSeenAchievements, { awardIds: batch }).then(
     () => {
-      reporting = false;
-      for (const k of batch) unreported.delete(k);
-      onSeen();
-      reportSeen(onSeen);
+      done();
+      afterSeen();
+      flushSeen();
     },
     (e: unknown) => {
-      reporting = false;
-      const wait = SEEN_RETRY_MS[attempt];
+      const wait = SEEN_RETRY_MS[failures];
       if (wait === undefined || !retryable(e)) {
-        for (const k of batch) unreported.delete(k);
+        done();
+        flushSeen();
         return;
       }
-      setTimeout(() => reportSeen(onSeen, attempt + 1), wait);
+      sending = false;
+      failures += 1;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        flushSeen();
+      }, wait);
     },
   );
 }
 
+/** Reports award rows as seen (queued; see above). `onSeen` runs after each successful request. */
+export function queueSeen(awardIds: readonly string[], onSeen: () => void): void {
+  afterSeen = onSeen;
+  for (const id of awardIds) queue.add(id);
+  flushSeen();
+}
+
 /**
  * New achievements are celebrated when the page opens, on any screen (S14d: the achievements are now
- * behind a tile, D-151), once per visit; then the page tells the server they were seen.
+ * behind a tile, D-151), once per visit; then the page tells the server which award rows were seen.
  * `language` is the class language from the page: the message is a fixed string, so it waits until the
  * page shows a language the class has switched on. On the first render with the page the locale is
  * still the device's saved one (English by default) and a Turkish-only class would get English text.
@@ -91,17 +112,17 @@ function reportSeen(onSeen: () => void, attempt = 0): void {
 export function useCelebrateNewAchievements(items: ReadonlyArray<{ subjectId: string; data: StudentAchievementsSection }>, language: ClassLanguage | null) {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
-  const fresh = items.flatMap(({ subjectId, data }) => data.earned.filter((b) => b.isNew && !celebrated.has(`${subjectId}:${b.id}`)).map((b) => ({ subjectId, b })));
+  const fresh = items.flatMap(({ data }) => data.earned.filter((b) => b.isNew && !celebrated.has(b.awardId)));
   const ready = language !== null && classLocales(language).includes(locale);
   useEffect(() => {
     if (!fresh.length || !ready) return;
-    for (const { subjectId, b } of fresh) {
-      celebrated.add(`${subjectId}:${b.id}`);
-      unreported.add(`${subjectId}:${b.id}`);
-    }
-    const first = fresh[0]!.b;
+    for (const b of fresh) celebrated.add(b.awardId);
+    const first = fresh[0]!;
     celebrate(fresh.length === 1 ? t('achievements.newBadge', { name: pickText(first.name, locale) }) : t('achievements.newBadges', { count: fresh.length }));
-    reportSeen(() => void qc.invalidateQueries({ queryKey: STUDENT_PAGE_KEY }));
+    queueSeen(
+      fresh.map((b) => b.awardId),
+      () => void qc.invalidateQueries({ queryKey: STUDENT_PAGE_KEY }),
+    );
   }, [fresh, ready, t, locale, qc]);
 }
 

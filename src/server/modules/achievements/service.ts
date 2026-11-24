@@ -497,6 +497,7 @@ export function studentSection(ctx: RequestContext, input: StudentPageInput): St
     const d = defs.get(r.achievementId);
     return {
       id: r.achievementId,
+      awardId: r.id,
       name: r.nameSnapshot,
       description: d?.description ?? { en: '', tr: '' },
       icon: r.iconSnapshot as AchievementDef['icon'],
@@ -521,9 +522,19 @@ export function studentSection(ctx: RequestContext, input: StudentPageInput): St
   return { earned, locked, level: settings.levelsEnabled ? levelFor(points) : null };
 }
 
-export function markSeen(ctx: RequestContext) {
+/**
+ * Marks the award rows the page celebrated as seen: only rows of the signed-in student (another
+ * student's id, an unknown or already seen one is skipped without a word, so the answer tells nothing),
+ * never a badge awarded after the page was fetched. `{}` from an older page marks nothing.
+ */
+export function markSeen(ctx: RequestContext, awardIds: readonly string[]) {
   const { studentId } = requireStudent(ctx);
-  ctx.db.update(studentAchievements).set({ seenAt: ctx.now() }).where(and(eq(studentAchievements.studentId, studentId), isNull(studentAchievements.seenAt))).run();
+  if (awardIds.length)
+    ctx.db
+      .update(studentAchievements)
+      .set({ seenAt: ctx.now() })
+      .where(and(eq(studentAchievements.studentId, studentId), inArray(studentAchievements.id, [...new Set(awardIds)]), isNull(studentAchievements.seenAt)))
+      .run();
   return { ok: true as const };
 }
 

@@ -212,12 +212,25 @@ export const StudentBadge = z.object({
   category: AchievementCategory,
 });
 export const StudentAchievementsSection = z.object({
-  earned: z.array(StudentBadge.extend({ awardedAt: z.number(), by: z.string().nullable(), isNew: z.boolean() })),
+  /** `awardId`: the award row shown (the newest of this badge); the page reports exactly these rows as seen. */
+  earned: z.array(StudentBadge.extend({ awardId: Id, awardedAt: z.number(), by: z.string().nullable(), isNew: z.boolean() })),
   locked: z.array(StudentBadge.extend({ progress: z.object({ current: z.number().int(), target: z.number().int() }).nullable() })),
   /** null when the class turned levels off. Personal only, never ranked (D-121). */
   level: z.object({ level: z.number().int(), name: LocalizedText, points: z.number().int(), nextAt: z.number().int().nullable() }).nullable(),
 });
 export type StudentAchievementsSection = z.infer<typeof StudentAchievementsSection>;
 
-/** The student has seen their new badges (the celebration then plays only once). */
-export const studentSeenAchievements = endpoint({ method: 'POST', path: '/api/student/achievements/seen', access: 'student', input: z.object({}), output: Ok });
+/** Most award rows one "seen" report names (a page celebrates a handful; a long queue is sent in parts). */
+export const SEEN_MAX_AWARDS = 200;
+/**
+ * The student has seen these new badges (the celebration then plays only once): only the award rows
+ * named, and only the student's own. A badge awarded after the page was fetched stays new. An older
+ * page that sends `{}` marks nothing (its badge is celebrated once more on the next visit, never lost).
+ */
+export const studentSeenAchievements = endpoint({
+  method: 'POST',
+  path: '/api/student/achievements/seen',
+  access: 'student',
+  input: z.object({ awardIds: z.array(Id).max(SEEN_MAX_AWARDS).default([]) }),
+  output: Ok,
+});

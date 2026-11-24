@@ -99,8 +99,8 @@ describe('rule engine, backfill and start fresh (items 2, 3)', () => {
     expect(sec.earned.find((e: any) => e.id === GOAL_SETTER).isNew).toBe(true);
     expect(sec.locked.find((l: any) => l.id === PLANNER).progress).toEqual({ current: 3, target: 5 });
     expect(sec.level).toMatchObject({ level: 1, points: 1 });
-    // Seen once: the celebration plays only once.
-    await ok(adaPhone.post('/api/student/achievements/seen', {}));
+    // Seen once: the celebration plays only once (the page names the award rows it celebrated).
+    await ok(adaPhone.post('/api/student/achievements/seen', { awardIds: [sec.earned.find((e: any) => e.id === GOAL_SETTER).awardId] }));
     expect(section(await ok(adaPhone.get('/api/student/page'))).earned[0].isNew).toBe(false);
     // Bora did nothing: no badges for him.
     expect(await awardsOf(bora.id)).toEqual([]);
@@ -149,6 +149,36 @@ describe('rule engine, backfill and start fresh (items 2, 3)', () => {
     expect(sec.locked).toEqual([]);
     await ok(s.teacherA.put(`/api/teacher/contexts/${s.ctxA.id}/modules/achievements`, { enabled: false }));
     expect(section(await ok(adaPhone.get('/api/student/page')))).toBeUndefined();
+  });
+});
+
+describe('"seen" marks only the award rows the page celebrated (D-122)', () => {
+  const seen = (body: unknown) => adaPhone.post('/api/student/achievements/seen', body);
+  const badgeOf = (sec: any, id: string) => sec.earned.find((e: any) => e.id === id);
+
+  it('a badge awarded after the page was fetched stays new; the row of another student, an unknown id and {} from an older page change nothing', async () => {
+    await ok(s.teacherA.post(`${base()}/award`, { achievementId: KIND, studentIds: [ada.id, bora.id] }));
+    const fetched = section(await ok(adaPhone.get('/api/student/page')));
+    const kind = badgeOf(fetched, KIND);
+    expect(kind).toMatchObject({ isNew: true, awardId: expect.any(String) });
+    // The teacher gives Ada another badge after her page was fetched, before its report lands.
+    env.clock.advance(1000);
+    await ok(s.teacherA.post(`${base()}/award`, { achievementId: SUNSHINE, studentIds: [ada.id] }));
+    const boraRow = (await awardsOf(bora.id)).find((a) => a.achievementId === KIND).id;
+    expect(boraRow).not.toBe(kind.awardId);
+    // The report names what the page celebrated, plus Bora's row (never Ada's to touch) and an unknown id.
+    expect(await ok(seen({ awardIds: [kind.awardId, boraRow, 'no-such-award'] }))).toEqual({ ok: true });
+    const after = section(await ok(adaPhone.get('/api/student/page')));
+    expect(badgeOf(after, KIND).isNew).toBe(false);
+    expect(badgeOf(after, SUNSHINE).isNew).toBe(true);
+    expect(badgeOf(section(await ok(boraPhone.get('/api/student/page'))), KIND).isNew).toBe(true);
+    // A page opened before the update sends {}: nothing is marked (celebrated once more next visit, never lost).
+    await ok(seen({}));
+    expect(badgeOf(section(await ok(adaPhone.get('/api/student/page'))), SUNSHINE).isNew).toBe(true);
+    // The list is bounded by the contract.
+    expect((await seen({ awardIds: Array.from({ length: 201 }, (_, i) => `award-${i}`) })).status).toBe(400);
+    await ok(seen({ awardIds: [badgeOf(after, SUNSHINE).awardId] }));
+    expect(badgeOf(section(await ok(adaPhone.get('/api/student/page'))), SUNSHINE).isNew).toBe(false);
   });
 });
 

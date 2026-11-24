@@ -69,7 +69,7 @@ describe('homework on the student page (HW-4, S13 usability)', () => {
 describe('badges on the student page (D-121, S13 usability)', () => {
   const badge = (id: string, name: string, tier: 'bronze' | 'silver' | 'gold', desc: string) => ({ id, name: label(name), description: label(desc), icon: 'check' as const, tier, category: 'homework' as const });
   const data = (earned: number): StudentAchievementsSection => ({
-    earned: Array.from({ length: earned }, (_, i) => ({ ...badge(`e${i}`, 'Homework hero', 'bronze', `Complete ${i + 1} tasks.`), awardedAt: Date.parse('2026-10-27T10:00:00Z') - i * 86_400_000, by: null, isNew: false })),
+    earned: Array.from({ length: earned }, (_, i) => ({ ...badge(`e${i}`, 'Homework hero', 'bronze', `Complete ${i + 1} tasks.`), awardId: `award-e${i}`, awardedAt: Date.parse('2026-10-27T10:00:00Z') - i * 86_400_000, by: null, isNew: false })),
     locked: [{ ...badge('l1', 'On a roll', 'silver', 'Complete 5 homework tasks on time in a row.'), progress: { current: 4, target: 5 } }],
     level: null,
   });

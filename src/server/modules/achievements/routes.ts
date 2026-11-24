@@ -18,5 +18,5 @@ export function registerAchievementRoutes(app: FastifyInstance, deps: AppDeps) {
   route(app, deps, C.adminAchievementDefaults, (ctx) => svc.adminDefaults(ctx));
   route(app, deps, C.adminArchiveAchievementDefault, (ctx, input) => svc.adminArchive(ctx, input));
   route(app, deps, C.classroomAchievements, (ctx, input) => svc.classroomView(ctx, input));
-  route(app, deps, C.studentSeenAchievements, (ctx) => svc.markSeen(ctx));
+  route(app, deps, C.studentSeenAchievements, (ctx, input) => svc.markSeen(ctx, input.awardIds));
 }

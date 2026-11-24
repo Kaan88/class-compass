@@ -22,7 +22,7 @@ import { preloadWritingScreens, tilesOf } from '../../src/client/student/section
 import { MyGoals } from '../../src/client/student/screens/MyGoals.tsx';
 import { NewGoal } from '../../src/client/student/screens/NewGoal.tsx';
 import { openLink, StudentApp, type OpenResult } from '../../src/client/student/StudentApp.tsx';
-import { SEEN_RETRY_MS } from '../../src/client/student/AchievementsSection.tsx';
+import { queueSeen, SEEN_RETRY_MS } from '../../src/client/student/AchievementsSection.tsx';
 import { CELEBRATION_MS } from '../../src/client/themes/Celebration.tsx';
 import { sounds, themeOf } from '../../src/client/themes/index.tsx';
 import { getDisplay, setDisplay } from '../../src/client/lib/display.ts';
@@ -274,11 +274,12 @@ describe('sentence starters (D-152)', () => {
 });
 
 describe('new achievement celebration in the class language (D-099, D-122)', () => {
-  // `celebrated` in AchievementsSection.tsx is module-level on purpose (one visit = one page load), so a
-  // badge id celebrated by one test is never celebrated again in this file: every test takes fresh ids.
+  // `celebrated` in AchievementsSection.tsx is module-level on purpose (one visit = one page load), so an
+  // award celebrated by one test is never celebrated again in this file: every test takes fresh ids.
   let next = 0;
   const badge = (name = { en: 'Kind helper', tr: 'Nazik yardımcı' }) => ({
     id: `badge-${++next}`,
+    awardId: `award-${next}`,
     name,
     description: { en: 'Helped a classmate', tr: 'Bir arkadaşına yardım etti' },
     icon: 'star',
@@ -313,7 +314,11 @@ describe('new achievement celebration in the class language (D-099, D-122)', () 
       if (String(url).includes('/api/student/page')) return json(pages.length > 1 ? pages.shift() : pages[0]);
       return (seen.shift() ?? (() => json({ ok: true })))();
     });
-  const seenCalls = (f: ReturnType<typeof serve>) => f.mock.calls.filter(([u]) => String(u).includes('/achievements/seen')).length;
+  const seenRequests = (f: ReturnType<typeof serve>) => (f.mock.calls as unknown as Array<[string, RequestInit?]>).filter(([u]) => String(u).includes('/achievements/seen'));
+  const seenCalls = (f: ReturnType<typeof serve>) => seenRequests(f).length;
+  /** The award ids each "seen" request named, in order. */
+  const seenBodies = (f: ReturnType<typeof serve>) => seenRequests(f).map(([, init]) => (JSON.parse(String(init?.body)) as { awardIds: string[] }).awardIds);
+  const pageCalls = (f: ReturnType<typeof serve>) => f.mock.calls.filter(([u]) => String(u).includes('/api/student/page')).length;
   const newBadge = (locale: Locale, name: string) => (locale === 'tr' ? tr : en)['achievements.newBadge'].replace('{name}', name);
   /** Like the student page: the StudentApp in its own QueryClient (returned for refetches). */
   const renderPage = () => {
@@ -379,8 +384,12 @@ describe('new achievement celebration in the class language (D-099, D-122)', () 
     await act(() => qc.invalidateQueries());
     await vi.waitFor(() => expect(screen.getByTestId('celebration').textContent).toContain(newBadge('en', 'Brave reader')));
     await vi.waitFor(() => expect(seenCalls(fetch)).toBe(2));
+    // The page after the second report has nothing new: wait for it and a while after it, then no third report.
+    await vi.waitFor(() => expect(pageCalls(fetch)).toBe(4));
     await act(() => qc.invalidateQueries());
-    expect(seenCalls(fetch)).toBe(2);
+    await vi.waitFor(() => expect(pageCalls(fetch)).toBe(5));
+    await act(() => new Promise((r) => setTimeout(r, 100)));
+    expect(seenBodies(fetch)).toEqual([[first.awardId], [later.awardId]]);
   });
 
   it('a failed "seen" report is tried again (no unhandled rejection, no second celebration); a refused one is given up', async () => {
@@ -435,5 +444,100 @@ describe('new achievement celebration in the class language (D-099, D-122)', () 
       play.mockRestore();
       setDisplay({ theme: DEFAULT_THEME });
     }
+  });
+});
+
+describe('the "seen" queue: one request at a time, one retry chain (D-122)', () => {
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  const busy = () => json({ error: { code: 'INTERNAL', message: 'x' } }, 503);
+  /** Each "seen" request waits for the test to answer it; returns the requests' award ids and the answer hooks. */
+  const manual = () => {
+    const bodies: string[][] = [];
+    const answers: Array<(r: Response) => void> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        bodies.push((JSON.parse(String(init?.body)) as { awardIds: string[] }).awardIds);
+        return new Promise<Response>((resolve) => answers.push(resolve));
+      }),
+    );
+    const answer = async (r: Response) => {
+      answers.shift()!(r);
+      await vi.advanceTimersByTimeAsync(0);
+    };
+    return { bodies, answer };
+  };
+  let n = 0;
+  const id = () => `queue-award-${++n}`;
+
+  afterEach(() => void vi.useRealTimers());
+
+  it('a badge celebrated while a retry waits joins that retry: no second chain, the backoff is kept, three retries in all', async () => {
+    vi.useFakeTimers();
+    const { bodies, answer } = manual();
+    const [a, b] = [id(), id()];
+    const seen = vi.fn();
+    queueSeen([a], seen);
+    expect(bodies).toEqual([[a]]);
+    await answer(json({ error: { code: 'RATE_LIMITED', message: 'x' } }, 429));
+    // During the wait: queued, but no request of its own and the wait is not cut short.
+    queueSeen([b], seen);
+    await vi.advanceTimersByTimeAsync(SEEN_RETRY_MS[0] - 1);
+    expect(bodies).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(bodies).toEqual([[a], [a, b]]);
+    await answer(busy());
+    await vi.advanceTimersByTimeAsync(SEEN_RETRY_MS[1]);
+    await answer(busy());
+    await vi.advanceTimersByTimeAsync(SEEN_RETRY_MS[2]);
+    expect(bodies).toHaveLength(4);
+    await answer(busy()); // the last try: given up
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(bodies).toHaveLength(4);
+    expect(seen).not.toHaveBeenCalled();
+    // The next celebration reports at once with a fresh count, only its own badge.
+    const c = id();
+    queueSeen([c], seen);
+    expect(bodies[4]).toEqual([c]);
+    await answer(json({ ok: true }));
+    expect(seen).toHaveBeenCalledTimes(1);
+  });
+
+  it('a badge added during the last failing request is sent after the give-up; one added during a successful request after it', async () => {
+    vi.useFakeTimers();
+    const { bodies, answer } = manual();
+    const [a, b, c] = [id(), id(), id()];
+    const seen = vi.fn();
+    queueSeen([a], seen);
+    await answer(busy());
+    for (const wait of SEEN_RETRY_MS) {
+      await vi.advanceTimersByTimeAsync(wait);
+      if (wait !== SEEN_RETRY_MS[2]) await answer(busy());
+    }
+    expect(bodies).toEqual([[a], [a], [a], [a]]);
+    queueSeen([b], seen); // while the last try runs
+    expect(bodies).toHaveLength(4);
+    await answer(busy());
+    expect(bodies[4]).toEqual([b]);
+    queueSeen([c], seen); // while that one runs
+    await answer(json({ ok: true }));
+    expect(bodies[5]).toEqual([c]);
+    await answer(json({ ok: true }));
+    expect(seen).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(bodies).toHaveLength(6);
+  });
+
+  it('a refused request is given up at once, and the queue keeps working', async () => {
+    vi.useFakeTimers();
+    const { bodies, answer } = manual();
+    const [a, b] = [id(), id()];
+    queueSeen([a], () => undefined);
+    await answer(json({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401));
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(bodies).toEqual([[a]]);
+    queueSeen([b], () => undefined);
+    await answer(json({ ok: true }));
+    expect(bodies).toEqual([[a], [b]]);
   });
 });
