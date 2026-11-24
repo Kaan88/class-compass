@@ -27,6 +27,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# The jobs only read the repository (code scanning: actions/missing-workflow-permissions).
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest

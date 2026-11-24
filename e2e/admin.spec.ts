@@ -4,7 +4,7 @@
  * labelled as disabled until consent is confirmed.
  */
 import { expect, test } from '@playwright/test';
-import { login } from './helpers.ts';
+import { escapeRegExp, login } from './helpers.ts';
 
 test('create a teacher, show the temporary password once, forced password change, deactivate', async ({ browser }) => {
   const adminCtx = await browser.newContext();
@@ -28,7 +28,7 @@ test('create a teacher, show the temporary password once, forced password change
     await expect(admin.getByRole('button', { name: 'Copy' })).toBeVisible();
     await admin.getByRole('button', { name: 'I have stored it' }).click();
     await expect(admin.getByTestId('temp-password')).toHaveCount(0); // shown only once
-    const row = admin.getByRole('row', { name: new RegExp(loginName.replace(/\./g, '\\.')) });
+    const row = admin.getByRole('row', { name: new RegExp(escapeRegExp(loginName)) });
     await expect(row).toContainText('Must change password');
 
     // The new teacher must change the temporary password first.
@@ -98,7 +98,7 @@ test('an account created with Türkçe sees the forced password change and the P
   } finally {
     // Deactivate the test account again (shared demo data stays as it was).
     await admin.goto('/admin/users');
-    const row = admin.getByRole('row', { name: new RegExp(loginName.replace(/\./g, '\\.')) });
+    const row = admin.getByRole('row', { name: new RegExp(escapeRegExp(loginName)) });
     await row.getByRole('button', { name: 'Deactivate' }).click();
     const confirm = admin.getByRole('alertdialog');
     await confirm.getByLabel(/To confirm, type/).fill(loginName);

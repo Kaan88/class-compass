@@ -6,10 +6,21 @@
 import mammoth from 'mammoth';
 import { freeTextRows, type SourceRow } from '../../../../domain/importing.ts';
 
-const decode = (s: string) =>
-  s
-    .replace(/<br\s*\/?>/giu, ' ')
-    .replace(/<[^>]*>/gu, '')
+/** Removes tags until none is left: one pass over `<b<i>>` would leave `<b>` behind. */
+function stripTags(s: string): string {
+  for (let out = s; ; ) {
+    const next = out.replace(/<[^>]*>/gu, '');
+    if (next === out) return out;
+    out = next;
+  }
+}
+
+/**
+ * mammoth's HTML for one cell or paragraph as plain text. The result is data (a name, a number): it
+ * is never put into a page as HTML, so `&lt;` becoming `<` at the end is intended.
+ */
+export const decode = (s: string) =>
+  stripTags(s.replace(/<br\s*\/?>/giu, ' '))
     .replace(/&nbsp;/gu, ' ')
     .replace(/&lt;/gu, '<')
     .replace(/&gt;/gu, '>')

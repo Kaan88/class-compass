@@ -5,6 +5,9 @@ export const PASSWORD = process.env.E2E_PASSWORD ?? 'e2e-only-Passw0rd!';
 export const PIN = '482913';
 
 /** Same-origin JSON API call that shares the page's cookies (like the app's own fetch). */
+/** A literal text as a regular expression source: every special character escaped (not only the dots). */
+export const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
 export async function api(page: Page, method: string, path: string, body?: unknown) {
   const res = await page.request.fetch(path, {
     method,

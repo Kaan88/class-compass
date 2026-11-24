@@ -6,7 +6,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { codeIn, linkIn, waitForMail } from './mail.ts';
-import { login } from './helpers.ts';
+import { escapeRegExp, login } from './helpers.ts';
 
 test('invite link → email sign-in links → sign in with the link and with the code', async ({ browser }) => {
   const adminCtx = await browser.newContext();
@@ -32,7 +32,7 @@ test('invite link → email sign-in links → sign in with the link and with the
     await expect(admin.getByText('The invite was emailed', { exact: false })).toBeVisible();
     await expect(admin.getByRole('img', { name: /QR code of the invite link/ })).toBeVisible();
     await admin.getByRole('button', { name: 'Done' }).click();
-    const row = admin.getByRole('row', { name: new RegExp(loginName.replace(/\./g, '\\.')) });
+    const row = admin.getByRole('row', { name: new RegExp(escapeRegExp(loginName)) });
     await expect(row).toContainText('Invite pending');
 
     // The email carries the same single-use link.
