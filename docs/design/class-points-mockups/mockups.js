@@ -333,7 +333,7 @@
       const compact = h <= 3;
       return `<div class="box sg ${compact ? 'sg--compact' : ''}"><div class="sg__head"><b>${L('19 students', '19 öğrenci')}</b><span class="btn btn--small">${L('Hide students', 'Öğrencileri gizle')}</span><span class="muted">${L('19 present', '19 burada')}</span></div><ul class="sg__cards">${S.kids.map((k) => studentCard(k, mark)).join('')}</ul></div>`;
     },
-    dock: (w, h, mark, b, inDock) => `<div class="dock"><span class="btn">${icon('users')}${L('Attendance', 'Yoklama')}</span><span class="btn">${icon('star')}${L('Daily Assistant', 'Günlük Yardımcı')} <span class="pill">0 / 4</span></span><span class="btn">${icon('mask')}${L('Secret Students', 'Gizli Öğrenciler')}</span><span class="btn">${icon('groups')}${L('Groups', 'Gruplar')}</span><span class="btn">${icon('pencil')}${L('Homework', 'Ödev')}</span><span class="btn">${icon('trophy')}${L('Achievements', 'Başarılar')}</span>${inDock ? `<button type="button" class="btn btn--new" ${b ? `data-act="dock-open" data-b="${b}" data-fk="dockbtn-${b}"` : 'tabindex="-1"'}>${icon('star')}${L('Class stars', 'Sınıf Yıldızları')}</button>` : ''}<span class="btn btn--end">${icon('flag')}${L('End lesson', 'Dersi bitir')}</span></div>`,
+    dock: (w, h, mark, b, inDock, combined) => combined ? combinedDock(b) : `<div class="dock"><span class="btn">${icon('users')}${L('Attendance', 'Yoklama')}</span><span class="btn">${icon('star')}${L('Daily Assistant', 'Günlük Yardımcı')} <span class="pill">0 / 4</span></span><span class="btn">${icon('mask')}${L('Secret Students', 'Gizli Öğrenciler')}</span><span class="btn">${icon('groups')}${L('Groups', 'Gruplar')}</span><span class="btn">${icon('pencil')}${L('Homework', 'Ödev')}</span><span class="btn">${icon('trophy')}${L('Achievements', 'Başarılar')}</span>${inDock ? `<button type="button" class="btn btn--new" ${b ? `data-act="dock-open" data-b="${b}" data-fk="dockbtn-${b}"` : 'tabindex="-1"'}>${icon('star')}${L('Class stars', 'Sınıf Yıldızları')}</button>` : ''}<span class="btn btn--end">${icon('flag')}${L('End lesson', 'Dersi bitir')}</span></div>`,
   };
   function studentCard(k, mark) {
     const m = mark && k.stars > 0 ? `<span class="mark" role="img" ${A(`${k.stars} stars`, `${k.stars} yıldız`)}>${starGlyph(14)}${k.stars}</span>` : '';
@@ -341,12 +341,14 @@
   }
 
   const MARK = { paths: true, jar: false, album: true, tiles: true, mountain: true };
-  function board(concept, size, b, extra = '') {
+  /** After the decisions (give.html): one dock button for stars and achievements. */
+  const combinedDock = (b) => `<div class="dock"><span class="btn">${icon('users')}${L('Attendance', 'Yoklama')}</span><span class="btn">${icon('star')}${L('Daily Assistant', 'Günlük Yardımcı')} <span class="pill">0 / 4</span></span><span class="btn">${icon('mask')}${L('Secret Students', 'Gizli Öğrenciler')}</span><span class="btn">${icon('groups')}${L('Groups', 'Gruplar')}</span><span class="btn">${icon('pencil')}${L('Homework', 'Ödev')}</span><button type="button" class="btn btn--new" ${b ? `data-act="dock-open" data-b="${b}" data-fk="dockbtn-${b}"` : 'tabindex="-1"'}>${icon('star')}${L('Stars and achievements', 'Yıldız ve başarı')}</button><span class="btn btn--end">${icon('flag')}${L('End lesson', 'Dersi bitir')}</span></div>`;
+  function board(concept, size, b, extra = '', combined = false) {
     const lay = LAYOUTS[size];
     const parts = lay.map(([k, r, c, w, h]) => {
       const style = `grid-area:${r}/${c}/span ${h}/span ${w}`;
       if (k === 'NEW') return `<section class="box nb nb--${size}" style="${style}" data-concept="${concept}" ${A('Class stars box (new)', 'Sınıf Yıldızları kutusu (yeni)')}>${BOX[concept](size, b)}</section>`;
-      return `<div class="part" style="${style}">${PART[k](w, h, MARK[concept], b, size === 'dock')}</div>`;
+      return `<div class="part" style="${style}">${PART[k](w, h, MARK[concept], b, size === 'dock', combined)}</div>`;
     }).join('');
     return `<div class="board" data-size="${size}"><div class="topbar"><b class="tb__c">3-A <span>${L('English', 'İngilizce')}</span></b><span class="muted tb__q">${L('Big dreams start with small plans.', 'Büyük hayaller küçük planlarla başlar.')}</span><b>${L('Tuesday 24 November 2026', '24 Kasım 2026 Salı')}</b><b class="tb__time">10:40</b><span class="btn">${icon('sun')}${L('Display', 'Ekran')}</span><span class="btn btn--ok">${icon('check')}${L('Saved', 'Kaydedildi')}</span><span class="btn">${icon('lock')}${L('Teacher area', 'Öğretmen alanı')}</span></div><div class="bgrid">${parts}</div>${extra}</div>`;
   }
@@ -712,6 +714,9 @@
     }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-act], [role="switch"]')) { e.preventDefault(); e.target.click(); }
   });
+
+  // Helpers for give.html (the combined give screen), which loads this file first.
+  window.CCMock = { L, A, esc, icon, ICON_PATHS, avatar, sticker, starGlyph, pathBar, progressWords, ofText, mascot, jarSvg, jarSegs, board, scaleAll, applyLabels, collator, KIDS0, REASONS, TARGETS, JAR, EVERYONE, nextT, reachedT, burst, state: () => S };
 
   resetState();
   fill();

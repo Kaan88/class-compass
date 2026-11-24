@@ -2800,3 +2800,370 @@ label.inline {
 [id] {
   scroll-margin-top: 7rem;
 }
+
+/* ------------------------------------------------------------------ give.html: the combined give screen */
+.back {
+  font-weight: 700;
+}
+.variants {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.variant {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.variant h3 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.reco {
+  padding: 0.75rem 1rem;
+  border: var(--cc-border-width-strong) solid var(--cc-accent);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-accent-soft);
+  font-weight: 700;
+  max-width: 62rem;
+}
+.dock--strip {
+  flex-wrap: wrap;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+.gv-host {
+  overflow: auto;
+}
+.gv {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.gv__h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.gv__h .ph__t {
+  flex: 1;
+}
+.gv__h h4 {
+  margin: 0;
+  font-size: 28px;
+}
+.gv__jar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: var(--cc-border-width) solid var(--cc-border);
+  border-radius: 999px;
+  background: var(--cc-surface);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.gv__rw {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.gv__rw .ic {
+  color: var(--cc-icon-accent);
+}
+.gv__jar.is-bump {
+  animation: cc-bump 600ms both;
+}
+@keyframes cc-bump {
+  40% {
+    transform: scale(1.08);
+    box-shadow: var(--cc-shadow-raised);
+  }
+}
+.gv__groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.gv .num {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--cc-text);
+  color: var(--cc-surface);
+  font-size: 13px;
+}
+.gv__kids {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 10px;
+}
+.gv--board .gtile {
+  min-height: 118px;
+  font-size: 18px;
+  justify-content: center;
+}
+.gv--board .gtile .av {
+  width: 50px;
+  height: 50px;
+}
+.gv--board .span2 {
+  grid-column: auto;
+}
+.gv--board .gv__bar {
+  position: static;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.gv__badges {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.bbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--cc-touch);
+  padding: 6px 10px;
+  box-sizing: border-box;
+  border: var(--cc-border-width) solid var(--cc-border-strong);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.bbtn > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.bbtn small {
+  font-size: 0.8em;
+}
+.bbtn.is-on {
+  border: 4px solid var(--cc-accent-strong);
+  background: var(--cc-accent-soft);
+  padding: 4px 8px;
+}
+.bbtn > .ic {
+  margin-left: auto;
+  color: var(--cc-accent-strong);
+}
+.shield {
+  flex: none;
+}
+.gv__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 8px;
+}
+.tick {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--cc-touch);
+  font-weight: 700;
+  cursor: pointer;
+}
+.tick input {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--cc-accent);
+}
+.gv__gh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  font-size: 18px;
+}
+.gv__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.gv__list .q {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: stretch;
+}
+.gv__list .q-row > span:first-child {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.result .shield {
+  vertical-align: middle;
+}
+.cele__more {
+  align-self: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 2px solid var(--cc-border-strong);
+  border-radius: 999px;
+}
+/* phone form */
+.gphone {
+  position: relative;
+}
+.gv--phone {
+  flex: 1 0 auto;
+  min-height: auto;
+  padding: 10px 10px 0;
+  gap: 8px;
+  font-size: 16px;
+}
+.gv--phone > * {
+  flex-shrink: 0;
+}
+.gv--phone .gv__h h4 {
+  font-size: 18px;
+}
+.gv--phone .gv__h .btn {
+  font-size: 14px;
+}
+.gv--phone .gv__groups {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.gv--phone .gv__groups > .muted {
+  flex: none;
+  font-size: 14px;
+}
+.gv--phone .gv__groups .btn {
+  flex: none;
+}
+.gv--phone .gv__kids {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.gv--phone .gtile {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  text-align: start;
+  padding: 6px 8px;
+  font-size: 15px;
+  column-gap: 6px;
+  row-gap: 2px;
+}
+.gv--phone .gtile.is-on {
+  padding: 4px 6px;
+}
+.gv--phone .gtile .segs i {
+  width: 12px;
+  height: 10px;
+}
+.gv--phone .gtile small {
+  font-size: 13px;
+}
+.gv--phone .gv__bar {
+  margin: 0 -10px;
+}
+.gv--phone.gv--tabs .gv__bar {
+  max-height: 360px;
+  overflow: auto;
+}
+.gv--phone.gv--list .gv__bar {
+  position: static;
+}
+.gv--phone .reasons {
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.gv--phone .rbtn {
+  min-height: var(--cc-touch);
+  padding: 6px 8px;
+  font-size: 14px;
+  gap: 6px;
+}
+.gv--phone .rbtn > .ic {
+  width: 22px;
+  height: 22px;
+}
+.gv--phone .rbtn b {
+  padding: 1px 7px;
+}
+.gv--phone .gv__badges {
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.gv--phone .bbtn {
+  font-size: 14px;
+  padding: 4px 6px;
+}
+.gv--phone .result {
+  font-size: 15px;
+  flex-wrap: wrap;
+  padding: 4px 8px;
+}
+.gv--phone .dv__status {
+  font-size: 16px;
+}
+.cele--inphone {
+  position: static;
+  display: block;
+  padding: 10px;
+  background: none;
+  overflow: visible;
+}
+.cele--inphone .cele__card {
+  min-width: 0;
+  padding: 20px 12px;
+  gap: 8px;
+  font-size: 16px;
+}
+.cele--inphone .cele__card > .mascot {
+  position: static;
+}
+.cele--inphone .cele__big {
+  font-size: 26px;
+}
+.cele--inphone .cele__t,
+.cele--inphone .cele__st {
+  font-size: 19px;
+}
+.cele--inphone .cele__stk {
+  right: -40px;
+}
+.cele--inphone .cele__row li {
+  width: 64px;
+  font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gv__jar.is-bump {
+    animation-name: cc-fade !important;
+  }
+}
+@media (max-width: 900px) {
+  .variants {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
