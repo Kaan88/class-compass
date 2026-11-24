@@ -39,7 +39,7 @@ Sitede başka sistemlerden gelen sınav ya da karne notları, ev adresleri, tele
 
 ## Çerezler
 
-Site, oturumunuzu açık tutan bir çerez ve giriş sırasında kısa ömürlü çerezler kullanır. Dil gibi birkaç seçimi cihazınızda hatırlar. Reklam, izleme ya da analiz çerezi kullanmaz; başka şirketlerin sunucularından hiçbir şey yüklemez.
+Site, oturumunuzu açık tutan bir çerez ve giriş sırasında kısa ömürlü çerezler kullanır. Öğretmen ve yönetici oturumları, çıkış yapılana kadar açık kalır; 90 gün hiç kullanılmazsa ya da en geç bir yıl sonra kendiliğinden kapanır. Dil gibi birkaç seçimi cihazınızda hatırlar. Reklam, izleme ya da analiz çerezi kullanmaz; başka şirketlerin sunucularından hiçbir şey yüklemez.
 
 ## Veriler ne kadar süre saklanır
 

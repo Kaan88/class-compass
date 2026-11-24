@@ -661,6 +661,10 @@ A summary of what is still open after S14, S15a and the move to the Oracle serve
   - [x] An invited account that signed in through the sign-in server without a password yet: `Me.passwordNotSet`, `PASSWORD_NOT_SET` instead of "wrong password", and a line in Profile that says to open the invite
   - [ ] A real change of address on the test site (the code and the notice arrive through the school's mail): a person's check
   - [ ] From the review, not built: a notice to administrators when an address changes; a per-account limit on wrong passwords at the re-authentication step (the route limit is per address)
+- [x] D-215: teacher and administrator sessions last 90 days without use and at most a year (was 12 hours and 14 days); a fresh sign-in by passkey or the sign-in server is the proof for a password account too (the passkey offer no longer answers "current password is not correct"); Google's mark on the Google button, which stands above the passkey button
+  - [ ] "Sign out everywhere" for a person's own sessions, and a list of them in Profile (longer sessions make this worth having)
+  - [ ] The guide screenshot of the Google button is from before the mark (`npm run docs:screenshots`)
+  - [ ] Idea, not decided: sign in on a classroom screen by scanning a QR code with a phone that is already signed in, and approving there (a short code on both screens against a swapped QR code)
 - [ ] A password together with an authenticator code (TOTP), only if still wanted once Google and passkeys exist: the rule is "no password on its own" (owner, 2026-11-24)
 - [ ] Not planned: sign-in for student links through a parent's Google or Apple account (a link already needs no typing and keeps the device signed in; parent identities would be new personal data). If a leaked link is the worry: the "link opened on a new device" notification exists, and a link could be limited to a few devices
 - [ ] A daily line or notification for administrators about lockouts and failed sign-ins; a Cloudflare alert on the rate-limit and challenge rules

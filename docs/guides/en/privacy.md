@@ -39,7 +39,7 @@ The site keeps no grades from other systems, no home addresses, no phone numbers
 
 ## Cookies
 
-The site sets a cookie that keeps you signed in, and short-lived cookies during sign-in. It remembers a few choices on your device, such as the language. It uses no advertising, tracking or analytics cookies and loads nothing from other companies' servers.
+The site sets a cookie that keeps you signed in, and short-lived cookies during sign-in. A teacher or administrator stays signed in on a device until they sign out, for 90 days without use, and for a year at most. It remembers a few choices on your device, such as the language. It uses no advertising, tracking or analytics cookies and loads nothing from other companies' servers.
 
 ## How long data is kept
 
