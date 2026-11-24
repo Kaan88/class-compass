@@ -50,7 +50,7 @@ const { LessonNotices, LESSON_NOTICES_KEY } = await import('../../src/client/mod
 const { LessonSummaryView } = await import('../../src/client/modules/lessons/EndLesson.tsx');
 const { deepLink } = await import('../../src/client/modules/notifications/NotificationsPage.tsx');
 const { OverdueNote } = await import('../../src/client/modules/lessons/OverdueNote.tsx');
-const { EndLessonFlow, END_LESSON_KEEPALIVE_MS } = await import('../../src/client/modules/lessons/EndLesson.tsx');
+const { EndLessonFlow, END_LESSON_IDLE_MS, END_LESSON_KEEPALIVE_MS } = await import('../../src/client/modules/lessons/EndLesson.tsx');
 const { endLessonTarget } = await import('../../src/client/routes/Classroom.tsx');
 const { endStepUis } = await import('../../src/client/modules/registry.ts');
 
@@ -191,6 +191,28 @@ describe('the board and End Lesson keep a lesson in use alive (S37, D-218)', () 
       expect(screen.getByRole('button', { name: en['lesson.saveAndEnd'] })).toBeTruthy();
       act(() => vi.advanceTimersByTime(3 * END_LESSON_KEEPALIVE_MS));
       expect(queued).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('an End Lesson nobody touches for 30 minutes stops the pings; any input starts them again', () => {
+    vi.useFakeTimers();
+    try {
+      wrap('en', <EndLessonFlow context={ctx3a} lesson={live} live draft={null} onDraft={() => {}} onCancel={() => {}} onEnded={() => {}} onQueued={() => {}} />);
+      expect(END_LESSON_IDLE_MS).toBe(3 * END_LESSON_KEEPALIVE_MS);
+      act(() => vi.advanceTimersByTime(2 * END_LESSON_KEEPALIVE_MS));
+      expect(queued).toHaveLength(3); // on opening, at 10 and at 20 minutes
+      act(() => vi.advanceTimersByTime(3 * END_LESSON_KEEPALIVE_MS));
+      expect(queued).toHaveLength(3); // idle since the opening: no ping at 30, 40, 50
+      fireEvent.pointerDown(screen.getByRole('heading', { level: 2 }));
+      expect(queued).toHaveLength(4); // input: at once
+      act(() => vi.advanceTimersByTime(END_LESSON_KEEPALIVE_MS));
+      expect(queued).toHaveLength(5);
+      fireEvent.keyDown(screen.getByTestId('end-lesson'), { key: 'Tab' });
+      act(() => vi.advanceTimersByTime(2 * END_LESSON_KEEPALIVE_MS));
+      expect(queued).toHaveLength(7); // a key also counts
+      expect(queued.every((q) => q.type === 'lesson.stillTeaching')).toBe(true);
     } finally {
       vi.useRealTimers();
     }

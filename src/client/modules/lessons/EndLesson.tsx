@@ -4,7 +4,7 @@
  * every optional module switched off (only the reflection remains). Save and end leaves full screen
  * when the teacher's "Full screen during lessons" is on (S18, D-167).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as L from '../../../shared/contracts/lessons.ts';
 import type { LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
@@ -28,6 +28,11 @@ import type { ReflectionValue } from './ReflectionStep.tsx';
 
 /** How often an open End Lesson says "Still teaching" (well inside LESSON_IDLE_BEFORE_AUTO_END_MS). */
 export const END_LESSON_KEEPALIVE_MS = 10 * 60_000;
+/**
+ * An End Lesson nobody touches for this long (no pointer, key or step change) stops saying "Still
+ * teaching", so a screen left open does not keep a forgotten lesson alive; any input starts it again.
+ */
+export const END_LESSON_IDLE_MS = 30 * 60_000;
 
 /** Values typed into the End Lesson steps so far; kept by the classroom page per class and lesson (LES-4). */
 export type EndDraft = Record<string, unknown>;
@@ -63,7 +68,16 @@ export function EndLessonFlow({
   const uis = endStepUis(lesson.endSteps);
   const initial = (): EndDraft => Object.fromEntries(uis.map((u) => [u.key, u.initial()]));
   const values: EndDraft = { ...initial(), ...draft };
-  const setValues = (fn: (v: EndDraft) => EndDraft) => onDraft((d) => fn({ ...initial(), ...d }));
+  // Input in the flow (S37, D-218): keeps the keep-alive going; after an idle spell it pings at once.
+  const lastInput = useRef(Date.now());
+  const onInput = useRef(() => {
+    lastInput.current = Date.now();
+  });
+  const noteInput = () => onInput.current();
+  const setValues = (fn: (v: EndDraft) => EndDraft) => {
+    noteInput();
+    onDraft((d) => fn({ ...initial(), ...d }));
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const label = classLabel(context, locale);
@@ -71,9 +85,25 @@ export function EndLessonFlow({
   useEffect(() => {
     if (!live) return;
     const ping = () => void sendLessonCommand('lesson.stillTeaching', { contextId: context.id, lessonId: lesson.id });
+    let idle = false;
+    onInput.current = () => {
+      lastInput.current = Date.now();
+      if (idle) {
+        idle = false;
+        ping();
+      }
+    };
     ping();
-    const id = window.setInterval(ping, END_LESSON_KEEPALIVE_MS);
-    return () => window.clearInterval(id);
+    const id = window.setInterval(() => {
+      if (Date.now() - lastInput.current >= END_LESSON_IDLE_MS) idle = true;
+      else ping();
+    }, END_LESSON_KEEPALIVE_MS);
+    return () => {
+      window.clearInterval(id);
+      onInput.current = () => {
+        lastInput.current = Date.now();
+      };
+    };
   }, [live, context.id, lesson.id]);
 
   const finish = async () => {
@@ -102,7 +132,7 @@ export function EndLessonFlow({
   };
 
   return (
-    <section className="cc-card cc-stack" aria-labelledby="cc-end-title" data-testid="end-lesson">
+    <section className="cc-card cc-stack" aria-labelledby="cc-end-title" data-testid="end-lesson" onPointerDownCapture={noteInput} onKeyDownCapture={noteInput}>
       <div className="cc-flow-head">
         <ThemeIllustration name="endLesson" width={150} />
         <h2 id="cc-end-title" className="cc-h1">
