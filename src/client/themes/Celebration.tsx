@@ -9,12 +9,12 @@
  * The overlay never takes clicks (pointer-events: none) and is announced once to screen readers.
  * Anything can call `celebrate()`; the layer is mounted once in the root layout.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useDisplay } from '../lib/display.ts';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { getDisplay, useDisplay } from '../lib/display.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { Mascot, motionMode, playThemeSound, useTheme } from './index.tsx';
+import { Mascot, motionMode, playThemeSound, ThemeScope, themeOf, useTheme } from './index.tsx';
 import { celebrationCues } from './sequences.ts';
-import type { ColorToken } from './types.ts';
+import type { ColorToken, SoundEvent } from './types.ts';
 
 export const CELEBRATION_MS = 2500;
 
@@ -156,20 +156,28 @@ export function CelebrationLayer() {
   const theme = useTheme();
   const [active, setActive] = useState<{ id: number; message: string | null } | null>(null);
   const mode = motionMode(display);
-  // The listener stays registered for the layer's whole life and reads the current settings: re-adding
-  // it whenever the theme or display changed left a gap in which a celebrate() from a component's effect
-  // in the same commit (the student page's new achievements, once its language and theme arrive) was lost.
-  const current = useRef({ display, theme });
+  // The listener stays registered for the layer's whole life: re-adding it whenever the theme or display
+  // changed left a gap in which a celebrate() from a component's effect in the same commit (the student
+  // page's new achievements, once its language and theme arrive) was lost. It reads the display store
+  // itself, not values from the last render: the student page sets its class theme and celebrates in one
+  // effect pass, before this layer has rendered with that theme, so a copy taken at render time gave the
+  // sounds the default theme while the overlay showed the class theme. Each delayed cue reads the store
+  // again when it plays (the same theme as the overlay, and a sound switched off meanwhile stays off).
+  const scope = useContext(ThemeScope);
+  const scopeRef = useRef(scope);
   useLayoutEffect(() => {
-    current.current = { display, theme };
-  }, [display, theme]);
+    scopeRef.current = scope;
+  }, [scope]);
   useEffect(() => {
+    const play = (event: SoundEvent) => {
+      const d = getDisplay();
+      playThemeSound(d, themeOf(scopeRef.current ?? d.theme), event);
+    };
     const l: Listener = (e) => {
-      const { display: d, theme: th } = current.current;
-      const m = motionMode(d);
+      const m = motionMode(getDisplay());
       for (const cue of celebrationCues(m)) {
-        if (cue.at === 0) playThemeSound(d, th, cue.event);
-        else setTimeout(() => playThemeSound(d, th, cue.event), cue.at);
+        if (cue.at === 0) play(cue.event);
+        else setTimeout(() => play(cue.event), cue.at);
       }
       if (m !== 'none') setActive(e);
     };

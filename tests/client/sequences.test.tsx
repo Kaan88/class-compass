@@ -88,4 +88,17 @@ describe('CelebrationLayer under reduced motion', () => {
     act(() => void vi.advanceTimersByTime(1500));
     expect(played).toEqual([]);
   });
+
+  it('full motion: the delayed cues read the switches when they play (sounds switched off after the fanfare stay off)', () => {
+    stubReducedMotion(false);
+    setDisplay({ theme: 'classroom', classAnimations: true, classSounds: true, deviceSounds: true });
+    const view = render(<CelebrationLayer />);
+    act(() => celebrate());
+    expect(eventsPlayed()).toEqual(['fanfare']);
+    act(() => setDisplay({ deviceSounds: false }));
+    act(() => void vi.advanceTimersByTime(1500));
+    expect(eventsPlayed()).toEqual(['fanfare']);
+    expect(view.getByTestId('celebration').dataset.mode).toBe('full');
+    act(() => setDisplay({ deviceSounds: true }));
+  });
 });

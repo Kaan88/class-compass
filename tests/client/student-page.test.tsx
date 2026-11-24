@@ -22,6 +22,11 @@ import { preloadWritingScreens, tilesOf } from '../../src/client/student/section
 import { MyGoals } from '../../src/client/student/screens/MyGoals.tsx';
 import { NewGoal } from '../../src/client/student/screens/NewGoal.tsx';
 import { openLink, StudentApp, type OpenResult } from '../../src/client/student/StudentApp.tsx';
+import { SEEN_RETRY_MS } from '../../src/client/student/AchievementsSection.tsx';
+import { CELEBRATION_MS } from '../../src/client/themes/Celebration.tsx';
+import { sounds, themeOf } from '../../src/client/themes/index.tsx';
+import { getDisplay, setDisplay } from '../../src/client/lib/display.ts';
+import { DEFAULT_THEME } from '../../src/shared/themes.ts';
 import { generatedAvatar } from '../../src/shared/avatarDefaults.ts';
 
 afterEach(() => {
@@ -269,9 +274,12 @@ describe('sentence starters (D-152)', () => {
 });
 
 describe('new achievement celebration in the class language (D-099, D-122)', () => {
-  const badge = {
-    id: 'badge-kind',
-    name: { en: 'Kind helper', tr: 'Nazik yardımcı' },
+  // `celebrated` in AchievementsSection.tsx is module-level on purpose (one visit = one page load), so a
+  // badge id celebrated by one test is never celebrated again in this file: every test takes fresh ids.
+  let next = 0;
+  const badge = (name = { en: 'Kind helper', tr: 'Nazik yardımcı' }) => ({
+    id: `badge-${++next}`,
+    name,
     description: { en: 'Helped a classmate', tr: 'Bir arkadaşına yardım etti' },
     icon: 'star',
     tier: 'none',
@@ -279,16 +287,15 @@ describe('new achievement celebration in the class language (D-099, D-122)', () 
     awardedAt: Date.UTC(2026, 10, 20),
     by: null,
     isNew: true,
-  };
-  const page = (language: { mainLanguage: 'en' | 'tr'; secondLanguageEnabled: boolean }) => ({
+  });
+  type Language = { mainLanguage: 'en' | 'tr'; secondLanguageEnabled: boolean };
+  const page = (language: Language, earned: unknown[] = [badge()], theme = 'default') => ({
     student: { fullName: 'Deniz Örnek', initials: 'DÖ', avatarHue: 120 },
     className: '3-Demo',
-    theme: 'default',
+    theme,
     language,
     media: { photos: false, audio: false, documents: false, video: false },
-    subjects: [
-      { subjectId: 'subject-1', name: { en: 'English', tr: 'İngilizce' }, sections: [{ key: 'achievements', data: { earned: [badge], locked: [], level: null } }] },
-    ],
+    subjects: [{ subjectId: 'subject-1', name: { en: 'English', tr: 'İngilizce' }, sections: [{ key: 'achievements', data: { earned, locked: [], level: null } }] }],
     avatar: {
       spec: null,
       generated: generatedAvatar('student-1'),
@@ -299,18 +306,134 @@ describe('new achievement celebration in the class language (D-099, D-122)', () 
     },
     textLimits: { minGoalWords: 1, minGoalLetters: 1 },
   });
-  const serve = (body: unknown) =>
-    vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes('/api/student/page') ? body : { ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }));
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  /** Serves the pages in turn (the last one again and again) and the "seen" answers in turn (then ok). */
+  const serve = (pages: unknown[], seen: Array<() => Response | Promise<Response>> = []) =>
+    vi.fn(async (url: string) => {
+      if (String(url).includes('/api/student/page')) return json(pages.length > 1 ? pages.shift() : pages[0]);
+      return (seen.shift() ?? (() => json({ ok: true })))();
+    });
+  const seenCalls = (f: ReturnType<typeof serve>) => f.mock.calls.filter(([u]) => String(u).includes('/achievements/seen')).length;
+  const newBadge = (locale: Locale, name: string) => (locale === 'tr' ? tr : en)['achievements.newBadge'].replace('{name}', name);
+  /** Like the student page: the StudentApp in its own QueryClient (returned for refetches). */
+  const renderPage = () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <StudentApp token={null} />
+      </QueryClientProvider>,
+    );
+    return qc;
+  };
+  const english = { mainLanguage: 'en', secondLanguageEnabled: false } as const;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.clear();
+  });
 
   it('a Turkish-only class celebrates in Turkish even when this device last showed English', async () => {
     localStorage.clear(); // a fresh device: the saved student locale is English
-    const fetch = serve(page({ mainLanguage: 'tr', secondLanguageEnabled: false }));
+    const fetch = serve([page({ mainLanguage: 'tr', secondLanguageEnabled: false })]);
     vi.stubGlobal('fetch', fetch);
-    render(wrap(<StudentApp token={null} />));
+    renderPage();
     const shown = await screen.findByTestId('celebration');
-    expect(shown.textContent).toContain(tr['achievements.newBadge'].replace('{name}', 'Nazik yardımcı'));
+    expect(shown.textContent).toContain(newBadge('tr', 'Nazik yardımcı'));
     expect(shown.textContent).not.toContain('New achievement');
-    // Seen is reported once.
-    expect(fetch.mock.calls.filter(([u]) => String(u).includes('/achievements/seen'))).toHaveLength(1);
+    await vi.waitFor(() => expect(seenCalls(fetch)).toBe(1));
+  });
+
+  it('a class with two languages celebrates at once in the language this device saved (Turkish)', async () => {
+    localStorage.setItem('cc.studentLocale', 'tr');
+    const fetch = serve([page({ mainLanguage: 'en', secondLanguageEnabled: true })]);
+    vi.stubGlobal('fetch', fetch);
+    renderPage();
+    const shown = await screen.findByTestId('celebration');
+    expect(shown.textContent).toContain(newBadge('tr', 'Nazik yardımcı'));
+    expect(document.documentElement.lang).toBe('tr');
+    await vi.waitFor(() => expect(seenCalls(fetch)).toBe(1));
+  });
+
+  it('an English-only class waits for English when this device saved Turkish', async () => {
+    localStorage.setItem('cc.studentLocale', 'tr');
+    const fetch = serve([page(english)]);
+    vi.stubGlobal('fetch', fetch);
+    renderPage();
+    const shown = await screen.findByTestId('celebration');
+    expect(shown.textContent).toContain(newBadge('en', 'Kind helper'));
+    expect(shown.textContent).not.toContain('Nazik yardımcı');
+    await vi.waitFor(() => expect(seenCalls(fetch)).toBe(1));
+  });
+
+  it('a badge that arrives on a later refetch is celebrated and reported as seen too, each badge once', async () => {
+    const first = badge();
+    const later = badge({ en: 'Brave reader', tr: 'Cesur okur' });
+    const old = (b: typeof first) => ({ ...b, isNew: false });
+    // The first page brings one new badge; the refetch after "seen" has none; a later refetch brings another.
+    const fetch = serve([page(english, [first]), page(english, [old(first)]), page(english, [later, old(first)]), page(english, [old(later), old(first)])]);
+    vi.stubGlobal('fetch', fetch);
+    const qc = renderPage();
+    expect((await screen.findByTestId('celebration')).textContent).toContain(newBadge('en', 'Kind helper'));
+    await vi.waitFor(() => expect(seenCalls(fetch)).toBe(1));
+    await vi.waitFor(() => expect(fetch.mock.calls.length).toBe(3)); // page, seen, page again
+    await act(() => qc.invalidateQueries());
+    await vi.waitFor(() => expect(screen.getByTestId('celebration').textContent).toContain(newBadge('en', 'Brave reader')));
+    await vi.waitFor(() => expect(seenCalls(fetch)).toBe(2));
+    await act(() => qc.invalidateQueries());
+    expect(seenCalls(fetch)).toBe(2);
+  });
+
+  it('a failed "seen" report is tried again (no unhandled rejection, no second celebration); a refused one is given up', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // A busy server, then no connection, then success.
+    const fetch = serve([page(english)], [() => json({ error: { code: 'RATE_LIMITED', message: 'x' } }, 429), () => Promise.reject(new TypeError('Failed to fetch'))]);
+    vi.stubGlobal('fetch', fetch);
+    renderPage();
+    await screen.findByTestId('celebration');
+    await vi.waitFor(() => expect(seenCalls(fetch)).toBe(1));
+    await act(() => vi.advanceTimersByTimeAsync(SEEN_RETRY_MS[0]));
+    await vi.waitFor(() => expect(seenCalls(fetch)).toBe(2));
+    await act(() => vi.advanceTimersByTimeAsync(SEEN_RETRY_MS[1]));
+    await vi.waitFor(() => expect(seenCalls(fetch)).toBe(3));
+    // Success refetches the page (this server still says "new"): not celebrated again this visit, no more reports.
+    await act(() => vi.advanceTimersByTimeAsync(CELEBRATION_MS + 100));
+    expect(screen.queryByTestId('celebration')).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(SEEN_RETRY_MS[2] * 2));
+    expect(screen.queryByTestId('celebration')).toBeNull();
+    expect(seenCalls(fetch)).toBe(3);
+    cleanup();
+
+    // A refused request (the link was revoked) is not retried.
+    const refused = serve([page(english)], [() => json({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401)]);
+    vi.stubGlobal('fetch', refused);
+    renderPage();
+    await screen.findByTestId('celebration');
+    await vi.waitFor(() => expect(seenCalls(refused)).toBe(1));
+    await act(() => vi.advanceTimersByTimeAsync(SEEN_RETRY_MS.reduce((a, x) => a + x, 0) + 1000));
+    expect(seenCalls(refused)).toBe(1);
+  });
+
+  it('the sounds use the class theme the overlay shows, also when the page is ready at once', async () => {
+    const fetch = serve([page(english, [badge()], 'animals')]);
+    vi.stubGlobal('fetch', fetch);
+    const play = vi.spyOn(sounds, 'play').mockReturnValue(true);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderPage();
+      await screen.findByTestId('celebration');
+      await act(() => vi.advanceTimersByTimeAsync(1000));
+      const animals = themeOf('animals').sounds!;
+      expect(animals.fanfare).not.toEqual(themeOf(DEFAULT_THEME).sounds!.fanfare);
+      expect(play.mock.calls.map(([sound, , event]) => [event, sound])).toEqual([
+        ['fanfare', animals.fanfare],
+        ['clapping', animals.clapping],
+        ['fireworks', animals.fireworks],
+      ]);
+      expect(getDisplay().theme).toBe('animals');
+      await vi.waitFor(() => expect(seenCalls(fetch)).toBe(1));
+    } finally {
+      play.mockRestore();
+      setDisplay({ theme: DEFAULT_THEME });
+    }
   });
 });

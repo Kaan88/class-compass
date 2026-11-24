@@ -3,20 +3,20 @@
  * the date and who gave it), the badges still to earn as silhouettes with how to earn them and a
  * progress bar with its text ("2 of 3"), and the optional private level path. Nothing compares the
  * student with anyone else. New badges are celebrated once (reduced motion: a still message only);
- * then the page tells the server they were seen.
+ * then the page tells the server they were seen (every celebrated badge once, failed reports retried).
  * S13 usability: only the newest earned badges are shown first (the rest behind "Show all my badges");
  * every card, earned or still to earn, shows its tier word and what it is for, so two badges with the
  * same name (one family of tiers) and an earned tier next to the next tier
  * ("On a roll" Bronze earned, Silver next) are told apart.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AchievementTier } from '../../shared/achievements.ts';
 import { classLocales, type ClassLanguage } from '../../shared/classLanguage.ts';
 import { studentSeenAchievements, type StudentAchievementsSection } from '../../shared/contracts/achievements.ts';
 import { pickText } from '../../shared/i18n/index.ts';
 import { BadgeArt } from '../achievements/icons.tsx';
-import { call } from '../lib/api.ts';
+import { ApiError, call } from '../lib/api.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { whenText } from '../modules/goals/shared.tsx';
 import { celebrate } from '../themes/Celebration.tsx';
@@ -35,8 +35,51 @@ export const LOCKED_FIRST = 4;
 /** Earned badges shown before "Show all my badges" (newest first). */
 export const EARNED_FIRST = 4;
 
-/** Celebrations already shown this visit (StrictMode and re-renders must not repeat them). */
+/**
+ * Celebrations already shown this visit. Module-level on purpose: a visit is one page load, and
+ * StrictMode, re-renders and a remount of the page must not repeat a celebration (a reload is a new visit).
+ */
 const celebrated = new Set<string>();
+
+/** Waits before trying a failed "seen" report again (busy server, server error or no connection). */
+export const SEEN_RETRY_MS = [2000, 10_000, 30_000] as const;
+
+/**
+ * Celebrated badges the server has not yet confirmed as seen. Every celebrated badge is reported once:
+ * one request at a time; a badge celebrated while a request runs (a later refetch brought it) gets the
+ * next one. A failed request is tried again after SEEN_RETRY_MS; after the last try, or when the server
+ * refuses the request itself (a 4xx other than 429, e.g. a revoked link), the page gives up quietly and
+ * the badge is celebrated again on the next visit, which is better than never.
+ */
+const unreported = new Set<string>();
+let reporting = false;
+
+function retryable(e: unknown): boolean {
+  return !(e instanceof ApiError) || e.status === 429 || e.status >= 500;
+}
+
+function reportSeen(onSeen: () => void, attempt = 0): void {
+  if (reporting || unreported.size === 0) return;
+  reporting = true;
+  const batch = [...unreported];
+  call(studentSeenAchievements, {}).then(
+    () => {
+      reporting = false;
+      for (const k of batch) unreported.delete(k);
+      onSeen();
+      reportSeen(onSeen);
+    },
+    (e: unknown) => {
+      reporting = false;
+      const wait = SEEN_RETRY_MS[attempt];
+      if (wait === undefined || !retryable(e)) {
+        for (const k of batch) unreported.delete(k);
+        return;
+      }
+      setTimeout(() => reportSeen(onSeen, attempt + 1), wait);
+    },
+  );
+}
 
 /**
  * New achievements are celebrated when the page opens, on any screen (S14d: the achievements are now
@@ -50,16 +93,15 @@ export function useCelebrateNewAchievements(items: ReadonlyArray<{ subjectId: st
   const qc = useQueryClient();
   const fresh = items.flatMap(({ subjectId, data }) => data.earned.filter((b) => b.isNew && !celebrated.has(`${subjectId}:${b.id}`)).map((b) => ({ subjectId, b })));
   const ready = language !== null && classLocales(language).includes(locale);
-  const sent = useRef(false);
   useEffect(() => {
     if (!fresh.length || !ready) return;
-    for (const { subjectId, b } of fresh) celebrated.add(`${subjectId}:${b.id}`);
+    for (const { subjectId, b } of fresh) {
+      celebrated.add(`${subjectId}:${b.id}`);
+      unreported.add(`${subjectId}:${b.id}`);
+    }
     const first = fresh[0]!.b;
     celebrate(fresh.length === 1 ? t('achievements.newBadge', { name: pickText(first.name, locale) }) : t('achievements.newBadges', { count: fresh.length }));
-    if (!sent.current) {
-      sent.current = true;
-      void call(studentSeenAchievements, {}).then(() => qc.invalidateQueries({ queryKey: STUDENT_PAGE_KEY }));
-    }
+    reportSeen(() => void qc.invalidateQueries({ queryKey: STUDENT_PAGE_KEY }));
   }, [fresh, ready, t, locale, qc]);
 }
 
