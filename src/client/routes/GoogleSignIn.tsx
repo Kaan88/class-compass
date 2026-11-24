@@ -8,6 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import * as Auth from '../../shared/contracts/auth.ts';
+import googleMark from '../assets/google-g.svg?url';
 import { call } from '../lib/api.ts';
 import { isClassroomDevice } from '../lib/classroomDevice.ts';
 import { errorText } from '../lib/errors.ts';
@@ -48,6 +49,8 @@ export function GoogleSignIn() {
           }
         }}
       >
+        {/* Google's own mark, a picture file: the button's text is its name. */}
+        <img className="cc-google__icon" src={googleMark} alt="" />
         {t('google.signIn')}
       </Button>
       {error ? <Alert>{error}</Alert> : null}

@@ -112,6 +112,8 @@ describe('Sign in with Google and shared computers (S31, D-208)', () => {
     for (const passwordsOff of [false, true]) {
       render(wrap(<LoginPage />, client([[INFO, { ...info, googleSignInEnabled: true, passwordsOff }]])));
       expect(button(en['google.signIn'])).toBeTruthy();
+      // Google's mark is on the button as a picture without a name of its own.
+      expect(button(en['google.signIn']).querySelector('img[alt=""]')).not.toBeNull();
       expect(screen.getByText(en['google.sharedWarning'])).toBeTruthy();
       cleanup();
     }

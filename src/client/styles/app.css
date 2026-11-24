@@ -1468,6 +1468,13 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
   position: relative;
   z-index: 1;
 }
+/* Google's mark on "Sign in with Google" (a picture file with Google's own colours). */
+.cc-google__icon {
+  display: block;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+}
 /* The operator's own sign-in server (S34, D-213): one small icon-only button at the end of the sign-in
    card. Quiet, not hidden: a full touch target, a name for screen readers, full strength on hover and focus. */
 .cc-sso {

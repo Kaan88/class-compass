@@ -66,6 +66,17 @@ describe('sign-in page (S33, D-210)', () => {
     expect(button(tr['passkey.signIn'])).toBeTruthy();
   });
 
+  it('stands below "Sign in with Google", which is the first of the two', () => {
+    withWebAuthn();
+    for (const passwordsOff of [false, true]) {
+      render(wrap(<LoginPage />, client([[INFO, { ...info, googleSignInEnabled: true, passwordsOff }]])));
+      const google = screen.getByTestId('google-signin');
+      const passkey = screen.getByTestId('passkey-signin');
+      expect(google.compareDocumentPosition(passkey) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      cleanup();
+    }
+  });
+
   it('does not offer it on an address where passkeys cannot work, or in a browser without them', () => {
     withWebAuthn();
     render(wrap(<LoginPage />, client([[INFO, { ...info, passkeysEnabled: false }]])));

@@ -86,8 +86,8 @@ export function LoginPage() {
         <Button variant="primary" size="big" onPress={() => setByEmail(true)}>
           {t('signin.emailMe')}
         </Button>
-        {resetInfo.data.passkeysEnabled ? <PasskeySignIn /> : null}
         {resetInfo.data.googleSignInEnabled ? <GoogleSignIn /> : null}
+        {resetInfo.data.passkeysEnabled ? <PasskeySignIn /> : null}
         {resetInfo.data.sso ? <SsoSignIn sso={resetInfo.data.sso} /> : null}
       </AuthCard>
     );
@@ -114,8 +114,8 @@ export function LoginPage() {
           {t('signin.emailMe')}
         </Button>
       ) : null}
-      {resetInfo.data?.passkeysEnabled ? <PasskeySignIn /> : null}
       {resetInfo.data?.googleSignInEnabled ? <GoogleSignIn /> : null}
+      {resetInfo.data?.passkeysEnabled ? <PasskeySignIn /> : null}
       {resetInfo.data?.sso ? <SsoSignIn sso={resetInfo.data.sso} /> : null}
     </AuthCard>
   );
