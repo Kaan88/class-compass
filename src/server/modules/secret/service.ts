@@ -392,6 +392,11 @@ export function endStep(ctx: RequestContext, lesson: LessonRow, data: z.infer<ty
   for (const o of data.outcomes ?? []) applyOutcome(ctx, revealed, o, null);
 }
 
+/** Did this lesson have a Secret Students round (any state)? A late End Lesson never applies one (S37, D-218). */
+export function lessonHasRound(db: Db, lessonId: string): boolean {
+  return db.select({ id: secretRounds.id }).from(secretRounds).where(eq(secretRounds.lessonId, lessonId)).get() !== undefined;
+}
+
 /**
  * Lesson close hook (D-010): a round that was never revealed (abandoned lesson, or the module was
  * switched off before End Lesson) is closed as `unrevealed_abandoned`. It still counts for the

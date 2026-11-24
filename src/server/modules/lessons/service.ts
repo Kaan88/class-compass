@@ -620,7 +620,7 @@ function lateEnd(ctx: RequestContext, l: LessonRow, p: P<'lesson.end'>, meta: Co
   }
   const fresh = ctx.db.select().from(lessons).where(eq(lessons.id, l.id)).get()!;
   const ended = updateLesson(ctx, fresh, { autoEndedAt: null, autoEndSeenAt: null });
-  audit(ctx.db, ctx.actor, { action: 'lesson.end', entity: 'lesson', entityId: l.id, after: { stageReached: ended.stageIndex, reflection: ended.reflectionJson?.rating ?? null, late: true, autoEndedAt: l.autoEndedAt, notApplied }, opId: meta.opId }, ctx.now());
+  audit(ctx.db, ctx.actor, { action: 'lesson.end', entity: 'lesson', entityId: l.id, after: { stageReached: ended.stageIndex, reflection: ended.reflectionJson?.rating ?? null, late: true, autoEndedAt: l.autoEndedAt, notApplied, ...(savedAt !== ctx.now() ? { savedAt } : {}) }, opId: meta.opId }, ctx.now());
   closeLessonNotices(ctx, l.id, ['lessonStillRunning', 'lessonAutoEnded']);
   return { ...summaryOf(ctx.db, ended), notApplied };
 }

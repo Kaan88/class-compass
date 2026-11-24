@@ -76,6 +76,7 @@ export function lessonNotices(ctx: RequestContext): LessonNotices {
   // Until Got it, a late End Lesson (which clears the mark) or the end of the fill-in window, whichever
   // comes first (no "Got it" needed then); lessons closed before S37 were abandoned, never marked.
   // Only recent lessons (NOTICE_LOOKBACK_DAYS): an old undismissed one is long closed, and every poll would scan its calendar.
+  // A notice can be hidden while its window is still open only if a closure longer than 60 days follows the lesson; the notification link and `lateEnd` still work then.
   const since = addDays(localDate(ctx.now(), 'UTC'), -NOTICE_LOOKBACK_DAYS);
   const autoEnded = ownLessons(ctx, and(isNotNull(lessons.autoEndedAt), isNull(lessons.autoEndSeenAt), gte(lessons.localDate, since)))
     .orderBy(desc(lessons.endedAt))

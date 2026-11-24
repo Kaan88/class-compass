@@ -6,7 +6,7 @@
 import { SecretCommands, SecretEndStepInput } from '../../../shared/contracts/secret.ts';
 import { command } from '../../lib/commands.ts';
 import { endLessonStep } from '../lessons/endSteps.ts';
-import { draw, endStep, recordOutcome, redraw, reveal } from './service.ts';
+import { draw, lessonHasRound, endStep, recordOutcome, redraw, reveal } from './service.ts';
 
 /** Listed in the manifest; registered once by installModules() (D-069). */
 export const secretCommands = [
@@ -18,7 +18,7 @@ export const secretCommands = [
 
 /** Before the core reflection (order 100): reveal + outcomes (SEC-5). */
 export const secretEndStep = endLessonStep({ key: 'secretStudents', module: 'secretStudents', order: 40, input: SecretEndStepInput, apply: endStep,
-  // Never applied late (S37, D-218): the round's reveal and outcomes belong to the running lesson; a
-  // late End Lesson lists it as not available and skips it, whatever the round's state.
-  canApplyLate: () => false,
+  // Never applied late when the lesson had a round (S37, D-218), whatever its state: the reveal and
+  // outcomes belong to the running lesson. With no round the step does nothing, so it is simply absent.
+  canApplyLate: (db, lesson) => !lessonHasRound(db, lesson.id),
 });

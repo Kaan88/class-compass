@@ -68,7 +68,7 @@ describe('the fill-in window: until the end of the next school day (S37, D-218)'
     expect(n.autoEnded).toEqual([expect.objectContaining({ lessonId, fillInUntil: deadline, timezone: 'Europe/Istanbul' })]);
     expect(await lessonItems(s.teacherA)).toEqual([expect.objectContaining({ fillIn: { lessonId, until: deadline } })]);
     const f = await ok(fillIn(s.teacherA, lessonId));
-    expect(f).toMatchObject({ contextId: s.ctxA.id, className: '3-A', fillInUntil: deadline, notAvailable: ['secretStudents'], state: { lesson: { id: lessonId, status: 'ended' }, today: { localDate: '2026-11-09' } } });
+    expect(f).toMatchObject({ contextId: s.ctxA.id, className: '3-A', fillInUntil: deadline, notAvailable: [], state: { lesson: { id: lessonId, status: 'ended' }, today: { localDate: '2026-11-09' } } });
     expect(f.state.lesson.endSteps).toContain('reflection');
   });
 
@@ -159,6 +159,23 @@ describe('the fill-in window: until the end of the next school day (S37, D-218)'
     await at(Date.parse('2026-11-10T07:00:00Z'));
     expect(await cmd(s.teacherA, 'lesson.setStage', { ...ref(lessonId), stageIndex: 1 }, { ...ref(lessonId), clientTime: before })).toMatchObject({ ok: false, error: { reason: 'LESSON_ENDED' } });
     expect((await fillIn(s.teacherA, lessonId)).status).toBe(200);
+  });
+
+  it('without a Secret Students round the step is in neither list; a backdated save is in the audit', async () => {
+    const lessonId = await forgotten('2026-11-06');
+    expect((await ok(fillIn(s.teacherA, lessonId))).notAvailable).toEqual([]);
+    await at(Date.parse('2026-11-10T08:00:00Z'));
+    const savedAt = Date.parse('2026-11-06T12:00:00Z');
+    expect(await cmd(s.teacherA, 'lesson.end', { ...ref(lessonId), steps: { secretStudents: {}, reflection: { rating: 3, note: null } } }, { ...ref(lessonId), clientTime: savedAt })).toMatchObject({ ok: true, result: { notApplied: [] } });
+    const a = env.db.$client.prepare("select after_json from audit_events where action = 'lesson.end' and entity_id = ?").get(lessonId) as { after_json: string };
+    expect(JSON.parse(a.after_json)).toMatchObject({ late: true, savedAt });
+  });
+
+  it('a late End Lesson judged by its arrival has no savedAt in the audit', async () => {
+    const lessonId = await forgotten('2026-11-09');
+    expect((await lateEnd(s.teacherA, lessonId)).ok).toBe(true);
+    const a = env.db.$client.prepare("select after_json from audit_events where action = 'lesson.end' and entity_id = ?").get(lessonId) as { after_json: string };
+    expect(JSON.parse(a.after_json).savedAt).toBeUndefined();
   });
 
   it('an End Lesson saved offline in time is applied when it arrives after the deadline; one saved after it is refused', async () => {
