@@ -124,7 +124,9 @@ export function PasskeysSection({ me }: { me: Me }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Passkey | null>(null);
-  const byPassword = me.signInMethod === 'password';
+  // A password account asks for the password, unless the sign-in a moment ago (a passkey, the sign-in
+  // server) already counts as the proof.
+  const byPassword = me.signInMethod === 'password' && !me.reauthFresh;
   const when = (ms: number) =>
     new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', {
       dateStyle: 'medium',

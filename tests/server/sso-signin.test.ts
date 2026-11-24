@@ -231,6 +231,15 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     expect((await c.post('/api/auth/pin', { pin: '1357' })).status).toBe(200);
   });
 
+  it('an administrator with a password who has just signed in here adds a passkey without typing the password; later the password is asked again', async () => {
+    const { s, fake } = await school();
+    const { c, r } = await signIn(fake, standard('root@mail.demo.example', 'acct-17'));
+    expect(r.body).toMatchObject({ id: s.adminUser.id, signInMethod: 'password', reauthFresh: true });
+    expect((await c.post('/api/auth/passkeys/register/start', {})).status).toBe(200);
+    env.clock.advance(16 * 60_000);
+    expect(reason(await c.post('/api/auth/passkeys/register/start', {}))).toBe('WRONG_PASSWORD');
+  });
+
   it('S35 (D-214): a fresh sign-in here is the re-authentication for changing the own address; the change clears the provider’s id', async () => {
     const { s, fake, mailer } = await school();
     // Ayşe without a password (as after "no passwords for anyone", D-207).
@@ -323,6 +332,8 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     expect(r.body).not.toHaveProperty('email');
     // Everyone else is not in this state.
     expect((await ok(s.admin.get('/api/auth/me'))).passwordNotSet).toBe(false);
+    // Right after the sign-in it counts as the proof (15 minutes); after that there is nothing to type.
+    env.clock.advance(16 * 60_000);
     for (const body of [{}, { currentPassword: 'never-had-one-123' }]) {
       expect(reason(await c.post('/api/auth/pin', { ...body, pin: '2468' }))).toBe('PASSWORD_NOT_SET');
       expect(reason(await c.post('/api/auth/email/start', { ...body, email: 'boss@mail.demo.example' }))).toBe('PASSWORD_NOT_SET');

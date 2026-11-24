@@ -15,7 +15,7 @@ import { isPinUnlocked, PIN_UNLOCK_MS } from '../../lib/http.ts';
 import { getUserSetting } from '../../lib/userSettings.ts';
 import { passwordBlocked } from './signInPolicy.ts';
 
-export const SESSION_ABSOLUTE_MS = 14 * 24 * 60 * 60 * 1000;
+export const SESSION_ABSOLUTE_MS = 365 * 24 * 60 * 60 * 1000;
 const LOGIN_FREE_FAILURES = 5;
 const IP_MAX_FAILURES = 30;
 const PIN_FREE_FAILURES = 5;
@@ -217,6 +217,9 @@ export async function assertReauth(deps: AppDeps, user: UserRow, session: Sessio
     if (!isFreshEmailSession(session, deps.now())) throw new AppError('UNAUTHENTICATED', 'Sign in again with a fresh email link first', { reason: 'REAUTH_REQUIRED' });
     return;
   }
+  // A password account that has just signed in without typing it (a passkey, the operator's sign-in
+  // server) has proven itself the same way an email-link account does: no second proof for 15 minutes.
+  if (isFreshEmailSession(session, deps.now())) return;
   if (passwordNotSet(user)) throw noPasswordYet();
   if (!currentPassword || !user.passwordHash || !(await verifyPassword(user.passwordHash, currentPassword))) {
     throw new AppError('UNAUTHENTICATED', 'Current password is incorrect', { reason: 'WRONG_PASSWORD' });

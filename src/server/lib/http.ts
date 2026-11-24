@@ -7,7 +7,8 @@ import { AppError } from './errors.ts';
 import { tokenHash } from './crypto.ts';
 import type { Actor, AppDeps, DisplayPrincipal, McpPrincipal, RequestContext, ScorerPrincipal, SessionRow, StudentPrincipal, UserRow } from './context.ts';
 
-export const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
+/** Teacher and administrator sessions (owner 2026-11-24, D-215): signed out after 90 days without use, at the latest after a year. A shared classroom screen is guarded by classroom mode and the PIN, not by a short session. */
+export const SESSION_IDLE_MS = 90 * 24 * 60 * 60 * 1000;
 export const PIN_UNLOCK_MS = 5 * 60 * 1000;
 const TOUCH_INTERVAL_MS = 60 * 1000;
 

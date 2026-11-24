@@ -35,11 +35,25 @@ describe('authentication', () => {
     expect((await c.post('/api/auth/login', { login: 'ayse.teacher', password: 'correct-horse-battery' })).status).toBe(200);
   });
 
-  it('expires idle sessions', async () => {
+  it('D-215: a session lasts through nights and holidays, ends after 90 days without use, and at the latest after a year', async () => {
+    const DAY = 24 * 60 * 60 * 1000;
     const c = new Client(env);
     await c.login('ayse.teacher');
     env.clock.advance(13 * 60 * 60 * 1000);
+    expect((await c.get('/api/auth/me')).status).toBe(200);
+    env.clock.advance(89 * DAY);
+    expect((await c.get('/api/auth/me')).status).toBe(200);
+    env.clock.advance(91 * DAY);
     expect((await c.get('/api/auth/me')).status).toBe(401);
+    // Used every month, it still ends a year after the sign-in.
+    const d = new Client(env);
+    await d.login('ayse.teacher');
+    for (let i = 0; i < 12; i++) {
+      env.clock.advance(30 * DAY);
+      expect((await d.get('/api/auth/me')).status).toBe(200);
+    }
+    env.clock.advance(6 * DAY);
+    expect((await d.get('/api/auth/me')).status).toBe(401);
   });
 
   it('requires the CSRF header and same origin for mutations', async () => {
