@@ -225,18 +225,19 @@ export const users = sqliteTable(
     timeUpClipFileId: text('time_up_clip_file_id'),
     /**
      * Sign in with Google (S31, D-208): Google's permanent id of the person, stored at the first Google
-     * sign-in that matched the account's address; later sign-ins match on it. Cleared when an
-     * administrator changes the address. Teachers, and administrators once they have no password (D-207);
-     * null = never signed in with Google.
+     * sign-in that matched the account's address; later sign-ins match on it. Cleared when the address
+     * changes or the account is deactivated. Teachers, and administrators once they have no password
+     * (D-207); null = never signed in with Google. Not unique (S36, D-216): one person's accounts that
+     * share an address (D-108) may all carry the same id, and the sign-in then asks which one.
      */
     googleSub: text('google_sub'),
-    /** The operator's own sign-in server (S34, D-213): its permanent id of the person, kept the same way. Any role. */
+    /** The operator's own sign-in server (S34, D-213): its permanent id of the person, kept the same way (not unique either, D-216). Any role. */
     ssoSub: text('sso_sub'),
     disabledAt: integer('disabled_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [uniqueIndex('users_login_uq').on(t.login), uniqueIndex('users_google_sub_uq').on(t.googleSub), uniqueIndex('users_sso_sub_uq').on(t.ssoSub)],
+  (t) => [uniqueIndex('users_login_uq').on(t.login), index('users_google_sub_idx').on(t.googleSub), index('users_sso_sub_idx').on(t.ssoSub)],
 );
 
 export const SESSION_KINDS = ['user', 'student', 'scorer', 'display'] as const;
