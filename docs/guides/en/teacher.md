@@ -37,6 +37,12 @@ A passkey lets you sign in with your fingerprint, your face or your device's scr
 - **On the classroom computer** do not add a passkey: anyone who can unlock that computer could then sign in as you. Profile holds the button back there and says why. You can still **sign in** on it with the passkey on your phone: press **Sign in with a passkey** and choose the phone or QR code option your browser offers.
 - **Lost a device?** Press **Remove passkey** next to it under **Profile and PIN** → **Passkeys** from another device, or ask your administrator to remove your passkeys. You can still sign in another way (email links, or your password).
 
+### Your email address
+
+You sign in with your email address (links, codes, Google), so **Profile and PIN** → **Email address** shows it and lets you change it. Confirm that it is you (type your **Current password**; without a password, sign in by email, Google or passkey in the last 15 minutes), type the **New email address** and press **Send a code to the new address**. Type the **6-digit code** from that email within 15 minutes and press **Change address**. Only then does the address change. You stay signed in on that device; your other devices are signed out, and AI tool connections must be made again. Your old address gets a short email saying that the address was changed. If the school has not set up email, your administrator changes the address.
+
+If **Profile and PIN** says that your account has no password yet, you signed in without opening your invite: open the invite link in your email to choose a password, or ask your administrator to send a new invite.
+
 ## PIN and classroom lock
 
 ![Profile and PIN](../img/en/profile-pin.png)

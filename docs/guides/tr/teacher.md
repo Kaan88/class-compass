@@ -37,6 +37,12 @@ Geçiş anahtarıyla parmak iziniz, yüzünüz ya da cihazınızın ekran kilidi
 - **Sınıf bilgisayarına** geçiş anahtarı eklemeyin: o bilgisayarın kilidini açabilen herkes sizin adınıza giriş yapabilir. Profil orada düğmeyi geri tutar ve nedenini söyler. Yine de o bilgisayarda telefonunuzdaki geçiş anahtarıyla **giriş yapabilirsiniz**: **Geçiş anahtarıyla giriş yap**'a basıp tarayıcının sunduğu telefon ya da QR kod seçeneğini kullanın.
 - **Cihazınızı mı kaybettiniz?** Başka bir cihazdan **Profil ve PIN** → **Geçiş anahtarları** altında o anahtarın yanındaki **Geçiş anahtarını kaldır**'a basın ya da yöneticinizden geçiş anahtarlarınızı kaldırmasını isteyin. Başka bir yolla (e-posta bağlantıları ya da şifrenizle) giriş yapmaya devam edebilirsiniz.
 
+### E-posta adresiniz
+
+E-posta adresinizle giriş yaparsınız (bağlantı, kod, Google); bu yüzden **Profil ve PIN** → **E-posta adresi** bölümü adresinizi gösterir ve değiştirmenizi sağlar. Siz olduğunuzu doğrulayın (**Mevcut şifre** alanına şifrenizi yazın; şifreniz yoksa son 15 dakika içinde e-posta, Google ya da geçiş anahtarıyla giriş yapmış olun), **Yeni e-posta adresi** alanını doldurun ve **Yeni adrese kod gönder**'e basın. O e-postadaki **6 haneli kod**u 15 dakika içinde yazıp **Adresi değiştir**'e basın. Adres ancak o zaman değişir. O cihazda oturumunuz açık kalır; diğer cihazlarınızda oturum kapanır ve yapay zekâ aracı bağlantılarını yeniden kurmanız gerekir. Eski adresinize, adresin değiştirildiğini bildiren kısa bir e-posta gider. Okulda e-posta ayarlanmamışsa adresi yöneticiniz değiştirir.
+
+**Profil ve PIN** sayfası hesabınızın henüz şifresi olmadığını söylüyorsa davetinizi açmadan giriş yapmışsınızdır: şifre seçmek için e-postanızdaki davet bağlantısını açın ya da yöneticinizden yeni bir davet göndermesini isteyin.
+
 ## PIN ve sınıf kilidi
 
 ![Profil ve PIN](../img/tr/profile-pin.png)

@@ -44,7 +44,7 @@ The list shows each account's status (**Active**, **Invite pending** until the i
 - **Clear PIN**: when someone forgot their PIN. They are signed out on every device and set a new PIN.
 - **New invite link** / **Revoke invite**.
 - **Deactivate** / **Reactivate**: a deactivated person cannot sign in; their records stay. You cannot deactivate yourself, and at least one active administrator must remain.
-- **Edit**: name, email, interface language. Changing the email revokes open invites and sign-in links.
+- **Edit**: name, email, interface language. Changing the email revokes open invites, sign-in and reset links and the link to Google or the sign-in server; the new address counts as unproven until the person uses an invite or sign-in link sent to it. Use it when someone has lost their mailbox. People change their own address in **Profile and PIN** → **Email address** with a code sent to the new address, and so do you: in **Edit** your own row shows your address with **You change your own address in your profile, with a code sent to the new address.** A typo there could lock you out, above all while passwords are switched off.
 
 ### Passwords
 

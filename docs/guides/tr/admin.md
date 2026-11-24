@@ -44,7 +44,7 @@ Listede her hesabın durumu (**Etkin**, davet kullanılana kadar **Davet bekliyo
 - **PIN sil**: bir kişi PIN'ini unuttuğunda. Bütün cihazlarda oturumu kapanır ve yeni bir PIN belirler.
 - **Yeni davet bağlantısı** / **Daveti iptal et**.
 - **Devre dışı bırak** / **Yeniden etkinleştir**: devre dışı bir kişi giriş yapamaz; kayıtları korunur. Kendinizi devre dışı bırakamazsınız ve en az bir etkin yönetici kalmalıdır.
-- **Düzenle**: ad, e-posta, arayüz dili. E-postayı değiştirmek açık davetleri ve giriş bağlantılarını iptal eder.
+- **Düzenle**: ad, e-posta, arayüz dili. E-postayı değiştirmek açık davetleri, giriş ve sıfırlama bağlantılarını ve Google ya da giriş sunucusu bağlantısını iptal eder; yeni adres, kişi ona gönderilen bir davet ya da giriş bağlantısını kullanana kadar doğrulanmamış sayılır. Birisi e-posta kutusunu kaybettiğinde bunu kullanın. Herkes kendi adresini **Profil ve PIN** → **E-posta adresi** bölümünden, yeni adrese gönderilen bir kodla değiştirir; siz de öyle: **Düzenle** penceresinde kendi satırınız adresinizi **Kendi adresinizi profilinizden, yeni adrese gönderilen bir kodla değiştirirsiniz.** notuyla gösterir. Orada yapılan bir yazım hatası, özellikle şifreler kapalıyken, sizi dışarıda bırakabilir.
 
 ### Şifreler
 
