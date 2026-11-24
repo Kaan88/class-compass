@@ -131,6 +131,8 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  /** Optional: a comma-separated list of domains; the provider may then vouch only for addresses in them. */
+  SSO_EMAIL_DOMAINS: z.string().max(500).optional().default(''),
 });
 
 /** "Sign in with ChatGPT" can be offered: the switch is on and every value it needs is set (D-179). */

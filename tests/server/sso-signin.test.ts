@@ -102,6 +102,15 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     const plain = await school({ ...SSO, SSO_ISSUER: 'http://mail.demo.example' });
     plain.fake.discovery = { issuer: 'http://mail.demo.example', authorization_endpoint: 'http://mail.demo.example/login', token_endpoint: 'http://mail.demo.example/auth/token' };
     expect(reason(await new Client(env).post('/api/auth/sso/start'))).toBe('SSO_SIGNIN_FAILED');
+    expect(plain.fake.calls).toEqual([]); // nothing was sent over plain http
+    await env.app.close();
+    for (const odd of ['https://user:pw@mail.demo.example', 'https://mail.demo.example?x=1']) {
+      const o = await school({ ...SSO, SSO_ISSUER: odd });
+      expect(reason(await new Client(env).post('/api/auth/sso/start')), odd).toBe('SSO_SIGNIN_FAILED');
+      expect(o.fake.calls, odd).toEqual([]);
+      await env.app.close();
+    }
+    await school();
   });
 
   it('reads the provider’s addresses once, and sends the browser there with PKCE, a nonce and a sealed cookie', async () => {
@@ -245,5 +254,47 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
       await env.app.close();
     }
     await school();
+  });
+
+  it('review fixes: a wrong state with the right cookie, an invited administrator, large numeric ids, a domain limit, a deactivated account', async () => {
+    const { s, fake, mailer } = await school();
+    // The browser that asked, but another state.
+    const c = new Client(env);
+    const started = new URL((await ok(c.post('/api/auth/sso/start'))).authorizeUrl);
+    fake.nonce = started.searchParams.get('nonce')!;
+    fake.claims = standard('root@mail.demo.example', 'acct-17');
+    const state = started.searchParams.get('state')!;
+    expect(reason(await c.post('/api/auth/sso/complete', { state: `${state.slice(0, -4)}AAAA`, code: 'fictional-code' }))).toBe('SSO_SIGNIN_FAILED');
+    // An id too large to be exact, or negative, is refused.
+    expect(reason((await signIn(fake, standard('root@mail.demo.example', 2 ** 53 + 2))).r)).toBe('SSO_SIGNIN_FAILED');
+    expect(reason((await signIn(fake, standard('root@mail.demo.example', -1))).r)).toBe('SSO_SIGNIN_FAILED');
+    expect(count('select count(*) n from users where sso_sub is not null')).toBe(0);
+
+    // An invited administrator while passwords are on: signed in, but the invite stays and the account does not become password-less.
+    const boss = await ok(s.admin.post('/api/admin/users', { login: 'new.admin', displayName: 'Yeni Yönetici', role: 'admin', email: 'new.admin@mail.demo.example' }));
+    const invite = tokenFrom(mailer.sent.at(-1)!.text);
+    const asBoss = await signIn(fake, standard('new.admin@mail.demo.example', 'acct-boss'));
+    expect(asBoss.r.body).toMatchObject({ id: boss.user.id, role: 'admin', signInMethod: 'password' });
+    await ok(new Client(env).post('/api/auth/invite/inspect', { token: invite }));
+    expect(audits('auth.invite_accept')).toBe(0);
+    // No sign-in link is mailed to that administrator: the account is not an email-link account.
+    const sentBefore = mailer.sent.length;
+    await ok(new Client(env).post('/api/auth/email-link/request', { email: 'new.admin@mail.demo.example' }));
+    expect(mailer.sent).toHaveLength(sentBefore);
+
+    // A deactivated account lets go of its id, so a new account with the address can be linked.
+    expect((await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'))).r.status).toBe(200);
+    await ok(s.admin.post(`/api/admin/users/${s.ayse.id}/deactivate`));
+    expect(env.db.select().from(users).where(eq(users.id, s.ayse.id)).get()!.ssoSub).toBeNull();
+    const fresh = await ok(s.admin.post('/api/admin/users', { login: 'ayse.again', displayName: 'Ayşe Yeniden', role: 'teacher', email: 'ayse@mail.demo.example', setup: 'temporary_password' }));
+    expect((await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'))).r.body.id).toBe(fresh.user.id);
+    await env.app.close();
+
+    // With a domain limit the provider may vouch only for addresses in those domains.
+    const limited = await school({ ...SSO, SSO_EMAIL_DOMAINS: ' Mail.Demo.Example , @second.demo.example ' });
+    await ok(limited.s.admin.patch(`/api/admin/users/${limited.s.mehmet.id}`, { email: 'mehmet@elsewhere.demo.example' }));
+    expect((await signIn(limited.fake, standard('root@mail.demo.example', 'acct-17'))).r.status).toBe(200);
+    expect(reason((await signIn(limited.fake, standard('mehmet@elsewhere.demo.example', 'acct-m'))).r)).toBe('SSO_SIGNIN_FAILED');
+    expect(reason((await signIn(limited.fake, standard('mehmet@notmail.demo.example', 'acct-m'))).r)).toBe('SSO_SIGNIN_FAILED');
   });
 });

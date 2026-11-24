@@ -134,7 +134,9 @@ export function setUserActive(ctx: RequestContext, userId: string, active: boole
     }
     if ((u.disabledAt === null) !== active) {
       const now = ctx.now();
-      ctx.db.update(users).set({ disabledAt: active ? null : now, updatedAt: now }).where(eq(users.id, u.id)).run();
+      // A deactivated account lets go of its Google id and its sign-in server id (D-208, D-213): otherwise the
+      // old link would keep answering for that person and shut out a new account with the same address.
+      ctx.db.update(users).set({ disabledAt: active ? null : now, ...(active ? {} : { googleSub: null, ssoSub: null }), updatedAt: now }).where(eq(users.id, u.id)).run();
       if (!active) {
         revokeAllUserSessions(ctx.db, u.id, now);
         invalidateResetTokens(ctx.db, u.id, now);

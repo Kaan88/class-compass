@@ -17,7 +17,7 @@
  * signature is not checked again (OpenID Connect Core 3.1.3.7, as for Google); its issuer, audience,
  * expiry, nonce and address are. `email_verified` must be true unless `SSO_TRUST_EMAIL` says that this
  * provider only ever names addresses it owns (a mail server naming its own mailboxes sends no such
- * claim). Matching is by the provider's permanent id (`users.sso_sub`) once known, before that by the
+ * claim), and `SSO_EMAIL_DOMAINS` can limit the addresses it may vouch for. Matching is by the provider's permanent id (`users.sso_sub`) once known, before that by the
  * address, which must belong to exactly one active account. No provider token is kept.
  *
  * The icon the sign-in page shows is a file in the data folder (`SSO_ICON_FILE`), never part of the
@@ -34,6 +34,7 @@ import type { AppDeps, UserRow } from '../../lib/context.ts';
 import { openSecret, randomToken, sealSecret, timingSafeEqualStr } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
 import { actorFor, createSession, invalidateResetTokens, SESSION_ABSOLUTE_MS } from './service.ts';
+import { passwordlessAllowed } from './signInPolicy.ts';
 
 export const SSO_RETURN_PATH = '/signin-sso';
 export const SSO_COOKIE = 'cc_sso_signin';
@@ -55,6 +56,12 @@ const issuerOf = (config: Config): string | null => (config.SSO_ISSUER && config
 
 export const ssoEnabled = (deps: Pick<AppDeps, 'config'>): boolean => issuerOf(deps.config) !== null;
 
+/** `SSO_EMAIL_DOMAINS` as a list of lower-case domains; empty = no limit. */
+export const ssoDomains = (config: Config): string[] =>
+  config.SSO_EMAIL_DOMAINS.split(',')
+    .map((d) => d.trim().toLowerCase().replace(/^@/u, ''))
+    .filter(Boolean);
+
 function iconPath(config: Config): { file: string; type: string } | null {
   const name = config.SSO_ICON_FILE;
   // A bare file name in the data folder: no folders, so the setting cannot point anywhere else.
@@ -63,12 +70,23 @@ function iconPath(config: Config): { file: string; type: string } | null {
   return type ? { file: path.join(config.DATA_DIR, name), type } : null;
 }
 
-/** The icon file for the sign-in page, or null (not set, wrong kind, missing or too large). */
-export function ssoIcon(deps: Pick<AppDeps, 'config'>): { body: Buffer; type: string } | null {
+/** The icon's file, if it is a regular file (not a link) of an allowed kind and size. */
+function usableIcon(deps: Pick<AppDeps, 'config'>): { file: string; type: string } | null {
   const icon = ssoEnabled(deps) ? iconPath(deps.config) : null;
   if (!icon) return null;
   try {
-    if (fs.statSync(icon.file).size > SSO_ICON_MAX_BYTES) return null;
+    const st = fs.lstatSync(icon.file);
+    return st.isFile() && st.size > 0 && st.size <= SSO_ICON_MAX_BYTES ? icon : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The icon file for the sign-in page, or null (not set, wrong kind, missing, a link or too large). */
+export function ssoIcon(deps: Pick<AppDeps, 'config'>): { body: Buffer; type: string } | null {
+  const icon = usableIcon(deps);
+  if (!icon) return null;
+  try {
     return { body: fs.readFileSync(icon.file), type: icon.type };
   } catch {
     return null;
@@ -78,7 +96,7 @@ export function ssoIcon(deps: Pick<AppDeps, 'config'>): { body: Buffer; type: st
 /** What the sign-in page may know: the name for the button, and whether there is an icon. Null = not offered. */
 export function ssoPublicInfo(deps: Pick<AppDeps, 'config'>): { name: string; hasIcon: boolean } | null {
   if (!ssoEnabled(deps)) return null;
-  return { name: deps.config.SSO_NAME || new URL(issuerOf(deps.config)!).hostname, hasIcon: ssoIcon(deps) !== null };
+  return { name: deps.config.SSO_NAME || new URL(issuerOf(deps.config)!).hostname, hasIcon: usableIcon(deps) !== null };
 }
 
 const notAvailable = () => new AppError('FEATURE_DISABLED', 'This sign-in is not set up', { reason: 'SSO_NOT_AVAILABLE' });
@@ -129,18 +147,20 @@ async function endpointsOf(deps: AppDeps): Promise<Endpoints> {
   const now = deps.now();
   const known = discovered.get(issuer);
   if (known && now - known.at < DISCOVERY_TTL_MS && now >= known.at) return known.endpoints;
+  const base = new URL(issuer);
+  // Checked before anything is sent: a plain-http issuer, or one carrying a user name, a query or a fragment, is never asked.
+  if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash) throw failed();
   let doc: Record<string, unknown>;
   try {
     doc = (await (deps.ssoHttp ?? ssoHttp)(`${issuer}/.well-known/openid-configuration`)) as Record<string, unknown>;
   } catch {
     throw failed();
   }
-  const base = new URL(issuer);
   const authorize = sameHostHttps(doc?.authorization_endpoint, base);
   const token = sameHostHttps(doc?.token_endpoint, base);
   const named = typeof doc?.issuer === 'string' ? doc.issuer.replace(/\/+$/u, '') : null;
   // A document that names another issuer, or sends people or the code to another host, is not this provider's.
-  if (base.protocol !== 'https:' || named !== issuer || !authorize || !token) throw failed();
+  if (named !== issuer || !authorize || !token) throw failed();
   const endpoints = { authorize, token };
   discovered.set(issuer, { at: now, endpoints });
   return endpoints;
@@ -192,7 +212,7 @@ interface IdClaims {
 }
 
 /** The claims of an ID token received directly from the token endpoint, or null when any check fails. */
-export function readSsoIdToken(idToken: unknown, expect: { issuer: string; clientId: string; nonce: string; now: number; trustEmail: boolean }): IdClaims | null {
+export function readSsoIdToken(idToken: unknown, expect: { issuer: string; clientId: string; nonce: string; now: number; trustEmail: boolean; domains: string[] }): IdClaims | null {
   if (typeof idToken !== 'string') return null;
   const parts = idToken.split('.');
   if (parts.length !== 3) return null;
@@ -208,12 +228,16 @@ export function readSsoIdToken(idToken: unknown, expect: { issuer: string; clien
   if (!audOk) return null;
   if (typeof c.exp !== 'number' || c.exp * 1000 < expect.now - CLOCK_SKEW_MS) return null;
   if (typeof c.nonce !== 'string' || !timingSafeEqualStr(c.nonce, expect.nonce)) return null;
-  // A number is accepted as an id too: not every provider sends a string.
-  const sub = typeof c.sub === 'number' ? String(c.sub) : c.sub;
+  // A number is accepted as an id too (not every provider sends a string), but only one that JSON kept
+  // exact: a larger one is rounded, and two people's ids could become the same text.
+  const sub = typeof c.sub === 'number' ? (Number.isSafeInteger(c.sub) && c.sub >= 0 ? String(c.sub) : null) : c.sub;
   if (typeof sub !== 'string' || sub.length === 0 || sub.length > 255) return null;
   if (typeof c.email !== 'string' || !/^[^\s@]+@[^\s@]+$/u.test(c.email)) return null;
   if (!expect.trustEmail && c.email_verified !== true) return null;
-  return { sub, email: c.email.trim().toLowerCase() };
+  const email = c.email.trim().toLowerCase();
+  // The operator may limit the addresses this provider can vouch for to its own domains.
+  if (expect.domains.length && !expect.domains.includes(email.slice(email.lastIndexOf('@') + 1))) return null;
+  return { sub, email };
 }
 
 function findAccount(db: Db, claims: IdClaims): UserRow {
@@ -250,7 +274,7 @@ export async function completeSsoSignIn(deps: AppDeps, cookie: string | undefine
   } catch {
     throw failed();
   }
-  const claims = readSsoIdToken((reply as { id_token?: unknown } | null)?.id_token, { issuer, clientId: deps.config.SSO_CLIENT_ID, nonce: pending.nonce, now: deps.now(), trustEmail: deps.config.SSO_TRUST_EMAIL });
+  const claims = readSsoIdToken((reply as { id_token?: unknown } | null)?.id_token, { issuer, clientId: deps.config.SSO_CLIENT_ID, nonce: pending.nonce, now: deps.now(), trustEmail: deps.config.SSO_TRUST_EMAIL, domains: ssoDomains(deps.config) });
   if (!claims) throw failed();
   return tx(deps.db, () => {
     const now = deps.now();
@@ -262,7 +286,10 @@ export async function completeSsoSignIn(deps: AppDeps, cookie: string | undefine
       audit(deps.db, actor, { action: 'auth.sso_linked', entity: 'user', entityId: user.id }, now);
     }
     if (user.emailVerifiedAt === null && user.email?.toLowerCase() === claims.email) patch.emailVerifiedAt = now;
-    if (invitePending(user)) {
+    // An open invite counts as used, as with Google, but only for an account that may be without a password
+    // (a teacher, or anyone while passwords are off). An invited administrator while passwords are on is
+    // signed in and keeps the invite: opening it is still how that account chooses its password (D-108).
+    if (invitePending(user) && passwordlessAllowed(deps.db, user)) {
       patch.signInMethod = 'email_link';
       patch.mustChangePassword = false;
       deps.db

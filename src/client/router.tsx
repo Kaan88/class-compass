@@ -92,7 +92,7 @@ const googleReturnRoute = createRoute({
   }),
   component: function GoogleReturnRoute() {
     const search = googleReturnRoute.useSearch();
-    return <GoogleReturnPage state={search.state} code={search.code} denied={search.error !== undefined} />;
+    return <GoogleReturnPage state={search.state} code={search.code} denied={search.error === 'access_denied'} />;
   },
 });
 
@@ -208,7 +208,7 @@ const ssoReturnRoute = createRoute({
   }),
   component: function SsoReturnRoute() {
     const search = ssoReturnRoute.useSearch();
-    return <SsoReturnPage state={search.state} code={search.code} denied={search.error !== undefined} />;
+    return <SsoReturnPage state={search.state} code={search.code} denied={search.error === 'access_denied'} />;
   },
 });
 

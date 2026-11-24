@@ -1,5 +1,5 @@
 /** Sign-in (password, or an emailed link for email-link accounts, D-108), email password reset (D-015) and the (forced) password change screen. */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearch, Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Auth from '../../shared/contracts/auth.ts';
@@ -19,6 +19,9 @@ import { EmailLinkRequest, LinkDeadEnd, useFragmentToken } from './SignIn.tsx';
 import { homeFor, safeNext } from './guards.ts';
 import { SensitiveGate } from './Lock.tsx';
 
+/** How long the sign-in page waits for the school's sign-in info before it draws the form anyway. */
+export const SIGN_IN_INFO_WAIT_MS = 4000;
+
 export function LoginPage() {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -32,6 +35,12 @@ export function LoginPage() {
   const [forgot, setForgot] = useState(search.mode === 'forgot');
   const [byEmail, setByEmail] = useState(search.mode === 'email-link');
   const resetInfo = useQuery({ queryKey: ['public', 'reset-available'], queryFn: () => call(Auth.passwordResetAvailable, {}), staleTime: 60_000 });
+  // A server that does not answer must not leave the page on "Loading…": after a few seconds the form is drawn anyway.
+  const [waitedLongEnough, setWaitedLongEnough] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setWaitedLongEnough(true), SIGN_IN_INFO_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, []);
   const back = (close: () => void) => () => {
     close();
     if (search.mode) void navigate({ to: '/login', search: { next: search.next, mode: undefined }, replace: true });
@@ -59,7 +68,7 @@ export function LoginPage() {
   // Until the page knows how this school signs in, it draws no form: otherwise the password form shows
   // for a moment and is then taken away where passwords are off. If the answer cannot be had (no
   // connection), the form below is the fallback.
-  if (resetInfo.isLoading) {
+  if (resetInfo.isLoading && !waitedLongEnough) {
     return (
       <AuthCard title={t('auth.signIn')}>
         <p className="cc-muted" role="status">

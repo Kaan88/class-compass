@@ -101,7 +101,7 @@ Sitenin adresinin sonuna `/privacy` eklendiğinde [Gizlilik](privacy.md) kılavu
 
 Bilgi işlem sorumlusu, sunucu ayarlarında okula ait bir giriş sunucusunu (herhangi bir OpenID Connect sağlayıcısı, örneğin okulun e-posta sunucusu) bağlayabilir. Giriş sayfası bunu **giriş kartının köşesinde küçük bir simge** olarak, yazısız gösterir; üzerine gelindiğinde adı görünür, ekran okuyucular da adını okur.
 
-- Hesap açmaz: sunucu yalnızca kişinin, hesabına yazdığınız e-posta adresinin sahibi olduğunu doğrular.
+- Hesap açmaz: ilk girişte sunucu kişinin, hesabına yazdığınız e-posta adresinin sahibi olduğunu doğrular. Sonrasında site kişiyi o sunucunun ona verdiği kimlik numarasıyla tanır; kişinin o sunucudaki adresi değişse bile. Buradaki hesabın adresini değiştirmek ya da hesabı devre dışı bırakmak bu bağı kaldırır.
 - Google'dan farklı olarak, **yöneticiler de kullanabilir**; şifreler açık da olsa kapalı da olsa. Çünkü bu sunucuyu okulun kendisi işletir.
 - Simge, sınıf ekranı olarak kullanılmış bir bilgisayarda gösterilmez; nedeni Google ile aynıdır: giriş yapmak o hesabı tarayıcıda açık bırakır.
 - Bir hesabın e-posta adresini değiştirirseniz bu yolla yapılacak sonraki giriş yeni adresle eşleşmelidir.

@@ -101,7 +101,7 @@ The site's address followed by `/privacy` opens the [Privacy](privacy.md) guide 
 
 The IT person can connect one sign-in server of the school's own (any OpenID Connect provider, for example the school's mail server) in the server's settings. The sign-in page then shows it as a **small icon in the corner of the sign-in card**, without words; its name appears when you point at it, and screen readers read it.
 
-- It never makes an account: the server only confirms that the person owns the email address you put on their account.
+- It never makes an account: at the first sign-in the server confirms that the person owns the email address you put on their account. After that the site recognises the person by that server's own ID for them, also if their address on that server changes; changing the address on the account here, or deactivating the account, drops that link.
 - Unlike Google, **administrators can use it too**, whether passwords are on or off, because the school itself runs this server.
 - The icon is not shown on a computer that has been used as a classroom display, for the same reason as Google: signing in would leave that account open in the browser.
 - Changing an account's email address means the next sign-in this way must match the new address.
