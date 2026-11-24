@@ -11,7 +11,7 @@
  * focus returns to its "Add my work" button, a calm note says the work is there, and the goal lists
  * its work (with the child's own delete, as on "Show my work"; deleting work there clears the note).
  */
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as G from '../../../shared/contracts/goals.ts';
 import type { GoalEntry, StudentGoalsSection } from '../../../shared/contracts/goals.ts';
 import { call } from '../../lib/api.ts';
@@ -64,10 +64,21 @@ export function MyGoals({ data, subjectId, media, nav, go, finish }: ScreenProps
   /** The goal or entry whose words are being changed. */
   const [editing, setEditing] = useState<string | null>(null);
   const list = useRef<HTMLUListElement>(null);
+  /** The goal or entry whose "Change my words" gets the focus back once the editor has gone from the page. */
+  const focusAfterEdit = useRef<string | null>(null);
   const stopEditing = (id: string) => {
+    focusAfterEdit.current = id;
     setEditing(null);
-    requestAnimationFrame(() => list.current?.querySelector<HTMLButtonElement>(`[data-edit-for="${id}"]`)?.focus());
   };
+  // The button is not on the page while its editor is open, so the focus can only go to it after the
+  // page has redrawn. An animation frame is not that moment: it can come before the redraw, and the
+  // focus was then lost to the page (a keyboard or screen-reader user had to start again from the top).
+  useLayoutEffect(() => {
+    if (editing !== null || focusAfterEdit.current === null) return;
+    const id = focusAfterEdit.current;
+    focusAfterEdit.current = null;
+    list.current?.querySelector<HTMLButtonElement>(`[data-edit-for="${id}"]`)?.focus();
+  }, [editing]);
   const editButton = (id: string) => (
     <Button variant="ghost" data-edit-for={id} onPress={() => setEditing(id)}>
       <IconPencil />

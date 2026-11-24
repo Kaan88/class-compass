@@ -214,6 +214,48 @@ function StarterBox({ initial = '' }: { initial?: string }) {
   );
 }
 
+describe('changing the words of a goal: the focus goes back to "Change my words" (UX-3, STU)', () => {
+  const mine = () => section('sub-en', { canWrite: true, goals: [goal('g-own', 'sub-en', { authorType: 'student' })] });
+  const editButton = () => document.querySelector<HTMLButtonElement>('[data-edit-for="g-own"]');
+  const show = () => render(wrap(<MyGoals data={mine()} subjectId="sub-en" media={media} nav={HOME} go={() => undefined} finish={() => undefined} titleId="t" />));
+
+  // The browser may paint (and run animation-frame callbacks) before React has put the button back on
+  // the page. An animation frame that fires at once is that order of events, every time.
+  const frameBeforeCommit = () =>
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
+
+  it('after Cancel, also when the next frame comes before the page has redrawn', async () => {
+    frameBeforeCommit();
+    show();
+    fireEvent.click(editButton()!);
+    await screen.findByTestId('student-edit-words');
+    expect(editButton()).toBeNull(); // the button is not on the page while the editor is open
+    fireEvent.click(screen.getByRole('button', { name: en['common.cancel'] }));
+    expect(screen.queryByTestId('student-edit-words')).toBeNull();
+    expect(editButton()).not.toBeNull();
+    expect(document.activeElement).toBe(editButton());
+  });
+
+  it('after Save, also when the next frame comes before the page has redrawn', async () => {
+    frameBeforeCommit();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    show();
+    fireEvent.click(editButton()!);
+    const editor = await screen.findByTestId('student-edit-words');
+    fireEvent.change(editor.querySelector('textarea')!, { target: { value: 'I will read two short comics every week.' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en['student.edit.save'] }));
+    });
+    expect(fetchMock).toHaveBeenCalled();
+    expect(screen.queryByTestId('student-edit-words')).toBeNull();
+    expect(document.activeElement).toBe(editButton());
+  });
+});
+
 describe('sentence starters (D-152)', () => {
   it('shows the blank as "…"; a tap fills the empty box and selects the blank', () => {
     render(wrap(<StarterBox />));

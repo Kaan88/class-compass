@@ -15,7 +15,7 @@
  * S20b (D-170): "Add evidence" on each goal card opens the evidence form (the shared `EvidenceAdder`,
  * S9 upload pipeline) for that goal; uploads name the class+subject so the server checks it first.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as Files from '../../../shared/contracts/files.ts';
 import * as G from '../../../shared/contracts/goals.ts';
@@ -486,6 +486,16 @@ export function LibraryTab({ contextId }: { contextId: string }) {
   const [presetTr, setPresetTr] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
+  /** The category whose Rename button gets the focus back once the rename form has gone from the page. */
+  const focusAfterRename = useRef<string | null>(null);
+  // The button is not on the page while the form is open, so the focus goes to it after the redraw, not on
+  // the next animation frame, which can come first (the same fault as on the student's My goals).
+  useLayoutEffect(() => {
+    if (renaming !== null || focusAfterRename.current === null) return;
+    const id = focusAfterRename.current;
+    focusAfterRename.current = null;
+    list.current?.querySelector<HTMLButtonElement>(`[data-rename-for="${id}"]`)?.focus();
+  }, [renaming]);
   const list = useRef<HTMLUListElement>(null);
   if (!q.data) return <p className="cc-muted">{t('common.loading')}</p>;
   const lib = q.data;
@@ -506,8 +516,8 @@ export function LibraryTab({ contextId }: { contextId: string }) {
       </Button>
     );
   const closeRename = (id: string) => {
+    focusAfterRename.current = id;
     setRenaming(null);
-    requestAnimationFrame(() => list.current?.querySelector<HTMLButtonElement>(`[data-rename-for="${id}"]`)?.focus());
   };
   return (
     <div className="cc-stack" data-testid="goals-library">
