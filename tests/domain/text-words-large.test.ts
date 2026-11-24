@@ -101,15 +101,28 @@ describe('the nonsense rules behave as before', () => {
       expect(checkStudentText(text, kind), text).toEqual({ ok: false, reason: 'KEYBOARD_MASH' });
       expect(checkStudentText(text, kind, large), text).toEqual({ ok: true });
     }
-    // Every entry of the generated lists in a neutral sentence: none is read as mashing.
-    for (const w of [...LARGE_EN.split(/\s+/u), ...LARGE_TR.split(/\s+/u)].filter(Boolean)) {
-      const r = checkStudentText(`I like the word ${w} today`, 'reflection', large);
-      expect(r.ok || r.reason !== 'KEYBOARD_MASH', w).toBe(true);
-    }
     // Mashing next to real words is still mashing.
     for (const text of ['The property asdf qwer', 'I like poverty jkl hjkl', 'Özgürlük asdfgh güzel', 'property lololo house'])
       expect(checkStudentText(text, 'reflection', large), text).toEqual({ ok: false, reason: 'KEYBOARD_MASH' });
   });
+
+  // Every entry of the generated lists in a neutral sentence: none is read as mashing. About 36,000 full
+  // checks (some 4 s alone, about 9 s while every test file runs in parallel, more next to an e2e run): kept
+  // apart from the cases above, one test per list, with a budget for a busy machine. Inside the cases above
+  // this sweep once took the whole test past the default 20 s and failed it on a loaded machine.
+  it.each([
+    ['English', LARGE_EN],
+    ['Turkish', LARGE_TR],
+  ])('no entry of the large %s list is read as mashing (S28b review)', (_, list) => {
+    const mashed = list
+      .split(/\s+/u)
+      .filter(Boolean)
+      .filter((w) => {
+        const r = checkStudentText(`I like the word ${w} today`, 'reflection', large);
+        return !r.ok && r.reason === 'KEYBOARD_MASH';
+      });
+    expect(mashed).toEqual([]);
+  }, 120_000);
 
   it('the reasons that depend on the dictionary include mashing; the language check never does', () => {
     expect([...DICTIONARY_REASONS].sort()).toEqual(['FEW_VOWELS', 'KEYBOARD_MASH', 'LONG_WORD', 'UNKNOWN_WORDS']);
