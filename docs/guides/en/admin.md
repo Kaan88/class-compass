@@ -58,10 +58,11 @@ Above the list, **Passwords** holds one rule for the whole school. Normally teac
 To switch passwords off:
 
 1. Press **Switch off passwords**. The window says how many accounts have a password now and warns what happens if the school's email stops working.
+
+![Step 1: the window before the code is sent, with Email me the code](../img/en/admin-passwords-confirm.png)
+
 2. Press **Email me the code**. A 6-digit code goes to your own address; it works for 15 minutes. Typing it shows that sign-in emails reach you, so you cannot lock yourself out by mistake.
 3. Type the code under **6-digit code** and press **Switch off passwords** in the window. **Cancel** closes it and changes nothing.
-
-![The confirmation before passwords are switched off](../img/en/admin-passwords-confirm.png)
 
 While passwords are off:
 
@@ -110,7 +111,7 @@ Class Compass sends email for invites, email sign-in links and password resets. 
 
 At the end of the year use **Maintenance** → **New school year**:
 
-1. **From the year**, the **New year's name**, **First day** and **Last day**. They are filled in with the old year moved on by one year; change them as needed (the dates have a calendar). Under the buttons a line says what is still missing.
+1. **From the year**, the **New year’s name**, **First day** and **Last day**. They are filled in with the old year moved on by one year; change them as needed (the dates have a calendar). Under the buttons a line says what is still missing.
 2. Choose: **Create the classes again (grade + 1)**, **Keep the same teachers and subjects**, **Move the students up on the first day**, **Archive the old year (read-only)**.
 3. **Preview**. Each class can be switched off (for example a final grade that graduates: it is not created again and nobody moves up from it) and new names can be changed. After any change, **Preview again**.
 4. **Start the new year**: type the old year's name to confirm. Everything happens at once and is recorded in the audit log. History stays with the students.
@@ -271,7 +272,7 @@ The history below lists **All imports in the school** with who made each one. **
 **Maintenance** → **Exports**:
 
 - **Full school export**: a ZIP file with one spreadsheet (CSV) per table, optionally the uploaded files (**Include uploaded files**), and a manifest. Type `EXPORT` to prepare it. It contains every student's data **and the teachers' private notes**: keep it safe and share it only as the school's data protection rules allow. Never included: passwords, PINs, sign-in data, student link codes, pairing codes and Secret Students who were never revealed.
-- **One student's data (KVKK request)**: choose the student and **Prepare export**. Everything recorded about that student, with their files. Private teacher notes stay with their author; the export says how many exist.
+- **One student’s data (KVKK request)**: choose the student and **Prepare export**. Everything recorded about that student, with their files. Private teacher notes stay with their author; the export says how many exist.
 
 An export can be downloaded **once**, within one hour, only by you; then it is deleted. Preparing and downloading are recorded in the audit log.
 

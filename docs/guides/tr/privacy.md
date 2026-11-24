@@ -8,7 +8,7 @@ Sınıf Pusulası, bir okulun kendi öğretmenleri ve öğrencileri için çalı
 
 - **Çalışan hesapları** (öğretmenler ve yöneticiler): ad, kullanıcı adı, e-posta adresi, arayüz dili, girişlerin ve hesapla yapılan değişikliklerin kaydı.
 - **Öğrenciler**: ad, sınıf ve okul giriyorsa öğrenci numarası; derslerde olanlar (yoklama, ödev durumu, sayaçlar, gruplar, sınıf görevleri); öğrencinin kendi sayfasına ekledikleri (hedefler, değerlendirmeler, eklediği çalışmalar, avatarı).
-- **Öğretmenlerin bir öğrenci hakkında kaydettikleri**: hedeflere ve çalışmalara geri bildirim, başarılar, Süper Konuşmacılar puanları, öğretmenin grup oluşturmak için belirlediği düzeyler ve özel notlar. Düzeyleri ve özel notları yalnızca öğretmenler görür; bunlar sınıf ekranında ya da öğrencinin sayfasında hiç görünmez. Öğrencinin yazdığı bir metinde okula uygun olmayan bir sözcük engellendiğinde site yalnızca bu denemeyi sayar; engellenen metnin kendisi saklanmaz.
+- **Öğretmenlerin bir öğrenci hakkında kaydettikleri**: hedeflere ve çalışmalara geri bildirim, başarılar, Süper Konuşmacılar puanları, öğretmenin grup oluşturmak için belirlediği düzeyler ve özel notlar. Düzeyler ve özel notlar sınıf ekranında ya da öğrencinin sayfasında hiç görünmez. Sitede bir özel notu yalnızca onu yazan öğretmen, düzeyleri de yalnızca o sınıfta o dersi veren öğretmen görür. İkisi de bir yöneticinin alabileceği okulun tüm verilerinin dışa aktarımında yer alır; tek bir öğrencinin verilerinin dışa aktarımında düzeyler vardır, özel notlar yoktur. Öğrencinin yazdığı bir metinde okula uygun olmayan bir sözcük engellendiğinde site yalnızca bu denemeyi sayar; engellenen metnin kendisi saklanmaz.
 - **Dosyalar**: fotoğraflar, ses kayıtları ve videolar yalnızca okul gerekli izni aldıktan sonra açtıysa; öğrencinin ya da öğretmenin eklediği belgeler.
 - **Değişiklik kaydı**: ortak kayıtlarda kimin neyi değiştirdiği, okulun görebilmesi için tutulur.
 
@@ -27,9 +27,9 @@ Sitede başka sistemlerden gelen sınav ya da karne notları, ev adresleri, tele
 
 - **E-postayla gönderilen bağlantı ya da kodla**: site, hesabınızdaki adrese bir e-posta gönderir. Siteden başka hiçbir şey çıkmaz.
 - **Şifreyle**, okul izin veriyorsa: şifre yalnızca geri okunamayan, karıştırılmış biçimde saklanır.
-- **Geçiş anahtarıyla**: anahtarı kendi cihazınız ya da şifre yöneticiniz saklar ve parmak izinizi, yüzünüzü ya da ekran kilidinizi ister. Sitede yalnızca anahtarın açık yarısı, ona verdiğiniz ad, eklenme ve son kullanım zamanı saklanır. Parmak iziniz ya da yüzünüz cihazınızdan hiç çıkmaz.
+- **Geçiş anahtarıyla**: anahtarı kendi cihazınız ya da şifre yöneticiniz saklar ve parmak izinizi, yüzünüzü ya da ekran kilidinizi ister. Sitede yalnızca anahtarın açık yarısı, ona verdiğiniz ad, eklenme ve son kullanım zamanı ve anahtarla ilgili birkaç teknik bilgi saklanır. Gizli anahtar cihazınızda ya da şifre yöneticinizde kalır. Parmak iziniz ya da yüzünüz cihazınızdan hiç çıkmaz.
 - **Google ile**, okul ayarladıysa. Bunu her seferinde siz seçersiniz. Google siteye iki şey bildirir: **e-posta adresiniz** ve **Google'ın Google hesabınız için kullandığı kimlik numarası**. Site bunları tek bir amaçla kullanır: okulunuzun sizin için açtığı hesabı bulup giriş yapmanızı sağlamak.
-  - Site, Google hesabınızdan başka hiçbir şey istemez, almaz ve saklamaz: kişiler, e-postalar, dosyalar, takvim ya da profil fotoğrafı alınmaz.
+  - Site, Google hesabınızdan başka hiçbir şey istemez, kullanmaz ve saklamaz: kişiler, e-postalar, dosyalar, takvim ya da profil fotoğrafı alınmaz.
   - Site Google erişim anahtarı saklamaz ve Google hesabınızda işlem yapamaz.
   - E-posta adresiniz ve Google'ın kimlik numarası okul hesabınızla birlikte saklanır, kimseyle paylaşılmaz. Okul hesabınızdaki adresi değiştirdiğinde Google'ın kimlik numarası silinir.
   - Google, bu siteye ne zaman giriş yaptığınızı öğrenir. Bu konuda Google'ın kendi gizlilik politikası geçerlidir.

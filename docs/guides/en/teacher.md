@@ -17,7 +17,7 @@ Your administrator creates your account. Usually you receive an **invite link** 
 - **With a password**: you type your username and a password you choose (at least 10 characters).
 - **With email sign-in links**: you have no password. Each time, press **Email me a sign-in link** on the sign-in page, type your email address and press **Send the link**. A link and a 6-digit code arrive within a minute. Open the link and press **Sign in**, or type the code on the device where you asked for the email. Both work once, for 15 minutes. The page repeats the address you typed, so you can spot a typo; **Use a different email** lets you type it again. This choice is only offered when the school has set up email and your account has an email address.
 
-Some schools switch passwords off. The invite then offers email sign-in links only, the sign-in page has no password field (only **Email me a sign-in link**), and your profile has no **Use a password instead**.
+Some schools switch passwords off. The invite then offers email sign-in links only, the sign-in page has no password field (it offers **Email me a sign-in link**, and **Sign in with a passkey** and **Sign in with Google** where the school has them), and your profile has no **Use a password instead**. Only while the school's email is not set up does the sign-in page keep its password form.
 
 If the sign-in page shows **Sign in with Google**, you can use it when your account's email address is your Google address. **Use it only on your own device.** On the classroom computer, or any computer you share, use the email code instead: a Google sign-in leaves your Google account, with your mail, open in that browser. On a computer that has been used as a classroom display the page says so and holds the Google button back; on your own laptop that you also use as the classroom display, **It is my own computer: show Google sign-in** brings it back.
 
@@ -31,7 +31,7 @@ Forgot your password? If the school has set up email, use **Forgot your password
 
 A passkey lets you sign in with your fingerprint, your face or your device's screen lock: no password to type and no email to wait for. Your phone, laptop or password manager keeps the key; the site stores only its public half. Passkeys work only when your school opens Class Compass by a named web address; at an address made only of numbers you do not see them.
 
-- **The offer:** right after you sign in by email (link, code or invite) or Google, a card **Sign in faster next time** offers to add a passkey on that device. Press **Add a passkey** only on a device that is yours alone; **Not now** hides the card on that device for a month, **Don't ask again** for good. The card does not appear after a password sign-in, on a computer that has been used as a classroom display, or once you have a passkey.
+- **The offer:** right after you sign in by email (link, code or invite) or Google, a card **Sign in faster next time** offers to add a passkey on that device. Press **Add a passkey** only on a device that is yours alone; **Not now** hides the card on that device for a month, **Don’t ask again** for good. The card does not appear after a password sign-in, on a computer that has been used as a classroom display, or once you have a passkey.
 - **Add one yourself:** open **Profile and PIN** → **Passkeys**, give it a name such as "My phone" (**Name for this passkey**), confirm that it is you (type your current password; without a password, sign in by email, Google or passkey in the last 15 minutes) and press **Add a passkey**. Your device asks for your fingerprint, face or screen lock.
 - **Sign in:** on the sign-in page press **Sign in with a passkey**. You do not type a username.
 - **On the classroom computer** do not add a passkey: anyone who can unlock that computer could then sign in as you. Profile holds the button back there and says why. You can still **sign in** on it with the passkey on your phone: press **Sign in with a passkey** and choose the phone or QR code option your browser offers.
@@ -60,7 +60,7 @@ How the lock works:
 
 Forgot your PIN? Set a new one in **Profile and PIN** with your password, or ask your administrator to clear it (you are then signed out everywhere and set a new PIN).
 
-In **Profile and PIN** you also choose your **Language**, **Text size** and **Spacing** (they change only what you see; **Spacing** — Compact, Normal or Large — sets how much room tables and cards take in the teacher area, buttons keep their size; the classroom screen sizes its student cards by itself), whether lessons open in full screen (**Lessons** → **Full screen during lessons**, see [Full screen](#full-screen)), and you can record **My time's-up recording** (see [Sounds and celebrations](#sounds-and-celebrations)).
+In **Profile and PIN** you also choose your **Language**, **Text size** and **Spacing** (they change only what you see; **Spacing** — Compact, Normal or Large — sets how much room tables and cards take in the teacher area, buttons keep their size; the classroom screen sizes its student cards by itself), whether lessons open in full screen (**Lessons** → **Full screen during lessons**, see [Full screen](#full-screen)), and you can record **My time’s-up recording** (see [Sounds and celebrations](#sounds-and-celebrations)).
 
 ## The teacher menu
 
@@ -270,8 +270,8 @@ If **Allow checking on the classroom screen** is on (Homework → Settings; off 
 
 ### Sounds and celebrations
 
-- **Class settings** → **Classroom display**: **Theme**, **Sounds** with **Volume** and **Try**, **Animations**, **Quote of the day** and **When the timer ends**: **Say "Time's up!"** (spoken in English by the computer; the chime plays if it has no English voice), **My own recording**, **Chime** or **Silent**.
-- **My own recording**: in **Profile and PIN** → **My time's-up recording**, record up to 5 seconds or choose a sound file.
+- **Class settings** → **Classroom display**: **Theme**, **Sounds** with **Volume** and **Try**, **Animations**, **Quote of the day** and **When the timer ends**: **Say “Time’s up!”** (spoken in English by the computer; the chime plays if it has no English voice), **My own recording**, **Chime** or **Silent**.
+- **My own recording**: in **Profile and PIN** → **My time’s-up recording**, record up to 5 seconds or choose a sound file.
 - **Sounds on this device** (classroom top bar → **Display**) mutes this device only.
 - Browsers play sound only after someone has tapped the screen or pressed a key. Until then the top bar shows **Sound is off · Turn sound on**; tap it (any tap works) and a short test sound plays. If you still hear nothing, open **Display** → **Sound check**: it says what is wrong (sounds off for the class or this device, volume 0, the browser waiting for a tap), shows the **Last sound**, has **Test sound**, and **Copy diagnostics** copies the details for whoever looks after Class Compass. Also check the computer's own volume and speakers.
 - Celebrations play only after you do something on the screen (a revealed Secret Student, **Celebrate on the display**), never by themselves. A device that asks for reduced motion gets a calm version without movement.

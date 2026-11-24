@@ -58,10 +58,11 @@ Listenin üstündeki **Şifreler** bölümünde bütün okul için tek bir kural
 Şifreleri kapatmak için:
 
 1. **Şifreleri kapat**'a basın. Açılan pencere şu anda kaç hesabın şifresi olduğunu söyler ve okulun e-postası çalışmazsa ne olacağı konusunda uyarır.
+
+![1. adım: kod gönderilmeden önceki pencere, Kodu bana e-postayla gönder düğmesiyle](../img/tr/admin-passwords-confirm.png)
+
 2. **Kodu bana e-postayla gönder**'e basın. Kendi adresinize 15 dakika geçerli, 6 haneli bir kod gelir. Kodu yazmanız giriş e-postalarının size ulaştığını gösterir; böylece yanlışlıkla kendinizi dışarıda bırakamazsınız.
 3. Kodu **6 haneli kod** alanına yazın ve penceredeki **Şifreleri kapat**'a basın. **Vazgeç** pencereyi kapatır, hiçbir şeyi değiştirmez.
-
-![Şifreler kapatılmadan önceki onay penceresi](../img/tr/admin-passwords-confirm.png)
 
 Şifreler kapalıyken:
 

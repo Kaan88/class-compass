@@ -590,7 +590,9 @@ for (const lang of ['en', 'tr'] as const) {
       await expect(ap.getByRole('heading', { name: T('admin.users'), level: 1 })).toBeVisible();
       const policy = ap.getByTestId('signin-policy');
       await expect(policy.getByRole('button', { name: T('users.policyTurnOn') })).toBeEnabled();
-      await shot(ap, lang, 'admin-accounts', { from: 'main h1' });
+      // From the heading to the end of the table: the same crop in both languages, no sliver of the menu.
+      await ap.locator('main h1').first().evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await shotAround(ap, lang, 'admin-accounts', ['main h1', 'main table']);
       // "Passwords" (S30, D-207): the section, and its confirmation opened but NEVER confirmed: switching
       // passwords off would remove the demo accounts' passwords. No code is asked for, so none is emailed.
       await shot(ap, lang, 'admin-passwords', { clipTo: '[data-testid="signin-policy"]' });
