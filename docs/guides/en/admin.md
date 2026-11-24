@@ -12,7 +12,7 @@ In a hurry? See the [quick start for administrators](quick-start-admin.md).
 
 After you sign in you land on **Administration**. **Add classroom** and **Add a teacher account** are the two most common jobs; the tiles open every section, and on the other pages the menu bar does (on a phone or tablet it is one **Section** list). **Help** (top bar) opens these guides. On a phone, tables show each row as a card with its buttons at the bottom.
 
-Administrator accounts sign in with a **password**, unless the school has switched passwords off (see **Passwords** under Accounts and invites): then administrators, like everyone, sign in with a link or code sent by email. Classroom mode and its PIN lock are for teacher accounts only, so an administrator account is never PIN-locked: do not sign in as an administrator on the classroom device. An administrator still sets a PIN in **Profile and PIN**: **Maintenance** asks for it before **Back up now** and **Verify the latest backup**. **Profile and PIN** also holds your **Language**, **Text size** and **Spacing** (Compact, Normal or Large: how much room tables and cards take on the administration pages; buttons keep their size).
+Administrator accounts sign in with a **password**, unless the school has switched passwords off (see **Passwords** under Accounts and invites): then administrators, like everyone, sign in with a link or code sent by email. Either way an administrator can also add a passkey (see **Passkeys**). Classroom mode and its PIN lock are for teacher accounts only, so an administrator account is never PIN-locked: do not sign in as an administrator on the classroom device. An administrator still sets a PIN in **Profile and PIN**: **Maintenance** asks for it before **Back up now** and **Verify the latest backup**. **Profile and PIN** also holds your **Language**, **Text size** and **Spacing** (Compact, Normal or Large: how much room tables and cards take on the administration pages; buttons keep their size).
 
 ## First setup
 
@@ -48,33 +48,53 @@ The list shows each account's status (**Active**, **Invite pending** until the i
 
 ### Passwords
 
+![The Passwords section on Accounts](../img/en/admin-passwords.png)
+
 Above the list, **Passwords** holds one rule for the whole school. Normally teachers choose between a password and email sign-in links, and administrators use a password. **Switch off passwords** removes passwords altogether: everyone, administrators included, types their email address on the sign-in page and gets a link and a 6-digit code that work once, for 15 minutes. Nobody can guess, reuse or give away a password that does not exist.
 
-- You can switch passwords off only when the school's email is set up and **every active account has an email address**, your own too; the page names the accounts that still need one.
-- Before the last step the page **emails a code to your own address** and asks for it. That shows that sign-in emails reach you, so you cannot lock yourself out by mistake.
+- The button works only when the school's email is set up and **every active account has an email address**, your own too; until then the section says what is missing and names the accounts that still need an address.
 - Switching passwords off **removes the password of every account** at once, yours included. This cannot be undone. People who are signed in stay signed in, so a lesson that is running is not interrupted.
-- While passwords are off, a new account needs an email address and always gets an invite link, the invite offers no password, **Reset password** is not offered (send a **New invite link** instead) and an email address cannot be removed from an account. The sign-in page shows no password form.
-- **Allow passwords again** gives nobody a password back: each person can choose one in their profile after signing in by email, or you give a temporary password with **Reset password**.
-- **If the school's email stops working while passwords are off, nobody can sign in**, administrators included. The IT person then allows passwords again on the server (`signin:allow-passwords`, see `docs/OPERATIONS.md`) and sets a password for an administrator.
+
+To switch passwords off:
+
+1. Press **Switch off passwords**. The window says how many accounts have a password now and warns what happens if the school's email stops working.
+2. Press **Email me the code**. A 6-digit code goes to your own address; it works for 15 minutes. Typing it shows that sign-in emails reach you, so you cannot lock yourself out by mistake.
+3. Type the code under **6-digit code** and press **Switch off passwords** in the window. **Cancel** closes it and changes nothing.
+
+![The confirmation before passwords are switched off](../img/en/admin-passwords-confirm.png)
+
+While passwords are off:
+
+- A new account needs an email address and always gets an invite link, the invite offers no password, **Reset password** is not offered (send a **New invite link** instead) and an email address cannot be removed from an account. The sign-in page shows no password form.
+- **Allow passwords again** gives nobody a password back: each person can choose one in their profile (**Use a password instead**) after signing in by email, or you give a temporary password with **Reset password**. Until then they, administrators included, keep signing in by email.
+- **If the school's email stops working, nobody can sign in**, administrators included. The IT person then allows passwords again on the server (`signin:allow-passwords`, see `docs/OPERATIONS.md`) and sets a password for an administrator.
 
 ### Passkeys
 
-Teachers and administrators can add **passkeys** under **Profile → Passkeys** and then sign in with a fingerprint, face or screen lock instead of a password or an email. A passkey works whether passwords are on or off, and it is the quickest way in for an administrator once passwords are switched off.
+Teachers and administrators can add **passkeys** under **Profile and PIN** → **Passkeys** and then sign in with a fingerprint, face or screen lock (**Sign in with a passkey** on the sign-in page) instead of a password or an email. A passkey works whether passwords are on or off, and it is the quickest way in for an administrator once passwords are switched off. Right after a sign-in by email or Google, the teacher and administrator pages offer to add one (**Sign in faster next time**).
 
 - The list shows **Passkeys: 2** on an account that has them.
-- **Remove passkeys** (type the username to confirm) is for a lost or stolen device: every passkey of that account stops working and the person is signed out everywhere. They sign in another way and add new ones.
+- **Remove passkeys** (type the username to confirm) is for a lost or stolen device: every passkey of that account stops working and the person is signed out everywhere. They sign in another way and add new ones. For your own account, remove them one by one in your profile.
 - Nobody should add a passkey on the classroom computer; Profile holds the button back on a computer that has been used as a classroom display.
-- Passkeys need the site to have a name (such as `sareteacher.com`); an install reached by a bare IP address does not offer them.
+- Passkeys need the site to have a name (a web address, not a bare IP address); an install reached by an IP address does not offer them.
 
 ### Sign in with Google
 
-When the IT person has set it up on the server, the sign-in page also offers **Sign in with Google**. It is a second way in beside email links, never a way to make an account: Google only confirms that the person owns the email address you put on their account. Teachers can always use it; administrators only while passwords are switched off.
+![Sign in with Google and its warning on the sign-in page](../img/en/sign-in-google.png)
+
+When the IT person has set it up on the server, the sign-in page also offers **Sign in with Google**. It is a second way in beside email links, never a way to make an account: Google only confirms that the person owns the email address you put on their account. Teachers can always use it; administrators only while their account has no password (while passwords are switched off, or if they kept email links after passwords were allowed again).
 
 - The address on the account must be the person's Google address. Someone with another address keeps using email links.
 - The list shows **Google sign-in used** on an account that has signed in this way. If you change the account's email address, the next Google sign-in must match the new address.
 - An invited teacher may press **Sign in with Google** without opening the invite first: the invite then counts as used, and the account has no password.
 - Google learns that the person signed in to this site and when. No student data goes to Google.
-- **Not on a shared computer.** A Google sign-in leaves that Google account, with its mail, open in the browser. The sign-in page says so next to the button, and on a computer that has been used as a classroom display it holds the button back and points to the email code instead.
+- **Not on a shared computer.** A Google sign-in leaves that Google account, with its mail, open in the browser. The sign-in page says so under the button, and on a computer that has been used as a classroom display it holds the button back and points to the email code instead (**It is my own computer: show Google sign-in** brings it back).
+
+### The public privacy page
+
+![The public privacy page](../img/en/privacy.png)
+
+The site's address followed by `/privacy` opens the [Privacy](privacy.md) guide without an account, in English or Turkish. It says what Class Compass keeps, who sees it and what each way of signing in sends (for Google: only the email address and Google's id for the account). Point parents to it, and give this address as the privacy policy link when the IT person registers Sign in with Google. It names no school: questions go to the school.
 
 ## Email (SMTP)
 

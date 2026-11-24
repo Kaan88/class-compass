@@ -145,7 +145,17 @@ for (const lang of ['en', 'tr'] as const) {
       const page = await context.newPage();
       await page.goto('/login');
       await expect(page.getByLabel(T('auth.login'))).toBeVisible();
-      await shot(page, lang, 'sign-in');
+      // Google sign-in is "set up" with fictional values (playwright.docs.config.ts); the button is never pressed.
+      await expect(page.getByRole('button', { name: T('google.signIn') })).toBeVisible();
+      // The whole card: with the Google button and its warning it is taller than the window.
+      await shot(page, lang, 'sign-in', { fullPage: true });
+      await page.getByTestId('google-signin').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await shotAround(page, lang, 'sign-in-google', ['[data-testid="google-signin"]']);
+      // The public privacy page (S32, D-209), signed out, in the browser's language.
+      await page.goto('/privacy');
+      await expect(page.getByTestId('privacy-page').getByRole('heading', { level: 1 })).toBeVisible();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await shot(page, lang, 'privacy');
       await context.close();
     }
 
@@ -578,7 +588,19 @@ for (const lang of ['en', 'tr'] as const) {
       await shot(ap, lang, 'admin-home');
       await ap.goto('/admin/users');
       await expect(ap.getByRole('heading', { name: T('admin.users'), level: 1 })).toBeVisible();
+      const policy = ap.getByTestId('signin-policy');
+      await expect(policy.getByRole('button', { name: T('users.policyTurnOn') })).toBeEnabled();
       await shot(ap, lang, 'admin-accounts', { from: 'main h1' });
+      // "Passwords" (S30, D-207): the section, and its confirmation opened but NEVER confirmed: switching
+      // passwords off would remove the demo accounts' passwords. No code is asked for, so none is emailed.
+      await shot(ap, lang, 'admin-passwords', { clipTo: '[data-testid="signin-policy"]' });
+      await policy.getByRole('button', { name: T('users.policyTurnOn') }).click();
+      const policyDialog = ap.getByRole('dialog');
+      await expect(policyDialog.getByRole('button', { name: T('users.policySendCode') })).toBeVisible();
+      await shot(ap, lang, 'admin-passwords-confirm', { clipTo: '[role="dialog"]' });
+      await policyDialog.getByRole('button', { name: T('common.cancel') }).click();
+      await expect(policyDialog).toBeHidden();
+      expect((await api(ap, 'GET', '/api/admin/sign-in-policy')).body?.passwordsOff).toBe(false);
       await ap.goto('/admin/settings');
       await expect(ap.getByRole('heading', { name: T('admin.settings'), level: 1 })).toBeVisible();
       await shot(ap, lang, 'admin-settings', { from: 'main h1' });

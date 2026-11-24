@@ -8,6 +8,7 @@ Class Compass is classroom software that a school runs for its own teachers and 
 
 - **Staff accounts** (teachers and administrators): name, username, email address, interface language, and a record of sign-ins and of changes made with the account.
 - **Students**: name, class, and a student number if the school enters one; what happens in lessons (attendance, homework status, counters, groups, classroom roles); and what the student adds to their own page (goals, reflections, work they attach, their avatar).
+- **What teachers record about a student**: feedback on goals and work, achievements, Super Speakers points, the levels a teacher sets for making groups, and private notes. Levels and private notes are seen only by teachers, never on the classroom screen or the student's page. When the site stops a word that is not suitable for school in what a student types, it counts the attempt; the blocked text itself is not kept.
 - **Files**: pictures, voice recordings and videos only when the school has switched them on after getting consent; documents a student or teacher attaches.
 - **A log of changes** to shared records, so the school can see who changed what.
 
@@ -26,11 +27,11 @@ The site keeps no grades from other systems, no home addresses, no phone numbers
 
 - **With a link or code sent by email**: the site sends an email to the address on your account. Nothing else leaves the site.
 - **With a password**, where the school allows it: the password is stored only in a scrambled form that cannot be read back.
-- **With a passkey**: your own device or password manager keeps the key and asks for your fingerprint, face or screen lock. The site stores only the public half of the key, the name you gave it and when it was last used. Your fingerprint or face never leaves your device.
+- **With a passkey**: your own device or password manager keeps the key and asks for your fingerprint, face or screen lock. The site stores only the public half of the key, the name you gave it, and when it was added and last used. Your fingerprint or face never leaves your device.
 - **With Google**, where the school has set it up. You choose this yourself each time. Google then tells the site two things: **your email address** and **Google's own ID for your Google account**. The site uses them for one purpose: to find the account your school made for you and sign you in.
   - The site does not ask for, receive or keep anything else from your Google account: no contacts, no mail, no files, no calendar, no profile picture.
   - The site keeps no Google access token and cannot act in your Google account.
-  - Your email address and Google's ID are stored with your school account, are not shared with anyone, and are removed when the school removes or changes the address on your account.
+  - Your email address and Google's ID are stored with your school account and are not shared with anyone. Google's ID is removed when the school changes the address on your account.
   - Google learns that you signed in to this site and when. Google's own privacy policy applies to that.
   - A Google sign-in leaves your Google account open in the browser you used. Use it only on your own device.
 - **Students** do not have accounts or passwords. A student opens their page with a link or card from the teacher; the link is the key, so keep it private.

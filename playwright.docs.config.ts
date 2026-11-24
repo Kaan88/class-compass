@@ -7,6 +7,10 @@
  * It builds the client, starts a throw-away server with the fictional demo school plus
  * `seed:demo-history` (E2E_DEMO_HISTORY=1, e2e/server.ts), and writes compressed PNGs into
  * docs/guides/img/en and docs/guides/img/tr. Fictional data only.
+ *
+ * Sign in with Google is "set up" with a fictional client id and secret, so the sign-in page shows its
+ * button and the shared-computer warning (D-208). The button is never pressed: Google is never contacted.
+ * Passkeys stay off (the server runs on 127.0.0.1, which cannot have passkeys, D-210).
  */
 import { defineConfig, devices } from '@playwright/test';
 import base from './playwright.config.ts';
@@ -32,7 +36,14 @@ export default defineConfig({
     url: `http://127.0.0.1:${port}/healthz`,
     timeout: 300_000,
     reuseExistingServer: false,
-    env: { PORT: String(port), E2E_PASSWORD: process.env.E2E_PASSWORD ?? '', E2E_DEMO_HISTORY: '1' },
+    env: {
+      PORT: String(port),
+      E2E_PASSWORD: process.env.E2E_PASSWORD ?? '',
+      E2E_DEMO_HISTORY: '1',
+      // Fictional values (no such Google client): enough for the button to appear.
+      GOOGLE_SIGNIN_CLIENT_ID: 'docs-screenshots.apps.googleusercontent.example',
+      GOOGLE_SIGNIN_CLIENT_SECRET: 'docs-screenshots-not-a-secret',
+    },
     stdout: 'ignore',
     stderr: 'pipe',
   },

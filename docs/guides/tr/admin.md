@@ -12,7 +12,7 @@ Aceleniz mi var? [Yöneticiler için hızlı başlangıç](quick-start-admin.md)
 
 Giriş yaptıktan sonra **Yönetim** sayfası açılır. En sık yapılan iki iş **Sınıf ekle** ve **Öğretmen hesabı ekle**'dir; kutucuklar bütün bölümleri açar, diğer sayfalarda bunu menü çubuğu yapar (telefonda ya da tablette tek bir **Bölüm** listesidir). Üst çubuktaki **Yardım** bu kılavuzları açar. Telefonda tablolar her satırı, düğmeleri altta olan bir kart olarak gösterir.
 
-Yönetici hesapları **şifreyle** giriş yapar; okul şifreleri kapattıysa (Hesaplar ve davetler altındaki **Şifreler** bölümüne bakın) yöneticiler de herkes gibi e-postayla gönderilen bağlantı ya da kodla giriş yapar. Sınıf modu ve PIN kilidi yalnızca öğretmen hesapları içindir; yönetici hesabı hiçbir zaman PIN ile kilitlenmez. Bu yüzden sınıf cihazında yönetici olarak giriş yapmayın. Yönetici yine de **Profil ve PIN** sayfasında bir PIN belirler: **Bakım**, **Şimdi yedekle** ve **Son yedeği doğrula** işlemlerinden önce bu PIN'i sorar. **Dil**, **Yazı boyutu** ve **Aralıklar** da bu sayfadadır (Sık, Normal ya da Geniş: yönetim sayfalarında tablo ve kartların ne kadar yer kapladığı; düğmeler aynı boyutta kalır).
+Yönetici hesapları **şifreyle** giriş yapar; okul şifreleri kapattıysa (Hesaplar ve davetler altındaki **Şifreler** bölümüne bakın) yöneticiler de herkes gibi e-postayla gönderilen bağlantı ya da kodla giriş yapar. Her iki durumda da yönetici bir geçiş anahtarı ekleyebilir (bkz. **Geçiş anahtarları**). Sınıf modu ve PIN kilidi yalnızca öğretmen hesapları içindir; yönetici hesabı hiçbir zaman PIN ile kilitlenmez. Bu yüzden sınıf cihazında yönetici olarak giriş yapmayın. Yönetici yine de **Profil ve PIN** sayfasında bir PIN belirler: **Bakım**, **Şimdi yedekle** ve **Son yedeği doğrula** işlemlerinden önce bu PIN'i sorar. **Dil**, **Yazı boyutu** ve **Aralıklar** da bu sayfadadır (Sık, Normal ya da Geniş: yönetim sayfalarında tablo ve kartların ne kadar yer kapladığı; düğmeler aynı boyutta kalır).
 
 ## İlk kurulum
 
@@ -48,33 +48,53 @@ Listede her hesabın durumu (**Etkin**, davet kullanılana kadar **Davet bekliyo
 
 ### Şifreler
 
+![Hesaplar sayfasındaki Şifreler bölümü](../img/tr/admin-passwords.png)
+
 Listenin üstündeki **Şifreler** bölümünde bütün okul için tek bir kural vardır. Normalde öğretmenler şifre ile e-posta giriş bağlantıları arasında seçim yapar, yöneticiler şifre kullanır. **Şifreleri kapat** dediğinizde şifreler tümüyle kalkar: yöneticiler dahil herkes giriş sayfasına e-posta adresini yazar; kendisine 15 dakika geçerli, tek kullanımlık bir bağlantı ve 6 haneli bir kod gelir. Olmayan bir şifre tahmin edilemez, başka yerde kullanılamaz, başkasına verilemez.
 
-- Şifreleri ancak okulun e-postası ayarlıysa ve sizinki dahil **etkin her hesabın e-posta adresi varsa** kapatabilirsiniz; sayfa, adresi eksik olan hesapların adını gösterir.
-- Son adımdan önce sayfa **kendi adresinize bir kod gönderir** ve bu kodu ister. Böylece giriş e-postalarının size ulaştığı görülür; yanlışlıkla kendinizi dışarıda bırakamazsınız.
+- Düğme ancak okulun e-postası ayarlıysa ve sizinki dahil **etkin her hesabın e-posta adresi varsa** çalışır; o zamana kadar bölüm neyin eksik olduğunu söyler ve adresi eksik hesapların adını gösterir.
 - Şifreleri kapattığınız anda sizinki dahil **bütün hesapların şifresi silinir**. Bu geri alınamaz. Oturumu açık olanların oturumu açık kalır; süren bir ders kesilmez.
-- Şifreler kapalıyken yeni hesap için e-posta adresi zorunludur ve her zaman davet bağlantısı verilir, davet şifre seçeneği sunmaz, **Şifreyi sıfırla** görünmez (bunun yerine **Yeni davet bağlantısı** gönderin) ve bir hesabın e-posta adresi silinemez. Giriş sayfasında şifre alanı bulunmaz.
-- **Şifrelere yeniden izin ver** kimseye şifresini geri vermez: herkes e-postayla giriş yaptıktan sonra profilinden bir şifre seçebilir ya da siz **Şifreyi sıfırla** ile geçici şifre verirsiniz.
-- **Şifreler kapalıyken okulun e-postası çalışmazsa yöneticiler dahil kimse giriş yapamaz.** O durumda bilgi işlem sorumlusu sunucuda şifrelere yeniden izin verir (`signin:allow-passwords`, bkz. `docs/OPERATIONS.md`) ve bir yöneticiye şifre belirler.
+
+Şifreleri kapatmak için:
+
+1. **Şifreleri kapat**'a basın. Açılan pencere şu anda kaç hesabın şifresi olduğunu söyler ve okulun e-postası çalışmazsa ne olacağı konusunda uyarır.
+2. **Kodu bana e-postayla gönder**'e basın. Kendi adresinize 15 dakika geçerli, 6 haneli bir kod gelir. Kodu yazmanız giriş e-postalarının size ulaştığını gösterir; böylece yanlışlıkla kendinizi dışarıda bırakamazsınız.
+3. Kodu **6 haneli kod** alanına yazın ve penceredeki **Şifreleri kapat**'a basın. **Vazgeç** pencereyi kapatır, hiçbir şeyi değiştirmez.
+
+![Şifreler kapatılmadan önceki onay penceresi](../img/tr/admin-passwords-confirm.png)
+
+Şifreler kapalıyken:
+
+- Yeni hesap için e-posta adresi zorunludur ve her zaman davet bağlantısı verilir, davet şifre seçeneği sunmaz, **Şifreyi sıfırla** görünmez (bunun yerine **Yeni davet bağlantısı** gönderin) ve bir hesabın e-posta adresi silinemez. Giriş sayfasında şifre alanı bulunmaz.
+- **Şifrelere yeniden izin ver** kimseye şifresini geri vermez: herkes e-postayla giriş yaptıktan sonra profilinden (**Bunun yerine şifre kullan**) bir şifre seçebilir ya da siz **Şifreyi sıfırla** ile geçici şifre verirsiniz. O zamana kadar yöneticiler dahil herkes e-postayla giriş yapmayı sürdürür.
+- **Okulun e-postası çalışmazsa yöneticiler dahil kimse giriş yapamaz.** O durumda bilgi işlem sorumlusu sunucuda şifrelere yeniden izin verir (`signin:allow-passwords`, bkz. `docs/OPERATIONS.md`) ve bir yöneticiye şifre belirler.
 
 ### Geçiş anahtarları
 
-Öğretmenler ve yöneticiler **Profil → Geçiş anahtarları** altında **geçiş anahtarı** ekleyip şifre ya da e-posta yerine parmak izi, yüz ya da ekran kilidiyle giriş yapabilir. Geçiş anahtarı şifreler açıkken de kapalıyken de çalışır; şifreler kapatıldığında bir yönetici için en hızlı giriş yoludur.
+Öğretmenler ve yöneticiler **Profil ve PIN** → **Geçiş anahtarları** altında **geçiş anahtarı** ekleyip şifre ya da e-posta yerine parmak izi, yüz ya da ekran kilidiyle (giriş sayfasında **Geçiş anahtarıyla giriş yap**) giriş yapabilir. Geçiş anahtarı şifreler açıkken de kapalıyken de çalışır; şifreler kapatıldığında bir yönetici için en hızlı giriş yoludur. E-posta ya da Google ile girişten hemen sonra öğretmen ve yönetici sayfaları bir geçiş anahtarı eklemeyi önerir (**Bir dahaki sefere daha hızlı giriş yapın**).
 
 - Geçiş anahtarı olan hesapta listede **Geçiş anahtarı: 2** yazar.
-- **Geçiş anahtarlarını kaldır** (onay için kullanıcı adını yazın) kaybolan ya da çalınan bir cihaz içindir: o hesabın bütün geçiş anahtarları geçersiz olur ve kişinin tüm cihazlarda oturumu kapanır. Kişi başka bir yolla giriş yapıp yenilerini ekler.
+- **Geçiş anahtarlarını kaldır** (onay için kullanıcı adını yazın) kaybolan ya da çalınan bir cihaz içindir: o hesabın bütün geçiş anahtarları geçersiz olur ve kişinin tüm cihazlarda oturumu kapanır. Kişi başka bir yolla giriş yapıp yenilerini ekler. Kendi hesabınızın anahtarlarını profilinizden tek tek kaldırırsınız.
 - Sınıf bilgisayarına kimse geçiş anahtarı eklememelidir; Profil, sınıf ekranı olarak kullanılmış bir bilgisayarda düğmeyi geri tutar.
-- Geçiş anahtarları için sitenin bir adı olmalıdır (`sareteacher.com` gibi); yalnızca IP adresiyle açılan bir kurulumda sunulmaz.
+- Geçiş anahtarları için sitenin bir adı olmalıdır (yalnızca IP adresi değil, bir web adresi); IP adresiyle açılan bir kurulumda sunulmaz.
 
 ### Google ile giriş
 
-Bilgi işlem sorumlusu sunucuda ayarladıysa giriş sayfasında **Google ile giriş yap** düğmesi de görünür. E-posta bağlantılarının yanında ikinci bir giriş yoludur; hesap açmaz: Google yalnızca kişinin, hesabına yazdığınız e-posta adresinin sahibi olduğunu doğrular. Öğretmenler her zaman kullanabilir; yöneticiler yalnızca şifreler kapalıyken.
+![Giriş sayfasında Google ile giriş ve uyarısı](../img/tr/sign-in-google.png)
+
+Bilgi işlem sorumlusu sunucuda ayarladıysa giriş sayfasında **Google ile giriş yap** düğmesi de görünür. E-posta bağlantılarının yanında ikinci bir giriş yoludur; hesap açmaz: Google yalnızca kişinin, hesabına yazdığınız e-posta adresinin sahibi olduğunu doğrular. Öğretmenler her zaman kullanabilir; yöneticiler yalnızca hesaplarının şifresi yokken (şifreler kapalıyken ya da şifrelere yeniden izin verildikten sonra e-posta bağlantılarıyla girmeyi sürdürüyorlarsa).
 
 - Hesaptaki adres kişinin Google adresi olmalıdır. Adresi başka olan kişi e-posta bağlantılarını kullanmayı sürdürür.
 - Bu yolla giriş yapılmış hesapta listede **Google ile giriş kullanıldı** yazar. Hesabın e-posta adresini değiştirirseniz sonraki Google girişi yeni adresle eşleşmelidir.
 - Davet edilen bir öğretmen daveti açmadan **Google ile giriş yap**'a basabilir: davet kullanılmış sayılır ve hesabın şifresi olmaz.
 - Google, kişinin bu siteye ne zaman giriş yaptığını öğrenir. Google'a hiçbir öğrenci verisi gitmez.
-- **Ortak bilgisayarda kullanılmaz.** Google ile giriş, o Google hesabını e-postalarıyla birlikte tarayıcıda açık bırakır. Giriş sayfası bunu düğmenin yanında söyler; sınıf ekranı olarak kullanılmış bir bilgisayarda ise düğmeyi geri tutar ve e-posta kodunu önerir.
+- **Ortak bilgisayarda kullanılmaz.** Google ile giriş, o Google hesabını e-postalarıyla birlikte tarayıcıda açık bırakır. Giriş sayfası bunu düğmenin altında söyler; sınıf ekranı olarak kullanılmış bir bilgisayarda ise düğmeyi geri tutar ve e-posta kodunu önerir (**Bu benim kendi bilgisayarım: Google ile girişi göster** düğmeyi yeniden gösterir).
+
+### Herkese açık gizlilik sayfası
+
+![Herkese açık gizlilik sayfası](../img/tr/privacy.png)
+
+Sitenin adresinin sonuna `/privacy` eklendiğinde [Gizlilik](privacy.md) kılavuzu hesap gerekmeden, Türkçe ya da İngilizce açılır. Sınıf Pusulası'nın neleri sakladığını, bunları kimin gördüğünü ve her giriş yolunun neleri gönderdiğini anlatır (Google için: yalnızca e-posta adresi ve Google'ın hesaba verdiği kimlik). Velileri bu sayfaya yönlendirin; bilgi işlem sorumlusu Google ile girişi kaydederken gizlilik politikası bağlantısı olarak bu adres verilmelidir. Sayfada hiçbir okulun adı geçmez: sorular okula yöneltilir.
 
 ## E-posta (SMTP)
 
@@ -105,7 +125,7 @@ Tek tek sınıflar **Sınıflar** → **Sınıfı üst sınıfa taşı** ile de 
 
 - **Tatil ekle**: bir ad (İngilizce, Türkçe ya da ikisi; örneğin *Yarıyıl tatili* / *Semester break*), **Başlangıç tarihi** ve **Bitiş tarihi** (tek gün için aynı tarih). Tarihler eğitim yılının içinde olmalıdır. Her satırda **Düzenle** ve **Sil** vardır; silmeden önce sayfada bir kez daha sorulur.
 - **Bu eğitim yılına resmî tatilleri ekle**, yılın içine denk gelen sabit tarihli millî tatilleri birer gün olarak ekler: 1 Ocak, 23 Nisan, 1 Mayıs, 19 Mayıs, 15 Temmuz, 30 Ağustos ve 29 Ekim. Takvimde zaten olan gün atlanır; iki kez basmak bir şey eklemez.
-- **Ramazan Bayramı ve Kurban Bayramı her yıl başka tarihe denk gelir**, bu yüzden hazır listede yoktur: bakanlığın açıkladığı tarihlerle **Tatil ekle** ile siz ekleyin, yarıyıl tatilini de. Class Compass internette hiçbir şey aramaz. Yarım günler desteklenmez.
+- **Ramazan Bayramı ve Kurban Bayramı her yıl başka tarihe denk gelir**, bu yüzden hazır listede yoktur: bakanlığın açıkladığı tarihlerle **Tatil ekle** ile siz ekleyin, yarıyıl tatilini de. Sınıf Pusulası internette hiçbir şey aramaz. Yarım günler desteklenmez.
 
 Tatil neyi değiştirir:
 

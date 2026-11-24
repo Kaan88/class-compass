@@ -2,7 +2,7 @@
 
 Set up a school in Class Compass. The full [Administrator guide](admin.md) explains each page.
 
-1. **Your account.** The IT person creates the first administrator account on the server. Administrators sign in with a password, unless the school has switched passwords off: then everyone signs in with a link or code sent by email.
+1. **Your account.** The IT person creates the first administrator account on the server. Administrators sign in with a password, unless the school has switched passwords off (**Accounts** → **Passwords**): then everyone signs in with a link or code sent by email.
 2. **School settings.** **School name**, **School timezone**, **Week starts on** and **Language for new accounts**.
 3. **School year.** **School years and terms** → **New school year**, then **Add term**.
 4. **Subjects and classes.** **Subjects** → **New subject**; **Classes** → **New class** (name, grade, class language).
