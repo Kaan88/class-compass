@@ -6,7 +6,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { weekDates } from '../../src/domain/assistant.ts';
 import { addDays, weekdayOf } from '../../src/domain/dates.ts';
-import { closedDates, closedSchoolDays, fixedHolidaysIn, isSchoolDayOn, TR_FIXED_HOLIDAYS, weekKind } from '../../src/domain/holidays.ts';
+import { closedDates, closedSchoolDays, fixedHolidaysIn, isSchoolDayOn, nextSchoolDay, TR_FIXED_HOLIDAYS, weekKind } from '../../src/domain/holidays.ts';
 import { schoolDaysBetween, weekStartsBetween } from '../../src/domain/periods.ts';
 
 const year = { from: '2026-09-01', to: '2027-06-30' };
@@ -78,6 +78,42 @@ describe('closure days (D-186)', () => {
         expect(all.filter((d) => !closed.has(d))).toEqual(open);
       }),
       { numRuns: 60 },
+    );
+  });
+});
+
+describe('the next school day (S37, D-218: filling in a forgotten lesson)', () => {
+  // 2026-11-06 is a Friday, 2026-11-09 a Monday.
+  it('Friday → Monday; a weekday → the next day', () => {
+    expect(nextSchoolDay('2026-11-06', closedDates([]))).toBe('2026-11-09');
+    expect(nextSchoolDay('2026-11-03', closedDates([]))).toBe('2026-11-04');
+    expect(nextSchoolDay('2026-11-07', closedDates([]))).toBe('2026-11-09'); // a Saturday make-up lesson
+  });
+  it('the day before a holiday → the first school day after it', () => {
+    const closed = closedDates([{ from: '2026-11-10', to: '2026-11-10' }]);
+    expect(nextSchoolDay('2026-11-09', closed)).toBe('2026-11-11');
+    // A Thursday before a Friday holiday → Monday.
+    expect(nextSchoolDay('2026-11-12', closedDates([{ from: '2026-11-13', to: '2026-11-13' }]))).toBe('2026-11-16');
+  });
+  it('a long break (two weeks) → the first day after it', () => {
+    const closed = closedDates([{ from: '2027-01-25', to: '2027-02-05' }]);
+    expect(nextSchoolDay('2027-01-22', closed)).toBe('2027-02-08');
+  });
+  it('no calendar configured → the next weekday; a broken calendar never answers "never"', () => {
+    expect(nextSchoolDay('2026-12-31', new Set())).toBe('2027-01-01');
+    const everything = closedDates([{ from: '2026-11-01', to: '2027-12-31' }]);
+    expect(weekdayOf(nextSchoolDay('2026-11-06', everything))).toBe(1);
+  });
+  it('is always a school day after the date (property)', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 300 }), fc.integer({ min: 0, max: 20 }), fc.integer({ min: 0, max: 20 }), (offset, start, len) => {
+        const date = addDays('2026-09-01', offset);
+        const closed = closedDates([{ from: addDays(date, start), to: addDays(date, start + len) }]);
+        const next = nextSchoolDay(date, closed);
+        expect(next > date).toBe(true);
+        expect(isSchoolDayOn(next, closed)).toBe(true);
+        for (let d = addDays(date, 1); d < next; d = addDays(d, 1)) expect(isSchoolDayOn(d, closed)).toBe(false);
+      }),
     );
   });
 });

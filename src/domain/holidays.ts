@@ -38,6 +38,21 @@ export function closedDates(closures: readonly DateSpan[], within?: DateSpan): S
 /** A school day: one of the school weekdays and not a closure day. */
 export const isSchoolDayOn = (date: string, closed: ReadonlySet<string>, weekdays: readonly number[] = SCHOOL_WEEKDAYS): boolean => weekdays.includes(weekdayOf(date)) && !closed.has(date);
 
+/** How far `nextSchoolDay` looks: longer than any break inside a school year (the summer is not a closure). */
+export const NEXT_SCHOOL_DAY_SEARCH_DAYS = 400;
+
+/**
+ * The first school day after `date` (S37, D-218: how long a forgotten lesson can still be filled in):
+ * Friday → Monday, the day before a holiday or a break → the first school day after it. With no
+ * closures this is the next weekday. Should nothing within NEXT_SCHOOL_DAY_SEARCH_DAYS be a school day
+ * (a broken calendar), the next school weekday ignoring closures, so the answer is never "never".
+ */
+export function nextSchoolDay(date: string, closed: ReadonlySet<string>, weekdays: readonly number[] = SCHOOL_WEEKDAYS): string {
+  for (let d = addDays(date, 1), i = 0; i < NEXT_SCHOOL_DAY_SEARCH_DAYS; d = addDays(d, 1), i += 1) if (isSchoolDayOn(d, closed, weekdays)) return d;
+  for (let d = addDays(date, 1), i = 0; i < 7; d = addDays(d, 1), i += 1) if (weekdays.includes(weekdayOf(d))) return d;
+  return addDays(date, 1);
+}
+
 /**
  * What a week (seven days from `weekStart`) is inside `range`: 'school' when at least one school weekday
  * in the range is not a closure, 'closed' when every school weekday in the range is a closure day (a
