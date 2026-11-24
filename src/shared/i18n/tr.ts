@@ -88,6 +88,7 @@ export const tr = {
   'error.UNAUTHENTICATED': 'Lütfen yeniden giriş yapın.',
   'error.NOT_FOUND': 'Bu öge artık yok.',
   'error.CONFLICT': 'Bu, mevcut bilgilerle çakışıyor.',
+  'error.SIGN_IN_GATE': 'Sitenin bu bölümünün önünde ek bir giriş adımı var. Oradan giriş yapmak için sayfayı yenileyin.',
   'error.RATE_LIMITED': 'Çok fazla deneme. Lütfen biraz bekleyip tekrar deneyin.',
   'error.CSRF': 'İstek güvenlik nedeniyle engellendi. Sayfayı yenileyip tekrar deneyin.',
   'error.INTERNAL': 'Sunucuda bir sorun oluştu. Tekrar deneyin.',

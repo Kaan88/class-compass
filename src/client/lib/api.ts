@@ -33,7 +33,9 @@ function buildRequest<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, 
     return encodeURIComponent(String(v));
   });
   let url = path;
-  const init: RequestInit = { method: ep.method, credentials: 'same-origin', headers: { 'x-cc-csrf': '1' } };
+  // The app's own API never redirects. A redirect means something in front of the app wants its own
+  // sign-in first (`gateInFront`), so it is not followed: it is seen.
+  const init: RequestInit = { method: ep.method, credentials: 'same-origin', redirect: 'manual', headers: { 'x-cc-csrf': '1' } };
   if (ep.method === 'GET') {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(rest)) if (v !== undefined && v !== null) qs.set(k, String(v));
@@ -60,6 +62,33 @@ function failure(ep: Endpoint, res: { status: number; statusText: string }, body
   return new ApiError(res.status, code, body?.error?.message ?? res.statusText, body?.error?.details);
 }
 
+/** The reload, replaceable in tests (jsdom cannot reload). */
+export const gate = { reload: () => window.location.reload() };
+const GATE_RELOAD_KEY = 'cc.gateReload';
+const GATE_RELOAD_EVERY_MS = 60_000;
+
+/**
+ * An access gate in front of part of the site (D-217): the operator may put an extra sign-in in front
+ * of some addresses, for example the administration pages and their API at a proxy. A page opened
+ * inside the app never asked the gate for that address, so its API call is answered with a redirect to
+ * the gate's sign-in, which a background request cannot show. Loading the page itself lets the gate
+ * show it and come back here. At most one reload a minute, so a gate that keeps refusing ends in a
+ * message and not in a loop.
+ */
+function gateInFront(): ApiError {
+  try {
+    const last = Number(sessionStorage.getItem(GATE_RELOAD_KEY) ?? 0);
+    if (Date.now() - last > GATE_RELOAD_EVERY_MS) {
+      sessionStorage.setItem(GATE_RELOAD_KEY, String(Date.now()));
+      gate.reload();
+    }
+  } catch {
+    /* no session storage: the message below says what to do */
+  }
+  return new ApiError(401, 'UNAUTHENTICATED', 'An extra sign-in is in front of this part of the site', { reason: 'SIGN_IN_GATE' });
+}
+const gated = (res: Response) => res.type === 'opaqueredirect';
+
 /**
  * Typed call for a contract endpoint. Path params (`:name`) are filled from input; GET sends the rest
  * as query string, others as JSON body. Same-origin cookies + CSRF header.
@@ -67,6 +96,7 @@ function failure(ep: Endpoint, res: { status: number; statusText: string }, body
 export async function call<I extends z.ZodType, O extends z.ZodType>(ep: Endpoint<I, O>, input: z.input<I>): Promise<z.infer<O>> {
   const { url, init } = buildRequest(ep, input);
   const res = await fetch(url, init);
+  if (gated(res)) throw gateInFront();
   const body = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) throw failure(ep as unknown as Endpoint, res, body);
   return body as z.infer<O>;
@@ -84,6 +114,7 @@ export async function callConditional<I extends z.ZodType, O extends z.ZodType>(
   const { url, init } = buildRequest(ep, input);
   if (etag) init.headers = { ...init.headers, 'if-none-match': etag };
   const res = await fetch(url, init);
+  if (gated(res)) throw gateInFront();
   if (res.status === 304) return { notModified: true };
   const body = await res.json().catch(() => null);
   if (!res.ok) throw failure(ep as unknown as Endpoint, res, body);

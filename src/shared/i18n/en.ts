@@ -95,6 +95,7 @@ export const en = {
   'error.UNAUTHENTICATED': 'Please sign in again.',
   'error.NOT_FOUND': 'This item no longer exists.',
   'error.CONFLICT': 'This conflicts with existing information.',
+  'error.SIGN_IN_GATE': 'This part of the site has an extra sign-in in front of it. Reload the page to sign in there.',
   'error.RATE_LIMITED': 'Too many attempts. Please wait and try again.',
   'error.CSRF': 'The request was blocked for security. Reload the page and try again.',
   'error.INTERNAL': 'Something went wrong on the server. Try again.',
