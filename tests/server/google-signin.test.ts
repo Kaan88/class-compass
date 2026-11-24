@@ -5,7 +5,7 @@
  */
 import crypto from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { users } from '../../src/server/db/schema.ts';
 import { GOOGLE_AUTHORIZE_URL, GOOGLE_CHOICE_COOKIE, GOOGLE_COOKIE } from '../../src/server/modules/auth/google.ts';
 import { Client, FakeMailer, makeEnv, TEST_ORIGIN, type TestEnv } from '../helpers.ts';
@@ -361,15 +361,44 @@ describe('S36 review: whom a linked person may reach, the cookie’s life, and t
   const emailLinkAccount = (id: string) => env.db.update(users).set({ signInMethod: 'email_link' }).where(eq(users.id, id)).run();
   const link = (id: string, googleSub: string | null) => env.db.update(users).set({ googleSub }).where(eq(users.id, id)).run();
 
-  it('a linked teacher and an unlinked administrator with the same stored address are both offered, whatever address Google names now', async () => {
+  it('a linked teacher and an unlinked administrator with the same stored address are both offered while Google names that address; a renamed address reaches only the linked account', async () => {
     const { s } = await school();
     const boss = await another(s, 'ayse.admin', 'admin');
     emailLinkAccount(boss.id);
     link(s.ayse.id, 'g-ayse');
-    for (const named of ['ayse@school.example', 'ayse.private@elsewhere.example']) {
-      const listed = await googleSignIn(standard(named, 'g-ayse'));
-      expect(listed.r.body.choose.map((a: any) => a.id).sort(), named).toEqual([s.ayse.id, boss.id].sort());
-    }
+    const listed = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    expect(listed.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.ayse.id, boss.id].sort());
+    // Google names another address now: the unlinked sibling waits until the stored addresses are updated.
+    const renamed = await googleSignIn(standard('ayse.private@elsewhere.example', 'g-ayse'));
+    expect(renamed.r.body).toMatchObject({ id: s.ayse.id, role: 'teacher' });
+    expect(renamed.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
+    expect(sub(boss.id)).toBeNull();
+  });
+
+  it('a mailbox given to somebody else under a new id: the linked person is not offered the new person’s account; the new person gets only their own', async () => {
+    const { s } = await school();
+    // Ayşe is linked and her stored address was left as it was; the mailbox went to Zehra, whose account the administrator made with it.
+    link(s.ayse.id, 'g-ayse');
+    const zehra = await another(s, 'zehra.teacher');
+    const ayse = await googleSignIn(standard('ayse.new@elsewhere.example', 'g-ayse'));
+    expect(ayse.r.body).toMatchObject({ id: s.ayse.id });
+    expect(ayse.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
+    expect(sub(zehra.id)).toBeNull();
+    const z = await googleSignIn(standard('ayse@school.example', 'g-zehra'));
+    expect(z.r.body).toMatchObject({ id: zehra.id });
+    expect(z.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
+    expect(sub(zehra.id)).toBe('g-zehra');
+    expect(sub(s.ayse.id)).toBe('g-ayse');
+  });
+
+  it('a linked administrator with a password while passwords are on is not listed; the unlinked teacher on the same address signs in directly', async () => {
+    const { s } = await school();
+    const boss = await another(s, 'ayse.admin', 'admin');
+    link(boss.id, 'g-ayse');
+    const direct = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    expect(direct.r.body).toMatchObject({ id: s.ayse.id, role: 'teacher' });
+    expect(direct.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
+    expect(sub(s.ayse.id)).toBe('g-ayse');
   });
 
   it('a linked teacher whose Google address now is somebody else’s does not reach that account: signed straight in, the other neither listed nor choosable', async () => {
@@ -453,6 +482,7 @@ describe('S36 review: whom a linked person may reach, the cookie’s life, and t
     const cookie = `${GOOGLE_CHOICE_COOKIE}=${listed.c.cookies.get(GOOGLE_CHOICE_COOKIE)!}`;
     const res = await env.app.inject({ method: 'POST', url: '/api/auth/google/choose', headers: { origin: env.config.origins.main, cookie }, payload: { userId: two.id } });
     expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error.code).toBe('CSRF');
     expect(sub(two.id)).toBeNull();
   });
 
@@ -467,5 +497,20 @@ describe('S36 review: whom a linked person may reach, the cookie’s life, and t
     expect(reason(many.r)).toBe('GOOGLE_TOO_MANY_ACCOUNTS');
     expect(many.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
     expect((await many.c.get('/api/auth/me')).status).toBe(401);
+  });
+});
+
+describe('the "too many accounts" advice holds (S36, D-216)', () => {
+  // Email links reach email-link accounts only (D-108): the message also names passkeys and passwords.
+  it('an email-link request for an address that eleven email-link accounts share sends eleven mails', async () => {
+    const { s, mailer } = await school();
+    const ids = [s.ayse.id];
+    for (let i = 2; i <= 11; i++) ids.push((await ok(s.admin.post('/api/admin/users', { login: `ayse.n${i}`, displayName: `Ayşe ${i}`, role: 'teacher', email: 'ayse@school.example', setup: 'temporary_password' }))).user.id);
+    env.db.update(users).set({ signInMethod: 'email_link' }).where(inArray(users.id, ids)).run();
+    expect(reason((await googleSignIn(standard('ayse@school.example', 'g-ayse'))).r)).toBe('GOOGLE_TOO_MANY_ACCOUNTS');
+    mailer.sent.length = 0;
+    await ok(new Client(env).post('/api/auth/email-link/request', { email: 'ayse@school.example' }));
+    expect(mailer.sent).toHaveLength(11);
+    expect(mailer.sent.every((m) => m.to === 'ayse@school.example')).toBe(true);
   });
 });

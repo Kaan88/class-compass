@@ -3,16 +3,19 @@
  * after the provider has proven a person: which accounts this person may be, and signing one of them in
  * (S36, D-216).
  *
- * Candidates (rule 1 of D-216): every active account that may use this provider (`eligible`: Google
- * only for accounts that may be without a password, the sign-in server for any account) and that either
- * already carries the provider's id of this person, or has no id from this provider yet and the address
- * that identifies the person:
- * - while no active account carries the id: the proven address (any case);
- * - once one does: the stored address of an active account that carries the id. The provider's address
- *   then no longer counts, as before D-216: a linked person whose provider address changes to somebody
- *   else's never reaches that account.
- * An account with the address but another id belongs to somebody else's provider account and is not a
- * candidate. Several accounts may share an address (D-108) and may then carry the same id.
+ * Candidates (rule 1 of D-216): active accounts that may use this provider (`eligible`: Google only
+ * for accounts that may be without a password, the sign-in server for any account), and of those:
+ * - linked: every account that carries the provider's id of this person (the token's `sub`);
+ * - unlinked (no id from this provider yet): every account whose stored address is the address the
+ *   provider proved in this sign-in (any case). While an active account carries the id, only if that
+ *   proven address is also the stored address of such an account: a linked person whose provider
+ *   address changed (renamed, or somebody else's address) reaches only the linked accounts; and an old
+ *   stored address the provider no longer vouches for this person (a mailbox given to somebody else under
+ *   a new id) never counts, because the match needs the proof of this sign-in.
+ * So an account reached by address always had its address proven now (which the invite handling and
+ * `emailVerifiedAt` rely on). An account with the address but another id belongs to somebody else's
+ * provider account and is not a candidate. Several accounts may share an address (D-108) and may then
+ * carry the same id.
  *
  * One candidate signs in at once. Several (at most `MAX_CHOICES`): nothing is signed in, the page shows
  * the accounts' names and roles only, and a sealed HttpOnly cookie that lives 5 minutes carries the
@@ -23,7 +26,7 @@
  * checks the chosen account again with the same rule (it may have been deactivated, given another
  * address or id, or lost the right to use the provider in between).
  */
-import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { tx, type Db } from '../../db/client.ts';
 import { oneTimeTokens, users } from '../../db/schema.ts';
 import { audit } from '../../lib/audit.ts';
@@ -85,40 +88,43 @@ interface PendingChoice {
  * The addresses (lower case) by which an account without this provider's id may be this person: the
  * stored addresses of the active accounts that carry the id, or the proven address while none does.
  */
-function personAddresses(db: Db, provider: Provider, claims: ProviderClaims): string[] {
+/**
+ * May an unlinked account be matched by the proven address? Yes while no active account carries the
+ * id; otherwise only when the proven address is the stored address of one of those accounts.
+ */
+function addressMatchAllowed(db: Db, provider: Provider, claims: ProviderClaims): boolean {
   const linked = db
     .select({ email: users.email })
     .from(users)
     .where(and(isNull(users.disabledAt), eq(users[provider.subField], claims.sub)))
     .all();
-  if (linked.length === 0) return [claims.email];
-  return [...new Set(linked.flatMap((u) => (u.email ? [u.email.toLowerCase()] : [])))];
+  return linked.length === 0 || linked.some((u) => u.email?.toLowerCase() === claims.email);
 }
 
 /** Rule 1 for one account (the choice checks it again). */
-function isCandidate(db: Db, provider: Provider, user: UserRow, claims: ProviderClaims, addresses: string[]): boolean {
+function isCandidate(db: Db, provider: Provider, user: UserRow, claims: ProviderClaims, byAddress: boolean): boolean {
   if (user.disabledAt !== null || !provider.eligible(db, user)) return false;
   const sub = user[provider.subField];
   if (sub !== null) return sub === claims.sub;
-  return user.email !== null && addresses.includes(user.email.toLowerCase());
+  return byAddress && user.email?.toLowerCase() === claims.email;
 }
 
 function candidatesOf(db: Db, provider: Provider, claims: ProviderClaims): UserRow[] {
   const col = users[provider.subField];
-  const addresses = personAddresses(db, provider, claims);
-  const byAddress = addresses.length ? and(isNull(col), inArray(sql`lower(${users.email})`, addresses)) : undefined;
+  const byAddress = addressMatchAllowed(db, provider, claims);
+  const match = byAddress ? or(eq(col, claims.sub), and(isNull(col), sql`lower(${users.email}) = ${claims.email}`)) : eq(col, claims.sub);
   return db
     .select()
     .from(users)
-    .where(and(isNull(users.disabledAt), byAddress ? or(eq(col, claims.sub), byAddress) : eq(col, claims.sub)))
+    .where(and(isNull(users.disabledAt), match))
     .orderBy(users.displayName, users.id)
     .all()
-    .filter((u) => isCandidate(db, provider, u, claims, addresses));
+    .filter((u) => isCandidate(db, provider, u, claims, byAddress));
 }
 
 /**
- * Signs this account in: links the provider's id at its first use, takes the proven address as
- * verified, uses up an open invite (an invited account may sign in this way straight away and is
+ * Signs this account in: links the provider's id at its first use, takes the stored address as
+ * verified when it is the proven one, uses up an open invite (an invited account may sign in this way straight away and is
  * without a password from then on; only an account that may be without one, D-108), starts the session
  * and writes the audits. Call inside the transaction.
  */
@@ -203,7 +209,7 @@ export function chooseProviderAccount(deps: AppDeps, provider: Provider, cookie:
   return tx(deps.db, () => {
     const user = deps.db.select().from(users).where(eq(users.id, userId)).get();
     // Deactivated, no longer allowed to use the provider, or given another address or id since the list.
-    if (!user || !isCandidate(deps.db, provider, user, claims, personAddresses(deps.db, provider, claims))) throw provider.noAccount();
+    if (!user || !isCandidate(deps.db, provider, user, claims, addressMatchAllowed(deps.db, provider, claims))) throw provider.noAccount();
     return signInAccount(deps, provider, user, claims);
   });
 }

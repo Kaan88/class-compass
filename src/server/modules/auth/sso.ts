@@ -103,9 +103,10 @@ const notAvailable = () => new AppError('FEATURE_DISABLED', 'This sign-in is not
 const failed = () => new AppError('UNAUTHENTICATED', 'The sign-in did not work. Try again.', { reason: 'SSO_SIGNIN_FAILED' });
 const noAccount = () => new AppError('UNAUTHENTICATED', 'No account uses this address', { reason: 'SSO_NO_ACCOUNT' });
 
-/** Any account may use it (D-213). *//** More than `MAX_CHOICES` accounts on the address (D-216): too many to list; email links still work. */
+/** More than `MAX_CHOICES` accounts on the address (D-216): too many to list; the person signs in another way. */
 const tooMany = () => new AppError('UNAUTHENTICATED', 'Too many accounts use this address', { reason: 'SSO_TOO_MANY_ACCOUNTS' });
 
+/** Any account may use it (D-213). */
 const SSO: Provider = {
   key: 'sso',
   subField: 'ssoSub',

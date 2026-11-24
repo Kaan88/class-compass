@@ -450,14 +450,31 @@ describe('S36 review: whom a linked person may reach, the cookie’s life, and t
     (await ok(s.admin.post('/api/admin/users', { login, displayName: `Kişi ${login}`, role, email, setup: 'temporary_password' }))).user as { id: string };
   const link = (id: string, ssoSub: string | null) => env.db.update(users).set({ ssoSub }).where(eq(users.id, id)).run();
 
-  it('a linked teacher and an unlinked administrator with the same stored address are both offered, whatever address the provider names now', async () => {
+  it('a linked teacher and an unlinked administrator with the same stored address are both offered while the provider names that address; a renamed address reaches only the linked account', async () => {
     const { s, fake } = await school();
     const boss = await another(s, 'ayse.admin');
     link(s.ayse.id, 'acct-ayse');
-    for (const named of ['ayse@mail.demo.example', 'ayse.moved@mail.demo.example']) {
-      const listed = await signIn(fake, standard(named, 'acct-ayse'));
-      expect(listed.r.body.choose.map((a: any) => a.id).sort(), named).toEqual([s.ayse.id, boss.id].sort());
-    }
+    const listed = await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'));
+    expect(listed.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.ayse.id, boss.id].sort());
+    const renamed = await signIn(fake, standard('ayse.moved@mail.demo.example', 'acct-ayse'));
+    expect(renamed.r.body).toMatchObject({ id: s.ayse.id, role: 'teacher' });
+    expect(renamed.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+    expect(sub(boss.id)).toBeNull();
+  });
+
+  it('a mailbox given to somebody else under a new id: the linked person is not offered the new person’s account; the new person gets only their own', async () => {
+    const { s, fake } = await school();
+    link(s.ayse.id, 'acct-ayse');
+    const zehra = await another(s, 'zehra.teacher', 'teacher');
+    const ayse = await signIn(fake, standard('ayse.new@mail.demo.example', 'acct-ayse'));
+    expect(ayse.r.body).toMatchObject({ id: s.ayse.id });
+    expect(ayse.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+    expect(sub(zehra.id)).toBeNull();
+    const z = await signIn(fake, standard('ayse@mail.demo.example', 'acct-zehra'));
+    expect(z.r.body).toMatchObject({ id: zehra.id });
+    expect(z.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+    expect(sub(zehra.id)).toBe('acct-zehra');
+    expect(sub(s.ayse.id)).toBe('acct-ayse');
   });
 
   it('a linked teacher whose provider address now is somebody else’s does not reach that account: signed straight in, the other neither listed nor choosable', async () => {
@@ -507,6 +524,7 @@ describe('S36 review: whom a linked person may reach, the cookie’s life, and t
     const cookie = `${SSO_CHOICE_COOKIE}=${listed.c.cookies.get(SSO_CHOICE_COOKIE)!}`;
     const res = await env.app.inject({ method: 'POST', url: '/api/auth/sso/choose', headers: { origin: env.config.origins.main, cookie }, payload: { userId: two.id } });
     expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error.code).toBe('CSRF');
     expect(sub(two.id)).toBeNull();
     const started = await listed.c.post('/api/auth/sso/start');
     expect(String(started.headers['set-cookie'])).toMatch(new RegExp(`${SSO_CHOICE_COOKIE}=;[^,]*Path=/api/auth/sso`, 'u'));
