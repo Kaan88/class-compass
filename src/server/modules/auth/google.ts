@@ -17,12 +17,13 @@
  *    id), expiry, nonce, and `email_verified`. Its signature is not checked again: it was received
  *    directly from Google over TLS in exchange for the code, which OpenID Connect Core 3.1.3.7 allows.
  *
- * Matching the account: first by Google's permanent id (`users.google_sub`), stored at the first
- * sign-in; otherwise by the verified address, which must belong to exactly one active account without
- * a Google id yet. Only accounts that may sign in without a password are matched (`passwordlessAllowed`):
- * every teacher, and administrators once the school has switched passwords off (D-207); an
- * administrator who still has a password never signs in with Google. An administrator who changes an
- * account's address clears its Google id.
+ * Matching the account (`providerSignIn.ts`, S36, D-216): every active account that may sign in
+ * without a password (`passwordlessAllowed`: every teacher, and administrators once the school has
+ * switched passwords off, D-207; an administrator who still has a password never signs in with Google)
+ * and that carries Google's permanent id of the person (`users.google_sub`, stored at the first
+ * sign-in) or has the verified address and no Google id yet. One such account signs in; several (one
+ * person's accounts sharing an address, D-108) are offered as a list to choose from. A changed address
+ * or a deactivation clears the Google id.
  *
  * An invited teacher who has not opened the invite yet may sign in with Google straight away: the
  * invited address is proven, so the invite counts as used and the account signs in without a password
@@ -31,14 +32,10 @@
  * Only `openid email` is asked for; no Google token is kept.
  */
 import crypto from 'node:crypto';
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { tx, type Db } from '../../db/client.ts';
-import { oneTimeTokens, users } from '../../db/schema.ts';
-import { audit } from '../../lib/audit.ts';
-import type { AppDeps, UserRow } from '../../lib/context.ts';
+import type { AppDeps } from '../../lib/context.ts';
 import { openSecret, randomToken, sealSecret, timingSafeEqualStr } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
-import { actorFor, createSession, invalidateResetTokens, passwordNotSet, SESSION_ABSOLUTE_MS } from './service.ts';
+import { chooseProviderAccount, finishProviderSignIn, type Provider, type ProviderResult } from './providerSignIn.ts';
 import { passwordlessAllowed } from './signInPolicy.ts';
 
 export const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -47,6 +44,8 @@ export const GOOGLE_RETURN_PATH = '/signin-google';
 export const GOOGLE_COOKIE = 'cc_google_signin';
 export const GOOGLE_COOKIE_PATH = '/api/auth/google';
 export const GOOGLE_STATE_TTL_MS = 10 * 60_000;
+/** Holds the proof while the person chooses one of several accounts (D-216). */
+export const GOOGLE_CHOICE_COOKIE = 'cc_google_choice';
 const GOOGLE_ISSUERS = new Set(['https://accounts.google.com', 'accounts.google.com']);
 const CLOCK_SKEW_MS = 5 * 60_000;
 const SEAL_PURPOSE = 'google-signin';
@@ -60,7 +59,16 @@ const notAvailable = () => new AppError('FEATURE_DISABLED', 'Sign in with Google
 /** The request does not belong to this browser, is too old, or Google did not accept it: start again. */
 const failed = () => new AppError('UNAUTHENTICATED', 'Google sign-in did not work. Try again.', { reason: 'GOOGLE_SIGNIN_FAILED' });
 const noAccount = () => new AppError('UNAUTHENTICATED', 'No account uses this Google address', { reason: 'GOOGLE_NO_ACCOUNT' });
-const ambiguous = () => new AppError('UNAUTHENTICATED', 'Several accounts use this address', { reason: 'GOOGLE_AMBIGUOUS' });
+
+const GOOGLE: Provider = {
+  key: 'google',
+  subField: 'googleSub',
+  linkedAction: 'auth.google_linked',
+  eligible: passwordlessAllowed,
+  choicePurpose: 'google-choice',
+  noAccount,
+  failed,
+};
 
 const redirectUri = (deps: Pick<AppDeps, 'config'>) => `${deps.config.origins.main}${GOOGLE_RETURN_PATH}`;
 
@@ -143,26 +151,7 @@ export function readIdToken(idToken: unknown, expect: { clientId: string; nonce:
   return { sub: c.sub, email: c.email.trim().toLowerCase() };
 }
 
-function findAccount(db: Db, claims: IdClaims): UserRow {
-  const linked = db.select().from(users).where(eq(users.googleSub, claims.sub)).get();
-  if (linked) {
-    if (linked.disabledAt || !passwordlessAllowed(db, linked)) throw noAccount();
-    return linked;
-  }
-  const matches = db
-    .select()
-    .from(users)
-    .where(and(sql`lower(${users.email}) = ${claims.email}`, isNull(users.disabledAt), isNull(users.googleSub)))
-    .all()
-    .filter((u) => passwordlessAllowed(db, u));
-  if (matches.length === 0) throw noAccount();
-  // Several accounts may share an address (D-108); Google cannot say which one is meant.
-  if (matches.length > 1) throw ambiguous();
-  return matches[0]!;
-}
-
-
-export async function completeGoogleSignIn(deps: AppDeps, cookie: string | undefined, input: { state: string; code: string }) {
+export async function completeGoogleSignIn(deps: AppDeps, cookie: string | undefined, input: { state: string; code: string }): Promise<ProviderResult> {
   if (!googleSignInEnabled(deps)) throw notAvailable();
   const pending = openPending(deps, cookie);
   if (!pending || pending.exp < deps.now() || !timingSafeEqualStr(pending.state, input.state)) throw failed();
@@ -183,31 +172,11 @@ export async function completeGoogleSignIn(deps: AppDeps, cookie: string | undef
   }
   const claims = readIdToken((reply as { id_token?: unknown } | null)?.id_token, { clientId: deps.config.GOOGLE_SIGNIN_CLIENT_ID, nonce: pending.nonce, now: deps.now() });
   if (!claims) throw failed();
-  return tx(deps.db, () => {
-    const now = deps.now();
-    const user = findAccount(deps.db, claims);
-    const actor = actorFor(user);
-    const patch: Partial<UserRow> = {};
-    if (user.googleSub === null) {
-      patch.googleSub = claims.sub;
-      audit(deps.db, actor, { action: 'auth.google_linked', entity: 'user', entityId: user.id }, now);
-    }
-    // Google proved the address on the account (for a linked account the address may have been left as it was).
-    if (user.emailVerifiedAt === null && user.email?.toLowerCase() === claims.email) patch.emailVerifiedAt = now;
-    if (passwordNotSet(user)) {
-      patch.signInMethod = 'email_link';
-      patch.mustChangePassword = false;
-      deps.db
-        .update(oneTimeTokens)
-        .set({ usedAt: now })
-        .where(and(eq(oneTimeTokens.kind, 'invite'), eq(oneTimeTokens.userId, user.id), isNull(oneTimeTokens.usedAt), isNull(oneTimeTokens.revokedAt)))
-        .run();
-      invalidateResetTokens(deps.db, user.id, now);
-      audit(deps.db, actor, { action: 'auth.invite_accept', entity: 'user', entityId: user.id, after: { method: 'google', emailVerified: true } }, now);
-    }
-    if (Object.keys(patch).length) deps.db.update(users).set({ ...patch, updatedAt: now }).where(eq(users.id, user.id)).run();
-    const s = createSession(deps, { kind: 'user', userId: user.id }, now, SESSION_ABSOLUTE_MS, 'google');
-    audit(deps.db, actor, { action: 'auth.login', entity: 'user', entityId: user.id, after: { method: 'google' } }, now);
-    return { user: deps.db.select().from(users).where(eq(users.id, user.id)).get()!, session: s.session, token: s.token };
-  });
+  return finishProviderSignIn(deps, GOOGLE, claims);
+}
+
+/** The person chose one of the accounts listed after a Google sign-in (D-216). */
+export function chooseGoogleAccount(deps: AppDeps, cookie: string | undefined, userId: string, spent: () => void) {
+  if (!googleSignInEnabled(deps)) throw notAvailable();
+  return chooseProviderAccount(deps, GOOGLE, cookie, userId, spent);
 }

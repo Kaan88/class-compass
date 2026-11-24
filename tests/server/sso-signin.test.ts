@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { users } from '../../src/server/db/schema.ts';
 import { loadConfig } from '../../src/server/config.ts';
-import { forgetSsoDiscovery, SSO_COOKIE, SSO_ICON_MAX_BYTES } from '../../src/server/modules/auth/sso.ts';
+import { forgetSsoDiscovery, SSO_CHOICE_COOKIE, SSO_COOKIE, SSO_ICON_MAX_BYTES } from '../../src/server/modules/auth/sso.ts';
 import { Client, FakeMailer, makeEnv, TEST_ORIGIN, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok } from '../school-fixture.ts';
 
@@ -207,7 +207,7 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     expect(count('select count(*) n from users where sso_sub is not null')).toBe(1);
   });
 
-  it('never makes an account: unknown, deactivated and shared addresses are refused; a changed address clears the id', async () => {
+  it('never makes an account: unknown and deactivated addresses are refused; a changed address clears the id', async () => {
     const { s, fake } = await school();
     expect(reason((await signIn(fake, standard('stranger@mail.demo.example', 'x'))).r)).toBe('SSO_NO_ACCOUNT');
     expect((await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'))).r.status).toBe(200);
@@ -216,9 +216,7 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     expect(reason((await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'))).r)).toBe('SSO_NO_ACCOUNT');
     await ok(s.admin.post(`/api/admin/users/${s.ayse.id}/deactivate`));
     expect(reason((await signIn(fake, standard('ayse.new@mail.demo.example', 'acct-ayse'))).r)).toBe('SSO_NO_ACCOUNT');
-    await ok(s.admin.post('/api/admin/users', { login: 'root.second', displayName: 'İkinci Yönetici', role: 'admin', email: 'root@mail.demo.example', setup: 'temporary_password' }));
-    expect(reason((await signIn(fake, standard('root@mail.demo.example', 'acct-17'))).r)).toBe('SSO_AMBIGUOUS');
-    expect(count('select count(*) n from users')).toBe(4);
+    expect(count('select count(*) n from users')).toBe(3);
   });
 
   it('an invited person may use it straight away: the invite counts as used, no password; it counts as re-authentication', async () => {
@@ -345,5 +343,100 @@ describe('the operator’s own sign-in server (S34, D-213)', () => {
     const after = new Client(env);
     await after.login('new.admin', 'chosen-password-123');
     expect((await ok(after.get('/api/auth/me'))).passwordNotSet).toBe(false);
+  });
+});
+
+describe('one proven address, several accounts: the person chooses (S36, D-216)', () => {
+  const sub = (id: string) => env.db.select().from(users).where(eq(users.id, id)).get()!.ssoSub;
+  const choose = (c: Client, userId: string) => c.post('/api/auth/sso/choose', { userId });
+  const another = async (s: Awaited<ReturnType<typeof school>>['s'], login: string, role: 'teacher' | 'admin' = 'admin', email = 'root@mail.demo.example') =>
+    (await ok(s.admin.post('/api/admin/users', { login, displayName: `Yönetici ${login}`, role, email, setup: 'temporary_password' }))).user as { id: string };
+
+  it('lists the accounts by name and role only, administrators with a password too; each choice links the id; the list comes again', async () => {
+    const { s, fake } = await school();
+    // The same person as a teacher too, and somebody else's provider account on the address.
+    const teacher = await another(s, 'root.teacher', 'teacher');
+    const other = await another(s, 'root.other');
+    env.db.update(users).set({ ssoSub: 'acct-somebody-else' }).where(eq(users.id, other.id)).run();
+
+    const first = await signIn(fake, standard('root@mail.demo.example', 'acct-17'));
+    expect(first.r.status).toBe(200);
+    expect(Object.keys(first.r.body)).toEqual(['choose']);
+    expect(first.r.body.choose).toHaveLength(2);
+    expect(first.r.body.choose).toEqual(
+      expect.arrayContaining([
+        { id: s.adminUser.id, displayName: s.adminUser.displayName, role: 'admin' },
+        { id: teacher.id, displayName: 'Yönetici root.teacher', role: 'teacher' },
+      ]),
+    );
+    expect(JSON.stringify(first.r.body)).not.toContain('mail.demo.example');
+    expect((await first.c.get('/api/auth/me')).status).toBe(401);
+    const setCookie = String(first.r.headers['set-cookie']);
+    expect(setCookie).toMatch(new RegExp(`${SSO_CHOICE_COOKIE}=[^;]+;[^,]*Max-Age=300`, 'u'));
+    expect(setCookie).toMatch(/HttpOnly/iu);
+    expect(setCookie).toContain('Path=/api/auth/sso');
+
+    const asAdmin = await choose(first.c, s.adminUser.id);
+    expect(asAdmin.body).toMatchObject({ id: s.adminUser.id, role: 'admin', signInMethod: 'password', reauthFresh: true });
+    expect((await first.c.get('/api/admin/users')).status).toBe(200);
+    expect(first.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+    expect(sub(s.adminUser.id)).toBe('acct-17');
+    expect(count("select count(*) n from audit_events where action = 'auth.login' and entity_id = ? and after_json like '%sso%'", s.adminUser.id)).toBe(1);
+    expect(reason(await choose(first.c, s.adminUser.id))).toBe('SSO_SIGNIN_FAILED');
+
+    const next = await signIn(fake, standard('root@mail.demo.example', 'acct-17'));
+    expect(next.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.adminUser.id, teacher.id].sort());
+    expect((await ok(choose(next.c, teacher.id))).role).toBe('teacher');
+    expect(sub(teacher.id)).toBe('acct-17');
+    expect(audits('auth.sso_linked')).toBe(2);
+    // Both linked: the list again, also when the provider names another address now.
+    const later = await signIn(fake, standard('renamed@mail.demo.example', 'acct-17'));
+    expect(later.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.adminUser.id, teacher.id].sort());
+    expect(sub(other.id)).toBe('acct-somebody-else');
+  });
+
+  it('refuses a choice without the cookie, with an expired or tampered one, with another browser’s, or for an account not on the list', async () => {
+    const { s, fake } = await school();
+    const two = await another(s, 'root.second');
+    const ayseTwo = await another(s, 'ayse.second', 'teacher', 'ayse@mail.demo.example');
+
+    expect(reason(await choose(new Client(env), s.adminUser.id))).toBe('SSO_SIGNIN_FAILED');
+    const mine = await signIn(fake, standard('ayse@mail.demo.example', 'acct-ayse'));
+    expect(mine.r.body.choose).toHaveLength(2);
+    expect(reason(await choose(mine.c, s.adminUser.id))).toBe('SSO_SIGNIN_FAILED');
+    expect(reason(await choose(mine.c, two.id))).toBe('SSO_SIGNIN_FAILED');
+    expect(mine.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(true);
+    expect((await ok(choose(mine.c, ayseTwo.id))).id).toBe(ayseTwo.id);
+    const tampered = await signIn(fake, standard('root@mail.demo.example', 'acct-17'));
+    const value = tampered.c.cookies.get(SSO_CHOICE_COOKIE)!;
+    tampered.c.cookies.set(SSO_CHOICE_COOKIE, `${value.slice(0, -6)}AAAAAA`);
+    expect(reason(await choose(tampered.c, two.id))).toBe('SSO_SIGNIN_FAILED');
+    expect(tampered.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+    // Five minutes are the limit.
+    const slow = await signIn(fake, standard('root@mail.demo.example', 'acct-17'));
+    env.clock.advance(5 * 60_000 + 1000);
+    expect(reason(await choose(slow.c, two.id))).toBe('SSO_SIGNIN_FAILED');
+    expect(slow.c.cookies.has(SSO_CHOICE_COOKIE)).toBe(false);
+    expect(count('select count(*) n from users where sso_sub = ?', 'acct-17')).toBe(0);
+  });
+
+  it('checks the chosen account again: deactivated or given another address since the list, it is refused', async () => {
+    const { s, fake } = await school();
+    const two = await another(s, 'root.second');
+    const three = await another(s, 'root.third');
+    const listed = await signIn(fake, standard('root@mail.demo.example', 'acct-17'));
+    expect(listed.r.body.choose).toHaveLength(3);
+    await ok(s.admin.post(`/api/admin/users/${two.id}/deactivate`));
+    expect(reason(await choose(listed.c, two.id))).toBe('SSO_NO_ACCOUNT');
+    await ok(s.admin.patch(`/api/admin/users/${three.id}`, { email: 'third@mail.demo.example' }));
+    expect(reason(await choose(listed.c, three.id))).toBe('SSO_NO_ACCOUNT');
+    expect((await listed.c.get('/api/auth/me')).status).toBe(401);
+    expect(count('select count(*) n from users where sso_sub is not null')).toBe(0);
+    expect((await ok(choose(listed.c, s.adminUser.id))).id).toBe(s.adminUser.id);
+  });
+
+  it('is not offered when the sign-in server is not set up', async () => {
+    await school({});
+    expect(reason(await new Client(env).post('/api/auth/sso/choose', { userId: 'u-1' }))).toBe('SSO_NOT_AVAILABLE');
   });
 });

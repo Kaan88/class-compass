@@ -15,6 +15,7 @@ import { errorText } from '../lib/errors.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from '../ui/Button.tsx';
 import { Alert } from '../ui/Feedback.tsx';
+import { AccountChooser, type AccountChoice } from './AccountChooser.tsx';
 import { AuthCard } from './AuthCard.tsx';
 import { LinkDeadEnd, useSignedIn } from './SignIn.tsx';
 
@@ -63,6 +64,8 @@ export function GoogleReturnPage({ state, code, denied }: { state: string | unde
   const { t } = useI18n();
   const signedIn = useSignedIn();
   const [error, setError] = useState<string | null>(null);
+  // Several accounts with the proven address (D-216): the person chooses one.
+  const [choices, setChoices] = useState<AccountChoice[] | null>(null);
   // The code works once: one request, also when React runs the effect twice in development.
   const sent = useRef(false);
   useEffect(() => {
@@ -73,7 +76,10 @@ export function GoogleReturnPage({ state, code, denied }: { state: string | unde
       setError(t(denied ? 'google.cancelled' : 'error.GOOGLE_SIGNIN_FAILED'));
       return;
     }
-    call(Auth.completeGoogleSignIn, { state, code }).then(signedIn, (err: unknown) => setError(errorText(t, err)));
+    call(Auth.completeGoogleSignIn, { state, code }).then(
+      (r) => ('choose' in r ? setChoices(r.choose) : signedIn(r)),
+      (err: unknown) => setError(errorText(t, err)),
+    );
     // Once per arrival: the values came from the address that was just cleared.
   }, []);
   return (
@@ -83,6 +89,15 @@ export function GoogleReturnPage({ state, code, denied }: { state: string | unde
           <Alert>{error}</Alert>
           <LinkDeadEnd to="email-link" label={t('signin.emailMe')} />
         </>
+      ) : choices ? (
+        <AccountChooser
+          accounts={choices}
+          endpoint={Auth.chooseGoogleAccount}
+          onError={(err) => {
+            setChoices(null);
+            setError(errorText(t, err));
+          }}
+        />
       ) : (
         <p className="cc-muted">{t('common.loading')}</p>
       )}

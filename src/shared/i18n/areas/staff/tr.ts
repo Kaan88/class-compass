@@ -2177,6 +2177,8 @@ export const tr = {
   'sso.signIn': '{name} ile giriş yap',
   'sso.title': 'Giriş yapılıyor',
   'sso.cancelled': 'Giriş iptal edildi.',
+  'signin.chooseAccount': 'Bu adres birden fazla hesaba ait. Hangisiyle devam etmek istiyorsunuz?',
+  'signin.chooseAccount.option': '{name}, {role}',
   'users.methodGoogle': 'Google ile giriş kullanıldı',
   'users.passkeys': 'Geçiş anahtarı: {count}',
   'users.removePasskeys': 'Geçiş anahtarlarını kaldır',

@@ -232,6 +232,19 @@ export const completeEmailCode = endpoint({
 
 // ---------------------------------------------------------------- Sign in with Google (S31, D-208)
 /**
+ * S36 (D-216): the proven address belongs to several accounts the person may be (D-108). Nothing is
+ * signed in; the page lets the person choose. Only the name and the role of each account: no login
+ * name, no address.
+ */
+export const ChooseAccount = z.object({
+  choose: z.array(z.object({ id: z.string(), displayName: z.string(), role: z.enum(['admin', 'teacher']) })).min(2),
+});
+/** A finished provider sign-in: signed in, or the accounts to choose from. */
+export const ProviderSignInResult = z.union([ChooseAccount, Me]);
+/** The account chosen from the list; the proof comes from the short-lived cookie the list set. */
+const ChooseInput = z.object({ userId: z.string().min(1).max(100) });
+
+/**
  * Where to send the browser. Also sets a short-lived HttpOnly cookie that binds Google's answer to this
  * browser. Teachers only; nothing about any account is revealed.
  */
@@ -243,14 +256,20 @@ export const startGoogleSignIn = endpoint({
   output: z.object({ authorizeUrl: z.string() }),
 });
 
-/** The `state` and `code` Google sent back to `/signin-google`, posted by that page (a GET never uses a code). */
+/**
+ * The `state` and `code` Google sent back to `/signin-google`, posted by that page (a GET never uses a
+ * code). Several accounts with the proven address: the list to choose from, and a 5-minute cookie (D-216).
+ */
 export const completeGoogleSignIn = endpoint({
   method: 'POST',
   path: '/api/auth/google/complete',
   access: 'public',
   input: z.object({ state: z.string().min(20).max(200), code: z.string().min(1).max(2000) }),
-  output: Me,
+  output: ProviderSignInResult,
 });
+
+/** One of the accounts `completeGoogleSignIn` listed (D-216); works once. */
+export const chooseGoogleAccount = endpoint({ method: 'POST', path: '/api/auth/google/choose', access: 'public', input: ChooseInput, output: Me });
 
 // ---------------------------------------------------------------- the operator's own sign-in server (S34, D-213)
 /** Where to send the browser; sets the short-lived HttpOnly cookie that binds the answer to this browser. Any role. */
@@ -262,14 +281,17 @@ export const startSsoSignIn = endpoint({
   output: z.object({ authorizeUrl: z.string() }),
 });
 
-/** The `state` and `code` the provider sent back to `/signin-sso`, posted by that page (a GET never uses a code). */
+/** The `state` and `code` the provider sent back to `/signin-sso`, posted by that page; as Google's, it may answer a list (D-216). */
 export const completeSsoSignIn = endpoint({
   method: 'POST',
   path: '/api/auth/sso/complete',
   access: 'public',
   input: z.object({ state: z.string().min(20).max(200), code: z.string().min(1).max(4000) }),
-  output: Me,
+  output: ProviderSignInResult,
 });
+
+/** One of the accounts `completeSsoSignIn` listed (D-216); works once. */
+export const chooseSsoAccount = endpoint({ method: 'POST', path: '/api/auth/sso/choose', access: 'public', input: ChooseInput, output: Me });
 
 /** The button's icon (a small image file the operator put in the data folder); 404 when there is none. */
 export const ssoIcon = endpoint({ method: 'GET', path: '/api/auth/sso/icon', access: 'public', input: Empty, output: z.unknown() });

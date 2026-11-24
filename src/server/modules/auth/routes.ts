@@ -16,6 +16,7 @@ import * as svc from './service.ts';
 import * as email from './emailSignIn.ts';
 import * as google from './google.ts';
 import * as passkey from './passkeys.ts';
+import { CHOICE_TTL_MS, type ProviderResult } from './providerSignIn.ts';
 import * as sso from './sso.ts';
 
 function setSessionCookie(deps: AppDeps, reply: FastifyReply, token: string, maxAgeMs: number) {
@@ -126,6 +127,12 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     setSessionCookie(deps, reply, r.token, svc.SESSION_ABSOLUTE_MS);
     return svc.toMe(ctx.db, r.user, r.session, ctx.now());
   };
+  // Google or the sign-in server proved the person: signed in, or several accounts to choose from (D-216).
+  const providerFinished = (ctx: RequestContext, reply: FastifyReply, r: ProviderResult, choiceCookie: string, cookieOptions: { path: string; httpOnly: boolean; secure: boolean; sameSite: 'lax' }) => {
+    if (r.kind === 'signed_in') return signedIn(ctx, reply, r.signedIn);
+    reply.setCookie(choiceCookie, r.cookie, { ...cookieOptions, maxAge: Math.floor(CHOICE_TTL_MS / 1000) });
+    return { choose: r.choose };
+  };
   route(app, deps, C.inspectInvite, (ctx, input) => email.inspectInvite(ctx, input.token), { rateLimit: { max: 30, timeWindow: '15 minutes' } });
   route(
     app,
@@ -211,7 +218,19 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     async (ctx, input, { req, reply }) => {
       // One try per start: the cookie goes whether or not the sign-in works.
       reply.clearCookie(google.GOOGLE_COOKIE, googleCookie);
-      return signedIn(ctx, reply, await google.completeGoogleSignIn(ctx, req.cookies?.[google.GOOGLE_COOKIE], input));
+      return providerFinished(ctx, reply, await google.completeGoogleSignIn(ctx, req.cookies?.[google.GOOGLE_COOKIE], input), google.GOOGLE_CHOICE_COOKIE, googleCookie);
+    },
+    { rateLimit: { max: 20, timeWindow: '15 minutes' } },
+  );
+  route(
+    app,
+    deps,
+    C.chooseGoogleAccount,
+    (ctx, input, { req, reply }) => {
+      const spent = () => reply.clearCookie(google.GOOGLE_CHOICE_COOKIE, googleCookie);
+      const r = google.chooseGoogleAccount(ctx, req.cookies?.[google.GOOGLE_CHOICE_COOKIE], input.userId, spent);
+      spent();
+      return signedIn(ctx, reply, r);
     },
     { rateLimit: { max: 20, timeWindow: '15 minutes' } },
   );
@@ -234,7 +253,19 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     C.completeSsoSignIn,
     async (ctx, input, { req, reply }) => {
       reply.clearCookie(sso.SSO_COOKIE, ssoCookie);
-      return signedIn(ctx, reply, await sso.completeSsoSignIn(ctx, req.cookies?.[sso.SSO_COOKIE], input));
+      return providerFinished(ctx, reply, await sso.completeSsoSignIn(ctx, req.cookies?.[sso.SSO_COOKIE], input), sso.SSO_CHOICE_COOKIE, ssoCookie);
+    },
+    { rateLimit: { max: 20, timeWindow: '15 minutes' } },
+  );
+  route(
+    app,
+    deps,
+    C.chooseSsoAccount,
+    (ctx, input, { req, reply }) => {
+      const spent = () => reply.clearCookie(sso.SSO_CHOICE_COOKIE, ssoCookie);
+      const r = sso.chooseSsoAccount(ctx, req.cookies?.[sso.SSO_CHOICE_COOKIE], input.userId, spent);
+      spent();
+      return signedIn(ctx, reply, r);
     },
     { rateLimit: { max: 20, timeWindow: '15 minutes' } },
   );

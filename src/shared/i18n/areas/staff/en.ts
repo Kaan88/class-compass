@@ -2180,6 +2180,8 @@ export const en = {
   'sso.signIn': 'Sign in with {name}',
   'sso.title': 'Signing in',
   'sso.cancelled': 'The sign-in was cancelled.',
+  'signin.chooseAccount': 'This address belongs to more than one account. Which one?',
+  'signin.chooseAccount.option': '{name}, {role}',
   'users.methodGoogle': 'Google sign-in used',
   'users.passkeys': 'Passkeys: {count}',
   'users.removePasskeys': 'Remove passkeys',

@@ -17,8 +17,10 @@
  * signature is not checked again (OpenID Connect Core 3.1.3.7, as for Google); its issuer, audience,
  * expiry, nonce and address are. `email_verified` must be true unless `SSO_TRUST_EMAIL` says that this
  * provider only ever names addresses it owns (a mail server naming its own mailboxes sends no such
- * claim), and `SSO_EMAIL_DOMAINS` can limit the addresses it may vouch for. Matching is by the provider's permanent id (`users.sso_sub`) once known, before that by the
- * address, which must belong to exactly one active account. No provider token is kept.
+ * claim), and `SSO_EMAIL_DOMAINS` can limit the addresses it may vouch for. The accounts that match are
+ * every active account that carries the provider's permanent id (`users.sso_sub`), or has the address and
+ * no id from it yet; several (one person's accounts sharing an address, D-108) are offered as a list to
+ * choose from (`providerSignIn.ts`, S36, D-216). No provider token is kept.
  *
  * The icon the sign-in page shows is a file in the data folder (`SSO_ICON_FILE`), never part of the
  * repository; it is served as an image only.
@@ -26,20 +28,17 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { tx, type Db } from '../../db/client.ts';
-import { oneTimeTokens, users } from '../../db/schema.ts';
-import { audit } from '../../lib/audit.ts';
-import type { AppDeps, UserRow } from '../../lib/context.ts';
+import type { AppDeps } from '../../lib/context.ts';
 import { openSecret, randomToken, sealSecret, timingSafeEqualStr } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
-import { actorFor, createSession, invalidateResetTokens, passwordNotSet, SESSION_ABSOLUTE_MS } from './service.ts';
-import { passwordlessAllowed } from './signInPolicy.ts';
+import { chooseProviderAccount, finishProviderSignIn, type Provider, type ProviderResult } from './providerSignIn.ts';
 
 export const SSO_RETURN_PATH = '/signin-sso';
 export const SSO_COOKIE = 'cc_sso_signin';
 export const SSO_COOKIE_PATH = '/api/auth/sso';
 export const SSO_STATE_TTL_MS = 10 * 60_000;
+/** Holds the proof while the person chooses one of several accounts (D-216). */
+export const SSO_CHOICE_COOKIE = 'cc_sso_choice';
 export const SSO_ICON_MAX_BYTES = 100 * 1024;
 const DISCOVERY_TTL_MS = 60 * 60_000;
 const CLOCK_SKEW_MS = 5 * 60_000;
@@ -103,7 +102,17 @@ const notAvailable = () => new AppError('FEATURE_DISABLED', 'This sign-in is not
 /** The request does not belong to this browser, is too old, or the provider did not accept it: start again. */
 const failed = () => new AppError('UNAUTHENTICATED', 'The sign-in did not work. Try again.', { reason: 'SSO_SIGNIN_FAILED' });
 const noAccount = () => new AppError('UNAUTHENTICATED', 'No account uses this address', { reason: 'SSO_NO_ACCOUNT' });
-const ambiguous = () => new AppError('UNAUTHENTICATED', 'Several accounts use this address', { reason: 'SSO_AMBIGUOUS' });
+
+/** Any account may use it (D-213). */
+const SSO: Provider = {
+  key: 'sso',
+  subField: 'ssoSub',
+  linkedAction: 'auth.sso_linked',
+  eligible: () => true,
+  choicePurpose: 'sso-choice',
+  noAccount,
+  failed,
+};
 
 const redirectUri = (deps: Pick<AppDeps, 'config'>) => `${deps.config.origins.main}${SSO_RETURN_PATH}`;
 
@@ -240,25 +249,7 @@ export function readSsoIdToken(idToken: unknown, expect: { issuer: string; clien
   return { sub, email };
 }
 
-function findAccount(db: Db, claims: IdClaims): UserRow {
-  const linked = db.select().from(users).where(eq(users.ssoSub, claims.sub)).get();
-  if (linked) {
-    if (linked.disabledAt) throw noAccount();
-    return linked;
-  }
-  const matches = db
-    .select()
-    .from(users)
-    .where(and(sql`lower(${users.email}) = ${claims.email}`, isNull(users.disabledAt), isNull(users.ssoSub)))
-    .all();
-  if (matches.length === 0) throw noAccount();
-  // Several accounts may share an address (D-108); the provider cannot say which one is meant.
-  if (matches.length > 1) throw ambiguous();
-  return matches[0]!;
-}
-
-
-export async function completeSsoSignIn(deps: AppDeps, cookie: string | undefined, input: { state: string; code: string }) {
+export async function completeSsoSignIn(deps: AppDeps, cookie: string | undefined, input: { state: string; code: string }): Promise<ProviderResult> {
   const issuer = issuerOf(deps.config);
   if (!issuer) throw notAvailable();
   const pending = openPending(deps, cookie);
@@ -274,33 +265,11 @@ export async function completeSsoSignIn(deps: AppDeps, cookie: string | undefine
   }
   const claims = readSsoIdToken((reply as { id_token?: unknown } | null)?.id_token, { issuer, clientId: deps.config.SSO_CLIENT_ID, nonce: pending.nonce, now: deps.now(), trustEmail: deps.config.SSO_TRUST_EMAIL, domains: ssoDomains(deps.config) });
   if (!claims) throw failed();
-  return tx(deps.db, () => {
-    const now = deps.now();
-    const user = findAccount(deps.db, claims);
-    const actor = actorFor(user);
-    const patch: Partial<UserRow> = {};
-    if (user.ssoSub === null) {
-      patch.ssoSub = claims.sub;
-      audit(deps.db, actor, { action: 'auth.sso_linked', entity: 'user', entityId: user.id }, now);
-    }
-    if (user.emailVerifiedAt === null && user.email?.toLowerCase() === claims.email) patch.emailVerifiedAt = now;
-    // An open invite counts as used, as with Google, but only for an account that may be without a password
-    // (a teacher, or anyone while passwords are off). An invited administrator while passwords are on is
-    // signed in and keeps the invite: opening it is still how that account chooses its password (D-108).
-    if (passwordNotSet(user) && passwordlessAllowed(deps.db, user)) {
-      patch.signInMethod = 'email_link';
-      patch.mustChangePassword = false;
-      deps.db
-        .update(oneTimeTokens)
-        .set({ usedAt: now })
-        .where(and(eq(oneTimeTokens.kind, 'invite'), eq(oneTimeTokens.userId, user.id), isNull(oneTimeTokens.usedAt), isNull(oneTimeTokens.revokedAt)))
-        .run();
-      invalidateResetTokens(deps.db, user.id, now);
-      audit(deps.db, actor, { action: 'auth.invite_accept', entity: 'user', entityId: user.id, after: { method: 'sso', emailVerified: true } }, now);
-    }
-    if (Object.keys(patch).length) deps.db.update(users).set({ ...patch, updatedAt: now }).where(eq(users.id, user.id)).run();
-    const s = createSession(deps, { kind: 'user', userId: user.id }, now, SESSION_ABSOLUTE_MS, 'sso');
-    audit(deps.db, actor, { action: 'auth.login', entity: 'user', entityId: user.id, after: { method: 'sso' } }, now);
-    return { user: deps.db.select().from(users).where(eq(users.id, user.id)).get()!, session: s.session, token: s.token };
-  });
+  return finishProviderSignIn(deps, SSO, claims);
+}
+
+/** The person chose one of the accounts listed after a sign-in here (D-216). */
+export function chooseSsoAccount(deps: AppDeps, cookie: string | undefined, userId: string, spent: () => void) {
+  if (!ssoEnabled(deps)) throw notAvailable();
+  return chooseProviderAccount(deps, SSO, cookie, userId, spent);
 }

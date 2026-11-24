@@ -16,6 +16,7 @@ import { errorText } from '../lib/errors.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { Button } from '../ui/Button.tsx';
 import { Alert } from '../ui/Feedback.tsx';
+import { AccountChooser, type AccountChoice } from './AccountChooser.tsx';
 import { AuthCard } from './AuthCard.tsx';
 import { LinkDeadEnd, useSignedIn } from './SignIn.tsx';
 
@@ -58,6 +59,8 @@ export function SsoReturnPage({ state, code, denied }: { state: string | undefin
   const { t } = useI18n();
   const signedIn = useSignedIn();
   const [error, setError] = useState<string | null>(null);
+  // Several accounts with the proven address (D-216): the person chooses one.
+  const [choices, setChoices] = useState<AccountChoice[] | null>(null);
   // The code works once: one request, also when React runs the effect twice in development.
   const sent = useRef(false);
   useEffect(() => {
@@ -68,7 +71,10 @@ export function SsoReturnPage({ state, code, denied }: { state: string | undefin
       setError(t(denied ? 'sso.cancelled' : 'error.SSO_SIGNIN_FAILED'));
       return;
     }
-    call(Auth.completeSsoSignIn, { state, code }).then(signedIn, (err: unknown) => setError(errorText(t, err)));
+    call(Auth.completeSsoSignIn, { state, code }).then(
+      (r) => ('choose' in r ? setChoices(r.choose) : signedIn(r)),
+      (err: unknown) => setError(errorText(t, err)),
+    );
     // Once per arrival: the values came from the address that was just cleared.
   }, []);
   return (
@@ -78,6 +84,15 @@ export function SsoReturnPage({ state, code, denied }: { state: string | undefin
           <Alert>{error}</Alert>
           <LinkDeadEnd to="email-link" label={t('signin.emailMe')} />
         </>
+      ) : choices ? (
+        <AccountChooser
+          accounts={choices}
+          endpoint={Auth.chooseSsoAccount}
+          onError={(err) => {
+            setChoices(null);
+            setError(errorText(t, err));
+          }}
+        />
       ) : (
         <p className="cc-muted">{t('common.loading')}</p>
       )}

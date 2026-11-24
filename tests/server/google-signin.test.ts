@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { users } from '../../src/server/db/schema.ts';
-import { GOOGLE_AUTHORIZE_URL, GOOGLE_COOKIE } from '../../src/server/modules/auth/google.ts';
+import { GOOGLE_AUTHORIZE_URL, GOOGLE_CHOICE_COOKIE, GOOGLE_COOKIE } from '../../src/server/modules/auth/google.ts';
 import { Client, FakeMailer, makeEnv, TEST_ORIGIN, type TestEnv } from '../helpers.ts';
 import { buildSchool, ok } from '../school-fixture.ts';
 
@@ -169,16 +169,13 @@ describe('Sign in with Google (S31, D-208)', () => {
     expect(count('select count(*) n from users where google_sub is not null')).toBe(0);
   });
 
-  it('never makes an account: unknown and deactivated addresses, administrators with a password and shared addresses are refused', async () => {
+  it('never makes an account: unknown and deactivated addresses and administrators with a password are refused', async () => {
     const { s } = await school();
     expect(reason((await googleSignIn(standard('stranger@elsewhere.example', 'g-x'))).r)).toBe('GOOGLE_NO_ACCOUNT');
     expect(reason((await googleSignIn(standard('root@school.example', 'g-root'))).r)).toBe('GOOGLE_NO_ACCOUNT');
     await ok(s.admin.post(`/api/admin/users/${s.mehmet.id}/deactivate`));
     expect(reason((await googleSignIn(standard('mehmet@school.example', 'g-m'))).r)).toBe('GOOGLE_NO_ACCOUNT');
-    // Two accounts with one address (D-108 allows it): Google cannot say which one is meant.
-    await ok(s.admin.post('/api/admin/users', { login: 'ayse.second', displayName: 'Ayşe İkinci', role: 'teacher', email: 'ayse@school.example', setup: 'temporary_password' }));
-    expect(reason((await googleSignIn(standard('ayse@school.example', 'g-a'))).r)).toBe('GOOGLE_AMBIGUOUS');
-    expect(count('select count(*) n from users')).toBe(4);
+    expect(count('select count(*) n from users')).toBe(3);
     expect(count('select count(*) n from users where google_sub is not null')).toBe(0);
   });
 
@@ -216,5 +213,140 @@ describe('Sign in with Google (S31, D-208)', () => {
     const { c, r } = await googleSignIn(standard('root@school.example', 'g-root'));
     expect(r.body).toMatchObject({ id: s.adminUser.id, role: 'admin', signInMethod: 'email_link' });
     expect((await c.get('/api/admin/users')).status).toBe(200);
+  });
+});
+
+describe('one proven address, several accounts: the person chooses (S36, D-216)', () => {
+  const sub = (id: string) => env.db.select().from(users).where(eq(users.id, id)).get()!.googleSub;
+  const choose = (c: Client, userId: string) => c.post('/api/auth/google/choose', { userId });
+  /** Another account on an address (D-108 allows it). */
+  const another = async (s: Awaited<ReturnType<typeof school>>['s'], login: string, role: 'teacher' | 'admin' = 'teacher', email = 'ayse@school.example') =>
+    (await ok(s.admin.post('/api/admin/users', { login, displayName: `Ayşe ${login}`, role, email, setup: 'temporary_password' }))).user as { id: string };
+
+  it('lists the accounts by name and role only; choosing one signs it in and links the id, so both end up with it; the list comes again', async () => {
+    const { s } = await school();
+    const two = await another(s, 'ayse.second');
+    // A third account with the address that is linked to another Google account is not this person's.
+    const other = await another(s, 'ayse.other');
+    env.db.update(users).set({ googleSub: 'g-somebody-else' }).where(eq(users.id, other.id)).run();
+
+    const first = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    expect(first.r.status).toBe(200);
+    expect(first.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.ayse.id, two.id].sort());
+    for (const a of first.r.body.choose) expect(Object.keys(a).sort()).toEqual(['displayName', 'id', 'role']);
+    expect(first.r.body.choose.find((a: any) => a.id === two.id)).toEqual({ id: two.id, displayName: 'Ayşe ayse.second', role: 'teacher' });
+    expect(Object.keys(first.r.body)).toEqual(['choose']);
+    expect(JSON.stringify(first.r.body)).not.toContain('school.example');
+    // Nothing is signed in or linked yet; the proof waits in a short-lived HttpOnly cookie.
+    expect((await first.c.get('/api/auth/me')).status).toBe(401);
+    expect(count('select count(*) n from users where google_sub = ?', 'g-ayse')).toBe(0);
+    expect(count("select count(*) n from audit_events where action = 'auth.login' and after_json like '%google%'")).toBe(0);
+    const setCookie = String(first.r.headers['set-cookie']);
+    expect(setCookie).toMatch(new RegExp(`${GOOGLE_CHOICE_COOKIE}=[^;]+;[^,]*Max-Age=300`, 'u'));
+    expect(setCookie).toMatch(/HttpOnly/iu);
+    expect(setCookie).toMatch(/SameSite=Lax/iu);
+    expect(setCookie).toContain('Path=/api/auth/google');
+    expect(first.c.cookies.get(GOOGLE_CHOICE_COOKIE)).not.toContain('g-ayse');
+
+    const chosen = await choose(first.c, two.id);
+    expect(chosen.status).toBe(200);
+    expect(chosen.body).toMatchObject({ id: two.id, role: 'teacher', reauthFresh: true });
+    expect((await ok(first.c.get('/api/auth/me'))).id).toBe(two.id);
+    expect(first.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
+    expect(sub(two.id)).toBe('g-ayse');
+    expect(sub(s.ayse.id)).toBeNull();
+    expect(count("select count(*) n from audit_events where action = 'auth.login' and entity_id = ? and after_json like '%google%'", two.id)).toBe(1);
+    expect(audits('auth.google_linked')).toBe(1);
+    // A choice works once.
+    expect(reason(await choose(first.c, two.id))).toBe('GOOGLE_SIGNIN_FAILED');
+
+    // Next time: Ayşe's first account by the address, the second by the id. Choosing the first links it too.
+    const next = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    expect(next.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.ayse.id, two.id].sort());
+    expect((await ok(choose(next.c, s.ayse.id))).id).toBe(s.ayse.id);
+    expect(sub(s.ayse.id)).toBe('g-ayse');
+    expect(sub(two.id)).toBe('g-ayse');
+    // Both linked: the list again, whatever address Google shows now.
+    const later = await googleSignIn(standard('renamed@elsewhere.example', 'g-ayse'));
+    expect(later.r.body.choose.map((a: any) => a.id).sort()).toEqual([s.ayse.id, two.id].sort());
+    expect(sub(other.id)).toBe('g-somebody-else');
+  });
+
+  it('with passwords on, an administrator who has a password is not offered, so the teacher signs in at once; with passwords off both are offered', async () => {
+    const { s, mailer } = await school();
+    const boss = await another(s, 'ayse.admin', 'admin');
+    const direct = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    expect(direct.r.body).toMatchObject({ id: s.ayse.id, role: 'teacher' });
+    expect(direct.r.body).not.toHaveProperty('choose');
+    expect(direct.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
+    await ok(s.admin.post('/api/admin/sign-in-policy/code'));
+    await ok(s.admin.put('/api/admin/sign-in-policy', { passwordsOff: true, code: codeFrom(mailer.sent.at(-1)!.text) }));
+    const listed = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    expect(listed.r.body.choose).toHaveLength(2);
+    expect(listed.r.body.choose).toEqual(
+      expect.arrayContaining([
+        { id: s.ayse.id, displayName: s.ayse.displayName, role: 'teacher' },
+        { id: boss.id, displayName: 'Ayşe ayse.admin', role: 'admin' },
+      ]),
+    );
+    expect((await ok(choose(listed.c, boss.id))).role).toBe('admin');
+    expect((await listed.c.get('/api/admin/users')).status).toBe(200);
+  });
+
+  it('refuses a choice without the cookie, with an expired or tampered one, with another browser’s, or for an account not on the list', async () => {
+    const { s } = await school();
+    const two = await another(s, 'ayse.second');
+    await ok(s.admin.patch(`/api/admin/users/${s.mehmet.id}`, { email: 'shared@school.example' }));
+    const mehmetTwo = await another(s, 'mehmet.second', 'teacher', 'shared@school.example');
+
+    expect(reason(await choose(new Client(env), s.ayse.id))).toBe('GOOGLE_SIGNIN_FAILED');
+    // Another browser with its own list (another address) cannot choose an account from Ayşe's.
+    const mine = await googleSignIn(standard('shared@school.example', 'g-mehmet'));
+    expect(mine.r.body.choose).toHaveLength(2);
+    expect(reason(await choose(mine.c, s.ayse.id))).toBe('GOOGLE_SIGNIN_FAILED');
+    expect(reason(await choose(mine.c, two.id))).toBe('GOOGLE_SIGNIN_FAILED');
+    // A wrong id leaves the cookie: the right button still works.
+    expect(mine.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(true);
+    expect((await ok(choose(mine.c, mehmetTwo.id))).id).toBe(mehmetTwo.id);
+    // A changed cookie is no proof, and is cleared.
+    const tampered = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    const value = tampered.c.cookies.get(GOOGLE_CHOICE_COOKIE)!;
+    tampered.c.cookies.set(GOOGLE_CHOICE_COOKIE, `${value.slice(0, -6)}AAAAAA`);
+    expect(reason(await choose(tampered.c, two.id))).toBe('GOOGLE_SIGNIN_FAILED');
+    expect(tampered.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
+    // Five minutes are the limit.
+    const slow = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    env.clock.advance(5 * 60_000 + 1000);
+    expect(reason(await choose(slow.c, two.id))).toBe('GOOGLE_SIGNIN_FAILED');
+    expect(slow.c.cookies.has(GOOGLE_CHOICE_COOKIE)).toBe(false);
+    expect(count('select count(*) n from users where google_sub = ?', 'g-ayse')).toBe(0);
+    expect((await slow.c.get('/api/auth/me')).status).toBe(401);
+  });
+
+  it('checks the chosen account again: deactivated or given another address since the list, it is refused', async () => {
+    const { s } = await school();
+    const two = await another(s, 'ayse.second');
+    const third = await another(s, 'ayse.third');
+    const listed = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    expect(listed.r.body.choose).toHaveLength(3);
+    await ok(s.admin.post(`/api/admin/users/${two.id}/deactivate`));
+    expect(reason(await choose(listed.c, two.id))).toBe('GOOGLE_NO_ACCOUNT');
+    await ok(s.admin.patch(`/api/admin/users/${third.id}`, { email: 'third@school.example' }));
+    expect(reason(await choose(listed.c, third.id))).toBe('GOOGLE_NO_ACCOUNT');
+    expect((await listed.c.get('/api/auth/me')).status).toBe(401);
+    expect(count('select count(*) n from users where google_sub is not null')).toBe(0);
+    // Still on the list and still a candidate: that one works.
+    expect((await ok(choose(listed.c, s.ayse.id))).id).toBe(s.ayse.id);
+  });
+
+  it('an invited account chosen from the list is handled as on a direct sign-in: the invite counts as used', async () => {
+    const { s, mailer } = await school();
+    const made = await ok(s.admin.post('/api/admin/users', { login: 'ayse.invited', displayName: 'Ayşe Davetli', role: 'teacher', email: 'ayse@school.example' }));
+    const invite = tokenFrom(mailer.sent.at(-1)!.text);
+    const listed = await googleSignIn(standard('ayse@school.example', 'g-ayse'));
+    expect(listed.r.body.choose).toHaveLength(2);
+    expect(await ok(choose(listed.c, made.user.id))).toMatchObject({ id: made.user.id, signInMethod: 'email_link' });
+    expect(reason(await new Client(env).post('/api/auth/invite/inspect', { token: invite }))).toBe('INVITE_INVALID');
+    expect(count("select count(*) n from audit_events where action = 'auth.invite_accept' and entity_id = ?", made.user.id)).toBe(1);
   });
 });

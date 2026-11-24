@@ -1502,6 +1502,25 @@ html:has(.cc-classroom) .cc-toaster[data-above-dock] .cc-toast {
 .cc-sso__letter {
   font-weight: 700;
 }
+/* S36 (D-216): one big button per account when a proven address belongs to several: the name, and the
+   role in words under it (never told apart by colour). */
+.cc-account-choice {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.15rem;
+  width: 100%;
+  padding-block: 0.5rem;
+  text-align: start;
+}
+.cc-account-choice__name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.cc-account-choice__role {
+  font-size: 1rem;
+  font-weight: 400;
+}
 /* The invite page shows the new username on its own, in a box that is easy to read and copy. */
 .cc-auth__username {
   display: flex;
