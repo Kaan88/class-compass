@@ -195,6 +195,12 @@ function NotificationLine({ item, onOpen }: { item: NotificationItem; onOpen: ()
           <Link to="/classroom" search={{ endLesson: item.context.id }} className={buttonClass('secondary', 'small')} onClick={onOpen}>
             {t('lessonNotice.endNow')}
           </Link>
+        ) : item.category === 'lessonAutoEnded' && item.fillIn ? (
+          // S37 (D-218): End Lesson for that lesson in the teacher area, only while it can still be
+          // filled in (the server sends `fillIn` until the end of the next school day, then null).
+          <Link to="/teacher" search={{ fillIn: item.fillIn.lessonId }} className={buttonClass('secondary', 'small')} onClick={onOpen}>
+            {t('lessonNotice.fillIn')}
+          </Link>
         ) : null}
       </div>
     </li>

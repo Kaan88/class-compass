@@ -15,7 +15,8 @@
  */
 import { and, eq, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
-import { endOfLocalDay, localDate, weekdayOf } from '../../../domain/dates.ts';
+import { addDays, endOfLocalDay, localDate, weekdayOf } from '../../../domain/dates.ts';
+import { NEXT_SCHOOL_DAY_SEARCH_DAYS, nextSchoolDay } from '../../../domain/holidays.ts';
 import { clampStage } from '../../../domain/routines.ts';
 import { idleTimer, type TimerState } from '../../../domain/timer.ts';
 import type { AssistantToday } from '../../../shared/contracts/assistant.ts';
@@ -33,7 +34,7 @@ import { requireUser, type Actor, type AppDeps, type RequestContext } from '../.
 import { notify, resolveNotifications } from '../../lib/notify.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
 import { attendanceStamp, dailyFor, lessonAttendanceCounts, markAllPresentCore, rosterWithAttendance, setDailyCore } from '../attendance/service.ts';
-import { closureOn } from '../school/closures.ts';
+import { closedDatesBetween, closureOn } from '../school/closures.ts';
 import { assertModuleEnabled, isModuleEnabled } from '../school/modules.ts';
 import { assertClassWritable, assertOwnsContext, effectiveTimezone, getClass, todayFor, type ClassRow, type ContextRow } from '../school/policy.ts';
 import { endStepsFor, type LessonRow } from './endSteps.ts';
@@ -56,6 +57,23 @@ const isCurrent = (deps: Pick<RequestContext, 'db' | 'now'>, lesson: LessonRow, 
 
 /** The end of the local day a lesson started on, in its class's timezone (the automatic end's cap). */
 export const lessonDayEnd = (db: Db, l: LessonRow): number => endOfLocalDay(l.localDate, effectiveTimezone(db, getClass(db, l.classId)));
+
+/**
+ * Until when End Lesson can still be filled in for a lesson that ended by itself (S37, D-218, the
+ * owner: "it should ask for a day to enter records, then close it"): the end of the first school day
+ * after the lesson's own local day, in the class timezone (weekends, the school's holiday calendar and
+ * breaks are skipped, `nextSchoolDay`). Derived at every read, never stored: past it, `lateEnd`
+ * refuses, the notice is gone and the notification no longer opens the flow; what was not filled in
+ * stays "not recorded". Only End Lesson gets this window: a late offline command keeps the lesson's
+ * own day (`happenedWhileRunning`).
+ */
+export function lessonFillInUntil(db: Db, l: LessonRow): number {
+  const closed = closedDatesBetween(db, addDays(l.localDate, 1), addDays(l.localDate, NEXT_SCHOOL_DAY_SEARCH_DAYS));
+  return endOfLocalDay(nextSchoolDay(l.localDate, closed), effectiveTimezone(db, getClass(db, l.classId)));
+}
+
+/** Can End Lesson still be filled in for this lesson now? Only one that ended by itself and stayed so (a late End Lesson clears the mark). */
+export const canFillIn = (db: Db, l: LessonRow, now: number): boolean => l.status === 'ended' && l.autoEndedAt !== null && now < lessonFillInUntil(db, l);
 
 export function lessonDto(db: Db, l: LessonRow, now: number): LessonState {
   return {
@@ -131,6 +149,9 @@ export function assertLessonRunning(l: LessonRow): void {
  * what it writes with `ctx.now()` (a counter tap, the daily attendance) still writes the lesson's day.
  */
 function happenedWhileRunning(ctx: RequestContext, l: LessonRow, cls: ClassRow, meta: CommandMeta): boolean {
+  // Deliberately the lesson's OWN day, not the fill-in window of End Lesson (`lessonFillInUntil`, until
+  // the end of the next school day): a queued tap is dated by `ctx.now()` in many modules, so arriving
+  // a day later would write the wrong day. Only End Lesson's answers belong to the lesson, not the day.
   const at = meta.clientTime;
   if (at === undefined || l.status !== 'ended' || l.autoEndedAt === null || at >= l.autoEndedAt || at > ctx.now()) return false;
   return localDate(ctx.now(), effectiveTimezone(ctx.db, cls)) === l.localDate;
@@ -329,6 +350,28 @@ export function lessonState(ctx: RequestContext, contextId: string) {
       grouping: (bodies.grouping ?? null) as GroupingLessonState | null,
       lessonGoal: (bodies.lessonGoal ?? null) as LessonGoalState | null,
     },
+  };
+}
+
+/**
+ * The lesson state of an ENDED lesson as End Lesson's steps read it (S37, D-218: filling in a lesson
+ * that ended by itself, from the teacher area). The contributors see that lesson and its own day (the
+ * clock is set to its end), so the assistant to thank is that day's, not today's; no ETag, no closure.
+ */
+export function lessonStateOf(ctx: RequestContext, context: ContextRow, cls: ClassRow, l: LessonRow) {
+  const at = l.endedAt ?? l.startedAt;
+  const dayCtx: RequestContext = { ...ctx, now: () => at };
+  const bodies = Object.fromEntries(contributors.map((c) => [c.key, c.body(dayCtx, context, l)]));
+  return {
+    lesson: lessonDto(ctx.db, l, ctx.now()),
+    today: { localDate: l.localDate, weekday: weekdayOf(l.localDate), timezone: effectiveTimezone(ctx.db, cls), closure: null },
+    serverNow: ctx.now(),
+    attendanceStamp: 'off',
+    counters: (bodies.counters ?? null) as CountersLessonState | null,
+    secret: (bodies.secret ?? null) as SecretLessonState | null,
+    assistant: (bodies.assistant ?? null) as AssistantToday | null,
+    grouping: (bodies.grouping ?? null) as GroupingLessonState | null,
+    lessonGoal: (bodies.lessonGoal ?? null) as LessonGoalState | null,
   };
 }
 
@@ -553,6 +596,8 @@ export function stillTeaching(ctx: RequestContext, p: P<'lesson.stillTeaching'>,
  * hooks already ran) and its "ended automatically" notice is gone.
  */
 function lateEnd(ctx: RequestContext, l: LessonRow, p: P<'lesson.end'>, meta: CommandMeta) {
+  // Until the end of the next school day, then closed for good (`lessonFillInUntil`).
+  if (!canFillIn(ctx.db, l, ctx.now())) throw new AppError('CONFLICT', 'The time to fill in End Lesson for this lesson is over', { reason: 'LESSON_FILL_IN_CLOSED' });
   assertClassWritable(ctx.db, getClass(ctx.db, l.classId));
   const notApplied: string[] = [];
   for (const step of endStepsFor(ctx.db, l.contextId, l)) {

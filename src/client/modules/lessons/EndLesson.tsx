@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as L from '../../../shared/contracts/lessons.ts';
 import type { LessonState, LessonSummary } from '../../../shared/contracts/lessons.ts';
-import { formatDate, pickText } from '../../../shared/i18n/index.ts';
+import { formatDate, hasMessage, pickText, type Locale, type MessageKey } from '../../../shared/i18n/index.ts';
 import { call } from '../../lib/api.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { getOutbox, useOutboxStatus } from '../../lib/outbox-client.ts';
@@ -34,6 +34,13 @@ export const END_LESSON_KEEPALIVE_MS = 10 * 60_000;
  */
 export const END_LESSON_IDLE_MS = 30 * 60_000;
 
+/**
+ * The last day End Lesson can be filled in, as a weekday and date (S37, D-218). `until` is the instant
+ * that day ends (00:00 of the day after), so the day shown is the one just before it. The server
+ * computes `until`; the client only shows it.
+ */
+export const fillInDay = (until: number, locale: Locale, timezone: string): string => formatDate(until - 1, locale, timezone, { weekday: 'long', day: 'numeric', month: 'long' });
+
 /** Values typed into the End Lesson steps so far; kept by the classroom page per class and lesson (LES-4). */
 export type EndDraft = Record<string, unknown>;
 
@@ -46,8 +53,9 @@ export function EndLessonFlow({
   onEnded,
   onQueued,
   live,
+  late,
 }: {
-  context: ClassroomContext;
+  context: Pick<ClassroomContext, 'id' | 'className' | 'subjectName'>;
   /** The lesson as it was when End Lesson opened (kept on screen if it ends underneath, S37). */
   lesson: LessonState;
   /**
@@ -63,6 +71,12 @@ export function EndLessonFlow({
   onEnded: (summary: LessonSummary | null) => void;
   /** The end could not be sent now and waits in the outbox (S26b, D-190). */
   onQueued: () => void;
+  /**
+   * Filling in a lesson that ended by itself, from the teacher area (S37, D-218): an intro with when it
+   * ended and until when it can be filled in, and the steps that can no longer be applied
+   * (`canApplyLate` false) shown as not available instead of offered.
+   */
+  late?: { notAvailable: readonly string[]; endedAt: number; until: number; timezone: string } | undefined;
 }) {
   const { t, locale } = useI18n();
   const uis = endStepUis(lesson.endSteps);
@@ -123,10 +137,13 @@ export function EndLessonFlow({
         onQueued();
         return;
       }
-      showToast({ message: t('lesson.toast.ended', { cls: label }), kind: 'success', scope: 'classroom' });
+      // From the teacher area (late) the note is teacher-area only; on the board it is classroom-safe.
+      showToast({ message: t('lesson.toast.ended', { cls: label }), kind: 'success', scope: late ? 'sensitive' : 'classroom' });
       onEnded(outcome.result as LessonSummary | null);
-    } catch {
-      setError(t('lesson.endFailed'));
+    } catch (err) {
+      // A refusal with a reason of its own (the fill-in window closed, S37) says so; anything else as before.
+      const reason = err instanceof Error ? `error.${err.message}` : '';
+      setError(late && hasMessage(reason) ? t(reason as MessageKey) : t('lesson.endFailed'));
       setBusy(false);
     }
   };
@@ -139,13 +156,30 @@ export function EndLessonFlow({
           {t('lesson.endTitle', { cls: label })}
         </h2>
       </div>
+      {late ? (
+        <p className="cc-offline-note" role="status" data-testid="end-lesson-fill-in">
+          <IconClock />
+          <span>
+            {t('lessonFillIn.intro', {
+              time: formatDate(late.endedAt, locale, late.timezone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
+              until: fillInDay(late.until, locale, late.timezone),
+            })}
+          </span>
+        </p>
+      ) : null}
       {uis.map(({ key, title, Component }) => (
-        <section key={key} className="cc-stack" aria-label={t(title)}>
+        <section key={key} className="cc-stack" aria-label={t(title)} data-step={key}>
           <h3 className="cc-h2">{t(title)}</h3>
-          <Component lesson={lesson} value={values[key]} onChange={(v) => setValues((s) => ({ ...s, [key]: v }))} />
+          {late?.notAvailable.includes(key) ? (
+            <p className="cc-muted" data-testid="end-step-not-available">
+              {t('summary.notApplied', { steps: t(title) })}
+            </p>
+          ) : (
+            <Component lesson={lesson} value={values[key]} onChange={(v) => setValues((s) => ({ ...s, [key]: v }))} />
+          )}
         </section>
       ))}
-      {live ? null : (
+      {live || late ? null : (
         <p className="cc-offline-note" role="status" data-testid="end-lesson-ended-underneath">
           <IconClock />
           <span>{t('lesson.endedUnderneath')}</span>

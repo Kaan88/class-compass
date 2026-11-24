@@ -195,12 +195,39 @@ export const lessonSummary = endpoint({
 const NoticeLesson = { lessonId: z.string(), contextId: z.string(), className: z.string(), subjectName: LocalizedText, localDate: z.string(), startedAt: z.number() };
 export const LessonNotices = z.object({
   running: z.array(z.object({ ...NoticeLesson, autoEndAt: z.number(), timezone: z.string() })),
-  autoEnded: z.array(z.object({ ...NoticeLesson, endedAt: z.number(), timezone: z.string() })),
+  /** Only while End Lesson can still be filled in: gone by itself after `fillInUntil` (the end of the next school day). */
+  autoEnded: z.array(z.object({ ...NoticeLesson, endedAt: z.number(), fillInUntil: z.number(), timezone: z.string() })),
 });
 export type LessonNotices = z.infer<typeof LessonNotices>;
 export const lessonNotices = endpoint({ method: 'GET', path: '/api/teacher/lesson-notices', access: 'teacher', background: true, input: z.object({}), output: LessonNotices });
 /** "Got it" on an "ended automatically" notice: gone for good, on every device (per lesson, so per teacher: one teacher holds a class+subject). */
 export const dismissLessonNotice = endpoint({ method: 'POST', path: '/api/teacher/lesson-notices/:lessonId/seen', access: 'teacher', input: z.object({ lessonId: Id }), output: Ok });
+
+/**
+ * Filling in End Lesson for a lesson that ended by itself (S37, D-218), from the teacher area (the
+ * home's notice and the notification), never on the classroom board: the lesson state as its steps
+ * read it (that lesson and its own day), the steps that can no longer be applied (`notAvailable`,
+ * shown as such) and until when. Only the lesson's current teacher; a lesson that is not hers, did not
+ * end by itself or was filled in already is not found; past `fillInUntil` CONFLICT with reason
+ * LESSON_FILL_IN_CLOSED. The answers go through the normal 'lesson.end' command (`lateEnd`). `teacher`
+ * (behind the PIN gate). No `mcp` field.
+ */
+export const lessonFillIn = endpoint({
+  method: 'GET',
+  path: '/api/teacher/lessons/:lessonId/fill-in',
+  access: 'teacher',
+  input: z.object({ lessonId: Id }),
+  output: z.object({
+    state: getLessonState.output.extend({ lesson: LessonState }),
+    contextId: z.string(),
+    className: z.string(),
+    subjectName: LocalizedText,
+    timezone: z.string(),
+    endedAt: z.number(),
+    fillInUntil: z.number(),
+    notAvailable: z.array(z.string().max(64)).max(32),
+  }),
+});
 
 // ---------------------------------------------------------------- lesson preferences (S18, D-167)
 

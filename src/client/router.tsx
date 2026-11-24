@@ -126,7 +126,13 @@ const classroomRoute = createRoute({
 });
 
 const teacherRoute = createRoute({ getParentRoute: () => rootRoute, path: '/teacher', beforeLoad: requireSession, component: TeacherLayout });
-const teacherIndex = createRoute({ getParentRoute: () => teacherRoute, path: '/', component: TeacherMenu });
+// `?fillIn=<lessonId>` opens End Lesson for a lesson that ended by itself, in the teacher area (S37, D-218).
+const teacherIndex = createRoute({
+  getParentRoute: () => teacherRoute,
+  path: '/',
+  validateSearch: (s: Record<string, unknown>): { fillIn?: string | undefined } => ({ fillIn: typeof s.fillIn === 'string' ? s.fillIn : undefined }),
+  component: TeacherMenu,
+});
 /**
  * Teacher-area pages come from the client module manifests (D-069): `/teacher/$page` renders the
  * manifest page with that path (inside TeacherLayout, so behind the PIN gate) or "not found".

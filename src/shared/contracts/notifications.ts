@@ -33,6 +33,11 @@ export const NotificationItem = z.object({
   label: LocalizedText.nullable(),
   /** The item was deleted, hidden or taken back since. */
   gone: z.boolean(),
+  /**
+   * `lessonAutoEnded` (S37, D-218): the lesson and until when End Lesson can still be filled in; null
+   * once that is over (the end of the next school day) or done, so the link is gone by itself.
+   */
+  fillIn: z.object({ lessonId: z.string(), until: z.number() }).nullable(),
 });
 export type NotificationItem = z.infer<typeof NotificationItem>;
 

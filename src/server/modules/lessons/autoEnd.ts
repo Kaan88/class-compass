@@ -15,9 +15,10 @@ import { lessons, teachingContexts } from '../../db/schema.ts';
 import { tx } from '../../db/client.ts';
 import type { AppDeps, RequestContext } from '../../lib/context.ts';
 import { requireUser } from '../../lib/context.ts';
-import { notFound } from '../../lib/errors.ts';
-import { effectiveTimezone, getClass } from '../school/policy.ts';
-import { lessonDayEnd, settleForRead, settleLesson } from './service.ts';
+import { AppError, notFound } from '../../lib/errors.ts';
+import { assertOwnsContext, effectiveTimezone, getClass } from '../school/policy.ts';
+import { endStepsFor } from './endSteps.ts';
+import { lessonDayEnd, lessonFillInUntil, lessonStateOf, settleForRead, settleLesson } from './service.ts';
 
 /** How often main.ts runs the sweep: a reminder or an end is at most this late while nobody reads. */
 export const LESSON_SWEEP_MS = 5 * 60_000;
@@ -68,11 +69,14 @@ export function lessonNotices(ctx: RequestContext): LessonNotices {
     const tz = effectiveTimezone(ctx.db, getClass(ctx.db, l.classId));
     running.push({ lessonId: l.id, contextId: l.contextId, className: l.classNameSnapshot, subjectName: l.subjectNameSnapshot, localDate: l.localDate, startedAt: l.startedAt, autoEndAt: autoEndAt(l, lessonDayEnd(ctx.db, l)), timezone: tz });
   }
-  // Until Got it or a late End Lesson (which clears the mark); lessons closed before S37 were abandoned, never marked.
+  // Until Got it, a late End Lesson (which clears the mark) or the end of the fill-in window, whichever
+  // comes first (no "Got it" needed then); lessons closed before S37 were abandoned, never marked.
   const autoEnded = ownLessons(ctx, and(isNotNull(lessons.autoEndedAt), isNull(lessons.autoEndSeenAt)))
     .orderBy(desc(lessons.endedAt))
     .all()
-    .map(({ lesson: l }) => ({
+    .map(({ lesson: l }) => ({ l, fillInUntil: lessonFillInUntil(ctx.db, l) }))
+    .filter(({ fillInUntil }) => ctx.now() < fillInUntil)
+    .map(({ l, fillInUntil }) => ({
       lessonId: l.id,
       contextId: l.contextId,
       className: l.classNameSnapshot,
@@ -80,6 +84,7 @@ export function lessonNotices(ctx: RequestContext): LessonNotices {
       localDate: l.localDate,
       startedAt: l.startedAt,
       endedAt: l.endedAt ?? l.autoEndedAt!,
+      fillInUntil,
       timezone: effectiveTimezone(ctx.db, getClass(ctx.db, l.classId)),
     }));
   return { running: running.sort((a, b) => a.startedAt - b.startedAt), autoEnded };
@@ -96,4 +101,34 @@ export function dismissLessonNotice(ctx: RequestContext, lessonId: string) {
     if (row.lesson.autoEndSeenAt === null) ctx.db.update(lessons).set({ autoEndSeenAt: ctx.now() }).where(eq(lessons.id, lessonId)).run();
     return { ok: true as const };
   });
+}
+
+/**
+ * End Lesson for a lesson that ended by itself, opened from the teacher area (S37, D-218): only the
+ * current teacher of its class+subject (as the notices), only while the window is open. Another
+ * teacher's lesson, one that did not end by itself or was filled in already: not found (never a hint
+ * that it exists). Past the window: LESSON_FILL_IN_CLOSED, so an old link says it is closed.
+ */
+export function lessonFillIn(ctx: RequestContext, lessonId: string) {
+  const row = ownLessons(ctx, eq(lessons.id, lessonId)).get();
+  if (!row || row.lesson.status !== 'ended' || row.lesson.autoEndedAt === null) throw notFound('Lesson');
+  const l = row.lesson;
+  const fillInUntil = lessonFillInUntil(ctx.db, l);
+  if (ctx.now() >= fillInUntil) throw new AppError('CONFLICT', 'The time to fill in End Lesson for this lesson is over', { reason: 'LESSON_FILL_IN_CLOSED' });
+  const context = assertOwnsContext(ctx, l.contextId);
+  const cls = getClass(ctx.db, l.classId);
+  const state = lessonStateOf(ctx, context, cls, l);
+  return {
+    state,
+    contextId: l.contextId,
+    className: l.classNameSnapshot,
+    subjectName: l.subjectNameSnapshot,
+    timezone: state.today.timezone,
+    endedAt: l.endedAt ?? l.autoEndedAt!,
+    fillInUntil,
+    // Shown as "not available any more", never offered (the same rule `lateEnd` applies).
+    notAvailable: endStepsFor(ctx.db, l.contextId, l)
+      .filter((s) => s.canApplyLate && !s.canApplyLate(ctx.db, l))
+      .map((s) => s.key),
+  };
 }

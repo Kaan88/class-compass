@@ -107,6 +107,7 @@ export const tr = {
   'error.PROMOTE_SAME_YEAR': 'Üst sınıfa taşıma, sınıfı başka bir eğitim yılına taşır. Aynı yıl içinde “Öğrencileri taşı” seçeneğini kullanın.',
   'error.WRONG_LESSON': 'Bu işlem başka bir ders veya sınıf içindi, bu yüzden kaydedilmedi.',
   'error.LESSON_ENDED': 'Bu ders zaten bitti, bu yüzden işlem kaydedilmedi.',
+  'error.LESSON_FILL_IN_CLOSED': 'Bu dersin bitirme adımlarını doldurma süresi doldu: bir sonraki okul gününün sonuna kadar açıktı. Doldurulmayanlar kaydedilmemiş olarak kalır.',
   'error.LESSON_ALREADY_ACTIVE': 'Bu sınıfta zaten bir ders sürüyor. Kaldığı yerden devam ediyor.',
   'error.START_STALE': 'Bu ders başlatma önceki bir gün kaydedildi ve sunucuya geç ulaştı. Bu yüzden ders başlatılmadı ve yoklaması bugüne işlenmedi.',
   'error.STAGE_OUT_OF_RANGE': 'Bu rutinde böyle bir aşama yok.',

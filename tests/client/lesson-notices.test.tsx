@@ -7,7 +7,9 @@
  * teaching; End Lesson keeps the lesson alive while open and keeps its draft when the lesson ended
  * underneath; a late end's summary names what could not be saved; `?endLesson=` decisions.
  * Status regions with words and an icon, never colour alone. The Lesson saved summary of a lesson that
- * ended by itself says so and shows no length. Fictional data only.
+ * ended by itself says so and shows no length. Filling in End Lesson after an automatic end: the
+ * notice says until when, with Fill in End Lesson; the flow (teacher area) shows a step it cannot
+ * apply as not available; after the deadline it says it is closed. Fictional data only.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -36,13 +38,18 @@ vi.mock('../../src/client/lib/outbox-client.ts', async (importOriginal) => ({
     },
   }),
 }));
-vi.mock('../../src/client/lib/api.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/client/lib/api.ts')>()),
-  call: (ep: { path: string }, input: unknown) => {
-    calls.push({ path: ep.path, input });
-    return Promise.resolve({ ok: true });
-  },
-}));
+vi.mock('../../src/client/lib/api.ts', async (importOriginal) => {
+  const api = await importOriginal<typeof import('../../src/client/lib/api.ts')>();
+  return {
+    ...api,
+    call: (ep: { path: string }, input: unknown) => {
+      calls.push({ path: ep.path, input });
+      // Only reached when a test has not put the fill-in data in the cache: the window is closed.
+      if (ep.path.endsWith('/fill-in')) return Promise.reject(new api.ApiError(409, 'CONFLICT', 'closed', { reason: 'LESSON_FILL_IN_CLOSED' }));
+      return Promise.resolve({ ok: true });
+    },
+  };
+});
 
 const { queryClient } = await import('../../src/client/lib/queryClient.ts');
 const { I18nProvider } = await import('../../src/client/lib/i18n.tsx');
@@ -53,12 +60,13 @@ const { OverdueNote } = await import('../../src/client/modules/lessons/OverdueNo
 const { EndLessonFlow, END_LESSON_IDLE_MS, END_LESSON_KEEPALIVE_MS } = await import('../../src/client/modules/lessons/EndLesson.tsx');
 const { endLessonTarget } = await import('../../src/client/routes/Classroom.tsx');
 const { endStepUis } = await import('../../src/client/modules/registry.ts');
+const { LateEndLesson, lessonFillInKey } = await import('../../src/client/modules/lessons/LateEndLesson.tsx');
 
 const tz = 'Europe/Istanbul';
 const startedAt = Date.UTC(2026, 10, 9, 7, 5); // 10:05 in Istanbul
 const notices: Notices = {
   running: [{ lessonId: 'lesson-run', contextId: 'ctx-3a', className: '3-A', subjectName: { en: 'English', tr: 'İngilizce' }, localDate: '2026-11-09', startedAt, autoEndAt: startedAt + 2 * 3600_000, timezone: tz }],
-  autoEnded: [{ lessonId: 'lesson-auto', contextId: 'ctx-3a', className: '3-A', subjectName: { en: 'English', tr: 'İngilizce' }, localDate: '2026-11-06', startedAt: Date.UTC(2026, 10, 6, 9, 0), endedAt: Date.UTC(2026, 10, 6, 11, 0), timezone: tz }],
+  autoEnded: [{ lessonId: 'lesson-auto', contextId: 'ctx-3a', className: '3-A', subjectName: { en: 'English', tr: 'İngilizce' }, localDate: '2026-11-06', startedAt: Date.UTC(2026, 10, 6, 9, 0), endedAt: Date.UTC(2026, 10, 6, 11, 0), fillInUntil: Date.UTC(2026, 10, 9, 21, 0), timezone: tz }],
 };
 const wrap = (locale: 'en' | 'tr', node: ReactNode) =>
   render(
@@ -79,9 +87,9 @@ afterEach(() => {
 });
 
 describe('teacher home notices (S37, D-218)', () => {
-  for (const [locale, m, subject, date] of [
-    ['en', en, 'English', 'Friday 6 November'],
-    ['tr', tr, 'İngilizce', '6 Kasım Cuma'],
+  for (const [locale, m, subject, date, until] of [
+    ['en', en, 'English', 'Friday 6 November', 'Monday 9 November'],
+    ['tr', tr, 'İngilizce', '6 Kasım Cuma', '9 Kasım Pazartesi'],
   ] as const) {
     it(`shows the running lesson with End lesson and the automatic end with Got it (${locale})`, async () => {
       queryClient.setQueryData(LESSON_NOTICES_KEY, notices);
@@ -104,7 +112,12 @@ describe('teacher home notices (S37, D-218)', () => {
       act(() => queryClient.setQueryData(LESSON_NOTICES_KEY, notices));
 
       const auto = screen.getByTestId('lesson-notice-auto-ended');
-      expect(auto.textContent).toContain(fill(m['lessonNotice.autoEnded'], { cls: `3-A · ${subject}`, date, time: '14:00' }));
+      // S37 (D-218): until when it can be filled in (the server's deadline, shown as weekday and date), with the button.
+      expect(auto.textContent).toContain(fill(m['lessonNotice.autoEnded'], { cls: `3-A · ${subject}`, date, time: '14:00', until }));
+      const fillIn = screen.getByRole('link', { name: m['lessonNotice.fillIn'] });
+      expect(fillIn.getAttribute('href')).toBe('/teacher');
+      expect(JSON.parse(fillIn.getAttribute('data-search')!)).toEqual({ fillIn: 'lesson-auto' });
+      expect(fillIn.className).toContain('primary');
       fireEvent.click(screen.getByRole('button', { name: m['lessonNotice.gotIt'] }));
       await waitFor(() => expect(screen.queryByTestId('lesson-notice-auto-ended')).toBeNull());
       expect(calls).toEqual([{ path: '/api/teacher/lesson-notices/:lessonId/seen', input: { lessonId: 'lesson-auto' } }]);
@@ -227,6 +240,55 @@ describe('the board and End Lesson keep a lesson in use alive (S37, D-218)', () 
   });
 });
 
+describe('filling in End Lesson for a lesson that ended by itself (S37, D-218)', () => {
+  const endedAt = Date.UTC(2026, 10, 6, 11, 0); // Friday 14:00 in Istanbul
+  const data = {
+    state: {
+      lesson: { id: 'lesson-auto', contextId: 'ctx-3a', status: 'ended', startedAt: endedAt - 3600_000, endedAt, localDate: '2026-11-06', version: 3, className: '3-A', subjectName: { en: 'English', tr: 'İngilizce' }, routine: { templateId: null, name: { en: 'Default' }, stages: [] }, stageIndex: 0, timer: { running: false, startedAt: null, remainingMs: 0, durationMs: 0 }, topics: [], display: { assistantVisible: null }, endSteps: ['secretStudents', 'reflection'], overdue: false, autoEndAt: endedAt },
+      today: { localDate: '2026-11-06', weekday: 5, timezone: tz, closure: null },
+      serverNow: endedAt,
+      attendanceStamp: 'off',
+      counters: null,
+      secret: null,
+      assistant: null,
+      grouping: null,
+      lessonGoal: null,
+    },
+    contextId: 'ctx-3a',
+    className: '3-A',
+    subjectName: { en: 'English', tr: 'İngilizce' },
+    timezone: tz,
+    endedAt,
+    fillInUntil: Date.UTC(2026, 10, 9, 21, 0),
+    notAvailable: ['secretStudents'],
+  };
+  for (const [locale, m, until] of [
+    ['en', en, 'Monday 9 November'],
+    ['tr', tr, '9 Kasım Pazartesi'],
+  ] as const) {
+    it(`opens the normal End Lesson for that lesson, says until when, and shows a step it cannot apply as not available (${locale})`, () => {
+      queryClient.setQueryData(lessonFillInKey('lesson-auto'), data);
+      wrap(locale, <LateEndLesson lessonId="lesson-auto" onClose={() => {}} onSaved={() => {}} />);
+      expect(screen.getByTestId('end-lesson-fill-in').textContent).toBe(fill(m['lessonFillIn.intro'], { time: '14:00', until }));
+      const title = m[endStepUis(['secretStudents'])[0]!.title as keyof typeof m];
+      expect(screen.getByTestId('end-step-not-available').textContent).toBe(fill(m['summary.notApplied'], { steps: title }));
+      expect(screen.getByRole('heading', { name: m['reflection.title'] })).toBeTruthy();
+      expect(screen.getByRole('button', { name: m['lesson.saveAndEnd'] })).toBeTruthy();
+      // Not a running lesson: no "Still teaching" pings, no "ended underneath" note.
+      expect(queued).toEqual([]);
+      expect(screen.queryByTestId('end-lesson-ended-underneath')).toBeNull();
+    });
+
+    it(`after the deadline it says the window is closed and offers no flow (${locale})`, async () => {
+      wrap(locale, <LateEndLesson lessonId="lesson-closed" onClose={() => {}} onSaved={() => {}} />);
+      await waitFor(() => expect(screen.getByTestId('lesson-fill-in-closed')).toBeTruthy());
+      expect(screen.getByTestId('lesson-fill-in-closed').textContent).toContain(m['error.LESSON_FILL_IN_CLOSED']);
+      expect(screen.queryByTestId('end-lesson')).toBeNull();
+      expect(screen.getByRole('link', { name: m['lessonFillIn.back'] })).toBeTruthy();
+    });
+  }
+});
+
 describe('?endLesson= on the classroom page (S37, D-218)', () => {
   const base = { wanted: 'ctx-3a', ids: ['ctx-3a', 'ctx-3b'], activeId: 'ctx-3a', lessonLoaded: true, lessonId: 'lesson-run' };
   it('opens End Lesson for a running lesson of that class+subject', () => {
@@ -242,7 +304,7 @@ describe('?endLesson= on the classroom page (S37, D-218)', () => {
 
 describe('lesson lines on the notifications page (S37, D-218)', () => {
   it('a notice about a lesson has no student and opens no teacher page', () => {
-    const item = { id: 'n1', category: 'lessonAutoEnded', student: null, context: { id: 'ctx-3a', classId: 'c-3a', className: '3-A', subjectName: { en: 'English' } }, entity: 'lesson', goalId: null, count: 1, localDate: '2026-11-09', createdAt: 1, updatedAt: 1, read: false, snippet: null, label: null, gone: false } satisfies NotificationItem;
+    const item = { id: 'n1', category: 'lessonAutoEnded', student: null, context: { id: 'ctx-3a', classId: 'c-3a', className: '3-A', subjectName: { en: 'English' } }, entity: 'lesson', goalId: null, count: 1, localDate: '2026-11-09', createdAt: 1, updatedAt: 1, read: false, snippet: null, label: null, gone: false, fillIn: null } satisfies NotificationItem;
     expect(deepLink(item)).toBeNull();
   });
 });

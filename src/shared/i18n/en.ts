@@ -114,6 +114,7 @@ export const en = {
   'error.PROMOTE_SAME_YEAR': 'Promotion moves a class into another school year. Use “Move students” within the same year.',
   'error.WRONG_LESSON': 'This action was meant for another lesson or class, so it was not saved.',
   'error.LESSON_ENDED': 'This lesson has already ended, so the action was not saved.',
+  'error.LESSON_FILL_IN_CLOSED': 'The time to fill in End Lesson for this lesson is over: it was open until the end of the next school day. Anything not filled in stays not recorded.',
   'error.LESSON_ALREADY_ACTIVE': 'A lesson is already running in this class. It has been resumed.',
   'error.START_STALE': 'This lesson start was saved on an earlier day and reached the server too late, so no lesson was started and its attendance was not recorded for today.',
   'error.STAGE_OUT_OF_RANGE': 'This routine has no such stage.',

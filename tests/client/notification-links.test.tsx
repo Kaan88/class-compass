@@ -28,6 +28,7 @@ const item = (category: NotificationItem['category'], extra: Partial<Notificatio
   snippet: null,
   label: null,
   gone: false,
+  fillIn: null,
   ...extra,
 });
 

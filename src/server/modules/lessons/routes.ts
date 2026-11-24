@@ -25,6 +25,7 @@ export function registerLessonRoutes(app: FastifyInstance, deps: AppDeps) {
   // S37 (D-218): the teacher home's notices about forgotten lessons.
   route(app, deps, C.lessonNotices, (ctx) => autoEnd.lessonNotices(ctx));
   route(app, deps, C.dismissLessonNotice, (ctx, input) => autoEnd.dismissLessonNotice(ctx, input.lessonId));
+  route(app, deps, C.lessonFillIn, (ctx, input) => autoEnd.lessonFillIn(ctx, input.lessonId));
   // S18 (D-167): the teacher's own "Full screen during lessons" preference.
   route(app, deps, C.getLessonPrefs, (ctx) => prefs.getLessonPrefs(ctx));
   route(app, deps, C.setLessonPrefs, (ctx, input) => prefs.setLessonPrefs(ctx, input));

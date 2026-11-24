@@ -8,7 +8,7 @@
  * - the server clock offset from the last full answer drives the date, day and timer display.
  */
 import { useQuery, type QueryKey } from '@tanstack/react-query';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import type { z } from 'zod';
 import * as L from '../../../shared/contracts/lessons.ts';
 import type { LessonCommandPayload, LessonCommandType, LessonState } from '../../../shared/contracts/lessons.ts';
@@ -96,8 +96,16 @@ export const lessonQueryOptions = (contextId: string | null) => ({
   staleTime: 0,
 });
 
+/**
+ * Filling in End Lesson for a lesson that ended by itself (S37, D-218, `LateEndLesson`): its steps read
+ * THAT lesson's state (sent by `lessonFillIn`), not today's polled one, which may be another lesson.
+ */
+export const LessonStateOverride = createContext<LessonQueryData | null>(null);
+
 export function useLessonState(contextId: string | null) {
-  return useQuery(lessonQueryOptions(contextId));
+  const late = useContext(LessonStateOverride);
+  const q = useQuery({ ...lessonQueryOptions(contextId), enabled: Boolean(contextId) && !late });
+  return late ? ({ ...q, data: late } as typeof q) : q;
 }
 
 export function useActiveLessons(enabled: boolean) {

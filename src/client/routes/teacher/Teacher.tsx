@@ -1,6 +1,6 @@
 /** Teacher area (PIN-gated in classroom mode): menu first (PIN-4), profile, class settings, roster. */
 import { useEffect, useId, useState } from 'react';
-import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Link, Outlet, useNavigate, useRouterState, useSearch } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Auth from '../../../shared/contracts/auth.ts';
 import { call } from '../../lib/api.ts';
@@ -220,12 +220,14 @@ export function TeacherMenu() {
   const qc = useQueryClient();
   const contexts = useMenuContexts();
   const shown = useMediaFilter();
+  // S37 (D-218): `?fillIn=<lessonId>` fills in End Lesson for a lesson that ended by itself, here.
+  const fillIn = (useSearch({ strict: false }) as { fillIn?: string }).fillIn;
   useEffect(() => setMenuFirst(false), []);
   if (!me) return null;
   return (
     <main className="cc-page cc-stack" data-testid="teacher-menu">
       {/* S37 (D-218): a lesson still running, or one that ended by itself, comes first. */}
-      <LessonNotices />
+      <LessonNotices fillIn={fillIn} onCloseFillIn={() => void navigate({ to: '/teacher', search: {} })} />
       <div className="cc-row">
         <Mascot size={80} />
         <div>

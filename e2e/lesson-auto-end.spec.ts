@@ -101,7 +101,8 @@ test('a forgotten lesson: the reminder and Still teaching on the teacher menu an
     const ended = t.getByTestId('lesson-notice-auto-ended');
     await expect(ended).toContainText(`The lesson in ${label} on`);
     await expect(ended).toContainText('ended by itself');
-    await expect(ended).toContainText('Anything you did not finish in End Lesson was left empty.');
+    await expect(ended).toContainText('You can still fill in End Lesson until the end of');
+    await expect(ended.getByRole('link', { name: 'Fill in End Lesson' })).toBeVisible();
     await ended.getByRole('button', { name: 'Got it' }).click();
     await expect(ended).toHaveCount(0);
     await t.reload();
