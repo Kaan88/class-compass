@@ -1,5 +1,5 @@
 /**
- * Sign in with Google for teachers (S31, D-208).
+ * Sign in with Google (S31, D-208): teachers, and administrators once they have no password.
  * - `GoogleSignIn`: the button on the sign-in page, always with the warning about shared computers
  *   (a Google sign-in leaves the Google account open in that browser). On a browser that has been a
  *   classroom display the button is held back behind that warning; "It is my own computer" shows it.

@@ -226,7 +226,8 @@ export const users = sqliteTable(
     /**
      * Sign in with Google (S31, D-208): Google's permanent id of the person, stored at the first Google
      * sign-in that matched the account's address; later sign-ins match on it. Cleared when an
-     * administrator changes the address. Teachers only; null = never signed in with Google.
+     * administrator changes the address. Teachers, and administrators once they have no password (D-207);
+     * null = never signed in with Google.
      */
     googleSub: text('google_sub'),
     disabledAt: integer('disabled_at'),
