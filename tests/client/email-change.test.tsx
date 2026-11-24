@@ -84,7 +84,7 @@ afterEach(() => {
 
 describe('Profile → Email address (S35, D-214)', () => {
   it('shows the address, sends the code to the new one with the current password, then changes it with the code', async () => {
-    answer = (path) => (path.endsWith('/confirm') ? ME : { ok: true });
+    answer = (path) => (path === '/api/auth/email' ? { email: 'deniz.new@school.example', pendingTo: null } : path.endsWith('/confirm') ? ME : { ok: true });
     render(wrap(<EmailChangeSection me={ME} emailEnabled />, qcWith(ME)));
     expect(screen.getByText(en['profile.emailCurrent'].replace('{email}', 'deniz@school.example'))).toBeTruthy();
     type(en['password.current'], 'correct-horse-battery');
@@ -140,17 +140,33 @@ describe('Profile → Email address (S35, D-214)', () => {
     }
   });
 
-  it('after a reload the code form comes back while the change still waits in this browser (S35 review)', async () => {
+  it('after a reload the code form comes back; the success line shows the real new address, not the masked one (S35 review)', async () => {
+    answer = (path) => (path === '/api/auth/email' ? { email: 'deniz.new@school.example', pendingTo: null } : path.endsWith('/confirm') ? ME : { ok: true });
     render(wrap(<EmailChangeSection me={ME} emailEnabled />, qcWith(ME, [], { email: 'deniz@school.example', pendingTo: 'd***@school.example' })));
     expect(screen.getByText(en['profile.emailCodeSent'].replace('{email}', 'd***@school.example'))).toBeTruthy();
     type(en['signin.code'], '123456');
     fireEvent.click(button(en['profile.emailConfirm']));
-    await waitFor(() => expect(calls.at(-1)).toEqual({ path: '/api/auth/email/confirm', input: { code: '123456' } }));
-    cleanup();
-    // Cancel goes back to the start form.
+    await screen.findByText(en['profile.emailChanged'].replace('{email}', 'deniz.new@school.example'));
+    expect(calls.map((c) => c.path).slice(0, 2)).toEqual(['/api/auth/email/confirm', '/api/auth/email']);
+    expect(document.body.textContent).not.toContain('d***@');
+  });
+
+  it('Cancel ends the pending change on the server, then shows the start form', async () => {
     render(wrap(<EmailChangeSection me={ME} emailEnabled />, qcWith(ME, [], { email: 'deniz@school.example', pendingTo: 'd***@school.example' })));
     fireEvent.click(button(en['common.cancel']));
     expect(await screen.findByRole('button', { name: en['profile.emailSendCode'] })).toBeTruthy();
+    expect(calls).toEqual([{ path: '/api/auth/email/cancel', input: {} }]);
+  });
+
+  it('when Cancel fails the code form stays', async () => {
+    answer = () => {
+      throw new ApiError(423, 'LOCKED', 'Locked', { reason: 'PIN_REQUIRED' });
+    };
+    render(wrap(<EmailChangeSection me={ME} emailEnabled />, qcWith(ME, [], { email: 'deniz@school.example', pendingTo: 'd***@school.example' })));
+    fireEvent.click(button(en['common.cancel']));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(button(en['profile.emailConfirm'])).toBeTruthy();
+    expect(screen.queryByRole('button', { name: en['profile.emailSendCode'] })).toBeNull();
   });
 
   it('draws nothing until the address has loaded', () => {

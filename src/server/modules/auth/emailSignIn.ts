@@ -395,6 +395,8 @@ export function confirmEmailLinkMethod(deps: AppDeps, user: UserRow, session: Se
     const c = checkCode(deps, 'email_method', sessionBinding(session), code);
     if (!c.row) return { ok: false as const, attemptsLeft: c.attemptsLeft ?? 0 };
     deps.db.update(oneTimeTokens).set({ usedAt: now }).where(eq(oneTimeTokens.id, c.row.id)).run();
+    // The owner proved the mailbox: the wrong-code count of this kind starts again.
+    deps.db.delete(authAttempts).where(eq(authAttempts.key, codeKey('email_method', user.id))).run();
     deps.db.update(users).set({ signInMethod: 'email_link', passwordHash: '', emailVerifiedAt: now, mustChangePassword: false, updatedAt: now }).where(eq(users.id, user.id)).run();
     revokeAllUserSessions(deps.db, user.id, now, session.id);
     invalidateResetTokens(deps.db, user.id, now);
@@ -440,6 +442,7 @@ export function usePolicyCode(deps: AppDeps, session: SessionRow, code: string):
   const c = checkCode(deps, 'email_policy', policyBinding(session), code);
   if (!c.row) return { ok: false, attemptsLeft: c.attemptsLeft ?? 0 };
   deps.db.update(oneTimeTokens).set({ usedAt: deps.now() }).where(eq(oneTimeTokens.id, c.row.id)).run();
+  deps.db.delete(authAttempts).where(eq(authAttempts.key, codeKey('email_policy', c.row.userId))).run();
   return { ok: true };
 }
 
@@ -547,9 +550,29 @@ export function maskEmail(email: string): string {
  */
 export function emailChangeStatus(deps: AppDeps, user: UserRow, session: SessionRow, cookie: string | undefined) {
   const pending = openPending(deps, user, session, cookie);
-  const live =
-    pending && activeToken(deps.db, 'email_change', eq(oneTimeTokens.bindingHash, hashOf(deps, 'bind', emailChangeBinding(session, pending))), deps.now());
-  return { email: user.email, pendingTo: live && live.userId === user.id && live.codeAttempts < CODE_MAX_ATTEMPTS ? maskEmail(pending.email) : null };
+  const now = deps.now();
+  const live = pending && activeToken(deps.db, 'email_change', eq(oneTimeTokens.bindingHash, hashOf(deps, 'bind', emailChangeBinding(session, pending))), now);
+  // A code that can no longer be used (five wrong tries, or the account's change path locked) is not offered.
+  const usable = live && live.userId === user.id && live.codeAttempts < CODE_MAX_ATTEMPTS && !codeLocked(deps.db, 'email_change', user.id, now);
+  return { email: user.email, pendingTo: usable ? maskEmail(pending.email) : null };
+}
+
+/** Cancel in Profile: the pending change code of this browser stops working (the route clears the cookie). */
+export function cancelEmailChange(deps: AppDeps, user: UserRow, session: SessionRow, cookie: string | undefined) {
+  const pending = openPending(deps, user, session, cookie);
+  if (!pending) return;
+  deps.db
+    .update(oneTimeTokens)
+    .set({ usedAt: deps.now() })
+    .where(
+      and(
+        eq(oneTimeTokens.userId, user.id),
+        eq(oneTimeTokens.kind, 'email_change'),
+        eq(oneTimeTokens.bindingHash, hashOf(deps, 'bind', emailChangeBinding(session, pending))),
+        isNull(oneTimeTokens.usedAt),
+      ),
+    )
+    .run();
 }
 
 export function meOf(deps: AppDeps, userId: string, sessionId: string) {

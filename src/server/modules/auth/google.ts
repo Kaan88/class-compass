@@ -38,7 +38,7 @@ import { audit } from '../../lib/audit.ts';
 import type { AppDeps, UserRow } from '../../lib/context.ts';
 import { openSecret, randomToken, sealSecret, timingSafeEqualStr } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
-import { actorFor, createSession, invalidateResetTokens, SESSION_ABSOLUTE_MS } from './service.ts';
+import { actorFor, createSession, invalidateResetTokens, passwordNotSet, SESSION_ABSOLUTE_MS } from './service.ts';
 import { passwordlessAllowed } from './signInPolicy.ts';
 
 export const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -161,8 +161,6 @@ function findAccount(db: Db, claims: IdClaims): UserRow {
   return matches[0]!;
 }
 
-/** The invite is still open: no password was ever chosen and the account is not an email-link account yet. */
-const invitePending = (u: UserRow) => u.signInMethod === 'password' && u.passwordHash === '';
 
 export async function completeGoogleSignIn(deps: AppDeps, cookie: string | undefined, input: { state: string; code: string }) {
   if (!googleSignInEnabled(deps)) throw notAvailable();
@@ -196,7 +194,7 @@ export async function completeGoogleSignIn(deps: AppDeps, cookie: string | undef
     }
     // Google proved the address on the account (for a linked account the address may have been left as it was).
     if (user.emailVerifiedAt === null && user.email?.toLowerCase() === claims.email) patch.emailVerifiedAt = now;
-    if (invitePending(user)) {
+    if (passwordNotSet(user)) {
       patch.signInMethod = 'email_link';
       patch.mustChangePassword = false;
       deps.db

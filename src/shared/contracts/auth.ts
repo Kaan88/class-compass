@@ -381,6 +381,15 @@ export const confirmEmailChange = endpoint({
   output: Me,
 });
 
+/** Cancel: the pending change code of this browser stops working and its cookie is cleared. */
+export const cancelEmailChange = endpoint({
+  method: 'POST',
+  path: '/api/auth/email/cancel',
+  access: 'account',
+  input: Empty,
+  output: Ok,
+});
+
 /** Back to a password (needs a fresh email sign-in on this session). */
 export const switchToPassword = endpoint({
   method: 'POST',

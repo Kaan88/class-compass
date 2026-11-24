@@ -33,7 +33,7 @@ import { audit } from '../../lib/audit.ts';
 import type { AppDeps, UserRow } from '../../lib/context.ts';
 import { openSecret, randomToken, sealSecret, timingSafeEqualStr } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
-import { actorFor, createSession, invalidateResetTokens, SESSION_ABSOLUTE_MS } from './service.ts';
+import { actorFor, createSession, invalidateResetTokens, passwordNotSet, SESSION_ABSOLUTE_MS } from './service.ts';
 import { passwordlessAllowed } from './signInPolicy.ts';
 
 export const SSO_RETURN_PATH = '/signin-sso';
@@ -257,8 +257,6 @@ function findAccount(db: Db, claims: IdClaims): UserRow {
   return matches[0]!;
 }
 
-/** The invite is still open: no password was ever chosen and the account is not an email-link account yet. */
-const invitePending = (u: UserRow) => u.signInMethod === 'password' && u.passwordHash === '';
 
 export async function completeSsoSignIn(deps: AppDeps, cookie: string | undefined, input: { state: string; code: string }) {
   const issuer = issuerOf(deps.config);
@@ -289,7 +287,7 @@ export async function completeSsoSignIn(deps: AppDeps, cookie: string | undefine
     // An open invite counts as used, as with Google, but only for an account that may be without a password
     // (a teacher, or anyone while passwords are off). An invited administrator while passwords are on is
     // signed in and keeps the invite: opening it is still how that account chooses its password (D-108).
-    if (invitePending(user) && passwordlessAllowed(deps.db, user)) {
+    if (passwordNotSet(user) && passwordlessAllowed(deps.db, user)) {
       patch.signInMethod = 'email_link';
       patch.mustChangePassword = false;
       deps.db

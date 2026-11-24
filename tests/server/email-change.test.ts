@@ -318,21 +318,93 @@ describe('changing the own email address (S35, D-214)', () => {
   it('anonymous sign-in requests for the address neither block, cancel nor lock a change', async () => {
     const { s, mailer } = await school();
     await passwordsOff(s, mailer);
-    const fresh = await emailSignIn(mailer, 'ayse@school.example');
     const stranger = new Client(env);
     stranger.ip = '203.0.113.7';
-    // Before the start: the public limit of three sign-in emails is used up by someone else.
+    const lockRow = () => env.db.$client.prepare('select failures f, locked_until l from auth_attempts where key = ?').get(`emailcode:user:${s.ayse.id}`) as { f: number; l: number | null } | undefined;
+
+    // Block: someone else uses up the public limit of sign-in emails; the change still sends its code.
+    let fresh = await emailSignIn(mailer, 'ayse@school.example');
     for (let i = 0; i < 3; i++) await ok(stranger.post('/api/auth/email-link/request', { email: 'ayse@school.example' }));
+    expect(count("select count(*) n from one_time_tokens where kind = 'email_signin' and user_id = ? and created_at > ?", s.ayse.id, env.clock.now() - 15 * 60_000)).toBe(3);
+    await ok(fresh.post(START, { email: 'ayse.new@school.example' }));
+    expect(mailer.sent.at(-1)!.to).toBe('ayse.new@school.example');
+
+    // After the 15 minutes the public limit is free again.
+    env.clock.advance(16 * 60_000);
+    fresh = await emailSignIn(mailer, 'ayse@school.example');
     await ok(fresh.post(START, { email: 'ayse.new@school.example' }));
     const code = codeFrom(mailer.sent.at(-1)!.text);
-    expect(mailer.sent.at(-1)!.to).toBe('ayse.new@school.example');
-    // Between start and confirm: more requests (which would void older codes) and ten wrong public codes (which lock the public code path).
-    const asked = [];
-    for (let i = 0; i < 3; i++) asked.push((await ok(stranger.post('/api/auth/email-link/request', { email: 'ayse@school.example' }))).requestId);
-    for (let i = 0; i < 10; i++) await stranger.post('/api/auth/email-link/code', { requestId: asked[0], code: otherCode(code) });
-    expect(codeRows(s.ayse.id, 'email_change')).toEqual([{ u: null, a: 0 }]);
+
+    // Cancel: two public requests that really issue a row each (and so stop older public codes) ...
+    // Lock: ... and five wrong codes on each, ten in all: the public code path locks for the account.
+    for (let round = 0; round < 2; round++) {
+      const sent = mailer.sent.length;
+      const { requestId } = await ok(stranger.post('/api/auth/email-link/request', { email: 'ayse@school.example' }));
+      expect(mailer.sent).toHaveLength(sent + 1);
+      expect(mailer.sent.at(-1)!.to).toBe('ayse@school.example');
+      const publicCode = codeFrom(mailer.sent.at(-1)!.text);
+      for (let i = 0; i < 5; i++) expect(reason(await stranger.post('/api/auth/email-link/code', { requestId, code: otherCode(publicCode) }))).toBe('SIGNIN_CODE_INVALID');
+    }
+    expect(lockRow()).toMatchObject({ f: 10 });
+    expect(lockRow()!.l).toBeGreaterThan(env.clock.now());
+    // The change code was neither stopped nor tried, and the person can still use it.
+    expect(codeRows(s.ayse.id, 'email_change').at(-1)).toEqual({ u: null, a: 0 });
+    expect((await ok(fresh.get(OWN))).pendingTo).toBe('a***@school.example');
     await ok(fresh.post(CONFIRM, { code }));
     expect(await ownEmail(fresh)).toBe('ayse.new@school.example');
+  });
+
+  it('a successful method or policy code clears its own wrong-code count', async () => {
+    const { s, mailer } = await school();
+    const key = (kind: string, id: string) => count('select count(*) n from auth_attempts where key = ?', `emailcode:${kind}:user:${id}`);
+    await ok(s.teacherB.post('/api/auth/sign-in-method/email-link/start', { currentPassword: PASSWORD }));
+    const methodCode = codeFrom(mailer.sent.at(-1)!.text);
+    expect(reason(await s.teacherB.post('/api/auth/sign-in-method/email-link/confirm', { code: otherCode(methodCode) }))).toBe('SIGNIN_CODE_INVALID');
+    expect(key('email_method', s.mehmet.id)).toBe(1);
+    await ok(s.teacherB.post('/api/auth/sign-in-method/email-link/confirm', { code: methodCode }));
+    expect(key('email_method', s.mehmet.id)).toBe(0);
+
+    await ok(s.admin.post('/api/admin/sign-in-policy/code'));
+    const policyCode = codeFrom(mailer.sent.at(-1)!.text);
+    expect(reason(await s.admin.put('/api/admin/sign-in-policy', { passwordsOff: true, code: otherCode(policyCode) }))).toBe('SIGNIN_CODE_INVALID');
+    expect(key('email_policy', s.adminUser.id)).toBe(1);
+    await ok(s.admin.put('/api/admin/sign-in-policy', { passwordsOff: true, code: policyCode }));
+    expect(key('email_policy', s.adminUser.id)).toBe(0);
+  });
+
+  it('cancel ends the pending code of this browser and clears its cookie; a reload offers nothing', async () => {
+    const { s, mailer } = await school();
+    const code = await start(s.teacherA, mailer, 'ayse.new@school.example');
+    const cookie = s.teacherA.cookies.get(EMAIL_CHANGE_COOKIE)!;
+    expect((await ok(s.teacherA.get(OWN))).pendingTo).toBe('a***@school.example');
+    const r = await s.teacherA.post('/api/auth/email/cancel');
+    expect(r.status).toBe(200);
+    expect(String(r.headers['set-cookie'])).toMatch(new RegExp(`${EMAIL_CHANGE_COOKIE}=;`, 'u'));
+    expect(codeRows(s.ayse.id, 'email_change').at(-1)!.u).not.toBeNull();
+    // Even with the old cookie put back, the code is dead and nothing is offered.
+    s.teacherA.cookies.set(EMAIL_CHANGE_COOKIE, cookie);
+    expect((await ok(s.teacherA.get(OWN))).pendingTo).toBeNull();
+    expect(reason(await s.teacherA.post(CONFIRM, { code }))).toBe('SIGNIN_CODE_INVALID');
+    expect(row(s.ayse.id).email).toBe('ayse@school.example');
+    // Without a pending change it is harmless, and it needs the PIN gate like the rest (account access).
+    await ok(s.teacherA.post('/api/auth/email/cancel'));
+    expect((await new Client(env).post('/api/auth/email/cancel')).status).toBe(401);
+  });
+
+  it('no pending change is offered once the change path is locked for the account', async () => {
+    const { s, mailer } = await school();
+    // Two codes with five wrong tries each: ten failures lock address-change codes for the account.
+    for (let i = 0; i < 2; i++) {
+      const c = await start(s.teacherA, mailer, 'ayse.new@school.example');
+      for (let j = 0; j < 5; j++) await s.teacherA.post(CONFIRM, { code: otherCode(c) });
+    }
+    const code = await start(s.teacherA, mailer, 'ayse.new@school.example');
+    expect(codeRows(s.ayse.id, 'email_change').at(-1)).toEqual({ u: null, a: 0 });
+    expect((await ok(s.teacherA.get(OWN))).pendingTo).toBeNull();
+    s.teacherA.ip = '203.0.113.9'; // past the route's own limit of ten confirms per address
+    expect(reason(await s.teacherA.post(CONFIRM, { code }))).toBe('SIGNIN_CODE_INVALID');
+    // The public sign-in path is not locked by this.
+    expect(count('select count(*) n from auth_attempts where key = ?', `emailcode:user:${s.ayse.id}`)).toBe(0);
   });
 
   it('an administrator’s address edit, a deactivation and a password reset between start and confirm each end the pending code', async () => {

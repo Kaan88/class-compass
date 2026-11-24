@@ -54,11 +54,12 @@ export function EmailChangeSection({ me, emailEnabled }: { me: Me; emailEnabled:
             try {
               const fresh = await call(Auth.confirmEmailChange, { code });
               qc.setQueryData(ME_KEY, fresh);
-              setChanged(address.trim().toLowerCase() || waitingFor);
+              // The real new address from the server (after a reload this browser knows only the masked one).
+              const now = await qc.fetchQuery({ queryKey: OWN_EMAIL, queryFn: () => call(Auth.ownEmail, {}), staleTime: 0 });
+              setChanged(now.email);
               setSentTo(null);
               setCode('');
               setAddress('');
-              await qc.invalidateQueries({ queryKey: OWN_EMAIL });
               await freshMe(qc);
             } catch (err) {
               setError(errorText(t, err));
@@ -74,12 +75,17 @@ export function EmailChangeSection({ me, emailEnabled }: { me: Me; emailEnabled:
             </Button>
             <Button
               variant="ghost"
-              onPress={() => {
-                setSentTo(null);
-                setCode('');
+              onPress={async () => {
                 setError(null);
-                // The pending code stays valid on the server until it expires; this browser stops offering it.
-                qc.setQueryData(OWN_EMAIL, { ...own.data, pendingTo: null });
+                try {
+                  // The pending code stops working on the server too, so a reload does not bring it back.
+                  await call(Auth.cancelEmailChange, {});
+                  setSentTo(null);
+                  setCode('');
+                  qc.setQueryData(OWN_EMAIL, { ...own.data, pendingTo: null });
+                } catch (err) {
+                  setError(errorText(t, err));
+                }
               }}
             >
               {t('common.cancel')}
