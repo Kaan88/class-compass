@@ -20,7 +20,7 @@ import { MetricCell } from '../../ui/Students.tsx';
 import { classLabel } from './labels.ts';
 import { ThemeIllustration } from '../../ui/Mascot.tsx';
 import { playEvent } from '../../themes/index.tsx';
-import { awaitCommand, awaitOrQueued, sendLessonCommand } from './lessonClient.ts';
+import { awaitCommand, awaitOrQueued, sendKeepAlive, sendLessonCommand } from './lessonClient.ts';
 import { exitLessonFullscreen, useLessonPrefs } from './fullscreen.tsx';
 import { endStepUis, type ClassroomContext } from '../registry.ts';
 import type { ReflectionValue } from './ReflectionStep.tsx';
@@ -98,7 +98,8 @@ export function EndLessonFlow({
   const prefs = useLessonPrefs();
   useEffect(() => {
     if (!live) return;
-    const ping = () => void sendLessonCommand('lesson.stillTeaching', { contextId: context.id, lessonId: lesson.id });
+    // Best effort, never queued (`sendKeepAlive`): offline the open flow simply does not ping.
+    const ping = () => void sendKeepAlive({ contextId: context.id, lessonId: lesson.id });
     let idle = false;
     onInput.current = () => {
       lastInput.current = Date.now();

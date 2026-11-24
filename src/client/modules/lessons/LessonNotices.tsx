@@ -19,7 +19,7 @@ import { Link } from '@tanstack/react-router';
 import * as L from '../../../shared/contracts/lessons.ts';
 import { formatDate } from '../../../shared/i18n/index.ts';
 import { call } from '../../lib/api.ts';
-import { getOutbox } from '../../lib/outbox-client.ts';
+import { getOutbox, useOutboxStatus } from '../../lib/outbox-client.ts';
 import { useI18n } from '../../lib/i18n.tsx';
 import { useRun } from '../../lib/useRun.ts';
 import { Button, buttonClass } from '../../ui/Button.tsx';
@@ -36,6 +36,8 @@ export function LessonNotices({ fillIn, onCloseFillIn = () => undefined }: { fil
   const { t, locale } = useI18n();
   const run = useRun();
   const qc = useQueryClient();
+  // Offline "Still teaching" is disabled: it is never queued to be replayed later (S37, D-218).
+  const { online } = useOutboxStatus();
   // A background poll (never keeps an unlock alive): the reminder appears while the page stays open.
   const q = useQuery({ queryKey: LESSON_NOTICES_KEY, queryFn: () => call(L.lessonNotices, {}), refetchInterval: 60_000 });
   const data = q.data;
@@ -67,6 +69,7 @@ export function LessonNotices({ fillIn, onCloseFillIn = () => undefined }: { fil
                 {t('lessonNotice.endNow')}
               </Link>
               <Button
+                isDisabled={!online}
                 onPress={() => {
                   void getOutbox().enqueue('lesson.stillTeaching', { contextId: n.contextId, lessonId: n.lessonId }, { contextId: n.contextId, lessonId: n.lessonId });
                   qc.setQueryData<L.LessonNotices>(LESSON_NOTICES_KEY, (d) => (d ? { ...d, running: d.running.filter((x) => x.lessonId !== n.lessonId) } : d));

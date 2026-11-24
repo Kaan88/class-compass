@@ -9,7 +9,9 @@
  */
 import { useQuery, type QueryKey } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import { v7 as uuidv7 } from 'uuid';
 import type { z } from 'zod';
+import { submitCommands } from '../../../shared/contracts/commands.ts';
 import * as L from '../../../shared/contracts/lessons.ts';
 import type { LessonCommandPayload, LessonCommandType, LessonState } from '../../../shared/contracts/lessons.ts';
 import { call, callConditional } from '../../lib/api.ts';
@@ -153,6 +155,23 @@ export async function sendLessonCommand<T extends LessonCommandType>(type: T, pa
   const queued = getOutbox().enqueue(type, payload, { contextId: p.contextId, lessonId: p.lessonId });
   await queryClient.cancelQueries({ queryKey: lessonKey(p.contextId) });
   return queued;
+}
+
+/**
+ * The keep-alive of an open End Lesson (S37, D-218): "Still teaching" as a best-effort signal, not a
+ * classroom change worth keeping. Sent only while online, straight to the command endpoint (the same
+ * command and server checks, never the outbox), and dropped silently on any failure (offline, network
+ * error, refusal): it is never queued, counted as waiting, shown in Needs attention or replayed after
+ * the lesson's end was queued. Resolves true when the server accepted it.
+ */
+export async function sendKeepAlive(p: { contextId: string; lessonId: string }): Promise<boolean> {
+  if (!getOutbox().getStatus().online) return false;
+  try {
+    const r = await call(submitCommands, { commands: [{ opId: uuidv7(), type: 'lesson.stillTeaching', payload: p, contextId: p.contextId, lessonId: p.lessonId, clientTime: Date.now() }] });
+    return r.results[0]?.ok === true;
+  } catch {
+    return false;
+  }
 }
 
 /** Resolves with the server's result for `opId` once it was accepted; rejects if it was refused. */

@@ -29,6 +29,8 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 }));
 const calls: Array<{ path: string; input: unknown }> = [];
 const queued: Array<{ type: string; payload: unknown; meta?: unknown }> = [];
+/** The mocked outbox's status (online or not) and how the command endpoint answers a direct send. */
+const box = { status: { pending: 0, sending: false, online: true, authPaused: false, rejected: [], otherAccounts: 0, lastSavedAt: null, retryAt: null, failures: 0 }, direct: 'ok' as 'ok' | 'refused' | 'network' };
 vi.mock('../../src/client/lib/outbox-client.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/client/lib/outbox-client.ts')>()),
   getOutbox: () => ({
@@ -36,7 +38,11 @@ vi.mock('../../src/client/lib/outbox-client.ts', async (importOriginal) => ({
       queued.push({ type, payload, meta });
       return Promise.resolve(`op-${queued.length}`);
     },
+    getStatus: () => box.status,
+    subscribe: () => () => {},
+    onSuccess: () => () => {},
   }),
+  useOutboxStatus: () => box.status,
 }));
 vi.mock('../../src/client/lib/api.ts', async (importOriginal) => {
   const api = await importOriginal<typeof import('../../src/client/lib/api.ts')>();
@@ -45,6 +51,10 @@ vi.mock('../../src/client/lib/api.ts', async (importOriginal) => {
     call: (ep: { path: string }, input: unknown) => {
       calls.push({ path: ep.path, input });
       // Only reached when a test has not put the fill-in data in the cache: the window is closed.
+      if (ep.path === '/api/commands') {
+        if (box.direct === 'network') return Promise.reject(new TypeError('Failed to fetch'));
+        return Promise.resolve({ results: [{ opId: 'x', ok: box.direct === 'ok', replayed: false, ...(box.direct === 'refused' ? { error: { code: 'CONFLICT', message: 'ended', reason: 'LESSON_ENDED' } } : {}) }] });
+      }
       if (ep.path.endsWith('/fill-in')) return Promise.reject(new api.ApiError(409, 'CONFLICT', 'closed', { reason: 'LESSON_FILL_IN_CLOSED' }));
       return Promise.resolve({ ok: true });
     },
@@ -74,11 +84,15 @@ const wrap = (locale: 'en' | 'tr', node: ReactNode) =>
       <I18nProvider locale={locale}>{node}</I18nProvider>
     </QueryClientProvider>,
   );
+/** Keep-alives sent directly to the command endpoint (never queued). */
+const pings = () => calls.filter((c) => c.path === '/api/commands').length;
 const fill = (s: string, vars: Record<string, string>) => s.replace(/\{(\w+)\}/gu, (_, k: string) => vars[k] ?? '');
 
 beforeEach(() => {
   calls.length = 0;
   queued.length = 0;
+  box.status = { ...box.status, online: true, pending: 0 };
+  box.direct = 'ok';
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity, refetchInterval: false, refetchOnMount: false } });
 });
 afterEach(() => {
@@ -188,9 +202,10 @@ describe('the board and End Lesson keep a lesson in use alive (S37, D-218)', () 
     try {
       const props = { context: ctx3a, lesson: live, draft: null, onDraft: () => {}, onCancel: () => {}, onEnded: () => {}, onQueued: () => {} };
       const view = wrap('en', <EndLessonFlow {...props} live />);
-      expect(queued.map((q) => q.type)).toEqual(['lesson.stillTeaching']);
+      expect(pings()).toBe(1);
+      expect(queued).toEqual([]);
       act(() => vi.advanceTimersByTime(END_LESSON_KEEPALIVE_MS));
-      expect(queued).toHaveLength(2);
+      expect(pings()).toBe(2);
       expect(screen.queryByTestId('end-lesson-ended-underneath')).toBeNull();
       // The lesson ended underneath: the flow stays (with Save), a note says so, no more pings.
       view.rerender(
@@ -203,7 +218,7 @@ describe('the board and End Lesson keep a lesson in use alive (S37, D-218)', () 
       expect(screen.getByTestId('end-lesson-ended-underneath').textContent).toBe(en['lesson.endedUnderneath']);
       expect(screen.getByRole('button', { name: en['lesson.saveAndEnd'] })).toBeTruthy();
       act(() => vi.advanceTimersByTime(3 * END_LESSON_KEEPALIVE_MS));
-      expect(queued).toHaveLength(2);
+      expect(pings()).toBe(2);
     } finally {
       vi.useRealTimers();
     }
@@ -215,20 +230,63 @@ describe('the board and End Lesson keep a lesson in use alive (S37, D-218)', () 
       wrap('en', <EndLessonFlow context={ctx3a} lesson={live} live draft={null} onDraft={() => {}} onCancel={() => {}} onEnded={() => {}} onQueued={() => {}} />);
       expect(END_LESSON_IDLE_MS).toBe(3 * END_LESSON_KEEPALIVE_MS);
       act(() => vi.advanceTimersByTime(2 * END_LESSON_KEEPALIVE_MS));
-      expect(queued).toHaveLength(3); // on opening, at 10 and at 20 minutes
+      expect(pings()).toBe(3); // on opening, at 10 and at 20 minutes
       act(() => vi.advanceTimersByTime(3 * END_LESSON_KEEPALIVE_MS));
-      expect(queued).toHaveLength(3); // idle since the opening: no ping at 30, 40, 50
+      expect(pings()).toBe(3); // idle since the opening: no ping at 30, 40, 50
       fireEvent.pointerDown(screen.getByRole('heading', { level: 2 }));
-      expect(queued).toHaveLength(4); // input: at once
+      expect(pings()).toBe(4); // input: at once
       act(() => vi.advanceTimersByTime(END_LESSON_KEEPALIVE_MS));
-      expect(queued).toHaveLength(5);
+      expect(pings()).toBe(5);
       fireEvent.keyDown(screen.getByTestId('end-lesson'), { key: 'Tab' });
       act(() => vi.advanceTimersByTime(2 * END_LESSON_KEEPALIVE_MS));
-      expect(queued).toHaveLength(7); // a key also counts
-      expect(queued.every((q) => q.type === 'lesson.stillTeaching')).toBe(true);
+      expect(pings()).toBe(7); // a key also counts
+      expect(queued).toEqual([]); // never through the outbox
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('an End Lesson opened offline queues nothing but its own end (the keep-alive is never queued)', async () => {
+    box.status = { ...box.status, online: false };
+    wrap('en', <EndLessonFlow context={ctx3a} lesson={live} live draft={null} onDraft={() => {}} onCancel={() => {}} onEnded={() => {}} onQueued={() => {}} />);
+    expect(pings()).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: en['lesson.saveAndEnd'] }));
+    await waitFor(() => expect(queued.map((q) => q.type)).toEqual(['lesson.end']));
+    expect(pings()).toBe(0);
+  });
+
+  it('online, opening End Lesson sends one keep-alive straight to the server, not through the outbox', async () => {
+    wrap('en', <EndLessonFlow context={ctx3a} lesson={live} live draft={null} onDraft={() => {}} onCancel={() => {}} onEnded={() => {}} onQueued={() => {}} />);
+    expect(calls.filter((c) => c.path === '/api/commands')).toEqual([{ path: '/api/commands', input: { commands: [expect.objectContaining({ type: 'lesson.stillTeaching', payload: { contextId: 'ctx-3a', lessonId: 'lesson-run' }, contextId: 'ctx-3a', lessonId: 'lesson-run' })] } }]);
+    expect(queued).toEqual([]);
+  });
+
+  for (const failure of ['network', 'refused'] as const) {
+    it(`a failing keep-alive (${failure}) leaves no outbox entry and nothing on screen`, async () => {
+      box.direct = failure;
+      wrap('en', <EndLessonFlow context={ctx3a} lesson={live} live draft={null} onDraft={() => {}} onCancel={() => {}} onEnded={() => {}} onQueued={() => {}} />);
+      expect(pings()).toBe(1);
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(queued).toEqual([]);
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+  }
+
+  it('offline the Still teaching buttons are disabled: nothing is queued to be replayed later', () => {
+    box.status = { ...box.status, online: false };
+    queryClient.setQueryData(LESSON_NOTICES_KEY, notices);
+    wrap('en', <LessonNotices />);
+    const home = screen.getByRole('button', { name: en['lessonNotice.stillTeaching'] });
+    expect(home.hasAttribute('disabled') || home.getAttribute('aria-disabled') === 'true').toBe(true);
+    fireEvent.click(home);
+    cleanup();
+    wrap('en', <OverdueNote lesson={live} timezone={tz} />);
+    const board = screen.getByRole('button', { name: en['lessonNotice.stillTeaching'] });
+    expect(board.hasAttribute('disabled') || board.getAttribute('aria-disabled') === 'true').toBe(true);
+    fireEvent.click(board);
+    expect(queued).toEqual([]);
   });
 
   it('a late End Lesson summary names the steps it could not save', () => {
