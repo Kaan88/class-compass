@@ -248,7 +248,10 @@ const UNTRUSTED = /"untrustedText"\s*:/u;
 
 function cap(text: string): string {
   if (text.length <= ASSISTANT_RESULT_MAX) return text;
-  return `${text.slice(0, ASSISTANT_RESULT_MAX - 400)}\n[truncated: the result was ${Math.round(text.length / 1024)} KB. Ask for a shorter period, one student, or fewer report sections.]`;
+  // Never cut inside an emoji: half a surrogate pair makes a provider refuse the whole request.
+  const end = ASSISTANT_RESULT_MAX - 400;
+  const cut = /[\uD800-\uDBFF]/.test(text[end - 1] ?? '') ? end - 1 : end;
+  return `${text.slice(0, cut)}\n[truncated: the result was ${Math.round(text.length / 1024)} KB. Ask for a shorter period, one student, or fewer report sections.]`;
 }
 
 const errorContent = (code: string, message: string, extra: Record<string, unknown> = {}) => JSON.stringify({ error: { code, message, ...extra } });

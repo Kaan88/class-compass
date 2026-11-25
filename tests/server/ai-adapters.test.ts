@@ -95,6 +95,47 @@ describe('Anthropic Messages adapter', () => {
   });
 });
 
+describe('Anthropic: a refused request (production incident 2026-11-25, HTTP 400 after a tool round)', () => {
+  it('logs the error type, a kind and the field path, never the provider’s sentence', async () => {
+    fake.override = (_r, res) => {
+      fake.override = null;
+      res.writeHead(400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'messages.3.content.0.text: text content blocks must contain non-whitespace text about Elif Kaya' } }));
+      return true;
+    };
+    const err = (await run(anthropicAdapter, target(FAKE_KEYS.anthropic)).catch((e: unknown) => e)) as AiCallError;
+    expect(err).toMatchObject({ failure: 'PROVIDER_ERROR', httpStatus: 400, providerHint: 'invalid_request_error BLANK_TEXT messages.3.content.0.text' });
+    expect(`${err.message} ${err.providerHint}`).not.toContain('Elif');
+    // A body that is not the expected shape, and another status: the status alone.
+    fake.override = (_r, res) => {
+      fake.override = null;
+      res.writeHead(400, { 'content-type': 'text/plain' });
+      res.end('not json');
+      return true;
+    };
+    expect(((await run(anthropicAdapter, target(FAKE_KEYS.anthropic)).catch((e: unknown) => e)) as AiCallError).providerHint).toBeNull();
+    fake.override = (_r, res) => {
+      fake.override = null;
+      res.writeHead(400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: { type: 'invalid_request_error', message: 'prompt is too long: 250000 tokens > 200000 maximum' } }));
+      return true;
+    };
+    expect(((await run(anthropicAdapter, target(FAKE_KEYS.anthropic)).catch((e: unknown) => e)) as AiCallError).providerHint).toBe('invalid_request_error PROMPT_TOO_LONG');
+  });
+
+  it('never sends a text block of white space only, or half an emoji', () => {
+    const turns = anthropicMessages([
+      { role: 'user', content: 'Check my theme' },
+      { role: 'assistant', content: '\n\n', toolCalls: [{ id: 'toolu_1', name: 'validate_theme', arguments: { file: 'a' } }] },
+      { role: 'tool', toolCallId: 'toolu_1', name: 'validate_theme', content: `ok \uD83C` },
+    ]);
+    expect(turns[1]!.content).toEqual([{ type: 'tool_use', id: 'toolu_1', name: 'validate_theme', input: { file: 'a' } }]);
+    expect((turns[2]!.content[0] as { content: string }).content).toBe('ok �');
+    // A whole emoji is left alone.
+    expect((anthropicMessages([{ role: 'user', content: 'star 🌟' }])[0]!.content[0] as { text: string }).text).toBe('star 🌟');
+  });
+});
+
 describe('OpenAI Chat Completions adapter (OpenAI, OpenRouter, compatible servers)', () => {
   it('streams text and usage with a bearer key', async () => {
     const es = await run(openAiAdapter, { ...target(FAKE_KEYS.openai), maxTokensField: 'max_completion_tokens' });

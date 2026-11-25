@@ -8,7 +8,7 @@
 'use strict';
 (() => {
   const M = window.CCMock;
-  const { L, A, esc, icon, avatar, sticker, starGlyph, pathBar, progressWords, mascot, jarSvg, jarSegs, REASONS, TARGETS, JAR, EVERYONE } = M;
+  const { L, A, esc, icon, avatar, sticker, pathBar, progressWords, mascot, jarSvg, jarSegs, REASONS, TARGETS, JAR, EVERYONE } = M;
   const S = () => M.state();
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 

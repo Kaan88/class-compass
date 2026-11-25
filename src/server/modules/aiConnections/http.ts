@@ -108,6 +108,12 @@ export class AiCallError extends Error {
   /** The stream's counters when it failed while streaming (set by the adapter). */
   stats: StreamStats | null = null;
   /**
+   * What the provider said was wrong with the request, as codes only (set by the adapter from a refused
+   * request's error body): the provider's error type, a kind from a fixed list and the field path it
+   * names. Never the provider's sentence, which can quote what was sent.
+   */
+  providerHint: string | null = null;
+  /**
    * Whether the request may have reached the provider: false when it failed before a connection was
    * made (refused address, unreachable host, stopped before sending) or before any provider request
    * (no key, a token that could not be refreshed). Token counting uses it: nothing sent counts nothing.

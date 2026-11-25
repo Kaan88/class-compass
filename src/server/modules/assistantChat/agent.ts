@@ -91,13 +91,15 @@ export function usageOrEstimate(seen: Usage | null, sent: { system: string; mess
 /**
  * The server log line of a failed provider call (D-203): non-personal facts only (the failure, its
  * detail and HTTP status, the round, the connection type and model name, the time and the stream's
- * counters). Never message text, tool arguments, provider bodies, the system prompt, names or the key.
+ * counters). Never message text, tool arguments, provider bodies, the system prompt, names or the key
+ * (`providerHint` is codes and a field path taken from a refused request's error, never its sentence).
  */
 export function providerFailureLog(e: AiCallError, facts: { round: number; connectionType: string; model: string; elapsedMs: number; retry: 'halve' | 'again' | null }) {
   const st = e.stats;
   return {
     failure: e.failure,
     detail: e.detail,
+    providerHint: e.providerHint,
     httpStatus: e.httpStatus,
     round: facts.round,
     connectionType: facts.connectionType,

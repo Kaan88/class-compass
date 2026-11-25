@@ -230,7 +230,7 @@
       return `${head(b)}<ul class="albumM">${all.slice(0, 5).map((o) => `<li>${sticker(o.t, 64)}<b>${esc(o.k.name)}</b><span>${L(o.t.en, o.t.tr)}</span><span class="muted">${L(o.dEn, o.dTr)}</span></li>`).join('')}</ul><p class="albumM__st">${icon('calendar')}${L('Next show and tell: <b>Asya</b>, Friday', 'Sıradaki göster ve anlat: <b>Asya</b>, Cuma')}</p>`;
     }
     const cells = S.kids.map((k) => {
-      const slots = TARGETS.map((t, i) => {
+      const slots = TARGETS.map((t) => {
         const r = k.stars >= t.n;
         const isNext = nextT(k.stars) === t;
         const frac = isNext ? (k.stars - prevN(k.stars)) / (t.n - prevN(k.stars)) : null;
@@ -692,7 +692,7 @@
     if (t.getAttribute('aria-disabled') === 'true') return;
     if (act === 'dock-open') { ui.dock = true; ui.msg = null; }
     else if (act === 'dock-close') { ui.dock = false; ui.sel = new Set(); }
-    else if (act === 'pick') { const id = t.dataset.kid; ui.sel.has(id) ? ui.sel.delete(id) : ui.sel.add(id); }
+    else if (act === 'pick') { const id = t.dataset.kid; if (ui.sel.has(id)) ui.sel.delete(id); else ui.sel.add(id); }
     else if (act === 'everyone') ui.sel = ui.sel.size === S.kids.length ? new Set() : new Set(S.kids.map((k) => k.id));
     else if (act === 'reason') return give(b, [...ui.sel], +t.dataset.r);
     else if (act === 'tile') { ui.sheet = [t.dataset.kid]; ui.msg = null; }

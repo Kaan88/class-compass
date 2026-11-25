@@ -4,7 +4,7 @@
  * `input_schema`); tool results go back as `tool_result` blocks in a user turn (consecutive turns of
  * the same role are merged, as the API requires alternating roles).
  */
-import { AiCallError, aiRequest, assertKept, countBytes, finishWord, newStreamStats, sseEvents, statusError, withStats } from '../http.ts';
+import { AiCallError, aiRequest, assertKept, countBytes, finishWord, newStreamStats, readText, sseEvents, statusError, withStats, type AiHttpResponse } from '../http.ts';
 import { toolCall, type Adapter, type ChatMessage, type StopReason, type ToolDefinition } from './types.ts';
 
 export const ANTHROPIC_VERSION = '2023-06-01';
@@ -13,6 +13,46 @@ type Block = Record<string, unknown>;
 interface Turn {
   role: 'user' | 'assistant';
   content: Block[];
+}
+
+/** Half of a surrogate pair on its own (text cut in the middle of an emoji): Anthropic refuses the whole request. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+const wellFormed = (s: string) => s.replace(LONE_SURROGATE, '�');
+
+/** The kinds of refused request told apart in the server log (`anthropicFailure`). */
+const REFUSAL_KINDS: Array<[RegExp, string]> = [
+  [/prompt is too long|exceed.*context|too many tokens/iu, 'PROMPT_TOO_LONG'],
+  [/non-whitespace|must be non-empty|cannot be empty/iu, 'BLANK_TEXT'],
+  [/max_tokens/iu, 'MAX_TOKENS'],
+  [/tool_use|tool_result/iu, 'TOOL_PAIRING'],
+  [/surrogate|unicode|utf-?8/iu, 'BAD_UNICODE'],
+  [/credit balance|billing/iu, 'BILLING'],
+  [/input_schema|json schema/iu, 'TOOL_SCHEMA'],
+  [/roles must alternate|first message/iu, 'TURN_ORDER'],
+];
+
+/**
+ * The error of a refused request. A 400, 413 or 422 body (small, capped) is read for the server log
+ * only, and only as codes: the error type, a kind from `REFUSAL_KINDS` and the field path the message
+ * starts with (`messages.3.content.0.text`). The provider's sentence is never kept or passed on.
+ */
+export async function anthropicFailure(res: AiHttpResponse): Promise<AiCallError> {
+  const err = statusError(res.status);
+  if (res.status !== 400 && res.status !== 413 && res.status !== 422) {
+    res.cancel();
+    return err;
+  }
+  try {
+    const d: any = JSON.parse(await readText(res, 16 * 1024));
+    const type = typeof d?.error?.type === 'string' && /^[a-z_]{1,40}$/u.test(d.error.type) ? d.error.type : 'unknown';
+    const message = typeof d?.error?.message === 'string' ? d.error.message : '';
+    const kind = REFUSAL_KINDS.find(([re]) => re.test(message))?.[1] ?? 'OTHER';
+    const path = /^(?:messages|tools|system|model|max_tokens|tool_choice)(?:\.[a-z_0-9]{1,40}){0,8}/u.exec(message)?.[0];
+    err.providerHint = [type, kind, path].filter(Boolean).join(' ');
+  } catch {
+    /* an unreadable body: the status alone is logged */
+  }
+  return err;
 }
 
 export function anthropicMessages(messages: ChatMessage[]): Turn[] {
@@ -24,13 +64,14 @@ export function anthropicMessages(messages: ChatMessage[]): Turn[] {
     else out.push({ role, content: blocks });
   };
   for (const m of messages) {
-    if (m.role === 'user') push('user', [{ type: 'text', text: m.content }]);
+    if (m.role === 'user') push('user', [{ type: 'text', text: wellFormed(m.content) }]);
     else if (m.role === 'assistant')
       push('assistant', [
-        ...(m.content ? [{ type: 'text', text: m.content }] : []),
+        // A text block of white space only (a line break written before a tool call) is refused with HTTP 400.
+        ...(m.content.trim() ? [{ type: 'text', text: wellFormed(m.content) }] : []),
         ...(m.toolCalls ?? []).map((c) => ({ type: 'tool_use', id: c.id, name: c.name, input: c.arguments })),
       ]);
-    else push('user', [{ type: 'tool_result', tool_use_id: m.toolCallId, content: m.content, ...(m.isError ? { is_error: true } : {}) }]);
+    else push('user', [{ type: 'tool_result', tool_use_id: m.toolCallId, content: wellFormed(m.content), ...(m.isError ? { is_error: true } : {}) }]);
   }
   return out;
 }
@@ -59,10 +100,7 @@ export const anthropicAdapter: Adapter = async function* (req) {
     chat: true,
     totalTimeoutMs: req.timeoutMs,
   });
-  if (res.status < 200 || res.status >= 300) {
-    res.cancel();
-    throw statusError(res.status);
-  }
+  if (res.status < 200 || res.status >= 300) throw await anthropicFailure(res);
   const stats = newStreamStats();
   let argChars = 0;
   const blocks = new Map<number, { id: string; name: string; json: string }>();
