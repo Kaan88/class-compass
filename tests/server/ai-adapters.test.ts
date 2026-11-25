@@ -121,6 +121,18 @@ describe('Anthropic: a refused request (production incident 2026-11-25, HTTP 400
       return true;
     };
     expect(((await run(anthropicAdapter, target(FAKE_KEYS.anthropic)).catch((e: unknown) => e)) as AiCallError).providerHint).toBe('invalid_request_error PROMPT_TOO_LONG');
+    // A kind the list does not know: the validator's sentence, without anything it quotes, short.
+    fake.override = (_r, res) => {
+      fake.override = null;
+      res.writeHead(400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: { type: 'invalid_request_error', message: `messages: some new rule about "Elif Kaya" and \`secret\` was broken\n${'x'.repeat(500)}` } }));
+      return true;
+    };
+    const other = ((await run(anthropicAdapter, target(FAKE_KEYS.anthropic)).catch((e: unknown) => e)) as AiCallError).providerHint!;
+    expect(other.startsWith('invalid_request_error OTHER messages | messages: some new rule about <quoted> and <quoted> was broken')).toBe(true);
+    expect(other).not.toContain('Elif');
+    expect(other).not.toContain('secret');
+    expect(other.length).toBeLessThan(260);
   });
 
   it('never sends a text block of white space only, or half an emoji', () => {

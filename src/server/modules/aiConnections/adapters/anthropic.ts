@@ -18,6 +18,9 @@ interface Turn {
 /** Half of a surrogate pair on its own (text cut in the middle of an emoji): Anthropic refuses the whole request. */
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
 const wellFormed = (s: string) => s.replace(LONE_SURROGATE, '�');
+/** The same for every string inside a tool call's arguments (a theme package the model wrote can hold emoji). */
+const wellFormedDeep = (v: unknown): unknown =>
+  typeof v === 'string' ? wellFormed(v) : Array.isArray(v) ? v.map(wellFormedDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [wellFormed(k), wellFormedDeep(x)])) : v;
 
 /** The kinds of refused request told apart in the server log (`anthropicFailure`). */
 const REFUSAL_KINDS: Array<[RegExp, string]> = [
@@ -34,7 +37,8 @@ const REFUSAL_KINDS: Array<[RegExp, string]> = [
 /**
  * The error of a refused request. A 400, 413 or 422 body (small, capped) is read for the server log
  * only, and only as codes: the error type, a kind from `REFUSAL_KINDS` and the field path the message
- * starts with (`messages.3.content.0.text`). The provider's sentence is never kept or passed on.
+ * starts with (`messages.3.content.0.text`). The provider's sentence is never passed on to the person,
+ * and is kept for the log only when the kind is not known, with everything it quotes removed.
  */
 export async function anthropicFailure(res: AiHttpResponse): Promise<AiCallError> {
   const err = statusError(res.status);
@@ -48,7 +52,19 @@ export async function anthropicFailure(res: AiHttpResponse): Promise<AiCallError
     const message = typeof d?.error?.message === 'string' ? d.error.message : '';
     const kind = REFUSAL_KINDS.find(([re]) => re.test(message))?.[1] ?? 'OTHER';
     const path = /^(?:messages|tools|system|model|max_tokens|tool_choice)(?:\.[a-z_0-9]{1,40}){0,8}/u.exec(message)?.[0];
-    err.providerHint = [type, kind, path].filter(Boolean).join(' ');
+    // For a kind the list does not know, the validator's sentence itself is the only clue (production,
+    // 2026-11-25: "OTHER messages" explained nothing). It names fields and rules, not what was written;
+    // anything it quotes is cut out, the rest is reduced to plain characters and kept short.
+    const sentence =
+      kind === 'OTHER'
+        ? message
+            .replace(/"[^"]*"|'[^']*'|`[^`]*`/gu, '<quoted>')
+            .replace(/[^A-Za-z0-9 .,:;_()<>=/+-]/gu, ' ')
+            .replace(/\s+/gu, ' ')
+            .trim()
+            .slice(0, 200)
+        : '';
+    err.providerHint = [type, kind, path, sentence ? `| ${sentence}` : ''].filter(Boolean).join(' ');
   } catch {
     /* an unreadable body: the status alone is logged */
   }
@@ -69,7 +85,7 @@ export function anthropicMessages(messages: ChatMessage[]): Turn[] {
       push('assistant', [
         // A text block of white space only (a line break written before a tool call) is refused with HTTP 400.
         ...(m.content.trim() ? [{ type: 'text', text: wellFormed(m.content) }] : []),
-        ...(m.toolCalls ?? []).map((c) => ({ type: 'tool_use', id: c.id, name: c.name, input: c.arguments })),
+        ...(m.toolCalls ?? []).map((c) => ({ type: 'tool_use', id: c.id, name: c.name, input: wellFormedDeep(c.arguments) })),
       ]);
     else push('user', [{ type: 'tool_result', tool_use_id: m.toolCallId, content: wellFormed(m.content), ...(m.isError ? { is_error: true } : {}) }]);
   }
